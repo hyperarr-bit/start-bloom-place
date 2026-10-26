@@ -122,17 +122,32 @@ export function BarraVidroGlobal() {
   }, [dicaCandidata]);
   useEffect(() => {
     if (!dicaNaTela) return;
-    // o 1º toque em QUALQUER lugar encerra (no "+" = usada: o toque segue e abre a folha)
-    const aoTocar = (e: Event) => {
-      const alvo = e.target as Element | null;
-      const via = alvo?.closest?.('[data-testid="hn-mais"]') ? "usada" : "dispensada";
+    // o 1º toque em QUALQUER lugar encerra (no "+" = usada: o toque segue e abre a folha). O balão só SAI depois do
+    // clique (ou em 700 ms, se o toque virar rolagem): mexer na tela no meio do toque fazia o WebKit do iPhone engolir
+    // o clique do "+" (visto no Simulador, 26/10: a dica sumia e a folha não abria)
+    // (nada muda na tela nem no dado durante o toque: a marca, o evento e a saída vêm juntos no `sair`)
+    let via: "usada" | "dispensada" | null = null;
+    let tirar = 0;
+    let saiu = false;
+    const sair = () => {
+      window.clearTimeout(tirar);
+      if (saiu || !via) return;
+      saiu = true;
       const marca = encerrarDicaMais(via);
       set(CHAVE_DICA_MAIS, marca, { system: true });
       trackEvent("home_dica_mais", { acao: via });
       setDicaNaTela(false);
     };
+    const aoTocar = (e: Event) => {
+      if (via) return;
+      const alvo = e.target as Element | null;
+      via = alvo?.closest?.('[data-testid="hn-mais"]') ? "usada" : "dispensada";
+      tirar = window.setTimeout(sair, 700);
+    };
+    const aoClicar = () => { if (via) window.setTimeout(sair, 0); };
     document.addEventListener("pointerdown", aoTocar, true);
-    return () => document.removeEventListener("pointerdown", aoTocar, true);
+    document.addEventListener("click", aoClicar, true);
+    return () => { document.removeEventListener("pointerdown", aoTocar, true); document.removeEventListener("click", aoClicar, true); window.clearTimeout(tirar); };
   }, [dicaNaTela, set]);
 
   if (!visivel || !aba) return null;

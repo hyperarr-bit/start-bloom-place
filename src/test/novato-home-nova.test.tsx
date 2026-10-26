@@ -333,6 +333,19 @@ describe("missão com a Home nova: segue SEM o tour antigo", () => {
     expect(totalDePassos(lerMissao())).toBe(3);
     window.removeEventListener(EVENTO_MISSAO_COMPLETA, completou);
   });
+  it("braço B, conta NOVA: as boas-vindas não prometem 'Depois a gente arruma sua Home junto' (conta antiga: sim)", () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarB(); novas("antiga");
+    let t = montar(montarStore(dados()), "/home");
+    fireEvent.click(screen.getByTestId("missao-doses-vamos-la"));
+    expect(screen.getByTestId("missao-doses-depois")).toBeInTheDocument();
+    t.unmount(); localStorage.removeItem(CHAVE_ESTADO_MISSAO_DOSES);
+    registrarOrigem("u1", "nova");
+    t = montar(montarStore(dados()), "/home");
+    fireEvent.click(screen.getByTestId("missao-doses-vamos-la"));
+    expect(screen.getByTestId("missao-doses-comecar")).toBeInTheDocument();
+    expect(screen.queryByTestId("missao-doses-depois")).toBeNull();
+  });
   it("braço B, conta NOVA: a 3ª dose não fala de 'arrumar a Home' — 'Missão de hoje · 3 de 3' e 'Ver minha Home'", () => {
     vi.stubEnv("VITE_V14_LOJA", "1");
     ligarB(); novas("nova");
@@ -441,6 +454,10 @@ describe("a dica do '+' na barra de vidro (fechar e reabrir o app)", () => {
     expect(screen.getByTestId("hn-mais").parentElement?.contains(dica)).toBe(true); // ancorada no "+"
     expect(eventos).toContainEqual(["home_dica_mais", expect.objectContaining({ acao: "vista", aparicao: 1 })]);
     fireEvent.pointerDown(screen.getByTestId("hn-mais"));
+    // nada muda NO MEIO do toque (o WebKit do iPhone engolia o clique do "+"): a dica sai com o clique
+    expect(screen.getByTestId("hn-dica-mais")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("hn-mais"));
+    avancar(10);
     expect(screen.queryByTestId("hn-dica-mais")).toBeNull();
     expect(eventos).toContainEqual(["home_dica_mais", { acao: "usada" }]);
     expect(store.dados[CHAVE_DICA_MAIS]).toEqual(expect.objectContaining({ via: "usada" }));
@@ -459,7 +476,9 @@ describe("a dica do '+' na barra de vidro (fechar e reabrir o app)", () => {
     const store = montarStore({});
     abrirApp(store);
     avancar(ESPERA_DICA_MAIS_MS + 50);
-    fireEvent.pointerDown(document.body);
+    fireEvent.pointerDown(document.body); // virou rolagem (sem clique): sai sozinha em 700 ms
+    expect(screen.getByTestId("hn-dica-mais")).toBeInTheDocument();
+    avancar(720);
     expect(screen.queryByTestId("hn-dica-mais")).toBeNull();
     expect(eventos).toContainEqual(["home_dica_mais", { acao: "dispensada" }]);
   });

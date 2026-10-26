@@ -32,25 +32,28 @@ export const DicaDoMais = () => (
 
 const PADRAO: Record<AbaNova, string> = { inicio: "Início", conquistas: "Conquistas", voce: "Você" };
 
+const AbaVidro = ({ id, ativa, rotulo, onIr, children }: { id: AbaNova; ativa: AbaNova; rotulo: string; onIr: (aba: AbaNova) => void; children: ReactNode }) => {
+  const on = id === ativa;
+  return (
+    <button
+      type="button"
+      onClick={() => onIr(id)}
+      aria-current={on ? "page" : undefined}
+      aria-label={rotulo}
+      data-testid={`hn-aba-${id}`}
+      className={`flex-1 h-full rounded-full flex flex-col items-center justify-center gap-[3px] transition-colors ${on ? "he-vidro-aba text-foreground" : "text-muted-foreground"}`}
+      style={on ? { boxShadow: "inset 0 1px 0 var(--he-vidro-fio), 0 1px 3px rgb(0 0 0 / 0.06)" } : undefined}
+    >
+      {children}
+      <span className={`text-[11px] leading-none ${on ? "font-bold" : "font-medium"}`}>{rotulo}</span>
+    </button>
+  );
+};
+
 export const BarraVidro = ({ ativa, iniciais, onIr, onMais, rotulos, dica }: Props) => {
   const nome = { ...PADRAO, ...(rotulos ?? {}) };
-  const Aba = ({ id, children }: { id: AbaNova; children: React.ReactNode }) => {
-    const on = id === ativa;
-    return (
-      <button
-        type="button"
-        onClick={() => onIr(id)}
-        aria-current={on ? "page" : undefined}
-        aria-label={nome[id]}
-        data-testid={`hn-aba-${id}`}
-        className={`flex-1 h-full rounded-full flex flex-col items-center justify-center gap-[3px] transition-colors ${on ? "he-vidro-aba text-foreground" : "text-muted-foreground"}`}
-        style={on ? { boxShadow: "inset 0 1px 0 var(--he-vidro-fio), 0 1px 3px rgb(0 0 0 / 0.06)" } : undefined}
-      >
-        {children}
-        <span className={`text-[11px] leading-none ${on ? "font-bold" : "font-medium"}`}>{nome[id]}</span>
-      </button>
-    );
-  };
+  /* 26/10: a aba (AbaVidro) é um componente de FORA — antes era criada dentro da barra, e cada re-render da barra
+     desmontava e remontava os botões (um re-render no meio do toque, como o da dica do "+" saindo, arriscava o clique) */
   return (
     <div
       className="hn-barra fixed inset-x-4 z-[60] flex items-center gap-3 max-w-lg mx-auto"
@@ -60,9 +63,9 @@ export const BarraVidro = ({ ativa, iniciais, onIr, onMais, rotulos, dica }: Pro
       data-testid="hn-barra"
     >
       <nav aria-label="Navegação principal" className="he-vidro rounded-full flex-1 h-[60px] p-1.5 flex items-center">
-        <Aba id="inicio"><Home className="w-[22px] h-[22px]" strokeWidth={ativa === "inicio" ? 2.2 : 1.75} aria-hidden /></Aba>
-        <Aba id="conquistas"><Trophy className="w-[22px] h-[22px]" strokeWidth={ativa === "conquistas" ? 2.2 : 1.75} aria-hidden /></Aba>
-        <Aba id="voce">
+        <AbaVidro id="inicio" ativa={ativa} rotulo={nome.inicio} onIr={onIr}><Home className="w-[22px] h-[22px]" strokeWidth={ativa === "inicio" ? 2.2 : 1.75} aria-hidden /></AbaVidro>
+        <AbaVidro id="conquistas" ativa={ativa} rotulo={nome.conquistas} onIr={onIr}><Trophy className="w-[22px] h-[22px]" strokeWidth={ativa === "conquistas" ? 2.2 : 1.75} aria-hidden /></AbaVidro>
+        <AbaVidro id="voce" ativa={ativa} rotulo={nome.voce} onIr={onIr}>
           <span
             className="w-[22px] h-[22px] rounded-full grid place-items-center text-[9.5px] font-bold leading-none"
             style={{ background: "hsl(var(--fixo-tinta) / 0.12)", color: ativa === "voce" ? "hsl(var(--fixo-tinta))" : "hsl(var(--fixo-tinta) / 0.75)" }}
@@ -70,7 +73,7 @@ export const BarraVidro = ({ ativa, iniciais, onIr, onMais, rotulos, dica }: Pro
           >
             {iniciais}
           </span>
-        </Aba>
+        </AbaVidro>
       </nav>
       <span className="relative shrink-0">
       {dica}

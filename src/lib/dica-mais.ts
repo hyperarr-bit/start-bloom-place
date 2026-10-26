@@ -16,8 +16,9 @@ import { localDayKey } from "@/lib/utils";
  */
 export const CHAVE_DICA_MAIS = "core-home-nova-dica-mais";
 export const MAX_APARICOES_DICA_MAIS = 2;
-/** Quanto tempo a barra tem que ficar parada, sem camada por cima, antes do balão entrar. */
-export const ESPERA_DICA_MAIS_MS = 1200;
+/** Quanto tempo a barra tem que ficar parada, sem camada por cima, antes do balão entrar. 3 s (Simulador, 26/10): com
+ *  1,2 s a dica entrava e a festa da figurinha (que espera a tela assentar ~2 s) cobria ela logo em seguida. */
+export const ESPERA_DICA_MAIS_MS = 3000;
 
 const ls = {
   get: (k: string): string | null => { try { return localStorage.getItem(k); } catch { return null; } },

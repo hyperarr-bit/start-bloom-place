@@ -7,6 +7,7 @@ import { trackEvent } from "@/lib/analytics";
 import { emSegundos, MODULOS, ORDEM_MODULOS, diaDaSemanaDoPasso, eventoDaMissao, type DiaDaMissao, type EstadoMissaoDoses, type ModuloDaMissao } from "@/lib/missao-doses";
 import { EVENTO_TRIAL_CARTAO, diasDoTesteDaLoja } from "@/lib/teste-da-loja";
 import { entrada, MOV, MOV_MS, saidaCalmaDe } from "@/lib/movimento";
+import { homeNovaLigadaSincrona } from "@/lib/home-nova";
 
 /** O resumo curto de cada dose na tela 2 do B ("Um gasto, um hábito, um copo d'água"). */
 const RESUMO_DA_DOSE: Partial<Record<ModuloDaMissao, string>> = {
@@ -251,7 +252,8 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
                 </div>
               ))}
             </div>
-            <p className="text-[12.5px] text-[#4f5a64] mt-3" data-testid="missao-doses-depois">Depois a gente arruma sua Home junto.</p>
+            {/* 1.0.19 (26/10): com a Home nova não existe o passo "arrumar a Home" (o tour antigo está aposentado) */}
+            {!homeNovaLigadaSincrona() && <p className="text-[12.5px] text-[#4f5a64] mt-3" data-testid="missao-doses-depois">Depois a gente arruma sua Home junto.</p>}
           </div>
         </div>
         {/* dono 10/10: o link fica ABAIXO do botão (como a welcome) — link em cima do botão "não faz sentido" */}

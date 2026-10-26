@@ -33,6 +33,7 @@ import { TrilhoLateral } from "@/components/TrilhoLateral";
 import { BarraDeAbas } from "@/components/nav/BarraDeAbas";
 import { guardarForcaNavDaUrl, navAbasLigada } from "@/lib/nav-abas";
 import { guardarForcaHomeNova, homeNovaLigadaSincrona } from "@/lib/home-nova";
+import { guardarForcaVidro } from "@/lib/vidro-calai";
 import { guardarForcaMenuNovoDaUrl } from "@/lib/menu-novo";
 import { testeLiberado } from "@/lib/teste-gratis";
 import { PortaPrimeiraAbertura } from "@/components/PortaPrimeiraAbertura";
@@ -57,6 +58,7 @@ guardarForcaNavDaUrl();
 guardarForcaMenuNovoDaUrl();
 // 1.0.19: `?home-nova=on|off|auto` (QA) antes da Home ler a chave remota `home_nova` (lib/home-nova)
 guardarForcaHomeNova();
+guardarForcaVidro(); // rodada 3: a variante "vidro Cal AI" (?vidro=calai | ?vidro=atual), guardada no aparelho
 
 
 
@@ -378,6 +380,8 @@ const DevIntroModulo = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevI
 const DevCompartilhar = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevCompartilhar")) : null;
 // 25/10: a HOME NOVA (mockup: topo com semana/fogo, card do score, Hoje, módulos grandes, barra flutuante + "+") com os dados reais da conta — só no dev
 const DevHomeNova = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevHomeNova")) : null;
+// MOCKUP do registro rápido (26/10): dev E QA (VITE_PORTA_QA) — o vídeo do fluxo é no Simulador
+const DevRegistroRapido = import.meta.env.DEV || import.meta.env.VITE_PORTA_QA === "1" ? lazy(() => import("./pages/dev/DevRegistroRapido")) : null;
 import NotFound from "./pages/NotFound";
 
 // Code-splitting: rotas pesadas (módulos do app, checkout, admin) saem do
@@ -822,6 +826,9 @@ const AnimatedRoutes = () => {
         <Route path="/funil-radar" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-radar"><ComecarRadar /></RouteErrorBoundary></PageTransition>} />} />
         {import.meta.env.DEV && DevCompartilhar && (
           <Route path="/dev/compartilhar" element={<Suspense fallback={null}><DevCompartilhar /></Suspense>} />
+        )}
+        {DevRegistroRapido && (
+          <Route path="/dev/registro-rapido" element={<Suspense fallback={null}><DevRegistroRapido /></Suspense>} />
         )}
         {import.meta.env.DEV && DevHomeNova && (
           <Route path="/dev/home-nova" element={<Suspense fallback={null}><DevHomeNova /></Suspense>} />

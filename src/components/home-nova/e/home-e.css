@@ -160,3 +160,29 @@ html.dark.he-mock-gradiente.he-fundo-da-tela .app-safe-shell {
   100% { transform: scale(1); filter: brightness(1); }
 }
 @media (prefers-reduced-motion: reduce) { .he-acende { animation: none; } }
+
+/* ---- VIDRO "CAL AI" — a VARIANTE pro dono comparar (rodada 3, 26/10; lib/vidro-calai põe `he-vidro-calai` no <html>):
+   bem mais transparente (fundo ~26 % branco), desfoque menor (14 px) com saturação 1,7 — o que passa por trás fica
+   nítido-desfocado e reconhecível —, realce especular fino no topo, fio claro de 0,5 px e sombra difusa leve. A aba
+   ativa fica um pouco mais branca pra o rótulo seguir legível; o "+" idem. A atual continua sendo a padrão. ---- */
+html.he-vidro-calai .hn.he {
+  --he-vidro: rgb(255 255 255 / 0.26);
+  --he-vidro-aba: rgb(255 255 255 / 0.62);
+  --he-vidro-fio: rgb(255 255 255 / 0.9);
+  --he-vidro-borda: rgb(255 255 255 / 0.5);
+  --he-vidro-brilho: rgb(255 255 255 / 0.55);
+  --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.04), 0 10px 28px rgb(0 0 0 / 0.09);
+}
+html.he-vidro-calai.dark .hn.he, html.dark.he-vidro-calai .hn.he {
+  --he-vidro: rgb(26 28 34 / 0.28);
+  --he-vidro-aba: rgb(255 255 255 / 0.16);
+  --he-vidro-fio: rgb(255 255 255 / 0.22);
+  --he-vidro-borda: rgb(255 255 255 / 0.12);
+  --he-vidro-brilho: rgb(255 255 255 / 0.14);
+  --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.5);
+}
+html.he-vidro-calai .he-vidro {
+  -webkit-backdrop-filter: blur(14px) saturate(1.7) brightness(1.02);
+  backdrop-filter: blur(14px) saturate(1.7) brightness(1.02);
+  box-shadow: var(--he-vidro-sombra), inset 0 0 0 0.5px var(--he-vidro-borda);
+}

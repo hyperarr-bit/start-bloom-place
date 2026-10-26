@@ -15,9 +15,13 @@ export const FOGOS_CADERNO: Faixa[] = [
   { ...paleta(0, "laranja", "laranja", "#f9e9bc", "#e7a65b", "#984411", "#fff1df"), chamaBase: "#d58b3e", chamaContorno: "#bd7839" },
   { ...paleta(0, "laranja", "laranja vivo", "#f7dfab", "#e5974e", "#9c390e", "#ffeddd"), min: 3, chamaBase: "#d17c36", chamaContorno: "#ba6931" },
   { ...paleta(1, "ambar", "amarelo dourado", "#f8edbf", "#e1bd60", "#80510d", "#fff5d5"), chamaBase: "#d2a747", chamaContorno: "#b58c39" },
-  { ...paleta(2, "petroleo", "petróleo", "#d1e9e3", "#6aa3a6", "#245e69", "#e7f3f1"), chamaBase: "#50898f", chamaContorno: "#3e717a" },
-  { ...paleta(3, "violeta", "violeta", "#e5dbef", "#ad93c6", "#67438d", "#f2eafa"), chamaBase: "#9274ae", chamaContorno: "#76588e" },
-  { ...paleta(4, "dourado", "ouro", "#f6eac5", "#d4b36b", "#805819", "#faf1d8"), chamaBase: "#bf964b", chamaContorno: "#a37b38" },
+  // RODADA 3 (adendo B, 26/10): medidas em OKLCH contra a régua suave da Home (paleta.ts, --he-t 0,7): petróleo tinha
+  // croma 0,06 (a metade dos azulejos Mente/Viagens, 0,12 — parecia cinza), violeta 0,08 e ouro 0,10 (menos que o
+  // âmbar, invertendo a progressão). Agora petróleo C 0,085 · violeta C 0,115 · ouro C 0,135, mesma matiz e L; as
+  // faixas iniciais (laranja 0,12–0,13 · âmbar 0,12) já estavam na régua (0,12–0,14) e ficaram.
+  { ...paleta(2, "petroleo", "petróleo", "#bce8e8", "#4fa8ad", "#245e69", "#e7f3f1"), chamaBase: "#348f97", chamaContorno: "#237580" },
+  { ...paleta(3, "violeta", "violeta", "#e7d6f8", "#b28ad5", "#67438d", "#f2eafa"), chamaBase: "#976eba", chamaContorno: "#785396" },
+  { ...paleta(4, "dourado", "ouro", "#fbe6b3", "#deb042", "#805819", "#faf1d8"), chamaBase: "#c6952c", chamaContorno: "#a97917" },
 ];
 
 const APAGADO: Faixa = {

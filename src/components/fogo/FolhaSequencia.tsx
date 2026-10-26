@@ -17,21 +17,21 @@ import "./fogo-sequencia.css";
 /**
  * A FOLHA DA SEQUÊNCIA, UNIFICADA (26/10, aprovada pelo dono) — UMA folha pros dois lugares: o toque no fogo da Home
  * nova e "Ver detalhes da sequência" nas Conquistas (com e sem a chave home_nova; lá ela substitui a folha do Codex).
- * Cabe numa tela (390×844) sem rolar, nesta ordem:
- *  1. o FOGO UNIFICADO (animado) + "27 dias seguidos"; "Recorde de N dias" SÓ se o recorde for maior que a atual;
- *  2. o status: "✓ Hoje já conta." (+ a próxima faixa) OU "Pra continuar hoje: <ação do dia>" com o toque que leva a fazer;
- *  3. a SEMANA ATUAL em 7 bolinhas (S T Q Q S S D) com os estados reais: registrado = a cor da faixa com ✓ · protetor
- *     usado = escudinho · hoje = destacado (tracejado se não garantido) · perdido = vazio · futuro = só a letra;
- *     "Ver mais" expande as últimas 4 semanas com os mesmos estados coloridos (sai a grade cinza);
- *  4. "Sua evolução": o carrossel do Codex, COMPACTO — só a figurinha (as artes dele) e "Conquistada" / "Faltam N dias" /
- *     "A conquistar", sem repetir "N dias" (já está na arte); abre posicionado no PRÓXIMO marco (os conquistados ficam
- *     à esquerda, é arrastar); o próximo em destaque; tocar amplia a figurinha (a ampliação do Codex);
- *  5. os protetores numa linha: "🛡 2 protetores guardados" + ⓘ que explica; embaixo (só no app), o LEMBRETE da sequência:
- *     "🔔 Me lembrar da sequência" liga o lembrete de hoje (mesmo evento sequencia_lembrete_ligar); já ligado, "🔔 Lembrete
- *     ligado · 20h" leva a Lembretes;
- *  6. o rodapé pequeno "O que conta…". Sai o lembrete.
- * Estilo da E (sem bordas/linhas, sombras mínimas, cantos grandes) conversando com o azul-tinta das Conquistas.
- * Eventos: sequencia_folha_aberta / sequencia_folha_acao com `origem: home | conquistas`.
+ * RODADA 3 (adendo do dono): os PERSONAGENS voltam a ser o foco, como na versão do Codex. De cima pra baixo:
+ *  1. o FOGO UNIFICADO (animado) + "27 dias seguidos"; "Recorde de N dias" SÓ se o recorde for maior; X e arrastar fecham;
+ *  2. "Sua evolução" em DESTAQUE: cards GRANDES (~60 % da largura, o próximo inteiro + a beirada do seguinte), abrindo
+ *     CENTRALIZADO no PRÓXIMO marco (silhueta + barrinha + "Faltam 3 dias" + borda suave na cor da próxima faixa); à
+ *     esquerda os conquistados coloridos com "✓ Conquistada"; à direita os futuros em silhueta "A conquistar"; tocar
+ *     amplia (a camada do Codex); sem repetir o rótulo da arte;
+ *  3. o status: "✓ Hoje já conta" (linha discreta) ou o card leve "Pra continuar hoje: <ação>" com o botão (o único
+ *     destaque com botão);
+ *  4. a SEMANA em 7 bolinhas com os estados reais (registrado = a cor da faixa com ✓ · protetor = escudo · hoje =
+ *     tracejado se não garantido · perdido = vazio · futuro = só a letra) + "Ver as últimas 4 semanas" (mesmas cores);
+ *  5. o card compacto: "🛡 2 protetores guardados ⓘ" + "🔔 Me lembrar da sequência" / "Lembrete ligado · 20h" (só no app);
+ *  6. o rodapé pequeno "O que conta…".
+ * Ao abrir, sem rolar: topo + personagens + status; o resto com uma rolagem curta. Estilo da E (sem bordas, sombras
+ * mínimas) conversando com o azul-tinta das Conquistas. Eventos: sequencia_folha_aberta / sequencia_folha_acao com
+ * `origem: home | conquistas`.
  */
 export interface PropsFolhaSequencia {
   aberta: boolean;
@@ -42,7 +42,7 @@ export interface PropsFolhaSequencia {
   origem: "home" | "conquistas";
   /** toque numa figurinha: a ampliação (nas Conquistas, a camada do Codex; na Home, vai pras Conquistas ampliando) */
   onAdesivo: (b: Badge) => void;
-  /** "Pra continuar hoje" → a rota da ação do dia */
+  /** "Pra continuar hoje" / "Lembrete ligado" → a rota */
   onIr: (rota: string) => void;
 }
 
@@ -84,7 +84,7 @@ const QuatroSemanas = ({ seq, cor }: { seq: Sequencia; cor: string }) => {
   );
 };
 
-/** "Sua evolução": as figurinhas da sequência do Codex, compactas, abrindo no próximo marco. */
+/** "Sua evolução": os personagens da sequência do Codex, GRANDES, abrindo centralizado no próximo marco. */
 const Evolucao = ({ trilha, dias, recorde, onAdesivo, aberta }: { trilha: Badge[]; dias: number; recorde: number; onAdesivo: (b: Badge) => void; aberta: boolean }) => {
   const lista = useRef<HTMLOListElement>(null);
   // Voltei (sequencia-2) segue no catálogo e no álbum; esta faixa acompanha só a família de pedra (como no Codex)
@@ -92,31 +92,40 @@ const Evolucao = ({ trilha, dias, recorde, onAdesivo, aberta }: { trilha: Badge[
   const iniciou = Math.max(dias, recorde) >= 1 || personagens.some((b) => b.unlocked);
   const proxima = personagens.find((b) => !b.unlocked);
   const destaque = iniciou ? proxima?.id ?? personagens.at(-1)?.id : "sequencia-1";
-  // abre já no próximo marco: os conquistados ficam à esquerda (é arrastar pra ver)
+  const marcoDestaque = destaque ? marcoDoAdesivo(destaque) ?? 1 : 1;
+  const corDaProxima = fogoDoCaderno(marcoDestaque).meio;
+  // abre CENTRALIZADO no próximo marco (os conquistados ficam à esquerda; é arrastar pra ver)
   useEffect(() => {
     if (!aberta) return;
     const el = lista.current;
     const alvo = el?.querySelector<HTMLElement>("[data-destaque]");
-    if (el && alvo) el.scrollLeft = Math.max(0, alvo.offsetLeft - el.offsetLeft - 12);
+    if (el && alvo) el.scrollLeft = Math.max(0, alvo.offsetLeft - (el.clientWidth - alvo.offsetWidth) / 2);
   }, [destaque, aberta]);
   if (personagens.length === 0) return null;
   return (
-    <section className="mt-5" aria-labelledby="he-seq-evolucao-titulo" data-testid="he-seq-evolucao" data-destaque={destaque}>
+    <section className="mt-4" aria-labelledby="he-seq-evolucao-titulo" data-testid="he-seq-evolucao" data-destaque={destaque}>
       <div className="flex items-baseline justify-between px-0.5">
-        <h4 id="he-seq-evolucao-titulo" className="text-[14px] font-bold fs-tinta">Sua evolução</h4>
+        <h4 id="he-seq-evolucao-titulo" className="text-[15px] font-bold fs-tinta">Sua evolução</h4>
         <span className="text-[11px] text-muted-foreground">Arraste pra ver</span>
       </div>
-      <ol ref={lista} className="fs-evolucao" aria-label="Marcos da sequência">
+      <ol ref={lista} className="fs-evolucao fs-evolucao-grande" aria-label="Marcos da sequência" data-rola>
         {personagens.map((b) => {
           const marco = marcoDoAdesivo(b.id)!;
           const falta = Math.max(1, marco - dias);
-          const texto = b.unlocked ? "Conquistada" : iniciou && b.id === proxima?.id ? `${falta === 1 ? "Falta" : "Faltam"} ${plural(falta, "dia", "dias")}` : "A conquistar";
           const emDestaque = b.id === destaque;
+          const texto = b.unlocked ? "Conquistada" : iniciou && b.id === proxima?.id ? `${falta === 1 ? "Falta" : "Faltam"} ${plural(falta, "dia", "dias")}` : "A conquistar";
+          const progresso = b.progresso ? Math.max(0, Math.min(1, b.progresso.atual / Math.max(1, b.progresso.alvo))) : 0;
           return (
             <li key={b.id} data-destaque={emDestaque ? "" : undefined} data-conquistada={b.unlocked ? "" : undefined} data-marco={marco}>
-              <button type="button" className="fs-marco" data-testid="he-seq-marco" onClick={() => onAdesivo(b)} aria-label={`${b.name}: ${texto.toLowerCase()}`}>
-                <span className="fs-marco-arte"><AdesivoRaro id={b.id} raridade={raridadeDe(b)} tamanho={emDestaque ? 72 : 60} trancado={!b.unlocked} progresso={b.progresso} /></span>
-                <small className={b.unlocked ? "fs-marco-ok" : emDestaque ? "fs-tinta" : undefined}>{b.unlocked && <Check size={11} strokeWidth={3} aria-hidden />}{texto}</small>
+              <button
+                type="button" className="fs-marco fs-marco-grande" data-testid="he-seq-marco" onClick={() => onAdesivo(b)} aria-label={`${b.name}: ${texto.toLowerCase()}`}
+                style={emDestaque ? ({ "--fs-proxima": corDaProxima } as React.CSSProperties) : undefined}
+              >
+                <span className="fs-marco-arte"><AdesivoRaro id={b.id} raridade={raridadeDe(b)} tamanho={emDestaque ? 124 : 112} trancado={!b.unlocked} progresso={b.progresso} /></span>
+                {!b.unlocked && emDestaque && iniciou && (
+                  <span className="fs-marco-barra" aria-hidden><span style={{ width: `${Math.round(progresso * 100)}%`, background: corDaProxima }} /></span>
+                )}
+                <small className={b.unlocked ? "fs-marco-ok" : emDestaque ? "fs-tinta" : undefined}>{b.unlocked && <Check size={12} strokeWidth={3} aria-hidden />}{texto}</small>
               </button>
             </li>
           );
@@ -126,7 +135,7 @@ const Evolucao = ({ trilha, dias, recorde, onAdesivo, aberta }: { trilha: Badge[
   );
 };
 
-const Linha = ({ children }: { children: ReactNode }) => <div className="rounded-[20px] px-4 py-3.5" style={{ background: "hsl(var(--muted) / 0.55)" }}>{children}</div>;
+const Linha = ({ children, testid }: { children: ReactNode; testid?: string }) => <div className="rounded-[20px] px-4 py-3" style={{ background: "hsl(var(--muted) / 0.55)" }} data-testid={testid}>{children}</div>;
 
 export const FolhaSequencia = ({ aberta, onFechar, seq, trilha, origem, onAdesivo, onIr }: PropsFolhaSequencia) => {
   const semMovimento = useReducedMotion();
@@ -192,30 +201,31 @@ export const FolhaSequencia = ({ aberta, onFechar, seq, trilha, origem, onAdesiv
             </div>
             <button type="button" onClick={onFechar} aria-label="Fechar" className="absolute top-3 right-4 w-9 h-9 rounded-full grid place-items-center bg-muted"><X className="w-4 h-4" strokeWidth={2.2} /></button>
 
-            {/* 2. o status */}
+            {/* 2. a evolução — os personagens em destaque (as artes do Codex) */}
+            <Evolucao trilha={trilha} dias={seq.dias} recorde={seq.recorde} onAdesivo={tocarAdesivo} aberta={aberta} />
+
+            {/* 3. o status */}
             <div className="mt-4">
               {seq.hojeFeito ? (
-                <Linha>
-                  <div data-testid="he-seq-garantido">
-                    <p className="flex items-center gap-2 text-[15px] font-semibold"><Check className="w-[18px] h-[18px]" strokeWidth={2.6} style={{ color: cor }} aria-hidden />Hoje já conta.</p>
-                    <p className="text-[13px] text-muted-foreground mt-0.5">{frase ? capitalizar(frase) + "." : "Você está no fogo ouro — o topo."}</p>
-                  </div>
-                </Linha>
+                <p className="flex items-center gap-2 px-1 text-[14px] font-semibold" data-testid="he-seq-garantido">
+                  <Check className="w-[18px] h-[18px] shrink-0" strokeWidth={2.6} style={{ color: cor }} aria-hidden />
+                  <span>Hoje já conta.{frase && <span className="font-normal text-muted-foreground"> {capitalizar(frase)}.</span>}{!frase && <span className="font-normal text-muted-foreground"> Você está no fogo ouro — o topo.</span>}</span>
+                </p>
               ) : acao ? (
-                <button type="button" onClick={fazer} data-testid="he-seq-acao" className="w-full rounded-[20px] px-4 py-3.5 flex items-center gap-3 text-left active:brightness-95" style={{ background: "hsl(var(--muted) / 0.55)" }}>
+                <button type="button" onClick={fazer} data-testid="he-seq-acao" className="w-full rounded-[20px] px-4 py-3 flex items-center gap-3 text-left active:brightness-95" style={{ background: "hsl(var(--muted) / 0.55)" }}>
                   <span className="flex-1 min-w-0">
                     <span className="block text-[11.5px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Pra continuar hoje</span>
-                    <span className="block text-[15px] font-semibold mt-0.5 fs-tinta">{capitalizar(acao)}</span>
+                    <span className="block text-[15px] font-semibold mt-0.5 fs-tinta truncate">{capitalizar(acao)}</span>
                   </span>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground/60 shrink-0" strokeWidth={2} aria-hidden />
+                  <span className="h-10 px-4 rounded-full text-[13.5px] font-bold shrink-0 grid place-items-center" style={{ background: "var(--hn-mais, hsl(var(--foreground)))", color: "var(--hn-mais-texto, hsl(var(--background)))" }}>Fazer agora</span>
                 </button>
               ) : (
-                <Linha><p className="text-[13.5px] text-muted-foreground leading-snug" data-testid="he-seq-acao-generica">Registre um cuidado no seu dia para continuar. Pode ser um copo d'água, um hábito ou uma tarefa.</p></Linha>
+                <Linha testid="he-seq-acao-generica"><p className="text-[13.5px] text-muted-foreground leading-snug">Registre um cuidado no seu dia para continuar. Pode ser um copo d'água, um hábito ou uma tarefa.</p></Linha>
               )}
             </div>
 
-            {/* 3. a semana atual (e, se quiser, as 4 semanas) */}
-            <div className="mt-5">
+            {/* 4. a semana atual (e, se quiser, as 4 semanas) */}
+            <div className="mt-4">
               <div className="grid grid-cols-7 gap-1" data-testid="he-seq-semana">
                 {semana.map((d) => (
                   <div key={d.dia} className="flex flex-col items-center gap-1.5" data-testid="he-seq-dia" data-estado={d.estado} data-hoje={d.ehHoje ? "1" : "0"}>
@@ -230,23 +240,19 @@ export const FolhaSequencia = ({ aberta, onFechar, seq, trilha, origem, onAdesiv
                   <QuatroSemanas seq={seq} cor={cor} />
                 </>
               )}
-              <button type="button" onClick={() => setMaisSemanas((v) => !v)} data-testid="he-seq-ver-mais" aria-expanded={maisSemanas} className="mt-2 w-full h-8 text-[12px] font-semibold text-muted-foreground">
+              <button type="button" onClick={() => setMaisSemanas((v) => !v)} data-testid="he-seq-ver-mais" aria-expanded={maisSemanas} className="mt-1.5 w-full h-8 text-[12px] font-semibold text-muted-foreground">
                 {maisSemanas ? "Ver menos" : "Ver as últimas 4 semanas"}
               </button>
             </div>
 
-            {/* 4. a evolução (as figurinhas do Codex) */}
-            <Evolucao trilha={trilha} dias={seq.dias} recorde={seq.recorde} onAdesivo={tocarAdesivo} aberta={aberta} />
-
-            {/* 5. os protetores */}
-            <div className="mt-4 rounded-[20px] px-4 py-3" style={{ background: "hsl(var(--muted) / 0.55)" }}>
+            {/* 5. o card compacto: protetores + o lembrete (só no app) */}
+            <div className="mt-2 rounded-[20px] px-4 py-3" style={{ background: "hsl(var(--muted) / 0.55)" }}>
               <div className="flex items-center gap-2.5">
                 <Shield className="w-[18px] h-[18px] text-sky-600 dark:text-sky-300 shrink-0" strokeWidth={2.2} aria-hidden />
                 <p className="flex-1 text-[14px] font-semibold" data-testid="he-seq-protetores">{plural(seq.saldo, "protetor guardado", "protetores guardados")}</p>
                 <button type="button" onClick={() => setExplicaProtetor((v) => !v)} aria-label="O que é um protetor" aria-expanded={explicaProtetor} data-testid="he-seq-protetores-info" className="w-8 h-8 -mr-1.5 rounded-full grid place-items-center text-muted-foreground"><Info className="w-[17px] h-[17px]" strokeWidth={2} /></button>
               </div>
               {explicaProtetor && <p className="mt-1.5 text-[12.5px] text-muted-foreground leading-snug" data-testid="he-seq-protetores-explica">A cada 7 dias seguidos você ganha 1. Um dia vazio? Ele segura a sequência.</p>}
-              {/* o lembrete da sequência (só no app): a mesma linha pequena, sem a folha precisar rolar */}
               {lembrete.visivel && (
                 <button type="button" onClick={tocarLembrete} disabled={lembrete.ligando} data-testid="he-seq-lembrete" data-ligado={lembrete.ligado ? "1" : "0"} className="mt-2.5 w-full flex items-center gap-2.5 text-left disabled:opacity-60">
                   <Bell className="w-[18px] h-[18px] text-amber-600 dark:text-amber-300 shrink-0" strokeWidth={2.2} aria-hidden />

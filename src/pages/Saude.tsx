@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 import { localDayKey } from "@/lib/utils";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
@@ -55,7 +56,7 @@ const Saude = () => {
           <button onClick={voltarDoModulo} aria-label="Voltar" className="hover:bg-muted rounded-md p-1 transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <Heart className="w-5 h-5 text-red-600 shrink-0" />
+          <IconeDoModulo id="saude" antes={<Heart className="w-5 h-5 text-red-600 shrink-0" />} />
           <h1 className="text-base font-bold tracking-tight shrink-0">SAÚDE</h1>
           <div className="flex items-center gap-2 ml-auto pl-3 shrink-0">
             <MesDoCabecalho />

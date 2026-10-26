@@ -1,4 +1,5 @@
 import { CHAVE_ACOES_CONQUISTAS, registrarAcao } from "@/lib/conquistas-acoes";
+import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 /**
  * TREINO — redesenho de 26/09 (mockups p1–p4 e p7 aprovados pelo dono).
  *
@@ -772,7 +773,7 @@ const Treino = () => {
           <button type="button" onClick={voltarDoModulo} aria-label="Voltar" className="w-9 h-9 -ml-2 shrink-0 grid place-items-center rounded-md hover:bg-muted">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <Dumbbell className="w-5 h-5 text-blue-600 shrink-0" aria-hidden="true" />
+          <IconeDoModulo id="treino" antes={<Dumbbell className="w-5 h-5 text-blue-600 shrink-0" aria-hidden="true" />} />
           <h1 className="text-[18px] font-extrabold tracking-tight">TREINO</h1>
           <div className="ml-auto flex items-center gap-1.5">
             {sequencia > 0 && (

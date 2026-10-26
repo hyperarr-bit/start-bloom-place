@@ -58,6 +58,17 @@
 .fs-evolucao li[data-destaque] .fs-marco { background: #f6f2e8; box-shadow: inset 0 0 0 1.5px #d9cdb6; }
 .dark .fs-evolucao li[data-destaque] .fs-marco { background: #303846; box-shadow: inset 0 0 0 1.5px #bdaf95; }
 .fs-marco-arte { display: grid; place-items: end center; height: 76px; }
+/* RODADA 3: os personagens GRANDES (~60 % da largura), parando centralizados; o próximo com a borda suave na cor da
+   próxima faixa (--fs-proxima) e a barrinha de progresso; o respiro das pontas deixa o 1º e o último centrarem */
+.fs-evolucao-grande { gap: 12px; scroll-snap-type: x mandatory; padding: 6px calc(50% - 30% - 2px) 4px; }
+.fs-evolucao-grande li { flex: 0 0 60%; scroll-snap-align: center; }
+.fs-marco-grande { gap: 6px; padding: 14px 10px 12px; border-radius: 22px; }
+.fs-marco-grande .fs-marco-arte { height: 128px; }
+.fs-marco-grande small { font-size: 12px; }
+.fs-evolucao-grande li[data-destaque] .fs-marco-grande { background: hsl(var(--card)); box-shadow: inset 0 0 0 1.5px var(--fs-proxima, #d9cdb6), 0 1px 2px rgb(0 0 0 / 0.03), 0 6px 18px rgb(0 0 0 / 0.06); }
+.dark .fs-evolucao-grande li[data-destaque] .fs-marco-grande { background: hsl(var(--card)); box-shadow: inset 0 0 0 1.5px var(--fs-proxima, #bdaf95); }
+.fs-marco-barra { display: block; width: 72%; height: 5px; border-radius: 999px; background: hsl(var(--foreground) / 0.08); overflow: hidden; }
+.fs-marco-barra > span { display: block; height: 100%; border-radius: 999px; }
 .fs-marco small { display: flex; align-items: center; gap: 3px; font-size: 10.5px; font-weight: 600; color: hsl(var(--muted-foreground)); line-height: 1.2; }
 .fs-marco small.fs-marco-ok { color: #52745d; }
 .dark .fs-marco small.fs-marco-ok { color: #a9d0b4; }

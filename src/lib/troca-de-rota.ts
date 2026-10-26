@@ -30,13 +30,23 @@ const fotografar = () => {
 };
 
 /** A rota nova (PageTransition) montou: solta a foto depois que ela pintar. */
-export function rotaMontou(): void {
+export type ModoDaTroca = "push" | "pop";
+export const DURACAO_PUSH_MS = 340;
+export const DURACAO_POP_MS = 320;
+/** A rota nova (PageTransition) montou: solta a foto depois que ela pintar — num fade (troca comum), na hora (troca de
+ *  aba) ou deslizando (push/pop do iOS, rodada 3: a tela de antes recua pra esquerda no push e sai pra direita no pop). */
+export function rotaMontou(modo?: ModoDaTroca): void {
   const f = pendente;
-  const ms = trocaDeAba ? 0 : DURACAO_DA_TROCA_MS;
+  const aba = trocaDeAba;
   trocaDeAba = false;
   if (!f) return;
   pendente = null;
-  try { requestAnimationFrame(() => requestAnimationFrame(() => f.soltar(ms))); } catch { f.soltar(ms); }
+  const soltar = () => {
+    if (modo === "push") f.deslizar("-28%", DURACAO_PUSH_MS);
+    else if (modo === "pop") f.deslizar("100%", DURACAO_POP_MS);
+    else f.soltar(aba ? 0 : DURACAO_DA_TROCA_MS);
+  };
+  try { requestAnimationFrame(() => requestAnimationFrame(soltar)); } catch { soltar(); }
 }
 /** só pros testes */
 export const _trocaDeAbaMarcada = (): boolean => trocaDeAba;

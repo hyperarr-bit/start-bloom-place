@@ -199,12 +199,11 @@ describe("a aba Você no estilo da E e Personalizar início", () => {
     cleanup(); ligar();
     await montar("/voce");
     await waitFor(() => expect(screen.getByTestId("tela-voce").getAttribute("data-layout")).toBe("e"));
-    const cats = screen.getByTestId("voce-categorias");
-    expect(within(cats).getAllByRole("button", { expanded: true }).length).toBe(1); // Início aberta
+    // rodada 3: seções com título e linhas VISÍVEIS (sem acordeão) — o menu do Cal AI
+    const secoes = screen.getByTestId("voce-secoes");
+    expect(within(secoes).getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual(["Início", "Conta", "Progresso", "Ajuda"]);
     expect(screen.getByTestId("voce-personalizar-inicio")).toBeTruthy();
-    expect(screen.queryByTestId("voce-plano")).toBeNull(); // Conta fechada
-    fireEvent.click(within(screen.getByTestId("voce-categoria-conta")).getByRole("button", { expanded: false }));
-    await waitFor(() => expect(screen.getByTestId("voce-plano")).toBeTruthy());
+    expect(screen.getByTestId("voce-plano")).toBeTruthy(); // tudo visível de cara
     expect(screen.getByTestId("voce-aparencia").textContent).toMatch(/Claro|Escuro/);
     expect(screen.getByTestId("voce-aparencia").textContent).not.toMatch(/Original/); // sem cor de tema
     fireEvent.click(screen.getByTestId("voce-personalizar-inicio"));
@@ -216,24 +215,25 @@ describe("a aba Você no estilo da E e Personalizar início", () => {
     ligar();
     const { n } = await montar("/voce/inicio");
     await waitFor(() => expect(screen.getByTestId("tela-personalizar-inicio")).toBeTruthy());
-    expect(screen.getByTestId("resumo-habitos").getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByTestId("resumo-sono").getAttribute("aria-pressed")).toBe("false");
-    expect((screen.getByTestId("resumo-sono") as HTMLButtonElement).disabled).toBe(true); // já tem 3
-    fireEvent.click(screen.getByTestId("resumo-refeicoes"));
+    // rodada 3: a lista dos Resumos tem interruptor (e a posição); o máximo de 3 desliga os outros
+    expect(screen.getByTestId("resumo-habitos").getAttribute("data-ligado")).toBe("1");
+    expect(screen.getByTestId("resumo-sono").getAttribute("data-ligado")).toBe("0");
+    expect((within(screen.getByTestId("resumo-sono")).getByRole("switch") as HTMLButtonElement).disabled).toBe(true); // já tem 3
+    fireEvent.click(within(screen.getByTestId("resumo-refeicoes")).getByRole("switch"));
     await waitFor(() => expect(n.ler<string[]>("core-home-resumos")).toEqual(["habitos", "agua"]));
-    fireEvent.click(screen.getByTestId("resumo-sono"));
+    fireEvent.click(within(screen.getByTestId("resumo-sono")).getByRole("switch"));
     await waitFor(() => expect(n.ler<string[]>("core-home-resumos")).toEqual(["habitos", "agua", "sono"]));
     expect(eventos.some(([e]) => e === "home_resumos")).toBe(true);
     fireEvent.click(screen.getByTestId("pi-widgets"));
     await waitFor(() => expect(screen.getByTestId("hn-widgets-folha")).toBeTruthy());
     // rodada 3: os widgets da E (lib/home-widgets-e, chave core-home-widgets-e); Leitura não está no padrão
-    fireEvent.click(screen.getByLabelText("Mostrar Leitura"));
+    fireEvent.click(within(screen.getByTestId("hn-widgets-folha")).getByLabelText("Mostrar Leitura")); // os Resumos também têm "Mostrar Leitura"
     await waitFor(() => expect(JSON.stringify(n.ler("core-home-widgets-e") ?? [])).toContain("leitura"));
     fireEvent.click(screen.getByTestId("hn-widgets-fechar"));
     await waitFor(() => expect(screen.queryByTestId("hn-widgets-folha")).toBeNull());
     fireEvent.click(screen.getByTestId("pi-pendencias"));
     await waitFor(() => expect(screen.getByTestId("hn-prefs-folha")).toBeTruthy());
-    fireEvent.click(screen.getByLabelText("Mostrar Sono"));
+    fireEvent.click(within(screen.getByTestId("hn-prefs-folha")).getByLabelText("Mostrar Sono")); // os Resumos também têm "Mostrar Sono"
     await waitFor(() => expect((n.ler<{ ocultos: string[] }>("home-pendencias-prefs") ?? { ocultos: [] }).ocultos).toContain("sono"));
   });
 

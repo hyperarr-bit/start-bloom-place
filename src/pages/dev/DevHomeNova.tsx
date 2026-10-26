@@ -2,12 +2,17 @@ import { lazy, Suspense, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
+import { useLifeHubData } from "@/hooks/use-life-hub-data";
+import { useModulePreferences } from "@/hooks/use-module-preferences";
 import { nomeDaHome } from "@/lib/nome-da-pessoa";
 import { HomeNova, iniciaisDe, type DirecaoTopo } from "@/components/home-nova/HomeNova";
 import { BarraFlutuante, type AbaNova } from "@/components/home-nova/BarraFlutuante";
 import { MolduraIphone } from "@/components/home-nova/MolduraIphone";
 import type { VarianteModulos } from "@/components/home-nova/ModulosNova";
 import { HomeE } from "@/components/home-nova/e/HomeE";
+import { ModulosE } from "@/components/home-nova/e/ModulosE";
+import { FogoSequencia } from "@/components/fogo/FogoSequencia";
+import { fogoDoCaderno } from "@/components/conquistas/nova/fogo-caderno";
 import { BarraVidro } from "@/components/home-nova/e/BarraVidro";
 import { EVENTO_HOME_NOVA_MAIS, SUAVIDADE_HOME_NOVA } from "@/lib/home-nova";
 import type { VarianteModulosE } from "@/components/home-nova/e/ModulosE";
@@ -36,7 +41,32 @@ const Voce = lazy(() => import("@/pages/Voce"));
  *   &numero=dentro           · variação do card do score com o número dentro do anel (como hoje)
  *   &fundo=gradiente         · MOCKUP (adendo 26/10, só pra comparar — não está no app): o fundo em degradê como o
  *                              do Cal AI (véu quente/rosado no alto que some ao descer) — html.he-mock-gradiente, home-e.css
+ *   &tira=fogos              · rodada 3: a TIRA "fogos 1/7/14/30/100 × paleta da Home" (os 6 fogos do caderno ao lado
+ *                              dos azulejos da grade), pra conferir a cor das faixas contra a régua suave da Home
  */
+/** A tira dos fogos × a paleta da Home (rodada 3, adendo B): os 6 fogos do caderno (1 · 3 · 7 · 14 · 30 · 100 dias)
+ *  acesos, com o nome da faixa, e embaixo os azulejos dos módulos da grade na mesma régua suave. */
+function TiraDosFogos() {
+  const dias = [1, 3, 7, 14, 30, 100];
+  const data = useLifeHubData();
+  const preferencias = useModulePreferences();
+  return (
+    <div className="hn he min-h-dvh px-4 py-5" data-suave={SUAVIDADE_HOME_NOVA} data-testid="tira-fogos">
+      <p className="text-[12px] font-bold uppercase tracking-[0.08em] text-muted-foreground mb-3">Fogos do caderno × paleta da Home</p>
+      <div className="grid grid-cols-6 gap-2">
+        {dias.map((d) => (
+          <div key={d} className="hn-card !rounded-[18px] p-2 flex flex-col items-center gap-1.5" data-testid={`tira-fogo-${d}`}>
+            <FogoSequencia dias={d} estado="aceso" tamanho={44} brilho={d >= 100} />
+            <span className="text-[10.5px] font-semibold tabular-nums">{d}d</span>
+            <span className="text-[9px] text-muted-foreground text-center leading-tight">{fogoDoCaderno(d).nome.replace("fogo ", "")}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4"><ModulosE data={data} variante="grade" azulejo="tinta" preferencias={preferencias} onOrganizar={() => {}} /></div>
+    </div>
+  );
+}
+
 export default function DevHomeNova() {
   const [sp] = useSearchParams();
   const navigate = useNavigate();
@@ -64,6 +94,7 @@ export default function DevHomeNova() {
     document.documentElement.classList.toggle("dark", tema === "escuro");
   }, [tema]);
   const fundoGradiente = layoutE && sp.get("fundo") === "gradiente";
+  const tiraFogos = sp.get("tira") === "fogos";
   useEffect(() => {
     document.documentElement.classList.toggle("he-mock-gradiente", fundoGradiente);
     return () => { document.documentElement.classList.remove("he-mock-gradiente"); };
@@ -74,6 +105,7 @@ export default function DevHomeNova() {
   const nome = nomeDaHome(get) || user?.email?.split("@")[0] || "";
   const ir = (aba: AbaNova) => navigate(`/dev/home-nova?${new URLSearchParams({ ...Object.fromEntries(sp.entries()), tela: aba }).toString()}`);
 
+  if (tiraFogos) return <TiraDosFogos />;
   return (
     <>
       {tela === "inicio" && layoutE ? (

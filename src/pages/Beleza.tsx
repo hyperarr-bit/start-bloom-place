@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 import { useSearchParams } from "react-router-dom";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
@@ -109,7 +110,7 @@ const Beleza = () => {
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={voltarDoModulo} aria-label="Voltar">
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <Droplets className="w-5 h-5 text-bz-acento" />
+          <IconeDoModulo id="beleza" antes={<Droplets className="w-5 h-5 text-bz-acento" />} />
           <h1 className="text-base font-bold tracking-tight">BELEZA</h1>
           <div className="flex items-center gap-2 ml-auto pl-3 shrink-0">
             <MesDoCabecalho />

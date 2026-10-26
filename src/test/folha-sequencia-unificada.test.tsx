@@ -192,3 +192,32 @@ describe("o lembrete da sequência na folha (26/10)", () => {
     vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-10-28T12:00:00"));
   });
 });
+
+describe("rodada 3: os personagens em destaque (ordem nova) e o posicionamento no próximo marco", () => {
+  it("de cima pra baixo: fogo+dias → Sua evolução (cards grandes) → status → semana → protetores/lembrete → rodapé", () => {
+    montar(seqDe({ dias: 9, hojeFeito: true, lista: [HOJE] }));
+    const folha = screen.getByTestId("he-folha-sequencia");
+    const ordem = ["he-seq-dias", "he-seq-evolucao", "he-seq-garantido", "he-seq-semana", "he-seq-protetores", "he-seq-o-que-conta"].map((id) => within(folha).getByTestId(id));
+    for (let i = 1; i < ordem.length; i++) expect(ordem[i - 1].compareDocumentPosition(ordem[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId("he-seq-evolucao").querySelector("ol")?.classList.contains("fs-evolucao-grande")).toBe(true);
+    expect(screen.getByTestId("he-seq-evolucao").querySelector("li[data-destaque] .fs-marco-barra")).toBeTruthy(); // a barrinha do próximo
+  });
+  it.each([
+    { dias: 2, destaque: "sequencia-3", falta: "Falta 1 dia" },
+    { dias: 5, destaque: "sequencia-7", falta: "Faltam 2 dias" },
+    { dias: 27, destaque: "sequencia-30", falta: "Faltam 3 dias" },
+  ])("com $dias dias o destaque é $destaque ($falta); os anteriores conquistados, os seguintes a conquistar", ({ dias, destaque, falta }) => {
+    const trilha = TRILHA.map((b) => ({ ...b, unlocked: (Number(b.id.replace("sequencia-", "")) <= dias) }));
+    cleanup();
+    const n = criarNuvem({});
+    render(<n.Provedor><FolhaSequencia aberta onFechar={() => {}} seq={seqDe({ dias, hojeFeito: true, lista: [HOJE] })} trilha={trilha} origem="home" onAdesivo={() => {}} onIr={() => {}} /></n.Provedor>);
+    const evolucao = screen.getByTestId("he-seq-evolucao");
+    expect(evolucao.getAttribute("data-destaque")).toBe(destaque);
+    const itens = Array.from(evolucao.querySelectorAll("li"));
+    const i = itens.findIndex((li) => li.hasAttribute("data-destaque"));
+    expect(itens.slice(0, i).every((li) => li.hasAttribute("data-conquistada"))).toBe(true);
+    expect(itens.slice(i).every((li) => !li.hasAttribute("data-conquistada"))).toBe(true);
+    expect(itens[i].textContent).toContain(falta);
+    expect(itens.slice(i + 1).every((li) => (li.textContent ?? "").includes("A conquistar"))).toBe(true);
+  });
+});

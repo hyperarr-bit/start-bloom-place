@@ -1,4 +1,5 @@
 import { lazy, Suspense, useState, useEffect, useMemo, useRef } from "react";
+import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 import { reais } from "@/lib/dinheiro";
 import { localDayKey } from "@/lib/utils";
 import { CHAVE_FINANCAS_VISTO } from "@/lib/reagendar";
@@ -538,7 +539,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
             <ArrowLeft className="w-5 h-5" />
           </button>
 
-          <DollarSign className="w-5 h-5 text-amber-600 shrink-0" />
+          <IconeDoModulo id="financas" antes={<DollarSign className="w-5 h-5 text-amber-600 shrink-0" />} />
           <h1 className="text-base font-bold tracking-tight shrink-0">FINANÇAS</h1>
           {/* O mês numa linha só (MesDoCabecalho: "Out 2026" no celular, por extenso de 460 px pra cima; some a
               375 px — Finanças tem 3 botões). 17/10, print do dono a 390 px: o ✨ "completamente achatado" e

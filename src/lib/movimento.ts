@@ -181,7 +181,7 @@ export function saidaCalmaDaTela(ms: number = MOV_MS.calmo, segura = 260): boole
 
 /** A foto da tela inteira, parada por cima até `soltar(ms)` (some em `ms`); solta sozinha depois de `teto` ms. null quando
  *  não anima (reduzir movimento, jsdom). Usada pela troca de rota da missão e pela troca de rota comum (lib/troca-de-rota). */
-export interface FotoDaTela { soltar: (ms?: number) => void }
+export interface FotoDaTela { soltar: (ms?: number) => void; /** rodada 3: a foto sai DESLIZANDO (push: -28 % pra esquerda; pop: 100 % pra direita) */ deslizar: (dx: string, ms: number) => void }
 export function fotoDaTela(teto = 1200): FotoDaTela | null {
   try {
     if (typeof document === "undefined" || /jsdom/i.test(navigator.userAgent)) return null;
@@ -249,8 +249,17 @@ export function fotoDaTela(teto = 1200): FotoDaTela | null {
       } catch { tirar(); return; }
       window.setTimeout(tirar, ms + 400);
     };
+    const deslizar = (dx: string, ms: number) => {
+      if (solta) return;
+      solta = true;
+      try {
+        const a = foto.animate([{ transform: "translateX(0)", opacity: 1 }, { transform: `translateX(${dx})`, opacity: 0 }], { duration: ms, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)", fill: "forwards" });
+        a.onfinish = tirar;
+      } catch { tirar(); return; }
+      window.setTimeout(tirar, ms + 400);
+    };
     window.setTimeout(() => soltar(), teto); // nunca fica presa por cima
-    return { soltar };
+    return { soltar, deslizar };
   } catch {
     try { document.querySelectorAll("[data-sc-rolagem],[data-sc-fixo],[data-sc-valor],[data-sc-estilo]").forEach((e) => { e.removeAttribute("data-sc-rolagem"); e.removeAttribute("data-sc-fixo"); e.removeAttribute("data-sc-valor"); e.removeAttribute("data-sc-estilo"); }); } catch { /* noop */ }
     return null;

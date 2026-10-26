@@ -25,6 +25,7 @@ export const PREFIXOS_VARRIDOS = ["u:", "finance-", "home-", "core-", "life-", "
 
 /** Chaves do APARELHO: sobrevivem à abertura do app, ao logout e à troca de conta. */
 export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
+  "core-vidro-calai", // rodada 3: a variante "vidro Cal AI" da barra (lib/vidro-calai) — experimento do dono, vale pro aparelho
   // preferências e marcas antigas (as listas inline desde 07–08/2026)
   "core-welcome-done",
   "theme",

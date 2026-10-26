@@ -1,6 +1,8 @@
-import { motion } from "framer-motion";
-import { ReactNode, useLayoutEffect, useState } from "react";
+import { animate, motion, useMotionValue, useReducedMotion, type MotionValue } from "framer-motion";
+import { ReactNode, useLayoutEffect, useRef, useState, type PointerEvent as PointerEventReact } from "react";
+import { useLocation, useNavigate, useNavigationType } from "react-router-dom";
 import { rotaComFoto, rotaMontou } from "@/lib/troca-de-rota";
+import { PUSH_IOS, modoDeEntrada, voltar, type EstadoPush, type ModoDeEntrada } from "@/lib/navegacao-ios";
 
 // Sem animação de exit de propósito: animar a saída de uma página grande
 // (Finanças tem milhares de nós) segura o AnimatePresence mode="wait" por
@@ -8,11 +10,72 @@ import { rotaComFoto, rotaMontou } from "@/lib/troca-de-rota";
 // Entrada só com opacidade, curta: barata de compor na GPU.
 // 1.0.17 QA (lib/troca-de-rota): no app, a tela de antes fica numa foto por cima durante a troca — a página nova entra
 // já inteira embaixo (sem o fade a partir do fundo, que era o quadro em branco) e a foto some quando ela pinta.
+// RODADA 3 (26/10, o menu do Cal AI): a página aberta EMPILHANDO (state.push = "ios", lib/navegacao-ios) entra
+// deslizando da direita enquanto a foto da tela de antes recua pra esquerda; voltar (← ou o gesto da borda esquerda)
+// faz a de cima sair pra direita e a de baixo voltar de -28 %. Só nas rotas que pedem; o resto segue como antes.
+
+/** A borda esquerda (22 px) das páginas empilhadas: arrastar pra direita volta, acompanhando o dedo. */
+const BordaDeVoltar = ({ x, onVoltar }: { x: MotionValue<number>; onVoltar: () => void }) => {
+  const g = useRef<{ x0: number; arrastando: boolean; xUlt: number; tUlt: number; vel: number } | null>(null);
+  const soltar = (e: PointerEventReact<HTMLDivElement>) => {
+    const s = g.current;
+    g.current = null;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
+    if (!s?.arrastando) return;
+    const dx = x.get();
+    if (dx > 100 || (dx > 24 && s.vel > 0.5)) {
+      const largura = typeof window !== "undefined" ? window.innerWidth : 400;
+      animate(x, largura, { duration: 0.22, ease: "easeOut", onComplete: onVoltar });
+    } else animate(x, 0, { type: "spring", stiffness: 520, damping: 42 });
+  };
+  return (
+    <div
+      data-testid="pt-borda-voltar" aria-hidden
+      className="fixed left-0 top-0 bottom-0 w-[22px] z-[60]"
+      style={{ touchAction: "none" }}
+      onPointerDown={(e) => { g.current = { x0: e.clientX, arrastando: false, xUlt: e.clientX, tUlt: e.timeStamp, vel: 0 }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ } }}
+      onPointerMove={(e) => {
+        const s = g.current;
+        if (!s) return;
+        const dx = e.clientX - s.x0;
+        const dt = Math.max(1, e.timeStamp - s.tUlt);
+        s.vel = (e.clientX - s.xUlt) / dt; s.xUlt = e.clientX; s.tUlt = e.timeStamp;
+        if (!s.arrastando) { if (dx > 6) s.arrastando = true; else return; }
+        x.set(Math.max(0, dx));
+      }}
+      onPointerUp={soltar}
+      onPointerCancel={soltar}
+    />
+  );
+};
+
 export const PageTransition = ({ children }: { children: ReactNode }) => {
+  const location = useLocation();
+  const tipo = useNavigationType();
+  const navigate = useNavigate();
+  const semMovimento = useReducedMotion();
+  const [modo] = useState<ModoDeEntrada>(() => modoDeEntrada(location.key, (location.state as EstadoPush | null)?.push === PUSH_IOS, tipo));
   const [comFoto] = useState(rotaComFoto);
-  useLayoutEffect(() => { rotaMontou(); }, []);
+  const x = useMotionValue(0);
+  useLayoutEffect(() => { rotaMontou(modo ?? undefined); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (modo && !semMovimento) {
+    return (
+      <motion.div
+        data-transicao={modo}
+        style={{ x }}
+        initial={{ x: modo === "push" ? "100%" : "-28%", opacity: modo === "pop" ? 0.6 : 1 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ type: "tween", duration: modo === "push" ? 0.34 : 0.3, ease: [0.2, 0.8, 0.2, 1] }}
+      >
+        {children}
+        {modo === "push" && <BordaDeVoltar x={x} onVoltar={() => voltar(navigate, "/voce")} />}
+      </motion.div>
+    );
+  }
   return (
     <motion.div
+      data-transicao={modo ?? undefined}
       initial={comFoto ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.18, ease: "easeOut" }}
@@ -57,35 +120,4 @@ export const FadeIn = ({ children, delay = 0, className }: { children: ReactNode
   >
     {children}
   </motion.div>
-);
-
-export const AnimatedCheckbox = ({ checked, onToggle, className = "" }: { checked: boolean; onToggle: () => void; className?: string }) => (
-  <motion.button
-    onClick={onToggle}
-    className={`flex items-center justify-center rounded border-2 transition-colors ${
-      checked
-        ? "bg-green-500 border-green-500"
-        : "border-muted-foreground/30 hover:border-green-400"
-    } ${className}`}
-    whileTap={{ scale: 0.85 }}
-    animate={checked ? { scale: [1, 1.2, 1] } : {}}
-    transition={{ duration: 0.25 }}
-  >
-    {checked && (
-      <motion.svg
-        initial={{ pathLength: 0, opacity: 0 }}
-        animate={{ pathLength: 1, opacity: 1 }}
-        transition={{ duration: 0.25, delay: 0.05 }}
-        className="w-3 h-3 text-white"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={3}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <motion.path d="M5 13l4 4L19 7" />
-      </motion.svg>
-    )}
-  </motion.button>
 );

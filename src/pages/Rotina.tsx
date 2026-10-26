@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
+import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 import { alternarHabitoNoDia, marcaDoDia, nivelDoHeatmap, type LogDoHeatmap } from "@/lib/rotina-habitos";
 import { useMarcarOntem } from "@/hooks/use-marcar-ontem";
 import { useAuth } from "@/hooks/use-auth";
@@ -1388,7 +1389,7 @@ const Rotina = () => {
           <button onClick={voltarDoModulo} aria-label="Voltar" className="hover:bg-muted rounded-md p-1 transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <Calendar className="w-5 h-5 text-emerald-600 shrink-0" />
+          <IconeDoModulo id="rotina" antes={<Calendar className="w-5 h-5 text-emerald-600 shrink-0" />} />
           <h1 className="text-base font-bold tracking-tight shrink-0">ROTINA</h1>
           <div className="flex items-center gap-2 ml-auto pl-3 shrink-0">
             <MesDoCabecalho />

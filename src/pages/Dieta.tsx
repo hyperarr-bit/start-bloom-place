@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 import { SerieHistorico } from "@/components/historico/SerieHistorico";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
@@ -754,7 +755,7 @@ const Dieta = () => {
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" aria-label="Voltar" onClick={() => { salvarEdicaoAberta(); voltarDoModulo(); }}><ArrowLeft className="w-5 h-5" /></Button>
-          <Apple className="w-5 h-5 text-green-600" />
+          <IconeDoModulo id="dieta" antes={<Apple className="w-5 h-5 text-green-600" />} />
           <h1 className="text-base font-bold tracking-tight">DIETA</h1>
           <div className="flex items-center gap-2 ml-auto pl-3 shrink-0">
             <MesDoCabecalho />

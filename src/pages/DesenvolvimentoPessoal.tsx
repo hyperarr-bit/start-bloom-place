@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 import { usePacote2027 } from "@/hooks/use-pacote-2027";
 import { Pacote2027 } from "@/components/pacote-2027/Pacote2027";
 import { localDayKey, dataSegura, parseLocalDay, semanaAtualId } from "@/lib/utils";
@@ -519,7 +520,7 @@ const DesenvolvimentoPessoal = () => {
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={voltarDoModulo} aria-label={isPreview ? "Voltar" : "Todos os módulos"}><ArrowLeft className="w-5 h-5" /></Button>
-          <Sparkles className="w-5 h-5 text-purple-600" />
+          <IconeDoModulo id="desenvolvimento" antes={<Sparkles className="w-5 h-5 text-purple-600" />} />
           <h1 className="text-base font-bold tracking-tight">DESENVOLVIMENTO PESSOAL</h1>
           <div className="flex items-center gap-2 ml-auto pl-3 shrink-0">
             <MesDoCabecalho />

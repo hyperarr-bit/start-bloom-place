@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 import { useSearchParams } from "react-router-dom";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { ArrowLeft, Mail } from "lucide-react";
@@ -102,7 +103,7 @@ const Relacionamentos = () => {
             <button onClick={voltarDoModulo} aria-label="Voltar" className="hover:bg-muted rounded-md p-1 transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <Mail className="w-5 h-5 text-[hsl(var(--rl-lacre))]" aria-hidden="true" />
+            <IconeDoModulo id="relacionamentos" antes={<Mail className="w-5 h-5 text-[hsl(var(--rl-lacre))]" aria-hidden="true" />} />
             <h1 className="text-base font-bold tracking-tight">RELAÇÕES</h1>
             <div className="flex items-center gap-2 ml-auto">
               <span className="text-muted-foreground text-xs">{mes}</span>

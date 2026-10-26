@@ -285,7 +285,7 @@ const PlanosApp = () => {
           <button
             onClick={tentarRestaurar}
             disabled={restaurando}
-            className="text-[12px] font-semibold text-muted-foreground disabled:opacity-50"
+            className="block mx-auto text-[12px] font-semibold text-muted-foreground disabled:opacity-50"
           >
             {restaurando ? "Restaurando…" : "Restaurar compras"}
           </button>
@@ -301,7 +301,8 @@ const PlanosApp = () => {
                "Restaurar compras" logo acima é o que confere depois. */
             <button
               type="button"
-              className="text-[12px] font-semibold text-muted-foreground underline underline-offset-2"
+              // varredura 26/10: os dois eram inline num space-y (que não separa inline) — "Restaurar comprasTenho um código"
+              className="block mx-auto text-[12px] font-semibold text-muted-foreground underline underline-offset-2"
               onClick={async () => {
                 trackEvent("app_codigo_planos_apple", {});
                 const abriu = await abrirResgateApple();

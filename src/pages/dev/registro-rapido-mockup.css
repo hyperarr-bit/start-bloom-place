@@ -1,0 +1,83 @@
+/* MOCKUP do REGISTRO RÁPIDO ("+") com design novo (26/10) — só a rota /dev/registro-rapido (dev e QA). Nada disto
+   está no app. Duas direções: D1 "teclado próprio" (painel de vidro acima do "+" + tela inteira com teclado numérico
+   do app) e D2 "cartões" (folha baixa de altura fixa, passos em cartões). Tokens da Home nova (.hn.he). */
+.rr { position: fixed; inset: 0; z-index: 80; }
+.rr-escurece { position: absolute; inset: 0; background: rgb(0 0 0 / 0.32); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
+
+/* ---- D1: o painel de vidro flutuando acima do "+" ---- */
+.rr-painel { position: absolute; right: 16px; bottom: calc(var(--app-safe-bottom, 0px) + 92px); width: 304px; padding: 12px; border-radius: 26px;
+  background: rgb(255 255 255 / 0.62); -webkit-backdrop-filter: blur(22px) saturate(1.8); backdrop-filter: blur(22px) saturate(1.8);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9), inset 0 0 0 0.5px rgb(255 255 255 / 0.55), 0 14px 40px rgb(0 0 0 / 0.16); }
+.dark .rr-painel { background: rgb(28 30 36 / 0.62); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18), inset 0 0 0 0.5px rgb(255 255 255 / 0.1), 0 14px 40px rgb(0 0 0 / 0.5); }
+.rr-painel::after { content: ""; position: absolute; right: 22px; bottom: -8px; width: 16px; height: 16px; border-radius: 4px; transform: rotate(45deg); background: inherit; }
+.rr-painel-grade { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.rr-azulejo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; height: 82px; border-radius: 18px; background: rgb(255 255 255 / 0.55); }
+.dark .rr-azulejo { background: rgb(255 255 255 / 0.07); }
+.rr-azulejo .rr-disco { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; }
+.rr-azulejo span { font-size: 11.5px; font-weight: 600; }
+.rr-mais { position: absolute; right: 16px; bottom: calc(var(--app-safe-bottom, 0px) + 20px); width: 60px; height: 60px; border-radius: 999px; display: grid; place-items: center; background: var(--hn-mais); color: var(--hn-mais-texto); box-shadow: 0 8px 24px rgb(0 0 0 / 0.22); }
+
+/* ---- D1: a tela inteira de registro ---- */
+.rr-tela { position: absolute; inset: 0; display: flex; flex-direction: column; background: hsl(var(--card)); padding: calc(var(--app-safe-top, 0px) + 8px) 20px calc(var(--app-safe-bottom, 0px) + 14px); }
+.rr-topo { display: flex; align-items: center; gap: 10px; }
+.rr-topo h2 { flex: 1; font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
+.rr-x { width: 36px; height: 36px; border-radius: 999px; display: grid; place-items: center; background: hsl(var(--muted)); }
+.rr-chip { height: 30px; padding: 0 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; background: hsl(var(--muted) / 0.7); }
+.rr-centro { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+.rr-eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
+.rr-numero { display: flex; align-items: baseline; gap: 6px; }
+.rr-numero b { font-size: 64px; line-height: 1; font-weight: 700; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+.rr-numero small { font-size: 22px; font-weight: 600; color: hsl(var(--muted-foreground)); }
+.rr-cursor { display: inline-block; width: 3px; height: 54px; margin-left: 4px; border-radius: 2px; background: hsl(var(--foreground)); animation: rr-pisca 1s steps(2) infinite; }
+@keyframes rr-pisca { to { opacity: 0; } }
+.rr-pilulas { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px 0; margin: 0 -20px; padding-inline: 20px; width: calc(100% + 40px); align-self: stretch; }
+.rr-pilulas::-webkit-scrollbar { display: none; }
+.rr-pilula { flex: 0 0 auto; height: 34px; padding: 0 14px; border-radius: 999px; font-size: 13.5px; font-weight: 600; background: hsl(var(--muted) / 0.7); }
+.rr-pilula[data-on] { background: var(--hn-mais); color: var(--hn-mais-texto); }
+.rr-teclado { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+.rr-tecla { height: 62px; border-radius: 18px; display: grid; place-items: center; font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; background: hsl(var(--muted) / 0.55); }
+.rr-tecla small { font-size: 10px; letter-spacing: 0.12em; color: hsl(var(--muted-foreground)); font-weight: 700; }
+.rr-tecla[data-apaga] { background: transparent; }
+.rr-principal { margin-top: 12px; height: 54px; border-radius: 18px; font-size: 16px; font-weight: 700; background: var(--hn-mais); color: var(--hn-mais-texto); display: grid; place-items: center; }
+.rr-humores { display: flex; gap: 10px; justify-content: center; }
+.rr-humor { width: 60px; height: 60px; border-radius: 20px; display: grid; place-items: center; font-size: 30px; background: hsl(var(--muted) / 0.55); }
+.rr-humor[data-on] { background: oklch(0.955 0.04 320); box-shadow: inset 0 0 0 2px oklch(0.7 0.14 320); }
+.dark .rr-humor[data-on] { background: oklch(0.3 0.06 320); }
+.rr-copo { display: grid; grid-template-columns: 56px 1fr 56px; gap: 14px; align-items: center; width: 100%; }
+.rr-copo-mais { height: 64px; border-radius: 20px; font-size: 20px; font-weight: 700; display: grid; place-items: center; background: var(--hn-mais); color: var(--hn-mais-texto); }
+.rr-copo-menos { height: 64px; border-radius: 20px; font-size: 26px; display: grid; place-items: center; background: hsl(var(--muted) / 0.55); }
+.rr-texto { width: 100%; min-height: 140px; border-radius: 22px; padding: 18px; font-size: 22px; line-height: 1.35; background: hsl(var(--muted) / 0.45); }
+.rr-texto[data-vazio] { color: hsl(var(--muted-foreground)); }
+
+/* ---- o teclado do SISTEMA (desenhado, só pro print) ---- */
+.rr-teclado-ios { position: absolute; left: 0; right: 0; bottom: 0; height: 336px; background: #d1d5db; display: flex; flex-direction: column; gap: 10px; padding: 8px 6px calc(var(--app-safe-bottom, 0px) + 6px); }
+.dark .rr-teclado-ios { background: #2a2d33; }
+.rr-teclado-ios .rr-fila { display: flex; gap: 6px; justify-content: center; }
+.rr-teclado-ios .rr-k { flex: 1; height: 42px; max-width: 34px; border-radius: 6px; background: #fff; display: grid; place-items: center; font-size: 20px; box-shadow: 0 1px 0 #8a8f98; }
+.dark .rr-teclado-ios .rr-k { background: #5b5f66; color: #fff; box-shadow: 0 1px 0 #000; }
+.rr-teclado-ios .rr-k[data-larga] { max-width: none; flex: 4; background: #adb3bd; font-size: 15px; }
+.dark .rr-teclado-ios .rr-k[data-larga] { background: #3d4147; }
+.rr-teclado-ios[data-numerico] .rr-k { max-width: none; height: 46px; font-size: 24px; }
+.rr-ancora-teclado { position: absolute; left: 0; right: 0; bottom: 336px; }
+
+/* ---- D2: a folha baixa de altura FIXA ---- */
+.rr-folha { position: absolute; left: 0; right: 0; bottom: 0; height: 46%; border-radius: 28px 28px 0 0; background: hsl(var(--card)); padding: 10px 16px calc(var(--app-safe-bottom, 0px) + 12px); display: flex; flex-direction: column; box-shadow: 0 -10px 40px rgb(0 0 0 / 0.08); }
+.rr-folha[data-com-teclado] { bottom: 336px; height: auto; max-height: calc(100% - 336px - var(--app-safe-top, 0px) - 8px); border-radius: 24px 24px 0 0; padding-bottom: 12px; }
+.rr-alca { width: 36px; height: 4px; border-radius: 999px; background: hsl(var(--muted-foreground) / 0.3); margin: 0 auto 10px; }
+.rr-cartoes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.rr-cartao { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 4px 9px; border-radius: 18px; background: hsl(var(--muted) / 0.45); }
+.rr-cartao .rr-disco { width: 40px; height: 40px; border-radius: 14px; display: grid; place-items: center; }
+.rr-cartao span { font-size: 11.5px; font-weight: 600; }
+.rr-passo { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+.rr-campo { border-radius: 20px; padding: 14px 16px; background: hsl(var(--muted) / 0.45); }
+.rr-campo b { display: block; font-size: 40px; line-height: 1; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.rr-campo .rr-eyebrow { margin-bottom: 6px; }
+.rr-passos { display: flex; gap: 6px; justify-content: center; }
+.rr-passos i { width: 6px; height: 6px; border-radius: 999px; background: hsl(var(--muted-foreground) / 0.3); }
+.rr-passos i[data-on] { width: 18px; background: hsl(var(--foreground)); }
+
+/* ---- com o teclado DE VERDADE (teclado=real): o documento travado e o campo real ---- */
+html.rr-trava, html.rr-trava body { overflow: hidden !important; height: 100%; overscroll-behavior: none; }
+.rr-input-numero { width: 100%; min-width: 0; background: transparent; border: 0; outline: 0; font: inherit; font-size: 40px !important; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; caret-color: hsl(var(--foreground)); }
+textarea.rr-texto { border: 0; outline: 0; resize: none; font: inherit; font-size: 22px !important; line-height: 1.35; color: hsl(var(--foreground)); }
+textarea.rr-texto::placeholder { color: hsl(var(--muted-foreground)); }

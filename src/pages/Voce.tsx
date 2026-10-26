@@ -151,7 +151,7 @@ export default function Voce() {
       {
         id: "inicio", titulo: "Início",
         itens: [
-          { id: "personalizar-inicio", Icone: SlidersHorizontal, rotulo: "Personalizar início", detalhe: "Resumos, widgets, pendências", onClick: () => empilhar("personalizar-inicio", "/voce/inicio") },
+          { id: "personalizar-inicio", Icone: SlidersHorizontal, rotulo: "Personalizar início", onClick: () => empilhar("personalizar-inicio", "/voce/inicio") }, // sem detalhe: no iPhone o rótulo truncava
           { id: "tutorial", Icone: RotateCcw, rotulo: "Rever tutorial", onClick: () => { clicar("tutorial"); navigate("/home", { state: { reverTutorial: true } }); } },
         ],
       },

@@ -37,6 +37,8 @@ export function rotaDoLink(url: string | null | undefined): string | null {
     if (u.protocol !== "core:") return null;
     // em `core://financas`, o "financas" vem no host, não no pathname
     const alvo = (u.hostname || u.pathname.replace(/^\/+/, "")).toLowerCase();
+    // QA/dev (26/10): `core://dev/registro-rapido?dir=1` abre o mockup no Simulador — nunca no build de loja
+    if (alvo === "dev" && (import.meta.env.DEV || import.meta.env.VITE_PORTA_QA === "1") && /^\/[a-z-]+$/.test(u.pathname)) return `/dev${u.pathname}${u.search}`;
     if (!ROTAS_VALIDAS.has(alvo)) return null;
     return `/${alvo}${u.search}`;
   } catch {

@@ -11,7 +11,6 @@ import { useTheme } from "@/hooks/use-theme";
 import { CHAVE_RESUMOS, normalizarResumos } from "@/lib/home-resumos";
 import { EscolherWidgetsE } from "./EscolherWidgetsE";
 import { PersonalizarPendenciasE } from "./PersonalizarPendenciasE";
-import { CelebracaoDia100 } from "@/components/home/CelebracaoDia100";
 import { DailyNudge } from "@/components/onboarding/DailyNudge";
 import { CardSeuDia } from "@/components/missao-doses/CardSeuDia";
 import { RetrospectivaNaHome } from "@/components/wrapped/RetrospectivaNaHome";
@@ -31,6 +30,7 @@ import { PaginaPendencias } from "./PaginaPendencias";
 import { PaginaWidgets } from "./PaginaWidgets";
 import { FolhaScore } from "./FolhaScore";
 import { FolhaPendencias } from "./FolhaPendencias";
+import { CelebracaoDia100E, celebracaoPendente, type VarianteCelebracao } from "./CelebracaoDia100E";
 import { ContextoDaEntrada, FadeDoConjunto, marcarEntradaDaHome } from "./Animacoes";
 import { ModulosE, type AzulejoE, type VarianteModulosE } from "./ModulosE";
 import { OrganizarModulos } from "./OrganizarModulos";
@@ -55,7 +55,7 @@ import "./home-e.css";
  *   3. Módulos: a grade de 4, ordem/favoritos/ocultos reais; "Organizar" = a mesma configuração de hoje.
  *   4. O "+" da barra de vidro (global, BarraVidroGlobal) abre a folha das ações — que grava pelo QuickActions real.
  * O que a Home de hoje mostra por cima continua: o card "Seu dia" da missão (web), a Retrospectiva do mês, o convite
- * das lojas (só no site), a comemoração dos 100 pontos, o nudge diário. O tour antigo da Home NÃO entra aqui
+ * das lojas (só no site), a comemoração dos 100 pontos (26/10: a da E, CelebracaoDia100E), o nudge diário. O tour antigo da Home NÃO entra aqui
  * (apontava pras ações rápidas que não existem mais — pages/Home desliga o useTourDaHome com a chave ligada).
  */
 interface Props {
@@ -70,6 +70,12 @@ interface Props {
   folhaMaisAberta?: boolean;
   /** rota de dev: o número dentro do anel */
   numeroDentro?: boolean;
+  /** rota de dev: força o número do score (os cards e a folha), sem gravar nada */
+  scoreDev?: number | null;
+  /** rota de dev: abre a comemoração do 100 já, nessa variante (sem olhar a chave do dia) */
+  celebracaoDev?: VarianteCelebracao | null;
+  /** rota de dev: a festinha do 100 do card toca a cada montagem */
+  festaDev?: boolean;
 }
 
 export const ROTULOS_DO_CARROSSEL = ["Seu dia", "Pendências de hoje", "Seus widgets"];
@@ -82,10 +88,14 @@ const saudacao = (): string => {
   return "Boa noite";
 };
 
-export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_HOME_NOVA, paginaInicial = 0, arrasto = null, folhaScoreAberta, folhaMaisAberta, numeroDentro }: Props) => {
+export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_HOME_NOVA, paginaInicial = 0, arrasto = null, folhaScoreAberta, folhaMaisAberta, numeroDentro, scoreDev = null, celebracaoDev = null, festaDev = false }: Props) => {
   const { user } = useAuth();
   const { get, set, loaded } = useUserData();
-  const lifeData = useLifeHubData();
+  const lifeDataReal = useLifeHubData();
+  const lifeData = useMemo(() => (scoreDev === null ? lifeDataReal : { ...lifeDataReal, dayScore: scoreDev }), [lifeDataReal, scoreDev]);
+  // 26/10: a festinha do 100 no card espera a comemoração de tela cheia (que abre por cima) — toca quando ela fecha
+  const [celebrando, setCelebrando] = useState(false);
+  const festaPausada = celebrando || (!celebracaoDev && celebracaoPendente(lifeData.dayScore));
   const seq = useSequencia();
   const navigate = useNavigate();
   // adendo 26/10: a faixa do relógio e a casca na cor da E (sem a faixa branca atrás do relógio)
@@ -154,7 +164,7 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
   if (!loaded) return <div className="hn he min-h-dvh" aria-hidden data-suave={suave} />;
 
   const paginas = [
-    <PaginaSeuDia key="dia" data={lifeData} onAbrirScore={abrirScore} onAcao={abrirAcao} onMais={abrirMais} numeroDentro={numeroDentro} copoMl={copo} resumos={resumos} />,
+    <PaginaSeuDia key="dia" data={lifeData} onAbrirScore={abrirScore} onAcao={abrirAcao} onMais={abrirMais} numeroDentro={numeroDentro} copoMl={copo} resumos={resumos} festaPausada={festaPausada} forcarFesta={festaDev} />,
     <PaginaPendencias key="pend" pendencias={pendencias} onAcao={abrirAcao} onPersonalizar={() => setPrefsAbertas(true)} onVerTodas={abrirTodasPendencias} />,
     <PaginaWidgets key="wid" data={lifeData} widgets={widgetsE.ativos} onEscolher={() => setPicker(true)} onAcao={abrirAcao} />,
   ];
@@ -193,7 +203,11 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
 
           <p className="text-center text-[11px] text-muted-foreground/70 pt-5">Core © {new Date().getFullYear()} — Organize sua vida</p>
         </main></FadeDoConjunto>
-        <CelebracaoDia100 score={lifeData.dayScore} streak={seq.dias} />
+        {/* 26/10 (dono): a comemoração do 100 no estilo da Home nova (a antiga segue na Home antiga, intocada) */}
+        <CelebracaoDia100E
+          score={lifeData.dayScore} streak={seq.dias} variante={celebracaoDev ?? undefined} forcar={!!celebracaoDev}
+          onAbrir={() => setCelebrando(true)} onFechar={() => setCelebrando(false)}
+        />
       </div>
       </ContextoDaEntrada.Provider>
 

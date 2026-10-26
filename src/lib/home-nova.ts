@@ -46,6 +46,8 @@ export const CHAVE_BRACO_HOME_NOVA = "core-home-nova-braco";
 export const CHAVE_ADMIN_HOME_NOVA = "core-home-nova-admin";
 /** O dia em que o fogo da pílula já acendeu (o pulso toca 1x por dia). */
 export const CHAVE_FOGO_ACESO_HOME_NOVA = "core-home-nova-fogo";
+/** O dia em que o card do score já fez a festinha do 100 (estrela âmbar; 1x por dia — home-nova/e/Festa100). */
+export const CHAVE_SCORE_100_HOME_NOVA = "core-home-nova-score-100";
 /** Força de QA — fora dos prefixos que as vassouras do cache apagam ("home-" é varrido; lib/chaves-do-aparelho). */
 export const CHAVE_FORCA_HOME_NOVA = "forcar-home-nova";
 /** 26/10: a cor do tema que a pessoa tinha ANTES da Home nova forçar o Original (chave da conta); volta quando a chave desliga. */

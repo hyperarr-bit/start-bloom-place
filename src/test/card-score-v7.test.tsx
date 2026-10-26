@@ -1,6 +1,7 @@
 /**
  * 1.0.19 — CARD DO SCORE V7 (escolha do dono 26/10): "44 /100 pontos" — número grande preto e "/100 pontos" cinza
- * na mesma linha, "Score do dia" cinza embaixo, SEM selo da faixa, anel 104 com a estrela (✓ no 100). No 100 o
+ * na mesma linha, "Score do dia" cinza embaixo, SEM selo da faixa, anel 104 com a estrela (no 100 a estrela FICA e vira
+ * âmbar — 26/10, "o Cal AI não muda o símbolo"; testes da festinha em src/test/festa-100.test.tsx). No 100 o
  * número desce de 50 pra 46 px e a linha nunca quebra (cabe em 390 e 430 pt — conferido nos prints do Simulador web).
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
@@ -34,7 +35,7 @@ describe("card do score V7", () => {
     expect(screen.getByTestId("he-score-numero").className).toContain("text-[50px]");
   });
 
-  it("anel 104: estrela até 99, ✓ no 100; tocar no card abre a folha", () => {
+  it("anel 104: estrela até 99 E no 100 (nunca ✓ — 26/10); tocar no card abre a folha", () => {
     const abrir = vi.fn();
     render(<CardScoreE score={44} onAbrir={abrir} />);
     const anel = screen.getByTestId("hn-anel");
@@ -44,7 +45,7 @@ describe("card do score V7", () => {
     expect(abrir).toHaveBeenCalledTimes(1);
     cleanup();
     render(<CardScoreE score={100} onAbrir={() => {}} />);
-    expect(screen.getByTestId("hn-anel").querySelector(".lucide-check")).toBeTruthy();
-    expect(screen.getByTestId("hn-anel").querySelector(".lucide-star")).toBeNull();
+    expect(screen.getByTestId("hn-anel").querySelector(".lucide-check")).toBeNull();
+    expect(screen.getByTestId("hn-anel").querySelector(".lucide-star")).toBeTruthy();
   });
 });

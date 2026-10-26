@@ -124,6 +124,7 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-home-nova-braco", // 1.0.19: o braço sorteado no modo "ab" da home_nova (nova|atual), estável entre aberturas
   "core-home-nova-admin", // 1.0.19: a resposta da checagem de admin pra conta ("<uid>:1|0"), pra 2ª abertura não esperar a consulta
   "core-home-nova-fogo", // 1.0.19: o dia em que o fogo da pílula da Home nova já acendeu (o pulso toca 1x por dia)
+  "core-home-nova-score-100", // 1.0.19 (26/10): o dia em que o card do score da Home nova já fez a festinha do 100 (estrela âmbar, 1x por dia)
   "core-home-nova-origem-aparelho", // 1.0.19 (26/10): o espelho da origem da conta ("<uid>:nova|antiga", lib/home-nova) — modo "novas"
   "core-home-nova-dica-mais", // 1.0.19 (26/10): a dica do "+" já tocada/aparições (lib/dica-mais) — nunca volta; a mesma chave vai pra conta
 ]);

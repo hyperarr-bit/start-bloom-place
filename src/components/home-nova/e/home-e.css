@@ -199,3 +199,54 @@ html.he-fundo-da-tela body.com-barra-vidro .app-safe-shell { padding-bottom: 0; 
 /* as telas da E têm min-h-dvh DENTRO da casca que soma as áreas seguras (59 + 34 px no iPhone): toda tela curta
    (Aparência, Personalizar início) rolava ~93 px além do conteúdo — a altura mínima desconta as áreas seguras */
 html.he-fundo-da-tela .app-safe-shell .hn.he.min-h-dvh { min-height: calc(100dvh - var(--app-safe-top, 0px) - var(--app-safe-bottom, 0px)); }
+
+/* ---- A FESTINHA DO 100 (dono 26/10; Festa100.tsx) ----
+   O âmbar é o do score antigo (--warning do tema Original, hsl(38 92% 50%), o que o DayScoreRing usava pro anel), um
+   pouco mais fundo: --he-ouro nos TRAÇOS (anel e estrela; no escuro, um âmbar mais claro); --he-ouro-texto no NÚMERO,
+   um tom abaixo no claro pra o "100" ter contraste no card branco (≈3,2:1, texto grande — o --warning puro dá 2,1:1). */
+.hn.he { --he-ouro: hsl(36 92% 48%); --he-ouro-texto: hsl(33 94% 43%); --he-ouro-brilho: hsl(42 100% 60% / 0.55); }
+.dark .hn.he { --he-ouro: hsl(40 90% 58%); --he-ouro-texto: hsl(40 92% 62%); --he-ouro-brilho: hsl(42 100% 60% / 0.38); }
+
+/* a cor passa RÁPIDO (0,2 s, no pico do pulo): do grafite ao âmbar a mistura passa por um marrom — curta, ela não aparece */
+.he-estrela-icone { transition: color 200ms ease-out 60ms, fill 200ms ease-out 60ms; }
+.he-score [data-testid="hn-anel"] circle, .he-festa-anel circle { transition: stroke 200ms ease-out 60ms; }
+.he-numero-100 { transition: color 200ms ease-out 60ms; }
+
+/* o pulo da estrela: sobe 26 % com um giro leve, assenta com um quique curto */
+.he-estrela[data-fase="festa"] .he-estrela-icone { animation: he-estrela-pulo 760ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes he-estrela-pulo {
+  0% { transform: scale(1) rotate(0deg); }
+  35% { transform: scale(1.26) rotate(-10deg); }
+  65% { transform: scale(0.94) rotate(4deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+/* o brilho: um disco âmbar desfocado atrás da estrela, acende e some */
+.he-estrela-brilho {
+  position: absolute; inset: -45%; border-radius: 9999px; pointer-events: none;
+  background: radial-gradient(circle, var(--he-ouro-brilho) 0%, transparent 65%);
+  animation: he-estrela-brilho 900ms ease-out both;
+}
+@keyframes he-estrela-brilho {
+  0% { opacity: 0; transform: scale(0.4); }
+  35% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.35); }
+}
+/* o eco do anel: um contorno âmbar fino que cresce 16 % e se desfaz */
+.he-anel-eco {
+  position: absolute; inset: 0; border-radius: 9999px; border-style: solid; border-color: var(--he-ouro); pointer-events: none;
+  animation: he-anel-eco 900ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+@keyframes he-anel-eco {
+  0% { opacity: 0.55; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.16); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .he-estrela[data-fase="festa"] .he-estrela-icone, .he-estrela-brilho, .he-anel-eco { animation: none; opacity: 0; }
+  .he-estrela[data-fase="festa"] .he-estrela-icone { opacity: 1; }
+  .he-estrela-icone, .he-score [data-testid="hn-anel"] circle, .he-festa-anel circle, .he-numero-100 { transition: none; }
+}
+
+/* a comemoração do dia 100 da Home nova (CelebracaoDia100E): branco chapado de ponta a ponta (a faixa do relógio fica
+   transparente enquanto ela está aberta — useFaixaDoRelogioTransparente), o fundo da E no escuro */
+.he-dia100 { background: hsl(0 0% 100%); }
+.dark .he-dia100 { background: hsl(222 16% 7%); }

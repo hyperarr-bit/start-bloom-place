@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Check, ChevronRight, X } from "lucide-react";
+import { Check, ChevronRight, Star, X } from "lucide-react";
 import type { LifeHubData } from "@/hooks/use-life-hub-data";
 import type { ActionId } from "@/components/home/QuickActions";
 import type { Sequencia } from "@/components/conquistas/use-conquistas";
@@ -9,6 +9,7 @@ import { explicacaoDoScore } from "./PaginaSeuDia";
 import { NumeroQueConta } from "./Animacoes";
 import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, propsDaFolha } from "./folha-arrasto";
 import { ICONE_DO_TIPO, TRACO, corDoTipo, tintaDoTipo } from "./paleta";
+import { COR_OURO } from "./Festa100";
 
 /**
  * A FOLHA DO SCORE (opção E) — RODADA 2 (dono, 26/10: "muito carregada → bem simples"): abre já mostrando a
@@ -17,6 +18,8 @@ import { ICONE_DO_TIPO, TRACO, corDoTipo, tintaDoTipo } from "./paleta";
  * discreto no fim quando feito) e uma barrinha do quanto está feito. Sem os pontos (0/20, 15/15), sem "Falta"/
  * "Feito", sem a caixa de regra. Tocar numa linha leva a resolver (o formulário do "+" ou o módulo). No fim, só
  * a porta pra "Personalizar". Abre tocando em QUALQUER parte do card do score.
+ * 26/10 (dono): no 100, a mesma lógica do card — o número em ÂMBAR e a estrela âmbar ao lado de "pontos" (nunca um ✓
+ * no lugar dela; os ✓ das linhas são dos itens). Parado: a festinha é do card (Festa100.tsx).
  */
 interface Props {
   aberta: boolean;
@@ -103,8 +106,9 @@ export const FolhaScore = ({ aberta, onFechar, data, onAcao, onPersonalizar }: P
               <div className="min-w-0">
                 <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Score do dia</p>
                 <span className="flex items-baseline gap-1.5 mt-0.5">
-                  <NumeroQueConta valor={score} className="text-[40px] leading-none font-bold tabular-nums tracking-[-0.03em]" testid="he-folha-numero" />
+                  <NumeroQueConta valor={score} className={`text-[40px] leading-none font-bold tabular-nums tracking-[-0.03em] ${score >= 100 ? "text-[color:var(--he-ouro-texto)]" : ""}`} testid="he-folha-numero" />
                   <span className="text-[16px] font-semibold">pontos</span>
+                  {score >= 100 && <Star className="w-[18px] h-[18px] self-center ml-0.5" style={{ color: COR_OURO, fill: COR_OURO }} strokeWidth={1.5} aria-hidden data-testid="he-folha-estrela" />}
                 </span>
                 <p className="text-[14px] text-muted-foreground mt-2" data-testid="he-folha-explica">{explicacaoDoScore(pendentes, score)}.</p>
               </div>

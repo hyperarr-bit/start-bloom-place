@@ -1,4 +1,4 @@
-import { Check, LayoutGrid, Plus } from "lucide-react";
+import { Check, LayoutGrid, Plus, SlidersHorizontal } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { ActionId } from "@/components/home/QuickActions";
 import type { LifeHubData } from "@/hooks/use-life-hub-data";
@@ -66,6 +66,18 @@ export const CardWidgetE = ({ w, atraso, onAcao, compacto }: { w: DadoDoWidgetE;
     </button>
   );
 };
+
+/**
+ * "Editar" dos widgets (varredura 26/10): com 4 widgets a página 3 não tinha como trocar/tirar (o "Escolher widgets"
+ * só existe com menos de 4) — o único caminho era Você › Personalizar início. Fica à direita das bolinhas do carrossel,
+ * só com a página 3 na tela (CarrosselDia `acoes`), discreto como o "Organizar" dos módulos; abre a mesma folha.
+ */
+export const EditarWidgets = ({ onEditar }: { onEditar: () => void }) => (
+  <button type="button" onClick={onEditar} data-testid="he-widgets-editar" className="min-h-[32px] px-2 -mr-1 rounded-full flex items-center gap-1 text-[12.5px] font-semibold text-muted-foreground active:bg-muted/60">
+    <SlidersHorizontal className="w-3.5 h-3.5" strokeWidth={TRACO} aria-hidden />
+    Editar
+  </button>
+);
 
 export const PaginaWidgets = ({ data, widgets, onEscolher, onAcao }: Props) => {
   const { get } = useUserData();

@@ -27,7 +27,7 @@ import { FolhaMaisE } from "./FolhaMaisE";
 import { CarrosselDia } from "./CarrosselDia";
 import { PaginaSeuDia } from "./PaginaSeuDia";
 import { PaginaPendencias } from "./PaginaPendencias";
-import { PaginaWidgets } from "./PaginaWidgets";
+import { EditarWidgets, PaginaWidgets } from "./PaginaWidgets";
 import { FolhaScore } from "./FolhaScore";
 import { FolhaPendencias } from "./FolhaPendencias";
 import { CelebracaoDia100E, celebracaoPendente, type VarianteCelebracao } from "./CelebracaoDia100E";
@@ -191,7 +191,7 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
           <div className="mt-4 empty:hidden"><CardSeuDia lifeData={lifeData} sequencia={seq} /></div>
 
           <div className="mt-5">
-            <CarrosselDia paginas={paginas} rotulos={ROTULOS_DO_CARROSSEL} paginaInicial={paginaInicial} arrasto={arrasto} onMudar={aoMudarPagina} />
+            <CarrosselDia paginas={paginas} rotulos={ROTULOS_DO_CARROSSEL} paginaInicial={paginaInicial} arrasto={arrasto} onMudar={aoMudarPagina} acoes={[null, null, widgetsE.ativos.length > 0 ? <EditarWidgets onEditar={() => setPicker(true)} /> : null]} />
           </div>
 
           {/* Retrospectiva do mês que fechou, do dia 1 ao 10 — some sozinha fora da janela */}

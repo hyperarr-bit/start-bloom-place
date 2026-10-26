@@ -15,9 +15,12 @@ interface Props {
   paginaInicial?: number;
   arrasto?: number | null;
   onMudar?: (pagina: number) => void;
+  /** Varredura 26/10: uma ação discreta por página, à direita das bolinhas, só com aquela página na tela (ex.: "Editar"
+   *  dos widgets — com 4 widgets a página 3 não tinha como editar). Não muda a altura de nada. */
+  acoes?: Array<ReactNode | null | undefined>;
 }
 
-export const CarrosselDia = ({ paginas, rotulos, paginaInicial = 0, arrasto = null, onMudar }: Props) => {
+export const CarrosselDia = ({ paginas, rotulos, paginaInicial = 0, arrasto = null, onMudar, acoes }: Props) => {
   const trilho = useRef<HTMLDivElement>(null);
   const [pagina, setPagina] = useState(paginaInicial);
 
@@ -70,7 +73,7 @@ export const CarrosselDia = ({ paginas, rotulos, paginaInicial = 0, arrasto = nu
       <div ref={trilho} className="he-trilho" data-testid="he-trilho">
         {paginas}
       </div>
-      <div className="flex justify-center items-center gap-[7px] mt-3.5" data-testid="he-bolinhas" data-pagina={pagina}>
+      <div className="relative flex justify-center items-center gap-[7px] mt-3.5" data-testid="he-bolinhas" data-pagina={pagina}>
         {paginas.map((_, i) => (
           <button
             key={i}
@@ -83,6 +86,7 @@ export const CarrosselDia = ({ paginas, rotulos, paginaInicial = 0, arrasto = nu
             <span className={`block w-[7px] h-[7px] rounded-full transition-colors ${i === pagina ? "bg-foreground" : "bg-foreground/20"}`} />
           </button>
         ))}
+        {acoes?.[pagina] && <div className="absolute right-0 top-1/2 -translate-y-1/2" data-testid="he-carrossel-acao">{acoes[pagina]}</div>}
       </div>
     </section>
   );

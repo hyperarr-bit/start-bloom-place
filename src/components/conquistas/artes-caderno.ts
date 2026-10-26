@@ -9,12 +9,9 @@ import resolvidoVermelho from "@/assets/conquistas-caderno/colecao/tarefa-feita.
 import chefDeCasa from "@/assets/conquistas-caderno/chef-de-casa.webp";
 import primeiroDia from "@/assets/conquistas-caderno/variacoes/uma-cor/primeiro-dia-salvia.webp";
 import primeiraDespesa from "@/assets/conquistas-caderno/variacoes/uma-cor/primeira-despesa-azul.webp";
-import sequencia7 from "@/assets/conquistas-caderno/variacoes/uma-cor/sequencia-7-ambar.webp";
 import primeiroTreino from "@/assets/conquistas-caderno/variacoes/uma-cor/primeiro-treino-petroleo.webp";
 import listaDesejos from "@/assets/conquistas-caderno/variacoes/uma-cor/lista-desejos-violeta.webp";
 import salario from "@/assets/conquistas-caderno/variacoes/uma-cor/salario-jade.webp";
-import sequencia14 from "@/assets/conquistas-caderno/variacoes/uma-cor/sequencia-14-petroleo.webp";
-import sequencia30 from "@/assets/conquistas-caderno/variacoes/uma-cor/sequencia-30-violeta.webp";
 import comoEuTo from "@/assets/conquistas-caderno/revisao-humor/humor-1.webp";
 import horaMarcada from "@/assets/conquistas-caderno/revisao-rotina/compromisso-1.webp";
 import pegandoRitmo from "@/assets/conquistas-caderno/revisao-rotina/rotina-21.webp";
@@ -22,8 +19,14 @@ import doMeuJeito from "@/assets/conquistas-caderno/variacoes/aplicadas/habito-c
 import entrelinhas from "@/assets/conquistas-caderno/revisao-leitura-financas/leitura-nota-v3.webp";
 import mesFechado from "@/assets/conquistas-caderno/revisao-leitura-financas/mes-fechado.webp";
 import meuMesPaginas from "@/assets/conquistas-caderno/variacoes/aplicadas/mes-20.webp";
-import sequencia1 from "@/assets/conquistas-caderno/sequencia-aprovada/inicio-1-brasa.png";
-import sequencia3 from "@/assets/conquistas-caderno/sequencia-aprovada/sequencia-3-despertar.webp";
+// A FAMÍLIA DE PEDRA da sequência (26/10, dono): artes novas com a legenda impressa ("1 DIA" … "100 DIAS"); a cor de
+// cada marco é a da chama (components/fogo/core-fire: âmbar · petróleo · violeta · magenta · ouro suave · ouro luminoso).
+import sequencia1 from "@/assets/conquistas-caderno/sequencia-pedra/sequencia-1.webp";
+import sequencia3 from "@/assets/conquistas-caderno/sequencia-pedra/sequencia-3.webp";
+import sequencia7 from "@/assets/conquistas-caderno/sequencia-pedra/sequencia-7.webp";
+import sequencia14 from "@/assets/conquistas-caderno/sequencia-pedra/sequencia-14.webp";
+import sequencia30 from "@/assets/conquistas-caderno/sequencia-pedra/sequencia-30.webp";
+import sequencia100 from "@/assets/conquistas-caderno/sequencia-pedra/sequencia-100.webp";
 
 // Vite resolve URLs leves; os arquivos só são baixados quando uma imagem é exibida.
 const novas = import.meta.glob<string>("/src/assets/conquistas-caderno/colecao/*.webp", { eager: true, query: "?url", import: "default" });
@@ -40,8 +43,12 @@ const revisaoFinal = Object.fromEntries(Object.entries(finalizadas).map(([p, url
 const artesComCor = {
   "first-income": salario, "first-expense": primeiraDespesa,
   "rotina-1": primeiroDia, "wishlist": listaDesejos, "treino-1": primeiroTreino,
-  "sequencia-7": sequencia7, "sequencia-14": sequencia14, "sequencia-30": sequencia30,
   "sono-7": sonoSuave,
+};
+/** Os 6 marcos da sequência — a mesma arte no álbum, na coleção, na capa, na festa, no compartilhar e na folha. */
+export const SEQUENCIA_PEDRA: Record<string, string> = {
+  "sequencia-1": sequencia1, "sequencia-3": sequencia3, "sequencia-7": sequencia7,
+  "sequencia-14": sequencia14, "sequencia-30": sequencia30, "sequencia-100": sequencia100,
 };
 /** Artes aprovadas preservadas; reconstruções em arquivos próprios.
  * Só os WebP finais (vencedores deste mapa) entram no app; as artes antigas que
@@ -49,12 +56,9 @@ const artesComCor = {
 export const ARTES_CADERNO: Record<string, string> = {
   "rotina-1": primeiroDia,
   "first-expense": primeiraDespesa,
-  "sequencia-7": sequencia7,
   "treino-1": primeiroTreino,
   "wishlist": listaDesejos,
   "first-income": salario,
-  "sequencia-30": sequencia30,
-  "sequencia-14": sequencia14,
   ...colecao,
   ...Object.fromEntries(Object.entries(colecao).filter(([id]) => id.endsWith("-v2")).map(([id, url]) => [id.slice(0, -3), url])),
   ...Object.fromEntries(Object.entries(colecao).filter(([id]) => id.endsWith("-v3")).map(([id, url]) => [id.slice(0, -3), url])),
@@ -81,7 +85,6 @@ export const ARTES_CADERNO: Record<string, string> = {
   "leitura-nota": entrelinhas,
   "mes-fechado": mesFechado,
   "mes-20": meuMesPaginas,
-  // Primeiro registro e três dias: artes aprovadas para toda a coleção.
-  "sequencia-1": sequencia1,
-  "sequencia-3": sequencia3,
+  // A família de pedra da sequência por último: nenhuma pasta (coleção, revisões) sobrescreve os 6 marcos.
+  ...SEQUENCIA_PEDRA,
 };

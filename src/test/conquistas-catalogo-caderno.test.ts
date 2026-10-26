@@ -45,7 +45,8 @@ describe("Catálogo aprovado: união, critérios e migração", () => {
   const finalizadas = ["leitura-10", "dieta-jejum", "rotina-semana", "treino-50", "dieta-refeicao", "saude-log"];
   // Reconstruções aprovadas também vivem em pastas próprias, não só em variacoes.
   for (const id of ids) expect(ARTES_CADERNO[id]).toMatch(/^\/src\/assets\/conquistas-caderno\/.+\.(?:webp|png)$/);
-  expect(ARTES_CADERNO["sequencia-3"]).toContain("/sequencia-aprovada/sequencia-3-despertar.webp");
+  // a família de pedra da sequência (26/10): os 6 marcos vêm da pasta nova, em WebP, e nada os sobrescreve
+  for (const d of [1, 3, 7, 14, 30, 100]) expect(ARTES_CADERNO[`sequencia-${d}`]).toContain(`/sequencia-pedra/sequencia-${d}.webp`);
   for (const id of revisadas) expect(ARTES_CADERNO[id]).toContain(`/revisao-paleta/${id}.webp`);
   for (const id of finalizadas) expect(ARTES_CADERNO[id]).toContain(`/revisao-final/${id}.webp`);
   for (const id of ["tarefa-1", "tarefa-feita"]) expect(ARTES_CADERNO[id]).toContain(`/colecao/${id}.webp`);

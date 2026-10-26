@@ -2,6 +2,7 @@ import { useId, type CSSProperties } from "react";
 import { RARIDADE_LABEL, XP_RARIDADE, type Badge, type Raridade } from "@/components/gamification/types";
 import { Adesivo } from "./adesivos-arte";
 import { ARTES_CADERNO } from "./artes-caderno";
+import { arteMini, useImagemPronta } from "./artes-caderno-mini";
 import { FigurinhaOculta } from "./FigurinhaOculta";
 import { MarcaRaridade, RARIDADES_EM_TESTE } from "./MarcaRaridade";
 import "./conquistas.css";
@@ -44,10 +45,17 @@ interface Props {
    * pra célula longe da tela não decodificar imagem. Quem usa só liga fora da tela; nada visível muda.
    */
   semArte?: boolean;
+  /**
+   * Varredura 26/10 (grade "Ver todas"): a MINIATURA da arte (artes-caderno-mini) num <img>/máscara. Enquanto ela não
+   * está baixada e decodificada, a arte fica invisível sobre um disco neutro (`data-mini-espera`) — nunca uma célula em
+   * branco ou cortada; pronta, o desenho é o de sempre.
+   */
+  mini?: boolean;
 }
 
-export const AdesivoRaro = ({ id, raridade, tamanho, trancado, progresso, titulo, bordaGrossa, giro = 0, className, style, entradaIndice, semArte }: Props) => {
+export const AdesivoRaro = ({ id, raridade, tamanho, trancado, progresso, titulo, bordaGrossa, giro = 0, className, style, entradaIndice, semArte, mini }: Props) => {
   const caderno = !!ARTES_CADERNO[id];
+  const pronta = useImagemPronta(mini && caderno && !semArte ? arteMini(id) : undefined);
   const brilha = !semArte && !caderno && !trancado && (raridade === "epico" || raridade === "lendario");
   return (
     <span
@@ -56,12 +64,13 @@ export const AdesivoRaro = ({ id, raridade, tamanho, trancado, progresso, titulo
       data-trancado={trancado ? "" : undefined}
       data-caderno={caderno ? "" : undefined}
       data-acabamento-v2={caderno && RARIDADES_EM_TESTE ? "" : undefined}
+      data-mini-espera={pronta ? undefined : ""}
       style={{ width: tamanho, height: tamanho, "--giro": `${giro}deg`, "--i": entradaIndice, transform: giro ? `rotate(${giro}deg)` : undefined, ...style } as CSSProperties}
     >
       {brilha && <span className="ad-anel" aria-hidden />}
       {brilha && <span className="ad-sheen" aria-hidden />}
       {!semArte && !caderno && !trancado && raridade === "lendario" && <Faiscas />}
-      {semArte ? null : caderno && trancado ? <FigurinhaOculta id={id} raridade={raridade} tamanho={tamanho} progresso={progresso} /> : <Adesivo id={id} tamanho={tamanho} titulo={titulo} bordaGrossa={bordaGrossa} />}
+      {semArte ? null : caderno && trancado ? <FigurinhaOculta id={id} raridade={raridade} tamanho={tamanho} progresso={progresso} mini={mini} /> : <Adesivo id={id} tamanho={tamanho} titulo={titulo} bordaGrossa={bordaGrossa} mini={mini} />}
       {caderno && <MarcaRaridade raridade={raridade} />}
     </span>
   );

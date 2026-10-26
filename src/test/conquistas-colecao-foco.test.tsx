@@ -75,75 +75,65 @@ describe("navegação da coleção de figurinhas", () => {
 
 });
 
-describe("coleção 'Ver todas': arte sob demanda (23/10, ~160 MB de imagem com tudo montado)", () => {
-  it("só as células perto da tela montam imagem/máscara; a que chega rolando monta; a que fica bem longe solta — a moldura fica sempre", async () => {
+describe("coleção 'Ver todas': MINIATURAS sempre montadas (varredura 26/10 — antes: arte sob demanda de 640 px)", () => {
+  it("toda célula monta a arte de cara, pela MINIATURA (<img> na conquistada, máscara na trancada); rolar não solta nada; disco neutro só até decodificar", async () => {
     const { ARTES_CADERNO } = await import("@/components/conquistas/artes-caderno");
+    const { ARTES_MINI, __zerarMinis } = await import("@/components/conquistas/artes-caderno-mini");
+    __zerarMinis();
     const ids = Object.keys(ARTES_CADERNO).slice(0, 60);
     const adesivos: Badge[] = ids.map((id, i) => ({ id, name: `F${i}`, description: "", category: "finance", icon: "", color: "", xp: 50, unlocked: i % 4 === 0 }));
     const muitas: ColecaoNova = { ...colecao, adesivos, abertos: 15, total: 60 };
-    // 3 por linha, 150 px por linha a partir de 300 px, tela de 800 px (o rolador no topo)
-    const observadores: Array<{ cb: IntersectionObserverCallback; margem: string; alvos: Set<Element> }> = [];
-    class IO {
-      alvos = new Set<Element>();
-      constructor(cb: IntersectionObserverCallback, o?: IntersectionObserverInit) { observadores.push({ cb, margem: o?.rootMargin ?? "", alvos: this.alvos }); }
-      observe(el: Element) { this.alvos.add(el); }
-      unobserve(el: Element) { this.alvos.delete(el); }
-      disconnect() { this.alvos.clear(); }
-      takeRecords() { return []; }
-    }
-    // o setup.ts põe um stub gravável (não configurável): troca e devolve no fim
-    const original = globalThis.IntersectionObserver;
-    globalThis.IntersectionObserver = IO as unknown as typeof IntersectionObserver;
-    window.IntersectionObserver = IO as unknown as typeof IntersectionObserver;
-    const rect = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
-      if ((this as HTMLElement).matches?.(".cn-colecao")) return { top: 0, bottom: 800, height: 800, left: 0, right: 390, width: 390, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
-      const i = Array.from(document.querySelectorAll(".cn-colecao-arte")).indexOf(this);
-      const top = i < 0 ? 0 : 300 + Math.floor(i / 3) * 150;
-      return { top, bottom: top + 96, height: 96, left: 0, right: 96, width: 96, x: 0, y: top, toJSON: () => ({}) } as DOMRect;
+    const { container } = render(<ColecaoTela e={{ colecoes: [muitas], abertos: 15, total: 60 }} inicial={null} onFechar={() => {}} onAdesivo={() => {}} />);
+    const celulas = Array.from(container.querySelectorAll(".cn-colecao-arte"));
+    expect(celulas).toHaveLength(60);
+    // a conquistada: <img> (não o <image> do SVG) com a miniatura; a trancada: a máscara da miniatura
+    celulas.forEach((c, i) => {
+      const id = ids[i];
+      if (i % 4 === 0) {
+        const img = c.querySelector("img[data-arte-caderno]") as HTMLImageElement;
+        expect(img).toBeTruthy();
+        expect(img.getAttribute("src")).toBe(ARTES_MINI[id]);
+        expect(c.querySelector("svg image")).toBeNull();
+      } else {
+        const oculta = c.querySelector(".fig-oculta") as HTMLElement;
+        expect(oculta).toBeTruthy();
+        expect(oculta.style.getPropertyValue("--fig-mascara")).toContain(ARTES_MINI[id]);
+      }
     });
+    // rolou até o fim e voltou: nada é solto
+    await act(async () => { container.querySelector(".cn-colecao")!.dispatchEvent(new Event("scroll")); await new Promise((r) => setTimeout(r, 30)); });
+    expect(celulas.filter((c) => c.querySelector("img[data-arte-caderno], .fig-oculta"))).toHaveLength(60);
+    // até a miniatura decodificar: o disco neutro (data-mini-espera); no jsdom a imagem nunca carrega → fica esperando
+    expect(container.querySelectorAll(".ad-rar[data-mini-espera]").length).toBe(60);
+  });
+
+  it("miniatura pré-carregada (ao abrir Conquistas) = célula já pronta, sem o disco; decode que nunca volta não segura pra sempre", async () => {
+    const { ARTES_CADERNO } = await import("@/components/conquistas/artes-caderno");
+    const mini = await import("@/components/conquistas/artes-caderno-mini");
+    const { AdesivoRaro } = await import("@/components/conquistas/adesivos-raridade");
+    mini.__zerarMinis();
+    const [a, b] = Object.keys(ARTES_CADERNO);
+    const criadas: Array<{ onload: null | (() => void); decode: () => Promise<void> }> = [];
+    const ImageOriginal = globalThis.Image;
+    class ImagemFalsa { onload: null | (() => void) = null; onerror: null | (() => void) = null; decoding = ""; src = ""; decode = () => Promise.resolve(); constructor() { criadas.push(this); } }
+    globalThis.Image = ImagemFalsa as unknown as typeof Image;
+    vi.useFakeTimers();
     try {
-      const { container } = render(<ColecaoTela e={{ colecoes: [muitas], abertos: 15, total: 60 }} inicial={null} onFechar={() => {}} onAdesivo={() => {}} />);
-      const celulas = Array.from(container.querySelectorAll(".cn-colecao-arte"));
-      expect(celulas).toHaveLength(60);
-      const comArte = (el: Element) => !!el.querySelector("svg image, .fig-oculta");
-      // perto = a tela + 1 tela abaixo (até 1600 px): linhas 0..8 = 27 células; o resto só com a moldura
-      expect(celulas.filter(comArte)).toHaveLength(27);
-      expect(comArte(celulas[0]) && comArte(celulas[26])).toBe(true);
-      expect(comArte(celulas[27]) || comArte(celulas[59])).toBe(false);
-      celulas.forEach((c) => expect(c.querySelector(".ad-rar")).toBeTruthy()); // a moldura (mesmo tamanho) sempre lá
-      // rolou: a célula 59 entra na margem de carregar → monta (depois de decodificar)
-      const carrega = observadores.find((o) => o.margem === "100% 0px")!;
-      const solta = observadores.find((o) => o.margem === "200% 0px")!;
-      expect(carrega.alvos.size).toBe(60);
-      await act(async () => { carrega.cb([{ target: celulas[59], isIntersecting: true } as unknown as IntersectionObserverEntry], {} as IntersectionObserver); await new Promise((r) => setTimeout(r, 0)); });
-      expect(comArte(celulas[59])).toBe(true);
-      // 1.0.19: decode() que nunca volta (WebKit) não deixa a célula vazia pra sempre — no máximo 250 ms
-      const proto = HTMLImageElement.prototype as { decode?: () => Promise<void> };
-      const decodeOriginal = proto.decode;
-      proto.decode = () => new Promise<void>(() => {});
-      await act(async () => { carrega.cb([{ target: celulas[56], isIntersecting: true } as unknown as IntersectionObserverEntry], {} as IntersectionObserver); await new Promise((r) => setTimeout(r, 10)); });
-      expect(comArte(celulas[56])).toBe(false);
-      await act(async () => { await new Promise((r) => setTimeout(r, 300)); });
-      expect(comArte(celulas[56])).toBe(true);
-      if (decodeOriginal) proto.decode = decodeOriginal; else delete proto.decode;
-      // rolagem com inércia sem aviso do IntersectionObserver: a conta a cada quadro de rolagem monta quem está na tela
-      rect.mockImplementation(function (this: Element) {
-        if ((this as HTMLElement).matches?.(".cn-colecao")) return { top: 0, bottom: 800, height: 800, left: 0, right: 390, width: 390, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
-        const i = Array.from(document.querySelectorAll(".cn-colecao-arte")).indexOf(this);
-        const top = i < 0 ? 0 : 300 + Math.floor(i / 3) * 150 - 2400; // rolou 2400 px
-        return { top, bottom: top + 96, height: 96, left: 0, right: 96, width: 96, x: 0, y: top, toJSON: () => ({}) } as DOMRect;
-      });
-      expect(comArte(celulas[45])).toBe(false);
-      await act(async () => { container.querySelector(".cn-colecao")!.dispatchEvent(new Event("scroll")); await new Promise((r) => setTimeout(r, 50)); });
-      expect(comArte(celulas[45])).toBe(true);
-      // a 0 ficou bem longe → solta a arte, a moldura fica
-      act(() => { solta.cb([{ target: celulas[0], isIntersecting: false } as unknown as IntersectionObserverEntry], {} as IntersectionObserver); });
-      expect(comArte(celulas[0])).toBe(false);
-      expect(celulas[0].querySelector(".ad-rar")).toBeTruthy();
-    } finally {
-      rect.mockRestore();
-      globalThis.IntersectionObserver = original;
-      window.IntersectionObserver = original;
-    }
+      const pa = mini.precarregar(mini.ARTES_MINI[a]);
+      criadas[0].onload!();
+      await vi.runAllTimersAsync(); await pa;
+      expect(mini.imagemPronta(mini.ARTES_MINI[a])).toBe(true);
+      // decode que nunca volta (WebKit com dezenas juntas): pronta depois de 1,5 s do load
+      const pb = mini.precarregar(mini.ARTES_MINI[b]);
+      criadas[1].decode = () => new Promise<void>(() => {});
+      criadas[1].onload!();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(mini.imagemPronta(mini.ARTES_MINI[b])).toBe(false);
+      await vi.advanceTimersByTimeAsync(600); await pb;
+      expect(mini.imagemPronta(mini.ARTES_MINI[b])).toBe(true);
+    } finally { vi.useRealTimers(); globalThis.Image = ImageOriginal; }
+    const { container } = render(<AdesivoRaro id={a} raridade="comum" tamanho={96} mini />);
+    expect(container.querySelector(".ad-rar")!.hasAttribute("data-mini-espera")).toBe(false);
+    expect(container.querySelector("img[data-arte-caderno]")).toBeTruthy();
   });
 });

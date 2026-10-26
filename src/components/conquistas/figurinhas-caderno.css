@@ -5,6 +5,14 @@
 :is(.fig, .ad-rar)[data-caderno][data-rar="lendario"], .fig-oculta[data-rar="lendario"] { --fig-borda: #bd9850; --fig-silhueta: #e6dab9; }
 :is(.fig, .ad-rar)[data-caderno][data-rar] > svg[data-arte-caderno] { width: 100%; height: 100%; opacity: 1; filter: drop-shadow(0 2px 1px #292b3525); }
 :is(.fig, .ad-rar)[data-caderno][data-rar="comum"] > svg[data-arte-caderno] { filter: drop-shadow(0 2px 1px #292b3525); }
+/* Varredura 26/10 — a grade "Ver todas" usa a MINIATURA num <img> (artes-caderno-mini): as mesmas regras do <svg> acima
+   (100% da célula, sombra de recorte, por cima do papel). Enquanto a miniatura não está decodificada, a arte fica
+   invisível sobre um disco neutro (data-mini-espera) — nunca célula em branco/cortada. */
+.ad-rar > img[data-arte-caderno] { position: relative; z-index: 1; display: block; object-fit: contain; }
+:is(.fig, .ad-rar)[data-caderno][data-rar] > img[data-arte-caderno] { width: 100%; height: 100%; opacity: 1; filter: drop-shadow(0 2px 1px #292b3525); }
+:is(.fig, .ad-rar)[data-caderno][data-rar][data-mini-espera] > img[data-arte-caderno] { opacity: 0; }
+.fig-oculta-espiada > img { width: 100%; height: 100%; display: block; }
+.ad-rar[data-mini-espera]::before { content: ""; position: absolute; inset: 16%; border-radius: 50%; background: var(--fig-silhueta, #e3dfd6); opacity: .55; z-index: 0; }
 .fig[data-caderno].fig-vazia { filter: none; }
 :is(.fig, .ad-rar)[data-caderno] > .fig-oculta { width: 100% !important; height: 100% !important; }
 .fig-oculta { position: relative; display: inline-block; line-height: 0; isolation: isolate; pointer-events: none; }

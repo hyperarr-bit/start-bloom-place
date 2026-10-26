@@ -2,6 +2,7 @@ import { useId, type CSSProperties, type ReactNode } from "react";
 import { Award } from "lucide-react";
 import { arteReferencia } from "./artes-referencia";
 import { ARTES_CADERNO } from "./artes-caderno";
+import { arteMini } from "./artes-caderno-mini";
 
 /**
  * ADESIVOS PRÓPRIOS (26/09; coleção de 65 em 27/09) — no lugar dos emojis das insígnias.
@@ -913,12 +914,20 @@ interface AdesivoProps {
   titulo?: string;
   /** Borda de recorte mais grossa (tamanhos grandes: detalhe, Stories). */
   bordaGrossa?: boolean;
+  /** Varredura 26/10 (grade "Ver todas"): a MINIATURA num <img> comum em vez da arte grande num <image> de SVG — o
+   *  WebKit não repintava o <image> que montava sem a imagem pronta (células em branco/cortadas). Mesmo desenho. */
+  mini?: boolean;
 }
 
 /** O adesivo conquistado, colorido, com borda branca de recorte e sombra. */
-export const Adesivo = ({ id, tamanho = 72, className, style, titulo, bordaGrossa }: AdesivoProps) => {
+export const Adesivo = ({ id, tamanho = 72, className, style, titulo, bordaGrossa, mini }: AdesivoProps) => {
   const uid = `dc${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const raio = bordaGrossa ? 4.5 : 3;
+  // a grade da coleção: a miniatura (artes-caderno-mini) num <img> — as mesmas regras de tamanho/sombra (figurinhas-caderno.css)
+  if (mini && ARTES_CADERNO[id]) return (
+    <img src={arteMini(id)} width={tamanho} height={tamanho} decoding="async" draggable={false} className={className} style={style}
+      alt={titulo ?? ""} aria-hidden={titulo ? undefined : true} data-adesivo={id} data-arte-caderno="" data-mini="" />
+  );
   // Mantém o contrato SVG usado no álbum, nas raridades e nos Stories.
   // A imagem já inclui o recorte; não recebe outra borda ou filtro pesado.
   if (ARTES_CADERNO[id]) return (

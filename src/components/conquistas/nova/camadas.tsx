@@ -1,11 +1,10 @@
 import { CelebracaoFigurinha } from "./CelebracaoFigurinha";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { ChevronRight, X } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { RARIDADE_LABEL, raridadeDe, type Badge } from "@/components/gamification/types";
 import { rotuloProgresso } from "@/lib/conquistas-registro";
 import { AdesivoRaro } from "../adesivos-raridade";
-import { ARTES_CADERNO } from "../artes-caderno";
 import { proximasFigurinhas } from "../capa-pessoal";
 import { requisitoDaFigurinha } from "../textos-figurinhas";
 import { RARIDADES_EM_TESTE } from "../MarcaRaridade";
@@ -68,94 +67,18 @@ export const DetalheSequencia = ({ e, aberto, onFechar, onAdesivo }: { e: Estado
 /* ------------------------------------------------------------------ a coleção inteira (ver todos, secundária) */
 
 /**
- * ARTE SOB DEMANDA (23/10): a coleção tem ~98 figurinhas e as trancadas usam a própria imagem como máscara — tudo
- * montado de uma vez dava ~160 MB de imagem decodificada (risco de derrubar o app em iPhone antigo). Só a célula
- * PERTO da tela (1 tela acima/abaixo) monta a arte; a que fica BEM longe (2 telas) solta. A moldura da célula fica
- * no mesmo tamanho e lugar, então nada visível muda. Sem IntersectionObserver (teste/navegador velho): tudo monta.
+ * A ARTE DA CÉLULA (varredura 26/10). Até aqui a grade montava a arte "sob demanda" (23/10: as artes de 640 px
+ * inteiras davam ~160 MB decodificados) e soltava a de quem ficava longe — na rolagem rápida as células voltavam em
+ * branco/cortadas (o `<image>` do SVG montado antes da imagem pronta não repinta no WebKit). Agora a grade usa a
+ * MINIATURA (artes-caderno-mini: 288 px, ~25 MB as 99 juntas) num <img>, sempre montada — nada é solto — e pré-carregada
+ * ao abrir Conquistas; enquanto a miniatura decodifica, um disco neutro no lugar (AdesivoRaro `mini`).
  */
-const MARGEM_CARREGA = 1; // telas
-const MARGEM_SOLTA = 2;
-type Observador = { observar: (el: HTMLElement, id: string) => () => void; perto: (id: string) => boolean };
-const useArteSobDemanda = (rolagem: RefObject<HTMLElement>): Observador => {
-  const semIO = typeof IntersectionObserver === "undefined";
-  const [perto, setPerto] = useState<ReadonlySet<string>>(() => new Set());
-  const celulas = useRef(new Map<HTMLElement, string>());
-  const ios = useRef<{ carrega: IntersectionObserver; solta: IntersectionObserver } | null>(null);
-  const juntar = useCallback((ids: string[]) => {
-    if (ids.length) setPerto((p) => (ids.every((id) => p.has(id)) ? p : new Set([...p, ...ids])));
-  }, []);
-  // a conta na hora (antes de pintar): a célula que já nasce na tela nunca aparece vazia nem por 1 quadro
-  const pertoAgora = useCallback((els: HTMLElement[]) => {
-    const raiz = rolagem.current;
-    if (!raiz) return;
-    const r = raiz.getBoundingClientRect();
-    const m = (r.height || window.innerHeight) * MARGEM_CARREGA;
-    juntar(els.filter((el) => { const b = el.getBoundingClientRect(); return b.bottom >= r.top - m && b.top <= r.bottom + m; }).map((el) => celulas.current.get(el)!).filter(Boolean));
-  }, [rolagem, juntar]);
-  useLayoutEffect(() => {
-    const raiz = rolagem.current;
-    if (semIO || !raiz) return;
-    const idDe = (el: Element) => celulas.current.get(el as HTMLElement);
-    // a que chega rolando: a imagem já vem decodificada ANTES de montar (nunca um quadro com a célula vazia na tela)
-    const carrega = new IntersectionObserver((es) => {
-      for (const e of es) {
-        const id = e.isIntersecting ? idDe(e.target) : undefined;
-        // 26/10 (rodada 2b, Simulador): um "fora" entregue a quem está na tela não pode deixar a célula vazia — a conta na mão decide
-        if (!id) { pertoAgora([e.target as HTMLElement]); continue; }
-        const url = ARTES_CADERNO[id];
-        if (!url) { juntar([id]); continue; }
-        const img = new Image();
-        img.src = url;
-        // 1.0.19 (páginas em branco na "Sua coleção", TestFlight do dono): no WebKit o decode() pode demorar muito ou nem
-        // voltar com dezenas pedidas juntas (rolagem rápida) — a célula esperava pra sempre, vazia. Espera no máximo 250 ms.
-        const decodificada = typeof img.decode === "function" ? img.decode().catch(() => undefined) : Promise.resolve();
-        Promise.race([decodificada, new Promise((r) => window.setTimeout(r, 250))]).then(() => juntar([id]));
-      }
-    }, { root: raiz, rootMargin: `${MARGEM_CARREGA * 100}% 0px` });
-    const solta = new IntersectionObserver((es) => {
-      // 26/10 (rodada 2b, Simulador do iPhone 17 Pro): depois de uma rolagem rápida até o FIM da coleção, o WebKit entregou
-      // "fora" pras duas últimas células — que estavam NA TELA — e a arte delas sumia (figurinhas em branco até a próxima
-      // rolagem). Só solta quem está longe DE VERDADE, pela geometria na hora da entrega.
-      const r = raiz.getBoundingClientRect();
-      const m = (r.height || window.innerHeight) * MARGEM_SOLTA;
-      const longe = es.filter((e) => !e.isIntersecting).map((e) => e.target as HTMLElement)
-        .filter((el) => { const b = el.getBoundingClientRect(); return b.bottom < r.top - m || b.top > r.bottom + m; })
-        .map((el) => idDe(el)!).filter(Boolean);
-      if (longe.length) setPerto((p) => (longe.some((id) => p.has(id)) ? new Set([...p].filter((id) => !longe.includes(id))) : p));
-    }, { root: raiz, rootMargin: `${MARGEM_SOLTA * 100}% 0px` });
-    ios.current = { carrega, solta };
-    for (const el of celulas.current.keys()) { carrega.observe(el); solta.observe(el); }
-    pertoAgora([...celulas.current.keys()]);
-    // rede de segurança: o WebKit nem sempre entrega o IntersectionObserver de um rolador `fixed` durante a rolagem
-    // com inércia (só no fim) — a conta na mão a cada quadro de rolagem garante a arte de quem está na tela.
-    let quadro = 0;
-    const aoRolar = () => {
-      if (quadro) return;
-      quadro = window.requestAnimationFrame(() => { quadro = 0; pertoAgora([...celulas.current.keys()]); });
-    };
-    raiz.addEventListener("scroll", aoRolar, { passive: true });
-    return () => { carrega.disconnect(); solta.disconnect(); ios.current = null; raiz.removeEventListener("scroll", aoRolar); if (quadro) window.cancelAnimationFrame(quadro); };
-  }, [rolagem, semIO, juntar, pertoAgora]);
-  const observar = useCallback((el: HTMLElement, id: string) => {
-    celulas.current.set(el, id);
-    if (ios.current) { ios.current.carrega.observe(el); ios.current.solta.observe(el); pertoAgora([el]); }
-    return () => { celulas.current.delete(el); ios.current?.carrega.unobserve(el); ios.current?.solta.unobserve(el); };
-  }, [pertoAgora]);
-  return { observar, perto: (id: string) => semIO || perto.has(id) };
-};
-
-/** A arte da célula da coleção: monta só perto da tela (ver useArteSobDemanda). */
-const ArteDaCelula = ({ b, i, obs }: { b: Badge; i: number; obs: Observador }) => {
-  const ref = useRef<HTMLSpanElement>(null);
-  const { observar } = obs;
-  useLayoutEffect(() => (ref.current ? observar(ref.current, b.id) : undefined), [observar, b.id]);
-  return (
-    <span ref={ref} className="cn-colecao-arte">
-      <AdesivoRaro id={b.id} raridade={raridadeDe(b)} tamanho={112} style={{ width: "var(--colecao-arte)", height: "var(--colecao-arte)" }} trancado={!b.unlocked} progresso={b.progresso} giro={b.unlocked ? giroDoAdesivo(i) : 0} semArte={!obs.perto(b.id)} />
-      {!b.unlocked && rotuloProgresso(b) && <span className="cn-prog">{rotuloProgresso(b)}</span>}
-    </span>
-  );
-};
+const ArteDaCelula = ({ b, i }: { b: Badge; i: number }) => (
+  <span className="cn-colecao-arte">
+    <AdesivoRaro id={b.id} raridade={raridadeDe(b)} tamanho={112} style={{ width: "var(--colecao-arte)", height: "var(--colecao-arte)" }} trancado={!b.unlocked} progresso={b.progresso} giro={b.unlocked ? giroDoAdesivo(i) : 0} mini />
+    {!b.unlocked && rotuloProgresso(b) && <span className="cn-prog">{rotuloProgresso(b)}</span>}
+  </span>
+);
 
 export const ColecaoTela = ({ e, inicial, onFechar, onAdesivo }: { e: Pick<EstadoConquistasNova, "colecoes" | "abertos" | "total">; inicial: ColecaoNova | null; onFechar: () => void; onAdesivo: (b: Badge) => void }) => {
   const [filtro, setFiltro] = useState<string>(inicial?.id ?? "todas");
@@ -163,7 +86,6 @@ export const ColecaoTela = ({ e, inicial, onFechar, onAdesivo }: { e: Pick<Estad
   const [visao, setVisao] = useState<"todas" | "perto">("todas");
   const fechar = useRef<HTMLButtonElement>(null);
   const rolagem = useRef<HTMLDivElement>(null);
-  const obs = useArteSobDemanda(rolagem);
   useEffect(() => {
     const origem = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     fechar.current?.focus({ preventScroll: true });
@@ -227,7 +149,7 @@ export const ColecaoTela = ({ e, inicial, onFechar, onAdesivo }: { e: Pick<Estad
               <div className="cn-grade4">
                 {c.adesivos.map((b, i) => (
                   <button key={b.id} type="button" className="cn-celula" onClick={() => onAdesivo(b)} data-aberto={b.unlocked ? "true" : "false"} aria-label={`${b.name}: ${b.unlocked ? "conquistada" : "a conquistar"}`}>
-                    <ArteDaCelula b={b} i={i} obs={obs} />
+                    <ArteDaCelula b={b} i={i} />
                     <span className={`cn-celula-nome ${b.unlocked ? "text-foreground" : "text-muted-foreground"}`}>{b.name}</span>
                     {(!b.unlocked || RARIDADES_EM_TESTE) && raridadeDe(b) !== "comum" && <span className="chip-rar" data-rar={raridadeDe(b)} style={{ height: 14, fontSize: 7.5 }}>{RARIDADE_LABEL[raridadeDe(b)]}</span>}
                   </button>

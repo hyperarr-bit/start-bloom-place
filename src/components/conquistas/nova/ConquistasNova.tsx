@@ -1,4 +1,5 @@
 import { CelebracaoFigurinha } from "./CelebracaoFigurinha";
+import { precarregarMinis } from "../artes-caderno-mini";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { LinkRetrospectiva } from "@/components/conquistas/LinkRetrospectiva";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -173,6 +174,8 @@ export const ConquistasNova = ({ testeDia: testeDiaProp, camada = null, prototip
   const location = useLocation();
   const reduzir = useReducedMotion();
   const e = useConquistasNova();
+  // varredura 26/10: as miniaturas da grade "Ver todas" já baixam e decodificam ao abrir Conquistas (artes-caderno-mini)
+  useEffect(() => { const t = window.setTimeout(precarregarMinis, 400); return () => window.clearTimeout(t); }, []);
   const { get, set } = useUserData();
   const capaCru = get<unknown>(CHAVE_CAPA_PESSOAL, null);
   const capa = lerCapaPessoal(capaCru);

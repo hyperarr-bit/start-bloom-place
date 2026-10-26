@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Settings2, Star } from "lucide-react";
 import { MODULOS, type Modulo } from "@/lib/modulos";
+import { modulosPorUso } from "./ordem-modulos";
 import type { useModulePreferences } from "@/hooks/use-module-preferences";
 import type { LifeHubData } from "@/hooks/use-life-hub-data";
 import { trackEvent } from "@/lib/analytics";
@@ -64,7 +65,8 @@ interface Props {
 export const ModulosE = ({ data, variante, azulejo = "tinta", onOrganizar, preferencias }: Props) => {
   const navigate = useNavigate();
   const { isFavorite, isHidden, ordenar } = preferencias;
-  const visiveis = ordenar(MODULOS).filter((m) => !isHidden(m.id));
+  // 26/10: sem ordem gravada, os mais usados primeiro (ordem-modulos.ts); com ordem/favoritos, manda o `ordenar`
+  const visiveis = ordenar(modulosPorUso()).filter((m) => !isHidden(m.id));
   const ocultos = MODULOS.length - visiveis.length;
   const abrir = (m: Modulo, i: number) => { trackEvent("home_modulo", { modulo: m.id, posicao: i, favorito: isFavorite(m.id) }); navigate(m.path); };
 

@@ -1,7 +1,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, FaixaDoRelogioSobFolha, propsDaFolha } from "./folha-arrasto";
 import { ChevronDown, ChevronUp, Eye, EyeOff, Star, X } from "lucide-react";
-import { MODULOS } from "@/lib/modulos";
+import { modulosPorUso } from "./ordem-modulos";
 import type { useModulePreferences } from "@/hooks/use-module-preferences";
 import { TRACO, corDoModulo, tintaDoModulo } from "./paleta";
 
@@ -18,7 +18,7 @@ interface Props { aberta: boolean; onFechar: () => void; preferencias: ReturnTyp
 
 export const OrganizarModulos = ({ aberta, onFechar, preferencias }: Props) => {
   const { toggleFavorite, toggleHidden, isFavorite, isHidden, ordenar, moveModule } = preferencias;
-  const lista = ordenar(MODULOS);
+  const lista = ordenar(modulosPorUso()); // a mesma ordem da grade (26/10: os mais usados primeiro)
   // varredura 26/10: como as outras folhas da E — com "reduzir movimento", sem a mola do arrasto nem o fade do fundo
   const semMovimento = useReducedMotion();
   const arrasto = useFolhaArrastavel(onFechar, !!semMovimento); // rodada 3: arrastar pra baixo fecha

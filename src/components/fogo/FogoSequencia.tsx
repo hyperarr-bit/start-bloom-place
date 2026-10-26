@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { useReducedMotion } from "framer-motion";
 import { fogoDoCaderno } from "@/components/conquistas/nova/fogo-caderno";
 import { CoreFire } from "./core-fire/CoreFire";
@@ -58,8 +58,11 @@ export const FogoSequencia = ({ dias, estado, tamanho = 42, brilho = false, viva
   const status = neutro ? "unstarted" : STATUS[est];
   const tom = neutro ? "gray" : toneForDays(dias);
   const faixa = fogoDoCaderno(dias);
+  // cada subida de `acender` (false → true) = um acender do CoreFire, no MESMO quadro (estado derivado na renderização)
+  const pedido = acender && !reduzir;
+  const [pedidoAntes, setPedidoAntes] = useState(false);
   const [celebracao, setCelebracao] = useState(0);
-  useEffect(() => { if (acender && !reduzir) setCelebracao((k) => k + 1); }, [acender, reduzir]);
+  if (pedido !== pedidoAntes) { setPedidoAntes(pedido); if (pedido) setCelebracao((k) => k + 1); }
   const altura = alturaDaChama(tamanho);
   const halo = brilho && !neutro ? `drop-shadow(0 0 ${Math.max(2, Math.round(altura / 8))}px ${CORE_FIRE_COLORS[tom].body}66)` : undefined;
   return (

@@ -8,7 +8,7 @@ export type { CoreFireStatus, CoreFireTone } from "./core-fire-data";
  * a CONTINUIDADE ao remontar. O SMIL começa do quadro 0 quando o <svg> entra na página; trocar de aba / voltar pra
  * Home fazia a chama "recomeçar com pulo". Agora, toda vez que o movimento liga (montagem, volta da aba oculta, volta
  * pra tela), o relógio do SVG é posto na fase do relógio do aparelho (`fireClockPhase`) — a chama continua de onde
- * "estaria". Fora isso: só React, sem dependência; pausa fora da tela, em aba oculta e com redução de movimento.
+ * "estaria". E o acender (cf-ignite) começa desbotado (0,52, o `pending`) e sobe junto com a chama. Fora isso: só React, sem dependência; pausa fora da tela, em aba oculta e com redução de movimento.
  */
 type Props = {
   tone?: CoreFireTone | "auto";
@@ -31,8 +31,6 @@ const reduzirMovimento = () => typeof window !== "undefined" && typeof window.ma
 /** A silhueta exata da Home, sem contorno. Este componente nunca lê nem grava dado do usuário. */
 export function CoreFire({ tone = "home", days = 0, status = "done", size = 24, motion = true, celebrationKey = 0, label, className = "", style }: Props) {
   const ref = useRef<SVGSVGElement>(null);
-  const lastCelebration = useRef(0);
-  const [celebrating, setCelebrating] = useState(false);
   const [visible, setVisible] = useState(true);
   const [pageVisible, setPageVisible] = useState(() => typeof document === "undefined" || document.visibilityState !== "hidden");
   const [reduced, setReduced] = useState(reduzirMovimento);
@@ -55,23 +53,25 @@ export function CoreFire({ tone = "home", days = 0, status = "done", size = 24, 
     const svg = ref.current as SvgComRelogio | null;
     try { svg?.setCurrentTime?.(fireClockPhase()); } catch { /* sem SMIL (jsdom): nada a sincronizar */ }
   }, [animate]);
+  // o ACENDER: decidido NA RENDERIZAÇÃO (padrão "estado derivado de prop"), pra entrar no MESMO quadro em que o
+  // estado vira `done` — a opacidade sobe 0,52 → 1 dentro do cf-ignite (core-fire.css), sem um quadro "aceso" antes.
+  const [celebration, setCelebration] = useState(() => ({ key: celebrationKey, on: celebrationKey > 0 && animate }));
+  if (celebrationKey !== celebration.key) setCelebration({ key: celebrationKey, on: celebrationKey > 0 && animate });
+  const celebrating = celebration.on && animate;
   useEffect(() => {
-    if (celebrationKey <= 0 || celebrationKey === lastCelebration.current) return;
-    lastCelebration.current = celebrationKey;
-    if (!animate) return;
-    setCelebrating(true);
-    const timer = window.setTimeout(() => setCelebrating(false), 1100);
-    return () => { window.clearTimeout(timer); setCelebrating(false); };
-  }, [celebrationKey, animate]);
+    if (!celebration.on) return;
+    const timer = window.setTimeout(() => setCelebration((c) => ({ ...c, on: false })), 1100);
+    return () => window.clearTimeout(timer);
+  }, [celebration]);
   const vars = { "--cf-body": color.body, "--cf-inner": color.inner, ...style } as CSSProperties;
   return <svg ref={ref} className={`core-fire ${className}`.trim()} style={vars} width={size * 28 / 32} height={size} viewBox="0 0 28 32" fill="none" data-status={status} data-tone={selected} data-motion={animate ? "on" : "off"} role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true}>
-    <g key={celebrationKey} className={animate && celebrating ? "cf-ignite" : undefined}>
+    <g key={celebrationKey} className={celebrating ? "cf-ignite" : undefined}>
       <g className="cf-moving">
         <path className="cf-body" fill={color.body} d={FIRE_BODY_FRAMES[0]}>{animate && <animate attributeName="d" values={FIRE_BODY_FRAMES.join(";")} dur={FIRE_BODY_DURATION} keyTimes={FIRE_KEY_TIMES} calcMode="linear" repeatCount="indefinite"/>}</path>
         <path className="cf-inner" fill={color.inner} d={FIRE_INNER_FRAMES[0]}>{animate && <animate attributeName="d" values={FIRE_INNER_FRAMES.join(";")} dur={FIRE_INNER_DURATION} keyTimes={FIRE_KEY_TIMES} calcMode="linear" repeatCount="indefinite"/>}</path>
       </g>
       <g className="cf-still"><path fill={color.body} d={FIRE_BODY_FRAMES[0]}/><path fill={color.inner} d={FIRE_INNER_FRAMES[0]}/></g>
-      {animate && celebrating && <g className="cf-sparks" fill={color.body}><circle className="cf-spark cf-spark-a" cx="7" cy="9" r=".65"/><circle className="cf-spark cf-spark-b" cx="22" cy="12" r=".55"/><circle className="cf-spark cf-spark-c" cx="18" cy="5" r=".45"/></g>}
+      {celebrating && <g className="cf-sparks" fill={color.body}><circle className="cf-spark cf-spark-a" cx="7" cy="9" r=".65"/><circle className="cf-spark cf-spark-b" cx="22" cy="12" r=".55"/><circle className="cf-spark cf-spark-c" cx="18" cy="5" r=".45"/></g>}
     </g>
   </svg>;
 }

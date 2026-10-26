@@ -60,8 +60,10 @@ describe("Home nova — pílula do fogo e folha da sequência", () => {
     await montar(base([diasAtras(1), hoje]));
     const pilula = screen.getByTestId("hn-pilula-fogo");
     expect(pilula.getAttribute("data-fogo")).toBe("aceso");
-    // 26/10: o fogo unificado (components/fogo) — a faixa e o estado no invólucro, o desenho do Codex dentro
-    expect(pilula.querySelector("[data-testid='fg-seq'][data-fogo='aceso'][data-faixa='ambar'] svg.core-fire[data-tone='amber'][data-status='done']")).toBeTruthy();
+    // 26/10: o fogo unificado (components/fogo) — a faixa e o estado no invólucro, o desenho do Codex dentro.
+    // Montou com o dia garantido e ainda não acendeu hoje: ~0,4 s APAGADO (pending) e então ACENDE (cf-ignite)
+    expect(pilula.querySelector("[data-testid='fg-seq'][data-fogo='apagado'] svg.core-fire[data-status='pending']")).toBeTruthy();
+    await waitFor(() => expect(pilula.querySelector("[data-testid='fg-seq'][data-fogo='aceso'][data-faixa='ambar'] svg.core-fire[data-tone='amber'][data-status='done'] .cf-ignite")).toBeTruthy());
     expect(screen.getByTestId("hn-pilula-dias").textContent).toBe("2");
     fireEvent.click(pilula);
     await waitFor(() => expect(screen.getByTestId("he-folha-sequencia")).toBeTruthy());

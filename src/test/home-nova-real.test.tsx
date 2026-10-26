@@ -153,8 +153,8 @@ describe("Home nova — chave ON", () => {
     await waitFor(() => expect(document.querySelector('[data-testid="barra-vidro-global"] [data-testid="hn-barra"]')).toBeTruthy());
     expect(document.querySelector('[data-camada-guia]')).toBeNull();
     expect(document.querySelector('[data-testid="barra-de-abas"]')).toBeNull();
-    // o fogo acendeu hoje (o dia está anotado): a marca do aparelho é de hoje
-    expect(localStorage.getItem(CHAVE_FOGO_ACESO_HOME_NOVA)).toBe(hoje);
+    // o fogo acendeu hoje (o dia está anotado): ~0,4 s apagado e acende; a marca do aparelho é de hoje
+    await waitFor(() => expect(localStorage.getItem(CHAVE_FOGO_ACESO_HOME_NOVA)).toBe(hoje));
   });
 
   it("o '+' → Água abre o FORMULÁRIO da água (não registra no toque); '+ 1 copo' grava nas duas chaves, a folha fica aberta e 'Pronto' fecha", async () => {
@@ -290,8 +290,8 @@ describe("Home nova — chave ON", () => {
     ligar();
     const primeira = await montar();
     await waitFor(() => expect(document.querySelector('[data-layout="e"]')).toBeTruthy());
+    await waitFor(() => expect(localStorage.getItem(CHAVE_FOGO_ACESO_HOME_NOVA)).toBe(hoje));
     const marca = localStorage.getItem(CHAVE_FOGO_ACESO_HOME_NOVA);
-    expect(marca).toBe(hoje);
     primeira.unmount();
     cleanup();
     await montar();
@@ -301,6 +301,9 @@ describe("Home nova — chave ON", () => {
     expect(screen.queryByTestId("hn-organizar-folha")).toBeNull();
     expect(localStorage.getItem(CHAVE_FOGO_ACESO_HOME_NOVA)).toBe(marca);
     expect(document.querySelector('[data-testid="hn-pilula-fogo"]')?.classList.contains("he-acende")).toBe(false);
+    // reabriu no mesmo dia: já monta ACESO (sem o "apagado → acende") e sem tocar o acender
+    expect(document.querySelector('[data-testid="hn-pilula-fogo"] [data-testid="fg-seq"]')?.getAttribute("data-fogo")).toBe("aceso");
+    expect(document.querySelector('[data-testid="hn-pilula-fogo"] .cf-ignite')).toBeNull();
   });
 });
 

@@ -6,7 +6,7 @@ import { ARTES_CADERNO } from "./artes-caderno";
  *
  * A grade desenhava cada célula (≤ 96 pt) a partir da arte de 640×640 (~1,6 MB decodificada; ~160 MB as 99) num
  * `<image>` de SVG — o WebKit pintava parcial/vazio quando a imagem ainda decodificava ou tinha sido descartada, e não
- * repintava. Agora a grade usa miniaturas de 288 px (3× a célula no iPhone: a mesma nitidez; ~25 MB decodificadas
+ * repintava. Agora a grade usa miniaturas de 288 px (3× a célula no iPhone: a mesma nitidez; ~33 MB decodificadas
  * todas juntas), geradas por `scripts/miniaturas-figurinhas.mjs` em src/assets/conquistas-caderno/mini/<id>.webp, num
  * `<img>` comum (que repinta sozinho). O detalhe/zoom, o álbum, a festa e o compartilhar seguem com a arte grande.
  */

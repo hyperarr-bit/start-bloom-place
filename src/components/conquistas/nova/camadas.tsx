@@ -70,7 +70,7 @@ export const DetalheSequencia = ({ e, aberto, onFechar, onAdesivo }: { e: Estado
  * A ARTE DA CÉLULA (varredura 26/10). Até aqui a grade montava a arte "sob demanda" (23/10: as artes de 640 px
  * inteiras davam ~160 MB decodificados) e soltava a de quem ficava longe — na rolagem rápida as células voltavam em
  * branco/cortadas (o `<image>` do SVG montado antes da imagem pronta não repinta no WebKit). Agora a grade usa a
- * MINIATURA (artes-caderno-mini: 288 px, ~25 MB as 99 juntas) num <img>, sempre montada — nada é solto — e pré-carregada
+ * MINIATURA (artes-caderno-mini: 288 px, ~33 MB as 100 juntas) num <img>, sempre montada — nada é solto — e pré-carregada
  * ao abrir Conquistas; enquanto a miniatura decodifica, um disco neutro no lugar (AdesivoRaro `mini`).
  */
 const ArteDaCelula = ({ b, i }: { b: Badge; i: number }) => (

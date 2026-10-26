@@ -511,14 +511,15 @@ describe("Home nova — as 12 ações do '+' (revisor 26/10: a Tarefa abria esco
 describe("Home nova — a barra de vidro e as folhas padrão (revisor 26/10: a barra ficava por cima das folhas z-50)", () => {
   it("a folha de Widgets (estilo E, rodada 2) abre por cima da barra e grava na mesma chave; um diálogo padrão (Radix) na Home ainda esconde a barra", async () => {
     ligar();
-    const { n } = await montar();
+    const { n } = await montar({ ...DADOS, "core-home-widgets-e": [] }); // rodada 3: sem widget escolhido → o convite "Escolher"
     await waitFor(() => expect(document.querySelector('[data-testid="hn-barra"]')).toBeTruthy());
     const escolher = screen.queryByTestId("he-widgets-escolher") ?? screen.getByText("Escolher");
     fireEvent.click(escolher);
     await waitFor(() => expect(screen.getByTestId("hn-widgets-folha")).toBeTruthy());
     expect(document.querySelector('[role="dialog"][data-state="open"]')).toBeNull(); // não é Radix: fica acima da barra (z-71)
-    fireEvent.click(screen.getByLabelText("Mostrar Treino"));
-    await waitFor(() => expect(JSON.stringify(n.ler("core-home-widgets-v2") ?? [])).toContain("workout"));
+    // rodada 3: os widgets da E (lib/home-widgets-e, chave core-home-widgets-e); Leitura não está no padrão
+    fireEvent.click(screen.getByLabelText("Mostrar Leitura"));
+    await waitFor(() => expect(JSON.stringify(n.ler("core-home-widgets-e") ?? [])).toContain("leitura"));
     fireEvent.click(screen.getByTestId("hn-widgets-fechar"));
     await waitFor(() => expect(screen.queryByTestId("hn-widgets-folha")).toBeNull());
     // um diálogo padrão (Radix) ainda esconde a barra

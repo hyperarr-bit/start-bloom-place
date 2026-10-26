@@ -27,14 +27,14 @@ interface Props {
   onVerTodas: () => void;
 }
 
-const Disco = ({ Icone, tom, feita }: { Icone: LucideIcon; tom: Tom; feita?: boolean }) => (
+export const Disco = ({ Icone, tom, feita }: { Icone: LucideIcon; tom: Tom; feita?: boolean }) => (
   <span className="w-8 h-8 rounded-[10px] grid place-items-center shrink-0" style={{ background: feita ? "hsl(var(--muted))" : tinta(tom) }} aria-hidden>
     {feita ? <Check className="w-4 h-4 text-muted-foreground" strokeWidth={2.5} /> : <Icone className="w-[17px] h-[17px]" strokeWidth={TRACO} style={{ color: cor(tom) }} />}
   </span>
 );
 
 /** Compromisso com hora (sem tipo) usa o ícone de calendário com relógio, na cor da Rotina. */
-const Linha = ({ item, feita, onClick }: { item: PendingItem; feita?: boolean; onClick?: () => void }) => {
+export const LinhaPendencia = ({ item, feita, onClick }: { item: PendingItem; feita?: boolean; onClick?: () => void }) => {
   const Icone = item.tipo ? ICONE_DO_TIPO[item.tipo] : ICONE_COMPROMISSO;
   const tom = item.tipo ? TOM_DO_TIPO[item.tipo] : TOM_DO_MODULO.rotina;
   return (
@@ -51,16 +51,23 @@ const Linha = ({ item, feita, onClick }: { item: PendingItem; feita?: boolean; o
   );
 };
 
+export interface AvisoDePendencia { Icone: LucideIcon; tom: Tom; texto: string; route: string; selo: string; alerta?: boolean }
+/** Os avisos do dia (conta a vencer, treino da semana) — a página 2 e a folha "Ver todas" mostram os mesmos. */
+export const avisosDasPendencias = ({ avisoConta, avisoTreino }: Pick<PendenciasDeHoje, "avisoConta" | "avisoTreino">): AvisoDePendencia[] => {
+  // rodada 2 (dono): a conta a vencer é um ALERTA — ícone de despertador e cor de aviso próprios, pra não parecer
+  // a mesma linha de "Registre um gasto" (que é da cor do gasto). Sem R$ (R$ só dentro de Finanças).
+  const avisos: AvisoDePendencia[] = [];
+  if (avisoConta) avisos.push({ Icone: ICONE_ALERTA, tom: TOM_ALERTA, texto: `${avisoConta.dias === 0 ? "Vence hoje" : avisoConta.dias === 1 ? "Vence amanhã" : `Vence em ${avisoConta.dias} dias`}: ${avisoConta.nome}`, route: "/financas", selo: "conta", alerta: true });
+  if (avisoTreino) avisos.push({ Icone: ICONE_DO_TIPO.treino, tom: TOM_DO_MODULO.treino, texto: "Configurar treino da semana", route: "/treino", selo: "aviso" });
+  return avisos;
+};
+
 export const PaginaPendencias = ({ pendencias, onAcao, onPersonalizar, onVerTodas }: Props) => {
   const navigate = useNavigate();
   // a dose de hoje da missão em doses (1.0.16): a 1ª linha, como na Home de hoje (fora do score)
   const dose = useDoseDeHoje();
-  const { pending, done, avisoConta, avisoTreino } = pendencias;
-  // rodada 2 (dono): a conta a vencer é um ALERTA — ícone de despertador e cor de aviso próprios, pra não parecer
-  // a mesma linha de "Registre um gasto" (que é da cor do gasto). Sem R$ (R$ só dentro de Finanças).
-  const avisos: { Icone: LucideIcon; tom: Tom; texto: string; route: string; selo: string; alerta?: boolean }[] = [];
-  if (avisoConta) avisos.push({ Icone: ICONE_ALERTA, tom: TOM_ALERTA, texto: `${avisoConta.dias === 0 ? "Vence hoje" : avisoConta.dias === 1 ? "Vence amanhã" : `Vence em ${avisoConta.dias} dias`}: ${avisoConta.nome}`, route: "/financas", selo: "conta", alerta: true });
-  if (avisoTreino) avisos.push({ Icone: ICONE_DO_TIPO.treino, tom: TOM_DO_MODULO.treino, texto: "Configurar treino da semana", route: "/treino", selo: "aviso" });
+  const { pending, done } = pendencias;
+  const avisos = avisosDasPendencias(pendencias);
   const vagas = Math.max(0, MAX_LINHAS - avisos.length - (dose ? 1 : 0));
   const visiveis = pending.slice(0, vagas);
   const escondidas = pending.length - visiveis.length;
@@ -98,7 +105,7 @@ export const PaginaPendencias = ({ pendencias, onAcao, onPersonalizar, onVerToda
         ) : (
           <div className="flex-1">
             {dose && <div className="px-1 pb-1.5"><LinhaDoseDeHoje dose={dose} /></div>}
-            {visiveis.map((item, i) => <Linha key={`p-${item.tipo ?? i}`} item={item} onClick={() => tocar(item)} />)}
+            {visiveis.map((item, i) => <LinhaPendencia key={`p-${item.tipo ?? i}`} item={item} onClick={() => tocar(item)} />)}
             {avisos.map((a) => (
               <button key={a.texto} type="button" onClick={() => navigate(a.route)} data-testid={a.alerta ? "hn-aviso-conta" : "hn-aviso"} data-alerta={a.alerta ? "1" : undefined} className="w-full h-[44px] flex items-center gap-2.5 pl-1.5 pr-1.5 rounded-xl text-left active:bg-muted/60">
                 <Disco Icone={a.Icone} tom={a.tom} />

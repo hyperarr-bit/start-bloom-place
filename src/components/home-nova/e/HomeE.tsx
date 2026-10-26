@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { useUserData } from "@/hooks/use-user-data";
 import { useAuth } from "@/hooks/use-auth";
-import { useHomeWidgets } from "@/hooks/use-home-widgets";
+import { useHomeWidgetsE } from "@/hooks/use-home-widgets-e";
 import { useModulePreferences } from "@/hooks/use-module-preferences";
 import { useSequencia } from "@/components/conquistas/use-conquistas";
 import { pendenciasDeHoje } from "@/components/home/NextHoursTimeline";
@@ -30,6 +30,8 @@ import { PaginaSeuDia } from "./PaginaSeuDia";
 import { PaginaPendencias } from "./PaginaPendencias";
 import { PaginaWidgets } from "./PaginaWidgets";
 import { FolhaScore } from "./FolhaScore";
+import { FolhaPendencias } from "./FolhaPendencias";
+import { ContextoDaEntrada, marcarEntradaDaHome } from "./Animacoes";
 import { ModulosE, type AzulejoE, type VarianteModulosE } from "./ModulosE";
 import { OrganizarModulos } from "./OrganizarModulos";
 import { useNavigate } from "react-router-dom";
@@ -89,7 +91,8 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
   // 26/10: a folha da sequência unificada mostra as figurinhas da sequência (a trilha das Conquistas, as artes do Codex)
   const conq = useConquistas();
   const trilha = useMemo(() => conq.adesivos.filter((b) => marcoDoAdesivo(b.id) !== null).sort((a, b) => marcoDoAdesivo(a.id)! - marcoDoAdesivo(b.id)!), [conq.adesivos]);
-  const { activeWidgets, addWidget, removeWidget, isActive, toggleSize } = useHomeWidgets();
+  // rodada 3: os widgets da E (lib/home-widgets-e — catálogo enxuto, card único, dado real)
+  const widgetsE = useHomeWidgetsE();
   // UMA instância das preferências de módulos: a grade e a folha "Organizar" leem/gravam o mesmo estado (como o ModuleDrawer de hoje)
   const preferencias = useModulePreferences();
   // rodada 2: os 3 cards da página 1 escolhidos em Você › Personalizar início (lib/home-resumos)
@@ -109,6 +112,10 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
   const [prefsAbertas, setPrefsAbertas] = useState(false);
   const [organizar, setOrganizar] = useState(false);
   const [folhaSequencia, setFolhaSequencia] = useState(false);
+  // rodada 3 (BUG: "Ver todas" abria a folha do score): a lista completa das pendências numa folha própria
+  const [folhaPendencias, setFolhaPendencias] = useState(false);
+  // rodada 3: a entrada escalonada/contagem só na 1ª Home da sessão — voltar pra Início pela barra não "pisca"
+  const [animarEntrada] = useState(marcarEntradaDaHome);
 
   const nomeCompleto = nomeDaHome(get) || user?.email?.split("@")[0] || "";
   const primeiroNome = nomeCompleto.trim().split(/\s+/)[0] || "";
@@ -118,6 +125,7 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
     [lifeData, get, copo],
   );
   const prefs: PendenciasPrefs = lifeData.pendenciasPrefs ?? PREFS_PADRAO;
+  const abrirTodasPendencias = useCallback(() => { trackEvent("home_pendencias_todas", { pendentes: pendencias.pending.length }); setFolhaPendencias(true); }, [pendencias.pending.length]);
 
   const abrirAcao = useCallback((id: ActionId) => { setAcaoInicial(id); setFolhaMais(true); }, []);
   const abrirMais = useCallback(() => { setAcaoInicial(null); setFolhaMais(true); }, []);
@@ -136,14 +144,15 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
 
   const paginas = [
     <PaginaSeuDia key="dia" data={lifeData} onAbrirScore={abrirScore} onAcao={abrirAcao} onMais={abrirMais} numeroDentro={numeroDentro} copoMl={copo} resumos={resumos} />,
-    <PaginaPendencias key="pend" pendencias={pendencias} onAcao={abrirAcao} onPersonalizar={() => setPrefsAbertas(true)} onVerTodas={abrirScore} />,
-    <PaginaWidgets key="wid" data={lifeData} widgets={activeWidgets} onEscolher={() => setPicker(true)} onAcao={abrirAcao} />,
+    <PaginaPendencias key="pend" pendencias={pendencias} onAcao={abrirAcao} onPersonalizar={() => setPrefsAbertas(true)} onVerTodas={abrirTodasPendencias} />,
+    <PaginaWidgets key="wid" data={lifeData} widgets={widgetsE.ativos} onEscolher={() => setPicker(true)} onAcao={abrirAcao} />,
   ];
 
   return (
     <>
       <DailyNudge />
       {/* ATRIBUTO_RAIZ: a Home de verdade está na tela — é o que deixa a barra de vidro aparecer */}
+      <ContextoDaEntrada.Provider value={animarEntrada}>
       <div className="hn he min-h-dvh" data-testid="home-nova" data-layout="e" data-modulos={modulos} data-suave={suave} {...{ [ATRIBUTO_RAIZ]: "hoje" }}>
         {/* rodada 2 (dono: "a Home rola além do necessário"): embaixo só o respiro da barra de vidro (60 + folga) */}
         <main className="max-w-lg mx-auto px-4 pt-2 pb-[calc(var(--app-safe-bottom,0px)+72px)]">
@@ -175,6 +184,7 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
         </main>
         <CelebracaoDia100 score={lifeData.dayScore} streak={seq.dias} />
       </div>
+      </ContextoDaEntrada.Provider>
 
       {/* as folhas são `fixed` fora do contêiner da Home: este nó (sem fundo) só leva as variáveis da paleta até elas */}
       <div className="hn he he-so-vars" data-suave={suave}>
@@ -187,7 +197,8 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
           onAdesivo={(b) => { setFolhaSequencia(false); window.setTimeout(() => navigate("/conquistas", { state: { origem: "home", figurinha: b.id } }), 180); }}
         />
         {/* rodada 2: Widgets e Personalizar pendências no estilo da Home nova (as mesmas chaves e regras de hoje) */}
-        <EscolherWidgetsE aberta={picker} onFechar={() => setPicker(false)} activeWidgets={activeWidgets} onToggle={(id) => (isActive(id) ? removeWidget(id) : addWidget(id))} onToggleSize={toggleSize} />
+        <EscolherWidgetsE aberta={picker} onFechar={() => setPicker(false)} ativos={widgetsE.ativos} onToggle={widgetsE.alternar} />
+        <FolhaPendencias aberta={folhaPendencias} onFechar={() => setFolhaPendencias(false)} pendencias={pendencias} onAcao={abrirAcao} onPersonalizar={() => setPrefsAbertas(true)} />
         <PersonalizarPendenciasE open={prefsAbertas} onOpenChange={setPrefsAbertas} prefs={prefs} onChange={(p) => set(CHAVE_PENDENCIAS_PREFS, p)} porModulo={lifeData.pendenciasPorModulo} />
       </div>
     </>

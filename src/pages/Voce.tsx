@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { useTheme, palettes } from "@/hooks/use-theme";
 import { useHomeNova } from "@/hooks/use-home-nova";
-import { useHomeWidgets } from "@/hooks/use-home-widgets";
+import { useHomeWidgetsE } from "@/hooks/use-home-widgets-e";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { SUAVIDADE_HOME_NOVA } from "@/lib/home-nova";
 import { CATALOGO_RESUMOS, CHAVE_RESUMOS, MAX_RESUMOS, alternarResumo, normalizarResumos } from "@/lib/home-resumos";
@@ -254,7 +254,7 @@ export function PersonalizarInicio() {
   const { get, set } = useUserData();
   const lifeData = useLifeHubData();
   useFundoDaTelaE(); // adendo 26/10: a faixa do relógio e a casca na cor da E
-  const { activeWidgets, addWidget, removeWidget, isActive, toggleSize } = useHomeWidgets();
+  const widgetsE = useHomeWidgetsE();
   const resumos = normalizarResumos(get<unknown>(CHAVE_RESUMOS, null));
   const prefs = lifeData.pendenciasPrefs ?? PREFS_PADRAO;
   const [widgets, setWidgets] = useState(false);
@@ -300,7 +300,7 @@ export function PersonalizarInicio() {
             <span className="w-10 h-10 rounded-xl grid place-items-center bg-muted/60 shrink-0" aria-hidden><LayoutGrid className="w-[19px] h-[19px]" strokeWidth={TRACO} /></span>
             <span className="flex-1 min-w-0">
               <span className="block text-[15px] font-semibold">Widgets</span>
-              <span className="block text-[12.5px] text-muted-foreground">{activeWidgets.length === 0 ? "Nenhum na página 3" : `${activeWidgets.length} na página 3`}</span>
+              <span className="block text-[12.5px] text-muted-foreground">{widgetsE.ativos.length === 0 ? "Nenhum na página 3" : `${widgetsE.ativos.length} na página 3`}</span>
             </span>
             <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" strokeWidth={2} aria-hidden />
           </button>
@@ -315,7 +315,7 @@ export function PersonalizarInicio() {
         </section>
       </main>
       <div className="hn he he-so-vars" data-suave={SUAVIDADE_HOME_NOVA}>
-        <EscolherWidgetsE aberta={widgets} onFechar={() => setWidgets(false)} activeWidgets={activeWidgets} onToggle={(id) => (isActive(id) ? removeWidget(id) : addWidget(id))} onToggleSize={toggleSize} />
+        <EscolherWidgetsE aberta={widgets} onFechar={() => setWidgets(false)} ativos={widgetsE.ativos} onToggle={widgetsE.alternar} />
         <PersonalizarPendenciasE open={pendencias} onOpenChange={setPendencias} prefs={prefs} onChange={(p) => set(CHAVE_PENDENCIAS_PREFS, p)} porModulo={lifeData.pendenciasPorModulo} />
       </div>
     </div>

@@ -12,8 +12,9 @@
 .fg-seq > svg { transform-origin: 50% 88%; }
 .fg-seq .fogo-gota { transform-box: fill-box; transform-origin: 50% 92%; }
 
-.fg-seq[data-viva]:not([data-subiu]) > svg { animation: fg-vivo 2.6s ease-in-out infinite; }
-.fg-seq[data-viva]:not([data-subiu]) .fogo-gota { animation: fg-gota 2.1s ease-in-out infinite; }
+/* a fase vem do relógio (FogoSequencia: --fg-fase-*, negativa) — remontar não reinicia a chama */
+.fg-seq[data-viva]:not([data-subiu]) > svg { animation: fg-vivo 2.6s ease-in-out infinite; animation-delay: var(--fg-fase-corpo, 0s); }
+.fg-seq[data-viva]:not([data-subiu]) .fogo-gota { animation: fg-gota 2.1s ease-in-out infinite; animation-delay: var(--fg-fase-gota, 0s); }
 @keyframes fg-vivo {
   0%, 100% { transform: rotate(-1.4deg) scale(1); }
   38% { transform: rotate(1.2deg) scale(1.025); }

@@ -7,6 +7,7 @@ import { nomeDaHome } from "@/lib/nome-da-pessoa";
 import { trackEvent } from "@/lib/analytics";
 import { dialogoAberto, lerTela, limparVolta, marcarVolta, planoDeNavegacao } from "@/lib/nav-abas";
 import { EVENTO_HOME_NOVA_MAIS, pedirMaisNaHome } from "@/lib/home-nova";
+import { marcarTrocaDeAba } from "@/lib/troca-de-rota";
 import { BarraVidro } from "./BarraVidro";
 import { iniciaisDe } from "../HomeNova";
 import type { AbaNova } from "../BarraFlutuante";
@@ -96,6 +97,7 @@ export function BarraVidroGlobal() {
     const plano = planoDeNavegacao(pathname, rota, hojeLogoAbaixo);
     if (plano.tipo === "nada") { try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch { /* noop */ } return; }
     trackEvent("tab_click", { tab: para, de: aba, barra: "vidro" });
+    marcarTrocaDeAba(); // rodada 3: a troca de aba é instantânea (sem a foto cruzando as duas telas)
     if (para === "conquistas") marcarVolta("/conquistas", "/home");
     const state = para === "conquistas" ? { origem: "home" } : undefined;
     if (plano.tipo === "voltar") { pendente = { para: rota, hojeAbaixo: false }; navigate(-1); return; }
@@ -108,6 +110,7 @@ export function BarraVidroGlobal() {
     // fora da Home: leva pra Home SEM empilhar histórico (volta 1 se a Home está logo abaixo; senão substitui) e a
     // folha abre ao chegar (pedido em memória, consumido 1x pela Home — nunca no estado da navegação)
     pedirMaisNaHome();
+    marcarTrocaDeAba();
     const plano = planoDeNavegacao(pathname, "/home", hojeLogoAbaixo);
     pendente = { para: "/home", hojeAbaixo: false };
     if (plano.tipo === "voltar") { navigate(-1); return; }

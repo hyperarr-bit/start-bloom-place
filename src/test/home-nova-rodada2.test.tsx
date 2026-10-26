@@ -226,8 +226,9 @@ describe("a aba Você no estilo da E e Personalizar início", () => {
     expect(eventos.some(([e]) => e === "home_resumos")).toBe(true);
     fireEvent.click(screen.getByTestId("pi-widgets"));
     await waitFor(() => expect(screen.getByTestId("hn-widgets-folha")).toBeTruthy());
-    fireEvent.click(screen.getByLabelText("Mostrar Treino"));
-    await waitFor(() => expect(JSON.stringify(n.ler("core-home-widgets-v2") ?? [])).toContain("workout"));
+    // rodada 3: os widgets da E (lib/home-widgets-e, chave core-home-widgets-e); Leitura não está no padrão
+    fireEvent.click(screen.getByLabelText("Mostrar Leitura"));
+    await waitFor(() => expect(JSON.stringify(n.ler("core-home-widgets-e") ?? [])).toContain("leitura"));
     fireEvent.click(screen.getByTestId("hn-widgets-fechar"));
     await waitFor(() => expect(screen.queryByTestId("hn-widgets-folha")).toBeNull());
     fireEvent.click(screen.getByTestId("pi-pendencias"));

@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
+import { Alca, useFolhaArrastavel } from "./folha-arrasto";
 import { ChevronDown, ChevronUp, Eye, EyeOff, Star, X } from "lucide-react";
 import { MODULOS } from "@/lib/modulos";
 import type { useModulePreferences } from "@/hooks/use-module-preferences";
@@ -15,6 +16,7 @@ interface Props { aberta: boolean; onFechar: () => void; preferencias: ReturnTyp
 export const OrganizarModulos = ({ aberta, onFechar, preferencias }: Props) => {
   const { toggleFavorite, toggleHidden, isFavorite, isHidden, ordenar, moveModule } = preferencias;
   const lista = ordenar(MODULOS);
+  const arrasto = useFolhaArrastavel(onFechar); // rodada 3: arrastar pra baixo fecha
   const ids = lista.map((m) => m.id);
   const ocultos = lista.filter((m) => isHidden(m.id)).length;
 
@@ -26,9 +28,10 @@ export const OrganizarModulos = ({ aberta, onFechar, preferencias }: Props) => {
           <motion.div
             role="dialog" aria-label="Organizar módulos" data-testid="hn-organizar-folha"
             className="fixed inset-x-0 bottom-0 z-[71] max-w-lg mx-auto rounded-t-[28px] bg-card max-h-[88dvh] overflow-y-auto overscroll-contain px-4 pt-2.5 pb-[calc(var(--app-safe-bottom,0px)+16px)]"
+            style={{ y: arrasto.y }} {...arrasto.folha}
             initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", stiffness: 420, damping: 38 }}
           >
-            <span className="block w-9 h-1 rounded-full bg-muted-foreground/30 mx-auto mb-3" aria-hidden />
+            <Alca arrasto={arrasto} className="mb-0.5" />
             <div className="flex items-center justify-between px-1 mb-1">
               <div>
                 <h3 className="text-[19px] font-bold tracking-tight">Organizar módulos</h3>

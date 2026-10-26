@@ -164,6 +164,7 @@ export const CHAVES_REVISADAS_DA_CONTA_OU_TRANSITORIAS: Readonly<Record<string, 
     "core-dias-anotados", "core-hub-streak", "core-tip-seen-*", "core-demo-conta", "core-home-widgets-v2",
     "core-home-resumos", // os 3 cards da página 1 da Home nova (lib/home-resumos, gravado por useUserData.set)
     "core-cor-antes-home-nova", // a cor do tema de antes da Home nova (HomeE guarda; pages/Home devolve e apaga com a chave off)
+    "core-home-widgets-e", // os widgets da Home nova (lib/home-widgets-e: ids na ordem da escolha, até 6)
     "core-intro-vistas", // lista de módulos com intro vista NESTA CONTA (lib/intro-modulo, gravada por useUserData.set)
     "core-intro-feitas", // lista de módulos com intro FEITA nesta conta (a missão lê pra não repetir a 1ª ação)
     "core-intro-acao-rapida", // 1.0.17: módulos cujo único dado veio da ação rápida da Home (a intro ainda aparece)

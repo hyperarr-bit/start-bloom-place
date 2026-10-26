@@ -1,57 +1,44 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
-import { WIDGET_CATALOG, type ActiveWidget, type WidgetId } from "@/hooks/use-home-widgets";
-import { Interruptor, Segmentos } from "./PersonalizarPendenciasE";
+import { CATALOGO_WIDGETS_E, MAX_WIDGETS_E, type IdDoWidgetE } from "@/lib/home-widgets-e";
+import { Interruptor } from "./PersonalizarPendenciasE";
+import { Alca, useFolhaArrastavel } from "./folha-arrasto";
+import { TRACO, cor, tinta } from "./paleta";
 
 /**
- * "WIDGETS" NO ESTILO DA HOME NOVA (rodada 2, 26/10) — a mesma lista `core-home-widgets-v2` e as mesmas ações
- * (ligar/desligar, pequeno/grande) do WidgetPicker de hoje, numa folha de baixo limpa: por categoria, uma linha
- * por widget (emoji, nome, o que mostra) com um interruptor; ligado, o tamanho em pílulas. Usada na página 3 da
- * Home e em Você › Personalizar início › Widgets.
+ * "WIDGETS" NO ESTILO DA HOME NOVA — RODADA 3 (26/10): o catálogo enxuto de lib/home-widgets-e, uma linha por widget
+ * (ícone no disco da cor, nome, o que mostra) com um interruptor; até 6, na ordem da escolha (o número ao lado). Sem
+ * pequeno/grande — o card é um só. Usada na página 3 da Home e em Você › Personalizar início › Widgets.
  */
-const CATEGORIAS: Record<string, string> = { produtividade: "Produtividade", "saúde": "Saúde", "finanças": "Finanças", "bem-estar": "Bem-estar" };
-
 interface ListaProps {
-  activeWidgets: ActiveWidget[];
-  onToggle: (id: WidgetId) => void;
-  onToggleSize: (id: WidgetId) => void;
+  ativos: IdDoWidgetE[];
+  onToggle: (id: IdDoWidgetE) => void;
 }
 
-export function ListaDeWidgets({ activeWidgets, onToggle, onToggleSize }: ListaProps) {
-  const categorias = [...new Set(WIDGET_CATALOG.map((w) => w.category))];
-  const ativo = (id: WidgetId) => activeWidgets.find((w) => w.id === id);
+export function ListaDeWidgets({ ativos, onToggle }: ListaProps) {
+  const cheio = ativos.length >= MAX_WIDGETS_E;
   return (
-    <div className="space-y-5" data-testid="hn-widgets-lista">
-      {categorias.map((cat) => (
-        <section key={cat}>
-          <h4 className="px-2 mb-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">{CATEGORIAS[cat] ?? cat}</h4>
-          <ul className="space-y-1">
-            {WIDGET_CATALOG.filter((w) => w.category === cat).map((w) => {
-              const a = ativo(w.id);
-              const ligado = !!a;
-              const grande = a?.size === "large";
-              return (
-                <li key={w.id} data-testid={`widget-${w.id}`} data-ligado={ligado ? "1" : "0"} className="rounded-[18px]" style={{ background: ligado ? "hsl(var(--muted) / 0.35)" : "transparent" }}>
-                  <div className="flex items-center gap-3 min-h-[56px] px-2 py-1.5">
-                    <span className="w-9 h-9 rounded-xl grid place-items-center shrink-0 text-[18px] leading-none bg-card" style={{ boxShadow: "var(--hn-sombra)" }} aria-hidden>{w.emoji}</span>
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-[15px] font-semibold truncate">{w.label}</span>
-                      <span className="block text-[12px] text-muted-foreground leading-tight line-clamp-1">{w.description}</span>
-                    </span>
-                    <Interruptor ligado={ligado} onChange={() => onToggle(w.id)} rotulo={`Mostrar ${w.label}`} />
-                  </div>
-                  {ligado && (
-                    <div className="px-2 pb-2.5">
-                      <Segmentos rotulo={`Tamanho de ${w.label}`} opcoes={[["pequeno", "Pequeno"], ["grande", "Grande"]] as const} ativa={grande ? "grande" : "pequeno"} aoEscolher={(v) => { if ((v === "grande") !== grande) onToggleSize(w.id); }} />
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ))}
-    </div>
+    <ul className="space-y-1" data-testid="hn-widgets-lista">
+      {CATALOGO_WIDGETS_E.map((w) => {
+        const posicao = ativos.indexOf(w.id);
+        const ligado = posicao >= 0;
+        return (
+          <li key={w.id} data-testid={`widget-${w.id}`} data-ligado={ligado ? "1" : "0"} className="rounded-[18px]" style={{ background: ligado ? "hsl(var(--muted) / 0.35)" : "transparent" }}>
+            <div className="flex items-center gap-3 min-h-[56px] px-2 py-1.5">
+              <span className="w-9 h-9 rounded-xl grid place-items-center shrink-0" style={{ background: tinta(w.tom) }} aria-hidden>
+                <w.Icone className="w-[18px] h-[18px]" strokeWidth={TRACO} style={{ color: cor(w.tom) }} />
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-[15px] font-semibold truncate">{w.rotulo}</span>
+                <span className="block text-[12px] text-muted-foreground leading-tight line-clamp-1">{w.descricao}</span>
+              </span>
+              {ligado && <span className="w-6 h-6 rounded-full grid place-items-center text-[11.5px] font-bold tabular-nums bg-foreground text-background" aria-label={`posição ${posicao + 1}`}>{posicao + 1}</span>}
+              <Interruptor ligado={ligado} disabled={!ligado && cheio} onChange={() => onToggle(w.id)} rotulo={`Mostrar ${w.rotulo}`} />
+            </div>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -60,9 +47,10 @@ interface Props extends ListaProps {
   onFechar: () => void;
 }
 
-export function EscolherWidgetsE({ aberta, onFechar, activeWidgets, onToggle, onToggleSize }: Props) {
+export function EscolherWidgetsE({ aberta, onFechar, ativos, onToggle }: Props) {
   const semMovimento = useReducedMotion();
-  const n = activeWidgets.length;
+  const arrasto = useFolhaArrastavel(onFechar, !!semMovimento); // rodada 3: arrastar pra baixo fecha
+  const n = ativos.length;
   return (
     <AnimatePresence>
       {aberta && (
@@ -71,17 +59,18 @@ export function EscolherWidgetsE({ aberta, onFechar, activeWidgets, onToggle, on
           <motion.div
             role="dialog" aria-label="Widgets da Home" data-testid="hn-widgets-folha" data-folha="widgets-escolher"
             className="fixed inset-x-0 bottom-0 z-[71] max-w-lg mx-auto rounded-t-[28px] bg-card max-h-[88dvh] overflow-y-auto overscroll-contain px-4 pt-2.5 pb-[calc(var(--app-safe-bottom,0px)+16px)]"
+            style={{ y: arrasto.y }} {...arrasto.folha}
             initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={semMovimento ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 38 }}
           >
-            <span className="block w-9 h-1 rounded-full bg-muted-foreground/30 mx-auto mb-4" aria-hidden />
+            <Alca arrasto={arrasto} className="mb-1.5" />
             <div className="flex items-start justify-between gap-3 px-1 mb-3">
               <div className="min-w-0">
                 <h3 className="text-[19px] font-bold tracking-tight">Widgets</h3>
-                <p className="text-[13px] text-muted-foreground mt-0.5">{n === 0 ? "Os resumos da página 3 da Home" : `${n} ${n === 1 ? "ligado" : "ligados"} · a página 3 da Home`}</p>
+                <p className="text-[13px] text-muted-foreground mt-0.5">{n === 0 ? `A página 3 da Home · até ${MAX_WIDGETS_E}` : `${n} de ${MAX_WIDGETS_E} · a página 3 da Home, na ordem da escolha`}</p>
               </div>
               <button type="button" onClick={onFechar} aria-label="Fechar" data-testid="hn-widgets-fechar" className="w-9 h-9 -mr-1 rounded-full grid place-items-center bg-muted shrink-0"><X className="w-4 h-4" strokeWidth={2.2} /></button>
             </div>
-            <ListaDeWidgets activeWidgets={activeWidgets} onToggle={onToggle} onToggleSize={onToggleSize} />
+            <ListaDeWidgets ativos={ativos} onToggle={onToggle} />
           </motion.div>
         </>
       )}

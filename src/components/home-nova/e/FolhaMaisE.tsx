@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { Alca, useFolhaArrastavel } from "./folha-arrasto";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Banknote, Droplets, Dumbbell, Heart, Leaf, Lightbulb, ListTodo, Moon, Scale, Smile, Utensils, Wallet, X, type LucideIcon } from "lucide-react";
 import type { ActionId } from "@/components/home/QuickActions";
@@ -121,6 +122,7 @@ export const FolhaMaisE = ({ aberta, onFechar, inicial, data }: Props) => {
     ...(escondida ? { pointerEvents: "none", visibility: "hidden" } : {}),
   };
   const mola = semMovimento ? { duration: 0 } : { type: "spring" as const, stiffness: 420, damping: 38 };
+  const arrasto = useFolhaArrastavel(onFechar, !!semMovimento); // rodada 3: arrastar pra baixo fecha (grade e formulários)
 
   return (
     <AnimatePresence>
@@ -137,10 +139,10 @@ export const FolhaMaisE = ({ aberta, onFechar, inicial, data }: Props) => {
             role="dialog" aria-label="Registrar agora" data-testid="hn-folha-mais" data-ativa={ativa ?? undefined}
             data-escondida={escondida ? "1" : undefined} aria-hidden={escondida || undefined}
             className="fixed inset-x-0 bottom-0 z-[71] max-w-lg mx-auto rounded-t-[28px] bg-card overflow-y-auto overscroll-contain px-5 pt-2.5 pb-[calc(var(--app-safe-bottom,0px)+20px)]"
-            style={estilo}
+            style={{ ...estilo, y: arrasto.y }} {...arrasto.folha}
             initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={mola}
           >
-            <span className="block w-9 h-1 rounded-full bg-muted-foreground/30 mx-auto mb-4" aria-hidden />
+            <Alca arrasto={arrasto} className="mb-1.5" />
             <div className="flex items-center gap-2 mb-4">
               {ativa && veioDaGrade && (
                 <button type="button" onClick={() => setAtiva(null)} aria-label="Voltar" data-testid="hn-acao-voltar" className="w-9 h-9 -ml-1.5 rounded-full grid place-items-center bg-muted">

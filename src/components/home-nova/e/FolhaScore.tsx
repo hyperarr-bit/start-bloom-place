@@ -7,6 +7,7 @@ import type { Sequencia } from "@/components/conquistas/use-conquistas";
 import { resumoDoScore, type ItemDoScore } from "./score-itens";
 import { explicacaoDoScore } from "./PaginaSeuDia";
 import { NumeroQueConta } from "./Animacoes";
+import { Alca, useFolhaArrastavel } from "./folha-arrasto";
 import { ICONE_DO_TIPO, TRACO, corDoTipo, tintaDoTipo } from "./paleta";
 
 /**
@@ -40,6 +41,7 @@ export function contagemDoItem(i: ItemDoScore, d: LifeHubData): string | null {
 export const FolhaScore = ({ aberta, onFechar, data, onAcao, onPersonalizar }: Props) => {
   const navigate = useNavigate();
   const semMovimento = useReducedMotion();
+  const arrasto = useFolhaArrastavel(onFechar, !!semMovimento); // rodada 3: arrastar pra baixo fecha
   const r = resumoDoScore(data);
   const score = data.dayScore;
   const mostrados = r.itens.filter((i) => !((i.tipo === "leitura" && !data.currentBook) || (i.tipo === "suplementos" && data.supplementsTotal === 0)));
@@ -93,9 +95,10 @@ export const FolhaScore = ({ aberta, onFechar, data, onAcao, onPersonalizar }: P
           <motion.div
             role="dialog" aria-label="Score do dia" data-testid="he-folha-score"
             className="fixed inset-x-0 bottom-0 z-[71] max-w-lg mx-auto rounded-t-[28px] bg-card max-h-[88dvh] overflow-y-auto overscroll-contain px-5 pt-2.5 pb-[calc(var(--app-safe-bottom,0px)+20px)]"
+            style={{ y: arrasto.y }} {...arrasto.folha}
             initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={semMovimento ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 38 }}
           >
-            <span className="block w-9 h-1 rounded-full bg-muted-foreground/30 mx-auto mb-4" aria-hidden />
+            <Alca arrasto={arrasto} className="mb-1.5" />
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Score do dia</p>

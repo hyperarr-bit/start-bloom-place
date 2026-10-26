@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { animate, motion, useReducedMotion } from "framer-motion";
 
 /**
@@ -10,8 +10,17 @@ import { animate, motion, useReducedMotion } from "framer-motion";
  */
 const emTeste = (): boolean => { try { return import.meta.env.MODE === "test"; } catch { return false; } };
 
+/* RODADA 3 (26/10): a entrada escalonada e a contagem do número tocam na 1ª montagem da Home por sessão; voltar
+   pra Início pela barra (remontagem) mostra tudo já no lugar — nada "pisca" ao trocar de aba. */
+let entradaJaTocou = false;
+export const marcarEntradaDaHome = (): boolean => { const primeira = !entradaJaTocou; entradaJaTocou = true; return primeira; };
+/** só pros testes */
+export const _zerarEntradaDaHome = (): void => { entradaJaTocou = false; };
+/** A Home provê `false` nas montagens seguintes: Entrada e NumeroQueConta mostram tudo pronto. */
+export const ContextoDaEntrada = createContext(true);
+
 export const NumeroQueConta = ({ valor, className, testid, duracao = 0.9 }: { valor: number; className?: string; testid?: string; duracao?: number }) => {
-  const semMovimento = useReducedMotion() || emTeste();
+  const semMovimento = useReducedMotion() || emTeste() || !useContext(ContextoDaEntrada);
   const [mostrado, setMostrado] = useState(semMovimento ? valor : 0);
   const anterior = useRef(semMovimento ? valor : 0);
   useEffect(() => {
@@ -29,7 +38,7 @@ export const NumeroQueConta = ({ valor, className, testid, duracao = 0.9 }: { va
 };
 
 export const Entrada = ({ children, atraso = 0, className, testid }: { children: ReactNode; atraso?: number; className?: string; testid?: string }) => {
-  const semMovimento = useReducedMotion() || emTeste();
+  const semMovimento = useReducedMotion() || emTeste() || !useContext(ContextoDaEntrada);
   if (semMovimento) return <div className={className} data-testid={testid}>{children}</div>;
   return (
     <motion.div

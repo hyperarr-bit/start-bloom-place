@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { useReducedMotion } from "framer-motion";
 import { Fogo } from "@/components/conquistas/Fogo";
 import { fogoDoCaderno } from "@/components/conquistas/nova/fogo-caderno";
@@ -15,7 +15,14 @@ import "./fogo-sequencia.css";
  * `neutro` (0 dias — o cinza do caderno). Animação: a chama VIVA (tremulação lenta e sutil, 2,6 s, no corpo e na gota de
  * dentro) só no aceso; `acender` toca o pulso + brilho rápido uma vez (quem chama decide quando — a pílula, 1x por dia);
  * `prefers-reduced-motion` desliga tudo (fogo-sequencia.css + o gate daqui).
+ * RODADA 3 (vídeo do dono, 26/10: o fogo "bugava" ao trocar de aba): a FASE da tremulação vem do relógio (um
+ * `animation-delay` negativo = onde a chama estaria se nunca tivesse parado) — remontar o componente (trocar de aba,
+ * voltar pra Home) continua a mesma chama em vez de recomeçar do zero com um pulo. O pulso de acender é de quem chama
+ * (a pílula: 1x por dia, pela chave), nunca da montagem.
  */
+const PERIODO_CORPO_MS = 2600;
+const PERIODO_GOTA_MS = 2100;
+export const faseDoFogo = (agora = Date.now()) => ({ corpo: -((agora % PERIODO_CORPO_MS) / 1000), gota: -((agora % PERIODO_GOTA_MS) / 1000) });
 export type EstadoDoFogo = "aceso" | "apagado" | "neutro";
 
 /** neutro = sem sequência · apagado = sequência viva mas HOJE ainda não garantido · aceso = garantido hoje. */
@@ -43,6 +50,7 @@ interface Props {
 
 export const FogoSequencia = ({ dias, estado, tamanho = 42, brilho = false, viva = true, acender = false, subiu = false, faisca = false, className, style, testid = "fg-seq" }: Props) => {
   const reduzir = useReducedMotion();
+  const [fase] = useState(faseDoFogo); // fixa na montagem: a chama continua de onde "estaria"
   const est: EstadoDoFogo = estado ?? (dias > 0 ? "aceso" : "neutro");
   const faixa = fogoDoCaderno(dias);
   const neutro = est === "neutro" || dias <= 0;
@@ -56,7 +64,7 @@ export const FogoSequencia = ({ dias, estado, tamanho = 42, brilho = false, viva
       data-acende={acender && !reduzir ? "" : undefined}
       data-subiu={subiu && !reduzir ? "" : undefined}
       data-ouro={dias >= 100 ? "" : undefined}
-      style={{ "--fg-t": `${tamanho}px`, ...style } as CSSProperties}
+      style={{ "--fg-t": `${tamanho}px`, "--fg-fase-corpo": `${fase.corpo.toFixed(3)}s`, "--fg-fase-gota": `${fase.gota.toFixed(3)}s`, ...style } as CSSProperties}
       aria-hidden
     >
       <Fogo dias={neutro ? 0 : dias} faixa={neutro ? undefined : faixa} tamanho={tamanho} semBrilho={!brilho} />

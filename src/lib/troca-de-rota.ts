@@ -13,6 +13,11 @@ import { fotoDaTela, type FotoDaTela } from "@/lib/movimento";
 
 export const DURACAO_DA_TROCA_MS = 200;
 let pendente: FotoDaTela | null = null;
+/* RODADA 3 (vídeo do dono, 26/10: Conquistas e Você SOBREPOSTAS por vários quadros ao trocar de aba — era o cross-fade
+   da foto). Entre as abas da barra (Início · Conquistas · Você) a troca é INSTANTÂNEA, como a tab bar do iOS: a foto
+   ainda cobre o vão até a tela nova pintar, mas sai na hora (0 ms), nunca as duas visíveis ao mesmo tempo. */
+let trocaDeAba = false;
+export function marcarTrocaDeAba(): void { trocaDeAba = true; }
 let ultimaRota = typeof location !== "undefined" ? location.pathname : "";
 let instalada = false;
 
@@ -27,10 +32,14 @@ const fotografar = () => {
 /** A rota nova (PageTransition) montou: solta a foto depois que ela pintar. */
 export function rotaMontou(): void {
   const f = pendente;
+  const ms = trocaDeAba ? 0 : DURACAO_DA_TROCA_MS;
+  trocaDeAba = false;
   if (!f) return;
   pendente = null;
-  try { requestAnimationFrame(() => requestAnimationFrame(() => f.soltar(DURACAO_DA_TROCA_MS))); } catch { f.soltar(DURACAO_DA_TROCA_MS); }
+  try { requestAnimationFrame(() => requestAnimationFrame(() => f.soltar(ms))); } catch { f.soltar(ms); }
 }
+/** só pros testes */
+export const _trocaDeAbaMarcada = (): boolean => trocaDeAba;
 /** Há uma foto esperando a rota nova? (o PageTransition entra sem o fade dele) */
 export const rotaComFoto = (): boolean => !!pendente;
 

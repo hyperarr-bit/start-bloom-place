@@ -21,3 +21,22 @@ describe("água: o número real (15 de 8)", () => {
     expect(m.valor).toBe(15);
   });
 });
+
+/* varredura novato (26/10): depois do Montar Finanças (Aluguel e Luz sem vencimento) o widget dizia "Nenhuma conta cadastrada" */
+import { contasSemVencimento } from "@/lib/home-widgets-e";
+describe("Próxima conta: contas sem vencimento", () => {
+  const vazio = { nextBillName: null, nextBillDaysUntil: null } as unknown as LifeHubData;
+  const conta = (dados: Record<string, unknown>) => <T,>(k: string, f: T): T => (k in dados ? (dados[k] as T) : f);
+  it("contas do Montar sem dia: o widget mostra a conta, honesto ('sem data'), com 'Pôr o dia'", () => {
+    const get = conta({ "finance-fixed-expenses": [{ id: "a", description: "Aluguel", value: 900 }, { id: "b", description: "Luz", value: 150 }] });
+    expect(contasSemVencimento(get)).toEqual(["Aluguel", "Luz"]);
+    const w = dadoDoWidgetE("proxima-conta", vazio, get);
+    expect(w.vazio).toEqual({ texto: "Aluguel e mais 1 · sem data", cta: "Pôr o dia" });
+    const um = dadoDoWidgetE("proxima-conta", vazio, conta({ "finance-fixed-expenses": [{ id: "a", description: "Aluguel", value: 900 }] }));
+    expect(um.vazio?.texto).toBe("Aluguel · sem data");
+  });
+  it("conta com dia: não entra; nada cadastrado: o vazio de sempre", () => {
+    expect(contasSemVencimento(conta({ "finance-fixed-expenses": [{ id: "a", description: "Aluguel", value: 900, day: 10 }] }))).toEqual([]);
+    expect(dadoDoWidgetE("proxima-conta", vazio, conta({})).vazio).toEqual({ texto: "Nenhuma conta cadastrada", cta: "Cadastrar conta" });
+  });
+});

@@ -99,6 +99,17 @@ const lista = (v: unknown): any[] => (Array.isArray(v) ? v : []);
 const valor = (i: unknown): number => { const o = i as { value?: unknown; amount?: unknown } | null; return Number(o?.value) || Number(o?.amount) || 0; };
 const diasTxt = (n: number) => (n === 0 ? "vence hoje" : n === 1 ? "vence amanhã" : `vence em ${n} dias`);
 
+/** Os custos fixos do perfil ativo SEM dia de vencimento (finance-fixed-expenses sem `day` 1–31 — só os com dia viram
+ *  conta no calendário, lib/finance-sync): os nomes. */
+export function contasSemVencimento(get: Get): string[] {
+  const perfil = get<string>("finance-perfil-ativo", PERFIL_PESSOAL) || PERFIL_PESSOAL;
+  const fixas = doPerfil(lista(get<unknown>("finance-fixed-expenses", [])), perfil);
+  return fixas
+    .filter((f) => { const dia = Number((f as { day?: unknown } | null)?.day); return !(Number.isFinite(dia) && dia >= 1 && dia <= 31); })
+    .map((f) => String((f as { description?: unknown; name?: unknown } | null)?.description ?? (f as { name?: unknown } | null)?.name ?? "").trim())
+    .filter(Boolean);
+}
+
 /** % do orçamento do mês que ainda sobra (a MESMA conta do Finanças/BudgetRemainingWidget: computeDailyBudget); null sem renda. */
 export function orcamentoRestante(get: Get): { pct: number; dias: number } | null {
   const perfil = get<string>("finance-perfil-ativo", PERFIL_PESSOAL) || PERFIL_PESSOAL;
@@ -118,10 +129,16 @@ export function dadoDoWidgetE(id: IdDoWidgetE, d: LifeHubData, get: Get, hoje = 
   const def = defDoWidgetE(id);
   const base = { id, rotulo: def.rotulo, Icone: def.Icone, tom: def.tom, rota: def.rota };
   switch (id) {
-    case "proxima-conta":
-      return d.nextBillName && d.nextBillDaysUntil !== null
-        ? { ...base, numero: String(Math.max(0, d.nextBillDaysUntil)), unidade: d.nextBillDaysUntil === 1 ? "dia" : "dias", detalhe: `${d.nextBillName} · ${diasTxt(Math.max(0, d.nextBillDaysUntil))}`, fracao: null, vazio: null }
-        : { ...base, numero: "—", fracao: null, vazio: { texto: "Nenhuma conta cadastrada", cta: "Cadastrar conta" } };
+    case "proxima-conta": {
+      if (d.nextBillName && d.nextBillDaysUntil !== null)
+        return { ...base, numero: String(Math.max(0, d.nextBillDaysUntil)), unidade: d.nextBillDaysUntil === 1 ? "dia" : "dias", detalhe: `${d.nextBillName} · ${diasTxt(Math.max(0, d.nextBillDaysUntil))}`, fracao: null, vazio: null };
+      // varredura novato (26/10): o Montar Finanças cadastra contas SEM dia de vencimento (Aluguel, Luz) e o widget dizia
+      // "Nenhuma conta cadastrada" logo depois — honesto: a conta existe, falta a data
+      const semData = contasSemVencimento(get);
+      if (semData.length)
+        return { ...base, numero: "—", fracao: null, vazio: { texto: semData.length === 1 ? `${semData[0]} · sem data` : `${semData[0]} e mais ${semData.length - 1} · sem data`, cta: "Pôr o dia" } };
+      return { ...base, numero: "—", fracao: null, vazio: { texto: "Nenhuma conta cadastrada", cta: "Cadastrar conta" } };
+    }
     case "orcamento": {
       const o = orcamentoRestante(get);
       return o

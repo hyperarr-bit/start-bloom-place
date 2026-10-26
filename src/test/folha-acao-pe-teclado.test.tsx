@@ -10,6 +10,7 @@ import { describe, it, expect } from "vitest";
 
 const acao = readFileSync(resolve(__dirname, "../components/home-nova/e/FolhaAcaoE.tsx"), "utf8");
 const mais = readFileSync(resolve(__dirname, "../components/home-nova/e/FolhaMaisE.tsx"), "utf8");
+const tarefas = readFileSync(resolve(__dirname, "../components/tarefas/tarefas-do-dia.tsx"), "utf8");
 
 describe("o botão principal preso no pé dos formulários do '+'", () => {
   it("todo formulário com CAMPO (teclado) tem o Principal preso; os sem campo (água, treino) não", () => {
@@ -25,5 +26,10 @@ describe("o botão principal preso no pé dos formulários do '+'", () => {
   it("com o teclado aberto, o fundo do cartão vai da folha até a borda da tela", () => {
     expect(mais).toMatch(/comTeclado && !escondida && <div aria-hidden data-testid="hn-folha-mais-pe"/);
     expect(mais).toMatch(/height: Math\.max\(0, area\.coberto\) \+ 40/);
+  });
+  it("a Tarefa do '+' (a folha da Rotina) também tem o 'Salvar' preso — só pelo '+' da Home nova (Rotina e Home antiga como estão)", () => {
+    expect(mais).toMatch(/<FolhaNovaTarefa [^\n]*salvarPreso \/>/);
+    expect(tarefas).toMatch(/salvarPreso = false,/);
+    expect(tarefas).toMatch(/data-testid="form-tarefa-pe"/);
   });
 });

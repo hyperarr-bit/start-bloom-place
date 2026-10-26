@@ -301,12 +301,15 @@ export function FormTarefa({
   rotuloSalvar = "Salvar tarefa",
   onSalvar,
   focarQuando = false,
+  salvarPreso = false,
 }: {
   inicial?: Partial<CamposNovos>;
   rotuloSalvar?: string;
   onSalvar: (c: CamposNovos) => void;
   /** quem abre a folha diz QUANDO o campo foca (depois da folha assentar) — ver o foco abaixo */
   focarQuando?: boolean;
+  /** varredura 26/10 (item 5): "Salvar" preso no pé da folha (sempre à vista acima do teclado) — só no "+" da Home nova */
+  salvarPreso?: boolean;
 }) {
   // FOCO SÓ DEPOIS DA FOLHA ASSENTAR (26/10, achado do QA no Simulador): o `autoFocus` focava DURANTE a animação de abrir,
   // com o campo ainda abaixo da tela — o WebKit rolava a página inteira (701 px) e arrastava a janela visível, e o
@@ -510,7 +513,15 @@ export function FormTarefa({
         />
       </div>
 
-      <Button onClick={salvar} className="w-full h-11 text-[14px] font-bold">{rotuloSalvar}</Button>
+      {salvarPreso ? (
+        // preso no pé do rolador da folha: o fundo da folha cobre o vão de cima (o espaço do space-y) e o respiro de baixo
+        // (pb da folha) com sombra chapada — sem mudar a montagem nem a rolagem; quando tudo cabe, fica onde sempre esteve
+        <div className="sticky bottom-0 z-[2] -mx-4 px-4 bg-background" style={{ boxShadow: "0 -12px 0 0 hsl(var(--background)), 0 calc(1rem + env(safe-area-inset-bottom)) 0 0 hsl(var(--background))" }} data-testid="form-tarefa-pe">
+          <Button onClick={salvar} className="w-full h-11 text-[14px] font-bold">{rotuloSalvar}</Button>
+        </div>
+      ) : (
+        <Button onClick={salvar} className="w-full h-11 text-[14px] font-bold">{rotuloSalvar}</Button>
+      )}
     </div>
   );
 }
@@ -523,6 +534,7 @@ export function FolhaNovaTarefa({
   textoInicial,
   onSalvar,
   onde = "Rotina",
+  salvarPreso = false,
 }: {
   aberta: boolean;
   onFechar: () => void;
@@ -530,6 +542,8 @@ export function FolhaNovaTarefa({
   onSalvar: (c: CamposNovos) => void;
   /** onde a tarefa vai morar (aparece na faixa) */
   onde?: string;
+  /** "Salvar" preso no pé (o "+" da Home nova — varredura 26/10); Rotina e Home antiga seguem como estão */
+  salvarPreso?: boolean;
 }) {
   const hoje = localDayKey();
   // TECLADO (26/10): com ele aberto a folha se ancora acima do que ele cobre e nunca passa da área visível (o iOS
@@ -552,7 +566,7 @@ export function FolhaNovaTarefa({
         <FaixaDaFolha titulo={`${nomeDoDiaDeHoje()} · NOVA TAREFA`} sub={`Tarefa de hoje, ${diaCurto(hoje)} · ${onde}`} onFechar={onFechar} />
         <div className="overflow-y-auto pb-[calc(1rem+env(safe-area-inset-bottom))]" onFocus={(e) => rolarCampoFocado(e)}>
           {/* o conteúdo da folha só existe aberta (o Radix desmonta ao fechar): cada abertura é um formulário novo */}
-          <FormTarefa inicial={{ texto: textoInicial }} focarQuando={assentou && !textoInicial} onSalvar={(c) => { onSalvar(c); onFechar(); }} />
+          <FormTarefa inicial={{ texto: textoInicial }} focarQuando={assentou && !textoInicial} salvarPreso={salvarPreso} onSalvar={(c) => { onSalvar(c); onFechar(); }} />
         </div>
       </SheetContent>
     </Sheet>

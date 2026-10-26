@@ -178,7 +178,7 @@ export const FolhaMaisE = ({ aberta, onFechar, inicial, data }: Props) => {
             )}
           </motion.div>
           {/* a Tarefa é a folha da Rotina (Sheet do Radix, por cima); salvar ou cancelar fecha o "+" junto */}
-          <FolhaNovaTarefa aberta={tarefa} onFechar={() => { setTarefa(false); fecharEmBreve(0); }} onde="Rotina" onSalvar={criarTarefa} />
+          <FolhaNovaTarefa aberta={tarefa} onFechar={() => { setTarefa(false); fecharEmBreve(0); }} onde="Rotina" onSalvar={criarTarefa} salvarPreso />
         </>
       )}
     </AnimatePresence>

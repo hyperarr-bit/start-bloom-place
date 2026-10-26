@@ -96,6 +96,16 @@ describe("a régua da área visível (use-area-visivel)", () => {
 });
 
 describe("FolhaNovaTarefa — os 3 caminhos ('+' da Home nova, Ações rápidas, '+ Nova tarefa' da Rotina) usam este componente", () => {
+  it("varredura 26/10: 'Salvar tarefa' preso no pé só com salvarPreso (o '+' da Home nova); sem ele, o formulário de sempre", () => {
+    montarTarefa({ salvarPreso: true });
+    const pe = screen.getByTestId("form-tarefa-pe");
+    expect(pe.className).toMatch(/sticky bottom-0/);
+    expect(pe.textContent).toContain("Salvar tarefa");
+    cleanup();
+    montarTarefa();
+    expect(screen.queryByTestId("form-tarefa-pe")).toBeNull();
+    expect(screen.getByRole("button", { name: "Salvar tarefa" })).toBeTruthy();
+  });
   it("o campo NÃO foca na hora (o autoFocus saiu): foca quando a folha assenta (animationend), sem rolar a página (preventScroll)", async () => {
     const focus = vi.spyOn(HTMLElement.prototype, "focus");
     montarTarefa();

@@ -14,15 +14,18 @@ import { PUSH_IOS, modoDeEntrada, voltar, type EstadoPush, type ModoDeEntrada } 
 // deslizando da direita enquanto a foto da tela de antes recua pra esquerda; voltar (← ou o gesto da borda esquerda)
 // faz a de cima sair pra direita e a de baixo voltar de -28 %. Só nas rotas que pedem; o resto segue como antes.
 
-/** A borda esquerda (22 px) das páginas empilhadas: arrastar pra direita volta, acompanhando o dedo. */
-const BordaDeVoltar = ({ x, onVoltar }: { x: MotionValue<number>; onVoltar: () => void }) => {
+/** A borda esquerda (22 px) das páginas empilhadas: arrastar pra direita volta, acompanhando o dedo. Com "reduzir
+ *  movimento" (varredura 26/10: a borda sumia junto com a animação) o GESTO continua — só não há o acompanhar nem a saída
+ *  animada: soltar além de 100 px (ou rápido) volta na hora. */
+const BordaDeVoltar = ({ x, onVoltar, semMovimento = false }: { x: MotionValue<number>; onVoltar: () => void; semMovimento?: boolean }) => {
   const g = useRef<{ x0: number; arrastando: boolean; xUlt: number; tUlt: number; vel: number } | null>(null);
   const soltar = (e: PointerEventReact<HTMLDivElement>) => {
     const s = g.current;
     g.current = null;
     try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
     if (!s?.arrastando) return;
-    const dx = x.get();
+    const dx = semMovimento ? s.xUlt - s.x0 : x.get();
+    if (semMovimento) { if (dx > 100 || (dx > 24 && s.vel > 0.5)) onVoltar(); return; }
     if (dx > 100 || (dx > 24 && s.vel > 0.5)) {
       const largura = typeof window !== "undefined" ? window.innerWidth : 400;
       animate(x, largura, { duration: 0.22, ease: "easeOut", onComplete: onVoltar });
@@ -42,7 +45,7 @@ const BordaDeVoltar = ({ x, onVoltar }: { x: MotionValue<number>; onVoltar: () =
         const dt = Math.max(1, e.timeStamp - s.tUlt);
         s.vel = (e.clientX - s.xUlt) / dt; s.xUlt = e.clientX; s.tUlt = e.timeStamp;
         if (!s.arrastando) { if (dx > 6) s.arrastando = true; else return; }
-        x.set(Math.max(0, dx));
+        if (!semMovimento) x.set(Math.max(0, dx));
       }}
       onPointerUp={soltar}
       onPointerCancel={soltar}
@@ -82,6 +85,7 @@ export const PageTransition = ({ children }: { children: ReactNode }) => {
       transition={{ duration: 0.18, ease: "easeOut" }}
     >
       {children}
+      {modo === "push" && <BordaDeVoltar x={x} semMovimento onVoltar={() => voltar(navigate, "/voce")} />}
     </motion.div>
   );
 };

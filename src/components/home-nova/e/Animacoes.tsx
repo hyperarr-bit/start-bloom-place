@@ -27,9 +27,14 @@ export const NumeroQueConta = ({ valor, className, testid, duracao = 0.9 }: { va
   useEffect(() => {
     if (semMovimento) { setMostrado(valor); anterior.current = valor; return; }
     const de = anterior.current;
+    /* 26/10 (dono no vídeo da welcome: "fica 41 e depois vai pra 42 com um glitch"): o expo-out espremia um salto
+       pequeno (37 → 42, o 1º registro do dia) no começo da curva — 38-39-40-41 em 0,16 s, o 41 parado e o 42 aos
+       0,3 s, e o resto da animação sem mexer em nada. Salto de até 10 conta com passo quase uniforme (quadrática,
+       freia de leve no fim); a contagem grande da abertura (0 → 37) segue no expo-out. */
+    const salto = Math.abs(valor - de);
     const controle = animate(de, valor, {
-      duration: Math.abs(valor - de) < 5 ? 0.3 : duracao,
-      ease: [0.16, 1, 0.3, 1],
+      duration: salto < 5 ? 0.45 : duracao,
+      ease: salto <= 10 ? (t: number) => 1 - (1 - t) * (1 - t) : [0.16, 1, 0.3, 1],
       onUpdate: (v) => setMostrado(Math.round(v)),
       onComplete: () => { anterior.current = valor; setMostrado(valor); },
     });

@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, propsDaFolha } from "./folha-arrasto";
+import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, FaixaDoRelogioSobFolha, propsDaFolha } from "./folha-arrasto";
 import { ChevronDown, ChevronUp, Eye, EyeOff, Star, X } from "lucide-react";
 import { MODULOS } from "@/lib/modulos";
 import type { useModulePreferences } from "@/hooks/use-module-preferences";
@@ -24,6 +24,7 @@ export const OrganizarModulos = ({ aberta, onFechar, preferencias }: Props) => {
     <AnimatePresence>
       {aberta && (
         <>
+          <FaixaDoRelogioSobFolha />
           <motion.button type="button" aria-label="Fechar" onClick={onFechar} className={CLASSE_FUNDO_FOLHA} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} />
           <motion.div
             role="dialog" aria-label="Organizar módulos" data-testid="hn-organizar-folha"

@@ -1,5 +1,6 @@
 import { animate, useMotionValue, type MotionValue } from "framer-motion";
 import { useCallback, useRef, type PointerEvent as PointerEventReact, type ReactNode } from "react";
+import { useFaixaDoRelogioTransparente } from "@/components/app/faixaDoRelogio";
 
 /**
  * FECHAR ARRASTANDO PARA BAIXO (rodada 3, 26/10 — dono: "como no iOS, com acompanhamento do dedo e mola"). Toda folha de
@@ -33,6 +34,16 @@ export const propsDaFolha = (semMovimento: boolean) => ({
   transition: semMovimento ? { duration: 0 } : MOLA_FOLHA,
 });
 export const CLASSE_FUNDO_FOLHA = "fixed inset-0 z-[70] bg-black/40";
+/**
+ * Varredura 26/10: a faixa do relógio (.app-safe-top-guard, z-index máximo, clara e desfocada na E) ficava POR CIMA do
+ * escurecido de toda folha — uma faixa clara no topo. Montado junto do fundo (dentro do `aberta && …` do
+ * AnimatePresence), deixa a faixa transparente e sem desfoque enquanto a folha está aberta, inclusive durante a saída:
+ * o escurecido cobre até o topo. Pilha: várias folhas juntas não se atropelam (faixaDoRelogio.ts).
+ */
+export const FaixaDoRelogioSobFolha = () => {
+  useFaixaDoRelogioTransparente(true);
+  return null;
+};
 export const propsDoFundo = (semMovimento: boolean) => ({ initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: semMovimento ? 0 : 0.2 } });
 export const LIMITE_FECHAR_VEL = 0.5; // px/ms
 

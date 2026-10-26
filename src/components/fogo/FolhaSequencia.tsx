@@ -11,7 +11,7 @@ import { normalizarDias, somarDias } from "@/lib/sequencia";
 import { trackEvent } from "@/lib/analytics";
 import { useLembreteDaSequencia } from "@/components/conquistas/LembreteDaSequencia";
 import { FogoSequencia, estadoDoFogo } from "./FogoSequencia";
-import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, propsDaFolha } from "@/components/home-nova/e/folha-arrasto";
+import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, FaixaDoRelogioSobFolha, propsDaFolha } from "@/components/home-nova/e/folha-arrasto";
 import "./fogo-sequencia.css";
 
 /**
@@ -178,6 +178,7 @@ export const FolhaSequencia = ({ aberta, onFechar, seq, trilha, origem, onAdesiv
     <AnimatePresence>
       {aberta && (
         <>
+          <FaixaDoRelogioSobFolha />
           <motion.button type="button" aria-label="Fechar" onClick={onFechar} className={CLASSE_FUNDO_FOLHA} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: semMovimento ? 0 : 0.2 }} />
           <motion.div
             role="dialog" aria-label="Sua sequência" data-testid="he-folha-sequencia" data-garantido={seq.hojeFeito ? "1" : "0"} data-origem={origem} data-faixa={faixa.id}

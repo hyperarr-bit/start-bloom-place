@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, propsDaFolha } from "./folha-arrasto";
+import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, FaixaDoRelogioSobFolha, propsDaFolha } from "./folha-arrasto";
 import { X } from "lucide-react";
 import {
   CATALOGO_PENDENCIAS, DIAS_CURTOS, comPeso, estaOculto, ocultar, religar,
@@ -107,6 +107,7 @@ export function PersonalizarPendenciasE({ open, onOpenChange, prefs, onChange, p
     <AnimatePresence>
       {open && (
         <>
+          <FaixaDoRelogioSobFolha />
           <motion.button type="button" aria-label="Fechar" onClick={fechar} className={CLASSE_FUNDO_FOLHA} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: semMovimento ? 0 : 0.2 }} />
           <motion.div
             role="dialog" aria-label="Personalizar pendências" data-testid="hn-prefs-folha" data-folha="pendencias-personalizar"

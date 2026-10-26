@@ -2,7 +2,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import { CATALOGO_WIDGETS_E, MAX_WIDGETS_E, type IdDoWidgetE } from "@/lib/home-widgets-e";
 import { Interruptor } from "./PersonalizarPendenciasE";
-import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, propsDaFolha } from "./folha-arrasto";
+import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, FaixaDoRelogioSobFolha, propsDaFolha } from "./folha-arrasto";
 import { TRACO, cor, tinta } from "./paleta";
 
 /**
@@ -55,6 +55,7 @@ export function EscolherWidgetsE({ aberta, onFechar, ativos, onToggle }: Props) 
     <AnimatePresence>
       {aberta && (
         <>
+          <FaixaDoRelogioSobFolha />
           <motion.button type="button" aria-label="Fechar" onClick={onFechar} className={CLASSE_FUNDO_FOLHA} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: semMovimento ? 0 : 0.2 }} />
           <motion.div
             role="dialog" aria-label="Widgets da Home" data-testid="hn-widgets-folha" data-folha="widgets-escolher"

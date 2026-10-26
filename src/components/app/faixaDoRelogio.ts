@@ -8,8 +8,14 @@ import { useEffect } from "react";
  * relógio; o conteúdo continua respeitando a área segura pelo padding de sempre.
  *
  * Pilha: duas telas abertas juntas não se atropelam — a faixa só volta quando a última fecha.
+ *
+ * Varredura 26/10: na Home nova a faixa também tem DESFOQUE (home-e.css) — transparente mas desfocada, o conteúdo atrás
+ * do relógio ficava borrado/nítido por cima do escurecido das folhas. Enquanto transparente, o <html> ganha a classe
+ * CLASSE_TRANSPARENTE e o index.css tira o desfoque. As folhas de baixo da Home nova usam isto via
+ * `FaixaDoRelogioSobFolha` (folha-arrasto.tsx): o escurecido cobre até o topo.
  */
 const VAR = "--safe-top-cor";
+export const CLASSE_TRANSPARENTE = "faixa-relogio-transparente";
 let abertas = 0;
 let anterior: string | null = null;
 
@@ -20,9 +26,11 @@ export function useFaixaDoRelogioTransparente(ativo = true) {
     if (abertas === 0) anterior = raiz.style.getPropertyValue(VAR) || null;
     abertas += 1;
     raiz.style.setProperty(VAR, "transparent");
+    raiz.classList.add(CLASSE_TRANSPARENTE);
     return () => {
       abertas = Math.max(0, abertas - 1);
       if (abertas > 0) return;
+      raiz.classList.remove(CLASSE_TRANSPARENTE);
       if (anterior) raiz.style.setProperty(VAR, anterior);
       else raiz.style.removeProperty(VAR);
       anterior = null;

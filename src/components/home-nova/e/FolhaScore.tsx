@@ -7,7 +7,7 @@ import type { Sequencia } from "@/components/conquistas/use-conquistas";
 import { resumoDoScore, type ItemDoScore } from "./score-itens";
 import { explicacaoDoScore } from "./PaginaSeuDia";
 import { NumeroQueConta } from "./Animacoes";
-import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, propsDaFolha } from "./folha-arrasto";
+import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, FaixaDoRelogioSobFolha, propsDaFolha } from "./folha-arrasto";
 import { ICONE_DO_TIPO, TRACO, corDoTipo, tintaDoTipo } from "./paleta";
 import { COR_OURO } from "./Festa100";
 
@@ -90,6 +90,7 @@ export const FolhaScore = ({ aberta, onFechar, data, onAcao, onPersonalizar }: P
     <AnimatePresence>
       {aberta && (
         <>
+          <FaixaDoRelogioSobFolha />
           <motion.button
             type="button" aria-label="Fechar" onClick={onFechar}
             className={CLASSE_FUNDO_FOLHA}

@@ -6,7 +6,7 @@ import type { ActionId } from "@/components/home/QuickActions";
 import { trackEvent } from "@/lib/analytics";
 import { LinhaDoseDeHoje, useDoseDeHoje } from "@/components/missao-doses/LinhaDoseDeHoje";
 import { Disco, LinhaPendencia, avisosDasPendencias } from "./PaginaPendencias";
-import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, propsDaFolha } from "./folha-arrasto";
+import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, FaixaDoRelogioSobFolha, propsDaFolha } from "./folha-arrasto";
 import { TRACO, cor, tinta } from "./paleta";
 
 /**
@@ -42,6 +42,7 @@ export const FolhaPendencias = ({ aberta, onFechar, pendencias, onAcao, onPerson
     <AnimatePresence>
       {aberta && (
         <>
+          <FaixaDoRelogioSobFolha />
           <motion.button type="button" aria-label="Fechar" onClick={onFechar} className={CLASSE_FUNDO_FOLHA} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: semMovimento ? 0 : 0.2 }} />
           <motion.div
             role="dialog" aria-label="Pendências de hoje" data-testid="he-folha-pendencias"

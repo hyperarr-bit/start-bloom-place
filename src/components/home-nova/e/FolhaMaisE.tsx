@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, propsDaFolha } from "./folha-arrasto";
+import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, FaixaDoRelogioSobFolha, propsDaFolha } from "./folha-arrasto";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Banknote, Droplets, Dumbbell, Heart, Leaf, Lightbulb, ListTodo, Moon, Scale, Smile, Utensils, Wallet, X, type LucideIcon } from "lucide-react";
 import type { ActionId } from "@/components/home/QuickActions";
@@ -127,6 +127,7 @@ export const FolhaMaisE = ({ aberta, onFechar, inicial, data }: Props) => {
     <AnimatePresence>
       {aberta && (
         <>
+          <FaixaDoRelogioSobFolha />
           <motion.button
             type="button" aria-label="Fechar" onClick={onFechar} tabIndex={escondida ? -1 : undefined}
             className={CLASSE_FUNDO_FOLHA}

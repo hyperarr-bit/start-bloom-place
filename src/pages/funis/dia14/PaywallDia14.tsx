@@ -23,6 +23,7 @@ import { GASTO_ANCHOR, VICTORY_PHRASE, AREAS, AREA_ANCHOR, ALL_MODULE_ICONS, typ
 import { useAuth } from "@/hooks/use-auth";
 import { backLigado, sairDeVerdade, useSegurarVoltar, varianteDoBack } from "@/lib/back-funil";
 import { BackFolha } from "@/components/paywall/BackFolha";
+import { OFERTA_ANUAL, POR_MES_ANUAL, ofertaAnualAqui } from "@/lib/oferta-anual";
 
 /**
  * CÓPIA CONGELADA do paywall do DIA 14 (83c0d98, 14/07 22:30) — usada só pelo
@@ -604,8 +605,16 @@ const TRUST_CHIPS_WEB = [
   ...TRUST_CHIPS,
 ];
 
-export function TrustChips() {
-  const chips = ehApple() ? TRUST_CHIPS_IOS : isNativeShell() ? TRUST_CHIPS : TRUST_CHIPS_WEB;
+/** 26/10 (oferta "anual" do /inicio): o ♾️ "Sem mensalidade" vira o que o anual é — 1 ano, sem renovação. */
+const TRUST_CHIPS_WEB_ANUAL = [
+  { emoji: "📱", label: "App na App Store e no Google Play" },
+  { emoji: "🇧🇷", label: "Pix na hora" },
+  { emoji: "🛡️", label: "Garantia de 7 dias" },
+  { emoji: "📅", label: "1 ano, não renova sozinho" },
+];
+
+export function TrustChips({ anual = false }: { anual?: boolean } = {}) {
+  const chips = ehApple() ? TRUST_CHIPS_IOS : isNativeShell() ? TRUST_CHIPS : anual ? TRUST_CHIPS_WEB_ANUAL : TRUST_CHIPS_WEB;
   return (
     <div className="flex items-center justify-center gap-2 flex-wrap">
       {chips.map((c) => (
@@ -700,6 +709,68 @@ function LifetimeCard({ roi2 = false }: { roi2?: boolean }) {
   );
 }
 
+/** OFERTA "ANUAL" DO /inicio (26/10, src/lib/oferta-anual.ts): o card do preço no lugar do VITALÍCIO. Diz com todas as
+ *  letras o que é (1 ano de acesso completo), quanto dá por mês, que NÃO é assinatura e NÃO renova sozinho — e compara
+ *  com o mesmo CORE na loja (o anual do app, R$ 97,90/ano, que renova). */
+export const PRECO_ANUAL_NA_LOJA = "97,90";
+function AnualCard() {
+  return (
+    <div className="relative w-full rounded-3xl p-[2px] bg-gradient-to-br from-accent via-accent/45 to-accent/15 shadow-[0_14px_44px_-14px_hsl(var(--accent)/0.55)]" data-testid="anual-card">
+      <div className="relative rounded-[calc(1.5rem-2px)] bg-white px-4 pt-5 pb-4 overflow-hidden text-center">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-14 left-1/2 -translate-x-1/2 w-60 h-28 rounded-full"
+          style={{ background: "hsl(var(--accent) / 0.14)", filter: "blur(28px)" }}
+        />
+        <span className="relative inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent text-accent-foreground text-[10px] font-bold tracking-widest mb-3">
+          1 ANO DE ACESSO COMPLETO
+        </span>
+        <div className="relative font-bold text-[15px] leading-tight mb-2">Os 16 módulos por 1 ano inteiro.</div>
+        <div className="relative flex items-end justify-center gap-2">
+          <span className="text-[42px] leading-none font-extrabold tracking-tight text-accent" data-testid="anual-preco">
+            R$ {PIX_PRICES[OFERTA_ANUAL]}
+          </span>
+        </div>
+        <div className="relative mt-2 inline-flex items-center rounded-full bg-accent/10 text-accent px-2.5 py-1 text-[12px] font-bold" data-testid="anual-por-mes">
+          dá R$ {POR_MES_ANUAL}/mês
+        </div>
+        <div className="relative text-[12px] font-semibold text-muted-foreground mt-1.5">pagamento único no Pix</div>
+        <div className="relative text-[12.5px] leading-snug mt-2.5" data-testid="nao-e-assinatura">
+          <strong>Não é assinatura.</strong> Nada é cobrado sozinho — daqui a 1 ano você decide se renova.
+        </div>
+        <div className="relative mt-3.5 rounded-2xl bg-secondary/70 text-left text-[12px] overflow-hidden" data-testid="anual-comparacao">
+          <div className="flex items-center justify-between px-3 py-2">
+            <span className="text-muted-foreground">CORE no app da loja</span>
+            <span className="font-semibold text-muted-foreground"><s>R$ {PRECO_ANUAL_NA_LOJA}/ano</s> · renova</span>
+          </div>
+          <div className="flex items-center justify-between px-3 py-2 bg-accent/[0.07]">
+            <span className="font-bold">Aqui, hoje</span>
+            <span className="font-extrabold text-accent">R$ {PIX_PRICES[OFERTA_ANUAL]} · 1 ano, não renova</span>
+          </div>
+        </div>
+        <div className="relative grid grid-cols-3 gap-1.5 mt-3.5">
+          {["16 módulos", "Sem renovação automática", "Garantia 7 dias"].map((c) => (
+            <span key={c} className="rounded-full bg-secondary px-1 py-1.5 text-[10px] font-bold leading-tight">
+              {c}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** A pílula do topo do paywall na variante anual — o que está à venda, antes de qualquer card. */
+function SeloAnual() {
+  return (
+    <motion.div {...stagger(1)} className="flex justify-center mb-5" data-testid="anual-selo">
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/[0.06] px-3 py-1.5 text-[12px] font-bold text-accent">
+        📅 1 ano de acesso completo · R$ {POR_MES_ANUAL}/mês
+      </span>
+    </motion.div>
+  );
+}
+
 /* ------------------------------------------------- blocos do funil ROI 2 */
 
 /** "O que você leva": os 16 com ✓ em TODAS as trilhas, o escolhido marcado
@@ -773,8 +844,8 @@ const ConstruiuNaDemo = lazy(() => import("@/components/demo-guiada/Construiu").
  * Rollback = FUNIL_ROI2 = false (volta o OfferScreen abaixo, intocado).
  */
 function OfferScreenRoi2({
-  context, answers, onBuy, onEscape, funilB = false,
-}: { context: "funnel" | "app"; answers: Record<string, string>; onBuy: (o: PixOffer) => void; onEscape: () => void; funilB?: boolean }) {
+  context, answers, onBuy, onEscape, funilB = false, anual = false,
+}: { context: "funnel" | "app"; answers: Record<string, string>; onBuy: (o: PixOffer) => void; onEscape: () => void; funilB?: boolean; anual?: boolean }) {
   const [showClose, setShowClose] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setShowClose(true), 1800);
@@ -839,14 +910,16 @@ function OfferScreenRoi2({
         <motion.div {...stagger(2)}><LevaCard area={area} /></motion.div>
         <motion.div {...stagger(3)}>
           {area === "dinheiro"
-            ? <AnchorCard gasto={answers?.gasto ?? ""} precoTitulo={<>CORE completo,<br />pra enxergar tudo</>} />
-            : <AreaAnchorCard area={area} />}
+            ? (anual
+              ? <AnchorCard gasto={answers?.gasto ?? ""} precoTitulo={<>CORE por 1 ano,<br />pra enxergar tudo</>} precoSub={`dá R$ ${POR_MES_ANUAL}/mês`} />
+              : <AnchorCard gasto={answers?.gasto ?? ""} precoTitulo={<>CORE completo,<br />pra enxergar tudo</>} />)
+            : (anual ? <AreaAnchorCard area={area} precoTitulo={<>CORE por 1 ano,<br />todas as áreas</>} precoSub={`dá R$ ${POR_MES_ANUAL}/mês`} /> : <AreaAnchorCard area={area} />)}
         </motion.div>
-        <motion.div {...stagger(4)}><LifetimeCard roi2 /></motion.div>
+        <motion.div {...stagger(4)}>{anual ? <AnualCard /> : <LifetimeCard roi2 />}</motion.div>
         <motion.div {...stagger(5)}><ConfiavelCard /></motion.div>
-        <motion.div {...stagger(6)}><MuralDepoimentos area={area} roi2 /></motion.div>
+        <motion.div {...stagger(6)}>{anual ? <MuralDepoimentos area={area} roi2 soAssinatura /> : <MuralDepoimentos area={area} roi2 />}</motion.div>
         <motion.div {...stagger(7)}><GuaranteeTimeline roi2 /></motion.div>
-        <motion.div {...stagger(8)}><TrustChips /></motion.div>
+        <motion.div {...stagger(8)}>{anual ? <TrustChips anual /> : <TrustChips />}</motion.div>
       </div>
 
       {/* CTA sticky */}
@@ -861,16 +934,24 @@ function OfferScreenRoi2({
             <Button
               size="lg"
               className="w-full h-14 rounded-full px-3 text-[14px] min-[390px]:text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
-              onClick={() => openPixIntent(OFERTA_WEB, "paywall_lifetime", context, onBuy, marcaDoFunilB(funilB))}
+              onClick={() => anual ? openPixIntent(OFERTA_ANUAL, "paywall_anual", context, onBuy, { oferta: "anual", ...marcaDoFunilB(funilB) }) : openPixIntent(OFERTA_WEB, "paywall_lifetime", context, onBuy, marcaDoFunilB(funilB))}
             >
-              Liberar os 16 módulos — R$ {PRICING.lifetime.total} no Pix <ArrowRight className="w-4 h-4 shrink-0" />
+              {anual
+                ? <>Liberar 1 ano — R$ {PIX_PRICES[OFERTA_ANUAL]} no Pix <ArrowRight className="w-4 h-4 shrink-0" /></>
+                : <>Liberar os 16 módulos — R$ {PRICING.lifetime.total} no Pix <ArrowRight className="w-4 h-4 shrink-0" /></>}
             </Button>
           </motion.div>
           <p className="text-[11px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
-            <span>
-              Pagamento <strong className="text-foreground font-semibold">único</strong> de R$ {PRICING.lifetime.total} · sem mensalidade · garantia de 7 dias
-            </span>
+            {anual ? (
+              <span>
+                Pagamento <strong className="text-foreground font-semibold">único</strong> de R$ {PIX_PRICES[OFERTA_ANUAL]} · 1 ano de acesso · não renova sozinho · garantia de 7 dias
+              </span>
+            ) : (
+              <span>
+                Pagamento <strong className="text-foreground font-semibold">único</strong> de R$ {PRICING.lifetime.total} · sem mensalidade · garantia de 7 dias
+              </span>
+            )}
           </p>
         </div>
       </div>
@@ -881,8 +962,8 @@ function OfferScreenRoi2({
 /* ----------------------------------------------------------------- offer */
 
 function OfferScreen({
-  context, answers, onBuy, braco, onEscape,
-}: { context: "funnel" | "app"; answers: Record<string, string>; onBuy: (o: PixOffer) => void; braco: PaywallArm; onEscape: () => void }) {
+  context, answers, onBuy, braco, onEscape, anual = false,
+}: { context: "funnel" | "app"; answers: Record<string, string>; onBuy: (o: PixOffer) => void; braco: PaywallArm; onEscape: () => void; anual?: boolean }) {
   /* ROTA DE FUGA DE VOLTA (05/08, ordem do dono). Ela tinha saído em 24/07 e
    * volta agora porque atrás dela existe downsell de novo: sem resgate, X é só
    * uma porta de saída; com resgate, é o gatilho de maior volume do funil.
@@ -940,17 +1021,22 @@ function OfferScreen({
       <motion.h1 {...stagger(0)} className="text-[27px] font-bold tracking-tight leading-[1.12] mb-2">
         Seu plano pra<br /><span className="text-accent">{semViuva(victory)}</span><br />está pronto
       </motion.h1>
-      <motion.p {...stagger(1)} className={`text-muted-foreground text-sm leading-relaxed ${braco === "b" ? "mb-4" : "mb-6"}`}>
+      <motion.p {...stagger(1)} className={`text-muted-foreground text-sm leading-relaxed ${braco === "b" || anual ? "mb-4" : "mb-6"}`}>
         Você já viu como funciona. Agora é com os seus números de verdade.
       </motion.p>
 
+      {anual && <SeloAnual />}
       {braco === "b" && <LaurelProva />}
 
       <div className="space-y-4">
         <motion.div {...stagger(2)}>
-          {area === "dinheiro"
-            ? <AnchorCard gasto={answers?.gasto ?? ""} />
-            : <AreaAnchorCard area={area} />}
+          {anual
+            ? (area === "dinheiro"
+              ? <AnchorCard gasto={answers?.gasto ?? ""} precoTitulo={<>CORE por 1 ano,<br />pra enxergar tudo</>} precoSub={`dá R$ ${POR_MES_ANUAL}/mês`} />
+              : <AreaAnchorCard area={area} precoTitulo={<>CORE por 1 ano,<br />todas as áreas</>} precoSub={`dá R$ ${POR_MES_ANUAL}/mês`} />)
+            : area === "dinheiro"
+              ? <AnchorCard gasto={answers?.gasto ?? ""} />
+              : <AreaAnchorCard area={area} />}
         </motion.div>
         <motion.div {...stagger(3)}><TransformChart label={CHART_LABEL[area]} /></motion.div>
         <ValueStack area={area} />
@@ -959,8 +1045,8 @@ function OfferScreen({
             responde a objeção DEPOIS que ela nasceu. */}
         {braco === "a" && <GuaranteeTimeline />}
         <motion.div {...stagger(9)}>{area === "dinheiro" ? <CompareTable /> : <ModulesIncludedCard />}</motion.div>
-        <motion.div {...stagger(10)}><LifetimeCard /></motion.div>
-        {braco === "b" && <MuralDepoimentos area={area} />}
+        <motion.div {...stagger(10)}>{anual ? <AnualCard /> : <LifetimeCard />}</motion.div>
+        {braco === "b" && (anual ? <MuralDepoimentos area={area} soAssinatura /> : <MuralDepoimentos area={area} />)}
         {/* Laurels de fechamento (BitePal fecha as stories com "4.7 rating |
             1M users"; Cal AI fecha o paywall com "Trusted by millions").
             Números honestos: os que temos. */}
@@ -982,7 +1068,7 @@ function OfferScreen({
           </div>
         )}
         {braco === "b" && <GuaranteeTimeline />}
-        <motion.div {...stagger(11)}><TrustChips /></motion.div>
+        <motion.div {...stagger(11)}>{anual ? <TrustChips anual /> : <TrustChips />}</motion.div>
       </div>
 
       {/* CTA sticky */}
@@ -996,16 +1082,25 @@ function OfferScreen({
             <Button
               size="lg"
               className="w-full h-14 rounded-full text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
-              onClick={() => openPixIntent(OFERTA_WEB, "paywall_lifetime", context, onBuy)}
+              onClick={() => anual ? openPixIntent(OFERTA_ANUAL, "paywall_anual", context, onBuy, { oferta: "anual" }) : openPixIntent(OFERTA_WEB, "paywall_lifetime", context, onBuy)}
+              data-testid={anual ? "paywall-cta-anual" : undefined}
             >
-              Quero pra sempre — R$ {PRICING.lifetime.total} no Pix <ArrowRight className="w-4 h-4" />
+              {anual
+                ? <>Quero 1 ano — R$ {PIX_PRICES[OFERTA_ANUAL]} no Pix <ArrowRight className="w-4 h-4" /></>
+                : <>Quero pra sempre — R$ {PRICING.lifetime.total} no Pix <ArrowRight className="w-4 h-4" /></>}
             </Button>
           </motion.div>
           <p className="text-[11px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
-            <span>
-              Pagamento <strong className="text-foreground font-semibold">único</strong> de R$ {PRICING.lifetime.total} no Pix · sem mensalidade · Garantia de 7 dias
-            </span>
+            {anual ? (
+              <span data-testid="paywall-legal-anual">
+                Pagamento <strong className="text-foreground font-semibold">único</strong> de R$ {PIX_PRICES[OFERTA_ANUAL]} no Pix · 1 ano de acesso · <strong className="text-foreground font-semibold">não renova sozinho</strong> · Garantia de 7 dias
+              </span>
+            ) : (
+              <span>
+                Pagamento <strong className="text-foreground font-semibold">único</strong> de R$ {PRICING.lifetime.total} no Pix · sem mensalidade · Garantia de 7 dias
+              </span>
+            )}
           </p>
         </div>
       </div>
@@ -1185,6 +1280,9 @@ export function PaywallDia14({
    * errar é oferecer Pix dentro do binário da loja, que reprova na revisão do
    * Play. Duas leituras, e basta UMA dizer "nativo" pra não abrir nada. */
   const nativoNoMount = useRef(isNativeShell());
+  /* OFERTA "ANUAL" DO /inicio (26/10, src/lib/oferta-anual.ts): congelada no mount, como o braço. Só no funil do
+   * /inicio com a marca do link da campanha (?oferta=anual); fora disso (e com a chave de emergência desligada), false. */
+  const [anual] = useState<boolean>(() => !nativoNoMount.current && context === "funnel" && !funilB && ofertaAnualAqui());
 
   const ROLETA_DA_FUGA = false;
 
@@ -1222,7 +1320,8 @@ export function PaywallDia14({
    * (pelo X, por exemplo), eu mesmo mando o voltar adiante. Ninguém fica preso. */
   /* BACK (21/10, src/lib/back-funil.ts): com a chave ligada, o degrau do voltar é o do back — este, antigo, sai do
    * caminho (com a roleta desligada ele só repassava o voltar; os dois juntos fariam o 1º voltar sair da página). */
-  const [backNoMount] = useState<boolean>(() => !nativoNoMount.current && context === "funnel" && backLigado());
+  // 26/10: a folha do back fala do vitalício — na variante anual ela não abre (o voltar segue o caminho antigo)
+  const [backNoMount] = useState<boolean>(() => !nativoNoMount.current && context === "funnel" && backLigado() && !anual);
   useEffect(() => {
     if (nativoNoMount.current || backNoMount) return;
     window.history.pushState({ paywallDia14: true }, "");
@@ -1243,7 +1342,7 @@ export function PaywallDia14({
   // 25/09 (teste Asaas × Cakto): quem vai cair na Cakto aquece a função dela
   // enquanto lê a oferta. Não cria cobrança.
   useEffect(() => {
-    if (nativoNoMount.current) return;
+    if (nativoNoMount.current || anual) return; // o anual é só Asaas: nada a aquecer
     aquecerCheckoutPix(abUser?.id, OFERTA_WEB);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1255,7 +1354,7 @@ export function PaywallDia14({
   assinanteRef.current = subLoaded && isSubscribed;
   const adiantadoRef = useRef<ReturnType<typeof prepararPixAdiantado> | null>(null);
   useEffect(() => {
-    if (nativoNoMount.current) return;
+    if (nativoNoMount.current || anual) return; // o adiantado é do vitalício na Cakto
     const a = prepararPixAdiantado(OFERTA_WEB, { podeAdiantar: () => !assinanteRef.current });
     adiantadoRef.current = a;
     return () => { a.parar(); adiantadoRef.current = null; };
@@ -1284,7 +1383,7 @@ export function PaywallDia14({
     const name = context === "funnel" ? "funnel_view" : "paywall_view";
     // paywall_ab vai junto pra dar pra separar os dois braços na leitura do dia.
     trackEvent(name, context === "funnel"
-      ? { step: phase === "offer" ? "offer" : phase, paywall_ab: braco, roi2, ...marcaDoFunilB(funilB) }
+      ? { step: phase === "offer" ? "offer" : phase, paywall_ab: braco, roi2, ...marcaDoFunilB(funilB), ...(anual ? { oferta: "anual" } : {}) }
       : { phase: `v2_${phase}`, paywall_ab: braco, roi2 });
   }, [phase, context, braco, roi2, funilB]);
 
@@ -1365,6 +1464,7 @@ export function PaywallDia14({
                 answers={quiz}
                 onBuy={abrirPix}
                 funilB={funilB}
+                anual={anual}
                 onEscape={() => {
                   if (abrirResgate("x")) return;
                   trackEvent("funnel_click", { cta: "paywall_escape", context, ...marcaDoFunilB(funilB) });
@@ -1387,6 +1487,7 @@ export function PaywallDia14({
                 answers={quiz}
                 onBuy={abrirPix}
                 braco={braco}
+                anual={anual}
                 onEscape={() => {
                   // Já girou uma vez? Então o X é X mesmo: entrega a pessoa ao
                   // módulo dela (o gate de trial segura lá dentro) em vez de

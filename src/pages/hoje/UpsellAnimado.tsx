@@ -14,20 +14,22 @@ import "./upsell-animado.css";
 
 /** Custo acumulado em 4 marcos (hoje, 1, 2, 3 anos): renovando o plano × pagando o "pra sempre" agora.
  *  A renovação NÃO é automática — a nota embaixo diz "se você renovar todo ano/mês". */
-export function GraficoPraSempre({ plano }: { plano: PlanoHoje }) {
+/* 26/10 (oferta "anual" do /inicio): `contas` opcional troca os números (entrada, renovação por ano, upgrade) e a nota.
+ * Sem a prop, o /hoje fica exatamente como era. */
+export function GraficoPraSempre({ plano, contas }: { plano: PlanoHoje; contas?: { entrada: number; porAno: number; upgrade: number; nota: string } }) {
   const g = useMemo(() => {
-    const entrada = PLANOS[plano].valor;
-    const porAno = plano === "anual" ? PRECO_ANUAL_DEPOIS : PLANOS.mensal.valor * 12;
+    const entrada = contas?.entrada ?? PLANOS[plano].valor;
+    const porAno = contas?.porAno ?? (plano === "anual" ? PRECO_ANUAL_DEPOIS : PLANOS.mensal.valor * 12);
     const renovando = [0, 1, 2, 3].map((k) => Math.round((entrada + porAno * k) * 100) / 100);
-    const sempre = Math.round((entrada + VALOR_OFERTA.hv47) * 100) / 100;
+    const sempre = Math.round((entrada + (contas?.upgrade ?? VALOR_OFERTA.hv47)) * 100) / 100;
     const max = renovando[3];
     const X = [16, 88, 160, 232];
     const y = (v: number) => 128 - (v / max) * 108;
     const cinza = renovando.map((v, i) => `${i ? "L" : "M"}${X[i]} ${y(v).toFixed(1)}`).join(" ");
     return { renovando, sempre, X, y, cinza, ys: y(sempre) };
-  }, [plano]);
+  }, [plano, contas?.entrada, contas?.porAno, contas?.upgrade]);
   const fim = g.renovando[3];
-  const nota = plano === "anual"
+  const nota = contas ? contas.nota : plano === "anual"
     ? `* renovando = se você renovar todo ano por ${reais(PRECO_ANUAL_DEPOIS, 2)}. Nada renova sozinho.`
     : `* renovando = se você renovar todo mês por ${reais(PLANOS.mensal.valor, 2)}. Nada renova sozinho.`;
   return (

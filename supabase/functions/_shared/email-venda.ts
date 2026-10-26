@@ -9,6 +9,7 @@
 import { eh2027 } from "./pacote-2027.ts";
 import { OFERTA_CASAL, OFERTA_VITALICIO_HOJE, ehPlanoHoje, temKit } from "./ofertas-hoje.ts";
 import { ehOfertaPlano30, ehOfertaPresente } from "./presente.ts";
+import { OFERTA_ANUAL_INICIO, ehOfertaAnualDoInicio, ehUpgradeDoInicio } from "./ofertas-anual-inicio.ts";
 export const OFERTA_PIX_ANUAL = "a97";
 /** 16/10: o PRESENTE do funil do app na web (/assinatura) — o mesmo anual por R$ 69,90 (6990), 365 dias. */
 export const OFERTA_PIX_ANUAL_69 = "a69";
@@ -16,7 +17,7 @@ export const OFERTA_PIX_ANUAL_69 = "a69";
  *  h149/h149k = 30 dias) levam as boas-vindas da venda; os upsells (hv47, hv27, hc199) não levam e-mail próprio. */
 export const ehOfertaHoje = ehPlanoHoje;
 /** As ofertas de Pix que são o ANUAL da venda da web (1 ano, não vitalício). */
-export const OFERTAS_PIX_ANUAIS: readonly string[] = [OFERTA_PIX_ANUAL, OFERTA_PIX_ANUAL_69, "h279", "h279k"];
+export const OFERTAS_PIX_ANUAIS: readonly string[] = [OFERTA_PIX_ANUAL, OFERTA_PIX_ANUAL_69, "h279", "h279k", OFERTA_ANUAL_INICIO];
 /** O mês pré-pago do Pix (R$ 24,90, 30 dias, NÃO renova): o degrau 3 do /assinatura e a 2ª coluna antiga da web. */
 export const OFERTA_PIX_MES = "w25";
 /** Todas as ofertas de 30 dias pré-pagos no Pix (w25 e o h149 do /hoje). */
@@ -35,6 +36,8 @@ export const ehAnualDaVenda = (offer: string | null | undefined): boolean => !!o
 export function periodoDoEmailVenda(offer: string | null | undefined): PeriodoVenda | null {
   // 20/10: o plano vitalício do /hoje (hv279) — é plano do /hoje, então TEM que ter período (os chamadores usam `!`)
   if (offer === OFERTA_VITALICIO_HOJE) return "lifetime";
+  // 26/10: o upgrade da oferta anual do /inicio (OFB_up47/OFB_down27) — a conta virou vitalícia: "Seu CORE pra sempre"
+  if (ehUpgradeDoInicio(offer)) return "lifetime";
   if (ehAnualDaVenda(offer)) return "annual";
   if (ehMesDaVenda(offer)) return "monthly_prepaid";
   return null;
@@ -59,12 +62,17 @@ export function nomeDoProduto(args: { offer?: string | null; periodo?: string | 
   if (ehOfertaPresente(args.offer)) return "CORE de presente"; // 21/10: o upsell de presente (pv149, R$ 14,90)
   if (ehOfertaPlano30(args.offer)) return "Plano de 30 dias"; // 21/10: o downsell do presente (pk99, R$ 9,90)
   if (args.offer === "hv47" || args.offer === "hv27") return "CORE pra sempre";
+  if (ehUpgradeDoInicio(args.offer)) return "CORE Vitalício upgrade"; // 26/10: OFB_up47 / OFB_down27
   if (temKit(args.offer)) return ehAnualDaVenda(args.offer) ? "CORE Anual + Kit" : "CORE 1 mês + Kit";
   if (ehAnualDaVenda(args.offer) || args.periodo === "annual") return "CORE Anual";
   if (args.periodo === "monthly") return "CORE Mensal";
   if (ehMesDaVenda(args.offer) || args.periodo === "monthly_prepaid") return "CORE 1 mês";
   return args.downsell ? "CORE Vitalício (oferta)" : "CORE Vitalício";
 }
+
+/** 26/10: a oferta anual do /inicio leva o e-mail com o bloco das lojas e o "nada é cobrado sozinho" (o `hoje` do
+ *  htmlVenda) — quem compra 1 ano precisa ler que NÃO renova, e a regra do dono pra todo funil web é mostrar as lojas. */
+export const emailVendaComLojas = (offer: string | null | undefined): boolean => ehOfertaAnualDoInicio(offer);
 
 export function assuntoVenda(periodo: PeriodoVenda): string {
   if (periodo === "lifetime") return "Seu CORE pra sempre tá ativo ✅";

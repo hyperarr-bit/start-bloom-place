@@ -683,7 +683,12 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
 
   useLayoutEffect(() => {
     const medir = () => {
-      const alturaUtil = (window.visualViewport?.height ?? window.innerHeight) - 172;
+      // varredura 26/10 (iPhone SE, 667 pt): no editorial a mesa soma padding 12 + livro + gap 20 + setas 44 + padding 8, e o
+      // cabeçalho do álbum desce com a área segura — os 172 pt fixos deixavam ~28 pt de sobra, cortando as setas ‹ › e o
+      // "01 / 24" no meio. Agora o editorial reserva 200 pt + a faixa do relógio. Só muda onde a ALTURA limita o livro
+      // (SE/8/7); nos iPhones altos a largura manda e o livro fica igual.
+      const topo = editorial ? (document.querySelector(".app-safe-top-guard")?.getBoundingClientRect().height ?? 0) : 0;
+      const alturaUtil = (window.visualViewport?.height ?? window.innerHeight) - (editorial ? 200 + topo : 172);
       setLargura(Math.max(240, Math.floor(Math.min(editorial ? 400 : 330, window.innerWidth - (editorial ? 68 : 48), alturaUtil / (editorial ? 1.56 : 1.42)))));
     };
     medir();

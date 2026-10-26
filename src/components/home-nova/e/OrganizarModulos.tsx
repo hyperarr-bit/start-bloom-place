@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, FaixaDoRelogioSobFolha, propsDaFolha } from "./folha-arrasto";
 import { ChevronDown, ChevronUp, Eye, EyeOff, Star, X } from "lucide-react";
 import { MODULOS } from "@/lib/modulos";
@@ -19,7 +19,9 @@ interface Props { aberta: boolean; onFechar: () => void; preferencias: ReturnTyp
 export const OrganizarModulos = ({ aberta, onFechar, preferencias }: Props) => {
   const { toggleFavorite, toggleHidden, isFavorite, isHidden, ordenar, moveModule } = preferencias;
   const lista = ordenar(MODULOS);
-  const arrasto = useFolhaArrastavel(onFechar); // rodada 3: arrastar pra baixo fecha
+  // varredura 26/10: como as outras folhas da E — com "reduzir movimento", sem a mola do arrasto nem o fade do fundo
+  const semMovimento = useReducedMotion();
+  const arrasto = useFolhaArrastavel(onFechar, !!semMovimento); // rodada 3: arrastar pra baixo fecha
   const ids = lista.map((m) => m.id);
   const ocultos = lista.filter((m) => isHidden(m.id)).length;
 
@@ -28,12 +30,12 @@ export const OrganizarModulos = ({ aberta, onFechar, preferencias }: Props) => {
       {aberta && (
         <>
           <FaixaDoRelogioSobFolha />
-          <motion.button type="button" aria-label="Fechar" onClick={onFechar} className={CLASSE_FUNDO_FOLHA} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} />
+          <motion.button type="button" aria-label="Fechar" onClick={onFechar} className={CLASSE_FUNDO_FOLHA} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: semMovimento ? 0 : 0.2 }} />
           <motion.div
             role="dialog" aria-label="Organizar módulos" data-testid="hn-organizar-folha"
             className="fixed inset-x-0 bottom-0 z-[71] max-w-lg mx-auto rounded-t-[28px] bg-card max-h-[88dvh] overflow-y-auto overscroll-contain px-4 pt-2.5 pb-[calc(var(--app-safe-bottom,0px)+16px)]"
             style={{ y: arrasto.y }} {...arrasto.folha}
-            {...propsDaFolha(false)}
+            {...propsDaFolha(!!semMovimento)}
           >
             <Alca arrasto={arrasto} className="mb-0.5" />
             <div className="flex items-center justify-between px-1 mb-1">

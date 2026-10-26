@@ -41,6 +41,40 @@ export function contagemDoItem(i: ItemDoScore, d: LifeHubData): string | null {
   }
 }
 
+/**
+ * Uma linha da folha do score. Varredura 26/10: era declarada DENTRO da FolhaScore — a cada render as linhas eram um
+ * componente novo (desmontavam e remontavam), o mesmo risco de clique perdido já corrigido na barra.
+ */
+const ItemDoScoreLinha = ({ i, data, resolver }: { i: ItemDoScore; data: LifeHubData; resolver: (i: ItemDoScore) => void }) => {
+  const Icone = ICONE_DO_TIPO[i.tipo];
+  const c = corDoTipo(i.tipo);
+  const contagem = contagemDoItem(i, data);
+  const fracao = i.max > 0 ? Math.max(0, Math.min(1, i.pontos / i.max)) : 0;
+  return (
+    <li>
+      <button type="button" onClick={() => resolver(i)} data-testid="he-score-item" data-tipo={i.tipo} data-feito={i.feito ? "1" : undefined} className="w-full flex items-center gap-3 h-[52px] -mx-1 px-1 rounded-xl text-left active:bg-muted/50">
+        <span className="w-9 h-9 rounded-xl grid place-items-center shrink-0" style={{ background: i.feito ? "hsl(var(--muted))" : tintaDoTipo(i.tipo) }} aria-hidden>
+          <Icone className="w-[18px] h-[18px]" strokeWidth={TRACO} style={{ color: i.feito ? "hsl(var(--muted-foreground))" : c }} />
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="flex items-baseline justify-between gap-3">
+            <span className={`text-[15px] font-semibold truncate ${i.feito ? "text-muted-foreground" : ""}`}>{i.nome}</span>
+            {contagem ? (
+              <span className="text-[14px] font-semibold tabular-nums text-muted-foreground shrink-0" data-testid="he-score-contagem">{contagem}</span>
+            ) : i.feito ? (
+              <Check className="w-4 h-4 shrink-0" strokeWidth={2.5} style={{ color: c }} aria-label="feito" />
+            ) : null}
+          </span>
+          <span className="block h-1 rounded-full bg-muted mt-2 overflow-hidden" aria-hidden>
+            <span className="block h-full rounded-full" style={{ width: `${Math.round(fracao * 100)}%`, background: i.feito ? "hsl(var(--muted-foreground) / 0.35)" : c }} />
+          </span>
+        </span>
+        {!i.feito && <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" strokeWidth={2} aria-hidden />}
+      </button>
+    </li>
+  );
+};
+
 export const FolhaScore = ({ aberta, onFechar, data, onAcao, onPersonalizar }: Props) => {
   const navigate = useNavigate();
   const semMovimento = useReducedMotion();
@@ -54,36 +88,6 @@ export const FolhaScore = ({ aberta, onFechar, data, onAcao, onPersonalizar }: P
     onFechar();
     if (i.action) window.setTimeout(() => onAcao(i.action!), 220);
     else if (i.route) navigate(i.route);
-  };
-
-  const Item = ({ i }: { i: ItemDoScore }) => {
-    const Icone = ICONE_DO_TIPO[i.tipo];
-    const c = corDoTipo(i.tipo);
-    const contagem = contagemDoItem(i, data);
-    const fracao = i.max > 0 ? Math.max(0, Math.min(1, i.pontos / i.max)) : 0;
-    return (
-      <li>
-        <button type="button" onClick={() => resolver(i)} data-testid="he-score-item" data-tipo={i.tipo} data-feito={i.feito ? "1" : undefined} className="w-full flex items-center gap-3 h-[52px] -mx-1 px-1 rounded-xl text-left active:bg-muted/50">
-          <span className="w-9 h-9 rounded-xl grid place-items-center shrink-0" style={{ background: i.feito ? "hsl(var(--muted))" : tintaDoTipo(i.tipo) }} aria-hidden>
-            <Icone className="w-[18px] h-[18px]" strokeWidth={TRACO} style={{ color: i.feito ? "hsl(var(--muted-foreground))" : c }} />
-          </span>
-          <span className="flex-1 min-w-0">
-            <span className="flex items-baseline justify-between gap-3">
-              <span className={`text-[15px] font-semibold truncate ${i.feito ? "text-muted-foreground" : ""}`}>{i.nome}</span>
-              {contagem ? (
-                <span className="text-[14px] font-semibold tabular-nums text-muted-foreground shrink-0" data-testid="he-score-contagem">{contagem}</span>
-              ) : i.feito ? (
-                <Check className="w-4 h-4 shrink-0" strokeWidth={2.5} style={{ color: c }} aria-label="feito" />
-              ) : null}
-            </span>
-            <span className="block h-1 rounded-full bg-muted mt-2 overflow-hidden" aria-hidden>
-              <span className="block h-full rounded-full" style={{ width: `${Math.round(fracao * 100)}%`, background: i.feito ? "hsl(var(--muted-foreground) / 0.35)" : c }} />
-            </span>
-          </span>
-          {!i.feito && <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" strokeWidth={2} aria-hidden />}
-        </button>
-      </li>
-    );
   };
 
   return (
@@ -116,7 +120,7 @@ export const FolhaScore = ({ aberta, onFechar, data, onAcao, onPersonalizar }: P
               <button type="button" onClick={onFechar} aria-label="Fechar" className="w-9 h-9 -mr-1.5 rounded-full grid place-items-center bg-muted shrink-0"><X className="w-4 h-4" strokeWidth={2.2} /></button>
             </div>
 
-            <ul className="mt-4" data-testid="he-score-itens">{mostrados.map((i) => <Item key={i.tipo} i={i} />)}</ul>
+            <ul className="mt-4" data-testid="he-score-itens">{mostrados.map((i) => <ItemDoScoreLinha key={i.tipo} i={i} data={data} resolver={resolver} />)}</ul>
 
             <button type="button" onClick={() => { onFechar(); window.setTimeout(onPersonalizar, 220); }} data-testid="he-score-personalizar" className="mt-3 w-full h-11 rounded-2xl flex items-center justify-center gap-1.5 text-[13.5px] font-semibold text-muted-foreground active:bg-muted/50">
               Personalizar o que conta <ChevronRight className="w-4 h-4 text-muted-foreground/60" strokeWidth={2} aria-hidden />

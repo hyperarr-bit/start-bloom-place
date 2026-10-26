@@ -29,6 +29,14 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* Toque longo num botão selecionava o TEXTO dele com as alças azuis do iOS (varredura novato 26/10: o "Começar" das
+     boas-vindas). Botão não é texto pra copiar: sem seleção nem a folha de "copiar/consultar". Campos seguem normais. */
+  button, [role="button"] {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
   /*
    * A CAUSA-RAIZ DE TODO "CINZA" EM BOTÃO (05/08, Moto g7 WebView 77).
    *

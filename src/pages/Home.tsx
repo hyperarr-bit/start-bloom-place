@@ -32,7 +32,8 @@ import { guardarForcasDaUrl, varianteDoTour } from "@/lib/tour-home";
 import { TourDaHome, useTourDaHome } from "@/components/home/TourDaHome";
 import { useHomeNova } from "@/hooks/use-home-nova";
 import { useTheme, palettes, type ThemePalette } from "@/hooks/use-theme";
-import { CHAVE_COR_ANTES_HOME_NOVA } from "@/lib/home-nova";
+import { CHAVE_COR_ANTES_HOME_NOVA, origemJaTentada } from "@/lib/home-nova";
+import { contaCarregadaDeVerdade, decidirOrigemDaConta } from "@/components/home-nova/OrigemDaConta";
 import { contarUso } from "@/lib/medicao-total";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ATRIBUTO_RAIZ } from "@/lib/nav-abas";
@@ -134,21 +135,24 @@ const HomePage = () => {
   // Sequência nova (26/09): dias com algo ANOTADO — o anel e a linha abaixo dele.
   const sequencia = useSequencia();
   const { activeWidgets, addWidget, removeWidget, isActive, toggleSize, reorder } = useHomeWidgets();
-  const { get, set: setData, loaded, isGuest } = useUserData();
+  const { get, set: setData, loaded, isGuest, contaCompleta } = useUserData();
   const { user } = useAuth();
-  // "Sua Home em 5 passos" (TOUR_HOME): relê nos eventos da missão em doses — vem DEPOIS da missão/plano de amanhã
-  // 1.0.19: a Home nova pra esta conta? (chave remota `home_nova`; no modo "admin" a checagem roda por trás e, sem
-  // resposta, vale "não" — a Home de hoje aparece na hora, nunca a tela em branco)
-  const homeNova = useHomeNova(user);
+  // 26/10 (home nova garantida): a ORIGEM da conta (nova × antiga) é decidida AQUI MESMO, no render, se ninguém decidiu
+  // ainda com a conta desta pessoa carregada — a Home nunca depende da ordem da árvore (OrigemDaContaNaSessao grava)
+  if (user?.id && !origemJaTentada(user.id) && contaCarregadaDeVerdade(loaded, contaCompleta)) decidirOrigemDaConta(user, get);
+  // 1.0.19: a Home nova pra esta conta? (chave remota `home_nova`, no app o padrão é "novas+admin"; no modo "admin" a
+  // checagem roda por trás e, sem resposta, vale "não"). `esperandoOrigem`: a origem desta conta ainda não foi decidida
+  // — a tela de carregamento fica (nunca a Home antiga por um quadro pra conta nova)
+  const homeNova = useHomeNova(user, loaded);
   // 26/10: a Home nova guarda a cor do tema de antes (core-cor-antes-home-nova) ao forçar o Original; com a chave
   // DESLIGADA a cor volta na próxima abertura e o guardado sai
   const { setPalette } = useTheme();
   const corGuardada = get<unknown>(CHAVE_COR_ANTES_HOME_NOVA, null);
   useEffect(() => {
-    if (!loaded || homeNova.ligada || typeof corGuardada !== "string" || !corGuardada) return;
+    if (!loaded || homeNova.ligada || homeNova.esperandoOrigem || typeof corGuardada !== "string" || !corGuardada) return;
     if (corGuardada !== "default" && corGuardada in palettes) setPalette(corGuardada as ThemePalette);
     setData(CHAVE_COR_ANTES_HOME_NOVA, null, { system: true });
-  }, [loaded, homeNova.ligada, corGuardada, setPalette, setData]);
+  }, [loaded, homeNova.ligada, homeNova.esperandoOrigem, corGuardada, setPalette, setData]);
   /* 26/10 (modo "novas"): a decisão "desde a montagem" é a do 1º render em que a Home APARECE (conta carregada,
      tutorial resolvido) — antes disso a origem da conta nova ainda não é conhecida e a Home antiga piscava */
   const homeNovaDesdeAMontagem = useRef<boolean | null>(null);
@@ -161,7 +165,7 @@ const HomePage = () => {
   }, [homeNova.ligada, homeECarregada]);
   // "Sua Home em 5 passos" (TOUR_HOME): relê nos eventos da missão em doses — vem DEPOIS da missão/plano de amanhã.
   // Com a Home nova ligada o tour antigo NÃO entra (aponta pras ações rápidas, que lá viraram o "+").
-  const mostrarTour = useTourDaHome(user?.created_at, !!user && !homeNova.ligada);
+  const mostrarTour = useTourDaHome(user?.created_at, !!user && !homeNova.ligada && !homeNova.esperandoOrigem);
 
   const ALL_MODULES: ModuleKey[] = ["financas", "rotina", "dieta", "treino", "saude", "metas", "hiperfoco", "estudos", "carreira", "biblioteca", "casa", "beleza", "viagens", "relacionamentos", "pet", "detox"];
 
@@ -332,7 +336,7 @@ const HomePage = () => {
     else addWidget(id);
   };
 
-  if (!loaded || !onboardingResolved) {
+  if (!loaded || !onboardingResolved || homeNova.esperandoOrigem) {
     return <div className="fixed inset-0 z-[100] bg-background" aria-hidden="true" />;
   }
   if (homeNovaDesdeAMontagem.current === null) homeNovaDesdeAMontagem.current = homeNova.ligada;

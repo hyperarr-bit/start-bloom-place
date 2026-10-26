@@ -200,6 +200,32 @@ html.he-fundo-da-tela body.com-barra-vidro .app-safe-shell { padding-bottom: 0; 
    (Aparência, Personalizar início) rolava ~93 px além do conteúdo — a altura mínima desconta as áreas seguras */
 html.he-fundo-da-tela .app-safe-shell .hn.he.min-h-dvh { min-height: calc(100dvh - var(--app-safe-top, 0px) - var(--app-safe-bottom, 0px)); }
 
+/* A DICA DO "+" (1.0.19, dono 26/10 — lib/dica-mais; DEVOLVIDA 26/10 — a rodada 4, 8d6f9a29, apagou o bloco por engano e a
+   dica sem CSS esmagava a barra: Conquistas/Você sumiam e o texto ficava solto; BarraVidro.tsx usa estas classes): o único ensino da Home nova. Um balão pequeno preso ao "+",
+   no papel do card com um sopro quente, SEM borda e com sombra mínima; a ponta aponta pro centro do "+" (56 px).
+   Entra subindo de leve (ou parado, com "reduzir movimento"). */
+.he-dica-mais {
+  position: absolute; right: 0; bottom: calc(100% + 12px);
+  width: max-content; max-width: min(232px, calc(100vw - 48px));
+  padding: 10px 14px; border-radius: 16px;
+  background: hsl(40 30% 99%); color: hsl(var(--foreground));
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 6px 18px rgb(0 0 0 / 0.07);
+  animation: he-dica-entra 320ms cubic-bezier(.2,.8,.2,1) both;
+  pointer-events: none;
+}
+.he-dica-mais-ponta {
+  position: absolute; right: 22px; bottom: -5px; width: 12px; height: 12px;
+  background: inherit; transform: rotate(45deg); border-radius: 2px;
+  box-shadow: 3px 3px 6px rgb(0 0 0 / 0.03);
+}
+.he-dica-mais-plus {
+  display: inline-grid; place-items: center; width: 18px; height: 18px; margin: 0 1px; vertical-align: -3px;
+  border-radius: 999px; background: var(--hn-mais); color: var(--hn-mais-texto); font-weight: 700; font-size: 13px; line-height: 1;
+}
+.dark .he-dica-mais { background: hsl(222 12% 16%); box-shadow: 0 6px 18px rgb(0 0 0 / 0.45); }
+@keyframes he-dica-entra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .he-dica-mais { animation: none; } }
+
 /* ---- A FESTINHA DO 100 (dono 26/10; Festa100.tsx) ----
    O âmbar é o do score antigo (--warning do tema Original, hsl(38 92% 50%), o que o DayScoreRing usava pro anel), um
    pouco mais fundo: --he-ouro nos TRAÇOS (anel e estrela; no escuro, um âmbar mais claro); --he-ouro-texto no NÚMERO,

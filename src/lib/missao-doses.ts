@@ -300,6 +300,9 @@ export interface EstadoMissaoDoses {
   convitesVistos?: Record<string, number>;
   /** 1.0.16 (4.8): o DONO da missão — hash do id da conta (nunca o id). Outra conta no mesmo aparelho não herda. */
   dono?: string;
+  /** 1.0.19 (P1, 26/10): a versão do app em que a missão NASCEU (MISSAO_CRIADA_NA). Sem o campo = missão de antes da
+   *  1.0.19 — é a única que conta como "missão de antes" na origem da conta (OrigemDaConta/decidirOrigemDaConta). */
+  criadaNa?: string;
   /** 1.0.16 (17/10): o 1º gasto guiado depois do Montar está PENDENTE (a dose `n` já está gravada) — fechou o app no
    *  meio, a dose volta no passo do gasto ao reabrir no mesmo dia (retomadaDoGasto). Sai quando o gasto entra, ela
    *  pula, ou a comemoração aparece. */
@@ -376,6 +379,16 @@ export function iniciarMissao(modulos: [ModuloDaMissao, ModuloDaMissao, ModuloDa
 }
 
 export const apagarMissao = (): void => { ls.del(CHAVE_ESTADO_MISSAO_DOSES); avisar(); };
+
+/**
+ * 1.0.19 (P1 da varredura novato, 26/10): o carimbo da versão em que a missão nasce (`criadaNa`). A origem da conta
+ * (Home nova × antiga) pergunta "essa conta já tinha missão ANTES da 1.0.19?" — antes ela olhava só se havia missão, e a
+ * missão que a própria 1.0.19 cria no cadastro dentro do app virava "missão de antes" (conta nova → Home antiga pra
+ * sempre). Missão carimbada nasceu na 1.0.19 ou depois: nunca é "de antes". Sem carimbo (1.0.16–1.0.18, cópia da conta
+ * vinda de outro aparelho) continua contando — quem começou o teste na 1.0.18 segue "antiga".
+ */
+export const MISSAO_CRIADA_NA = "1.0.19";
+export const missaoDeAntesDa1019 = (m: EstadoMissaoDoses | null | undefined): boolean => !!m && !m.criadaNa;
 
 /** 1.0.16 (4.8): a CÓPIA da missão na conta (useUserData) — reinstalar/trocar de aparelho restaura. */
 export const CHAVE_MISSAO_NA_CONTA = "missao-doses-conta";

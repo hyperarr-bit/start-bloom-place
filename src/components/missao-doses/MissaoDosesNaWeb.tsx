@@ -20,7 +20,7 @@ import { pedirAvaliacaoPorMissao, type MotivoDaMissao } from "@/lib/avaliacao";
 import { EVENTO_TOUR_HOME_FIM, deveMostrarTourHome, tourFeito, tourHomeLigado, tourSemMaisAberturas } from "@/lib/tour-home";
 import {
   CHAVE_MISSAO_NA_CONTA, EVENTO_MISSAO_COMPLETA, EVENTO_MISSAO_DOSES, MISSAO_DOSES_APP, MODULOS, TOTAL_PASSOS_B, apagarMissao, aprofundarPendente, contaNova, conviteDoDiaDevido, diaDaMissao, dicaDoDiaDevida, donoDaConta, doseAbreHoje, dosesFeitas, ehBracoB, ehUmPorDia, eventoDaMissao, gravarMissao, guardarForcaDaUrl, iniciarMissao, lerMissao,
-  definirDonoDaMissao, marcarComecar, missaoDaConta, semValor, missaoValida, precisaPlanoA, retomadaDoGasto,
+  MISSAO_CRIADA_NA, definirDonoDaMissao, marcarComecar, missaoDaConta, semValor, missaoValida, precisaPlanoA, retomadaDoGasto,
   missaoCumprida, missaoDosesLigada, missaoDosesMandaNoApp, modulosPadrao, passoHomePendente, passoPendente, precisaPlanoAmanha, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao,
   ROTULO_DOSE_PELA_INTRO, comEscolha2, construiuAoAbrirDevido, dias23NaMissao, escolhaDoDia2Devida, introEhADoseDoDia2, opcoesDoDia2,
 } from "@/lib/missao-doses";
@@ -38,6 +38,7 @@ import { PlanoDeAmanhaA } from "./PlanoDeAmanhaA";
 import { DicaDoDia } from "./DicaDoDia";
 import { missaoAtual } from "@/lib/teste-gratis";
 import { homeNovaLigadaSincrona } from "@/lib/home-nova";
+import { contaCarregadaDeVerdade } from "@/components/home-nova/OrigemDaConta";
 import "./missao-doses.css";
 
 /**
@@ -208,7 +209,15 @@ function Ligada() {
    * teste/assinatura: no app ela só nasce e só aparece com acesso (isSubscribed; antes da 1ª resposta do
    * check-subscription é false, então nada pisca). A web segue como estava. */
   const semAcessoNoApp = isNativeShell() && !isSubscribed;
-  const { loaded, get, set: gravarNaConta } = useUserData();
+  const { loaded, get, set: gravarNaConta, contaCompleta } = useUserData();
+  /* P1 (varredura novato, 26/10): no CADASTRO DENTRO DO APP, o render em que o convidado vira conta ainda traz o
+     `loaded` do convidado (o provider só zera no efeito dele, que roda depois dos filhos) — a missão nascia com o dono
+     antes de a conta ser lida, e a origem da conta via essa missão como "de antes" (Home antiga pra sempre). A missão só
+     nasce/restaura com a conta DESTA pessoa lida (contaCarregadaDeVerdade); uma vez lida, uma 2ª leitura que falhe
+     (contaCompleta volta a false com loaded true) não segura mais nada. */
+  const contaLida = useRef<string | null>(null);
+  if (user?.id && contaCarregadaDeVerdade(loaded, contaCompleta)) contaLida.current = user.id;
+  const contaDestaPessoa = !!user && loaded && contaLida.current === user.id;
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const hoje = localDayKey();
@@ -354,7 +363,7 @@ function Ligada() {
 
   // nasce na 1ª entrada logada: a área da porta primeiro
   useEffect(() => {
-    if (!user || !loaded || missao || semAcessoNoApp) return;
+    if (!user || !contaDestaPessoa || missao || semAcessoNoApp) return;
     // 1.0.16 (4.8): reinstalou / trocou de aparelho / a missão local é de outra conta → a CÓPIA DA CONTA volta
     // (boas-vindas, convites e doses feitas não se repetem)
     const copia = missaoValida(get<unknown>(CHAVE_MISSAO_NA_CONTA, null));
@@ -379,14 +388,16 @@ function Ligada() {
     const braco = bracoDia1();
     let m = iniciarMissao(modulos, hoje, undefined, braco);
     // o dono só entra com o braço (build de loja): sem braço, o JSON é o de sempre, campo a campo
-    if (braco) m = gravarMissao({ ...m, dono: donoDaConta(user.id) });
+    // P1 (26/10): com o braço (build de loja) a missão também leva o carimbo da versão (criadaNa) — a origem da conta
+    // nunca a conta como "missão de antes"
+    if (braco) m = gravarMissao({ ...m, dono: donoDaConta(user.id), criadaNa: MISSAO_CRIADA_NA });
     setMissao(m);
     const portaArea = (() => { try { const a = (user.user_metadata as { porta?: { respostas?: { area?: unknown } } } | undefined)?.porta?.respostas?.area; return typeof a === "string" ? a : null; } catch { return null; } })();
     trackEvent("missao_doses_inicio", eventoDaMissao({
       modulos, area: area ?? null, area_lida: areaLida ?? null, area_respondida: portaArea,
       origem_area: areaLida && areaLida in AREAS ? "funil" : area ? "porta" : "padrao", ...(braco ? { missao_1_por_dia: modoUmPorDia() } : {}),
     }));
-  }, [user, loaded, missao, hoje, semAcessoNoApp]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user, contaDestaPessoa, missao, hoje, semAcessoNoApp]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* 1.0.16 (4.8): a cópia da missão na conta acompanha cada mudança (sobe pro user_data). Escrita de SISTEMA:
      mexer na missão (ver as boas-vindas, o convite) não é registro da pessoa — não conta dia na sequência. */

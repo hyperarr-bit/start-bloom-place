@@ -35,7 +35,7 @@
 .cn-colecao-secao-cab > span { margin-left: auto; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--colecao-secundaria); }
 .cn-colecao .cn-grade4 { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 6px; padding: 20px 10px; }
 .cn-colecao .cn-celula { padding: 5px 2px 7px; gap: 9px; border-radius: 12px; justify-content: start; transition: background-color .18s ease, transform .18s ease; }
-.cn-colecao-arte { display: grid; place-items: center; position: relative; width: var(--colecao-arte); height: var(--colecao-arte); }
+.cn-colecao-arte { display: grid; place-items: center; position: relative; width: var(--colecao-arte); height: var(--colecao-arte); isolation: isolate; } /* isolate (grandes, 26/10): o selo .cn-prog (z 4) não passa por cima do cabeçalho fixo (z 2) */
 .cn-colecao .cn-celula-nome { color: var(--colecao-tinta); font-size: 11px; line-height: 1.25; font-weight: 600; max-width: 130px; }
 .cn-colecao .cn-celula[data-aberto="false"] .cn-celula-nome { color: var(--colecao-secundaria); }
 .cn-colecao .cn-prog { right: -2px; bottom: -2px; background: var(--colecao-tinta); color: var(--colecao-folha); font-weight: 650; box-shadow: 0 0 0 2px var(--colecao-folha); }

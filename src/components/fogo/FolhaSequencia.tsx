@@ -208,7 +208,7 @@ export const FolhaSequencia = ({ aberta, onFechar, seq, trilha, origem, onAdesiv
               {seq.hojeFeito ? (
                 <p className="flex items-center gap-2 px-1 text-[14px] font-semibold" data-testid="he-seq-garantido">
                   <Check className="w-[18px] h-[18px] shrink-0" strokeWidth={2.6} style={{ color: cor }} aria-hidden />
-                  <span>Hoje já conta.{frase && <span className="font-normal text-muted-foreground"> {capitalizar(frase)}.</span>}{!frase && <span className="font-normal text-muted-foreground"> Você está no fogo ouro — o topo.</span>}</span>
+                  <span>Hoje já conta.{frase && <span className="font-normal text-muted-foreground"> {capitalizar(frase)}.</span>}{!frase && <span className="font-normal text-muted-foreground"> Você está no fogo ouro luminoso — o topo.</span>}</span>
                 </p>
               ) : acao ? (
                 <button type="button" onClick={fazer} data-testid="he-seq-acao" className="w-full rounded-[20px] px-4 py-3 flex items-center gap-3 text-left active:brightness-95" style={{ background: "hsl(var(--muted) / 0.55)" }}>

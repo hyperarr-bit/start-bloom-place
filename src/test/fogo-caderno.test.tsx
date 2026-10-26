@@ -10,7 +10,7 @@ beforeEach(() => { estado.vista = null; estado.loaded = true; estado.reduzir = f
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 describe("fogo do caderno", () => {
-  it.each([[1,"laranja"],[2,"laranja"],[3,"laranja"],[6,"laranja"],[7,"ambar"],[13,"ambar"],[14,"petroleo"],[29,"petroleo"],[30,"violeta"],[99,"violeta"],[100,"dourado"],[365,"dourado"]])("%s dias → %s", (dias, id) => {
+  it.each([[1,"ambar"],[2,"ambar"],[3,"petroleo"],[6,"petroleo"],[7,"violeta"],[13,"violeta"],[14,"magenta"],[29,"magenta"],[30,"ouro"],[99,"ouro"],[100,"dourado"],[365,"dourado"]])("%s dias → %s", (dias, id) => {
     expect(fogoDoCaderno(Number(dias)).id).toBe(id);
   });
   it("zero e dados inválidos ficam apagados; próximos marcos não dependem dos protetores", () => {
@@ -30,18 +30,19 @@ describe("fogo do caderno", () => {
     expect(estado.set).not.toHaveBeenCalled();
     expect(container.querySelector("[data-subiu]")).toBeNull();
   });
-  it("a chama usa pigmento vivo e não o tom escuro reservado ao texto", () => {
+  it("a chama é chapada no pigmento da faixa (o corpo do CoreFire), nunca o tom escuro reservado ao texto", () => {
     const { container } = render(<FogoDaSequencia dias={7}/>);
-    const stops = container.querySelectorAll("linearGradient")[0].querySelectorAll("stop");
-    expect(stops[1].getAttribute("stop-color")).toBe(fogoDoCaderno(7).chamaBase);
-    expect(stops[1].getAttribute("stop-color")).not.toBe(fogoDoCaderno(7).hojeTexto);
+    const corpo = container.querySelector(".cf-body");
+    expect(corpo?.getAttribute("fill")).toBe(fogoDoCaderno(7).meio);
+    expect(corpo?.getAttribute("fill")).not.toBe(fogoDoCaderno(7).hojeTexto);
+    expect(container.querySelector("linearGradient")).toBeNull();
   });
   it("primeira visita registra a faixa sem festa; zero mostra SVG apagado", () => {
     const {container, rerender} = render(<FogoDaSequencia dias={30}/>);
     expect(container.querySelector("[data-subiu]")).toBeNull();
     expect(estado.set).toHaveBeenCalledWith("conquistas-fogo-caderno-visto",3,{system:true});
     rerender(<FogoDaSequencia dias={0}/>);
-    expect(container.querySelector("svg")?.getAttribute("data-fogo")).toBe("apagado");
+    expect(container.querySelector("svg")?.getAttribute("data-tone")).toBe("gray");
   });
   it("subir anima uma vez; a gravação não corta a animação; cair não comemora", () => {
     estado.vista = 1;

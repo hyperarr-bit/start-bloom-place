@@ -35,7 +35,8 @@ import HomePage from "@/pages/Home";
 import { BarraVidroGlobal } from "@/components/home-nova/e/BarraVidroGlobal";
 import { CHAVE_FORCA_HOME_NOVA, _zerarHomeNova } from "@/lib/home-nova";
 import { deveFechar, LIMITE_FECHAR_PX } from "@/components/home-nova/e/folha-arrasto";
-import { FogoSequencia, faseDoFogo } from "@/components/fogo/FogoSequencia";
+import { FogoSequencia } from "@/components/fogo/FogoSequencia";
+import { fireClockPhase, FIRE_CYCLE_MS } from "@/components/fogo/core-fire/core-fire-data";
 import { marcarTrocaDeAba, rotaMontou, _trocaDeAbaMarcada } from "@/lib/troca-de-rota";
 import { _zerarEntradaDaHome, marcarEntradaDaHome } from "@/components/home-nova/e/Animacoes";
 import { CATALOGO_WIDGETS_E, MAX_WIDGETS_E, WIDGETS_E_PADRAO, alternarWidgetE, dadoDoWidgetE, normalizarWidgetsE, widgetsE } from "@/lib/home-widgets-e";
@@ -223,21 +224,31 @@ describe("widgets da Home nova (lib/home-widgets-e)", () => {
 });
 
 describe("o fogo não reinicia ao remontar; a troca de aba é instantânea; a entrada da Home é 1x por sessão", () => {
-  it("a fase da chama vem do relógio (animation-delay negativo dentro do período) e remontar dá a mesma fase", () => {
-    const f = faseDoFogo(10_000);
-    expect(f.corpo).toBeCloseTo(-((10_000 % 2600) / 1000), 3);
-    expect(f.gota).toBeCloseTo(-((10_000 % 2100) / 1000), 3);
-    expect(f.corpo).toBeLessThanOrEqual(0); expect(f.corpo).toBeGreaterThan(-2.6);
-    const { unmount } = render(<FogoSequencia dias={5} estado="aceso" />);
-    const antes = (screen.getByTestId("fg-seq") as HTMLElement).style.getPropertyValue("--fg-fase-corpo");
-    expect(antes).toMatch(/^-?\d+\.\d{3}s$/);
-    unmount();
-    render(<FogoSequencia dias={5} estado="aceso" />);
-    const depois = (screen.getByTestId("fg-seq") as HTMLElement).style.getPropertyValue("--fg-fase-corpo");
-    expect(Math.abs(parseFloat(depois) - parseFloat(antes))).toBeLessThan(0.1);
-    const css = readFileSync(resolve(process.cwd(), "src/components/fogo/fogo-sequencia.css"), "utf8");
-    expect(css).toContain("animation-delay: var(--fg-fase-corpo, 0s)");
-    expect(css).toContain("animation-delay: var(--fg-fase-gota, 0s)");
+  it("a fase da chama vem do relógio: ao (re)montar, o relógio do SVG vai pra fase do aparelho — remontar continua a mesma chama", () => {
+    expect(FIRE_CYCLE_MS).toBe(4800);
+    expect(fireClockPhase(10_000)).toBeCloseTo((10_000 % 4800) / 1000, 3);
+    expect(fireClockPhase(4800 * 3)).toBe(0);
+    const proto = SVGSVGElement.prototype as SVGSVGElement & { setCurrentTime?: (s: number) => void };
+    const antes = proto.setCurrentTime;
+    const chamadas: number[] = [];
+    proto.setCurrentTime = function (t: number) { chamadas.push(t); };
+    try {
+      const agora = vi.spyOn(Date, "now").mockReturnValue(1_000_003_700);
+      const { unmount } = render(<FogoSequencia dias={5} estado="aceso" />);
+      expect(chamadas.at(-1)).toBeCloseTo((1_000_003_700 % 4800) / 1000, 3);
+      unmount();
+      agora.mockReturnValue(1_000_005_100); // 1,4 s depois: a chama nova continua 1,4 s adiante, não do quadro 0
+      render(<FogoSequencia dias={5} estado="aceso" />);
+      expect(chamadas.at(-1)).toBeCloseTo((1_000_005_100 % 4800) / 1000, 3);
+      expect(chamadas.length).toBe(2);
+      // apagado (parado) não mexe no relógio
+      cleanup();
+      render(<FogoSequencia dias={5} estado="apagado" />);
+      expect(chamadas.length).toBe(2);
+      agora.mockRestore();
+    } finally {
+      if (antes) proto.setCurrentTime = antes; else delete proto.setCurrentTime;
+    }
   });
   it("marcar a troca de aba faz a foto da tela de antes sair na hora (0 ms) e a marca se apaga ao montar a rota", () => {
     expect(_trocaDeAbaMarcada()).toBe(false);

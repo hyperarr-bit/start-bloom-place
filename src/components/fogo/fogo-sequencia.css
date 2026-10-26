@@ -1,44 +1,11 @@
-/* O FOGO UNIFICADO (26/10) — ver FogoSequencia.tsx. O desenho e as cores são do `Fogo` + paleta do caderno; aqui
-   moram os estados e as animações:
-   · aceso  → a CHAMA VIVA: tremulação lenta e sutil (2,6 s) no corpo — escala/inclinação mínimas — e a gota de
-             dentro balançando um pouco mais devagar (2,1 s). Nada que distraia.
-   · apagado (hoje ainda não garantido) → a mesma chama, desbotada e PARADA.
-   · neutro (0 dias) → o cinza do caderno, parado.
-   · [data-acende] → o acender: pulso + brilho rápido (0,6 s), 1x por dia (a pílula decide).
-   · [data-subiu] → a subida de faixa do caderno (conquistas-caderno.css) — sem a tremulação por cima.
-   prefers-reduced-motion desliga tudo. */
+/* O FOGO UNIFICADO — ver FogoSequencia.tsx. O desenho, os estados e as animações são da chama sem borda do Codex
+   (core-fire/core-fire.css: aceso = fluxo contínuo · apagado = mais suave e parado · neutro = cinza · o acender).
+   Aqui só a caixa de layout (a mesma de antes: tamanho + 4 px) e a base da chama centrada. */
 .fg-seq { position: relative; display: grid; place-items: center; flex-shrink: 0; line-height: 0; }
 .fg-seq:not(.cn-fogo) { width: calc(var(--fg-t, 42px) + 4px); height: calc(var(--fg-t, 42px) + 4px); }
-.fg-seq > svg { transform-origin: 50% 88%; }
-.fg-seq .fogo-gota { transform-box: fill-box; transform-origin: 50% 92%; }
-
-/* a fase vem do relógio (FogoSequencia: --fg-fase-*, negativa) — remontar não reinicia a chama */
-.fg-seq[data-viva]:not([data-subiu]) > svg { animation: fg-vivo 2.6s ease-in-out infinite; animation-delay: var(--fg-fase-corpo, 0s); }
-.fg-seq[data-viva]:not([data-subiu]) .fogo-gota { animation: fg-gota 2.1s ease-in-out infinite; animation-delay: var(--fg-fase-gota, 0s); }
-@keyframes fg-vivo {
-  0%, 100% { transform: rotate(-1.4deg) scale(1); }
-  38% { transform: rotate(1.2deg) scale(1.025); }
-  70% { transform: rotate(-0.6deg) scale(1.01); }
-}
-@keyframes fg-gota {
-  0%, 100% { transform: scaleY(1) translateY(0); }
-  45% { transform: scaleY(1.07) translateY(-2%); }
-  75% { transform: scaleY(0.97) translateY(1%); }
-}
-
-.fg-seq[data-fogo="apagado"] > svg { opacity: 0.45; filter: saturate(0.55) brightness(1.04); }
-.dark .fg-seq[data-fogo="apagado"] > svg { opacity: 0.5; filter: saturate(0.55) brightness(1.2); }
-
-.fg-seq[data-acende] { animation: fg-acende 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; transform-origin: 50% 85%; }
-@keyframes fg-acende {
-  0% { transform: scale(1); filter: brightness(1); }
-  35% { transform: scale(1.16); filter: brightness(1.35) saturate(1.3); }
-  100% { transform: scale(1); filter: brightness(1); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .fg-seq > svg, .fg-seq .fogo-gota, .fg-seq[data-acende] { animation: none !important; }
-}
+.fg-seq > svg { transform-origin: 50% 90%; }
+/* apagado no escuro: o CoreFire baixa a opacidade (0,52); no fundo escuro a cor suave some um pouco mais — 0,6 segura */
+.dark .fg-seq .core-fire[data-status="pending"] { opacity: 0.6; }
 
 /* ---- A FOLHA DA SEQUÊNCIA UNIFICADA (FolhaSequencia.tsx): o estilo da E conversando com o azul-tinta das Conquistas ----
    (a posição da folha é das utilidades no JSX — `fixed inset-x-0 bottom-0`; nada aqui pode disputar com elas: este

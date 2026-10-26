@@ -11,6 +11,7 @@ import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 import { MODULOS } from "@/lib/modulos";
 import { CHAVE_FORCA_HOME_NOVA, _zerarHomeNova } from "@/lib/home-nova";
 import { FOGOS_CADERNO, fogoDoCaderno } from "@/components/conquistas/nova/fogo-caderno";
+import { CORE_FIRE_COLORS } from "@/components/fogo/core-fire/core-fire-data";
 
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));
 vi.mock("@/lib/admin", () => ({ checkIsAdmin: vi.fn(async () => false) }));
@@ -57,16 +58,21 @@ describe("a identidade do módulo dentro do módulo", () => {
   });
 });
 
-describe("as cores do fogo na régua suave da Home (adendo B)", () => {
-  it("petróleo, violeta e ouro com o croma na faixa dos azulejos (0,08–0,14); a progressão âmbar < ouro; as iniciais na faixa", () => {
-    const C = (i: number) => oklch(FOGOS_CADERNO[i].meio).C;
-    expect(C(3)).toBeGreaterThan(0.08); // petróleo (era 0,06)
-    expect(C(4)).toBeGreaterThan(0.10); // violeta (era 0,08)
-    expect(C(5)).toBeGreaterThan(C(2)); // ouro mais rico que o âmbar (era ao contrário)
-    for (let i = 0; i < 6; i++) { expect(C(i)).toBeGreaterThan(0.08); expect(C(i)).toBeLessThan(0.15); }
-    // a matiz de cada faixa ficou (laranja ~60–70 · âmbar ~88 · petróleo ~200 · violeta ~308 · ouro ~86)
-    expect(oklch(FOGOS_CADERNO[3].meio).h).toBeGreaterThan(190); expect(oklch(FOGOS_CADERNO[3].meio).h).toBeLessThan(212);
-    expect(oklch(FOGOS_CADERNO[4].meio).h).toBeGreaterThan(300); expect(oklch(FOGOS_CADERNO[4].meio).h).toBeLessThan(316);
-    expect(fogoDoCaderno(14).id).toBe("petroleo"); expect(fogoDoCaderno(30).id).toBe("violeta"); expect(fogoDoCaderno(100).id).toBe("dourado");
+describe("as cores do fogo = as das figurinhas da família de pedra (26/10, substitui o adendo B)", () => {
+  it("cada faixa do caderno pinta com o corpo/miolo do CoreFire do mesmo marco; a matiz segue a figurinha", () => {
+    const tons = [["amber", 1], ["petrol", 3], ["violet", 7], ["home", 14], ["gold", 30], ["gold-bright", 100]] as const;
+    tons.forEach(([tom, dias], i) => {
+      expect(FOGOS_CADERNO[i].meio, tom).toBe(CORE_FIRE_COLORS[tom].body);
+      expect(FOGOS_CADERNO[i].claro, tom).toBe(CORE_FIRE_COLORS[tom].inner);
+      expect(fogoDoCaderno(dias)).toBe(FOGOS_CADERNO[i]);
+    });
+    // âmbar ~85–95 · petróleo ~190–212 · violeta ~300–316 · magenta ~340–360 · ouro ~80–95
+    const h = (i: number) => oklch(FOGOS_CADERNO[i].meio).h;
+    expect(h(0)).toBeGreaterThan(75); expect(h(0)).toBeLessThan(95);
+    expect(h(1)).toBeGreaterThan(190); expect(h(1)).toBeLessThan(212);
+    expect(h(2)).toBeGreaterThan(295); expect(h(2)).toBeLessThan(316);
+    expect(h(3)).toBeGreaterThan(335); expect(h(3)).toBeLessThan(360);
+    expect(h(4)).toBeGreaterThan(75); expect(h(4)).toBeLessThan(95);
+    for (let i = 0; i < 6; i++) { expect(oklch(FOGOS_CADERNO[i].meio).C).toBeGreaterThan(0.05); expect(oklch(FOGOS_CADERNO[i].meio).C).toBeLessThan(0.16); }
   });
 });

@@ -61,7 +61,7 @@ describe("Home nova — pílula do fogo e folha da sequência", () => {
     const pilula = screen.getByTestId("hn-pilula-fogo");
     expect(pilula.getAttribute("data-fogo")).toBe("aceso");
     // 26/10: o fogo unificado (components/fogo) — a faixa e o estado no invólucro, o desenho do Codex dentro
-    expect(pilula.querySelector("[data-testid='fg-seq'][data-fogo='aceso'][data-faixa='laranja'] svg[data-fogo='laranja']")).toBeTruthy();
+    expect(pilula.querySelector("[data-testid='fg-seq'][data-fogo='aceso'][data-faixa='ambar'] svg.core-fire[data-tone='amber'][data-status='done']")).toBeTruthy();
     expect(screen.getByTestId("hn-pilula-dias").textContent).toBe("2");
     fireEvent.click(pilula);
     await waitFor(() => expect(screen.getByTestId("he-folha-sequencia")).toBeTruthy());
@@ -77,8 +77,8 @@ describe("Home nova — pílula do fogo e folha da sequência", () => {
     expect(deHoje?.getAttribute("data-estado")).toBe("feito");
     expect(dias.filter((d) => d.getAttribute("data-estado") === "feito").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByTestId("he-seq-garantido").textContent).toContain("Hoje já conta.");
-    // a próxima faixa nos nomes da sequência das Conquistas (paleta do caderno): com 2 dias, o laranja vivo vem aos 3
-    expect(screen.getByTestId("he-seq-garantido").textContent).toContain("Falta 1 dia pro fogo laranja vivo");
+    // a próxima faixa nos nomes da sequência das Conquistas (paleta do caderno): com 2 dias, o petróleo vem aos 3
+    expect(screen.getByTestId("he-seq-garantido").textContent).toContain("Falta 1 dia pro fogo petróleo");
     expect(screen.queryByTestId("he-seq-acao")).toBeNull();
     expect(eventos.some(([e, d]) => e === "sequencia_folha_aberta" && d.garantido === true && d.dias === 2 && d.origem === "home")).toBe(true);
     // a evolução com as figurinhas da sequência, aberta no próximo marco (3 dias), e os protetores numa linha

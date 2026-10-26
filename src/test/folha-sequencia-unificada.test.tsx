@@ -60,19 +60,19 @@ describe("cabeçalho e status", () => {
     montar(seqDe({ dias: 9, hojeFeito: true, recorde: 30, lista: ["2026-10-27", HOJE] }));
     expect(screen.getByTestId("he-seq-recorde").textContent).toBe("Recorde de 30 dias");
     expect(screen.getByTestId("he-seq-fogo").getAttribute("data-fogo")).toBe("aceso");
-    expect(screen.getByTestId("he-seq-fogo").getAttribute("data-faixa")).toBe("ambar");
+    expect(screen.getByTestId("he-seq-fogo").getAttribute("data-faixa")).toBe("violeta");
   });
 
   it("garantido: '✓ Hoje já conta.' + a próxima faixa nos nomes do caderno; no topo (ouro), a frase do topo", () => {
     montar(seqDe({ dias: 9, hojeFeito: true, lista: [HOJE] }));
     expect(screen.getByTestId("he-seq-garantido").textContent).toContain("Hoje já conta.");
-    expect(screen.getByTestId("he-seq-garantido").textContent).toContain("Faltam 5 dias pro fogo petróleo.");
+    expect(screen.getByTestId("he-seq-garantido").textContent).toContain("Faltam 5 dias pro fogo magenta.");
     expect(screen.queryByTestId("he-seq-acao")).toBeNull();
-    expect(fraseDaProximaFaixaDoCaderno(2)).toBe("Falta 1 dia pro fogo laranja vivo");
+    expect(fraseDaProximaFaixaDoCaderno(2)).toBe("Falta 1 dia pro fogo petróleo");
     expect(fraseDaProximaFaixaDoCaderno(120)).toBeNull();
     cleanup();
     montar(seqDe({ dias: 120, hojeFeito: true, lista: [HOJE] }));
-    expect(screen.getByTestId("he-seq-garantido").textContent).toContain("fogo ouro");
+    expect(screen.getByTestId("he-seq-garantido").textContent).toContain("fogo ouro luminoso — o topo");
   });
 
   it("não garantido: 'Pra continuar hoje: <ação>' leva a fazer (onIr com a rota + evento com a origem); fogo apagado", () => {

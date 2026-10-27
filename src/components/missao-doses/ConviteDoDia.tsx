@@ -8,6 +8,7 @@ import { MODULOS, dosesFeitas, passoPendente, type DiaDaMissao, type EstadoMissa
 import { entrada, MOV } from "@/lib/movimento";
 import { tomDoBotaoDaMissao } from "@/lib/home-nova";
 import "./missao-doses.css";
+import { FaixaDoRelogioTransparente } from "@/components/app/faixaDoRelogio";
 
 /** "Ontem" / "Na sexta" / "No sábado" — quando a dose anterior foi feita, do jeito que se fala. */
 export function quandoFoi(dia: string, hoje: string): string {
@@ -73,6 +74,7 @@ export function ConviteDoDia({ missao, hoje, aoIr, aoDepois, aoVer }: {
       data-camada-guia="missao-doses-convite" data-testid="missao-doses-convite" data-dia={dia}
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={entrada(reduzir, MOV.base)}
     >
+      <FaixaDoRelogioTransparente />
       <motion.div
         initial={reduzir ? false : { y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
         transition={entrada(reduzir, MOV.calmo, 0.08)}

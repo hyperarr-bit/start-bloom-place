@@ -37,3 +37,15 @@ export function useFaixaDoRelogioTransparente(ativo = true) {
     };
   }, [ativo]);
 }
+
+/**
+ * 1.0.20 — o mesmo, como componente: montado DENTRO de uma camada escura de tela cheia, vive e morre com ela (inclusive na
+ * animação de saída do AnimatePresence/Radix, que mantém os filhos montados até o fim). Usado pelo menu da conta
+ * (AccountDrawer) e pelas folhas da missão em doses (festas, "Dia 1 feito", plano de amanhã, convite/escolha do dia 2,
+ * pré-folha do lembrete, a dica do dia e o fundo do "Escolher treino") — QA do v1020: todas ficavam com a faixa clara
+ * por cima do escurecido, logo no dia 1 de toda conta nova.
+ */
+export function FaixaDoRelogioTransparente(): null {
+  useFaixaDoRelogioTransparente(true);
+  return null;
+}

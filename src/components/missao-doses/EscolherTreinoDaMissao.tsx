@@ -1,6 +1,7 @@
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { EscolherTreino, type ResultadoDaEscolha } from "@/components/intro-modulo/EscolherTreino";
+import { FaixaDoRelogioTransparente } from "@/components/app/faixaDoRelogio";
 
 export type { ResultadoDaEscolha };
 
@@ -30,6 +31,7 @@ export function EscolherTreinoDaMissao({ onPronto, onPular }: { origem: "missao"
   return createPortal(
     <>
       <div aria-hidden className="fixed inset-0 z-[199]" style={{ background: "rgba(15,12,20,.38)" }} data-testid="missao-escolher-treino-fundo" />
+      <FaixaDoRelogioTransparente />
       <motion.div
         className="fixed inset-x-0 z-[200] px-4"
         style={{ top: "calc(var(--missao-doses-faixa-h, 44px) + var(--app-safe-top, 0px) + 12px)" }}

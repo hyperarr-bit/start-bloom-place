@@ -24,18 +24,7 @@ import { trialCartaoAtivo } from "@/lib/teste-gratis";
 import { PainelAparencia } from "@/components/account/PainelAparencia";
 import { useSequencia } from "@/components/conquistas/use-conquistas";
 import { Fogo } from "@/components/conquistas/Fogo";
-import { useFaixaDoRelogioTransparente } from "@/components/app/faixaDoRelogio";
-
-/**
- * 1.0.20 (2ª passada 26/10): com o menu da conta aberto na Home ANTIGA, a faixa do relógio (.app-safe-top-guard, por cima
- * de tudo) ficava BRANCA sobre o escurecido da folha. Montado DENTRO da folha (o Radix a mantém montada até o fim da
- * animação de saída), deixa a faixa transparente enquanto o menu está na tela — o escurecido (fixed inset-0) cobre até o
- * topo — e devolve a cor quando a folha sai de vez, como as folhas da Home nova, o álbum e o "Dia completo".
- */
-const FaixaDoRelogioSobOMenu = () => {
-  useFaixaDoRelogioTransparente(true);
-  return null;
-};
+import { FaixaDoRelogioTransparente } from "@/components/app/faixaDoRelogio";
 
 /* ───────────── 1.0.18: o MENU NOVO (lib/menu-novo) — 3 grupos, no desenho v1-menu ───────────── */
 
@@ -248,7 +237,10 @@ export const AccountDrawer = ({
           // 1.0.18: o menu novo segue o desenho (sem o X do canto — fecha tocando fora, arrastando ou no ‹ das sub-telas)
           semFechar={novo}
         >
-          <FaixaDoRelogioSobOMenu />
+          {/* 1.0.20 (2ª passada 26/10): com o menu aberto na Home ANTIGA a faixa do relógio (.app-safe-top-guard, por cima de
+              tudo) ficava BRANCA sobre o escurecido. Montado DENTRO da folha (o Radix a mantém montada até o fim da animação
+              de saída): faixa transparente enquanto o menu está na tela, a cor de antes volta quando ele sai de vez */}
+          <FaixaDoRelogioTransparente />
           {/* pegador: sinaliza que a folha desce arrastando */}
           <div className="pt-3 pb-1 flex justify-center" aria-hidden="true">
             <span className="h-1 w-9 rounded-full bg-muted-foreground/25" />

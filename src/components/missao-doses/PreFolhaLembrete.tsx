@@ -12,6 +12,7 @@ import { localDayKey } from "@/lib/utils";
 import { somarDias } from "@/lib/sequencia";
 import { tomDoBotaoDaMissao } from "@/lib/home-nova";
 import "./missao-doses.css";
+import { FaixaDoRelogioTransparente } from "@/components/app/faixaDoRelogio";
 
 /**
  * A PRÉ-FOLHA DA PERMISSÃO (03/10): "Quer que eu te lembre amanhã às 19h?"
@@ -94,6 +95,7 @@ export function PreFolhaLembrete() {
 export function Folha({ hora, conteudo, aoSim, aoAgoraNao }: { hora: string; conteudo: ConteudoDia2; aoSim: () => void; aoAgoraNao: () => void }) {
   return (
     <motion.div className="fixed inset-0 z-[250] flex items-end justify-center" style={{ background: "rgba(15,12,20,.45)" }} data-camada-guia="pre-folha-lembrete" data-testid="pre-folha-lembrete" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }} role="dialog" aria-modal="true" aria-labelledby="pre-folha-titulo">
+      <FaixaDoRelogioTransparente />
       <motion.div
         initial={{ y: 40 }} animate={{ y: 0 }} transition={{ type: "spring", stiffness: 320, damping: 28 }}
         className="md-tema w-full max-w-[440px] rounded-t-3xl bg-card text-card-foreground shadow-2xl px-5 pt-5"

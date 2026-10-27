@@ -31,6 +31,7 @@ import { lembretesSoNoApp } from "@/lib/missao-web";
 import { EscolhaDeHora } from "./EscolhaDeHora";
 import { entrada, MOV, MOV_MS, saida } from "@/lib/movimento";
 import { BaixarAppPopup } from "@/missao/BaixarAppPopup";
+import { FaixaDoRelogioTransparente } from "@/components/app/faixaDoRelogio";
 
 /** 1.0.17 (dono 19/10: "minimalista, uma ideia por tela") — a copy do 1º gasto: uma pergunta, os chips, "+ Outro" e a
  *  saída quieta. Sem frase explicando o toque (o post-it já diz). */
@@ -1355,6 +1356,7 @@ export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, 
   if (modo === "aprofundar") {
     return createPortal(
       <motion.div className="fixed inset-0 z-[230] flex items-end sm:items-center justify-center px-4 pb-6 pt-10 overflow-y-auto" style={{ background: "rgba(15,12,20,.55)" }} data-camada-guia="missao-doses-festa" data-testid="missao-doses-festa" data-dia={n} data-modo="aprofundar" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+        <FaixaDoRelogioTransparente />
         <motion.div initial={reduzir ? false : { y: 26, scale: 0.92, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 280, damping: 20, delay: 0.08 }} className="md-tema relative w-full max-w-[340px] rounded-3xl bg-card text-card-foreground border border-border/60 p-5 text-center shadow-2xl">
           <span className="inline-block rounded-full bg-foreground text-background text-[12px] font-extrabold px-3.5 py-1.5">🔥 Dia {diaDaMissao(missao, hoje)} · {cfg.emoji} {cfg.nome} ✓</span>
           <p className="text-[21px] font-black tracking-[-0.02em] leading-tight mt-2.5">{titulo}</p>
@@ -1370,6 +1372,7 @@ export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, 
 
   return createPortal(
     <motion.div className="fixed inset-0 z-[230] flex items-end sm:items-center justify-center px-4 pb-6 pt-10 overflow-y-auto" style={{ background: "rgba(15,12,20,.55)" }} data-camada-guia="missao-doses-festa" data-testid="missao-doses-festa" data-dia={n} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+      <FaixaDoRelogioTransparente />
       <Confete />
       <motion.div
         initial={reduzir ? false : { y: 26, scale: 0.92, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }}
@@ -1647,6 +1650,7 @@ function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVe
       role="dialog" aria-modal="true" aria-label={primeiraDose ? tituloDoModuloPronto(modulo) : `Dia ${n} feito`}
       data-camada-guia="missao-doses-festa" data-testid="missao-doses-festa" data-dia={n} data-braco="A" data-saindo={saindo ? "" : undefined}
       initial={{ opacity: 0 }} animate={{ opacity: saindo ? 0 : 1 }} exit={{ opacity: 0 }} transition={saindo ? saida(reduzir) : entrada(reduzir, MOV.base)}>
+      <FaixaDoRelogioTransparente />
       <motion.div initial={reduzir ? false : { y: 40, opacity: 0 }} animate={saindo && !reduzir ? { y: "110%", opacity: 1 } : { y: 0, opacity: 1 }} transition={saindo ? saida(reduzir) : entrada(reduzir, MOV.calmo, 0.05)}
         className="md-tema relative w-full max-w-[380px] rounded-3xl bg-card text-card-foreground border border-border/60 p-5 pt-6 text-left shadow-2xl">
         {comArte && a && (

@@ -51,6 +51,8 @@ import { CONVITE_DO_PADRAO, metricasDoDia, type Metrica } from "@/components/hom
 import { PersonalizarInicio } from "@/pages/Voce";
 import { resumoDoCard, resumosEscolhidos } from "@/lib/home-resumos";
 import { ORDEM_DA_LISTA } from "@/lib/pendencias-novato";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import type { LifeHubData } from "@/hooks/use-life-hub-data";
 import { localDayKey } from "@/lib/utils";
 import { somarDias } from "@/lib/sequencia";
@@ -284,6 +286,42 @@ describe("3. as folhas da missão por cima da Home nova: botão da E (tinta), n�
     expect(tomDoBotaoDaMissao()).toBe("magenta");
     plano();
     expect(screen.getByTestId("plano-a-combinado").getAttribute("data-tom")).toBe("magenta");
+  });
+});
+
+/* 1.0.20 (QA do v1020 no Simulador): as folhas da missão sobre a Home nova (e sobre os módulos) ficavam com a faixa do
+   relógio CLARA por cima do escurecido — "Dia 1 feito", plano de amanhã, as festas das doses, convite/escolha do dia 2,
+   pré-folha do lembrete, a dica do dia e o fundo do "Escolher treino". Agora todas deixam a faixa transparente enquanto
+   estão na tela (o mesmo que as folhas da Home nova, o álbum e o "Dia completo"). */
+describe("3b. as folhas da missão cobrem a faixa do relógio (escurecido até o topo)", () => {
+  const raiz = () => document.documentElement;
+  const cor = () => raiz().style.getPropertyValue("--safe-top-cor");
+  afterEach(() => { raiz().style.removeProperty("--safe-top-cor"); raiz().classList.remove("faixa-relogio-transparente"); });
+  it("'Dia 1 feito' (braço A) e a pré-folha do lembrete: faixa transparente aberta; ao sair, a cor de antes volta", () => {
+    raiz().style.setProperty("--safe-top-cor", "#f4f4f3");
+    const n = criarNuvem({});
+    const m = missao("A", { feitos: { 1: { dia: hoje, rotulo: "x" } } });
+    const r = render(<MemoryRouter><n.Provedor><PlanoDeAmanhaA missao={m} aoCombinar={() => {}} aoSemLembrete={() => {}} /></n.Provedor></MemoryRouter>);
+    expect(screen.getByTestId("plano-amanha-a")).toBeTruthy();
+    expect(cor()).toBe("transparent");
+    expect(raiz().classList.contains("faixa-relogio-transparente")).toBe(true);
+    r.unmount();
+    expect(cor()).toBe("#f4f4f3");
+    const f = render(<PreFolha hora="20h" conteudo={{ title: "t", body: "b", modulo: null } as never} aoSim={() => {}} aoAgoraNao={() => {}} />);
+    expect(cor()).toBe("transparent");
+    f.unmount();
+    expect(cor()).toBe("#f4f4f3");
+  });
+  it("trava: toda camada escura de tela cheia da missão em doses monta a FaixaDoRelogioTransparente (menos a tela cheia do '3 dias seguidos', fundo escuro com o relógio escuro)", () => {
+    const pasta = join(process.cwd(), "src/components/missao-doses");
+    const faltando: string[] = [];
+    for (const arq of readdirSync(pasta).filter((a) => a.endsWith(".tsx"))) {
+      const src = readFileSync(join(pasta, arq), "utf8");
+      const camadas = (src.match(/rgba\(15,12,20,\.\d+\)/g) ?? []).length;
+      const marcadores = (src.match(/<FaixaDoRelogioTransparente \/>/g) ?? []).length;
+      if (marcadores < camadas) faltando.push(`${arq} (${marcadores}/${camadas})`);
+    }
+    expect(faltando).toEqual([]);
   });
 });
 

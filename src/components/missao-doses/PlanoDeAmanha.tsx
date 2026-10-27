@@ -14,6 +14,7 @@ import {
 import { eventoDaMissao, type EstadoMissaoDoses } from "@/lib/missao-doses";
 import { tomDoBotaoDaMissao } from "@/lib/home-nova";
 import "./missao-doses.css";
+import { FaixaDoRelogioTransparente } from "@/components/app/faixaDoRelogio";
 
 /**
  * A FOLHA DO PLANO DE AMANHÃ (10/10, chave DIA1_CHEIO, braço B — lib/dia1-cheio).
@@ -67,6 +68,7 @@ export function PlanoDeAmanha({ missao, hoje = localDayKey(), aoCombinar, aoPula
 
   return createPortal(
     <motion.div className="fixed inset-0 z-[245] flex flex-col justify-end" style={{ background: "rgba(15,12,20,.45)" }} data-camada-guia="plano-amanha" data-testid="plano-amanha" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }} role="dialog" aria-modal="true" aria-labelledby="plano-amanha-titulo">
+      <FaixaDoRelogioTransparente />
       <motion.div
         initial={{ y: 40 }} animate={{ y: 0 }} transition={{ type: "spring", stiffness: 320, damping: 28 }}
         className="md-tema w-full rounded-t-3xl bg-card text-card-foreground shadow-2xl flex flex-col max-h-[calc(100dvh-var(--app-safe-top,0px)-24px)]"

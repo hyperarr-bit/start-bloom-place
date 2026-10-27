@@ -12,6 +12,7 @@ import "./missao-doses.css";
 import { lembretesSoNoApp } from "@/lib/missao-web";
 import { BaixarAppPopup } from "@/missao/BaixarAppPopup";
 import { tomDoBotaoDaMissao } from "@/lib/home-nova";
+import { FaixaDoRelogioTransparente } from "@/components/app/faixaDoRelogio";
 
 /**
  * "PLANO DE AMANHÃ" DO BRAÇO A (1.0.16, desenho 8 seção 4.2 passo 6) — a ÚLTIMA coisa do dia 1:
@@ -74,6 +75,7 @@ export function PlanoDeAmanhaA({ missao, aoCombinar, aoSemLembrete }: {
     <motion.div className="fixed inset-0 z-[230] flex items-end justify-center px-4 pt-10" style={{ background: "rgba(15,12,20,.45)", paddingBottom: "calc(var(--app-safe-bottom, 0px) + 20px)" }}
       role="dialog" aria-modal="true" aria-label="Plano de amanhã" data-camada-guia="missao-doses-plano" data-testid="plano-amanha-a"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={entrada(reduzir, MOV.base)}>
+      <FaixaDoRelogioTransparente />
       <motion.div initial={reduzir ? false : { y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={entrada(reduzir, MOV.calmo, 0.08)}
         className="md-tema w-full max-w-[380px] rounded-3xl bg-card text-card-foreground border border-border/60 p-5 shadow-2xl">
         {/* 1.0.17 (item 7): o fechamento do dia mora AQUI (a festa da dose 1 comemora o módulo; o tour vem no meio) */}

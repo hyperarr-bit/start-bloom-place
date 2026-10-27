@@ -8,6 +8,7 @@ import { localDayKey } from "@/lib/utils";
 import { entrada, MOV } from "@/lib/movimento";
 import { tomDoBotaoDaMissao } from "@/lib/home-nova";
 import "./missao-doses.css";
+import { FaixaDoRelogioTransparente } from "@/components/app/faixaDoRelogio";
 
 const reais = (n: number): string => Math.floor(n).toLocaleString("pt-BR");
 
@@ -56,6 +57,7 @@ export function EscolhaDoDia2({ missao, opcoes, porDia, aoVer, aoComecar, aoAgor
       data-camada-guia="missao-doses-convite" data-testid="dia2-escolha"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={entrada(reduzir, MOV.base)}
     >
+      <FaixaDoRelogioTransparente />
       <motion.div
         initial={reduzir ? false : { y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
         transition={entrada(reduzir, MOV.calmo, 0.08)}

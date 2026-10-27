@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { trackEvent } from "@/lib/analytics";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { eventoDaMissao } from "@/lib/missao-doses";
+import { FaixaDoRelogioTransparente } from "@/components/app/faixaDoRelogio";
 
 /**
  * AS DICAS DE 1 BALÃO DOS DIAS 2 E 3 (1.0.16, braço A — desenho 8 seção 7c). Depois da dose do dia, na
@@ -74,6 +75,7 @@ export function DicaDoDia({ dia, aoFechar, aoVer, scoreAntes }: {
   const top = rect ? (cabeAbaixo ? rect.bottom + 12 : Math.max(8, rect.top - ALTURA - 12)) : vh - 220;
   return createPortal(
     <motion.div className="fixed inset-0 z-[220] pointer-events-none" data-camada-guia="missao-dica" data-testid="missao-dica" data-dia={dia} data-pronto={pronto ? "" : undefined} initial={{ opacity: 0 }} animate={{ opacity: pronto ? 1 : 0 }}>
+      {pronto && rect && <FaixaDoRelogioTransparente />}
       {pronto && rect && <div className="absolute rounded-2xl pointer-events-none" style={{ top: rect.top - 6, left: rect.left - 6, width: rect.width + 12, height: rect.height + 12, boxShadow: "0 0 0 2px #fff, 0 0 0 9999px rgba(15,12,20,.45)" }} />}
       <div className={`absolute left-1/2 -translate-x-1/2 w-[92%] max-w-[340px] ${pronto ? "pointer-events-auto" : "pointer-events-none invisible"} rounded-2xl bg-accent text-accent-foreground px-4 py-3.5 shadow-2xl`} style={{ top }} role="dialog" aria-label={t.titulo}>
         <p className="text-[16px] font-bold leading-tight" data-testid="missao-dica-titulo">{t.titulo}</p>

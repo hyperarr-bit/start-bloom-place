@@ -124,7 +124,7 @@ export function PersonalizarPendenciasE({ open, onOpenChange, prefs, onChange, p
             <div className="flex items-start justify-between gap-3 px-1 mb-3">
               <div className="min-w-0">
                 <h3 className="text-[19px] font-bold tracking-tight">Pendências de hoje</h3>
-                <p className="text-[13px] text-muted-foreground mt-0.5" data-testid="hn-prefs-explica">{visiveis ? "Por enquanto, só o que você já usa. Ligue o que quiser ver aqui." : "O que fica desligado sai da lista e do score."}</p>
+                <p className="text-[13px] text-muted-foreground mt-0.5" data-testid="hn-prefs-explica">{visiveis ? "Só o que você já usa entra na lista e no score. Ligue o que quiser acompanhar." : "O que fica desligado sai da lista e do score."}</p>
               </div>
               <button type="button" onClick={fechar} aria-label="Fechar" data-testid="hn-prefs-fechar" className="w-9 h-9 -mr-1 rounded-full grid place-items-center bg-muted shrink-0"><X className="w-4 h-4" strokeWidth={2.2} /></button>
             </div>

@@ -320,7 +320,7 @@ export function PersonalizarInicio() {
   const copo = normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO));
   const previa = metricasDoDia(lifeData, copo, resumos);
   const prefs = lifeData.pendenciasPrefs ?? PREFS_PADRAO;
-  const tiposDoNovato = useTiposDoNovato(prefs);
+  const tiposDoNovato = useTiposDoNovato(lifeData);
   const [widgets, setWidgets] = useState(false);
   const [pendencias, setPendencias] = useState(false);
   const alternar = (id: (typeof CATALOGO_RESUMOS)[number]["id"]) => {

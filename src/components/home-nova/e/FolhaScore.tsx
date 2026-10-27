@@ -83,6 +83,8 @@ export const FolhaScore = ({ aberta, onFechar, data, onAcao, onPersonalizar }: P
   const score = data.dayScore;
   const mostrados = r.itens.filter((i) => !((i.tipo === "leitura" && !data.currentBook) || (i.tipo === "suplementos" && data.supplementsTotal === 0)));
   const pendentes = mostrados.filter((i) => !i.feito).length;
+  // 1.0.19 (novato polido): a conta nova sem nenhum tipo na lista — 0 pontos (nunca 100 de graça) e a frase calma da página 2
+  const calmo = mostrados.length === 0 && score < 100;
 
   const resolver = (i: ItemDoScore) => {
     onFechar();
@@ -115,12 +117,13 @@ export const FolhaScore = ({ aberta, onFechar, data, onAcao, onPersonalizar }: P
                   <span className="text-[16px] font-semibold">pontos</span>
                   {score >= 100 && <Star className="w-[18px] h-[18px] self-center ml-0.5" style={{ color: COR_OURO, fill: COR_OURO }} strokeWidth={1.5} aria-hidden data-testid="he-folha-estrela" />}
                 </span>
-                <p className="text-[14px] text-muted-foreground mt-2" data-testid="he-folha-explica">{explicacaoDoScore(pendentes, score)}.</p>
+                <p className="text-[14px] text-muted-foreground mt-2" data-testid="he-folha-explica" data-calmo={calmo ? "1" : undefined}>{calmo ? "O que você usar no dia a dia aparece aqui" : explicacaoDoScore(pendentes, score)}.</p>
               </div>
               <button type="button" onClick={onFechar} aria-label="Fechar" className="w-9 h-9 -mr-1.5 rounded-full grid place-items-center bg-muted shrink-0"><X className="w-4 h-4" strokeWidth={2.2} /></button>
             </div>
 
             <ul className="mt-4" data-testid="he-score-itens">{mostrados.map((i) => <ItemDoScoreLinha key={i.tipo} i={i} data={data} resolver={resolver} />)}</ul>
+
 
             <button type="button" onClick={() => { onFechar(); window.setTimeout(onPersonalizar, 220); }} data-testid="he-score-personalizar" className="mt-3 w-full h-11 rounded-2xl flex items-center justify-center gap-1.5 text-[13.5px] font-semibold text-muted-foreground active:bg-muted/50">
               Personalizar o que conta <ChevronRight className="w-4 h-4 text-muted-foreground/60" strokeWidth={2} aria-hidden />

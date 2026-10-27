@@ -37,6 +37,9 @@ import { _zerarEntradaDaHome } from "@/components/home-nova/e/Animacoes";
 import { DIAS_NOVATO_PENDENCIAS, enxugarPendencias, pendenciasDeNovato, tiposAdotados, tiposDoNovato } from "@/lib/pendencias-novato";
 import { desligarAMao, ligarAMao, normalizarPrefs, PREFS_PADRAO } from "@/lib/home-pendencias";
 import { CATALOGO_WIDGETS_E, WIDGETS_E_PADRAO, dadoDoWidgetE, widgetsDoNovato, widgetsE } from "@/lib/home-widgets-e";
+import { useLifeHubData } from "@/hooks/use-life-hub-data";
+import { useUserData } from "@/hooks/use-user-data";
+import { CHAVE_DIA_100_VISTO } from "@/components/home/DayScoreRing";
 import { CHAVE_ESTADO_MISSAO_DOSES, doseDoDia1DoBracoB, type EstadoMissaoDoses } from "@/lib/missao-doses";
 import { PlanoDeAmanhaA } from "@/components/missao-doses/PlanoDeAmanhaA";
 import { Folha as PreFolha } from "@/components/missao-doses/PreFolhaLembrete";
@@ -48,11 +51,14 @@ import { criarNuvem, prepararJsdom, type Dados } from "./compat-comum";
 
 const hoje = localDayKey();
 const AGORA = Date.now();
+let gravar: (k: string, v: unknown) => void = () => {};
 const Sonda = () => { const { pathname } = useLocation(); return <div data-testid="sonda" data-rota={pathname} />; };
 const respirar = (ms = 0) => act(() => new Promise((r) => setTimeout(r, ms)));
+/** Um `set` da conta na mão do teste (como o "+" gravaria). */
+const Gravador = () => { const { set } = useUserData(); gravar = set; return null; };
 const montar = async (dados: Dados) => {
   const n = criarNuvem(dados);
-  render(<MemoryRouter initialEntries={["/home"]}><n.Provedor><Routes><Route path="/home" element={<HomePage />} /><Route path="*" element={<Sonda />} /></Routes><BarraVidroGlobal /></n.Provedor></MemoryRouter>);
+  render(<MemoryRouter initialEntries={["/home"]}><n.Provedor><Routes><Route path="/home" element={<HomePage />} /><Route path="*" element={<Sonda />} /></Routes><BarraVidroGlobal /><Gravador /></n.Provedor></MemoryRouter>);
   await respirar(30);
   await waitFor(() => expect(document.querySelector('[data-layout="e"]')).toBeTruthy());
   return n;
@@ -151,7 +157,7 @@ describe("1. pendências do novato — só o que ela usa + a missão (lib/penden
     // Personalizar: segue a lista (peso nasce desligado); ligar à mão grava `ligados` e o "Pesar hoje" entra
     fireEvent.click(within(pagina(2)).getByTestId("hn-personalizar"));
     const folha = await screen.findByTestId("hn-prefs-folha");
-    expect(within(folha).getByTestId("hn-prefs-explica").textContent).toMatch(/só o que você já usa/);
+    expect(within(folha).getByTestId("hn-prefs-explica").textContent).toMatch(/^Só o que você já usa entra na lista e no score/);
     expect(within(folha).getByTestId("pref-peso").getAttribute("data-ligado")).toBe("0");
     expect(within(folha).getByTestId("pref-agua").getAttribute("data-ligado")).toBe("1");
     fireEvent.click(within(within(folha).getByTestId("pref-peso")).getByRole("switch"));
@@ -296,5 +302,99 @@ describe("4. braço B: fechou no meio da dose 1 → 'Dose de hoje' na Home nova 
     expect(linha.getAttribute("data-braco")).toBe("A");
     expect(linha.textContent).toContain("Dose de hoje · Rotina");
     expect(linha.textContent).toContain("Dia 2 de 3");
+  });
+});
+
+/* ================================================================== 5. o score do novato = a lista */
+/** Sonda: o score e os tipos do hub na tela, e um `set` na mão do teste (como o "+" gravaria). */
+const Sonda5 = () => {
+  const d = useLifeHubData();
+  const { set } = useUserData();
+  gravar = set;
+  return <div data-testid="sonda-score" data-score={d.dayScore} data-cobrados={(d.pendenciasCobradas ?? []).slice().sort().join(",")} data-novato={d.pendenciasNovato ? "1" : "0"} />;
+};
+const sondar = (dados: Dados) => { const n = criarNuvem(dados); render(<n.Provedor><Sonda5 /></n.Provedor>); return n; };
+const score = () => Number(screen.getByTestId("sonda-score").getAttribute("data-score"));
+const cobrados = () => screen.getByTestId("sonda-score").getAttribute("data-cobrados");
+/** A conta nova que explorou sozinha (sem missão) e já usou Finanças (renda) e o humor (ontem): a lista = gasto + humor. */
+const ONTEM = somarDias(hoje, -1);
+const NOVA_2_TIPOS: Dados = {
+  "core-home-nova-origem": CONTA_NOVA["core-home-nova-origem"], "core-user-name": "Bia",
+  "finance-incomes": [{ id: "r1", description: "Salário", value: 3200, date: hoje }],
+  "core-mood-log": { [ONTEM]: { value: 4, emoji: "🙂" } },
+};
+
+describe("5. score do novato conta SÓ o que a lista mostra (dono 26/10: 'o score só contar o que tá lá')", () => {
+  beforeEach(() => { contaNova(); gravarMissao(missao("A", { explorou: true })); });
+  it("2 tipos na lista (gasto + humor): 0 → 50 → 100; os mesmos tipos no score e na lista", () => {
+    sondar(NOVA_2_TIPOS);
+    expect(cobrados()).toBe("gasto,humor");
+    expect(screen.getByTestId("sonda-score").getAttribute("data-novato")).toBe("1");
+    expect(score()).toBe(0);
+    act(() => gravar("finance-expenses", [{ id: "g1", description: "Café", value: 12, date: hoje }]));
+    expect(score()).toBe(50);
+    act(() => gravar("core-mood-log", { [ONTEM]: { value: 4, emoji: "🙂" }, [hoje]: { value: 5, emoji: "🤩" } }));
+    expect(score()).toBe(100);
+  });
+  it("ligou um tipo em Personalizar: entra no score junto (pode cair — é o plano dela); desligou: sai dos dois", () => {
+    sondar({ ...NOVA_2_TIPOS, "finance-expenses": [{ id: "g1", value: 12, date: hoje }], "core-mood-log": { [hoje]: { value: 5, emoji: "🤩" } } });
+    expect(score()).toBe(100);
+    act(() => gravar("home-pendencias-prefs", ligarAMao(PREFS_PADRAO, "peso")));
+    expect(cobrados()).toBe("gasto,humor,peso");
+    expect(score()).toBe(67); // 10 de 15
+    act(() => gravar("home-pendencias-prefs", desligarAMao(ligarAMao(PREFS_PADRAO, "peso"), "humor")));
+    expect(cobrados()).toBe("gasto,peso");
+    expect(score()).toBe(50);
+  });
+  it("sem nenhum tipo na lista: 0 (nunca o 100 de graça), sem dividir por zero", () => {
+    sondar({ "core-home-nova-origem": CONTA_NOVA["core-home-nova-origem"] });
+    expect(cobrados()).toBe("");
+    expect(score()).toBe(0);
+  });
+  it("a missão conta (Finanças → Rotina → Saúde): gasto + hábitos + água; o score é a lista do dia 1", () => {
+    gravarMissao(missao("A", { feitos: { 1: { dia: hoje, rotulo: "x" } }, lembrete: "20h" }));
+    sondar(CONTA_NOVA);
+    expect(cobrados()).toBe("agua,gasto,habitos");
+    expect(score()).toBe(13); // o gasto de hoje: 5 de 40
+  });
+  it("conta ANTIGA, passada dos 7 dias ou com a Home antiga: a conta de sempre", () => {
+    contaAntiga();
+    sondar({ "core-user-name": "Ana", "finance-expenses": [{ id: "g1", value: 12, date: hoje }] });
+    expect(screen.getByTestId("sonda-score").getAttribute("data-novato")).toBe("0");
+    expect(score()).toBe(30); // os 12 blocos de sempre (treino/leitura/suplementos sem cadastro contam cheio)
+    cleanup();
+    // conta nova de 8 dias: sem a régua do novato (só sem os pontos de graça, como já era)
+    const velha = { ...NOVA_2_TIPOS, "core-home-nova-origem": { tipo: "nova", em: new Date(AGORA - 8 * 86400e3).toISOString() } };
+    auth.user.created_at = new Date(AGORA - 8 * 86400e3).toISOString();
+    sondar(velha);
+    expect(screen.getByTestId("sonda-score").getAttribute("data-novato")).toBe("0");
+    expect(cobrados()?.split(",").length).toBe(9);
+    cleanup();
+    // Home antiga (chave desligada): a conta de sempre, mesmo na conta nova
+    contaNova();
+    localStorage.setItem(CHAVE_FORCA_HOME_NOVA, "off"); _zerarHomeNova();
+    sondar(NOVA_2_TIPOS);
+    expect(screen.getByTestId("sonda-score").getAttribute("data-novato")).toBe("0");
+  });
+  it("Home nova: fez tudo o que a lista mostra → 'Dia completo' (1x por dia) e a folha do score tem as MESMAS linhas", async () => {
+    await montar({ ...NOVA_2_TIPOS, "finance-expenses": [{ id: "g1", value: 12, date: hoje }] });
+    // a lista: só o humor pendente (o gasto feito)
+    expect(linhas()).toEqual(["Check de humor"]);
+    fireEvent.click(screen.getByTestId("he-score-abrir"));
+    const folha = await screen.findByTestId("he-folha-score");
+    expect(within(folha).getAllByTestId("he-score-item").map((e) => e.getAttribute("data-tipo")).sort()).toEqual(["gasto", "humor"]);
+    fireEvent.click(within(folha).getByLabelText("Fechar"));
+    await waitFor(() => expect(screen.queryByTestId("he-folha-score")).toBeNull());
+    expect(screen.queryByTestId("celebracao-100")).toBeNull();
+    // o humor de hoje: tudo o que a lista mostra está feito → 100 → "Dia completo" (estrela âmbar), 1x por dia
+    act(() => gravar("core-mood-log", { [hoje]: { value: 5, emoji: "🤩" } }));
+    const dia = await screen.findByTestId("celebracao-100");
+    expect(dia.textContent).toContain("Dia completo");
+    expect(localStorage.getItem(CHAVE_DIA_100_VISTO)).toBe(hoje);
+    expect(within(pagina(2)).getByTestId("hn-pendencias-calmo").textContent).toBe("Tudo em dia por aqui.");
+    cleanup(); _zerarEntradaDaHome();
+    await montar({ ...NOVA_2_TIPOS, "finance-expenses": [{ id: "g1", value: 12, date: hoje }], "core-mood-log": { [hoje]: { value: 5, emoji: "🤩" } } });
+    await respirar(50);
+    expect(screen.queryByTestId("celebracao-100")).toBeNull(); // já comemorou hoje
   });
 });

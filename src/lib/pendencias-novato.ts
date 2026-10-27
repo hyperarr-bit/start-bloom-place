@@ -13,7 +13,10 @@ import type { PendenciasPrefs, TipoPendencia } from "@/lib/home-pendencias";
  *     é a mesma coisa dita duas vezes;
  *   · compromissos, tarefas e contas que ela criou ficam sempre (são dela);
  *   · no máximo 4 linhas na página (a dose conta); vazia = uma linha calma, sem ilustração.
- * O SCORE não muda (é a régua do dia, aprovada nas rodadas da Home nova) — muda só a LISTA. Conta antiga/admin: nada muda.
+ * O SCORE segue a LISTA (dono 26/10, depois do antes×depois: "o score só contar o que tá lá"): na mesma conta e no mesmo
+ * período, o hub (use-life-hub-data) conta SÓ os tipos que a lista mostra — fez tudo o que está lá = 100; ligou um tipo
+ * em Personalizar, ele entra nos dois (o score pode cair: é o plano dela); desligou, sai dos dois. Sem nenhum tipo
+ * visível o score é 0 (nunca 100 de graça). Só com a Home nova ligada; conta antiga/admin e a Home antiga: nada muda.
  * Rollback = `DIAS_NOVATO_PENDENCIAS = 0`.
  */
 export const DIAS_NOVATO_PENDENCIAS = 7;
@@ -65,6 +68,10 @@ export function tiposAdotados(get: Get): Set<TipoPendencia> {
   if (algum("core-gratitude-log", "dp-gratitude")) s.add("gratidao");
   return s;
 }
+
+/** Os módulos da missão que contam (quem tocou "Explorar por conta própria" não fez a missão: nenhum). */
+export const modulosDaMissaoQueContam = (m: { modulos: readonly string[]; explorou?: boolean } | null | undefined): readonly string[] | null =>
+  (m && !m.explorou ? m.modulos : null);
 
 /** Os tipos que a lista do novato mostra: adotados + os da missão + os ligados à mão − os ocultos. */
 export function tiposDoNovato(p: { adotados: Iterable<TipoPendencia>; modulosDaMissao?: readonly string[] | null; prefs?: PendenciasPrefs | null }): Set<TipoPendencia> {

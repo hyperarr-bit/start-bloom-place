@@ -145,7 +145,7 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
   );
   const prefs: PendenciasPrefs = lifeData.pendenciasPrefs ?? PREFS_PADRAO;
   // 1.0.19 (dono 26/10, "parece cobrança"): a conta nova nos primeiros dias vê só o que usa + a missão (lib/pendencias-novato)
-  const novatoNaLista = usePendenciasNovato(pendencias, prefs);
+  const novatoNaLista = usePendenciasNovato(pendencias, lifeData);
   const listaDePendencias = novatoNaLista.lista;
   const abrirTodasPendencias = useCallback(() => { trackEvent("home_pendencias_todas", { pendentes: listaDePendencias.pending.length, ...(novatoNaLista.novato ? { novato: true } : {}) }); setFolhaPendencias(true); }, [listaDePendencias.pending.length, novatoNaLista.novato]);
 

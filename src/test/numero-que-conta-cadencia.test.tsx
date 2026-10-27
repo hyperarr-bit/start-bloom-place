@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, act, cleanup } from "@testing-library/react";
-import { NumeroQueConta } from "@/components/home-nova/e/Animacoes";
+import { ContextoDaEntrada, NumeroQueConta } from "@/components/home-nova/e/Animacoes";
 
 /**
  * A CADÊNCIA DA CONTAGEM DO SCORE (vídeo da welcome, 26/10 — dono: "o score dá uma bugada: fica 41 e depois vai pra 42").
@@ -52,5 +52,24 @@ describe("NumeroQueConta — cadência da contagem num salto pequeno (37 → 42,
       expect(passos[i], `o ${trocas[i].n} ficou ${passos[i]} ms na tela, ${(passos[i] / passos[i - 1]).toFixed(1)}× o passo anterior (${relatorio})`).toBeLessThanOrEqual(passos[i - 1] * 1.6 + QUADRO);
     }
     expect(trocas[trocas.length - 1].t, `o 42 chegou cedo demais e o resto da animação não mexe em nada (${relatorio})`).toBeGreaterThanOrEqual(900 * 0.45);
+  });
+});
+
+describe("NumeroQueConta — Home REMONTADA na sessão (voltou da missão/de um módulo; 2ª passada 26/10)", () => {
+  it("nasce pronto (sem contar 0 → valor), mas CONTA quando o valor muda com a Home na tela (29 → 36, não pula seco)", async () => {
+    vi.stubEnv("MODE", "development");
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "requestAnimationFrame", "cancelAnimationFrame", "performance", "Date"] });
+    const comEntrada = (v: number) => <ContextoDaEntrada.Provider value={false}><NumeroQueConta valor={v} testid="n" /></ContextoDaEntrada.Provider>;
+    const { rerender } = render(comEntrada(29));
+    expect(screen.getByTestId("n").textContent).toBe("29"); // pronto já no 1º quadro
+    rerender(comEntrada(36));
+    const vistos = new Set<number>();
+    for (let q = 1; q <= 90; q++) {
+      await act(async () => { vi.advanceTimersByTime(QUADRO); });
+      vistos.add(Number(screen.getByTestId("n").textContent));
+    }
+    expect(screen.getByTestId("n").textContent).toBe("36");
+    // passou pelos números do meio (contou), em vez de ir de 29 a 36 num quadro
+    expect([30, 31, 32, 33, 34, 35].filter((n) => vistos.has(n)).length).toBeGreaterThanOrEqual(5);
   });
 });

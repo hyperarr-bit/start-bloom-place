@@ -61,7 +61,11 @@
  .alb-tela[data-editorial] .alb-pag[data-prototipo] .vaga:nth-child(3) .vaga-caixa { max-width:none; max-height:none; }
  .alb-tela[data-editorial] .alb-pag[data-prototipo] .alb-grade { gap:3px 14px !important; }
 }
-@media(max-height:620px) {
+/* 2ª passada 26/10: o bloco das telas BAIXAS valia só até 620 pt — o iPhone SE 2/3 e o 8 (667 pt) nunca entravam e, com o
+   livro menor do conserto das setas (e94bf107), a 10ª aba e o rodapé da página de 5 figurinhas saíam cortados. Até 700 pt
+   (o 13 mini, 812, fica de fora) + abas um pouco mais baixas: 10 × 34 pt cabem na coluna do livro do SE. */
+@media(max-height:700px) {
+ .alb-tela[data-editorial] .alb-abas:has([data-modulo]) .alb-aba { min-height:34px; padding:6px 0; }
  .alb-tela[data-editorial] .alb-mesa { justify-content:flex-start; }
  .alb-tela[data-editorial] .alb-pag[data-prototipo] .alb-cap-titulo h3 { font-size:26px; }
  .alb-tela[data-editorial] .alb-jornada-intro { display:none; }

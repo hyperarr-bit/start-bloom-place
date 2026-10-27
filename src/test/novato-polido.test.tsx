@@ -170,6 +170,25 @@ describe("1. pendências do novato — só o que ela usa + a missão (lib/penden
     fireEvent.click(within(within(folha).getByTestId("pref-peso")).getByRole("switch"));
     await waitFor(() => expect(linhas()).toContain("Pesar hoje"));
   });
+  it("1.0.20 (QA): ligou 'Treino' em Personalizar sem plano → 'Configurar treino da semana' entra na lista (fora do score, sem os 15 de graça); com o plano de hoje → pendência que conta", async () => {
+    contaNova();
+    gravarMissao(missao("A", { feitos: { 1: { dia: hoje, rotulo: "x" } }, lembrete: "20h" }));
+    await montar(CONTA_NOVA);
+    expect(within(pagina(2)).queryByTestId("hn-aviso")).toBeNull();
+    const score = () => Number(screen.getByTestId("he-score-numero").getAttribute("data-valor"));
+    const antes = score();
+    fireEvent.click(within(pagina(2)).getByTestId("hn-personalizar"));
+    const folha = await screen.findByTestId("hn-prefs-folha");
+    expect(within(folha).getByTestId("pref-treino").getAttribute("data-ligado")).toBe("0");
+    fireEvent.click(within(within(folha).getByTestId("pref-treino")).getByRole("switch"));
+    await waitFor(() => expect(within(pagina(2)).getByTestId("hn-aviso").textContent).toContain("Configurar treino da semana"));
+    expect(score()).toBe(antes); // sem plano não há o que contar (nem os 15 de graça)
+    const dia = ["DOMINGO", "SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO"][new Date().getDay()];
+    act(() => { gravar("saude-workouts-v2", { [dia]: { muscles: ["Peito"], exercises: [] } }); gravar("treino-active-days", [dia]); });
+    await waitFor(() => expect(linhas()).toContain("Treino de Peito hoje"));
+    expect(within(pagina(2)).queryByTestId("hn-aviso")).toBeNull();
+    expect(score()).toBeLessThan(antes); // entrou no score (0 de 15): é o plano dela
+  });
   it("conta nova sem nada pendente: UMA linha calma (sem o 'Tudo feito' com ícone); até 4 linhas no máximo", async () => {
     contaNova();
     // explorou por conta própria (sem missão) e só usou Finanças, com o gasto de hoje feito

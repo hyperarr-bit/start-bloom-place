@@ -131,9 +131,14 @@ export function pendenciasDeHoje(data: LifeHubData, compromissos: Compromisso[],
      o que cobrar), então "Configurar treino da semana" como PENDÊNCIA
      contradizia o próprio score — 100 pontos com "1 pendente". Vira aviso,
      fora da contagem, junto da conta a vencer. (10/10: treino escondido
-     esconde a dica também.) */
+     esconde a dica também.)
+     1.0.20 (QA 27/10): na CONTA NOVA (a lista do novato, lib/pendencias-novato) a dica segue a LISTA, não o score. O "sem
+     pontos de graça" tira o treino sem plano do score (pendenciasCobradas) e a dica sumia junto: ligar "Treino" em
+     Personalizar não fazia nada. Agora o Treino na lista dela (ligado à mão ou módulo da missão) sem plano mostra
+     "Configurar treino da semana" — fora do score, como sempre; com o plano de hoje ele vira pendência e conta. */
   const cobra = (t: TipoPendencia) => !data.pendenciasCobradas || data.pendenciasCobradas.includes(t);
-  const avisoTreino = !data.todayWorkoutGroup && data.workoutStatus !== "descanso" && cobra("treino");
+  const naLista = (t: TipoPendencia) => (data.pendenciasNovato ? data.pendenciasNovato.includes(t) : cobra(t));
+  const avisoTreino = !data.todayWorkoutGroup && data.workoutStatus !== "descanso" && naLista("treino");
 
   // Water - always show
   const waterRemaining = data.waterGoal - data.waterGlasses;

@@ -499,6 +499,17 @@ describe("6. página 1 da conta nova = o que conta no score (1.0.20, dono 27/10)
     expect(reg.map((m) => m.action)).toEqual(["mood", "idea", "gratitude"]); // tocar abre o formulário do "+" (nunca registra sozinho)
     expect(cards(metricasDoDia(novato(["peso", "suplementos"], { supplementsTotal: 2, supplementsTaken: 1 })))).toEqual(["Suplementos 1/2", "Peso 0/1", "Hábitos (Criar hábito)"]);
   });
+  it("contou MAIS de 3 (QA: o tutorial da Rotina pergunta o humor): os registros viram UM card 'Registros x/y' — o que falta aparece; os blocos grandes ficam com o card deles", () => {
+    const quatro = novato(["gasto", "habitos", "agua", "humor"], { habits: [{ name: "Beber água", done: true }], waterGlasses: 8, registrosHoje: { ...NADA, humor: true } });
+    expect(cards(metricasDoDia(quatro))).toEqual(["Hábitos 1/1", "Água 8/8", "Registros 1/2"]); // não "Humor 1/1" com o Gasto escondido
+    expect(metricasDoDia(quatro)[2].abreMais).toBe(true); // toca → o "+" (gasto, humor…)
+    const cem = novato(["gasto", "habitos", "agua", "humor"], { habits: [{ name: "Beber água", done: true }], waterGlasses: 8, registrosHoje: { ...NADA, humor: true, gasto: true } });
+    expect(metricasDoDia(cem).every((m) => m.valor >= m.max)).toBe(true);
+    // só registros (explorou e usou o "+"): 4 registros = 1 card + os convites do padrão
+    expect(cards(metricasDoDia(novato(["humor", "gasto", "sono", "ideia"])))).toEqual(["Registros 0/4", "Hábitos (Criar hábito)", "Água (Anotar copo)"]);
+    // 3 blocos grandes + registros (raro nos 7 dias): os 3 primeiros da lista
+    expect(cards(metricasDoDia(novato(["habitos", "agua", "refeicoes", "gasto"])))).toEqual(["Hábitos 0/1", "Refeições 0/4", "Água 0/8"]);
+  });
   it("contou menos de 3: completa com o padrão em CONVITE (tracejado), nunca como obrigação; o que ela escondeu não volta", () => {
     expect(cards(metricasDoDia(novato(["gasto", "humor"])))).toEqual(["Humor 0/1", "Gasto 0/1", "Hábitos (Criar hábito)"]);
     expect(cards(metricasDoDia(novato([])))).toEqual(["Hábitos (Criar hábito)", "Água (Anotar copo)", "Refeições (Criar plano)"]);
@@ -551,6 +562,18 @@ describe("6. página 1 da conta nova = o que conta no score (1.0.20, dono 27/10)
     await waitFor(() => expect(screen.getByTestId("he-score-numero").getAttribute("data-valor")).toBe("100"));
     expect(ids()).toEqual(["habitos", "agua", "gasto"]);
     expect(within(pagina(1)).getAllByTestId("he-metrica").map((c) => c.textContent?.replace(/\s+/g, ""))).toEqual(["1/1Hábitos", "8/8Água", "1/1Gasto"]);
+  });
+  it("Home nova, conta NOVA que respondeu o humor (tutorial da Rotina): Hábitos · Água · Registros 1/2 — nunca 3 completos do lado de 89", async () => {
+    contaNova();
+    gravarMissao(missao("A", { feitos: { 1: { dia: hoje, rotulo: "x" } }, lembrete: "20h" }));
+    await montar({ ...CONTA_NOVA, "finance-expenses": [], "rotina-habits": ["Beber água ao acordar"], "core-rotina-habit-log": { [hoje]: { "Beber água ao acordar": true } }, "mood-log": { [hoje]: { mood: "bem" } }, "core-saude-water": { [hoje]: 8 } });
+    const cs = () => within(pagina(1)).getAllByTestId("he-metrica");
+    expect(cs().map((c) => c.getAttribute("data-metrica"))).toEqual(["habitos", "agua", "registros"]);
+    expect(cs()[2].textContent?.replace(/\s+/g, "")).toBe("1/2Registros");
+    expect(Number(screen.getByTestId("he-score-numero").getAttribute("data-valor"))).toBeLessThan(100);
+    act(() => gravar("finance-expenses", [{ id: "g1", description: "Café", value: 12, date: hoje }]));
+    await waitFor(() => expect(screen.getByTestId("he-score-numero").getAttribute("data-valor")).toBe("100"));
+    expect(cs()[2].textContent?.replace(/\s+/g, "")).toBe("2/2Registros");
   });
   it("Home nova, conta nova que explorou sem usar nada: 3 convites tracejados (score 0); o 'Anotar copo' abre o copo; a conta antiga segue Hábitos · Água · Refeições", async () => {
     contaNova();

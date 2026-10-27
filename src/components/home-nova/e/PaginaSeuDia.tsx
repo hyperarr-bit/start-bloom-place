@@ -60,6 +60,8 @@ const ROTULO_DO_TIPO: Record<TipoPendencia, string> = {
   habitos: "Hábitos", treino: "Treino", agua: "Água", refeicoes: "Refeições", suplementos: "Suplementos", leitura: "Leitura",
   humor: "Humor", gasto: "Gasto", peso: "Peso", sono: "Sono", ideia: "Ideia", gratidao: "Gratidão",
 };
+/** 1.0.20: os blocos grandes do score (os outros 6 são os registros de sim/não, de 5 pontos). */
+const BLOCOS_GRANDES = new Set<TipoPendencia>(["habitos", "treino", "refeicoes", "agua", "suplementos", "leitura"]);
 /** O formulário do "+" que cada registro de sim/não abre (o mesmo da linha da lista). */
 const ACAO_DO_REGISTRO: Record<keyof RegistrosHoje, ActionId> = { humor: "mood", gasto: "expense", peso: "weight", sono: "sleep", ideia: "idea", gratidao: "gratitude" };
 /** 1.0.20: o texto do CONVITE dos cards do padrão (Hábitos · Água · Refeições) que ainda não contam pra conta nova. Cabe
@@ -120,6 +122,11 @@ export function metricasDoDia(d: LifeHubData, copoMl: number = COPO_ML_PADRAO, r
  * largos: a página 1 aprovada é a grade de 3; com 2 ou 1 card a grade fica com buraco ou com cards esticados, e a conta
  * que explorou sozinha (0 tipos) ficaria só com o número. O que ela escondeu em Personalizar não volta nem como convite.
  * Usar o convite (anotar o copo, a refeição) faz o tipo contar — ele vira card de verdade e entra na lista e no score.
+ * Contou MAIS de 3 (QA do v1020 no Simulador: o tutorial da Rotina pergunta o humor, e o humor passa a contar — Hábitos ·
+ * Água · Humor completos do lado de "89" e o Gasto que faltava fora da página): os registros de sim/não (Humor, Gasto,
+ * Peso, Sono, Ideia, Gratidão) viram UM card "Registros x/y" — o mesmo card da reserva de sempre —, e os blocos grandes
+ * (Hábitos, Treino, Refeições, Água, Suplementos, Leitura) ficam com o card deles. Assim o que falta aparece: Hábitos ·
+ * Água · Registros 1/2 → 2/2 no 100. Com 3 ou mais blocos grandes (raro nos 7 dias), os 3 primeiros da lista.
  */
 function metricasDoNovato(d: LifeHubData, porId: Record<IdDoResumo, Metrica | null>, suplementos: Metrica | null, cobra: (t: TipoPendencia) => boolean): Metrica[] {
   const reg = d.registrosHoje ?? { humor: false, gasto: false, peso: false, sono: false, gratidao: false, ideia: false };
@@ -134,7 +141,12 @@ function metricasDoNovato(d: LifeHubData, porId: Record<IdDoResumo, Metrica | nu
     }
   };
   const contam = new Set(d.pendenciasCobradas ?? []);
-  const cards = ORDEM_DA_LISTA.filter((t) => contam.has(t)).map(doTipo).filter((m): m is Metrica => !!m);
+  const naOrdem = ORDEM_DA_LISTA.filter((t) => contam.has(t));
+  const grandes = naOrdem.filter((t) => BLOCOS_GRANDES.has(t));
+  const registros = naOrdem.filter((t): t is keyof RegistrosHoje => !BLOCOS_GRANDES.has(t));
+  const tipos: (TipoPendencia | "registros")[] = naOrdem.length <= 3 ? naOrdem : grandes.length <= 2 ? [...grandes, "registros"] : grandes.slice(0, 3);
+  const juntos: Metrica = { id: "registros", rotulo: "Registros", valor: registros.filter((t) => reg[t]).length, max: registros.length, Icone: PenLine, tom: TOM_DO_MODULO.desenvolvimento, abreMais: true };
+  const cards = tipos.map((t) => (t === "registros" ? juntos : doTipo(t))).filter((m): m is Metrica => !!m);
   const convites = (["habitos", "agua", "refeicoes"] as const)
     .filter((t) => !contam.has(t) && cobra(t) && !cards.some((m) => m.id === t) && porId[t])
     .map((t): Metrica => ({ ...porId[t]!, convite: CONVITE_DO_PADRAO[t] }));

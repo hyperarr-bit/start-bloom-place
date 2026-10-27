@@ -36,6 +36,7 @@ const marcarVisto = () => {
 };
 /** 1.0.21 (fluxo enxuto): a TelaParabens do cadastro do iPhone fez o papel desta tela — ela não volta na abertura. */
 export const marcarBoasVindasPagoVista = marcarVisto;
+export const boasVindasPagoJaVista = jaViu;
 
 /** Confete: 22 pedaços, uma vez só, e acabou. Nada de laço infinito — o que
  *  fica animando pra sempre é o que faz aparelho simples errar o repaint. */

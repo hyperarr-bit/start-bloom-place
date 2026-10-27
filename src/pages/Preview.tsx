@@ -310,6 +310,13 @@ const DemoCta = ({ funnel, trava }: {
   const volta = useVoltaDaDemo();
   const dialogoAberto = useDialogoAberto();
   const faixaRef = useRef<HTMLDivElement>(null);
+  const shell = isNativeShell();
+  /* 1.0.21 (QA da demo no iPhone, modo 1.0.12): com o teclado aberto a faixa "Quero o meu assim" subia junto e cobria o
+     que a pessoa digitava, e a página rolada passava por baixo do relógio. No app: a faixa sai enquanto o teclado está
+     aberto (volta ao fechar) e a tarja do relógio cobre a área segura. A altura publicada (--teste-banner-h, lida pelo
+     rodapé do Treino e pela demo guiada) é refeita quando a faixa sai/volta (revisor 27/10). */
+  const { teclado } = useAreaVisivel(shell);
+  const faixaNaTela = !dialogoAberto && !!volta && !(shell && teclado);
   useLayoutEffect(() => {
     const raiz = document.documentElement.style;
     const el = faixaRef.current;
@@ -319,12 +326,7 @@ const DemoCta = ({ funnel, trava }: {
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(publica) : null;
     ro?.observe(el);
     return () => { ro?.disconnect(); raiz.removeProperty("--teste-banner-h"); };
-  }, [dialogoAberto]);
-  const shell = isNativeShell();
-  /* 1.0.21 (QA da demo no iPhone, modo 1.0.12): com o teclado aberto a faixa "Quero o meu assim" subia junto e cobria o
-     que a pessoa digitava, e a página rolada passava por baixo do relógio. No app: a faixa sai enquanto o teclado está
-     aberto (volta ao fechar) e a tarja do relógio cobre a área segura. */
-  const { teclado } = useAreaVisivel(shell);
+  }, [dialogoAberto, faixaNaTela, !!trava]); // eslint-disable-line react-hooks/exhaustive-deps
   if (dialogoAberto || !volta) return null;
   if (shell && teclado) return <TarjaDoRelogio />;
   if (trava) {

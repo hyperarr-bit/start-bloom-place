@@ -31,7 +31,7 @@ import { lembretesSoNoApp } from "@/lib/missao-web";
 import { EscolhaDeHora } from "./EscolhaDeHora";
 import { entrada, MOV, MOV_MS, saida } from "@/lib/movimento";
 import { BaixarAppPopup } from "@/missao/BaixarAppPopup";
-import { FaixaDoRelogioTransparente } from "@/components/app/faixaDoRelogio";
+import { FaixaDoRelogioSobFundoEscuro, FaixaDoRelogioTransparente } from "@/components/app/faixaDoRelogio";
 
 /** 1.0.17 (dono 19/10: "minimalista, uma ideia por tela") — a copy do 1º gasto: uma pergunta, os chips, "+ Outro" e a
  *  saída quieta. Sem frase explicando o toque (o post-it já diz). */
@@ -1625,6 +1625,9 @@ function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVe
       <motion.div className="fixed inset-0 z-[230] flex flex-col items-center justify-center px-6 text-center text-white" style={{ background: "linear-gradient(180deg,#2a1840 0%,#16121c 100%)", paddingTop: "var(--app-safe-top)", paddingBottom: "var(--app-safe-bottom, 0px)" }}
         role="dialog" aria-modal="true" aria-label="3 dias seguidos"
         data-camada-guia="missao-doses-festa" data-testid="missao-doses-festa" data-dia={n} data-braco="A" data-tela-cheia="" initial={{ opacity: 0 }} animate={{ opacity: saindo ? 0 : 1 }} exit={{ opacity: 0 }} transition={saindo ? saida(reduzir) : entrada(reduzir, MOV.calmo)}>
+        {/* 1.0.21: fundo escuro de tela cheia — a faixa do relógio ficava BRANCA no topo do dia 3 (QA do v1020); agora
+            transparente e com o relógio branco enquanto a festa está na tela */}
+        <FaixaDoRelogioSobFundoEscuro />
         <Confete atraso={reduzir ? 0 : 0.7} />
         <motion.div initial={reduzir ? false : { scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={entrada(reduzir, MOV.calmo, 0.25)}
           data-testid="missao-doses-adesivo" data-adesivo={a.id}>

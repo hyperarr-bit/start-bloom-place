@@ -312,7 +312,7 @@ describe("3b. as folhas da missão cobrem a faixa do relógio (escurecido até o
     f.unmount();
     expect(cor()).toBe("#f4f4f3");
   });
-  it("trava: toda camada escura de tela cheia da missão em doses monta a FaixaDoRelogioTransparente (menos a tela cheia do '3 dias seguidos', fundo escuro com o relógio escuro)", () => {
+  it("trava: toda camada escura de tela cheia da missão em doses monta a FaixaDoRelogioTransparente (a tela cheia do '3 dias seguidos', de fundo escuro, monta a FaixaDoRelogioSobFundoEscuro — polimento-1021)", () => {
     const pasta = join(process.cwd(), "src/components/missao-doses");
     const faltando: string[] = [];
     for (const arq of readdirSync(pasta).filter((a) => a.endsWith(".tsx"))) {

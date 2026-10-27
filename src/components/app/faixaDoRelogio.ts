@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { aplicarBarraDeStatus } from "@/lib/status-bar";
 
 /**
  * FAIXA DO RELÓGIO SOB TELAS ESCURAS (QA de Simulador da 1.0.18). O `.app-safe-top-guard` (App.tsx/index.css) pinta a
@@ -47,5 +48,20 @@ export function useFaixaDoRelogioTransparente(ativo = true) {
  */
 export function FaixaDoRelogioTransparente(): null {
   useFaixaDoRelogioTransparente(true);
+  return null;
+}
+
+/**
+ * 1.0.21 — o mesmo para tela de fundo ESCURO (a tela cheia do "3 dias seguidos!" da missão, o menu da conta com o
+ * escurecido de 80%): a faixa fica transparente E o relógio/bateria ficam brancos enquanto ela está montada, como o
+ * álbum faz (AlbumTela). Sem a troca, o relógio escuro do tema claro some no fundo escuro. Ao sair, a barra volta ao
+ * tema do app.
+ */
+export function FaixaDoRelogioSobFundoEscuro(): null {
+  useFaixaDoRelogioTransparente(true);
+  useEffect(() => {
+    void aplicarBarraDeStatus("dark");
+    return () => { void aplicarBarraDeStatus(document.documentElement.classList.contains("dark") ? "dark" : "light"); };
+  }, []);
   return null;
 }

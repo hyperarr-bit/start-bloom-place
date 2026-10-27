@@ -11,7 +11,7 @@ import { useHomeNova } from "@/hooks/use-home-nova";
 import { useHomeWidgetsE } from "@/hooks/use-home-widgets-e";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { SUAVIDADE_HOME_NOVA } from "@/lib/home-nova";
-import { CATALOGO_RESUMOS, CHAVE_RESUMOS, MAX_RESUMOS, alternarResumo, normalizarResumos } from "@/lib/home-resumos";
+import { CATALOGO_RESUMOS, CHAVE_RESUMOS, MAX_RESUMOS, RESUMOS_PADRAO, alternarResumo, resumoDoCard, resumosEscolhidos } from "@/lib/home-resumos";
 import { CHAVE_PENDENCIAS_PREFS, PREFS_PADRAO } from "@/lib/home-pendencias";
 import { VoceE, type SecaoVoce } from "@/components/home-nova/e/VoceE";
 import { Interruptor } from "@/components/home-nova/e/PersonalizarPendenciasE";
@@ -316,15 +316,20 @@ export function PersonalizarInicio() {
   useFundoDaTelaE(); // adendo 26/10: a faixa do relógio e a casca na cor da E
   // 1.0.19: a conta nova vê aqui o MESMO padrão de widgets e o MESMO interruptor das pendências que a Home mostra
   const widgetsE = useHomeWidgetsE(usePadraoDeWidgetsDoNovato(lifeData));
-  const resumos = normalizarResumos(get<unknown>(CHAVE_RESUMOS, null));
+  const escolhidos = resumosEscolhidos(get<unknown>(CHAVE_RESUMOS, null));
   const copo = normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO));
-  const previa = metricasDoDia(lifeData, copo, resumos);
+  const previa = metricasDoDia(lifeData, copo, escolhidos);
+  /* 1.0.20: a lista liga o que está na página 1 — a escolha dela; sem escolha, os 3 de sempre, e na conta nova (primeiros
+     7 dias) os cards do que conta no score dela, como a Home mostra (os convites tracejados não contam como ligados) */
+  const resumos: IdDoResumo[] = escolhidos
+    ?? (lifeData.pendenciasNovato ? previa.filter((m) => !m.convite).map((m) => resumoDoCard(m.id)).filter((id): id is IdDoResumo => !!id) : RESUMOS_PADRAO);
   const prefs = lifeData.pendenciasPrefs ?? PREFS_PADRAO;
   const tiposDoNovato = useTiposDoNovato(lifeData);
   const [widgets, setWidgets] = useState(false);
   const [pendencias, setPendencias] = useState(false);
   const alternar = (id: (typeof CATALOGO_RESUMOS)[number]["id"]) => {
-    const lista = alternarResumo(resumos, id);
+    // (a conta nova só com convites na página 1 não tem nenhum ligado: o 1º toque liga só aquele)
+    const lista = resumos.length === 0 ? [id] : alternarResumo(resumos, id);
     if (lista === resumos) return;
     trackEvent("home_resumos", { resumos: lista.join(",") });
     set(CHAVE_RESUMOS, lista, { system: true }); // preferência de tela: não conta como dia anotado

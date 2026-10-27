@@ -1,7 +1,8 @@
 /**
  * OS RESUMOS DA HOME NOVA (rodada 2, 26/10) — os 3 cards pequenos da página 1 ("Seu dia"), que a pessoa pode
  * trocar em Você › Personalizar início › Resumos. Até 3 ("mais que isso é desnecessário", dono); a ordem é a da
- * escolha. Guardado na conta (`core-home-resumos`, useUserData). Sem escolha, os 3 de sempre: Hábitos · Água · Refeições.
+ * escolha. Guardado na conta (`core-home-resumos`, useUserData). Sem escolha, os 3 de sempre: Hábitos · Água · Refeições
+ * (1.0.20: menos na conta nova nos primeiros 7 dias — lá, sem escolha, os cards são o que conta no score dela).
  */
 export type IdDoResumo = "habitos" | "agua" | "refeicoes" | "sono" | "financas" | "treino" | "leitura";
 
@@ -25,6 +26,22 @@ export function normalizarResumos(v: unknown): IdDoResumo[] {
   const lista = v.filter((x): x is IdDoResumo => typeof x === "string" && VALIDOS.has(x));
   const unicos = lista.filter((x, i) => lista.indexOf(x) === i).slice(0, MAX_RESUMOS);
   return unicos.length > 0 ? unicos : RESUMOS_PADRAO;
+}
+
+/**
+ * 1.0.20 — o que a pessoa ESCOLHEU em Personalizar início, ou null quando ela nunca escolheu (nada gravado, ou só lixo).
+ * A conta nova sem escolha não vê o padrão fixo: vê os cards do que conta no score dela (PaginaSeuDia, metricasDoDia).
+ */
+export function resumosEscolhidos(v: unknown): IdDoResumo[] | null {
+  if (!Array.isArray(v) || !v.some((x) => typeof x === "string" && VALIDOS.has(x))) return null;
+  return normalizarResumos(v);
+}
+
+/** 1.0.20 — o resumo do catálogo que um card da página 1 representa (o card do gasto é o resumo "financas"); null nos
+ *  cards sem resumo no catálogo (Humor, Peso, Ideia, Gratidão, Suplementos, Registros). */
+export function resumoDoCard(idDoCard: string): IdDoResumo | null {
+  const id = idDoCard === "gasto" ? "financas" : idDoCard;
+  return VALIDOS.has(id) ? (id as IdDoResumo) : null;
 }
 
 /** Liga/desliga um resumo (no máximo 3; nunca fica sem nenhum). */

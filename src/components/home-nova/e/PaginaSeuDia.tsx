@@ -1,13 +1,14 @@
 import { BookOpen, CalendarCheck, Check, Droplets, Dumbbell, Moon, PenLine, Pill, Plus, Utensils, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import type { LifeHubData } from "@/hooks/use-life-hub-data";
+import type { LifeHubData, RegistrosHoje } from "@/hooks/use-life-hub-data";
 import type { ActionId } from "@/components/home/QuickActions";
 import type { TipoPendencia } from "@/lib/home-pendencias";
 import { COPO_ML_PADRAO, unidadeDaAgua } from "@/lib/saude-copo";
 import { RESUMOS_PADRAO, type IdDoResumo } from "@/lib/home-resumos";
+import { ORDEM_DA_LISTA } from "@/lib/pendencias-novato";
 import { Anel } from "./Anel";
 import { Entrada, NumeroQueConta } from "./Animacoes";
-import { TOM_DO_MODULO, TOM_DO_TIPO, TRACO, cor, type Tom } from "./paleta";
+import { ICONE_DO_TIPO, TOM_DO_MODULO, TOM_DO_TIPO, TRACO, cor, type Tom } from "./paleta";
 import { EcoDoAnel, EstrelaFesta, corDaFase, useFesta100 } from "./Festa100";
 
 /**
@@ -25,6 +26,9 @@ import { EcoDoAnel, EstrelaFesta, corDaFase, useFesta100 } from "./Festa100";
  *    que existem pra todo mundo, 45 dos 100 pontos num olhar —, com o anel e o ícone na cor do módulo de
  *    origem da paleta única (verde-água, céu, sálvia) e traço 1,75. RODADA 4: só o nome, uma palavra
  *    ("Hábitos", "Água", "Refeições"; na fila de reserva, "Suplementos" e "Registros").
+ *  - 1.0.20 (dono 27/10): na CONTA NOVA (primeiros 7 dias) que não escolheu resumos, os 3 cards são o que CONTA no score
+ *    dela, na ordem da lista (dia 1 da missão: Hábitos · Água · Gasto); faltando card, o padrão entra em CONVITE
+ *    (tracejado + "+") — metricasDoNovato.
  */
 export interface Metrica {
   id: TipoPendencia | "registros";
@@ -37,6 +41,9 @@ export interface Metrica {
   action?: ActionId;
   /** toque abre o "+" na grade (registros) */
   abreMais?: boolean;
+  /** 1.0.20 (conta nova): o card é um CONVITE — anel tracejado com "+", como o "Criar hábito" — de um tipo que ainda NÃO
+   *  conta no score dela (nunca um "0/4" do lado do número); o valor é o texto do convite */
+  convite?: string;
 }
 
 export const tituloDoScore = (score: number): string =>
@@ -48,20 +55,36 @@ export const explicacaoDoScore = (faltam: number, score: number): string => {
   return faltam === 1 ? "Falta 1 coisa pra fechar o dia" : `Faltam ${faltam} coisas pra fechar o dia`;
 };
 
+/** 1.0.20: o nome de uma palavra de cada tipo (os cards do que conta, na conta nova — RODADA 4: "só o nome"). */
+const ROTULO_DO_TIPO: Record<TipoPendencia, string> = {
+  habitos: "Hábitos", treino: "Treino", agua: "Água", refeicoes: "Refeições", suplementos: "Suplementos", leitura: "Leitura",
+  humor: "Humor", gasto: "Gasto", peso: "Peso", sono: "Sono", ideia: "Ideia", gratidao: "Gratidão",
+};
+/** O formulário do "+" que cada registro de sim/não abre (o mesmo da linha da lista). */
+const ACAO_DO_REGISTRO: Record<keyof RegistrosHoje, ActionId> = { humor: "mood", gasto: "expense", peso: "weight", sono: "sleep", ideia: "idea", gratidao: "gratitude" };
+/** 1.0.20: o texto do CONVITE dos cards do padrão (Hábitos · Água · Refeições) que ainda não contam pra conta nova. Cabe
+ *  numa linha no card de 375 pt (iPhone SE/mini: ~78 pt de texto; "Anotar refeição" cortava). Refeições = "Criar plano",
+ *  como o "+" sem plano ("Planejar na Dieta") e o CRIAR_DO_RESUMO. */
+export const CONVITE_DO_PADRAO: Record<"habitos" | "agua" | "refeicoes", string> = { habitos: "Criar hábito", agua: "Anotar copo", refeicoes: "Criar plano" };
+
 /**
  * As três métricas da página 1, pelos dados do dia e pelo que a pessoa cobra. `copoMl` dá a unidade da água.
  * RODADA 2: `resumos` são os cards que a pessoa escolheu em Você › Personalizar início (lib/home-resumos: até 3,
- * entre Hábitos · Água · Refeições · Sono · Gasto · Treino · Leitura); sem escolha, os 3 de sempre. Os que a pessoa
- * ocultou em Personalizar pendências saem; se sobrar vaga, entram Suplementos e Registros como antes.
+ * entre Hábitos · Água · Refeições · Sono · Gasto · Treino · Leitura); sem escolha (null), os 3 de sempre. Os que a
+ * pessoa ocultou em Personalizar pendências saem; se sobrar vaga, entram Suplementos e Registros como antes.
+ * 1.0.20 (dono 27/10): na CONTA NOVA nos primeiros 7 dias (o hub manda `pendenciasNovato`) e SEM escolha, os cards são
+ * os do que CONTA no score dela (metricasDoNovato). Quem escolheu mantém a escolha; conta antiga/admin: nada muda.
  * Tocar num card ABRE o registro/detalhe — nunca registra sozinho (água abre o formulário da água, com o "+ 1 copo").
  */
-export function metricasDoDia(d: LifeHubData, copoMl: number = COPO_ML_PADRAO, resumos: IdDoResumo[] = RESUMOS_PADRAO): Metrica[] {
-  // 1.0.19 (novato polido): os resumos da página 1 seguem a conta de SEMPRE (o score do novato conta só a lista, mas os
-  // 3 cards de "Seu dia" continuam Hábitos · Água · Refeições, como no desenho aprovado)
+export function metricasDoDia(d: LifeHubData, copoMl: number = COPO_ML_PADRAO, resumos: IdDoResumo[] | null = null): Metrica[] {
+  // 1.0.19 (novato polido): o que a conta nova ESCOLHEU aparece mesmo sem contar no score dela (é a escolha dela) — por
+  // isso os cards escolhidos leem a conta de sempre; o que só COMPLETA a fila (a reserva) segue o score (`contaNoScore`)
   const base = d.pendenciasCobradasSemNovato ?? d.pendenciasCobradas;
   const cobra = (t: TipoPendencia) => !base || base.includes(t);
+  // o que conta no score (na conta nova = a lista; nas outras contas é o mesmo `base`)
+  const contaNoScore = (t: TipoPendencia) => !d.pendenciasCobradas || d.pendenciasCobradas.includes(t);
   const reg = d.registrosHoje ?? { humor: false, gasto: false, peso: false, sono: false, gratidao: false, ideia: false };
-  const registrosCobrados = (["humor", "gasto", "peso", "sono", "ideia", "gratidao"] as const).filter((t) => cobra(t));
+  const registrosCobrados = (["humor", "gasto", "peso", "sono", "ideia", "gratidao"] as const).filter((t) => contaNoScore(t));
   // (a unidade da água — copos/garrafas — não aparece mais no rótulo; segue valendo no "x/y" e nas pendências)
   void unidadeDaAgua(copoMl);
   const porId: Record<IdDoResumo, Metrica | null> = {
@@ -74,13 +97,48 @@ export function metricasDoDia(d: LifeHubData, copoMl: number = COPO_ML_PADRAO, r
     treino: { id: "treino", rotulo: "Treino", valor: d.workoutDone ? 1 : 0, max: 1, Icone: Dumbbell, tom: TOM_DO_TIPO.treino, action: "workout" },
     leitura: { id: "leitura", rotulo: "Leitura", valor: d.leuHoje ? 1 : 0, max: 1, Icone: BookOpen, tom: TOM_DO_MODULO.biblioteca, route: "/biblioteca" },
   };
-  const escolhidos = (resumos.length > 0 ? resumos : RESUMOS_PADRAO).map((id) => porId[id]).filter((m): m is Metrica => !!m);
+  const suplementos: Metrica | null = d.supplementsTotal > 0 ? { id: "suplementos", rotulo: "Suplementos", valor: Math.min(d.supplementsTaken, d.supplementsTotal), max: d.supplementsTotal, Icone: Pill, tom: TOM_DO_TIPO.suplementos, route: "/saude" } : null;
+  if (d.pendenciasNovato && !(resumos && resumos.length > 0)) return metricasDoNovato(d, porId, suplementos, cobra);
+  const escolhidos = (resumos && resumos.length > 0 ? resumos : RESUMOS_PADRAO).map((id) => porId[id]).filter((m): m is Metrica => !!m);
   const reserva: (Metrica | null)[] = [
-    cobra("suplementos") && d.supplementsTotal > 0 ? { id: "suplementos", rotulo: "Suplementos", valor: Math.min(d.supplementsTaken, d.supplementsTotal), max: d.supplementsTotal, Icone: Pill, tom: TOM_DO_TIPO.suplementos, route: "/saude" } : null,
+    contaNoScore("suplementos") ? suplementos : null,
     registrosCobrados.length > 0 ? { id: "registros", rotulo: "Registros", valor: registrosCobrados.filter((t) => reg[t]).length, max: registrosCobrados.length, Icone: PenLine, tom: TOM_DO_MODULO.desenvolvimento, abreMais: true } : null,
   ];
   const fila = [...escolhidos, ...reserva.filter((m): m is Metrica => !!m && !escolhidos.some((e) => e.id === m.id))];
   return fila.slice(0, 3);
+}
+
+/**
+ * 1.0.20 (dono 27/10: "Refeições 0/4 do lado do 100 sem ela ter usado a Dieta") — A PÁGINA 1 DA CONTA NOVA SEM ESCOLHA:
+ * os 3 cards são os tipos que CONTAM no score dela (os mesmos da lista e da folha do score — lib/pendencias-novato), na
+ * ordem da lista (ORDEM_DA_LISTA; fixa, o card não pula quando fica feito). No dia 1 da missão: Hábitos · Água · Gasto.
+ * Cada card diz o mesmo que o score: completo ⇔ o item está feito na folha (o Sono conta "registrou hoje", não as horas;
+ * o Treino num dia de descanso de quem tem plano já vem feito). Humor, Peso, Ideia e Gratidão ganham o card de sim/não
+ * (como o Gasto: 0/1 → 1/1).
+ * Contou MENOS de 3: completa com o padrão (Hábitos · Água · Refeições) em CONVITE — o anel tracejado com "+" do
+ * "Criar hábito" ("Anotar copo", "Criar plano"), nunca o "0/4" de uma obrigação. Escolhi o convite em vez de 2 cards
+ * largos: a página 1 aprovada é a grade de 3; com 2 ou 1 card a grade fica com buraco ou com cards esticados, e a conta
+ * que explorou sozinha (0 tipos) ficaria só com o número. O que ela escondeu em Personalizar não volta nem como convite.
+ * Usar o convite (anotar o copo, a refeição) faz o tipo contar — ele vira card de verdade e entra na lista e no score.
+ */
+function metricasDoNovato(d: LifeHubData, porId: Record<IdDoResumo, Metrica | null>, suplementos: Metrica | null, cobra: (t: TipoPendencia) => boolean): Metrica[] {
+  const reg = d.registrosHoje ?? { humor: false, gasto: false, peso: false, sono: false, gratidao: false, ideia: false };
+  const simNao = (t: keyof RegistrosHoje): Metrica => ({ id: t, rotulo: ROTULO_DO_TIPO[t], valor: reg[t] ? 1 : 0, max: 1, Icone: ICONE_DO_TIPO[t], tom: TOM_DO_TIPO[t], action: ACAO_DO_REGISTRO[t] });
+  const doTipo = (t: TipoPendencia): Metrica | null => {
+    switch (t) {
+      case "habitos": case "agua": case "refeicoes": case "leitura": return porId[t];
+      case "gasto": return porId.financas;
+      case "treino": return porId.treino && { ...porId.treino, valor: d.workoutDone || !d.todayWorkoutGroup ? 1 : 0 };
+      case "suplementos": return suplementos;
+      default: return simNao(t);
+    }
+  };
+  const contam = new Set(d.pendenciasCobradas ?? []);
+  const cards = ORDEM_DA_LISTA.filter((t) => contam.has(t)).map(doTipo).filter((m): m is Metrica => !!m);
+  const convites = (["habitos", "agua", "refeicoes"] as const)
+    .filter((t) => !contam.has(t) && cobra(t) && !cards.some((m) => m.id === t) && porId[t])
+    .map((t): Metrica => ({ ...porId[t]!, convite: CONVITE_DO_PADRAO[t] }));
+  return [...cards, ...convites].slice(0, 3);
 }
 
 interface PropsScore {
@@ -170,8 +228,9 @@ export const CardMetrica = ({ m, atraso, onAcao, onMais }: PropsMetrica) => {
     if (m.route) navigate(m.route);
   };
   // 1.0.19 (dono 26/10): resumo sem meta (0/0) não mostra "0/0" — vira o convite "Criar" (anel tracejado + "+")
-  if (m.max <= 0) {
-    const texto = textoDoCriar(m.id);
+  // 1.0.20: o mesmo convite pro card do padrão que ainda não conta no score da conta nova (`m.convite`)
+  if (m.max <= 0 || m.convite) {
+    const texto = m.convite ?? textoDoCriar(m.id);
     return (
       <button
         type="button"
@@ -179,6 +238,7 @@ export const CardMetrica = ({ m, atraso, onAcao, onMais }: PropsMetrica) => {
         data-testid="he-metrica"
         data-metrica={m.id}
         data-criar=""
+        data-convite={m.convite ? "" : undefined}
         aria-label={`${m.rotulo}: ${texto}`}
         className="hn-card !rounded-[22px] p-3.5 flex flex-col items-start text-left min-h-[148px] w-full active:scale-[0.98] transition-transform"
       >
@@ -219,8 +279,8 @@ interface Props {
   onMais: () => void;
   numeroDentro?: boolean;
   copoMl?: number;
-  /** os cards escolhidos em Você › Personalizar início (lib/home-resumos) */
-  resumos?: IdDoResumo[];
+  /** os cards escolhidos em Você › Personalizar início (lib/home-resumos `resumosEscolhidos`); null = nunca escolheu */
+  resumos?: IdDoResumo[] | null;
   festaPausada?: boolean;
   forcarFesta?: boolean;
 }

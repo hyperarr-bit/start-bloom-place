@@ -7,6 +7,9 @@
  *      na página 1); os vazios viram convite curto ("Como foi a noite?"), não "Sem …". Quem escolheu: nada muda.
  *   3. As folhas da missão por cima da Home nova ("Dia 1 feito · Combinado" etc.): botão da E (tinta), não magenta.
  *   4. Braço B: fechou no meio da dose 1 → a Home nova mostra "Dose de hoje" (estilo E) → toca → volta pro passo. A: igual.
+ *   5. O score do novato = a lista.
+ *   6. (1.0.20, dono 27/10) A PÁGINA 1 da conta nova sem escolha = o que conta no score (na ordem da lista); faltando card,
+ *      o padrão entra em CONVITE tracejado — nunca "Refeições 0/4" do lado do 100. Quem escolheu e a conta antiga: igual.
  */
 process.env.TZ = "America/Sao_Paulo";
 
@@ -43,7 +46,11 @@ import { CHAVE_DIA_100_VISTO } from "@/components/home/DayScoreRing";
 import { CHAVE_ESTADO_MISSAO_DOSES, doseDoDia1DoBracoB, type EstadoMissaoDoses } from "@/lib/missao-doses";
 import { PlanoDeAmanhaA } from "@/components/missao-doses/PlanoDeAmanhaA";
 import { Folha as PreFolha } from "@/components/missao-doses/PreFolhaLembrete";
-import type { PendenciasDeHoje } from "@/components/home/NextHoursTimeline";
+import { pendenciasDeHoje, type PendenciasDeHoje } from "@/components/home/NextHoursTimeline";
+import { CONVITE_DO_PADRAO, metricasDoDia, type Metrica } from "@/components/home-nova/e/PaginaSeuDia";
+import { PersonalizarInicio } from "@/pages/Voce";
+import { resumoDoCard, resumosEscolhidos } from "@/lib/home-resumos";
+import { ORDEM_DA_LISTA } from "@/lib/pendencias-novato";
 import type { LifeHubData } from "@/hooks/use-life-hub-data";
 import { localDayKey } from "@/lib/utils";
 import { somarDias } from "@/lib/sequencia";
@@ -396,5 +403,139 @@ describe("5. score do novato conta SÓ o que a lista mostra (dono 26/10: 'o scor
     await montar({ ...NOVA_2_TIPOS, "finance-expenses": [{ id: "g1", value: 12, date: hoje }], "core-mood-log": { [hoje]: { value: 5, emoji: "🤩" } } });
     await respirar(50);
     expect(screen.queryByTestId("celebracao-100")).toBeNull(); // já comemorou hoje
+  });
+});
+
+/* ================================================================== 6. a página 1 da conta nova = o que conta */
+describe("6. página 1 da conta nova = o que conta no score (1.0.20, dono 27/10)", () => {
+  const NADA = { humor: false, gasto: false, peso: false, sono: false, gratidao: false, ideia: false };
+  /** o hub de uma conta qualquer (nada feito hoje) */
+  const hub = (extra: Partial<LifeHubData> = {}): LifeHubData => ({
+    dayScore: 0, habits: [{ name: "Beber água", done: false }], waterGlasses: 0, waterGoal: 8, mealsLogged: 0, mealsTotal: 4, sleepHours: null,
+    supplementsTaken: 0, supplementsTotal: 0, currentBook: null, leuHoje: false, todayWorkoutGroup: null, workoutDone: false, workoutStatus: "vazio",
+    registrosHoje: NADA, ...extra,
+  }) as unknown as LifeHubData;
+  /** o que o hub devolve pra conta nova: `contam` = a lista (e o score); o "de sempre" = os 9 sem os pontos de graça */
+  const DE_SEMPRE = ["habitos", "agua", "refeicoes", "humor", "gasto", "peso", "sono", "ideia", "gratidao"] as const;
+  const novato = (contam: readonly string[], extra: Partial<LifeHubData> = {}, deSempre: readonly string[] = DE_SEMPRE) =>
+    hub({ pendenciasNovato: [...contam], pendenciasCobradas: [...contam], pendenciasCobradasSemNovato: [...deSempre], ...extra } as Partial<LifeHubData>);
+  const cards = (ms: Metrica[]) => ms.map((m) => (m.convite ? `${m.rotulo} (${m.convite})` : `${m.rotulo} ${m.valor}/${m.max}`));
+
+  it("a ordem fixa dos cards é a da lista (página 2 com tudo pendente)", () => {
+    const tudo = hub({ todayWorkoutGroup: "Peito", workoutStatus: "treino", supplementsTotal: 1, currentBook: "Dom Casmurro", readingProgress: 10 });
+    expect(pendenciasDeHoje(tudo, [], new Date()).pending.map((i) => i.tipo)).toEqual([...ORDEM_DA_LISTA]);
+  });
+  it("sem escolha: os tipos que CONTAM, na ordem da lista — o dia 1 da missão é Hábitos · Água · Gasto (sem Refeições)", () => {
+    expect(cards(metricasDoDia(novato(["gasto", "habitos", "agua"])))).toEqual(["Hábitos 0/1", "Água 0/8", "Gasto 0/1"]);
+    // ordem da lista, não a da escolha: refeições (3) vem antes da água (4)
+    expect(cards(metricasDoDia(novato(["agua", "gasto", "refeicoes", "habitos"])))).toEqual(["Hábitos 0/1", "Refeições 0/4", "Água 0/8"]);
+    // fez tudo o que a lista mostra: os 3 cards completos (é o 100 do lado)
+    const feito = metricasDoDia(novato(["gasto", "habitos", "agua"], { habits: [{ name: "Beber água", done: true }], waterGlasses: 8, registrosHoje: { ...NADA, gasto: true } }));
+    expect(feito.every((m) => m.max > 0 && m.valor >= m.max)).toBe(true);
+  });
+  it("cada card diz o mesmo que o score: sono = registrou hoje (não as horas); treino em dia de descanso de quem tem plano = feito; humor/ideia/gratidão/peso viram card de sim/não", () => {
+    expect(cards(metricasDoDia(novato(["sono"], { sleepHours: 6, registrosHoje: { ...NADA, sono: true } })))[0]).toBe("Sono 1/1");
+    expect(cards(metricasDoDia(novato(["treino"], { workoutStatus: "descanso" })))[0]).toBe("Treino 1/1");
+    expect(cards(metricasDoDia(novato(["treino"], { todayWorkoutGroup: "Peito", workoutStatus: "treino" })))[0]).toBe("Treino 0/1");
+    const reg = metricasDoDia(novato(["humor", "ideia", "gratidao"], { registrosHoje: { ...NADA, ideia: true } }));
+    expect(cards(reg)).toEqual(["Humor 0/1", "Ideia 1/1", "Gratidão 0/1"]);
+    expect(reg.map((m) => m.action)).toEqual(["mood", "idea", "gratitude"]); // tocar abre o formulário do "+" (nunca registra sozinho)
+    expect(cards(metricasDoDia(novato(["peso", "suplementos"], { supplementsTotal: 2, supplementsTaken: 1 })))).toEqual(["Suplementos 1/2", "Peso 0/1", "Hábitos (Criar hábito)"]);
+  });
+  it("contou menos de 3: completa com o padrão em CONVITE (tracejado), nunca como obrigação; o que ela escondeu não volta", () => {
+    expect(cards(metricasDoDia(novato(["gasto", "humor"])))).toEqual(["Humor 0/1", "Gasto 0/1", "Hábitos (Criar hábito)"]);
+    expect(cards(metricasDoDia(novato([])))).toEqual(["Hábitos (Criar hábito)", "Água (Anotar copo)", "Refeições (Criar plano)"]);
+    expect(CONVITE_DO_PADRAO).toEqual({ habitos: "Criar hábito", agua: "Anotar copo", refeicoes: "Criar plano" });
+    // cabe numa linha no card de 375 pt (~78 pt de texto: "Criar hábito" mede 70; "Anotar refeição", 92, cortava)
+    expect(Object.values(CONVITE_DO_PADRAO).every((t) => t.length <= "Criar hábito".length)).toBe(true);
+    // escondeu Refeições e Hábitos em Personalizar: nem convite
+    expect(cards(metricasDoDia(novato(["gasto"], {}, ["agua", "humor", "gasto", "peso", "sono", "ideia", "gratidao"])))).toEqual(["Gasto 0/1", "Água (Anotar copo)"]);
+    // os convites abrem o mesmo lugar do card de sempre (água = o formulário do copo; refeições = a Dieta)
+    const [h, a, r] = metricasDoDia(novato([]));
+    expect([h.route, a.action, r.route]).toEqual(["/rotina", "water", "/dieta"]);
+  });
+  it("quem ESCOLHEU resumos mantém a escolha (mesmo o que não conta); a vaga que sobra segue o score", () => {
+    expect(cards(metricasDoDia(novato(["gasto", "habitos", "agua"]), undefined, ["habitos", "agua", "refeicoes"]))).toEqual(["Hábitos 0/1", "Água 0/8", "Refeições 0/4"]);
+    // escolheu só o Sono: a reserva "Registros" conta só o registro que vale pra ela (o gasto), não os 6
+    expect(cards(metricasDoDia(novato(["gasto", "habitos", "agua"]), undefined, ["sono"]))).toEqual(["Sono 0/8", "Registros 0/1"]);
+  });
+  it("conta antiga/admin (sem a régua do novato): nada muda", () => {
+    expect(cards(metricasDoDia(hub()))).toEqual(["Hábitos 0/1", "Água 0/8", "Refeições 0/4"]);
+    expect(cards(metricasDoDia(hub({ pendenciasCobradas: ["habitos", "agua", "humor", "gasto"] } as Partial<LifeHubData>)))).toEqual(["Hábitos 0/1", "Água 0/8", "Registros 0/2"]);
+  });
+  it("resumosEscolhidos: null quando nunca escolheu (ou lixo); resumoDoCard: o card do gasto é o resumo 'financas'", () => {
+    expect(resumosEscolhidos(null)).toBeNull();
+    expect(resumosEscolhidos([])).toBeNull();
+    expect(resumosEscolhidos(["x", 3])).toBeNull();
+    expect(resumosEscolhidos(["sono", "x", "sono"])).toEqual(["sono"]);
+    expect(resumoDoCard("gasto")).toBe("financas");
+    expect(resumoDoCard("habitos")).toBe("habitos");
+    expect(resumoDoCard("humor")).toBeNull();
+  });
+  it("widgets da conta nova: o Humor que virou card na página 1 não se repete na página 3", () => {
+    const get = <T,>(_k: string, f: T): T => f;
+    expect(widgetsDoNovato(hub(), get, ["humor", "gasto", "agua"], hoje)).toEqual(["habitos", "sono"]);
+    expect(widgetsDoNovato(hub(), get, ["habitos", "agua", "gasto"], hoje)).toEqual(["sono", "humor"]);
+  });
+
+  it("Home nova, conta NOVA no dia 1: página 1 = Hábitos · Água · Gasto (o que conta) → fez tudo → 100 com os 3 completos", async () => {
+    contaNova();
+    gravarMissao(missao("A", { feitos: { 1: { dia: hoje, rotulo: "Pode gastar R$ 54 por dia" } }, lembrete: "20h" }));
+    await montar(CONTA_NOVA);
+    const ids = () => within(pagina(1)).getAllByTestId("he-metrica").map((c) => c.getAttribute("data-metrica"));
+    expect(ids()).toEqual(["habitos", "agua", "gasto"]);
+    expect(pagina(1).textContent).not.toMatch(/Refeiç/);
+    // sem hábito ainda: o "Criar hábito" (conta no score, 0 de 20) — é o card dela, não um convite de fora
+    const habitos = within(pagina(1)).getAllByTestId("he-metrica")[0];
+    expect(habitos.hasAttribute("data-criar")).toBe(true);
+    expect(habitos.hasAttribute("data-convite")).toBe(false);
+    // o hábito criado e feito + os 8 copos: tudo o que a lista mostra → 100, e os 3 cards completos
+    act(() => { gravar("rotina-habits", ["Beber água ao acordar"]); gravar("core-rotina-habit-log", { [hoje]: { "Beber água ao acordar": true } }); gravar("core-saude-water", { [hoje]: 8 }); });
+    await waitFor(() => expect(screen.getByTestId("he-score-numero").getAttribute("data-valor")).toBe("100"));
+    expect(ids()).toEqual(["habitos", "agua", "gasto"]);
+    expect(within(pagina(1)).getAllByTestId("he-metrica").map((c) => c.textContent?.replace(/\s+/g, ""))).toEqual(["1/1Hábitos", "8/8Água", "1/1Gasto"]);
+  });
+  it("Home nova, conta nova que explorou sem usar nada: 3 convites tracejados (score 0); o 'Anotar copo' abre o copo; a conta antiga segue Hábitos · Água · Refeições", async () => {
+    contaNova();
+    gravarMissao(missao("A", { explorou: true }));
+    await montar({ "core-home-nova-origem": CONTA_NOVA["core-home-nova-origem"], "core-user-name": "Bia" });
+    const cs = within(pagina(1)).getAllByTestId("he-metrica");
+    expect(cs.map((c) => c.getAttribute("data-metrica"))).toEqual(["habitos", "agua", "refeicoes"]);
+    expect(cs.every((c) => c.hasAttribute("data-convite"))).toBe(true);
+    expect(cs.map((c) => c.getAttribute("aria-label"))).toEqual(["Hábitos: Criar hábito", "Água: Anotar copo", "Refeições: Criar plano"]);
+    expect(pagina(1).textContent).not.toMatch(/0\/4|0\/8/);
+    expect(screen.getByTestId("he-score-numero").getAttribute("data-valor")).toBe("0");
+    fireEvent.click(cs[1]);
+    await waitFor(() => expect(screen.getByTestId("hn-folha-acao").getAttribute("data-acao")).toBe("water"));
+    cleanup(); _zerarEntradaDaHome();
+    contaAntiga();
+    await montar({ "core-user-name": "Ana" });
+    const antiga = within(pagina(1)).getAllByTestId("he-metrica");
+    expect(antiga.map((c) => c.getAttribute("data-metrica"))).toEqual(["habitos", "agua", "refeicoes"]);
+    expect(antiga.some((c) => c.hasAttribute("data-convite"))).toBe(false);
+  });
+  it("Home nova, conta nova que ESCOLHEU Hábitos · Água · Refeições: fica a escolha dela (Refeições 0/4)", async () => {
+    contaNova();
+    gravarMissao(missao("A", { feitos: { 1: { dia: hoje, rotulo: "x" } }, lembrete: "20h" }));
+    await montar({ ...CONTA_NOVA, "core-home-resumos": ["habitos", "agua", "refeicoes"] });
+    const cs = within(pagina(1)).getAllByTestId("he-metrica");
+    expect(cs.map((c) => c.getAttribute("data-metrica"))).toEqual(["habitos", "agua", "refeicoes"]);
+    expect(cs[2].textContent?.replace(/\s+/g, "")).toBe("0/4Refeições");
+  });
+  it("Personalizar início da conta nova sem escolha: a prévia e os ligados são os da Home (Hábitos · Água · Gasto); mexer grava a escolha", async () => {
+    contaNova();
+    gravarMissao(missao("A", { feitos: { 1: { dia: hoje, rotulo: "x" } }, lembrete: "20h" }));
+    const n = criarNuvem(CONTA_NOVA);
+    render(<MemoryRouter initialEntries={["/voce/inicio"]}><n.Provedor><Routes><Route path="/voce/inicio" element={<PersonalizarInicio />} /><Route path="*" element={<Sonda />} /></Routes></n.Provedor></MemoryRouter>);
+    await respirar(30);
+    expect(within(screen.getByTestId("pi-resumos-previa")).getAllByTestId("he-metrica").map((c) => c.getAttribute("data-metrica"))).toEqual(["habitos", "agua", "gasto"]);
+    expect(screen.getByTestId("resumo-habitos").getAttribute("data-ligado")).toBe("1");
+    expect(screen.getByTestId("resumo-agua").getAttribute("data-ligado")).toBe("1");
+    expect(within(screen.getByTestId("resumo-financas")).getByLabelText("posição 3")).toBeTruthy();
+    expect(screen.getByTestId("resumo-refeicoes").getAttribute("data-ligado")).toBe("0");
+    fireEvent.click(within(screen.getByTestId("resumo-financas")).getByRole("switch"));
+    await waitFor(() => expect(n.ler<string[]>("core-home-resumos")).toEqual(["habitos", "agua"]));
+    fireEvent.click(within(screen.getByTestId("resumo-sono")).getByRole("switch"));
+    await waitFor(() => expect(n.ler<string[]>("core-home-resumos")).toEqual(["habitos", "agua", "sono"]));
   });
 });

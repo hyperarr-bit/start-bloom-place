@@ -31,6 +31,14 @@ export function pendenciasDeNovato(p: { origemNova: boolean; criadoEm?: string |
   return (p.agora ?? Date.now()) - t < DIAS_NOVATO_PENDENCIAS * 86400e3;
 }
 
+/**
+ * 1.0.20 — A ORDEM DOS TIPOS NA LISTA (a página 2 com tudo pendente: hábitos 1, treino 2, refeições 3, água 4,
+ * suplementos 5, leitura 6 e os registros 20–25 na ordem das ações rápidas — pendenciasDeHoje, NextHoursTimeline).
+ * Os 3 cards da página 1 da conta nova seguem esta ordem (fixa: o card não troca de lugar quando um item fica feito).
+ * O teste `novato-polido` confere que ela bate com a lista de verdade.
+ */
+export const ORDEM_DA_LISTA: readonly TipoPendencia[] = ["habitos", "treino", "refeicoes", "agua", "suplementos", "leitura", "humor", "gasto", "peso", "sono", "ideia", "gratidao"];
+
 /** O tipo de pendência que a dose de cada módulo da missão cria (os módulos sem pendência diária não trazem nada). */
 export const TIPOS_DA_DOSE: Readonly<Record<string, readonly TipoPendencia[]>> = {
   financas: ["gasto"], rotina: ["habitos"], saude: ["agua"], treino: ["treino"], dieta: ["refeicoes"], hiperfoco: ["ideia"], biblioteca: ["leitura"],

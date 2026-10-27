@@ -200,8 +200,9 @@ export function dadoDoWidgetE(id: IdDoWidgetE, d: LifeHubData, get: Get, hoje = 
 /** Os rótulos das 5 caras do check de humor (os mesmos do formulário do "+"). */
 const ROTULO_DO_HUMOR: Record<number, string> = { 1: "Péssimo", 2: "Ruim", 3: "Neutro", 4: "Bom", 5: "Ótimo" };
 
-/** O resumo da página 1 que já mostra o mesmo número (Hábitos, Água, Refeições≈Calorias, Sono, Treino, Leitura). */
-const NA_PAGINA_1: Partial<Record<IdDoWidgetE, string>> = { habitos: "habitos", agua: "agua", calorias: "refeicoes", sono: "sono", treino: "treino", leitura: "leitura" };
+/** O resumo da página 1 que já mostra o mesmo número (Hábitos, Água, Refeições≈Calorias, Sono, Treino, Leitura; 1.0.20:
+ *  o Humor, que vira card na página 1 da conta nova quando conta no score dela). */
+const NA_PAGINA_1: Partial<Record<IdDoWidgetE, string>> = { habitos: "habitos", agua: "agua", calorias: "refeicoes", sono: "sono", treino: "treino", leitura: "leitura", humor: "humor" };
 
 /**
  * 1.0.19 (dono 26/10: "3 dos 4 widgets da conta nova são vazios") — o PADRÃO da conta NOVA que nunca escolheu widgets:

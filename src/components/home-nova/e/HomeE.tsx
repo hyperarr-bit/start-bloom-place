@@ -8,7 +8,7 @@ import { useSequencia } from "@/components/conquistas/use-conquistas";
 import { pendenciasDeHoje } from "@/components/home/NextHoursTimeline";
 import type { ActionId } from "@/components/home/QuickActions";
 import { useTheme } from "@/hooks/use-theme";
-import { CHAVE_RESUMOS, normalizarResumos } from "@/lib/home-resumos";
+import { CHAVE_RESUMOS, resumosEscolhidos } from "@/lib/home-resumos";
 import { EscolherWidgetsE } from "./EscolherWidgetsE";
 import { PersonalizarPendenciasE } from "./PersonalizarPendenciasE";
 import { DailyNudge } from "@/components/onboarding/DailyNudge";
@@ -112,8 +112,9 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
   const widgetsE = useHomeWidgetsE(padraoDeWidgets);
   // UMA instância das preferências de módulos: a grade e a folha "Organizar" leem/gravam o mesmo estado (como o ModuleDrawer de hoje)
   const preferencias = useModulePreferences();
-  // rodada 2: os 3 cards da página 1 escolhidos em Você › Personalizar início (lib/home-resumos)
-  const resumos = normalizarResumos(get<unknown>(CHAVE_RESUMOS, null));
+  // rodada 2: os 3 cards da página 1 escolhidos em Você › Personalizar início (lib/home-resumos); 1.0.20: null = nunca
+  // escolheu (a conta nova sem escolha vê o que conta no score dela — metricasDoDia)
+  const resumos = resumosEscolhidos(get<unknown>(CHAVE_RESUMOS, null));
   // rodada 2 (dono): só o tema padrão com a Home nova — quem tinha outra cor volta pro Original (claro/escuro continuam)
   const { palette, setPalette } = useTheme();
   useEffect(() => {

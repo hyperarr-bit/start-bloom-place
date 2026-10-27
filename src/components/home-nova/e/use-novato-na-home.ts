@@ -6,7 +6,7 @@ import type { PendenciasDeHoje } from "@/components/home/NextHoursTimeline";
 import { useDoseDeHoje } from "@/components/missao-doses/LinhaDoseDeHoje";
 import { metricasDoDia } from "./PaginaSeuDia";
 import { CHAVE_ORIGEM_CONTA, contaEhNova, lerMarcadorOrigem } from "@/lib/home-nova";
-import { CHAVE_RESUMOS, normalizarResumos } from "@/lib/home-resumos";
+import { CHAVE_RESUMOS, resumosEscolhidos } from "@/lib/home-resumos";
 import { CHAVE_COPO_ML, COPO_ML_PADRAO, normalizarCopoMl } from "@/lib/saude-copo";
 import type { TipoPendencia } from "@/lib/home-pendencias";
 import { enxugarPendencias } from "@/lib/pendencias-novato";
@@ -53,6 +53,6 @@ export function usePadraoDeWidgetsDoNovato(data: LifeHubData): IdDoWidgetE[] | u
   const contaNova = useContaNova();
   if (!contaNova) return undefined;
   const copo = normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO));
-  const naPagina1 = metricasDoDia(data, copo, normalizarResumos(get<unknown>(CHAVE_RESUMOS, null))).map((m) => m.id);
+  const naPagina1 = metricasDoDia(data, copo, resumosEscolhidos(get<unknown>(CHAVE_RESUMOS, null))).map((m) => m.id);
   return widgetsDoNovato(data, get, naPagina1);
 }

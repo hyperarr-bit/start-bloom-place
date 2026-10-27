@@ -6,6 +6,7 @@ import { useSequencia } from "@/components/conquistas/use-conquistas";
 import { somarDias } from "@/lib/sequencia";
 import { MODULOS, dosesFeitas, passoPendente, type DiaDaMissao, type EstadoMissaoDoses } from "@/lib/missao-doses";
 import { entrada, MOV } from "@/lib/movimento";
+import { tomDoBotaoDaMissao } from "@/lib/home-nova";
 import "./missao-doses.css";
 
 /** "Ontem" / "Na sexta" / "No sábado" — quando a dose anterior foi feita, do jeito que se fala. */
@@ -86,7 +87,7 @@ export function ConviteDoDia({ missao, hoje, aoIr, aoDepois, aoVer }: {
         {fechaTres && (
           <p className="text-[14px] text-muted-foreground leading-snug mt-1.5" data-testid="missao-doses-convite-texto">Falta um passo pros 3 dias seguidos.</p>
         )}
-        <button type="button" className="md-botao mt-5" data-tom="magenta" data-testid="missao-doses-convite-ir" onClick={aoIr}>
+        <button type="button" className="md-botao mt-5" data-tom={tomDoBotaoDaMissao()} data-testid="missao-doses-convite-ir" onClick={aoIr}>
           Começar
         </button>
         <button type="button" className="md-link" data-testid="missao-doses-convite-depois" onClick={aoDepois}>Agora não</button>

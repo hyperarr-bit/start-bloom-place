@@ -6,6 +6,7 @@ import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
 import { MODULOS, SUB_DO_TILE, diaDaMissao, dosesFeitas, type EstadoMissaoDoses, type ModuloDaMissao } from "@/lib/missao-doses";
 import { localDayKey } from "@/lib/utils";
 import { entrada, MOV } from "@/lib/movimento";
+import { tomDoBotaoDaMissao } from "@/lib/home-nova";
 import "./missao-doses.css";
 
 const reais = (n: number): string => Math.floor(n).toLocaleString("pt-BR");
@@ -90,7 +91,7 @@ export function EscolhaDoDia2({ missao, opcoes, porDia, aoVer, aoComecar, aoAgor
             );
           })}
         </div>
-        <button type="button" className="md-botao mt-5" data-tom="magenta" data-testid="dia2-escolha-comecar"
+        <button type="button" className="md-botao mt-5" data-tom={tomDoBotaoDaMissao()} data-testid="dia2-escolha-comecar"
           onClick={() => aoComecar(marcado, opcoes.indexOf(marcado) + 1)}>
           Começar {MODULOS[marcado].nome}
         </button>

@@ -1,0 +1,300 @@
+/**
+ * NOVATO POLIDO (1.0.19, dono 26/10 — "a Home está bonita e intuitiva pra quem acabou de começar o teste?"):
+ *   1. PENDÊNCIAS enxutas na conta nova (primeiros 7 dias): só o que ela já usa + os 3 módulos da missão + o que ligou à
+ *      mão; nada de "Pesar hoje"/"refeições"/"Check de humor" de módulo que ela nunca escolheu; no máximo 4 linhas; vazia
+ *      = uma linha calma. Personalizar segue mandando (ligar → aparece). Conta antiga: nada muda.
+ *   2. WIDGETS padrão da conta nova que nunca escolheu: o que já tem conteúdo + Sono/Humor de 1 toque (nunca o que já está
+ *      na página 1); os vazios viram convite curto ("Como foi a noite?"), não "Sem …". Quem escolheu: nada muda.
+ *   3. As folhas da missão por cima da Home nova ("Dia 1 feito · Combinado" etc.): botão da E (tinta), não magenta.
+ *   4. Braço B: fechou no meio da dose 1 → a Home nova mostra "Dose de hoje" (estilo E) → toca → volta pro passo. A: igual.
+ */
+process.env.TZ = "America/Sao_Paulo";
+
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, cleanup, act, waitFor, within } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import type { ReactNode } from "react";
+
+const eventos = vi.hoisted(() => [] as Array<[string, Record<string, unknown>]>);
+vi.mock("@/lib/analytics", async (orig) => ({ ...(await orig<typeof import("@/lib/analytics")>()), trackEvent: (n: string, d: Record<string, unknown> = {}) => { eventos.push([n, d]); } }));
+vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn(), message: vi.fn(), warning: vi.fn() }), Toaster: () => null }));
+vi.mock("@/lib/native-shell", async (orig) => ({ ...(await orig<typeof import("@/lib/native-shell")>()), isNativeShell: () => false, plataformaApp: () => "web", isIOS: () => false, isAndroid: () => false }));
+const auth = vi.hoisted(() => ({ user: { id: "u1", email: "bia@exemplo.com.br", created_at: "2026-08-01T12:00:00Z", user_metadata: {} }, session: null, loading: false, isSubscribed: true, subLoaded: true, signOut: () => {} }));
+vi.mock("@/hooks/use-auth", () => ({ useAuth: () => auth, useAuthOpcional: () => auth, AuthProvider: ({ children }: { children: ReactNode }) => children }));
+vi.mock("@/lib/image-upload", async (orig) => ({ ...(await orig<typeof import("@/lib/image-upload")>()), uploadFromInput: vi.fn() }));
+vi.mock("@/lib/desfazer", () => ({ avisarApagado: vi.fn() }));
+vi.mock("@/lib/admin", () => ({ checkIsAdmin: vi.fn(async () => false) }));
+vi.mock("@/integrations/supabase/client", () => {
+  const q: Record<string, unknown> = {};
+  Object.assign(q, { select: () => q, eq: () => q, in: () => q, order: () => q, range: () => q, limit: () => q, gte: () => q, lte: () => q, neq: () => q, is: () => q, abortSignal: async () => ({ data: [], error: null }), maybeSingle: async () => ({ data: null, error: null }), single: async () => ({ data: null, error: null }), insert: async () => ({ data: null, error: null }), upsert: async () => ({ data: null, error: null }), update: () => q, delete: () => q, then: (r: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(r) });
+  return { supabase: { from: () => q, rpc: async () => ({ data: null, error: null }), functions: { invoke: vi.fn(async () => ({ data: null, error: null })) }, auth: { getUser: async () => ({ data: { user: null } }), getSession: async () => ({ data: { session: { access_token: "x", user: { id: "u1" } } } }), resetPasswordForEmail: vi.fn(async () => ({ error: null })), onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }) }, storage: { from: () => ({ upload: vi.fn(), createSignedUrl: vi.fn(async () => ({ data: null })), remove: vi.fn() }) }, channel: () => ({ on: () => ({ subscribe: () => ({}) }), subscribe: () => ({}) }), removeChannel: vi.fn() } };
+});
+
+import HomePage from "@/pages/Home";
+import { BarraVidroGlobal } from "@/components/home-nova/e/BarraVidroGlobal";
+import { CHAVE_FORCA_HOME_NOVA, CHAVE_ORIGEM_APARELHO, _zerarHomeNova, tomDoBotaoDaMissao } from "@/lib/home-nova";
+import { _zerarEntradaDaHome } from "@/components/home-nova/e/Animacoes";
+import { DIAS_NOVATO_PENDENCIAS, enxugarPendencias, pendenciasDeNovato, tiposAdotados, tiposDoNovato } from "@/lib/pendencias-novato";
+import { desligarAMao, ligarAMao, normalizarPrefs, PREFS_PADRAO } from "@/lib/home-pendencias";
+import { CATALOGO_WIDGETS_E, WIDGETS_E_PADRAO, dadoDoWidgetE, widgetsDoNovato, widgetsE } from "@/lib/home-widgets-e";
+import { CHAVE_ESTADO_MISSAO_DOSES, doseDoDia1DoBracoB, type EstadoMissaoDoses } from "@/lib/missao-doses";
+import { PlanoDeAmanhaA } from "@/components/missao-doses/PlanoDeAmanhaA";
+import { Folha as PreFolha } from "@/components/missao-doses/PreFolhaLembrete";
+import type { PendenciasDeHoje } from "@/components/home/NextHoursTimeline";
+import type { LifeHubData } from "@/hooks/use-life-hub-data";
+import { localDayKey } from "@/lib/utils";
+import { somarDias } from "@/lib/sequencia";
+import { criarNuvem, prepararJsdom, type Dados } from "./compat-comum";
+
+const hoje = localDayKey();
+const AGORA = Date.now();
+const Sonda = () => { const { pathname } = useLocation(); return <div data-testid="sonda" data-rota={pathname} />; };
+const respirar = (ms = 0) => act(() => new Promise((r) => setTimeout(r, ms)));
+const montar = async (dados: Dados) => {
+  const n = criarNuvem(dados);
+  render(<MemoryRouter initialEntries={["/home"]}><n.Provedor><Routes><Route path="/home" element={<HomePage />} /><Route path="*" element={<Sonda />} /></Routes><BarraVidroGlobal /></n.Provedor></MemoryRouter>);
+  await respirar(30);
+  await waitFor(() => expect(document.querySelector('[data-layout="e"]')).toBeTruthy());
+  return n;
+};
+const pagina = (n: 1 | 2 | 3) => screen.getByTestId(`he-pagina-${n}`);
+const linhas = () => within(pagina(2)).queryAllByTestId("hn-pendencia").map((e) => e.textContent?.trim() ?? "");
+
+/** A conta NOVA: criada há 2 h, marcador "nova" na conta. Os dados = o que o Montar Finanças + o 1º gasto gravam. */
+const CONTA_NOVA: Dados = {
+  "core-home-nova-origem": { tipo: "nova", em: new Date(AGORA - 2 * 3600e3).toISOString(), versao: "1.0.19", regra: "conta<48h e sem missão de antes" },
+  "core-user-name": "Bia",
+  "finance-incomes": [{ id: "r1", description: "Salário", value: 3200, date: hoje }],
+  "finance-fixed-expenses": [{ id: "f1", description: "Aluguel", value: 1300 }, { id: "f2", description: "Luz", value: 160 }],
+  "finance-expenses": [{ id: "g1", description: "Café", value: 12, category: "Alimentação", date: hoje }],
+  "core-dias-anotados": [hoje], "core-hub-streak": { count: 1, lastDate: hoje },
+};
+/** A missão do aparelho (Finanças → Rotina → Saúde), no braço pedido. */
+const missao = (braco: "A" | "B", extra: Partial<EstadoMissaoDoses> = {}, inicio = hoje): EstadoMissaoDoses => ({
+  v: 1, inicio, modulos: ["financas", "rotina", "saude"], boasVindas: true, braco, criadaNa: "1.0.19", feitos: {}, ...extra,
+});
+const gravarMissao = (m: EstadoMissaoDoses) => localStorage.setItem(CHAVE_ESTADO_MISSAO_DOSES, JSON.stringify(m));
+const contaNova = () => { auth.user.created_at = new Date(AGORA - 2 * 3600e3).toISOString(); };
+const contaAntiga = () => { auth.user.created_at = "2026-08-01T12:00:00Z"; };
+
+beforeAll(() => { prepararJsdom(); Element.prototype.scrollTo = (() => {}) as typeof Element.prototype.scrollTo; });
+beforeEach(() => {
+  localStorage.clear(); sessionStorage.clear(); eventos.length = 0; _zerarHomeNova(); _zerarEntradaDaHome();
+  localStorage.setItem(CHAVE_FORCA_HOME_NOVA, "on");
+  localStorage.setItem("dia1-cheio-force", "ab"); // o teste da missão (braços A/B) ligado neste "aparelho"
+  contaAntiga();
+});
+afterEach(() => { cleanup(); document.body.className = ""; });
+
+/* ================================================================== 1. pendências do novato */
+describe("1. pendências do novato — só o que ela usa + a missão (lib/pendencias-novato)", () => {
+  it("a régua: conta NOVA e criada há menos de 7 dias; antiga, sem data ou passada da semana: a lista de sempre", () => {
+    expect(DIAS_NOVATO_PENDENCIAS).toBe(7);
+    const criada = new Date(AGORA - 3 * 86400e3).toISOString();
+    expect(pendenciasDeNovato({ origemNova: true, criadoEm: criada, agora: AGORA })).toBe(true);
+    expect(pendenciasDeNovato({ origemNova: false, criadoEm: criada, agora: AGORA })).toBe(false);
+    expect(pendenciasDeNovato({ origemNova: true, criadoEm: null, agora: AGORA })).toBe(false);
+    expect(pendenciasDeNovato({ origemNova: true, criadoEm: new Date(AGORA - 8 * 86400e3).toISOString(), agora: AGORA })).toBe(false);
+  });
+  it("adotado = já tem registro/cadastro; missão traz água (não peso) da Saúde; ligado à mão entra, oculto sai", () => {
+    const get = <T,>(k: string, f: T): T => ((CONTA_NOVA as Record<string, unknown>)[k] as T) ?? f;
+    const adotados = tiposAdotados(get);
+    expect([...adotados]).toEqual(["gasto"]); // o Montar Finanças + 1 gasto: só Finanças
+    const tipos = tiposDoNovato({ adotados, modulosDaMissao: ["financas", "rotina", "saude"], prefs: PREFS_PADRAO });
+    expect([...tipos].sort()).toEqual(["agua", "gasto", "habitos"]);
+    expect(tipos.has("peso")).toBe(false);
+    expect(tipos.has("refeicoes")).toBe(false);
+    const comPeso = tiposDoNovato({ adotados, modulosDaMissao: ["financas", "rotina", "saude"], prefs: { ...PREFS_PADRAO, ligados: ["peso"], ocultos: ["agua"] } });
+    expect(comPeso.has("peso")).toBe(true);
+    expect(comPeso.has("agua")).toBe(false);
+    // registro vazio não conta como uso ({dia: 0}, [], {dia: []})
+    const vazio = <T,>(k: string, f: T): T => ({ "core-saude-water": { [hoje]: 0 }, "core-mood-log": {}, "hiperfoco-thoughts": { [hoje]: { ideias: [] } } } as Record<string, unknown>)[k] as T ?? f;
+    expect(tiposAdotados(vazio).size).toBe(0);
+  });
+  it("enxugar: tira o que não é dela, mantém o compromisso dela, espera a dose do módulo e só avisa treino se permitido", () => {
+    const p: PendenciasDeHoje = {
+      pending: [
+        { label: "15:00 · Dentista", done: false, emoji: "📅", priority: -10 },
+        { label: "Adicionar hábitos diários", done: false, emoji: "✅", priority: 1, tipo: "habitos" },
+        { label: "4 refeições para registrar", done: false, emoji: "🍽️", priority: 3, tipo: "refeicoes" },
+        { label: "Faltam 8 copos de água", done: false, emoji: "💧", priority: 4, tipo: "agua" },
+        { label: "Pesar hoje", done: false, emoji: "⚖️", priority: 22, tipo: "peso" },
+      ],
+      done: [{ label: "Gasto registrado", done: true, emoji: "💸", priority: 31, tipo: "gasto" }],
+      avisoTreino: true, avisoConta: { nome: "Aluguel", dias: 2 },
+    };
+    const permitidos = new Set(["gasto", "habitos", "agua"] as const);
+    const e = enxugarPendencias(p, permitidos);
+    expect(e.pending.map((i) => i.label)).toEqual(["15:00 · Dentista", "Adicionar hábitos diários", "Faltam 8 copos de água"]);
+    expect(e.done.map((i) => i.label)).toEqual(["Gasto registrado"]);
+    expect(e.avisoTreino).toBe(false);
+    expect(e.avisoConta).toEqual({ nome: "Aluguel", dias: 2 });
+    // a dose de hoje é Rotina: "Adicionar hábitos diários" espera a dose sair
+    expect(enxugarPendencias(p, permitidos, "rotina").pending.map((i) => i.label)).toEqual(["15:00 · Dentista", "Faltam 8 copos de água"]);
+  });
+  it("prefs: `ligados` só existe quando tem algo; ligar/desligar à mão mexem em ligados e ocultos", () => {
+    expect(normalizarPrefs({ ocultos: ["peso"] })).toEqual({ ocultos: ["peso"], peso: { frequencia: "diaria", diaSemana: 1 } });
+    expect(normalizarPrefs({ ligados: ["peso", "x", "peso"] })).toEqual({ ocultos: [], peso: { frequencia: "diaria", diaSemana: 1 }, ligados: ["peso"] });
+    const ligado = ligarAMao({ ...PREFS_PADRAO, ocultos: ["peso"] }, "peso");
+    expect(ligado).toEqual({ ...PREFS_PADRAO, ocultos: [], ligados: ["peso"] });
+    expect(desligarAMao(ligado, "peso")).toEqual({ ...PREFS_PADRAO, ocultos: ["peso"] });
+  });
+  it("Home nova, conta NOVA no dia 1 (dose 1 feita): a página 2 mostra só Rotina e Saúde da missão — sem refeições, peso, humor", async () => {
+    contaNova();
+    gravarMissao(missao("A", { feitos: { 1: { dia: hoje, rotulo: "Pode gastar R$ 54 por dia" } }, lembrete: "20h" }));
+    await montar(CONTA_NOVA);
+    const l = linhas();
+    expect(l).toEqual(["Adicionar hábitos diários", "Faltam 8 copos de água"]);
+    expect(pagina(2).textContent).not.toMatch(/refeiç|Pesar|humor|ideia|gratidão|sono/i);
+    expect(within(pagina(2)).queryByTestId("pendencia-dose-de-hoje")).toBeNull(); // dose de hoje já feita
+    expect(within(pagina(2)).getByTestId("hn-pendencias-mais").textContent).toContain("Ver todas (3)"); // + o gasto feito
+    // Personalizar: segue a lista (peso nasce desligado); ligar à mão grava `ligados` e o "Pesar hoje" entra
+    fireEvent.click(within(pagina(2)).getByTestId("hn-personalizar"));
+    const folha = await screen.findByTestId("hn-prefs-folha");
+    expect(within(folha).getByTestId("hn-prefs-explica").textContent).toMatch(/só o que você já usa/);
+    expect(within(folha).getByTestId("pref-peso").getAttribute("data-ligado")).toBe("0");
+    expect(within(folha).getByTestId("pref-agua").getAttribute("data-ligado")).toBe("1");
+    fireEvent.click(within(within(folha).getByTestId("pref-peso")).getByRole("switch"));
+    await waitFor(() => expect(linhas()).toContain("Pesar hoje"));
+  });
+  it("conta nova sem nada pendente: UMA linha calma (sem o 'Tudo feito' com ícone); até 4 linhas no máximo", async () => {
+    contaNova();
+    // explorou por conta própria (sem missão) e só usou Finanças, com o gasto de hoje feito
+    gravarMissao(missao("A", { explorou: true }));
+    await montar(CONTA_NOVA);
+    expect(linhas()).toEqual([]);
+    expect(within(pagina(2)).getByTestId("hn-pendencias-calmo").textContent).toBe("Tudo em dia por aqui.");
+    expect(pagina(2).textContent).not.toContain("Tudo feito por hoje");
+    cleanup(); _zerarEntradaDaHome();
+    // usou tudo: no máximo 4 linhas na página
+    const usouTudo: Dados = { ...CONTA_NOVA, "finance-expenses": [], "core-mood-log": { [somarDias(hoje, -1)]: { value: 4, emoji: "🙂" } }, "core-saude-measures": [{ date: somarDias(hoje, -1), weight: 60 }], "core-saude-sleep": { [somarDias(hoje, -1)]: 7 }, "core-gratitude-log": { [somarDias(hoje, -1)]: ["x"] } };
+    await montar(usouTudo);
+    expect(linhas().length).toBe(4);
+  });
+  it("conta ANTIGA: a lista de sempre (todas as pendências, 5 linhas com o aviso do treino, sem a linha calma)", async () => {
+    contaAntiga();
+    await montar({ "core-user-name": "Ana" });
+    expect(within(pagina(2)).getAllByTestId("hn-pendencia").length).toBe(4);
+    expect(within(pagina(2)).getByTestId("hn-aviso").textContent).toContain("Configurar treino da semana");
+    expect(pagina(2).textContent).toMatch(/^Pendências de hoje9/); // as 9 de sempre (peso, sono, ideia… atrás do "Ver todas")
+    expect(pagina(2).textContent).toMatch(/refeições para registrar/);
+    expect(pagina(2).textContent).toContain("Check de humor");
+    expect(within(pagina(2)).queryByTestId("hn-pendencias-calmo")).toBeNull();
+  });
+});
+
+/* ================================================================== 2. widgets da conta nova */
+describe("2. widgets padrão da conta nova (widgetsDoNovato) e os vazios em convite", () => {
+  const vida = (extra: Partial<LifeHubData> = {}): LifeHubData => ({
+    habits: [], waterGlasses: 0, waterGoal: 8, mealsLogged: 0, mealsTotal: 4, caloriesConsumed: 0, caloriesGoal: 2000, sleepHours: null,
+    currentBook: null, readingProgress: 0, todayWorkoutGroup: null, workoutDone: false, workoutStatus: "vazio", nextBillName: null, nextBillDaysUntil: null,
+    nextBillDate: null, dayScore: 7, registrosHoje: { humor: false, gasto: true, peso: false, sono: false, gratidao: false, ideia: false }, ...extra,
+  }) as unknown as LifeHubData;
+  const getDe = (d: Dados) => <T,>(k: string, f: T): T => ((d as Record<string, unknown>)[k] as T) ?? f;
+  it("depois do Montar Finanças: Orçamento + a conta sem dia + Sono e Humor de 1 toque (nada da página 1)", () => {
+    expect(widgetsDoNovato(vida(), getDe(CONTA_NOVA), ["habitos", "agua", "refeicoes"], hoje)).toEqual(["orcamento", "proxima-conta", "sono", "humor"]);
+  });
+  it("quem explorou sem montar nada: só os de 1 toque; com hábito e livro, eles entram (o que já tem conteúdo vem antes)", () => {
+    expect(widgetsDoNovato(vida(), getDe({}), ["habitos", "agua", "refeicoes"], hoje)).toEqual(["sono", "humor"]);
+    expect(widgetsDoNovato(vida({ habits: [{ name: "a", done: false }], currentBook: "Dom Casmurro", readingProgress: 10 }), getDe({}), ["agua", "refeicoes", "sono"], hoje)).toEqual(["habitos", "leitura", "humor"]);
+  });
+  it("conta antiga/sem padrão = o de sempre; quem escolheu (core-home-widgets-e) não muda", () => {
+    expect(widgetsE(undefined, undefined)).toEqual(WIDGETS_E_PADRAO);
+    expect(widgetsE(undefined, undefined, ["sono", "humor"])).toEqual(["sono", "humor"]);
+    expect(widgetsE(["agua", "treino"], undefined, ["sono", "humor"])).toEqual(["agua", "treino"]);
+    expect(CATALOGO_WIDGETS_E.some((w) => w.id === "humor")).toBe(true);
+  });
+  it("os vazios viram convite curto (nada de 'Sem …'/'Nenhum …'); Sono, Humor e Calorias abrem o formulário em 1 toque", () => {
+    const d = vida();
+    const get = getDe({});
+    for (const w of CATALOGO_WIDGETS_E) {
+      const dado = dadoDoWidgetE(w.id, d, get, hoje);
+      if (dado.vazio) expect(dado.vazio.texto, w.id).not.toMatch(/^(Sem|Nenhum|Nenhuma|Nada)\b/);
+    }
+    expect(dadoDoWidgetE("sono", d, get, hoje).vazio).toEqual({ texto: "Como foi a noite?", cta: "Registrar sono", acao: "sleep" });
+    expect(dadoDoWidgetE("humor", d, get, hoje).vazio).toEqual({ texto: "Como você está hoje?", cta: "Registrar humor", acao: "mood" });
+    expect(dadoDoWidgetE("calorias", d, get, hoje).vazio?.acao).toBe("meal");
+    expect(dadoDoWidgetE("proxima-conta", d, getDe(CONTA_NOVA), hoje).vazio).toEqual({ texto: "Que dia vencem Aluguel e mais 1?", cta: "Pôr o dia" });
+    // humor feito hoje: a carinha e o rótulo
+    expect(dadoDoWidgetE("humor", d, getDe({ "core-mood-log": { [hoje]: { value: 4, emoji: "🙂" } } }), hoje)).toMatchObject({ numero: "🙂", detalhe: "Bom", vazio: null });
+  });
+  it("Home nova, conta NOVA: a página 3 abre no padrão dela; tocar no Sono vazio abre o formulário do sono (não o módulo)", async () => {
+    contaNova();
+    gravarMissao(missao("A", { feitos: { 1: { dia: hoje, rotulo: "x" } }, lembrete: "20h" }));
+    await montar(CONTA_NOVA);
+    const ids = Array.from(pagina(3).querySelectorAll('button[data-testid^="he-widget-"]')).map((e) => e.getAttribute("data-testid"));
+    expect(ids).toEqual(["he-widget-orcamento", "he-widget-proxima-conta", "he-widget-sono", "he-widget-humor"]);
+    fireEvent.click(within(pagina(3)).getByTestId("he-widget-sono"));
+    await waitFor(() => expect(screen.getByTestId("hn-folha-acao").getAttribute("data-acao")).toBe("sleep"));
+    expect(screen.queryByTestId("sonda")).toBeNull(); // continua na Home
+  });
+  it("Home nova, conta ANTIGA sem escolha: o padrão de sempre (próxima conta, orçamento, treino, sono)", async () => {
+    contaAntiga();
+    await montar({ "core-user-name": "Ana" });
+    const ids = Array.from(pagina(3).querySelectorAll('button[data-testid^="he-widget-"]')).map((e) => e.getAttribute("data-testid")?.replace("he-widget-", ""));
+    expect(ids).toEqual(WIDGETS_E_PADRAO);
+  });
+});
+
+/* ================================================================== 3. botão da E nas folhas da missão */
+describe("3. as folhas da missão por cima da Home nova: botão da E (tinta), não magenta", () => {
+  const m = missao("A", { feitos: { 1: { dia: hoje, rotulo: "x" } } });
+  const plano = () => { const n = criarNuvem({}); return render(<MemoryRouter><n.Provedor><PlanoDeAmanhaA missao={m} aoCombinar={() => {}} aoSemLembrete={() => {}} /></n.Provedor></MemoryRouter>); };
+  it("Home nova ligada → 'e'; desligada → 'magenta' (a Home antiga fica como está)", () => {
+    expect(tomDoBotaoDaMissao()).toBe("e");
+    plano();
+    expect(screen.getByTestId("plano-a-combinado").getAttribute("data-tom")).toBe("e");
+    render(<PreFolha hora="20h" conteudo={{ title: "t", body: "b", modulo: null } as never} aoSim={() => {}} aoAgoraNao={() => {}} />);
+    expect(screen.getByTestId("pre-folha-sim").getAttribute("data-tom")).toBe("e");
+    cleanup();
+    localStorage.setItem(CHAVE_FORCA_HOME_NOVA, "off");
+    _zerarHomeNova();
+    expect(tomDoBotaoDaMissao()).toBe("magenta");
+    plano();
+    expect(screen.getByTestId("plano-a-combinado").getAttribute("data-tom")).toBe("magenta");
+  });
+});
+
+/* ================================================================== 4. braço B: a dose que ficou no meio */
+describe("4. braço B: fechou no meio da dose 1 → 'Dose de hoje' na Home nova → volta pro passo", () => {
+  it("a regra: B, dia 1, dose por fazer, sem o dia fechado; nunca no dia 2, com o plano decidido, explorando ou A", () => {
+    expect(doseDoDia1DoBracoB(missao("B"), hoje)).toBe(true);
+    expect(doseDoDia1DoBracoB(missao("B", { feitos: { 1: { dia: hoje, rotulo: "x" } } }), hoje)).toBe(true); // dose 2 por fazer
+    expect(doseDoDia1DoBracoB(missao("B", {}, somarDias(hoje, -1)), hoje)).toBe(false); // dia 2
+    expect(doseDoDia1DoBracoB(missao("B", { planoAmanha: { quando: "noite" } as never }), hoje)).toBe(false);
+    expect(doseDoDia1DoBracoB(missao("B", { planoAmanhaPulado: hoje }), hoje)).toBe(false);
+    expect(doseDoDia1DoBracoB(missao("B", { agoraNao: { dia: hoje, indice: 2 } }), hoje)).toBe(false); // a folha do plano está devendo (na tela)
+    expect(doseDoDia1DoBracoB(missao("B", { explorou: true }), hoje)).toBe(false);
+    expect(doseDoDia1DoBracoB(missao("B", { boasVindas: false }), hoje)).toBe(false);
+    expect(doseDoDia1DoBracoB(missao("A"), hoje)).toBe(false);
+    const tres = { 1: { dia: hoje, rotulo: "a" }, 2: { dia: hoje, rotulo: "b" }, 3: { dia: hoje, rotulo: "c" } };
+    expect(doseDoDia1DoBracoB(missao("B", { feitos: tres }), hoje)).toBe(false);
+  });
+  it("reabrir com a dose 1 no meio: a linha aparece (estilo E, 'Dose 1 de 3') → toca → vai pro módulo da dose (o passo retoma lá)", async () => {
+    contaNova();
+    gravarMissao(missao("B", { gastoGuiado: undefined }));
+    await montar({ ...CONTA_NOVA, "finance-expenses": [] });
+    const linha = within(pagina(2)).getByTestId("pendencia-dose-de-hoje");
+    expect(linha.getAttribute("data-braco")).toBe("B");
+    expect(linha.textContent).toContain("Dose de hoje · Finanças");
+    expect(linha.textContent).toContain("Dose 1 de 3");
+    // não duplica com a pendência do mesmo módulo (o gasto espera a dose)
+    expect(linhas().some((t) => /gasto/i.test(t))).toBe(false);
+    fireEvent.click(linha);
+    await waitFor(() => expect(screen.getByTestId("sonda").getAttribute("data-rota")).toBe("/financas"));
+    expect(eventos).toContainEqual(["home_pendencia", { tipo: "dose_de_hoje", destino: "/financas", braco_linha: "B" }]);
+  });
+  it("B com o dia 1 fechado (plano combinado) ou no dia 2: sem linha; A no dia 2: a linha de sempre ('Dia 2 de 3')", async () => {
+    contaNova();
+    gravarMissao(missao("B", { feitos: { 1: { dia: hoje, rotulo: "x" } }, planoAmanha: { quando: "noite" } as never }));
+    await montar(CONTA_NOVA);
+    expect(within(pagina(2)).queryByTestId("pendencia-dose-de-hoje")).toBeNull();
+    cleanup(); _zerarEntradaDaHome();
+    gravarMissao(missao("A", { feitos: { 1: { dia: somarDias(hoje, -1), rotulo: "x" } }, lembrete: "20h", convites: { [hoje]: "depois" } }, somarDias(hoje, -1)));
+    await montar(CONTA_NOVA);
+    const linha = within(pagina(2)).getByTestId("pendencia-dose-de-hoje");
+    expect(linha.getAttribute("data-braco")).toBe("A");
+    expect(linha.textContent).toContain("Dose de hoje · Rotina");
+    expect(linha.textContent).toContain("Dia 2 de 3");
+  });
+});

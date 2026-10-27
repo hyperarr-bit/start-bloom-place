@@ -10,6 +10,7 @@ import { EVENTO_DIA2, conteudoDoLembrete, diaDoUso, horaDoLembrete, lerDia2, reg
 import { lerMissao } from "@/lib/missao-doses";
 import { localDayKey } from "@/lib/utils";
 import { somarDias } from "@/lib/sequencia";
+import { tomDoBotaoDaMissao } from "@/lib/home-nova";
 import "./missao-doses.css";
 
 /**
@@ -111,7 +112,7 @@ export function Folha({ hora, conteudo, aoSim, aoAgoraNao }: { hora: string; con
           <span className="block text-[14.5px] font-extrabold leading-snug mt-0.5">{conteudo.title}</span>
           <span className="block text-[12.5px] opacity-75 leading-snug mt-0.5">{conteudo.body}</span>
         </div>
-        <button type="button" className="md-botao mt-4" data-tom="magenta" data-testid="pre-folha-sim" onClick={aoSim}>Sim, me lembra às {hora}</button>
+        <button type="button" className="md-botao mt-4" data-tom={tomDoBotaoDaMissao()} data-testid="pre-folha-sim" onClick={aoSim}>Sim, me lembra às {hora}</button>
         <button type="button" className="md-link mt-1" data-testid="pre-folha-nao" onClick={aoAgoraNao}>Agora não</button>
       </motion.div>
     </motion.div>

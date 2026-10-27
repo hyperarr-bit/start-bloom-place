@@ -1,4 +1,4 @@
-import { BookOpen, CalendarCheck, CalendarClock, Droplets, Dumbbell, Moon, PiggyBank, Receipt, Utensils, type LucideIcon } from "lucide-react";
+import { BookOpen, CalendarCheck, CalendarClock, Droplets, Dumbbell, Moon, PiggyBank, Receipt, Smile, Utensils, type LucideIcon } from "lucide-react";
 import type { LifeHubData } from "@/hooks/use-life-hub-data";
 import type { ActionId } from "@/components/home/QuickActions";
 import { TOM_DO_MODULO, TOM_DO_TIPO, type Tom } from "@/components/home-nova/e/paleta";
@@ -16,7 +16,7 @@ import { localDayKey } from "@/lib/utils";
  * (`core-home-widgets-v2`) é migrado na 1ª leitura (os que têm par). R$ nunca aparece aqui (regra da casa: valor só
  * dentro de Finanças) — o orçamento vem em % do que sobra.
  */
-export type IdDoWidgetE = "proxima-conta" | "orcamento" | "calorias" | "treino" | "sono" | "leitura" | "habitos" | "agua" | "cuidados";
+export type IdDoWidgetE = "proxima-conta" | "orcamento" | "calorias" | "treino" | "sono" | "leitura" | "habitos" | "agua" | "cuidados" | "humor";
 
 export const CHAVE_WIDGETS_E = "core-home-widgets-e";
 /** 26/10 (dono): no máximo 4 — 2×2, a mesma altura da página 1; 5 ou 6 viravam 3 linhas e esticavam o carrossel. */
@@ -34,6 +34,8 @@ export const CATALOGO_WIDGETS_E: ReadonlyArray<DefWidgetE> = [
   { id: "habitos", rotulo: "Hábitos", descricao: "Os hábitos do dia feitos", Icone: CalendarCheck, tom: TOM_DO_TIPO.habitos, rota: "/rotina" },
   { id: "agua", rotulo: "Água", descricao: "Os copos da meta de hoje", Icone: Droplets, tom: TOM_DO_TIPO.agua, rota: "/saude" },
   { id: "cuidados", rotulo: "Próximo cuidado", descricao: "Unha, sobrancelha, depilação: o que vence primeiro", Icone: CalendarClock, tom: TOM_DO_MODULO.beleza, rota: "/beleza?aba=cuidados" },
+  // 1.0.19 (dono 26/10: "Água/Humor de 1 toque" no padrão da conta nova): o humor de hoje, registrado no "+" em 1 toque
+  { id: "humor", rotulo: "Humor", descricao: "Como você está hoje, em 1 toque", Icone: Smile, tom: TOM_DO_TIPO.humor, rota: "/desenvolvimento" },
 ];
 const VALIDOS = new Set<string>(CATALOGO_WIDGETS_E.map((w) => w.id));
 export const defDoWidgetE = (id: IdDoWidgetE): DefWidgetE => CATALOGO_WIDGETS_E.find((w) => w.id === id)!;
@@ -51,8 +53,9 @@ export function normalizarWidgetsE(v: unknown): IdDoWidgetE[] | null {
   return lista.filter((x, i) => lista.indexOf(x) === i).slice(0, MAX_WIDGETS_E);
 }
 
-/** A lista a mostrar: a gravada; senão a migrada dos widgets antigos (os que têm par); senão a padrão. */
-export function widgetsE(gravado: unknown, antigos: unknown): IdDoWidgetE[] {
+/** A lista a mostrar: a gravada; senão a migrada dos widgets antigos (os que têm par); senão a padrão (`padrao`: a da
+ *  conta nova, `widgetsDoNovato`; sem ela, WIDGETS_E_PADRAO como sempre). */
+export function widgetsE(gravado: unknown, antigos: unknown, padrao: IdDoWidgetE[] = WIDGETS_E_PADRAO): IdDoWidgetE[] {
   const lista = normalizarWidgetsE(gravado);
   if (lista) return lista;
   if (Array.isArray(antigos) && antigos.length > 0) {
@@ -60,7 +63,7 @@ export function widgetsE(gravado: unknown, antigos: unknown): IdDoWidgetE[] {
     const unicos = migrados.filter((x, i) => migrados.indexOf(x) === i).slice(0, MAX_WIDGETS_E);
     if (unicos.length > 0) return unicos;
   }
-  return WIDGETS_E_PADRAO;
+  return padrao;
 }
 
 /** Liga/desliga (até 4; a ordem é a da escolha). */
@@ -86,8 +89,9 @@ export interface DadoDoWidgetE {
   fracao: { valor: number; max: number } | null;
   /** feito/completo: ✓ no anel */
   completo?: boolean;
-  /** sem dado: o estado vazio útil — texto curto + a ação que cadastra */
-  vazio: { texto: string; cta: string } | null;
+  /** sem dado: o estado vazio útil — um convite curto + a ação que cadastra (`acao`: abre o formulário do "+" em 1 toque
+   *  em vez de ir pro módulo) */
+  vazio: { texto: string; cta: string; acao?: ActionId } | null;
   rota: string;
   /** um toque que abre o formulário do "+" em vez do módulo */
   action?: ActionId;
@@ -136,39 +140,39 @@ export function dadoDoWidgetE(id: IdDoWidgetE, d: LifeHubData, get: Get, hoje = 
       // "Nenhuma conta cadastrada" logo depois — honesto: a conta existe, falta a data
       const semData = contasSemVencimento(get);
       if (semData.length)
-        return { ...base, numero: "—", fracao: null, vazio: { texto: semData.length === 1 ? `${semData[0]} · sem data` : `${semData[0]} e mais ${semData.length - 1} · sem data`, cta: "Pôr o dia" } };
-      return { ...base, numero: "—", fracao: null, vazio: { texto: "Nenhuma conta cadastrada", cta: "Cadastrar conta" } };
+        return { ...base, numero: "—", fracao: null, vazio: { texto: semData.length === 1 ? `Que dia vence ${semData[0]}?` : `Que dia vencem ${semData[0]} e mais ${semData.length - 1}?`, cta: "Pôr o dia" } };
+      return { ...base, numero: "—", fracao: null, vazio: { texto: "Te aviso antes de vencer", cta: "Cadastrar conta" } };
     }
     case "orcamento": {
       const o = orcamentoRestante(get);
       return o
         ? { ...base, numero: String(o.pct), unidade: "%", detalhe: o.pct === 0 ? "do mês já foi" : o.dias > 1 ? `sobra pra ${o.dias} dias` : "sobra pra hoje", fracao: { valor: o.pct, max: 100 }, vazio: null }
-        : { ...base, numero: "—", fracao: null, vazio: { texto: "Sem renda cadastrada", cta: "Cadastrar renda" } };
+        : { ...base, numero: "—", fracao: null, vazio: { texto: "Veja quanto sobra no mês", cta: "Cadastrar renda" } };
     }
     case "calorias":
       return d.caloriesGoal > 0 && (d.mealsLogged > 0 || d.caloriesConsumed > 0)
         ? { ...base, numero: String(d.caloriesConsumed), unidade: `/${d.caloriesGoal}`, detalhe: "kcal hoje", fracao: { valor: d.caloriesConsumed, max: d.caloriesGoal }, vazio: null }
-        : { ...base, numero: "0", unidade: `/${d.caloriesGoal}`, fracao: { valor: 0, max: d.caloriesGoal }, vazio: { texto: "Nada registrado hoje", cta: "Registrar refeição" } };
+        : { ...base, numero: "0", unidade: `/${d.caloriesGoal}`, fracao: { valor: 0, max: d.caloriesGoal }, vazio: { texto: "O que você comeu hoje?", cta: "Registrar refeição", acao: "meal" } };
     case "treino":
       if (d.todayWorkoutGroup) return { ...base, numero: d.workoutDone ? "Feito" : "Hoje", detalhe: d.todayWorkoutGroup, fracao: { valor: d.workoutDone ? 1 : 0, max: 1 }, completo: d.workoutDone, vazio: null, action: d.workoutDone ? undefined : "workout" };
       if (d.workoutStatus === "descanso") return { ...base, numero: "Descanso", detalhe: "hoje o corpo recupera", fracao: null, vazio: null };
-      return { ...base, numero: "—", fracao: null, vazio: { texto: "Sem treino montado", cta: "Montar treino" } };
+      return { ...base, numero: "—", fracao: null, vazio: { texto: "Um treino pronto em 20 s", cta: "Montar treino" } };
     case "sono": {
       const h = d.sleepHours;
       return h
         ? { ...base, numero: String(h).replace(".", ","), unidade: "h", detalhe: h >= 7 ? "noite boa" : h >= 5 ? "noite regular" : "pouco sono", fracao: { valor: Math.min(8, h), max: 8 }, vazio: null, action: "sleep" }
-        : { ...base, numero: "—", fracao: null, vazio: { texto: "Sem registro de ontem", cta: "Registrar sono" }, action: "sleep" };
+        : { ...base, numero: "—", fracao: null, vazio: { texto: "Como foi a noite?", cta: "Registrar sono", acao: "sleep" }, action: "sleep" };
     }
     case "leitura":
       return d.currentBook
         ? { ...base, numero: String(d.readingProgress), unidade: "%", detalhe: d.currentBook, fracao: { valor: d.readingProgress, max: 100 }, vazio: null }
-        : { ...base, numero: "—", fracao: null, vazio: { texto: "Nenhum livro em andamento", cta: "Começar um livro" } };
+        : { ...base, numero: "—", fracao: null, vazio: { texto: "O que você está lendo?", cta: "Começar um livro" } };
     case "habitos": {
       const t = d.habits.length;
       const f = d.habits.filter((x) => x.done).length;
       return t > 0
         ? { ...base, numero: String(f), unidade: `/${t}`, detalhe: f >= t ? "todos feitos" : `${t - f} ${t - f === 1 ? "falta" : "faltam"}`, fracao: { valor: f, max: t }, completo: f >= t, vazio: null }
-        : { ...base, numero: "—", fracao: null, vazio: { texto: "Nenhum hábito na semana", cta: "Criar hábito" } };
+        : { ...base, numero: "—", fracao: null, vazio: { texto: "Comece com 1 hábito", cta: "Criar hábito" } };
     }
     case "agua": {
       const meta = Math.max(1, d.waterGoal);
@@ -178,9 +182,43 @@ export function dadoDoWidgetE(id: IdDoWidgetE, d: LifeHubData, get: Get, hoje = 
     case "cuidados": {
       const c = ordenarCuidados(cuidadosValidos(get<unknown>(CHAVE_CUIDADOS, [])), hoje)[0];
       const falta = c ? faltaDoCuidado(c, hoje) : undefined;
-      if (!c || falta === undefined) return { ...base, numero: "—", fracao: null, vazio: { texto: "Nenhum cuidado cadastrado", cta: "Cadastrar cuidado" } };
+      if (!c || falta === undefined) return { ...base, numero: "—", fracao: null, vazio: { texto: "Lembre do próximo cuidado", cta: "Cadastrar cuidado" } };
       const n = Math.max(0, falta);
       return { ...base, numero: String(n), unidade: n === 1 ? "dia" : "dias", detalhe: `${c.nome} · ${falta < 0 ? "venceu" : n === 0 ? "é hoje" : n === 1 ? "amanhã" : `em ${n} dias`}`, fracao: null, vazio: null };
     }
+    case "humor": {
+      // o check de humor de hoje (a ação do "+" grava em core-mood-log: { value, emoji }); tocar abre o formulário
+      const r = (get<Record<string, { value?: unknown; emoji?: unknown }>>("core-mood-log", {}) ?? {})[hoje];
+      const emoji = typeof r?.emoji === "string" && r.emoji ? r.emoji : null;
+      if (emoji) return { ...base, numero: emoji, detalhe: ROTULO_DO_HUMOR[Number(r?.value)] ?? "hoje", fracao: null, vazio: null, action: "mood" };
+      if (d.registrosHoje?.humor) return { ...base, numero: "✓", detalhe: "registrado hoje", fracao: null, vazio: null, action: "mood" };
+      return { ...base, numero: "—", fracao: null, vazio: { texto: "Como você está hoje?", cta: "Registrar humor", acao: "mood" }, action: "mood" };
+    }
   }
+}
+
+/** Os rótulos das 5 caras do check de humor (os mesmos do formulário do "+"). */
+const ROTULO_DO_HUMOR: Record<number, string> = { 1: "Péssimo", 2: "Ruim", 3: "Neutro", 4: "Bom", 5: "Ótimo" };
+
+/** O resumo da página 1 que já mostra o mesmo número (Hábitos, Água, Refeições≈Calorias, Sono, Treino, Leitura). */
+const NA_PAGINA_1: Partial<Record<IdDoWidgetE, string>> = { habitos: "habitos", agua: "agua", calorias: "refeicoes", sono: "sono", treino: "treino", leitura: "leitura" };
+
+/**
+ * 1.0.19 (dono 26/10: "3 dos 4 widgets da conta nova são vazios") — o PADRÃO da conta NOVA que nunca escolheu widgets:
+ * primeiro o que JÁ TEM conteúdo (o que ela montou: o orçamento depois do Montar Finanças, a conta que vence, os
+ * hábitos, o treino, o livro, o cuidado, a refeição/o sono/o humor de hoje); depois, pra completar, o que se faz em
+ * 1 TOQUE no dia 1 (Sono e Humor — abrem o formulário do "+"). Nunca repete um resumo que já está na página 1
+ * (`naPagina1`: os ids de metricasDoDia). Muda sozinho conforme ela usa, até ela escolher (core-home-widgets-e manda).
+ */
+export function widgetsDoNovato(d: LifeHubData, get: Get, naPagina1: ReadonlyArray<string> = [], hoje = localDayKey()): IdDoWidgetE[] {
+  const out: IdDoWidgetE[] = [];
+  const pagina1 = new Set(naPagina1);
+  const por = (id: IdDoWidgetE) => { if (out.length < MAX_WIDGETS_E && !out.includes(id) && !(NA_PAGINA_1[id] && pagina1.has(NA_PAGINA_1[id]!))) out.push(id); };
+  const temConteudo = (id: IdDoWidgetE) => dadoDoWidgetE(id, d, get, hoje).vazio === null;
+  for (const id of ["orcamento", "proxima-conta", "habitos", "treino", "leitura", "cuidados", "calorias", "sono", "humor"] as const) if (temConteudo(id)) por(id);
+  // a conta que o Montar Finanças cadastrou sem dia: "Que dia vence Aluguel?" — é o passo seguinte do que ela acabou de fazer
+  if (contasSemVencimento(get).length > 0) por("proxima-conta");
+  por("sono");
+  por("humor");
+  return out;
 }

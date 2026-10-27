@@ -11,6 +11,7 @@ import { EscolhaDeHora } from "./EscolhaDeHora";
 import "./missao-doses.css";
 import { lembretesSoNoApp } from "@/lib/missao-web";
 import { BaixarAppPopup } from "@/missao/BaixarAppPopup";
+import { tomDoBotaoDaMissao } from "@/lib/home-nova";
 
 /**
  * "PLANO DE AMANHÃ" DO BRAÇO A (1.0.16, desenho 8 seção 4.2 passo 6) — a ÚLTIMA coisa do dia 1:
@@ -49,6 +50,8 @@ export function PlanoDeAmanhaA({ missao, aoCombinar, aoSemLembrete }: {
 }) {
   const reduzir = !!useReducedMotion();
   const [hora, setHora] = useState<Lembrete>(() => horaMaisPerto());
+  // 1.0.19: com a Home nova por baixo, o "Combinado" é o botão da E (tinta), não o magenta
+  const [tom] = useState(() => tomDoBotaoDaMissao());
   const proxima = passoPendente(missao);
   // 18/10 (funil da missão na WEB): "que horas te lembro?" vira o pop-up "Baixe o app pra receber os lembretes" —
   // o navegador não manda notificação. "Agora não" = "Sem lembrete" (a missão segue)
@@ -94,7 +97,7 @@ export function PlanoDeAmanhaA({ missao, aoCombinar, aoSemLembrete }: {
         <div className="mt-4">
           <EscolhaDeHora valor={hora} aoMudar={(h) => setHora(h)} comSem={false} testid="plano-a-hora" />
         </div>
-        <button type="button" className="md-botao mt-5" data-tom="magenta" data-testid="plano-a-combinado" onClick={() => aoCombinar(hora)}>Combinado</button>
+        <button type="button" className="md-botao mt-5" data-tom={tom} data-testid="plano-a-combinado" onClick={() => aoCombinar(hora)}>Combinado</button>
         <button type="button" className="md-link" data-testid="plano-a-sem" onClick={aoSemLembrete}>Sem lembrete</button>
       </motion.div>
     </motion.div>,

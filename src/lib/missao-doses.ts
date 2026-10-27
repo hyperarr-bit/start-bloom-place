@@ -575,6 +575,20 @@ export function doseDeHojeDevida(m: EstadoMissaoDoses | null, hoje: string = loc
   return !!p && m.pulados?.[p.n] !== hoje;
 }
 
+/**
+ * 1.0.19 (varredura novato-2, bug 2): BRAÇO B — a dose que ficou no meio do DIA 1 (fechou o app no meio da dose, saiu do
+ * módulo): a Home nova mostra a mesma linha "Dose de hoje" do braço A, que leva de volta ao passo pendente. Só no dia 1
+ * do calendário, com dose por fazer, depois das boas-vindas, sem "Explorar", sem o dia fechado (plano de amanhã
+ * combinado ou pulado hoje), sem a folha do plano devendo (ela está na tela) e sem pulo hoje. A Home antiga não usa.
+ */
+export function doseDoDia1DoBracoB(m: EstadoMissaoDoses | null, hoje: string = localDayKey()): boolean {
+  if (!m || !ehBracoB(m) || !m.boasVindas || m.explorou) return false;
+  if (missaoCumprida(m) || diaDaMissao(m, hoje) !== 1) return false;
+  if (m.planoAmanha || m.planoAmanhaPulado === hoje || precisaPlanoAmanha(m, hoje)) return false;
+  const p = passoPendente(m);
+  return !!p && m.pulados?.[p.n] !== hoje;
+}
+
 /** Braço A: a dose pode abrir hoje no módulo? (liberada e dentro dos 7 dias; nos outros braços, sempre) */
 export function doseAbreHoje(m: EstadoMissaoDoses, hoje: string = localDayKey()): boolean {
   if (!ehUmPorDia(m)) return true;

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { localDayKey } from "@/lib/utils";
-import { EVENTO_MISSAO_DOSES, MODULOS, diaDaMissao, dias23NaMissao, doseDeHojeDevida, eventoDaMissao, lerMissao, passoPendente } from "@/lib/missao-doses";
+import { EVENTO_MISSAO_DOSES, MODULOS, diaDaMissao, dias23NaMissao, doseDeHojeDevida, doseDoDia1DoBracoB, eventoDaMissao, lerMissao, passoPendente } from "@/lib/missao-doses";
 
 /** 1.0.18 (dias23): tocar "Dia 2 · escolhe o seu" nas Pendências reabre a folha da escolha (a orquestra escuta). */
 export const EVENTO_ABRIR_ESCOLHA_DIA2 = "missao-doses:abrir-escolha-dia2";
@@ -15,7 +15,7 @@ export const EVENTO_ABRIR_ESCOLHA_DIA2 = "missao-doses:abrir-escolha-dia2";
  * da dose (o passo entra lá). Nada com a missão do braço B, com "Explorar por conta própria", depois do 7º
  * dia, pulada hoje ou com a dose feita.
  */
-export function useDoseDeHoje() {
+export function useDoseDeHoje(opcoes: { bracoB?: boolean } = {}) {
   const [m, setM] = useState(() => lerMissao());
   useEffect(() => {
     const reler = () => setM(lerMissao());
@@ -23,6 +23,11 @@ export function useDoseDeHoje() {
     return () => window.removeEventListener(EVENTO_MISSAO_DOSES, reler);
   }, []);
   const hoje = localDayKey();
+  // 1.0.19 (varredura novato-2, bug 2): só a Home nova pede o braço B — a dose que ficou no meio do dia 1
+  if (opcoes.bracoB && m && doseDoDia1DoBracoB(m, hoje)) {
+    const pb = passoPendente(m);
+    if (pb) return { n: pb.n, modulo: pb.modulo, diaCal: 1, braco: "B" as const };
+  }
   if (!m || !doseDeHojeDevida(m, hoje)) return null;
   const p = passoPendente(m);
   if (!p) return null;
@@ -32,7 +37,24 @@ export function useDoseDeHoje() {
   return { n: p.n, modulo: p.modulo, diaCal, ...(escolher ? { escolher: true as const } : {}) };
 }
 
-export function LinhaDoseDeHoje({ dose }: { dose: NonNullable<ReturnType<typeof useDoseDeHoje>> }) {
+export type DoseDeHoje = NonNullable<ReturnType<typeof useDoseDeHoje>>;
+
+/** O toque na linha (as duas versões, a de hoje e a da Home nova): a escolha do dia 2 ou o módulo da dose (o passo entra lá). */
+export function tocarNaDose(dose: DoseDeHoje, navigate: (rota: string) => void): void {
+  const cfg = MODULOS[dose.modulo];
+  if ("escolher" in dose && dose.escolher) {
+    trackEvent("home_pendencia", { tipo: "dose_de_hoje", destino: "escolha_dia2" });
+    trackEvent("missao_pendencia_dose", eventoDaMissao({ indice: dose.n, modulo: null, escolha: true }));
+    try { window.dispatchEvent(new CustomEvent(EVENTO_ABRIR_ESCOLHA_DIA2)); } catch { /* noop */ }
+    return;
+  }
+  const b = "braco" in dose && dose.braco === "B" ? { braco_linha: "B" } : {};
+  trackEvent("home_pendencia", { tipo: "dose_de_hoje", destino: cfg.rota, ...b });
+  trackEvent("missao_pendencia_dose", eventoDaMissao({ indice: dose.n, modulo: dose.modulo, ...b }));
+  navigate(cfg.rota);
+}
+
+export function LinhaDoseDeHoje({ dose }: { dose: DoseDeHoje }) {
   const navigate = useNavigate();
   const cfg = MODULOS[dose.modulo];
   return (

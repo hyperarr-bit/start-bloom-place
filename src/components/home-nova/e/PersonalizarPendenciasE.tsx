@@ -2,7 +2,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, FaixaDoRelogioSobFolha, propsDaFolha } from "./folha-arrasto";
 import { X } from "lucide-react";
 import {
-  CATALOGO_PENDENCIAS, DIAS_CURTOS, comPeso, estaOculto, ocultar, religar,
+  CATALOGO_PENDENCIAS, DIAS_CURTOS, comPeso, desligarAMao, estaOculto, ligarAMao, ocultar, religar,
   type PendenciasPrefs, type TipoPendencia,
 } from "@/lib/home-pendencias";
 import { ICONE_DO_TIPO, TRACO, corDoTipo, tintaDoTipo } from "./paleta";
@@ -47,15 +47,20 @@ interface Props {
   porModulo?: TipoPendencia[];
   /** sem título próprio (quando mora dentro de outra página) */
   embutida?: boolean;
+  /** 1.0.19 (conta nova nos primeiros dias, lib/pendencias-novato): os tipos que a lista MOSTRA hoje — o interruptor
+   *  segue ela (o que ela não usa nasce desligado) e ligar/desligar grava `ligados`/`ocultos`. Ausente = a regra de sempre. */
+  visiveis?: Set<TipoPendencia> | null;
 }
 
-export function ListaDePendencias({ prefs, onChange, porModulo = [] }: Pick<Props, "prefs" | "onChange" | "porModulo">) {
-  const alternar = (tipo: TipoPendencia, mostrar: boolean) => onChange(mostrar ? religar(prefs, tipo) : ocultar(prefs, tipo));
+export function ListaDePendencias({ prefs, onChange, porModulo = [], visiveis = null }: Pick<Props, "prefs" | "onChange" | "porModulo" | "visiveis">) {
+  const alternar = (tipo: TipoPendencia, mostrar: boolean) => onChange(
+    visiveis ? (mostrar ? ligarAMao(prefs, tipo) : desligarAMao(prefs, tipo)) : (mostrar ? religar(prefs, tipo) : ocultar(prefs, tipo)),
+  );
   return (
     <ul className="space-y-1" data-testid="hn-prefs-lista">
       {CATALOGO_PENDENCIAS.map((c) => {
         const peloModulo = porModulo.includes(c.tipo);
-        const ligado = !estaOculto(prefs, c.tipo) && !peloModulo;
+        const ligado = (visiveis ? visiveis.has(c.tipo) : !estaOculto(prefs, c.tipo)) && !peloModulo;
         const Icone = ICONE_DO_TIPO[c.tipo];
         return (
           <li key={c.tipo} data-testid={`pref-${c.tipo}`} data-ligado={ligado ? "1" : "0"} data-pelo-modulo={peloModulo ? "" : undefined} className="rounded-[18px]" style={{ background: ligado ? "transparent" : "hsl(var(--muted) / 0.35)" }}>
@@ -99,7 +104,7 @@ export function ListaDePendencias({ prefs, onChange, porModulo = [] }: Pick<Prop
   );
 }
 
-export function PersonalizarPendenciasE({ open, onOpenChange, prefs, onChange, porModulo = [] }: Props) {
+export function PersonalizarPendenciasE({ open, onOpenChange, prefs, onChange, porModulo = [], visiveis = null }: Props) {
   const semMovimento = useReducedMotion();
   const fechar = () => onOpenChange(false);
   const arrasto = useFolhaArrastavel(fechar, !!semMovimento); // rodada 3: arrastar pra baixo fecha
@@ -119,11 +124,11 @@ export function PersonalizarPendenciasE({ open, onOpenChange, prefs, onChange, p
             <div className="flex items-start justify-between gap-3 px-1 mb-3">
               <div className="min-w-0">
                 <h3 className="text-[19px] font-bold tracking-tight">Pendências de hoje</h3>
-                <p className="text-[13px] text-muted-foreground mt-0.5">O que fica desligado sai da lista e do score.</p>
+                <p className="text-[13px] text-muted-foreground mt-0.5" data-testid="hn-prefs-explica">{visiveis ? "Por enquanto, só o que você já usa. Ligue o que quiser ver aqui." : "O que fica desligado sai da lista e do score."}</p>
               </div>
               <button type="button" onClick={fechar} aria-label="Fechar" data-testid="hn-prefs-fechar" className="w-9 h-9 -mr-1 rounded-full grid place-items-center bg-muted shrink-0"><X className="w-4 h-4" strokeWidth={2.2} /></button>
             </div>
-            <ListaDePendencias prefs={prefs} onChange={onChange} porModulo={porModulo} />
+            <ListaDePendencias prefs={prefs} onChange={onChange} porModulo={porModulo} visiveis={visiveis} />
             <p className="px-2 pt-3 text-[12px] text-muted-foreground leading-snug">Compromissos, tarefas e contas que você criou sempre aparecem.</p>
           </motion.div>
         </>

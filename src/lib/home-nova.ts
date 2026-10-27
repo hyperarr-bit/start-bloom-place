@@ -317,6 +317,12 @@ export function homeNovaLigadaSincrona(userId?: string | null): boolean {
   } catch { return false; }
 }
 
+/** 1.0.19 (dono 26/10): o tom do botão principal das folhas da missão que abrem POR CIMA da Home ("Dia 1 feito ·
+ *  Combinado", "Dia 2: Rotina · Começar", a escolha do dia 2, o plano do braço B, a pré-folha do lembrete) — com a Home
+ *  nova ligada, "e" (a tinta da E: preto no claro, claro no escuro, canto cheio, como o "+" e o "Continuar" da
+ *  CelebracaoDia100E — missao-doses.css); com a Home antiga, o magenta de sempre. */
+export const tomDoBotaoDaMissao = (userId?: string | null): "e" | "magenta" => (homeNovaLigadaSincrona(userId) ? "e" : "magenta");
+
 /** Os campos dos eventos: com a chave em qualquer modo que não "off", qual Home a pessoa vê. */
 export function camposHomeNova(userId?: string | null): { home_nova?: BracoHomeNova } {
   try {

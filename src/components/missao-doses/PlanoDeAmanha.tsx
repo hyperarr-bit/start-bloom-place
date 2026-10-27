@@ -12,6 +12,7 @@ import {
   type GatilhoAmanha, type PlanoAmanha, type QuandoAmanha,
 } from "@/lib/dia1-cheio";
 import { eventoDaMissao, type EstadoMissaoDoses } from "@/lib/missao-doses";
+import { tomDoBotaoDaMissao } from "@/lib/home-nova";
 import "./missao-doses.css";
 
 /**
@@ -130,7 +131,7 @@ export function PlanoDeAmanha({ missao, hoje = localDayKey(), aoCombinar, aoPula
         <div className="shrink-0 px-6 pt-2 bg-card" style={{ paddingBottom: "calc(var(--app-safe-bottom, 0px) + 20px)" }}>
           <div className="max-w-[420px] mx-auto">
             <button type="button" className="md-link mb-1" data-testid="plano-amanha-pular" onClick={aoPular}>Sem lembrete</button>
-            <button type="button" className="md-botao md-botao-56" data-tom="magenta" data-testid="plano-amanha-combinado" disabled={indo} onClick={combinar}>
+            <button type="button" className="md-botao md-botao-56" data-tom={tomDoBotaoDaMissao()} data-testid="plano-amanha-combinado" disabled={indo} onClick={combinar}>
               Combinado, {frase}
             </button>
           </div>

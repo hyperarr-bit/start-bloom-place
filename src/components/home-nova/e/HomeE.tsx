@@ -40,6 +40,8 @@ import { marcoDoAdesivo } from "@/components/conquistas/nova/recompensas";
 import { FolhaSequencia } from "@/components/fogo/FolhaSequencia";
 import { useFundoDaTelaE } from "./fundo-da-tela";
 import { useToastNaTela } from "./use-toast-na-tela";
+import { usePadraoDeWidgetsDoNovato, usePendenciasNovato } from "./use-novato-na-home";
+import { MAX_LINHAS_NOVATO } from "@/lib/pendencias-novato";
 import "../home-nova.css";
 import "./home-e.css";
 
@@ -104,8 +106,10 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
   // 26/10: a folha da sequência unificada mostra as figurinhas da sequência (a trilha das Conquistas, as artes do Codex)
   const conq = useConquistas();
   const trilha = useMemo(() => conq.adesivos.filter((b) => marcoDoAdesivo(b.id) !== null).sort((a, b) => marcoDoAdesivo(a.id)! - marcoDoAdesivo(b.id)!), [conq.adesivos]);
-  // rodada 3: os widgets da E (lib/home-widgets-e — catálogo enxuto, card único, dado real)
-  const widgetsE = useHomeWidgetsE();
+  // rodada 3: os widgets da E (lib/home-widgets-e — catálogo enxuto, card único, dado real); 1.0.19: a conta nova que
+  // nunca escolheu vê o padrão dela (o que já tem conteúdo + Sono/Humor de 1 toque — widgetsDoNovato)
+  const padraoDeWidgets = usePadraoDeWidgetsDoNovato(lifeData);
+  const widgetsE = useHomeWidgetsE(padraoDeWidgets);
   // UMA instância das preferências de módulos: a grade e a folha "Organizar" leem/gravam o mesmo estado (como o ModuleDrawer de hoje)
   const preferencias = useModulePreferences();
   // rodada 2: os 3 cards da página 1 escolhidos em Você › Personalizar início (lib/home-resumos)
@@ -140,7 +144,10 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
     [lifeData, get, copo],
   );
   const prefs: PendenciasPrefs = lifeData.pendenciasPrefs ?? PREFS_PADRAO;
-  const abrirTodasPendencias = useCallback(() => { trackEvent("home_pendencias_todas", { pendentes: pendencias.pending.length }); setFolhaPendencias(true); }, [pendencias.pending.length]);
+  // 1.0.19 (dono 26/10, "parece cobrança"): a conta nova nos primeiros dias vê só o que usa + a missão (lib/pendencias-novato)
+  const novatoNaLista = usePendenciasNovato(pendencias, prefs);
+  const listaDePendencias = novatoNaLista.lista;
+  const abrirTodasPendencias = useCallback(() => { trackEvent("home_pendencias_todas", { pendentes: listaDePendencias.pending.length, ...(novatoNaLista.novato ? { novato: true } : {}) }); setFolhaPendencias(true); }, [listaDePendencias.pending.length, novatoNaLista.novato]);
 
   const abrirAcao = useCallback((id: ActionId) => { setAcaoInicial(id); setFolhaMais(true); }, []);
   const abrirMais = useCallback(() => { setAcaoInicial(null); setFolhaMais(true); }, []);
@@ -168,7 +175,7 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
 
   const paginas = [
     <PaginaSeuDia key="dia" data={lifeData} onAbrirScore={abrirScore} onAcao={abrirAcao} onMais={abrirMais} numeroDentro={numeroDentro} copoMl={copo} resumos={resumos} festaPausada={festaPausada} forcarFesta={festaDev} />,
-    <PaginaPendencias key="pend" pendencias={pendencias} onAcao={abrirAcao} onPersonalizar={() => setPrefsAbertas(true)} onVerTodas={abrirTodasPendencias} />,
+    <PaginaPendencias key="pend" pendencias={listaDePendencias} onAcao={abrirAcao} onPersonalizar={() => setPrefsAbertas(true)} onVerTodas={abrirTodasPendencias} novato={novatoNaLista.novato} maxLinhas={novatoNaLista.novato ? MAX_LINHAS_NOVATO : undefined} />,
     <PaginaWidgets key="wid" data={lifeData} widgets={widgetsE.ativos} onEscolher={() => setPicker(true)} onAcao={abrirAcao} />,
   ];
 
@@ -226,8 +233,8 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
         />
         {/* rodada 2: Widgets e Personalizar pendências no estilo da Home nova (as mesmas chaves e regras de hoje) */}
         <EscolherWidgetsE aberta={picker} onFechar={() => setPicker(false)} ativos={widgetsE.ativos} onToggle={widgetsE.alternar} />
-        <FolhaPendencias aberta={folhaPendencias} onFechar={() => setFolhaPendencias(false)} pendencias={pendencias} onAcao={abrirAcao} onPersonalizar={() => setPrefsAbertas(true)} />
-        <PersonalizarPendenciasE open={prefsAbertas} onOpenChange={setPrefsAbertas} prefs={prefs} onChange={(p) => set(CHAVE_PENDENCIAS_PREFS, p)} porModulo={lifeData.pendenciasPorModulo} />
+        <FolhaPendencias aberta={folhaPendencias} onFechar={() => setFolhaPendencias(false)} pendencias={listaDePendencias} onAcao={abrirAcao} onPersonalizar={() => setPrefsAbertas(true)} novato={novatoNaLista.novato} />
+        <PersonalizarPendenciasE open={prefsAbertas} onOpenChange={setPrefsAbertas} prefs={prefs} onChange={(p) => set(CHAVE_PENDENCIAS_PREFS, p)} porModulo={lifeData.pendenciasPorModulo} visiveis={novatoNaLista.permitidos} />
       </div>
     </>
   );

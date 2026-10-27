@@ -1,9 +1,11 @@
-import { AlarmClock, Check, ChevronRight, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import { AlarmClock, Check, ChevronRight, SlidersHorizontal, Sparkles, type LucideIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { PendenciasDeHoje, PendingItem } from "@/components/home/NextHoursTimeline";
 import type { ActionId } from "@/components/home/QuickActions";
 import { trackEvent } from "@/lib/analytics";
-import { LinhaDoseDeHoje, useDoseDeHoje } from "@/components/missao-doses/LinhaDoseDeHoje";
+import { tocarNaDose, useDoseDeHoje, type DoseDeHoje } from "@/components/missao-doses/LinhaDoseDeHoje";
+import { MODULOS as MODULOS_DA_MISSAO } from "@/lib/missao-doses";
+import { MODULOS as MODULOS_DO_APP } from "@/lib/modulos";
 import { ICONE_COMPROMISSO, ICONE_DO_TIPO, TOM_DO_MODULO, TOM_DO_TIPO, TRACO, cor, tinta, type Tom } from "./paleta";
 
 /** O alerta de conta a vencer: despertador na cor de aviso (a laranja da paleta), diferente do gasto. */
@@ -25,7 +27,14 @@ interface Props {
   onAcao: (id: ActionId) => void;
   onPersonalizar: () => void;
   onVerTodas: () => void;
+  /** 1.0.19 (conta nova nos primeiros dias, lib/pendencias-novato): a lista já vem enxuta, cabe no máximo 4 linhas e a
+   *  lista vazia vira UMA linha calma (sem o "Tudo feito por hoje" com o ícone — o score do dia pode não estar em 100) */
+  novato?: boolean;
+  maxLinhas?: number;
 }
+
+/** 1.0.19: o vazio calmo da conta nova — uma linha só. Com algo feito hoje, "em dia"; sem nada ainda, o que vai entrar aqui. */
+export const textoVazioNovato = (feitas: number): string => (feitas > 0 ? "Tudo em dia por aqui." : "O que você usar no dia a dia aparece aqui.");
 
 export const Disco = ({ Icone, tom, feita }: { Icone: LucideIcon; tom: Tom; feita?: boolean }) => (
   <span className="w-8 h-8 rounded-[10px] grid place-items-center shrink-0" style={{ background: feita ? "hsl(var(--muted))" : tinta(tom) }} aria-hidden>
@@ -51,6 +60,32 @@ export const LinhaPendencia = ({ item, feita, onClick }: { item: PendingItem; fe
   );
 };
 
+/**
+ * 1.0.19 — a linha "DOSE DE HOJE" no estilo da E (a de hoje, com borda e emoji, fica na Home antiga): a mesma linha das
+ * pendências, com o ícone do módulo no disco da cor dele, "Dose de hoje · Finanças" e, à direita, discreto, "Dia 2 de 3"
+ * (braço A) ou "Dose 1 de 3" (braço B, a dose que ficou no meio do dia 1 — varredura novato-2, bug 2). Toque = o módulo
+ * (o passo pendente entra lá) ou a escolha do dia 2.
+ */
+export const LinhaDoseE = ({ dose, antesDeIr }: { dose: DoseDeHoje; antesDeIr?: () => void }) => {
+  const navigate = useNavigate();
+  const escolher = "escolher" in dose && !!dose.escolher;
+  const bracoB = "braco" in dose && dose.braco === "B";
+  const Icone = escolher ? Sparkles : MODULOS_DO_APP.find((m) => m.id === dose.modulo)?.Icon ?? Sparkles;
+  const tom = escolher ? TOM_DO_MODULO.desenvolvimento : TOM_DO_MODULO[dose.modulo] ?? TOM_DO_MODULO.carreira;
+  return (
+    <button
+      type="button" data-testid="pendencia-dose-de-hoje" data-track="pendencia:dose_de_hoje" data-braco={bracoB ? "B" : "A"}
+      onClick={() => { antesDeIr?.(); tocarNaDose(dose, navigate); }}
+      className="w-full h-[44px] flex items-center gap-2.5 pl-1.5 pr-1.5 rounded-xl text-left active:bg-muted/60"
+    >
+      <Disco Icone={Icone} tom={tom} />
+      <span className="flex-1 min-w-0 text-[14.5px] font-medium truncate"><span className="font-semibold">Dose de hoje</span> · {escolher ? "escolhe o seu" : MODULOS_DA_MISSAO[dose.modulo].nome}</span>
+      <span className="text-[12px] font-medium text-muted-foreground tabular-nums shrink-0">{bracoB ? `Dose ${dose.n} de 3` : `Dia ${dose.n} de 3`}</span>
+      <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" strokeWidth={2} aria-hidden />
+    </button>
+  );
+};
+
 export interface AvisoDePendencia { Icone: LucideIcon; tom: Tom; texto: string; route: string; selo: string; alerta?: boolean }
 /** Os avisos do dia (conta a vencer, treino da semana) — a página 2 e a folha "Ver todas" mostram os mesmos. */
 export const avisosDasPendencias = ({ avisoConta, avisoTreino }: Pick<PendenciasDeHoje, "avisoConta" | "avisoTreino">): AvisoDePendencia[] => {
@@ -62,13 +97,14 @@ export const avisosDasPendencias = ({ avisoConta, avisoTreino }: Pick<Pendencias
   return avisos;
 };
 
-export const PaginaPendencias = ({ pendencias, onAcao, onPersonalizar, onVerTodas }: Props) => {
+export const PaginaPendencias = ({ pendencias, onAcao, onPersonalizar, onVerTodas, novato = false, maxLinhas = MAX_LINHAS }: Props) => {
   const navigate = useNavigate();
-  // a dose de hoje da missão em doses (1.0.16): a 1ª linha, como na Home de hoje (fora do score)
-  const dose = useDoseDeHoje();
+  // a dose de hoje da missão em doses (1.0.16): a 1ª linha, como na Home de hoje (fora do score); 1.0.19: também a do
+  // braço B que ficou no meio do dia 1 (fechou o app no meio da dose)
+  const dose = useDoseDeHoje({ bracoB: true });
   const { pending, done } = pendencias;
   const avisos = avisosDasPendencias(pendencias);
-  const vagas = Math.max(0, MAX_LINHAS - avisos.length - (dose ? 1 : 0));
+  const vagas = Math.max(0, maxLinhas - avisos.length - (dose ? 1 : 0));
   const visiveis = pending.slice(0, vagas);
   const escondidas = pending.length - visiveis.length;
 
@@ -96,7 +132,11 @@ export const PaginaPendencias = ({ pendencias, onAcao, onPersonalizar, onVerToda
           </button>
         </header>
 
-        {pending.length === 0 ? (
+        {pending.length === 0 && novato && !dose && avisos.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center text-center px-6" data-testid="hn-pendencias-calmo">
+            <p className="text-[15px] leading-snug font-medium text-muted-foreground">{textoVazioNovato(done.length)}</p>
+          </div>
+        ) : pending.length === 0 && !novato ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center px-6 gap-2">
             <span className="w-12 h-12 rounded-2xl grid place-items-center" style={{ background: tinta(TOM_DO_MODULO.rotina) }} aria-hidden><Check className="w-6 h-6" strokeWidth={2.5} style={{ color: cor(TOM_DO_MODULO.rotina) }} /></span>
             <p className="text-[15px] font-semibold">Tudo feito por hoje</p>
@@ -104,7 +144,7 @@ export const PaginaPendencias = ({ pendencias, onAcao, onPersonalizar, onVerToda
           </div>
         ) : (
           <div className="flex-1">
-            {dose && <div className="px-1 pb-1.5"><LinhaDoseDeHoje dose={dose} /></div>}
+            {dose && <LinhaDoseE dose={dose} />}
             {visiveis.map((item, i) => <LinhaPendencia key={`p-${item.tipo ?? i}`} item={item} onClick={() => tocar(item)} />)}
             {avisos.map((a) => (
               <button key={a.texto} type="button" onClick={() => navigate(a.route)} data-testid={a.alerta ? "hn-aviso-conta" : "hn-aviso"} data-alerta={a.alerta ? "1" : undefined} className="w-full h-[44px] flex items-center gap-2.5 pl-1.5 pr-1.5 rounded-xl text-left active:bg-muted/60">

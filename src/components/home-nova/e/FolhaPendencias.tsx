@@ -4,8 +4,8 @@ import { ChevronRight, SlidersHorizontal, X } from "lucide-react";
 import type { PendenciasDeHoje, PendingItem } from "@/components/home/NextHoursTimeline";
 import type { ActionId } from "@/components/home/QuickActions";
 import { trackEvent } from "@/lib/analytics";
-import { LinhaDoseDeHoje, useDoseDeHoje } from "@/components/missao-doses/LinhaDoseDeHoje";
-import { Disco, LinhaPendencia, avisosDasPendencias } from "./PaginaPendencias";
+import { useDoseDeHoje } from "@/components/missao-doses/LinhaDoseDeHoje";
+import { Disco, LinhaDoseE, LinhaPendencia, avisosDasPendencias } from "./PaginaPendencias";
 import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, FaixaDoRelogioSobFolha, propsDaFolha } from "./folha-arrasto";
 import { TRACO, cor, tinta } from "./paleta";
 
@@ -21,13 +21,15 @@ interface Props {
   pendencias: PendenciasDeHoje;
   onAcao: (id: ActionId) => void;
   onPersonalizar: () => void;
+  /** 1.0.19: conta nova nos primeiros dias (lib/pendencias-novato) — a lista já vem enxuta; vazia não diz "Tudo feito" */
+  novato?: boolean;
 }
 
-export const FolhaPendencias = ({ aberta, onFechar, pendencias, onAcao, onPersonalizar }: Props) => {
+export const FolhaPendencias = ({ aberta, onFechar, pendencias, onAcao, onPersonalizar, novato = false }: Props) => {
   const navigate = useNavigate();
   const semMovimento = useReducedMotion();
   const arrasto = useFolhaArrastavel(onFechar, !!semMovimento);
-  const dose = useDoseDeHoje();
+  const dose = useDoseDeHoje({ bracoB: true });
   const { pending, done } = pendencias;
   const avisos = avisosDasPendencias(pendencias);
 
@@ -55,14 +57,14 @@ export const FolhaPendencias = ({ aberta, onFechar, pendencias, onAcao, onPerson
               <div className="min-w-0">
                 <h3 className="text-[19px] font-bold tracking-tight">Pendências de hoje</h3>
                 <p className="text-[13px] text-muted-foreground mt-0.5" data-testid="he-pendencias-resumo">
-                  {pending.length === 0 ? "Tudo feito por hoje" : `${pending.length} ${pending.length === 1 ? "pendente" : "pendentes"}`}{done.length > 0 ? ` · ${done.length} ${done.length === 1 ? "feita" : "feitas"}` : ""}
+                  {pending.length === 0 ? (novato ? "Nada pendente por aqui" : "Tudo feito por hoje") : `${pending.length} ${pending.length === 1 ? "pendente" : "pendentes"}`}{done.length > 0 ? ` · ${done.length} ${done.length === 1 ? "feita" : "feitas"}` : ""}
                 </p>
               </div>
               <button type="button" onClick={onFechar} aria-label="Fechar" data-testid="he-pendencias-fechar" className="w-9 h-9 -mr-1 rounded-full grid place-items-center bg-muted shrink-0"><X className="w-4 h-4" strokeWidth={2.2} /></button>
             </div>
 
             <div data-testid="he-pendencias-lista">
-              {dose && <div className="px-1 pb-1.5"><LinhaDoseDeHoje dose={dose} /></div>}
+              {dose && <LinhaDoseE dose={dose} antesDeIr={onFechar} />}
               {pending.map((item, i) => <LinhaPendencia key={`p-${item.tipo ?? i}`} item={item} onClick={() => tocar(item)} />)}
               {avisos.map((a) => (
                 <button key={a.texto} type="button" onClick={() => { onFechar(); navigate(a.route); }} data-testid={a.alerta ? "hn-aviso-conta" : "hn-aviso"} className="w-full h-[44px] flex items-center gap-2.5 pl-1.5 pr-1.5 rounded-xl text-left active:bg-muted/60">

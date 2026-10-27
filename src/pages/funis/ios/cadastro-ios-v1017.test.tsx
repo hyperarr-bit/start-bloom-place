@@ -292,6 +292,13 @@ describe("conta que JÁ tinha acesso comprando o teste do iPhone (1.0.17)", () =
     expect(acessoAnteriorDaConta([{ status: "active", billing_period: "monthly", payment_method: "cakto", current_period_end: "2026-11-01T00:00:00Z" }], agora)).toBe("assinatura");
     expect(acessoAnteriorDaConta([{ status: "active", billing_period: "monthly", payment_method: "cakto", current_period_end: "2026-10-01T00:00:00Z" }], agora)).toBeNull();
     expect(acessoAnteriorDaConta([{ status: "active", billing_period: "annual", payment_method: "app_store", current_period_end: "2026-10-23T00:00:00Z" }], agora)).toBeNull();
+    // 27/10: a linha da Apple chega como "play_store" (revenuecat-webhook/-sync) — com o cartão recusado ela segue "active"
+    expect(acessoAnteriorDaConta([{ status: "active", billing_period: "annual", payment_method: "play_store", current_period_end: "2026-10-23T00:00:00Z" }], agora)).toBeNull();
+    expect(acessoAnteriorDaConta([{ status: "active", billing_period: "annual", payment_method: "play_store", current_period_end: "2027-10-20T00:00:00Z" }], agora)).toBeNull();
+    expect(acessoAnteriorDaConta([
+      { status: "active", billing_period: "annual", payment_method: "play_store", current_period_end: "2027-10-20T00:00:00Z" },
+      { status: "active", billing_period: "lifetime", payment_method: "pix", current_period_end: null },
+    ], agora)).toBe("vitalicio");
     expect(acessoAnteriorDaConta([{ status: "canceled", billing_period: "lifetime", payment_method: "pix" }], agora)).toBeNull();
     expect(acessoAnteriorDaConta(null, agora)).toBeNull();
   });

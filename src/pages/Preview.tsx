@@ -1,4 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useAreaVisivel } from "@/hooks/use-area-visivel";
+import { TarjaDoRelogio } from "@/components/app/TarjaDoRelogio";
 import { useParams, Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { PreviewUserDataProvider } from "@/hooks/use-preview-user-data";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
@@ -319,7 +321,12 @@ const DemoCta = ({ funnel, trava }: {
     return () => { ro?.disconnect(); raiz.removeProperty("--teste-banner-h"); };
   }, [dialogoAberto]);
   const shell = isNativeShell();
+  /* 1.0.21 (QA da demo no iPhone, modo 1.0.12): com o teclado aberto a faixa "Quero o meu assim" subia junto e cobria o
+     que a pessoa digitava, e a página rolada passava por baixo do relógio. No app: a faixa sai enquanto o teclado está
+     aberto (volta ao fechar) e a tarja do relógio cobre a área segura. */
+  const { teclado } = useAreaVisivel(shell);
   if (dialogoAberto || !volta) return null;
+  if (shell && teclado) return <TarjaDoRelogio />;
   if (trava) {
     return (
       <div

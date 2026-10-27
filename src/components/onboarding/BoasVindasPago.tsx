@@ -116,6 +116,13 @@ export const BoasVindasPago = ({ nome, onComecar, imediato, nuncaPula = false }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, imediato, user?.created_at]);
 
+  /* 1.0.21 (QA no Simulador, modo 1.0.12): logo depois do "Salvar meu acesso" o campo do cadastro ainda tinha o foco e o
+     teclado ficava ~1 s por cima do "Pronto, Nome." — ao aparecer, a tela tira o foco (o teclado desce junto com a entrada) */
+  useEffect(() => {
+    if (!visivel) return;
+    try { const el = document.activeElement as HTMLElement | null; if (el && el !== document.body) el.blur?.(); } catch { /* noop */ }
+  }, [visivel]);
+
   const area = useMemo(() => {
     const a = getFunnelArea();
     return a ? AREAS[a] : null;

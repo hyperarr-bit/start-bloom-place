@@ -1,4 +1,5 @@
 import { isAndroid, isNativeShell } from "./native-shell";
+import { modo1012 } from "@/lib/modo-1012";
 import { trackEvent } from "./analytics";
 import { planejarCompromissos, type Compromisso } from "./compromissos";
 import { planejarTarefas, type TarefaAgendavel } from "./tarefas";
@@ -1206,6 +1207,8 @@ const somarDiasLocal = (dia: string, n: number): string => {
 /** O dia (local, YYYY-MM-DD) que o paywall prometeu: o dia do início + (dias do teste − 2). Sem início
  *  (pedido de build antiga) ou teste < 3 dias: o dia de (fim − 48 h). */
 export function diaDoAvisoDoTeste(fimMs: number, inicioMs?: number | null): string {
+  // 1.0.21 modo 1.0.12: o dia do aviso é o da 1.0.12 (fim − 36 h, puxado pra 9h–20h30) — ver quandoLembrarDoTeste1012
+  if (modo1012()) return localDayKey(alvoDoTeste1012(fimMs));
   if (inicioMs && fimMs > inicioMs) {
     const dias = Math.round((fimMs - inicioMs) / DIA_MS);
     if (dias >= 3) return somarDiasLocal(localDayKey(new Date(inicioMs)), dias - 2);
@@ -1213,7 +1216,31 @@ export function diaDoAvisoDoTeste(fimMs: number, inicioMs?: number | null): stri
   return localDayKey(new Date(fimMs - 2 * DIA_MS));
 }
 
+/**
+ * 1.0.21 MODO 1.0.12 (dono 27/10: "o lembrete 'seu teste acaba amanhã' agendado como na 1.0.12"): a regra da 1.0.12
+ * (c86bdb25, lib/notificacoes) — fim do teste − 36 h, puxado pra 9h00 (cedo) ou 20h30 (tarde). Teste de 3 dias começado
+ * às 16h do dia 1 → dia 3 às 9h ("acaba amanhã" de verdade: o teste acaba no dia 4 às 16h). Armado tarde: em 10 min, se
+ * ainda faltam ≥ 24 h e não é de noite. O texto continua o de hoje (sem "cancele"/"24 h antes").
+ */
+function alvoDoTeste1012(fimMs: number): Date {
+  const alvo = new Date(fimMs - 36 * 3600e3);
+  if (alvo.getHours() < 9) alvo.setHours(9, 0, 0, 0);
+  else if (alvo.getHours() >= 21 || (alvo.getHours() === 20 && alvo.getMinutes() > 30)) alvo.setHours(20, 30, 0, 0);
+  return alvo;
+}
+export function quandoLembrarDoTeste1012(fimMs: number, agora = Date.now(), semAtraso = false): Date | null {
+  const alvo = alvoDoTeste1012(fimMs);
+  if (alvo.getTime() > agora + 60e3) return alvo;
+  if (semAtraso) return null;
+  const logo = new Date(agora + 10 * 60e3);
+  if (fimMs - logo.getTime() < 24 * 3600e3) return null;
+  if (logo.getHours() < 9) { logo.setHours(9, 0, 0, 0); if (fimMs - logo.getTime() < 24 * 3600e3) return null; }
+  else if (logo.getHours() >= 21 || (logo.getHours() === 20 && logo.getMinutes() > 30)) return null;
+  return logo;
+}
+
 export function quandoLembrarDoTeste(fimMs: number, agora = Date.now(), opts: { horaMin?: number | null; inicioMs?: number | null; semAtraso?: boolean } = {}): Date | null {
+  if (modo1012()) return quandoLembrarDoTeste1012(fimMs, agora, !!opts.semAtraso);
   const dia = diaDoAvisoDoTeste(fimMs, opts.inicioMs);
   const [y, m, d] = dia.split("-").map(Number);
   const hora = Math.min(HORA_MAX_AVISO, Math.max(HORA_MIN_AVISO, Math.round(opts.horaMin ?? 12 * 60)));

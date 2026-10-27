@@ -146,6 +146,23 @@ describe("o modo fixa os comportamentos da 1.0.12 (e ignora as chaves remotas qu
     expect(bracoDia1()).toBe("A");
   });
 
+  it("o lembrete 'seu teste acaba amanhã' na hora da 1.0.12: fim − 36 h, puxado pra 9h–20h30 (o dia 2 do lembrete diário fica livre)", async () => {
+    const { diaDoAvisoDoTeste, quandoLembrarDoTeste } = await vi.importActual<typeof import("@/lib/notificacoes")>("@/lib/notificacoes");
+    const inicio = new Date(2026, 9, 27, 16, 30).getTime();
+    const fim = inicio + 3 * 86_400_000; // 30/10 16h30
+    const q = quandoLembrarDoTeste(fim, inicio + 60_000, { inicioMs: inicio, horaMin: 12 * 60 })!;
+    expect(q.getDate()).toBe(29);
+    expect([q.getHours(), q.getMinutes()]).toEqual([9, 0]); // 29/10 04h30 → 9h
+    expect(diaDoAvisoDoTeste(fim, inicio)).toBe("2026-10-29");
+    const tarde = new Date(2026, 9, 27, 23, 0).getTime();
+    expect(quandoLembrarDoTeste(tarde + 3 * 86_400_000, tarde + 60_000)!.getHours()).toBe(11); // fim 30/10 23h − 36 h = 29/10 11h
+    const cedo = new Date(2026, 9, 27, 7, 0).getTime();
+    const q2 = quandoLembrarDoTeste(cedo + 4 * 86_400_000 + 2 * 3600e3, cedo)!; // fim 31/10 9h − 36 h = 29/10 21h → 20h30
+    expect([q2.getDate(), q2.getHours(), q2.getMinutes()]).toEqual([29, 20, 30]);
+    delete G.__MODO_1012__;
+    expect(diaDoAvisoDoTeste(fim, inicio)).toBe("2026-10-28"); // a regra de hoje (o "dia 2" do calendário)
+  });
+
   it("as duas dicas que sobraram saem: a do planner (Conquistas antiga) e o balão do menu novo", () => {
     expect(deveMostrarDica(undefined)).toBe(false);
     expect(consumirAvisoMenuNovo("dark", "original")).toBe(false);

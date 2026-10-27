@@ -181,8 +181,9 @@ describe("widgets da Home nova (lib/home-widgets-e)", () => {
     expect(dadoDoWidgetE("habitos", d, get)).toMatchObject({ numero: "1", unidade: "/2", detalhe: "1 falta" });
     expect(dadoDoWidgetE("agua", d, get)).toMatchObject({ numero: "3", unidade: "/8", detalhe: "5 copos pra meta", action: "water" });
     // sem renda cadastrada: o orçamento pede pra cadastrar (nunca R$ aqui — é % quando tem)
-    expect(dadoDoWidgetE("orcamento", d, get).vazio).toEqual({ texto: "Sem renda cadastrada", cta: "Cadastrar renda" });
-    expect(dadoDoWidgetE("cuidados", d, get).vazio).toEqual({ texto: "Nenhum cuidado cadastrado", cta: "Cadastrar cuidado" });
+    // 1.0.19 (dono 26/10): os vazios viram convite curto — nada de "Sem …"/"Nenhum …" (novato-polido.test)
+    expect(dadoDoWidgetE("orcamento", d, get).vazio).toEqual({ texto: "Veja quanto sobra no mês", cta: "Cadastrar renda" });
+    expect(dadoDoWidgetE("cuidados", d, get).vazio).toEqual({ texto: "Lembre do próximo cuidado", cta: "Cadastrar cuidado" });
     const vazio = vida({ nextBillName: null, nextBillDaysUntil: null, currentBook: null, todayWorkoutGroup: null, workoutStatus: "vazio", sleepHours: null, habits: [] });
     expect(dadoDoWidgetE("proxima-conta", vazio, get).vazio?.cta).toBe("Cadastrar conta");
     expect(dadoDoWidgetE("leitura", vazio, get).vazio?.cta).toBe("Começar um livro");

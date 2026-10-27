@@ -24,6 +24,7 @@ import { lerAdminGuardado } from "@/lib/home-nova";
 import { TOM_DO_MODULO, TOM_DO_TIPO, cor, tinta, type Tom } from "@/components/home-nova/e/paleta";
 import { EscolherWidgetsE } from "@/components/home-nova/e/EscolherWidgetsE";
 import { PersonalizarPendenciasE } from "@/components/home-nova/e/PersonalizarPendenciasE";
+import { usePadraoDeWidgetsDoNovato, useTiposDoNovato } from "@/components/home-nova/e/use-novato-na-home";
 import { useFundoDaTelaE } from "@/components/home-nova/e/fundo-da-tela";
 import { TRACO } from "@/components/home-nova/e/paleta";
 import type { IdDoResumo } from "@/lib/home-resumos";
@@ -313,11 +314,13 @@ export function PersonalizarInicio() {
   const { get, set } = useUserData();
   const lifeData = useLifeHubData();
   useFundoDaTelaE(); // adendo 26/10: a faixa do relógio e a casca na cor da E
-  const widgetsE = useHomeWidgetsE();
+  // 1.0.19: a conta nova vê aqui o MESMO padrão de widgets e o MESMO interruptor das pendências que a Home mostra
+  const widgetsE = useHomeWidgetsE(usePadraoDeWidgetsDoNovato(lifeData));
   const resumos = normalizarResumos(get<unknown>(CHAVE_RESUMOS, null));
   const copo = normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO));
   const previa = metricasDoDia(lifeData, copo, resumos);
   const prefs = lifeData.pendenciasPrefs ?? PREFS_PADRAO;
+  const tiposDoNovato = useTiposDoNovato(lifeData);
   const [widgets, setWidgets] = useState(false);
   const [pendencias, setPendencias] = useState(false);
   const alternar = (id: (typeof CATALOGO_RESUMOS)[number]["id"]) => {
@@ -379,7 +382,7 @@ export function PersonalizarInicio() {
             <span className="w-10 h-10 rounded-xl grid place-items-center bg-muted/60 shrink-0" aria-hidden><ListChecks className="w-[19px] h-[19px]" strokeWidth={TRACO} /></span>
             <span className="flex-1 min-w-0">
               <span className="block text-[15px] font-semibold">Pendências de hoje</span>
-              <span className="block text-[12.5px] text-muted-foreground">{prefs.ocultos.length === 0 ? "Tudo ligado" : `${prefs.ocultos.length} ${prefs.ocultos.length === 1 ? "oculta" : "ocultas"}`}</span>
+              <span className="block text-[12.5px] text-muted-foreground">{tiposDoNovato ? "Só o que você usa" : prefs.ocultos.length === 0 ? "Tudo ligado" : `${prefs.ocultos.length} ${prefs.ocultos.length === 1 ? "oculta" : "ocultas"}`}</span>
             </span>
             <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" strokeWidth={2} aria-hidden />
           </button>
@@ -387,7 +390,7 @@ export function PersonalizarInicio() {
       </main>
       <div className="hn he he-so-vars" data-suave={SUAVIDADE_HOME_NOVA}>
         <EscolherWidgetsE aberta={widgets} onFechar={() => setWidgets(false)} ativos={widgetsE.ativos} onToggle={widgetsE.alternar} />
-        <PersonalizarPendenciasE open={pendencias} onOpenChange={setPendencias} prefs={prefs} onChange={(p) => set(CHAVE_PENDENCIAS_PREFS, p)} porModulo={lifeData.pendenciasPorModulo} />
+        <PersonalizarPendenciasE open={pendencias} onOpenChange={setPendencias} prefs={prefs} onChange={(p) => set(CHAVE_PENDENCIAS_PREFS, p)} porModulo={lifeData.pendenciasPorModulo} visiveis={tiposDoNovato} />
       </div>
     </div>
   );

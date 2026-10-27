@@ -26,7 +26,9 @@ export const CardWidgetE = ({ w, atraso, onAcao, compacto }: { w: DadoDoWidgetE;
   const navigate = useNavigate();
   const c = cor(w.tom);
   const tocar = () => {
-    if (w.action && onAcao && !w.vazio) return onAcao(w.action);
+    // 1.0.19: o vazio com `acao` (Sono, Humor, Calorias) abre o formulário do "+" em 1 toque, como o cheio
+    const acao = w.vazio ? w.vazio.acao : w.action;
+    if (acao && onAcao) return onAcao(acao);
     navigate(w.rota);
   };
   return (

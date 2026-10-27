@@ -34,6 +34,10 @@ export interface PendenciasPrefs {
   ocultos: TipoPendencia[];
   /** Peso: todo dia (padrão) ou 1x por semana num dia (0 = domingo … 6 = sábado). */
   peso: { frequencia: FrequenciaPeso; diaSemana: number };
+  /** 1.0.19 (dono 26/10): os tipos que a pessoa LIGOU à mão em Personalizar. Só a conta nova usa (nos primeiros dias
+   *  ela vê só o que já usa — lib/pendencias-novato — e o que ligar aqui aparece mesmo sem uso). Ausente = nenhum; o
+   *  app antigo não conhece o campo e segue mostrando tudo o que não está em `ocultos`. */
+  ligados?: TipoPendencia[];
 }
 
 export interface CatalogoPendencia {
@@ -77,7 +81,11 @@ export function normalizarPrefs(bruto: unknown): PendenciasPrefs {
   const frequencia: FrequenciaPeso = p.frequencia === "semanal" ? "semanal" : "diaria";
   const dia = Number(p.diaSemana);
   const diaSemana = Number.isInteger(dia) && dia >= 0 && dia <= 6 ? dia : PREFS_PADRAO.peso.diaSemana;
-  return { ocultos, peso: { frequencia, diaSemana } };
+  // 1.0.19: `ligados` só existe quando tem algo (quem nunca ligou nada continua com o objeto de sempre, campo a campo)
+  const ligados = Array.isArray(o.ligados)
+    ? Array.from(new Set(o.ligados.filter((t): t is TipoPendencia => typeof t === "string" && TIPOS.has(t))))
+    : [];
+  return { ocultos, peso: { frequencia, diaSemana }, ...(ligados.length ? { ligados } : {}) };
 }
 
 export const estaOculto = (prefs: PendenciasPrefs | undefined, tipo: TipoPendencia): boolean =>
@@ -88,6 +96,20 @@ export const ocultar = (prefs: PendenciasPrefs, tipo: TipoPendencia): Pendencias
 
 export const religar = (prefs: PendenciasPrefs, tipo: TipoPendencia): PendenciasPrefs =>
   ({ ...prefs, ocultos: prefs.ocultos.filter((t) => t !== tipo) });
+
+/** 1.0.19 (conta nova): LIGAR à mão em Personalizar — sai de `ocultos` e entra em `ligados` (aparece mesmo sem uso). */
+export const ligarAMao = (prefs: PendenciasPrefs, tipo: TipoPendencia): PendenciasPrefs => {
+  const r = religar(prefs, tipo);
+  const ligados = prefs.ligados ?? [];
+  return ligados.includes(tipo) ? r : { ...r, ligados: [...ligados, tipo] };
+};
+
+/** 1.0.19 (conta nova): DESLIGAR à mão — entra em `ocultos` (sai da lista e do score, como sempre) e sai de `ligados`. */
+export const desligarAMao = (prefs: PendenciasPrefs, tipo: TipoPendencia): PendenciasPrefs => {
+  const { ligados = [], ...resto } = ocultar(prefs, tipo);
+  const sobram = ligados.filter((t) => t !== tipo);
+  return sobram.length ? { ...resto, ligados: sobram } : resto;
+};
 
 export const comPeso = (prefs: PendenciasPrefs, frequencia: FrequenciaPeso, diaSemana?: number): PendenciasPrefs =>
   ({ ...prefs, peso: { frequencia, diaSemana: diaSemana ?? prefs.peso.diaSemana } });

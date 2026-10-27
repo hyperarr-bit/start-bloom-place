@@ -148,7 +148,7 @@ export function registrarHomeNovaRemoto(offerings: unknown): void {
   } catch { /* metadata estranha: fica como estava */ }
 }
 /** Só testes. */
-export const _zerarHomeNova = (): void => { remoto = undefined; adminAtual = null; maisPendente = false; origens.clear(); origensTentadas.clear(); contaDaSessao = null; modoFixo = null; };
+export const _zerarHomeNova = (): void => { remoto = undefined; adminAtual = null; maisPendente = false; origens.clear(); origensTentadas.clear(); contaDaSessao = null; criadoEmDaSessao = null; modoFixo = null; };
 
 /* ------------------------------------------------------------------ ORIGEM DA CONTA (modo "novas") */
 
@@ -161,8 +161,15 @@ export const marcarOrigemTentada = (userId: string): void => { origensTentadas.a
 export const origemJaTentada = (userId: string): boolean => origensTentadas.has(userId);
 /** Em memória: a conta logada (OrigemDaContaNaSessao define a cada render) — pra quem decide sem o user na mão. */
 let contaDaSessao: string | null = null;
-export const definirContaHomeNova = (userId: string | null | undefined): void => { contaDaSessao = userId || null; };
+/** 1.0.19 (novato polido): quando ESSA conta foi criada (created_at do Supabase) — o score do novato (use-life-hub-data,
+ *  lib/pendencias-novato) usa a mesma régua de 7 dias da lista, sem o hub precisar do useAuth. */
+let criadoEmDaSessao: string | null = null;
+export const definirContaHomeNova = (userId: string | null | undefined, criadoEm?: string | null): void => {
+  contaDaSessao = userId || null;
+  criadoEmDaSessao = userId ? criadoEm ?? null : null;
+};
 export const contaDaSessaoHomeNova = (): string | null => contaDaSessao;
+export const criadoEmDaContaHomeNova = (): string | null => criadoEmDaSessao;
 
 /** O marcador gravado na conta → a origem (lixo = null). */
 export function lerMarcadorOrigem(v: unknown): OrigemDaConta | null {
@@ -316,6 +323,12 @@ export function homeNovaLigadaSincrona(userId?: string | null): boolean {
     return homeNovaLigada(adminAtual ?? lerAdminGuardado(id), origemConhecida(id));
   } catch { return false; }
 }
+
+/** 1.0.19 (dono 26/10): o tom do botão principal das folhas da missão que abrem POR CIMA da Home ("Dia 1 feito ·
+ *  Combinado", "Dia 2: Rotina · Começar", a escolha do dia 2, o plano do braço B, a pré-folha do lembrete) — com a Home
+ *  nova ligada, "e" (a tinta da E: preto no claro, claro no escuro, canto cheio, como o "+" e o "Continuar" da
+ *  CelebracaoDia100E — missao-doses.css); com a Home antiga, o magenta de sempre. */
+export const tomDoBotaoDaMissao = (userId?: string | null): "e" | "magenta" => (homeNovaLigadaSincrona(userId) ? "e" : "magenta");
 
 /** Os campos dos eventos: com a chave em qualquer modo que não "off", qual Home a pessoa vê. */
 export function camposHomeNova(userId?: string | null): { home_nova?: BracoHomeNova } {

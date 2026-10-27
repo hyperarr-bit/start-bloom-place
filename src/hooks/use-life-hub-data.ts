@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef } from "react";
+import { useMemo, useEffect, useRef, useState } from "react";
 import { useUserData } from "@/hooks/use-user-data";
 import { CHAVE_NOME_DA_HOME, nomeDaHome, nomeParaMigrar } from "@/lib/nome-da-pessoa";
 import { semanaAtualId } from "@/lib/utils";
@@ -12,7 +12,9 @@ import {
   type BlocoDoScore, type PendenciasPrefs, type TipoPendencia,
 } from "@/lib/home-pendencias";
 import { moduloOcultaPendenciasLigado } from "@/lib/tour-home";
-import { CHAVE_ORIGEM_CONTA, contaEhNova, lerMarcadorOrigem } from "@/lib/home-nova";
+import { CHAVE_ORIGEM_CONTA, contaEhNova, criadoEmDaContaHomeNova, homeNovaLigada, lerMarcadorOrigem } from "@/lib/home-nova";
+import { modulosDaMissaoQueContam, pendenciasDeNovato, tiposAdotados, tiposDoNovato } from "@/lib/pendencias-novato";
+import { EVENTO_MISSAO_DOSES, lerMissao } from "@/lib/missao-doses";
 
 /**
  * Os seis registros diários de 5 pontos do Score do Dia (humor, gasto, peso,
@@ -73,6 +75,13 @@ export interface LifeHubData {
   pendenciasCobradas?: TipoPendencia[];
   /** 10/10 — os tipos que um MÓDULO OCULTO na Home levou junto (só com MODULO_OCULTA_PENDENCIAS ligada). */
   pendenciasPorModulo?: TipoPendencia[];
+  /** 1.0.19 (novato polido, dono 26/10: "o score só contar o que tá lá") — SÓ na conta nova nos primeiros 7 dias com a
+   *  Home nova ligada (lib/pendencias-novato): os tipos que a lista MOSTRA (adotados + missão + ligados − ocultos). Aí
+   *  `pendenciasCobradas` e o `dayScore` já vêm restritos a eles; ausente = a conta de sempre. */
+  pendenciasNovato?: TipoPendencia[];
+  /** 1.0.19: com `pendenciasNovato`, o que seria cobrado SEM a regra do novato — os 3 resumos da página 1 (metricasDoDia)
+   *  continuam os de sempre (Hábitos · Água · Refeições), como no desenho aprovado. */
+  pendenciasCobradasSemNovato?: TipoPendencia[];
 }
 
 const NADA_REGISTRADO: RegistrosHoje = { humor: false, gasto: false, peso: false, sono: false, gratidao: false, ideia: false };
@@ -96,6 +105,13 @@ const weekDayMap: Record<number, string> = {
 export function useLifeHubData(): LifeHubData {
   const { get, set, loaded } = useUserData();
   const streakHandled = useRef(false);
+  // 1.0.19 (novato polido): a missão em doses mora no aparelho — a troca do módulo do dia 2 relê a régua do novato
+  const [versaoDaMissao, setVersaoDaMissao] = useState(0);
+  useEffect(() => {
+    const reler = () => setVersaoDaMissao((v) => v + 1);
+    window.addEventListener(EVENTO_MISSAO_DOSES, reler);
+    return () => window.removeEventListener(EVENTO_MISSAO_DOSES, reler);
+  }, []);
 
   /* 1.0.17: o cadastro do iPhone gravava o nome só em "user-name" e a saudação caía no começo do e-mail.
    * Com a conta carregada, copia UMA vez o nome antigo pra chave da Home (lib/nome-da-pessoa). Escrita de
@@ -458,8 +474,19 @@ export function useLifeHubData(): LifeHubData {
           ...(supplements.length === 0 ? (["suplementos"] as const) : []),
         ]
       : [];
-    const cobrados = tiposCobradosHoje(pendenciasPrefs, pesoCobrado, [...pendenciasPorModulo, ...semCadastro]);
-    const dayScore = scoreDosBlocos(blocos, cobrados);
+    const cobradosDeSempre = tiposCobradosHoje(pendenciasPrefs, pesoCobrado, [...pendenciasPorModulo, ...semCadastro]);
+    /* 1.0.19 (novato polido, dono 26/10: "o score só contar o que tá lá") — na conta nova nos primeiros 7 dias, com a
+     * Home nova ligada, o score conta SÓ os tipos que a lista mostra (lib/pendencias-novato: adotados + missão + ligados
+     * à mão − ocultos). Fez tudo o que está lá = 100; ligou um tipo, ele entra nos dois; desligou, sai dos dois. Sem nenhum
+     * tipo visível: 0 (nunca o "100 de graça" de quem escondeu tudo). Conta antiga/admin e a Home antiga: a conta de sempre. */
+    const marcadorOrigem = get<{ em?: unknown } | null>(CHAVE_ORIGEM_CONTA, null);
+    const criadoEm = criadoEmDaContaHomeNova() ?? (typeof marcadorOrigem?.em === "string" ? marcadorOrigem.em : null);
+    const novato = semPontosDeGraca && homeNovaLigada(null, "nova") && pendenciasDeNovato({ origemNova: true, criadoEm });
+    const permitidos = novato
+      ? tiposDoNovato({ adotados: tiposAdotados(get), modulosDaMissao: modulosDaMissaoQueContam(lerMissao()), prefs: pendenciasPrefs })
+      : null;
+    const cobrados = permitidos ? new Set([...cobradosDeSempre].filter((t) => permitidos.has(t))) : cobradosDeSempre;
+    const dayScore = permitidos && cobrados.size === 0 ? 0 : scoreDosBlocos(blocos, cobrados);
     const userName = nomeDaHome(get);
 
     return {
@@ -475,6 +502,9 @@ export function useLifeHubData(): LifeHubData {
       tasksCompleted, tasksTotal, habits: mappedHabits, userName,
       registrosHoje: { humor: humorHoje, gasto: gastoHoje, peso: pesoHoje, sono: sonoHoje, gratidao: gratidaoHoje, ideia: hasThoughtToday },
       pendenciasPrefs, pendenciasCobradas: Array.from(cobrados), pendenciasPorModulo,
+      ...(permitidos ? { pendenciasNovato: Array.from(permitidos), pendenciasCobradasSemNovato: Array.from(cobradosDeSempre) } : {}),
     };
-  }, [get, loaded]);
+    // versaoDaMissao: só força a releitura da missão do aparelho (a régua do novato)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [get, loaded, versaoDaMissao]);
 }

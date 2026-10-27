@@ -80,7 +80,7 @@ export function OrigemDaContaNaSessao() {
   const user = auth?.user ?? null;
   const { get, set, loaded, contaCompleta } = useUserData();
   const uid = user?.id ?? null;
-  definirContaHomeNova(uid);
+  definirContaHomeNova(uid, user?.created_at ?? null);
 
   const pronta = !!uid && contaCarregadaDeVerdade(loaded, contaCompleta);
   const { origem, faltaNaConta } = pronta

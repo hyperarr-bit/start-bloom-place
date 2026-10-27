@@ -56,7 +56,10 @@ export const explicacaoDoScore = (faltam: number, score: number): string => {
  * Tocar num card ABRE o registro/detalhe — nunca registra sozinho (água abre o formulário da água, com o "+ 1 copo").
  */
 export function metricasDoDia(d: LifeHubData, copoMl: number = COPO_ML_PADRAO, resumos: IdDoResumo[] = RESUMOS_PADRAO): Metrica[] {
-  const cobra = (t: TipoPendencia) => !d.pendenciasCobradas || d.pendenciasCobradas.includes(t);
+  // 1.0.19 (novato polido): os resumos da página 1 seguem a conta de SEMPRE (o score do novato conta só a lista, mas os
+  // 3 cards de "Seu dia" continuam Hábitos · Água · Refeições, como no desenho aprovado)
+  const base = d.pendenciasCobradasSemNovato ?? d.pendenciasCobradas;
+  const cobra = (t: TipoPendencia) => !base || base.includes(t);
   const reg = d.registrosHoje ?? { humor: false, gasto: false, peso: false, sono: false, gratidao: false, ideia: false };
   const registrosCobrados = (["humor", "gasto", "peso", "sono", "ideia", "gratidao"] as const).filter((t) => cobra(t));
   // (a unidade da água — copos/garrafas — não aparece mais no rótulo; segue valendo no "x/y" e nas pendências)

@@ -49,6 +49,12 @@ html[data-missao-doses-faixa] header.sticky { top: calc(var(--app-safe-top, 0px)
    branco no branco (os prints de 02/10 já saíam sem o "Fazer o toque de hoje"). Um nível a mais e ele sempre ganha. */
 button.md-botao, .md-botao { width: 100%; min-height: 54px; border-radius: 999px; background: #16121c; color: #fff; font-size: 16px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; }
 button.md-botao[data-tom="magenta"], .md-botao[data-tom="magenta"] { background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); }
+/* 1.0.19 (dono 26/10): com a Home nova ligada, o botão principal das folhas que abrem por cima dela é o da E — a tinta
+   (preto no claro, claro no escuro), canto cheio, Inter semibold 17, 56 px — o mesmo do "+" e do "Continuar" da
+   CelebracaoDia100E (`--hn-mais` = hsl(var(--fixo-tinta))). Quem escolhe é tomDoBotaoDaMissao (lib/home-nova). */
+button.md-botao[data-tom="e"], .md-botao[data-tom="e"] { background: hsl(var(--fixo-tinta)); color: #fff; min-height: 56px; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.dark button.md-botao[data-tom="e"], .dark .md-botao[data-tom="e"] { color: hsl(222 16% 7%); }
+button.md-botao[data-tom="e"]:active { transform: scale(0.98); }
 /* 10/10 (regra do dono pro funil): o botão principal colado embaixo tem 56 px, como nas outras telas do funil */
 button.md-botao.md-botao-56, .md-botao.md-botao-56 { min-height: 56px; height: 56px; }
 .md-link { display: block; width: 100%; text-align: center; font-size: 13px; font-weight: 600; color: hsl(var(--muted-foreground)); padding: 10px 0; background: none; border: 0; }

@@ -8,7 +8,7 @@
  * repete ao reabrir e nunca aparece pra quem estava no Claro · Original.
  */
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup, act, within } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, act, within, waitFor } from "@testing-library/react";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import { useCallback, useMemo, useReducer, type ReactNode } from "react";
 
@@ -275,6 +275,28 @@ describe("o topo da Home", () => {
     fireEvent.click(screen.getByRole("button", { name: "Minha conta" }));
     expect(dos("account_drawer_open")).toEqual([{ via: "avatar", menu: "novo" }]);
     expect(screen.getByTestId("menu-novo")).toBeTruthy();
+  });
+});
+
+/* 1.0.20 (2ª passada 26/10): com o menu da conta aberto na Home ANTIGA, a faixa do relógio (.app-safe-top-guard, z-index
+   máximo) ficava BRANCA por cima do escurecido. Agora o menu deixa a faixa transparente enquanto está na tela. */
+describe("a faixa do relógio com o menu da conta aberto (Home antiga)", () => {
+  const raiz = () => document.documentElement;
+  const corDaFaixa = () => raiz().style.getPropertyValue("--safe-top-cor");
+  afterEach(() => { raiz().style.removeProperty("--safe-top-cor"); raiz().classList.remove("faixa-relogio-transparente"); });
+  it.each([["menu novo", false], ["menu de antes (chave off)", true]])("%s: avatar abre → faixa transparente e sem desfoque; fecha → a cor de antes volta", async (_nome, chaveOff) => {
+    if (chaveOff) registrarMenuNovoRemoto({ current: { metadata: { menu_novo: "off" } }, all: {} });
+    raiz().style.setProperty("--safe-top-cor", "#ffffff");
+    montar(<GreetingHeader data={lifeData} />);
+    expect(corDaFaixa()).toBe("#ffffff"); // fechado: nada muda
+    fireEvent.click(screen.getByRole("button", { name: "Minha conta" }));
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(corDaFaixa()).toBe("transparent");
+    expect(raiz().classList.contains("faixa-relogio-transparente")).toBe(true);
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(corDaFaixa()).toBe("#ffffff");
+    expect(raiz().classList.contains("faixa-relogio-transparente")).toBe(false);
   });
 });
 

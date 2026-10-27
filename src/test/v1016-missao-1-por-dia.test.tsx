@@ -43,6 +43,9 @@ vi.mock("@/lib/notificacoes", () => ({
 }));
 vi.mock("@/components/missao-doses/ConstruiuEm3Dias", () => ({ ConstruiuEm3Dias: () => <div data-testid="construiu">O que você construiu</div> }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { auth: { getSession: async () => ({ data: { session: null } }) }, functions: { invoke: async () => ({ data: null, error: null }) } } }));
+// 1.0.21: a festa do "3 dias seguidos!" troca o estilo da barra de status (FaixaDoRelogioSobFundoEscuro). Com o app nativo
+// fingido aqui, o plugin de verdade carregaria o @capacitor/core, que troca o window.Capacitor e desliga o "nativo" dos testes seguintes
+vi.mock("@/lib/status-bar", () => ({ aplicarBarraDeStatus: async () => {}, barraClaraEnquantoMontado: () => () => {} }));
 
 import { UserDataContext, useUserData } from "@/hooks/use-user-data";
 import { purgeLocalUserCache } from "@/hooks/use-auth";

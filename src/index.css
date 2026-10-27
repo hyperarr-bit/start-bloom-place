@@ -752,6 +752,14 @@ html.faixa-relogio-transparente .app-safe-top-guard {
   backdrop-filter: none !important;
 }
 
+/* 1.0.21 (QA do v1020): a figurinha COMUM (o aviso de baixo, .cf-chegada z 400) ficava ~2 s por cima da folha do score
+   quando ela abria a folha logo depois de anotar. Com uma camada escura na tela (a mesma classe acima: folhas, menu,
+   missão, "Dia completo") o aviso some; se a camada sai antes dos 6 s dele, ele volta. As figurinhas grandes ligam a
+   classe elas mesmas e não são afetadas. */
+html.faixa-relogio-transparente .cf-chegada[data-tipo="comum"] {
+  visibility: hidden;
+}
+
 /* Toaster da Home nova (components/ui/sonner.tsx): no celular o sonner 1.7.4 faz o contêiner `left:16px; width:100%`
    (passa 16 px da tela pra direita). Com width:auto, left/right de 16 px definem a largura e a pílula (w-full) fica
    centrada. Varredura 26/10, item 1. */

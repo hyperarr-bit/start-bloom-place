@@ -1,3 +1,4 @@
+import { fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
 import { useEffect, useState } from "react";
 import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 import { useSearchParams } from "react-router-dom";
@@ -139,7 +140,7 @@ const Beleza = () => {
         {activeTab === "routine" && (
           <>
             {rotinaNoTopo && rotina}
-            {!comCartoes && <DicasDaBeleza
+            {!comCartoes && !fluxoEnxutoLigado() && <DicasDaBeleza
               dicas={[
                 "3 perguntas e a sua rotina sai pronta, de manhã e de noite",
                 "Toque num passo pra escolher o produto e os dias da semana",

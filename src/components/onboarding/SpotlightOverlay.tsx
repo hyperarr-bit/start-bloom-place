@@ -1,3 +1,4 @@
+import { fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
 import { useEffect, useState, useCallback, useRef, useLayoutEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -87,7 +88,8 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
     const selecionados = Array.isArray(selecionadosRaw) ? selecionadosRaw : [];
     const escolhido = target === moduleKey || (forceNewUser && selecionados.includes(moduleKey));
 
-    const shouldShow = replayPending || ((isGuest || forceNewUser) && !done && escolhido);
+    // 1.0.21 (FLUXO ENXUTO, dono 27/10): o holofote nunca abre sozinho — só o "Rever tutorial" que a pessoa pediu
+    const shouldShow = replayPending || (!fluxoEnxutoLigado() && (isGuest || forceNewUser) && !done && escolhido);
     if (shouldShow) {
       setActive(true);
       setIsReplay(replayPending);

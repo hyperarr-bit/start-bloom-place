@@ -44,7 +44,9 @@ import { entrarComApple } from "@/lib/auth-nativo";
 import { getAuthRedirectUrl } from "@/lib/utils";
 import { fireMetaEvent } from "@/lib/meta-pixel";
 import { AREA_TUTORIAL, FUNNEL_AREA_KEY, type AreaKey } from "@/lib/funnel";
-import { BoasVindasPago, pulaPelaMissao } from "@/components/onboarding/BoasVindasPago";
+import { BoasVindasPago, marcarBoasVindasPagoVista, pulaPelaMissao } from "@/components/onboarding/BoasVindasPago";
+import { TelaParabens } from "@/components/onboarding/TelaParabens";
+import { fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
 import { EntrarComCodigo } from "@/components/auth/EntrarComCodigo";
 import { ultimaCompraAnualFoiTrial } from "@/lib/revenuecat";
 import { EVENTO_MISSAO_DOSES, lerMissao } from "@/lib/missao-doses";
@@ -450,7 +452,38 @@ export function LiberandoIOS() {
     window.location.href = "/";
   };
 
-  if (pronto) {
+  /* 1.0.21 — FLUXO ENXUTO (dono 27/10): compra → cadastro → TELA DE PARABÉNS → Home. A Parabéns aparece JÁ (o acesso é
+   * conferido por baixo); "Entrar" espera o acesso estar pronto (as mesmas regras de cima: SPA com acesso + missão, ou o
+   * recarregamento de antes) — enquanto isso, o "Guardando seu acesso…" de sempre. Sem BoasVindasPago e sem o "Tá
+   * dentro!" da missão (MissaoDosesNaWeb dá as boas-vindas da missão sozinha). Decidido 1x por montagem. */
+  const [enxuto] = useState(() => fluxoEnxutoLigado());
+  const [querEntrar, setQuerEntrar] = useState(false);
+  useEffect(() => {
+    if (enxuto) trackEvent("parabens_view", { funil: "ios" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const foiPraHome = useRef(false);
+  useEffect(() => {
+    if (!enxuto || !querEntrar || !pronto || foiPraHome.current) return;
+    foiPraHome.current = true;
+    irPraHome();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enxuto, querEntrar, pronto]);
+
+  // depois do toque, com o acesso pronto, a Parabéns fica na tela até a rota trocar (sem piscar o "Guardando…")
+  if (enxuto && (!querEntrar || pronto)) {
+    return (
+      <TelaParabens
+        nome={nome}
+        onEntrar={() => {
+          trackEvent("parabens_entrar", { funil: "ios", pronto });
+          marcarBoasVindasPagoVista();
+          setQuerEntrar(true);
+        }}
+      />
+    );
+  }
+  if (pronto && !enxuto) {
     return <BoasVindasPago imediato nome={nome} onComecar={irPraHome} />;
   }
   return (

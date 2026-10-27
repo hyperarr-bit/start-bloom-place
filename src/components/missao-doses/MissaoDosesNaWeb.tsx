@@ -38,8 +38,21 @@ import { PlanoDeAmanhaA } from "./PlanoDeAmanhaA";
 import { DicaDoDia } from "./DicaDoDia";
 import { missaoAtual } from "@/lib/teste-gratis";
 import { homeNovaLigadaSincrona } from "@/lib/home-nova";
+import { fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
 import { contaCarregadaDeVerdade } from "@/components/home-nova/OrigemDaConta";
 import "./missao-doses.css";
+
+/** Roda `aoMontar` 1x quando monta (sem tela). */
+function AoMontar({ aoMontar }: { aoMontar: () => void }) {
+  const feito = useRef(false);
+  useEffect(() => {
+    if (feito.current) return;
+    feito.current = true;
+    aoMontar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
+}
 
 /**
  * A ORQUESTRA DA MISSÃO EM DOSES (02/10, web · 03/10, app) — montada no App ao
@@ -464,7 +477,9 @@ function Ligada() {
   }, [pathname]);
   /* 1.0.18 (dias23): as opções do "escolhe o seu" — a intro do módulo tem que poder abrir (sem intro vista, sem dado) */
   const opcoesDia2 = (m: EstadoMissaoDoses): ModuloDaMissao[] => opcoesDoDia2(m, areaDaMissao(user?.user_metadata), (mod) => {
-    const r = porQueNaoMostrar(mod, get);
+    // 1.0.21 (FLUXO ENXUTO): sem intro, a dose 2 do módulo escolhido é a dose guiada simples — a régua é a mesma
+    // (módulo sem dado de antes), lida sem a chave da intro
+    const r = porQueNaoMostrar(mod, get, { ignorarChave: fluxoEnxutoLigado() });
     return r === null || r === "missao" || r === "outra_guia";
   });
   // tocou a linha "escolhe o seu" mas não sobrou opção (todas as intros já vistas): o módulo da dose, como sempre
@@ -557,6 +572,26 @@ function Ligada() {
 
   /* D1/D2 */
   if (!missao.boasVindas) {
+    /* 1.0.21 (FLUXO ENXUTO, dono 27/10: "a tela pós compra é uma tela nova bonita parabenizando, aí depois o usuário já
+       entra na home"): sem o "Tá dentro! / Seu plano de 3 dias" — a TelaParabens do cadastro foi a boas-vindas. A missão
+       nasce já com as boas-vindas dadas (os 3 módulos padrão, a área da porta primeiro) e segue leve: a linha "Dia 1" nas
+       Pendências leva ao módulo e a dose aponta a ação direto lá. Vale em qualquer rota (a missão pode nascer com a
+       pessoa já num módulo). O score do começo (braço A) é lido antes, como no caminho de sempre. */
+    if (fluxoEnxutoLigado()) {
+      return (
+        <>
+          {ehUmPorDia(missao) && missao.scoreNoInicio === undefined && (
+            <LerScoreDoDia aoLer={(score) => { const m = lerMissao() ?? missao; if (m.scoreNoInicio === undefined) salvar({ ...m, scoreNoInicio: score }); }} />
+          )}
+          <AoMontar aoMontar={() => {
+            const m = lerMissao() ?? missao;
+            if (m.boasVindas) return;
+            salvar({ ...m, boasVindas: true });
+            trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "enxuto", modulos: m.modulos }));
+          }} />
+        </>
+      );
+    }
     if (!noHome) return null;
     const comModulos = (modulos: [ModuloDaMissao, ModuloDaMissao, ModuloDaMissao]) => {
       const trocou = modulos.some((m, i) => m !== missao.modulos[i]);

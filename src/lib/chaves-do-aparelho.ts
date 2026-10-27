@@ -128,6 +128,9 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-home-nova-score-100", // 1.0.19 (26/10): o dia em que o card do score da Home nova já fez a festinha do 100 (estrela âmbar, 1x por dia)
   "core-home-nova-origem-aparelho", // 1.0.19 (26/10): o espelho da origem da conta ("<uid>:nova|antiga", lib/home-nova) — modo "novas"
   "core-home-nova-dica-mais", // 1.0.19 (26/10): a dica do "+" já tocada/aparições (lib/dica-mais) — nunca volta; a mesma chave vai pra conta
+  "core-fluxo-enxuto", // 1.0.21 (27/10): a última resposta do RevenueCat pro fluxo enxuto (metadata fluxo_enxuto: on|off|ab, lib/fluxo-enxuto)
+  "core-fluxo-enxuto-braco", // 1.0.21: o braço sorteado no "ab" do fluxo enxuto (enxuto|atual), estável entre aberturas
+  "core-festas-calma", // 1.0.21: as festas de conquista já mostradas HOJE nos 3 primeiros dias da conta ({ dia, n }, lib/festas-calma)
 ]);
 
 /** Famílias de chaves do aparelho (prefixo + id). */

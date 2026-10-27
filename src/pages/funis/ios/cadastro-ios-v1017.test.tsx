@@ -228,7 +228,8 @@ describe("iPhone SE com o teclado de verdade (1.0.17)", () => {
   });
 });
 
-describe("Guardando seu acesso… → Home pela rota, sem recarregar (1.0.17)", () => {
+describe("Guardando seu acesso… → Home pela rota, sem recarregar (1.0.17; fluxo enxuto OFF = o de hoje)", () => {
+  beforeEach(() => { localStorage.setItem("fluxo-enxuto-force", "off"); });
   const App = () => (
     <MemoryRouter initialEntries={["/app"]}>
       <Routes>
@@ -294,9 +295,13 @@ describe("conta que JÁ tinha acesso comprando o teste do iPhone (1.0.17)", () =
     expect(acessoAnteriorDaConta([{ status: "active", billing_period: "annual", payment_method: "app_store", current_period_end: "2026-10-23T00:00:00Z" }], agora)).toBeNull();
     // 27/10: a linha da Apple chega como "play_store" (revenuecat-webhook/-sync) — com o cartão recusado ela segue "active"
     expect(acessoAnteriorDaConta([{ status: "active", billing_period: "annual", payment_method: "play_store", current_period_end: "2026-10-23T00:00:00Z" }], agora)).toBeNull();
-    expect(acessoAnteriorDaConta([{ status: "active", billing_period: "annual", payment_method: "play_store", current_period_end: "2027-10-20T00:00:00Z" }], agora)).toBeNull();
+    expect(acessoAnteriorDaConta([{ status: "active", billing_period: "annual", payment_method: "play_store", revenuecat_subscription_id: "subAapXyZ123", current_period_end: "2027-10-20T00:00:00Z" }], agora)).toBeNull();
+    expect(acessoAnteriorDaConta([{ status: "active", plan: "lifetime", payment_method: "play_store", revenuecat_subscription_id: "otpAabc" }], agora)).toBeNull();
+    // 27/10 (revisor b52): a GOOGLE PLAY também grava "play_store" — essa conta como acesso de fora (Android + teste da Apple)
+    expect(acessoAnteriorDaConta([{ status: "active", billing_period: "annual", payment_method: "play_store", revenuecat_subscription_id: "subGooAbc123", current_period_end: "2027-10-20T00:00:00Z" }], agora)).toBe("assinatura");
+    expect(acessoAnteriorDaConta([{ status: "active", billing_period: "annual", payment_method: "play_store", revenuecat_subscription_id: "GPA.3344-1122-5566-77889", current_period_end: "2027-10-20T00:00:00Z" }], agora)).toBe("assinatura");
     expect(acessoAnteriorDaConta([
-      { status: "active", billing_period: "annual", payment_method: "play_store", current_period_end: "2027-10-20T00:00:00Z" },
+      { status: "active", billing_period: "annual", payment_method: "play_store", revenuecat_subscription_id: "subAapXyZ123", current_period_end: "2027-10-20T00:00:00Z" },
       { status: "active", billing_period: "lifetime", payment_method: "pix", current_period_end: null },
     ], agora)).toBe("vitalicio");
     expect(acessoAnteriorDaConta([{ status: "canceled", billing_period: "lifetime", payment_method: "pix" }], agora)).toBeNull();
@@ -385,3 +390,66 @@ describe("Entrar com a Apple sem sessão (1.0.17)", () => {
     expect(onSession).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("FLUXO ENXUTO (1.0.21): compra → cadastro → Parabéns → Home", () => {
+  // o padrão de verdade do iPhone ("on") — o setup da suíte deixa "off" pros testes do fluxo de antes
+  const G = globalThis as { __FLUXO_ENXUTO_PADRAO_APP__?: string };
+  let antes: string | undefined;
+  beforeEach(() => { antes = G.__FLUXO_ENXUTO_PADRAO_APP__; delete G.__FLUXO_ENXUTO_PADRAO_APP__; });
+  afterEach(() => { G.__FLUXO_ENXUTO_PADRAO_APP__ = antes; });
+  const App = () => (
+    <MemoryRouter initialEntries={["/app"]}>
+      <Routes>
+        <Route path="/app" element={<LiberandoIOS />} />
+        <Route path="/" element={<div data-testid="raiz">RAIZ</div>} />
+      </Routes>
+    </MemoryRouter>
+  );
+
+  it("no iPhone o padrão é ligado: a Parabéns aparece JÁ (sem 'Guardando…' antes, sem BoasVindasPago)", async () => {
+    render(<App />);
+    expect(screen.getByTestId("tela-parabens")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Parabéns/ })).toBeInTheDocument();
+    expect(screen.queryByText("Guardando seu acesso…")).toBeNull();
+    expect(eventosDe("parabens_view")).toHaveLength(1);
+    await act(async () => { await Promise.resolve(); });
+  });
+
+  it("Entrar antes do acesso: espera em 'Guardando…'; com assinatura + missão, troca de rota sem recarregar", async () => {
+    const hrefAntes = window.location.href;
+    const { rerender } = render(<App />);
+    fireEvent.click(screen.getByTestId("parabens-entrar"));
+    expect(eventosDe("parabens_entrar")).toHaveLength(1);
+    expect(localStorage.getItem("core-boas-vindas-visto")).toBe("1"); // a BoasVindasPago não volta na abertura
+    expect(screen.getByText("Guardando seu acesso…")).toBeInTheDocument();
+    estado.auth.isSubscribed = true;
+    rerender(<App />);
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.queryByTestId("raiz")).toBeNull();
+    await act(async () => { iniciarMissao(["financas", "rotina", "saude"]); });
+    expect(await screen.findByTestId("raiz")).toBeInTheDocument();
+    expect(window.location.href).toBe(hrefAntes);
+    expect(vi.mocked(trackEvent).mock.calls.some((c) => c[0] === "app_pos_compra_home" && (c[1] as { via?: string }).via === "rota")).toBe(true);
+    localStorage.removeItem(CHAVE_ESTADO_MISSAO_DOSES);
+  });
+
+  it("acesso já pronto: Entrar vai direto pra Home (a Parabéns fica até a rota trocar; o 'Guardando…' não pisca)", async () => {
+    estado.auth.isSubscribed = true;
+    await act(async () => { iniciarMissao(["financas", "rotina", "saude"]); });
+    render(<App />);
+    await waitFor(() => expect(vi.mocked(trackEvent).mock.calls.some((c) => c[0] === "app_pos_compra_liberado")).toBe(true));
+    await act(async () => { await Promise.resolve(); });
+    fireEvent.click(screen.getByTestId("parabens-entrar"));
+    expect(screen.queryByText("Guardando seu acesso…")).toBeNull();
+    expect(await screen.findByTestId("raiz")).toBeInTheDocument();
+    localStorage.removeItem(CHAVE_ESTADO_MISSAO_DOSES);
+  });
+
+  it("?fluxo-enxuto=off (rollback): volta o 'Guardando…' e nada de Parabéns", () => {
+    localStorage.setItem("fluxo-enxuto-force", "off");
+    render(<App />);
+    expect(screen.queryByTestId("tela-parabens")).toBeNull();
+    expect(screen.getByText("Guardando seu acesso…")).toBeInTheDocument();
+  });
+});
+const eventosDe = (n: string) => vi.mocked(trackEvent).mock.calls.filter((c) => c[0] === n);

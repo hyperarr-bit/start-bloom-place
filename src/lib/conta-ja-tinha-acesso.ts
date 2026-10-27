@@ -15,6 +15,12 @@
  * "acesso de fora": o cartão recusado via "Você já tem acesso… cancele na App Store" no lugar do card da recusa (20
  * pessoas desde 22/10, 0 com compra na web) e conta que já existia via o mesmo aviso no cadastro (8). Linha de loja
  * nunca conta.
+ *
+ * 27/10 (revisor da build 52): "linha de loja nunca conta" calava também a GOOGLE PLAY (o mesmo "play_store") — quem
+ * assina no Android e começa o teste da Apple deixou de ser avisado. Agora só a linha da APPLE é ignorada, pelo
+ * `revenuecat_subscription_id` (assinatura da App Store começa com "subAap", compra única com "otpA" — a mesma leitura
+ * de pages/Planos). "play_store" SEM o id (linha antiga/incompleta: não dá pra saber a loja) segue ignorada, como no
+ * conserto da manhã — na dúvida, o cartão recusado da Apple não vira "já tinha acesso".
  */
 import { supabase } from "@/integrations/supabase/client";
 
@@ -24,19 +30,28 @@ export type LinhaDeAssinatura = {
   billing_period?: string | null;
   plan?: string | null;
   payment_method?: string | null;
+  /** o id do RevenueCat (existe na tabela, não nos tipos gerados): "subAap…"/"otpA…" = App Store */
+  revenuecat_subscription_id?: string | null;
 };
 export type TipoDeAcessoAnterior = "vitalicio" | "assinatura";
 
 const STATUS_COM_ACESSO = ["active", "past_due", "cancel_scheduled"];
-/** As linhas das lojas (Apple e Google gravam "play_store"; "app_store" fica por garantia). */
-const DA_LOJA = ["play_store", "app_store"];
+/** A linha é da APPLE (ou de loja sem como saber qual)? Só ela é ignorada; a da Google Play conta como acesso de fora. */
+export function ehLinhaDaApple(l: LinhaDeAssinatura): boolean {
+  const metodo = String(l.payment_method ?? "");
+  if (metodo === "app_store") return true;
+  if (metodo !== "play_store") return false;
+  const id = String(l.revenuecat_subscription_id ?? "").trim();
+  if (!id) return true; // sem o id não dá pra separar as lojas: na dúvida, não avisa
+  return /^(subAap|otpA)/.test(id);
+}
 
 /** Decisão pura: o acesso que a conta já tinha FORA da App Store (null = nenhum). */
 export function acessoAnteriorDaConta(linhas: LinhaDeAssinatura[] | null | undefined, agora: number = Date.now()): TipoDeAcessoAnterior | null {
   let achou: TipoDeAcessoAnterior | null = null;
   for (const l of linhas ?? []) {
     if (!l || !STATUS_COM_ACESSO.includes(String(l.status ?? ""))) continue;
-    if (DA_LOJA.includes(String(l.payment_method ?? ""))) continue; // a compra desta folha (ou outra da loja): a Apple não deixa 2 testes no grupo
+    if (ehLinhaDaApple(l)) continue; // a compra desta folha (ou outra da Apple): a Apple não deixa 2 testes no grupo
     const vitalicio = l.billing_period === "lifetime" || l.plan === "lifetime";
     const fim = l.current_period_end ? new Date(l.current_period_end).getTime() : null;
     if (!vitalicio && fim != null && Number.isFinite(fim) && fim <= agora) continue;
@@ -51,7 +66,7 @@ export async function lerAcessoAnteriorDaConta(userId: string): Promise<TipoDeAc
   try {
     const { data, error } = await supabase
       .from("subscriptions")
-      .select("status, current_period_end, billing_period, plan, payment_method")
+      .select("status, current_period_end, billing_period, plan, payment_method, revenuecat_subscription_id")
       .eq("user_id", userId)
       .in("status", STATUS_COM_ACESSO);
     if (error) return null;

@@ -57,6 +57,7 @@ import type { TipoDoItem } from "@/lib/demo-guiada";
 import { bracoFixo, bracoGravado, dia1CheioLigado, modoUmPorDia, tourHomeQuando, type BracoDia1, type PlanoAmanha } from "@/lib/dia1-cheio";
 import { dias23Ligado } from "@/lib/dias23";
 import { homeNovaLigadaSincrona } from "@/lib/home-nova";
+import { fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
 
 export type ModoMissaoDoses = "off" | "on";
 /** A web: desligada (02/10). */
@@ -553,6 +554,8 @@ export function dicaDoDiaDevida(m: EstadoMissaoDoses | null, hoje: string = loca
   // 1.0.19 (dono 26/10): com a Home nova as duas dicas saem (apontavam pro score antigo e pro "Adicionar widget",
   // que não existem lá) — o único ensino da Home nova é a dica do "+" (lib/dica-mais)
   if (homeNovaLigadaSincrona()) return null;
+  // 1.0.21 (FLUXO ENXUTO, dono 27/10: "tirar o tutorial, dicas de uso e etc."): a Dica do dia sai também na Home antiga
+  if (fluxoEnxutoLigado()) return null;
   const d = ([2, 3] as const).find((n) => m.feitos[n]?.dia === hoje && !m.dicas?.[n]);
   if (!d) return null;
   if (d === 3 && !m.fimVisto) return null; // dia 3: depois de "O que você construiu"
@@ -898,6 +901,8 @@ export function comEscolha2(m: EstadoMissaoDoses, modulo: ModuloDaMissao, via: "
  * e o fim dela grava a dose 2.
  */
 export function introEhADoseDoDia2(m: EstadoMissaoDoses | null, modulo: string): boolean {
+  // 1.0.21 (FLUXO ENXUTO): sem intro, a dose 2 do módulo escolhido é a dose guiada simples (o PassoDoDia), como os outros dias
+  if (fluxoEnxutoLigado()) return false;
   if (!dias23NaMissao(m) || !m!.escolha2 || m!.feitos[2]) return false;
   return m!.escolha2.modulo === modulo && m!.modulos[1] === modulo;
 }

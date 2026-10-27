@@ -5,6 +5,11 @@ import { afterAll } from "vitest";
  * de passo; os fluxos dos testes clicam em sequência em < 1 ms. Zerada aqui; o teste da guarda liga ela. */
 (globalThis as { __CORE_GUARDA_TOQUE_MS?: number }).__CORE_GUARDA_TOQUE_MS = 0;
 
+/* 1.0.21 — FLUXO ENXUTO (lib/fluxo-enxuto): o padrão do iPhone é "on", mas a suíte de antes descreve o fluxo de hoje
+ * (montar, intro, tour, "Tá dentro!") — que é exatamente o "off". Aqui o padrão do app vira "off"; os testes do enxuto
+ * (src/test/fluxo-enxuto*.test.tsx, o pós-compra) apagam este global e veem o padrão de verdade. */
+(globalThis as { __FLUXO_ENXUTO_PADRAO_APP__?: string }).__FLUXO_ENXUTO_PADRAO_APP__ = "off";
+
 /**
  * REDE EXTERNA BLOQUEADA NOS TESTES (28/09). O cliente do Supabase aponta pra
  * PRODUÇÃO (endereço fixo em integrations/supabase/client) e o trackEvent

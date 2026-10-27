@@ -9,6 +9,11 @@
  *
  * Decide em dois níveis: a regra (porQueNaoMostrar) e a tela (IntroDoModulo monta a faixa). A tabela módulo × caso
  * sai no fim (console) pro relatório.
+ *
+ * 1.0.21 (dono 27/10): a regra acima foi REVOGADA pelo FLUXO ENXUTO (lib/fluxo-enxuto). Tudo acima é a chave `off`
+ * (o setup da suíte deixa o padrão do app em "off"); o bloco "FLUXO ENXUTO ligado" no fim faz a MESMA grade com a chave
+ * `on`: nenhum módulo abre com tutorial (intro, cartões, "Dicas para começar", holofote, "Dicas"), em nenhum caso — a
+ * dose de hoje continua sendo do módulo (a missão aponta a ação direto).
  */
 process.env.TZ = "America/Sao_Paulo";
 
@@ -33,6 +38,8 @@ import {
 } from "@/lib/missao-doses";
 import { guardarForcaDia1Cheio } from "@/lib/dia1-cheio";
 import { MODULOS } from "@/lib/modulos";
+import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
+import { AcessoConhecerMais } from "@/components/intro-modulo/ConhecerMais";
 import { localDayKey } from "@/lib/utils";
 
 type Dados = Record<string, unknown>;
@@ -404,5 +411,50 @@ describe("os 16 módulos têm intro, e ela é a 1ª coisa que a pessoa vê — e
     fireEvent.click(screen.getByTestId("intro-modulo-fechar"));
     expect(localStorage.getItem(chaveIntroVista("saude"))).toMatch(/^feita@/);
     medir.mockRestore();
+  });
+});
+
+describe("FLUXO ENXUTO ligado (1.0.21): os 16 módulos × os casos — NUNCA tutorial na 1ª abertura", () => {
+  beforeEach(() => { localStorage.setItem("fluxo-enxuto-force", "on"); });
+  for (const m of TODOS) {
+    for (const [braco, pos] of CASOS) {
+      const caso = braco === "sem" ? "sem missão" : `braço ${braco} · ${pos}`;
+      it(`${m} · ${caso}: nem intro, nem cartões, nem dicas, nem holofote (conta nova e conta antiga)`, () => {
+        const plano = planoPara(m, pos);
+        armarMissao(braco, plano);
+        for (const conta of ["nova", "antiga"] as const) {
+          // conta nova: com o flag do tutorial antigo e o módulo escolhido; antiga: nada disso
+          const s = criarStore(conta === "nova" ? { "force-new-user-tutorial": "true", "tutorial-selected-modules": [m], "quickstart-target-module": m } : {});
+          expect(porQueNaoMostrar(m, s.get), `${m} ${caso} ${conta}`).toBe("desligada");
+          const r = render(
+            <MemoryRouter initialEntries={[`/${m}`]}>
+              <s.Provedor>
+                <SpotlightOverlay moduleKey={m as never} steps={[{ target: "body", title: "x", description: "y", label: "z" } as never]} />
+                <BoasVindasDoModulo moduleId={m} tips={["dica 1", "dica 2"]} />
+                <IntroDoModulo moduleId={m} />
+                <AcessoConhecerMais moduleId={m} />
+              </s.Provedor>
+            </MemoryRouter>,
+          );
+          expect(faixa(), `${m} ${caso} ${conta}: a intro montou`).toBeNull();
+          expect(document.querySelector("[data-testid=cartoes-modulo]"), `${m} ${caso} ${conta}: cartões`).toBeNull();
+          expect(document.querySelector("[data-camada-guia]"), `${m} ${caso} ${conta}: holofote/camada de guia`).toBeNull();
+          expect(document.querySelector("[data-testid=conhecer-mais-acesso]"), `${m} ${caso} ${conta}: lâmpada Dicas`).toBeNull();
+          expect(screen.queryByText("dica 1"), `${m} ${caso} ${conta}: Dicas para começar`).toBeNull();
+          r.unmount();
+        }
+        // a dose de HOJE continua sendo deste módulo (a missão não muda: a dose aponta a ação direto)
+        if (pos === "hoje" && braco !== "sem") expect(moduloDaMissaoHoje(), `${m} ${caso}`).toBe(m);
+        registrar(m, `ENXUTO · ${caso}`, pos === "hoje" && braco !== "sem" ? "só a DOSE da missão (sem tutorial)" : "o módulo, direto (nada por cima)");
+      });
+    }
+  }
+
+  it("rollback: a mesma conta com ?fluxo-enxuto=off volta a ter a intro na 1ª abertura", () => {
+    localStorage.setItem("fluxo-enxuto-force", "off");
+    const s = criarStore();
+    expect(porQueNaoMostrar("casa", s.get)).toBeNull();
+    render(<MemoryRouter><s.Provedor><IntroDoModulo moduleId="casa" /></s.Provedor></MemoryRouter>);
+    expect(faixa()).toBeTruthy();
   });
 });

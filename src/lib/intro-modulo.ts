@@ -44,6 +44,7 @@
  * (rollback sem build — registrada em revenuecat.ts junto das ofertas de saída). QA no navegador:
  * `?intro-modulo=on|off|auto` (a força fica no localStorage; ignorada no app das lojas).
  */
+import { fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
 import { isNativeShell } from "@/lib/native-shell";
 import type { TipoDoItem } from "@/lib/demo-guiada";
 import * as missaoDoses from "@/lib/missao-doses";
@@ -122,6 +123,7 @@ export function guardarForcaDaIntro(busca?: string | URLSearchParams): void {
 
 /** Está ligada AQUI? app: metadata do RC > constante do app · web: força de QA > metadata > constante da web. */
 export function introLigada(modo: ModoIntro = INTRO_MODULO, modoApp: ModoIntro = INTRO_MODULO_APP): boolean {
+  if (fluxoEnxutoLigado()) return false; // 1.0.21 (dono 27/10): sem tutorial na 1ª abertura de módulo (e sem "Dicas"/"Mais dicas")
   if (isNativeShell()) return remota ? remota === "on" : modoApp === "on";
   const f = ls.get(CHAVE_FORCA_INTRO);
   if (f === "on" || f === "off") return f === "on";
@@ -1074,10 +1076,11 @@ export const introVistaPeloMontar = (moduleId: string, get?: Leitor): boolean =>
 /* ───── a decisão ───── */
 export type MotivoSemIntro = "desligada" | "sem_intro" | "ja_vista" | "ja_apresentado" | "com_dado" | "missao" | "outra_guia";
 /** Mostra a intro deste módulo? `null` = mostra; senão o motivo de não mostrar (pros testes e pro dev). */
-export function porQueNaoMostrar(moduleId: string, get: Leitor, extras: { outraGuiaAtiva?: boolean } = {}): MotivoSemIntro | null {
+export function porQueNaoMostrar(moduleId: string, get: Leitor, extras: { outraGuiaAtiva?: boolean; ignorarChave?: boolean } = {}): MotivoSemIntro | null {
   const config = INTROS[moduleId];
   if (!config) return "sem_intro";
-  if (!introLigada()) return "desligada";
+  // `ignorarChave` (1.0.21): a escolha do dia 2 no fluxo enxuto pergunta "o módulo está zerado?" sem a intro existir
+  if (!extras.ignorarChave && !introLigada()) return "desligada";
   if (introVistaNesteAparelho(moduleId) || introVistaNaConta(moduleId, get)) return "ja_vista";
   if (introVistaPeloMontar(moduleId, get)) return "ja_vista";
   if (moduloJaApresentado(moduleId, get)) return "ja_apresentado";

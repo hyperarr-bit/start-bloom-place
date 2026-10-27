@@ -34,6 +34,8 @@ const jaViu = () => {
 const marcarVisto = () => {
   try { localStorage.setItem(CHAVE_DISPOSITIVO, "1"); } catch { /* noop */ }
 };
+/** 1.0.21 (fluxo enxuto): a TelaParabens do cadastro do iPhone fez o papel desta tela — ela não volta na abertura. */
+export const marcarBoasVindasPagoVista = marcarVisto;
 
 /** Confete: 22 pedaços, uma vez só, e acabou. Nada de laço infinito — o que
  *  fica animando pra sempre é o que faz aparelho simples errar o repaint. */

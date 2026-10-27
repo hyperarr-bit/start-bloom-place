@@ -85,6 +85,7 @@
  *   17/10 só pela missão. `registrarTelaAberta` conta as abertas; se a do módulo for religada, ela
  *   cede pra da missão e não abre por cima dela.
  */
+import { fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
 import { isNativeShell } from "@/lib/native-shell";
 import { computeDailyBudget } from "@/lib/finance-totals";
 import { localDayKey } from "@/lib/utils";
@@ -232,6 +233,7 @@ export function guardarForcaMontarDaUrl(busca?: string): boolean {
 
 /** Está ligado AQUI? força de QA (navegador) > metadata do RevenueCat (app) > constante. */
 export function montarFinancasLigado(): boolean {
+  if (fluxoEnxutoLigado()) return false; // 1.0.21 (dono 27/10): o fluxo enxuto tira o "Vamos montar suas Finanças"
   const f = forcaQa();
   if (f) return f === "on";
   if (isNativeShell()) return (remota ?? MONTAR_FINANCAS) === "on";

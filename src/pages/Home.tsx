@@ -1,3 +1,4 @@
+import { fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
 import { useState, useCallback, useEffect, useRef, lazy, Suspense } from "react";
 import { localDayKey } from "@/lib/utils";
 import { useUserData } from "@/hooks/use-user-data";
@@ -209,7 +210,8 @@ const HomePage = () => {
     // 03/10 (1.0.10): a MISSÃO EM DOSES também manda — pra quem é novo no app
     // ela SUBSTITUI o tutorial de módulos (e a Missão do iPhone), nunca duas na
     // tela. Quem veio da 1.0.9 com a Missão antiga em andamento segue como antes.
-    const missaoManda = trialCartaoAtivo() || missaoDosesMandaNoApp(user.created_at);
+    // 1.0.21 (FLUXO ENXUTO): o tutorial de módulos (QuickStart + holofote) também nunca monta
+    const missaoManda = trialCartaoAtivo() || missaoDosesMandaNoApp(user.created_at) || fluxoEnxutoLigado();
     const forceNewUser = contaNova && (dbFlag || lsFlag) && !missaoManda;
     if ((dbFlag || lsFlag) && (!contaNova || missaoManda)) {
       try { localStorage.removeItem("force-new-user-tutorial"); } catch { /* ignore */ }

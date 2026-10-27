@@ -1,3 +1,4 @@
+import { fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
 import { useLocation } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
 import { cartoesLigados, guardarForcasDaUrl } from "@/lib/tour-home";
@@ -24,6 +25,8 @@ export const BoasVindasDoModulo = ({ moduleId, tips, icon }: { moduleId: string;
   const demo = pathname.startsWith("/preview");
   guardarForcasDaUrl(); // a força do link (`?cartoes=on`) tem que estar guardada ANTES de perguntar se está ligado
   guardarForcaDaIntro();
+  // 1.0.21 (dono 27/10, FLUXO ENXUTO): nenhum tutorial nem dica na 1ª abertura — nem intro, nem cartões, nem "Dicas para começar"
+  if (fluxoEnxutoLigado()) return null;
   const comIntro = !demo && introLigada();
   if (comIntro && INTROS[moduleId]) return <IntroDoModulo moduleId={moduleId} />;
   // 17/10: Treino não ganha nada por cima — a tela vazia dele ("Comece com um modelo pronto") é o 1º passo

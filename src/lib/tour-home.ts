@@ -24,6 +24,7 @@
  * força é ignorada: só a chave do código decide — ou a build de QA (`VITE_V14_QA=1`,
  * lib/v14-qa), que liga as três.
  */
+import { fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
 import { isNativeShell } from "@/lib/native-shell";
 import { contaNova, ehUmPorDia, lerMissao, missaoCumprida, missaoDosesLigada, missaoDosesMandaNoApp, missaoEmAndamento } from "@/lib/missao-doses";
 import { trialCartaoAtivo } from "@/lib/teste-gratis";
@@ -98,14 +99,15 @@ const ligado = (modo: ModoChave, chaveForca: string): boolean => {
   return modo === "on" || v14Ligada();
 };
 
-export const cartoesLigados = (modo: ModoChave = CARTOES_MODULO): boolean => ligado(modo, CHAVE_FORCA_CARTOES);
+export const cartoesLigados = (modo: ModoChave = CARTOES_MODULO): boolean => !fluxoEnxutoLigado() && ligado(modo, CHAVE_FORCA_CARTOES);
 /**
  * 1.0.19 (dono 26/10): com a HOME NOVA ligada pra conta da sessão (lib/home-nova) o tour antigo de 5 passos está
  * APOSENTADO — ele apontava pro score/ações rápidas/widgets da Home de hoje. Responder "desligado" aqui é o que faz
  * TODO mundo que espera o tour seguir sem ele: a missão (braço B fecha o 4º passo sozinha; braço A não segura o
  * "Plano de amanhã"), a festa da dose 1 (sem "Conhecer minha Home") e o álbum (sem "Casa arrumada").
  */
-export const tourHomeLigado = (modo: ModoChave = TOUR_HOME): boolean => !homeNovaLigadaSincrona() && ligado(modo, CHAVE_FORCA_TOUR_HOME);
+/** 1.0.21: com o FLUXO ENXUTO (lib/fluxo-enxuto) o tour da Home antiga também sai — o mesmo caminho da Home nova acima. */
+export const tourHomeLigado = (modo: ModoChave = TOUR_HOME): boolean => !fluxoEnxutoLigado() && !homeNovaLigadaSincrona() && ligado(modo, CHAVE_FORCA_TOUR_HOME);
 /** A Home nova está ligada pra conta da sessão (o tour antigo está aposentado). */
 export const tourAposentadoPelaHomeNova = (): boolean => homeNovaLigadaSincrona();
 export const moduloOcultaPendenciasLigado = (modo: ModoChave = MODULO_OCULTA_PENDENCIAS): boolean => ligado(modo, CHAVE_FORCA_MODULO_OCULTA);

@@ -64,6 +64,7 @@
  *   hora de acordar, com os hábitos do dia; nada pro que já foi marcado hoje. É aviso de USO que a
  *   pessoa pediu (como o skincare), não um dos avisos do teste — esses continuam 1 por dia entre eles.
  */
+import { fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
 import { isNativeShell } from "@/lib/native-shell";
 import { localDayKey } from "@/lib/utils";
 import { marcadosDoDia, nomesDosHabitos } from "@/lib/rotina-habitos";
@@ -413,6 +414,7 @@ export function guardarForcaMontarRotinaDaUrl(busca?: string): boolean {
 
 /** Está ligado AQUI? força de QA (navegador) > metadata do RevenueCat (app) > constante. */
 export function montarRotinaLigado(): boolean {
+  if (fluxoEnxutoLigado()) return false; // 1.0.21 (dono 27/10: "o montar rotinas sai também")
   const f = forcaQa();
   if (f) return f === "on";
   if (isNativeShell()) return (remota ?? MONTAR_ROTINA) === "on";

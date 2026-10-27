@@ -18,6 +18,7 @@ import { CAPAS, CHAVE_CAPA, CapaResponsiva, type CapaId } from "./CapaPlanner";
 import { CHAVE_CAPAS_VISTAS, capasNovas, diasPraCapa, lerCapasVistas } from "@/lib/fogo-sequencia";
 import { isNativeShell } from "@/lib/native-shell";
 import { missaoAtual, trialCartaoAtivo } from "@/lib/teste-gratis";
+import { aplicarCalma, calmaDasFestasVale, registrarFestaNaCalma } from "@/lib/festas-calma";
 import { DIA_FIM_DA_MISSAO, EVENTO_MISSAO_DOSES, diaDaMissao as diaDaMissaoDoses, ehUmPorDia, lerMissao, missaoDoDiaEmCena } from "@/lib/missao-doses";
 import { conquistas2Ligada } from "@/lib/conquistas2";
 import { ehMarcoDeFesta, festaDoMarcoNovo, formatoDoAviso } from "./nova/recompensas";
@@ -696,6 +697,10 @@ export const idsMostradosDoItem = (item: { tipo: string; dias?: number; badges?:
     : item.tipo === "capa" ? (item.capas ?? []).map((c) => `capa:${c}`)
     : item.badge ? [item.badge.id] : [];
 
+/** A chave de um aviso da fila (a mesma do `key` da cena). */
+const chaveDoItem = (item: Item): string =>
+  item.tipo === "marco" ? `marco-${item.dias}` : item.tipo === "popup" || item.tipo === "toast" ? `${item.tipo}-${item.badges.map((b) => b.id).join("+")}` : item.tipo === "capa" ? `capa-${item.capas.join("+")}` : item.badge.id;
+
 export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean } = {}) => {
   const { get, set, loaded } = useUserData();
   const { user } = useAuth();
@@ -766,7 +771,14 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
    * popup com os comuns (até 6, em carrossel). Conta nova: uma peça só (o
    * raro mais alto, ou um popup com 1 comum). O que sobra entra como visto.
    */
+  // 1.0.21 (FLUXO ENXUTO): a calma dos 3 primeiros dias (lib/festas-calma) — lida 1x por montagem
+  const calma = useMemo(() => calmaDasFestasVale(user?.created_at), [user?.created_at]);
   const { fila, semFesta } = useMemo<{ fila: Item[]; semFesta: string[] }>(() => {
+    const bruto = filaBruta();
+    if (!calma || !bruto.fila.length) return bruto;
+    const c = aplicarCalma(bruto.fila, chaveDoItem, (i) => idsMostradosDoItem(i as Parameters<typeof idsMostradosDoItem>[0]), (i) => i.tipo !== "marco" && i.tipo !== "capa");
+    return { fila: c.fila, semFesta: [...bruto.semFesta, ...c.silenciar] };
+    function filaBruta(): { fila: Item[]; semFesta: string[] } {
     if (!loaded || !vistas) return { fila: [], semFesta: [] };
     const itens: Item[] = [];
     // pelo RECORDE: quem bateu 7 e quebrou antes de abrir a Home ainda ganha a roseta dos 7
@@ -817,7 +829,8 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
     if (noPopup.length) itens.push({ tipo: "popup", badges: noPopup });
     const semFesta = [...raros.slice(maxRaros), ...comuns.slice(maxComuns)].map((b) => b.id);
     return { fila: itens, semFesta };
-  }, [loaded, vistas, seq.recorde, seq.dias, seq.hojeFeito, conq.folha, conq.diaUmSilencioso, contaNova, capasVistas, emConquistas, esperaMissao, c2, mostradasAntes]);
+    }
+  }, [calma, loaded, vistas, seq.recorde, seq.dias, seq.hojeFeito, conq.folha, conq.diaUmSilencioso, contaNova, capasVistas, emConquistas, esperaMissao, c2, mostradasAntes]);
 
   // os que ficaram sem festa entram como vistos (uma escrita só)
   const semFestaTxt = semFesta.join(",");
@@ -865,7 +878,7 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
   };
 
   const atual = liberado ? fila[0] : undefined;
-  const chaveAtual = atual ? (atual.tipo === "marco" ? `marco-${atual.dias}` : atual.tipo === "popup" || atual.tipo === "toast" ? `${atual.tipo}-${atual.badges.map((b) => b.id).join("+")}` : atual.tipo === "capa" ? `capa-${atual.capas.join("+")}` : atual.badge.id) : null;
+  const chaveAtual = atual ? chaveDoItem(atual) : null;
   // "Ver em tela cheia" do popup: a festa de hoje do adesivo escolhido, por cima; "Voltar" devolve ao cartão
   const [telaCheia, setTelaCheia] = useState<Badge | null>(null);
   const [previaStory, setPreviaStory] = useState<Badge | null>(null);
@@ -874,6 +887,8 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
   // 14/10: apareceu → fica gravado NESTE aparelho (fechar o app com a festa aberta não a repete na próxima abertura)
   useEffect(() => {
     if (atual) gravarFestaMostrada(idsMostradosDoItem(atual as Parameters<typeof idsMostradosDoItem>[0]), conta);
+    // 1.0.21: na calma dos 3 primeiros dias, este aviso gasta o orçamento da abertura e do dia
+    if (atual && chaveAtual && calma && atual.tipo !== "marco" && atual.tipo !== "capa") registrarFestaNaCalma(chaveAtual);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chaveAtual, conta]);
 

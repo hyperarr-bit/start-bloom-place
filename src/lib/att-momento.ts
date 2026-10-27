@@ -17,6 +17,7 @@
  * ("auto3s" | "comecar" — o que valeu pra essa pessoa) e `att_momento` (o modo remoto).
  */
 import { idDoAparelho } from "@/lib/dia1-cheio";
+import { modo1012 } from "@/lib/modo-1012";
 
 export type ModoAttMomento = "auto3s" | "comecar" | "ab";
 export type BracoATT = "auto3s" | "comecar";
@@ -63,6 +64,7 @@ export const _zerarAttMomentoRemoto = (): void => { remoto = undefined; };
 
 /** O modo que vale AQUI: o que o RevenueCat disse nesta abertura, senão a última resposta do aparelho, senão "auto3s". */
 export function modoAttMomento(): ModoAttMomento {
+  if (modo1012()) return "auto3s"; // 1.0.21 modo 1.0.12: o ATT na welcome, ~3 s depois
   if (remoto) return remoto;
   return modoDe(ls.get(CHAVE_ATT_MOMENTO_APARELHO)) ?? "auto3s";
 }

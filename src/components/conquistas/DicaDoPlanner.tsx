@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { BookOpen } from "lucide-react";
 import "./conquistas.css";
@@ -27,6 +28,8 @@ export const lerDica = (v: unknown): EstadoDica => {
 
 /** Mostra nesta visita? (nem depois de "Entendi", nem depois de abrir o planner, nem da 4ª visita em diante) */
 export const deveMostrarDica = (v: unknown): boolean => {
+  // 1.0.21 (dono 27/10, "sim, tira"): com o fluxo enxuto (e no modo 1.0.12) a dica do planner sai
+  if (fluxoEnxutoLigado()) return false;
   const d = lerDica(v);
   return !d.fim && d.vistas < VISITAS_COM_DICA;
 };

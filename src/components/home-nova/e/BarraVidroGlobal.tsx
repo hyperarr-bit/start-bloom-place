@@ -8,7 +8,10 @@ import { trackEvent } from "@/lib/analytics";
 import { dialogoAberto, lerTela, limparVolta, marcarVolta, planoDeNavegacao } from "@/lib/nav-abas";
 import { EVENTO_HOME_NOVA_MAIS, pedirMaisNaHome } from "@/lib/home-nova";
 import { marcarTrocaDeAba } from "@/lib/troca-de-rota";
-import { BarraVidro, DicaDoMais } from "./BarraVidro";
+import { BarraVidro, DicaDoMais, SeloNovas } from "./BarraVidro";
+import { useConquistas } from "@/components/conquistas/use-conquistas";
+import { CHAVE_ALBUM_VISTO } from "@/lib/conquistas-registro";
+import { fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
 import { CHAVE_DICA_MAIS, ESPERA_DICA_MAIS_MS, dicaDoMaisDevida, encerrarDicaMais, registrarAparicaoDicaMais } from "@/lib/dica-mais";
 import { EVENTO_MISSAO_DOSES, lerMissao } from "@/lib/missao-doses";
 import { iniciaisDe } from "../HomeNova";
@@ -40,6 +43,17 @@ export const __zerarDicaDaBarraVidro = () => { dicaContadaNestaAbertura = false;
 let pendente: { para: string; hojeAbaixo: boolean } | null = null;
 /** só pros testes */
 export const __zerarPilhaDaBarraVidro = () => { hojeLogoAbaixo = false; pendente = null; };
+
+/** 1.0.21 (regra das festas, dono 27/10): o que passou do limite de festas entra QUIETO no álbum — o número aparece no
+ *  troféu das Conquistas (as coladas e ainda não vistas no álbum: a mesma conta do "novas" do álbum). Só com o enxuto. */
+function SeloDasNovas() {
+  const { get } = useUserData();
+  const conq = useConquistas();
+  const visto = get<unknown>(CHAVE_ALBUM_VISTO, undefined);
+  if (!Array.isArray(visto)) return null;
+  const n = conq.adesivos.filter((b) => b.unlocked && !visto.includes(b.id)).length;
+  return <SeloNovas n={n} />;
+}
 
 export function BarraVidroGlobal() {
   const { pathname } = useLocation();
@@ -180,7 +194,7 @@ export function BarraVidroGlobal() {
   const nome = nomeDaHome(get) || user?.email?.split("@")[0] || "";
   return (
     <div className="hn he he-so-vars" data-testid="barra-vidro-global">
-      <BarraVidro ativa={aba} iniciais={iniciaisDe(nome)} onIr={ir} onMais={mais} dica={dicaNaTela && dicaCandidata ? <DicaDoMais /> : null} />
+      <BarraVidro ativa={aba} iniciais={iniciaisDe(nome)} onIr={ir} onMais={mais} dica={dicaNaTela && dicaCandidata ? <DicaDoMais /> : null} seloConquistas={fluxoEnxutoLigado() && aba !== "conquistas" ? <SeloDasNovas /> : null} />
     </div>
   );
 }

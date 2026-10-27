@@ -22,6 +22,7 @@
  * desfaz) — padrão da MISSAO_DOSES. A build `VITE_V14_QA=1` (lib/v14-qa) liga.
  */
 import { plataformaApp } from "@/lib/native-shell";
+import { modo1012 } from "@/lib/modo-1012";
 import { urlGerenciarAssinatura } from "@/lib/loja";
 import type { ProblemaDeCobranca } from "@/lib/revenuecat";
 import { v14Ligada } from "@/lib/v14-qa";
@@ -49,6 +50,8 @@ export function guardarForcaDaCobrancaV14(busca?: string | URLSearchParams): voi
 }
 
 export const cobrancaV14Ligada = (): boolean => {
+  // 1.0.21 modo 1.0.12: a cobrança da 1.0.14 SEMPRE ligada (sem ela o card da recusa volta sem segurar a folha da Apple)
+  if (modo1012()) return true;
   const f = ls.get(CHAVE_FORCA_COBRANCA_V14);
   if (f === "on" || f === "off") return f === "on";
   if (v14Ligada()) return true;

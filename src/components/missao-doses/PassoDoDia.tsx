@@ -1,4 +1,5 @@
 import { AlbumDaMissao } from "./AlbumDaMissao";
+import { modo1012 } from "@/lib/modo-1012";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { missaoWebConvidada } from "@/lib/missao-web";
 import { createPortal } from "react-dom";
@@ -36,6 +37,8 @@ import { FaixaDoRelogioSobFundoEscuro, FaixaDoRelogioTransparente } from "@/comp
 /** 1.0.17 (dono 19/10: "minimalista, uma ideia por tela") — a copy do 1º gasto: uma pergunta, os chips, "+ Outro" e a
  *  saída quieta. Sem frase explicando o toque (o post-it já diz). */
 export const PERGUNTA_DO_GASTO = "Gastou algo hoje?";
+/** 1.0.21 modo 1.0.12: a nota amarela da dose 1 com o texto da 1.0.12 (prints 1012/32). */
+export const PERGUNTA_DO_GASTO_1012 = "Qual foi o seu último gasto?";
 export const AINDA_NAO_GASTEI = "Ainda não";
 /** O balão do "olha" de Finanças (um só, no MEU MÊS): a linha do número do card QUANTO POSSO GASTAR HOJE. */
 export const HOJE_AINDA_DA = "Dá pra gastar hoje";
@@ -329,7 +332,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     : metaGuiada ? metaGuiada.pergunta
     // 17/10 (relatório 11, D2): o 1º gasto pergunta do jeito que se fala, em qualquer caminho (depois do Montar, sem
     // ele, ou continuação) — "Toca num e ele já entra ali embaixo, em CUSTOS VARIÁVEIS"
-    : doseDeGasto ? PERGUNTA_DO_GASTO
+    : doseDeGasto ? (modo1012() ? PERGUNTA_DO_GASTO_1012 : PERGUNTA_DO_GASTO)
     : continuacao && cfg.tipo === "habito" ? "Já fez o seu hábito hoje?"
     : continuacao && cfg.tipo === "agua" ? "Mais 1 copo d'água hoje?"
     : continuacao && cfg.tipo === "exercicio" && !treinoPronto ? "Qual exercício você fez hoje?"
@@ -1348,7 +1351,9 @@ export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, 
   /* 1.0.16 — BRAÇO A ("uma dose por dia", desenho 8 seção 4.2/4.4): comemoração PEQUENA (folha de baixo,
      sem confete) com o adesivo REAL que a dose abriu e o de amanhã TRANCADO; a ÚNICA festa em tela cheia do
      teste é a do adesivo "3 dias seguidos" (adesivo-da-dose.tsx). */
-  if (braco === "A" && modo === "dose") {
+  /* 1.0.21 modo 1.0.12: a comemoração da 1.0.12 ("Primeiro registro feito!" + a hora do lembrete de amanhã), sem o
+     "Quero fazer o toque de amanhã agora" (braço A: o de amanhã é amanhã) */
+  if (braco === "A" && modo === "dose" && !modo1012()) {
     return <ComemoracaoUmPorDia n={n} missao={missao} modulo={modulo} rotulo={rotulo} hoje={hoje} aoCombinar={aoCombinar} aoVerFim={aoVerFim} aoFecharDia={aoFecharDia} aoMostrarAdesivo={aoMostrarAdesivo} gastoExtra={gastoExtra} gastosNoExtra={gastosNoExtra} porDiaAgora={porDiaAgora} aoConhecerMais={aoConhecerMais} />;
   }
 

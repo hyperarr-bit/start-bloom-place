@@ -115,6 +115,15 @@ console.log(`✓ loja: ${LOJA.nome}`);
 if (process.env.VITE_V14_LOJA === "1") {
   console.log("\n✓ VITE_V14_LOJA=1 — 1.0.14 de LOJA: novidades da 1.0.14 ligadas no app (menos o mensal 19,90).\n");
 }
+/* 1.0.21 (dono 27/10): o MODO 1.0.12 (lib/modo-1012) — funil antigo com a demo, paywall longo, 2ª chance, boas-vindas
+ * "Pronto, Nome.", missão 1 por dia nas telas da 1.0.12, sem tutorial/dicas, cobrança da 1.0.14 ligada. */
+if (process.env.VITE_MODO_1012 === "1") {
+  console.log("\n✓ VITE_MODO_1012=1 — 1.0.21 MODO 1.0.12: a experiência da 1.0.12 + Home nova + consertos de hoje.\n");
+  if (process.env.VITE_V14_LOJA === "1") {
+    console.error("✗ VITE_MODO_1012=1 junto com VITE_V14_LOJA=1: o modo 1.0.12 já liga só a cobrança da 1.0.14. Tire a VITE_V14_LOJA.");
+    process.exit(1);
+  }
+}
 if (process.env.VITE_V14_QA === "1") {
   console.log("\n⚠️  VITE_V14_QA=1 — BUILD DE QA: todas as chaves da 1.0.14 LIGADAS. NÃO é build de loja.\n");
 } else {

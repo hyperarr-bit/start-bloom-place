@@ -39,6 +39,7 @@ import { DicaDoDia } from "./DicaDoDia";
 import { missaoAtual } from "@/lib/teste-gratis";
 import { homeNovaLigadaSincrona } from "@/lib/home-nova";
 import { fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
+import { modo1012 } from "@/lib/modo-1012";
 import { contaCarregadaDeVerdade } from "@/components/home-nova/OrigemDaConta";
 import "./missao-doses.css";
 
@@ -577,7 +578,9 @@ function Ligada() {
        nasce já com as boas-vindas dadas (os 3 módulos padrão, a área da porta primeiro) e segue leve: a linha "Dia 1" nas
        Pendências leva ao módulo e a dose aponta a ação direto lá. Vale em qualquer rota (a missão pode nascer com a
        pessoa já num módulo). O score do começo (braço A) é lido antes, como no caminho de sempre. */
-    if (fluxoEnxutoLigado()) {
+    /* 1.0.21 modo 1.0.12: o convite da 1.0.12 VOLTA ("Seu CORE tá pronto… 1 toque por dia" + "Trocar os 3 módulos") —
+       a boas-vindas da 1.0.12 ("Pronto, Nome.") veio antes, no cadastro; as duas conviviam na 1.0.12 */
+    if (fluxoEnxutoLigado() && !modo1012()) {
       return (
         <>
           {ehUmPorDia(missao) && missao.scoreNoInicio === undefined && (
@@ -610,7 +613,7 @@ function Ligada() {
         nome={nomeDaPessoa(get<unknown>("core-user-name", "") || get<unknown>("user-name", ""), user?.user_metadata)}
         areaNome={areaNome}
         hoje={hoje}
-        braco={B ? "B" : ehUmPorDia(missao) ? "A" : null} /* B: "3 toques hoje"; A (1.0.16): "Tá dentro! + Seu plano de 3 dias", 1 tela */
+        braco={B ? "B" : ehUmPorDia(missao) && !modo1012() ? "A" : null} /* B: "3 toques hoje"; A (1.0.16): "Tá dentro! + Seu plano de 3 dias", 1 tela; modo 1.0.12: a tela da 1.0.12 */
         aoComecar={(modulos) => {
           // a rota troca embaixo (a Home some, o módulo entra): a cópia fica inteira até o módulo estar lá — sem a Home aparecendo
           saidaCalmaDe('[data-testid="missao-doses-boas-vindas"]', MOV_MS.base, 420);

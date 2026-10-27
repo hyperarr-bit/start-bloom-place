@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { modo1012 } from "@/lib/modo-1012";
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, Check } from "lucide-react";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
 import { Confete } from "@/components/demo-guiada/pecas";
 import { trackEvent } from "@/lib/analytics";
-import { emSegundos, MODULOS, ORDEM_MODULOS, diaDaSemanaDoPasso, eventoDaMissao, type DiaDaMissao, type EstadoMissaoDoses, type ModuloDaMissao } from "@/lib/missao-doses";
+import { emSegundos, MODULOS, modulosDaEscolha, diaDaSemanaDoPasso, eventoDaMissao, type DiaDaMissao, type EstadoMissaoDoses, type ModuloDaMissao } from "@/lib/missao-doses";
 import { EVENTO_TRIAL_CARTAO, diasDoTesteDaLoja } from "@/lib/teste-da-loja";
 import { entrada, MOV, MOV_MS, saidaCalmaDe } from "@/lib/movimento";
 import { homeNovaLigadaSincrona } from "@/lib/home-nova";
@@ -127,7 +128,7 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
      que a tela apareceu (voltar da escolha dos módulos não conta de novo). O funil A×B precisa do "viu" e o alarme de
      telas que voltam (telas-repetidas) só enxerga a tela repetida com ele. O braço vem do eventoDaMissao. */
   useEffect(() => {
-    if (braco === "A") trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "view", tela: 1 }));
+    if (braco === "A" || modo1012()) trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "view", tela: 1 }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const reduzir = !!useReducedMotion();
@@ -167,7 +168,7 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
               {B ? <><b className="text-foreground">Os outros 13 continuam liberados.</b> Isso só decide onde a gente te guia hoje — o app inteiro é seu desde já.</> : "Um por dia. Os outros continuam abertos."}
             </p>
             <div className="grid grid-cols-4 gap-3 mt-5" role="group" aria-label="Módulos da missão">
-              {ORDEM_MODULOS.map((m) => {
+              {modulosDaEscolha().map((m) => {
                 const cfg = MODULOS[m];
                 const pos = escolhidos.indexOf(m);
                 return (

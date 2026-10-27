@@ -25,6 +25,7 @@
  * ignorado — lá quem manda é a metadata.
  */
 import { isNativeShell } from "@/lib/native-shell";
+import { fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
 
 export type ModoMenuNovo = "todos" | "off";
 /** O nome da chave no metadata da offering do RevenueCat. */
@@ -113,6 +114,8 @@ export const temaFogeDoPadrao = (mode: string, palette: string): boolean => mode
  * Quem chama só pede quando o menu novo está ligado e nada está por cima da Home.
  */
 export function consumirAvisoMenuNovo(mode: string, palette: string): boolean {
+  // 1.0.21 (dono 27/10, "sim, tira"): com o fluxo enxuto (e no modo 1.0.12) o balão "Modo escuro e cores agora ficam aqui" sai
+  if (fluxoEnxutoLigado()) return false;
   if (ls.get(CHAVE_AVISO_MENU_NOVO)) return false;
   const precisa = temaFogeDoPadrao(mode, palette);
   ls.set(CHAVE_AVISO_MENU_NOVO, precisa ? "visto" : "nao-precisa");

@@ -1,4 +1,5 @@
 import { idDoAparelho } from "@/lib/dia1-cheio";
+import { modo1012 } from "@/lib/modo-1012";
 import { isIOS, isNativeShell } from "@/lib/native-shell";
 
 /**
@@ -132,6 +133,7 @@ export function bracoFluxoEnxuto(): BracoFluxoEnxuto {
 /** O enxuto está ligado AQUI? */
 export function fluxoEnxutoLigado(): boolean {
   try {
+    if (modo1012()) return true; // 1.0.21 modo 1.0.12: sem tutorial nem dicas, fixo (a chave remota não desliga)
     const m = modoFluxoEnxuto();
     if (m === "off") return false;
     if (m === "on") return true;
@@ -142,6 +144,7 @@ export function fluxoEnxutoLigado(): boolean {
 /** Os campos dos eventos: com o modo diferente de "off", qual fluxo a pessoa vê. "off" = nada (eventos idênticos). */
 export function camposFluxoEnxuto(): { fluxo_enxuto?: BracoFluxoEnxuto } {
   try {
+    if (modo1012()) return { fluxo_enxuto: "enxuto" };
     if (modoFluxoEnxuto() === "off") return {};
     return { fluxo_enxuto: fluxoEnxutoLigado() ? "enxuto" : "atual" };
   } catch { return {}; }

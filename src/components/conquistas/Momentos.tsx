@@ -18,7 +18,7 @@ import { CAPAS, CHAVE_CAPA, CapaResponsiva, type CapaId } from "./CapaPlanner";
 import { CHAVE_CAPAS_VISTAS, capasNovas, diasPraCapa, lerCapasVistas } from "@/lib/fogo-sequencia";
 import { isNativeShell } from "@/lib/native-shell";
 import { missaoAtual, trialCartaoAtivo } from "@/lib/teste-gratis";
-import { aplicarCalma, calmaDasFestasVale, registrarFestaNaCalma } from "@/lib/festas-calma";
+import { EVENTO_NOVA_ABERTURA_FESTAS, aplicarCalma, calmaDasFestasVale, diaDaConta, ouvirAberturasDasFestas, registrarFestaNaCalma } from "@/lib/festas-calma";
 import { DIA_FIM_DA_MISSAO, EVENTO_MISSAO_DOSES, diaDaMissao as diaDaMissaoDoses, ehUmPorDia, lerMissao, missaoDoDiaEmCena } from "@/lib/missao-doses";
 import { conquistas2Ligada } from "@/lib/conquistas2";
 import { ehMarcoDeFesta, festaDoMarcoNovo, formatoDoAviso } from "./nova/recompensas";
@@ -697,6 +697,11 @@ export const idsMostradosDoItem = (item: { tipo: string; dias?: number; badges?:
     : item.tipo === "capa" ? (item.capas ?? []).map((c) => `capa:${c}`)
     : item.badge ? [item.badge.id] : [];
 
+/** 1.0.21 (calma dos 3 primeiros dias): o aviso conta no limite? Marcos e capas não; figurinha RARA (ou mais) também
+ *  não — a rara sempre comemora (regra do dono 27/10). Toast/popup de comuns e a comum com envelope contam. */
+const contaNaCalma = (item: Item): boolean =>
+  item.tipo !== "marco" && item.tipo !== "capa" && !(item.tipo === "adesivo" && raridadeDe(item.badge) !== "comum");
+
 /** A chave de um aviso da fila (a mesma do `key` da cena). */
 const chaveDoItem = (item: Item): string =>
   item.tipo === "marco" ? `marco-${item.dias}` : item.tipo === "popup" || item.tipo === "toast" ? `${item.tipo}-${item.badges.map((b) => b.id).join("+")}` : item.tipo === "capa" ? `capa-${item.capas.join("+")}` : item.badge.id;
@@ -731,7 +736,19 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
     window.addEventListener(EVENTO_MISSAO_DOSES, reler);
     return () => window.removeEventListener(EVENTO_MISSAO_DOSES, reler);
   }, []);
-  const esperaMissao = useMemo(() => missaoEmCena(), [tiqueMissao]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 1.0.21 (regra do dono 27/10): na calma dos 3 primeiros dias SAI o "festa espera a missão sair" (só 26% viam festa;
+  // na 1.0.12, 66%) — a festa só espera a camada da missão que está NA TELA (outraTelaAberta: dose, comemoração, convite)
+  const calma = useMemo(() => calmaDasFestasVale(user?.created_at), [user?.created_at]);
+  const esperaMissao = useMemo(() => !calma && missaoEmCena(), [tiqueMissao, calma]); // eslint-disable-line react-hooks/exhaustive-deps
+  // uma "abertura" nova (voltou do fundo depois de 5 min): a fila é relida com o orçamento da abertura zerado
+  const [tiqueAbertura, setTiqueAbertura] = useState(0);
+  useEffect(() => {
+    if (!calma) return;
+    ouvirAberturasDasFestas();
+    const reler = () => setTiqueAbertura((t) => t + 1);
+    window.addEventListener(EVENTO_NOVA_ABERTURA_FESTAS, reler);
+    return () => window.removeEventListener(EVENTO_NOVA_ABERTURA_FESTAS, reler);
+  }, [calma]);
 
   // 14/10: festas que já apareceram em aberturas ANTERIORES viram "visto" na conta (uma escrita), antes da fila
   const mostradasAntes = useMemo(() => lerFestasMostradas(conta), [conta]);
@@ -771,12 +788,12 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
    * popup com os comuns (até 6, em carrossel). Conta nova: uma peça só (o
    * raro mais alto, ou um popup com 1 comum). O que sobra entra como visto.
    */
-  // 1.0.21 (FLUXO ENXUTO): a calma dos 3 primeiros dias (lib/festas-calma) — lida 1x por montagem
-  const calma = useMemo(() => calmaDasFestasVale(user?.created_at), [user?.created_at]);
+  // 1.0.21 (FLUXO ENXUTO / modo 1.0.12): a calma dos 3 primeiros dias (lib/festas-calma, regra do dono 27/10): dia 1 até 3,
+  // dias 2 e 3 até 2, 1 por abertura; a rara sempre comemora (não conta); o resto entra quieto no álbum
   const { fila, semFesta } = useMemo<{ fila: Item[]; semFesta: string[] }>(() => {
     const bruto = filaBruta();
     if (!calma || !bruto.fila.length) return bruto;
-    const c = aplicarCalma(bruto.fila, chaveDoItem, (i) => idsMostradosDoItem(i as Parameters<typeof idsMostradosDoItem>[0]), (i) => i.tipo !== "marco" && i.tipo !== "capa");
+    const c = aplicarCalma(bruto.fila, chaveDoItem, (i) => idsMostradosDoItem(i as Parameters<typeof idsMostradosDoItem>[0]), contaNaCalma, undefined, diaDaConta(user?.created_at));
     return { fila: c.fila, semFesta: [...bruto.semFesta, ...c.silenciar] };
     function filaBruta(): { fila: Item[]; semFesta: string[] } {
     if (!loaded || !vistas) return { fila: [], semFesta: [] };
@@ -830,7 +847,7 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
     const semFesta = [...raros.slice(maxRaros), ...comuns.slice(maxComuns)].map((b) => b.id);
     return { fila: itens, semFesta };
     }
-  }, [calma, loaded, vistas, seq.recorde, seq.dias, seq.hojeFeito, conq.folha, conq.diaUmSilencioso, contaNova, capasVistas, emConquistas, esperaMissao, c2, mostradasAntes]);
+  }, [calma, tiqueAbertura, loaded, vistas, seq.recorde, seq.dias, seq.hojeFeito, conq.folha, conq.diaUmSilencioso, contaNova, capasVistas, emConquistas, esperaMissao, c2, mostradasAntes]);
 
   // os que ficaram sem festa entram como vistos (uma escrita só)
   const semFestaTxt = semFesta.join(",");
@@ -888,7 +905,7 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
   useEffect(() => {
     if (atual) gravarFestaMostrada(idsMostradosDoItem(atual as Parameters<typeof idsMostradosDoItem>[0]), conta);
     // 1.0.21: na calma dos 3 primeiros dias, este aviso gasta o orçamento da abertura e do dia
-    if (atual && chaveAtual && calma && atual.tipo !== "marco" && atual.tipo !== "capa") registrarFestaNaCalma(chaveAtual);
+    if (atual && chaveAtual && calma && contaNaCalma(atual)) registrarFestaNaCalma(chaveAtual);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chaveAtual, conta]);
 

@@ -202,6 +202,10 @@ export const MODULOS: Record<ModuloDaMissao, PassoDoModulo> = {
 
 /** A ordem da grade de escolha (a mesma do mockup). */
 export const ORDEM_MODULOS: ModuloDaMissao[] = ["financas", "rotina", "saude", "treino", "dieta", "desenvolvimento", "hiperfoco", "estudos", "carreira", "biblioteca", "casa", "beleza", "viagens", "relacionamentos", "pet", "detox"];
+/** 1.0.21 (dono 27/10, "sim, tira"): com o fluxo enxuto a BELEZA sai das opções da missão (a escolha/troca dos 3 módulos e o
+ *  "escolhe o seu" do dia 2) — a dose dela pede montar a rotina de pele antes de marcar 1 passo: a mais fraca. */
+export const foraDaMissaoNoEnxuto = (m: ModuloDaMissao): boolean => m === "beleza" && fluxoEnxutoLigado();
+export const modulosDaEscolha = (): ModuloDaMissao[] => ORDEM_MODULOS.filter((m) => !foraDaMissaoNoEnxuto(m));
 
 export const MODULO_DA_AREA: Record<AreaKey, ModuloDaMissao> = { dinheiro: "financas", rotina: "rotina", corpo: "treino", saude: "saude", metas: "desenvolvimento" };
 /**
@@ -872,7 +876,7 @@ export function opcoesDoDia2(m: EstadoMissaoDoses, area: string | null | undefin
   const out: ModuloDaMissao[] = [];
   for (const mod of [...daArea, ...OPCOES_DIA2_RESERVA]) {
     if (out.length === 3) break;
-    if (out.includes(mod) || mod === m.modulos[0]) continue;
+    if (out.includes(mod) || mod === m.modulos[0] || foraDaMissaoNoEnxuto(mod)) continue;
     let ok = false;
     try { ok = introPodeAbrir(mod); } catch { ok = false; }
     if (ok) out.push(mod);

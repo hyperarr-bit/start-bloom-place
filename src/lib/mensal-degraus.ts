@@ -41,6 +41,7 @@
  * (o app pode precisar antes do getOfferings desta abertura responder). Força de QA > RevenueCat > aparelho > "off".
  */
 import { idDoAparelho } from "@/lib/dia1-cheio";
+import { modo1012 } from "@/lib/modo-1012";
 import { isNativeShell, plataformaApp } from "@/lib/native-shell";
 import { CHAVE_CARD_RECUSA_VISTO_EM, cardRecusaJaVisto, marcaDaRecusa } from "@/lib/card-recusa";
 
@@ -174,6 +175,7 @@ export function guardarForcaMotivos(busca?: string | URLSearchParams): void {
 }
 
 export function modoMotivos(): ModoMotivos {
+  if (modo1012()) return "off"; // 1.0.21 modo 1.0.12: folha fechada → 2ª chance, sem "O que te fez parar?"
   const f = modoMotivosDe(ls.get(CHAVE_FORCA_MOTIVOS));
   if (f) return f;
   if (remotoMotivos) return remotoMotivos;

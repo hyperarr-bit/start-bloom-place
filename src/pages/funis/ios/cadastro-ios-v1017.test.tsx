@@ -453,3 +453,67 @@ describe("FLUXO ENXUTO (1.0.21): compra → cadastro → Parabéns → Home", ()
   });
 });
 const eventosDe = (n: string) => vi.mocked(trackEvent).mock.calls.filter((c) => c[0] === n);
+
+/* 1.0.21 — MODO 1.0.12 (lib/modo-1012): compra → cadastro → a BOAS-VINDAS DA 1.0.12 ("Pronto, Nome." + círculo magenta +
+ * confete + "Começar") → Home, onde o convite da missão aparece. Mesmo com a missão em doses vindo (antes ela era
+ * PULADA por pulaPelaMissao) e mesmo com o enxuto ligado (no lugar da TelaParabens). */
+describe("MODO 1.0.12: compra → cadastro → boas-vindas da 1.0.12 → Home", () => {
+  const G = globalThis as { __FLUXO_ENXUTO_PADRAO_APP__?: string; __MODO_1012__?: unknown };
+  let antes: string | undefined;
+  beforeEach(() => { antes = G.__FLUXO_ENXUTO_PADRAO_APP__; delete G.__FLUXO_ENXUTO_PADRAO_APP__; G.__MODO_1012__ = true; });
+  afterEach(() => { G.__FLUXO_ENXUTO_PADRAO_APP__ = antes; delete G.__MODO_1012__; });
+  const App = () => (
+    <MemoryRouter initialEntries={["/app"]}>
+      <Routes>
+        <Route path="/app" element={<LiberandoIOS />} />
+        <Route path="/" element={<div data-testid="raiz">RAIZ</div>} />
+      </Routes>
+    </MemoryRouter>
+  );
+
+  it("a boas-vindas da 1.0.12 aparece JÁ (nunca pulada pela missão), sem TelaParabens e sem 'Tá dentro'", async () => {
+    render(<App />);
+    expect(screen.getByTestId("boas-vindas-pago")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^Pronto/ })).toBeInTheDocument();
+    expect(screen.getByText(/O CORE inteiro é seu/)).toBeInTheDocument();
+    expect(screen.getByTestId("boas-vindas-comecar")).toHaveTextContent("Começar");
+    expect(screen.queryByTestId("tela-parabens")).toBeNull();
+    expect(screen.queryByText(/Tá dentro/)).toBeNull();
+    expect(eventosDe("parabens_view")).toHaveLength(0);
+    expect(vi.mocked(trackEvent).mock.calls.some((c) => c[0] === "boas_vindas_pago_seguiu" && (c[1] as { pulada?: boolean }).pulada)).toBe(false);
+    await act(async () => { await Promise.resolve(); });
+  });
+
+  it("Começar antes do acesso: 'Guardando…'; com assinatura + missão, troca de rota sem recarregar; a marca de visto fica gravada", async () => {
+    const hrefAntes = window.location.href;
+    const { rerender } = render(<App />);
+    fireEvent.click(screen.getByTestId("boas-vindas-comecar"));
+    expect(localStorage.getItem("core-boas-vindas-visto")).toBe("1");
+    expect(eventosDe("boas_vindas_1012_comecar")).toHaveLength(1);
+    expect(await screen.findByText("Guardando seu acesso…")).toBeInTheDocument();
+    estado.auth.isSubscribed = true;
+    rerender(<App />);
+    await act(async () => { iniciarMissao(["financas", "rotina", "saude"]); });
+    expect(await screen.findByTestId("raiz")).toBeInTheDocument();
+    expect(window.location.href).toBe(hrefAntes);
+    localStorage.removeItem(CHAVE_ESTADO_MISSAO_DOSES);
+  });
+
+  it("acesso já pronto: Começar vai direto pra Home, sem a boas-vindas reaparecer nem o 'Guardando…'", async () => {
+    estado.auth.isSubscribed = true;
+    await act(async () => { iniciarMissao(["financas", "rotina", "saude"]); });
+    render(<App />);
+    await waitFor(() => expect(vi.mocked(trackEvent).mock.calls.some((c) => c[0] === "app_pos_compra_liberado")).toBe(true));
+    await act(async () => { await Promise.resolve(); });
+    fireEvent.click(screen.getByTestId("boas-vindas-comecar"));
+    expect(screen.queryByText("Guardando seu acesso…")).toBeNull();
+    expect(await screen.findByTestId("raiz")).toBeInTheDocument();
+    localStorage.removeItem(CHAVE_ESTADO_MISSAO_DOSES);
+  });
+
+  it("o rollback remoto do enxuto (`fluxo_enxuto: off`) não muda o modo 1.0.12", () => {
+    localStorage.setItem("core-fluxo-enxuto", "off");
+    render(<App />);
+    expect(screen.getByTestId("boas-vindas-pago")).toBeInTheDocument();
+  });
+});

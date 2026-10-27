@@ -18,6 +18,8 @@ interface Props {
   rotulos?: Partial<Record<AbaNova, string>>;
   /** 1.0.19 (26/10): a dica do "+" (lib/dica-mais), presa ao botão — vem pronta de quem monta a barra */
   dica?: ReactNode;
+  /** 1.0.21: o número de figurinhas novas no álbum (as que entraram quietas), no ícone das Conquistas */
+  seloConquistas?: ReactNode;
 }
 
 /** O balão da dica do "+": pequeno, sem borda, sombra mínima, na paleta suave da Home nova; a ponta aponta pro "+". */
@@ -29,6 +31,18 @@ export const DicaDoMais = () => (
     <span className="he-dica-mais-ponta" aria-hidden />
   </div>
 );
+
+/** 1.0.21: o selo com o número de figurinhas novas (ainda não coladas) no troféu das Conquistas. */
+export const SeloNovas = ({ n }: { n: number }) => (n > 0 ? (
+  <span
+    className="absolute -top-1.5 -right-2.5 min-w-[17px] h-[17px] px-1 rounded-full grid place-items-center text-[10px] font-extrabold leading-none text-white"
+    style={{ background: "hsl(330 65% 50%)", boxShadow: "0 0 0 2px var(--he-vidro-fio, #fff)" }}
+    data-testid="hn-conquistas-novas"
+    aria-label={`${n} figurinha${n > 1 ? "s" : ""} nova${n > 1 ? "s" : ""}`}
+  >
+    {n > 9 ? "9+" : n}
+  </span>
+) : null);
 
 const PADRAO: Record<AbaNova, string> = { inicio: "Início", conquistas: "Conquistas", voce: "Você" };
 
@@ -50,7 +64,7 @@ const AbaVidro = ({ id, ativa, rotulo, onIr, children }: { id: AbaNova; ativa: A
   );
 };
 
-export const BarraVidro = ({ ativa, iniciais, onIr, onMais, rotulos, dica }: Props) => {
+export const BarraVidro = ({ ativa, iniciais, onIr, onMais, rotulos, dica, seloConquistas }: Props) => {
   const nome = { ...PADRAO, ...(rotulos ?? {}) };
   /* 26/10: a aba (AbaVidro) é um componente de FORA — antes era criada dentro da barra, e cada re-render da barra
      desmontava e remontava os botões (um re-render no meio do toque, como o da dica do "+" saindo, arriscava o clique) */
@@ -64,7 +78,7 @@ export const BarraVidro = ({ ativa, iniciais, onIr, onMais, rotulos, dica }: Pro
     >
       <nav aria-label="Navegação principal" className="he-vidro rounded-full flex-1 h-[60px] p-1.5 flex items-center">
         <AbaVidro id="inicio" ativa={ativa} rotulo={nome.inicio} onIr={onIr}><Home className="w-[22px] h-[22px]" strokeWidth={ativa === "inicio" ? 2.2 : 1.75} aria-hidden /></AbaVidro>
-        <AbaVidro id="conquistas" ativa={ativa} rotulo={nome.conquistas} onIr={onIr}><Trophy className="w-[22px] h-[22px]" strokeWidth={ativa === "conquistas" ? 2.2 : 1.75} aria-hidden /></AbaVidro>
+        <AbaVidro id="conquistas" ativa={ativa} rotulo={nome.conquistas} onIr={onIr}><span className="relative inline-grid"><Trophy className="w-[22px] h-[22px]" strokeWidth={ativa === "conquistas" ? 2.2 : 1.75} aria-hidden />{seloConquistas}</span></AbaVidro>
         <AbaVidro id="voce" ativa={ativa} rotulo={nome.voce} onIr={onIr}>
           <span
             className="w-[22px] h-[22px] rounded-full grid place-items-center text-[9.5px] font-bold leading-none"

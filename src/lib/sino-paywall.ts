@@ -23,6 +23,7 @@
  * QA: `?sino-paywall=on|off|ab|auto` (guarda neste aparelho, como `?paywall-minimalista=`).
  */
 import { idDoAparelho } from "@/lib/dia1-cheio";
+import { modo1012 } from "@/lib/modo-1012";
 
 export type ModoSino = "off" | "on" | "ab";
 export type BracoSino = "com" | "sem";
@@ -84,6 +85,7 @@ export function guardarForcaSino(busca?: string): void {
 
 /** O modo que vale AQUI: força de QA > RevenueCat desta abertura > última resposta do aparelho > "off". */
 export function modoSino(): ModoSino {
+  if (modo1012()) return "off"; // 1.0.21 modo 1.0.12: sem o sino antes do paywall
   const f = modoDe(ls.get(CHAVE_FORCA_SINO));
   if (f) return f;
   if (remoto) return remoto;

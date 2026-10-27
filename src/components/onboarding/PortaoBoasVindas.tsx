@@ -6,6 +6,7 @@ import { isNativeShell } from "@/lib/native-shell";
 import { BoasVindasPago, boasVindasPagoJaVista, marcarBoasVindasPagoVista } from "./BoasVindasPago";
 import { TelaParabens } from "./TelaParabens";
 import { fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
+import { modo1012 } from "@/lib/modo-1012";
 import { trackEvent } from "@/lib/analytics";
 
 /**
@@ -41,10 +42,21 @@ export const PortaoBoasVindas = () => {
   const visto = vistoAqui || boasVindasPagoJaVista();
   const contaNovaAqui = !!user?.created_at && Date.now() - new Date(user.created_at).getTime() < 48 * 3600e3;
   const parabensAqui = enxuto && !visto && isNativeShell() && subLoaded && isSubscribed && !!user && contaNovaAqui && !pathname.startsWith("/app");
-  useEffect(() => { if (parabensAqui) trackEvent("parabens_view", { funil: "abertura" }); }, [parabensAqui]);
+  useEffect(() => { if (parabensAqui && !modo1012()) trackEvent("parabens_view", { funil: "abertura" }); }, [parabensAqui]);
 
   if (enxuto) {
     if (!parabensAqui) return null;
+    /* 1.0.21 MODO 1.0.12: fora do /app (assinou pelo gate/Porta) a boas-vindas é a da 1.0.12, 1x, e "Começar" → Home */
+    if (modo1012()) {
+      return (
+        <BoasVindasPago
+          imediato
+          nuncaPula
+          nome={get<string>("core-user-name", "") || get<string>("user-name", "")}
+          onComecar={() => { marcarBoasVindasPagoVista(); setVisto(true); navigate("/home"); }}
+        />
+      );
+    }
     return (
       <TelaParabens
         nome={get<string>("core-user-name", "") || get<string>("user-name", "")}

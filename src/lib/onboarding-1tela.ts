@@ -26,6 +26,7 @@
  * A build `VITE_V14_QA=1` (lib/v14-qa) liga.
  */
 import { v14Ligada } from "@/lib/v14-qa";
+import { modo1012 } from "@/lib/modo-1012";
 
 export type ModoOnboarding1Tela = "off" | "on";
 export const ONBOARDING_1TELA: ModoOnboarding1Tela = "off";
@@ -58,6 +59,7 @@ export const forcaOnboarding1Tela = (): "on" | "off" | null => {
 
 /** A tela única está ligada AQUI? força de QA > chave. */
 export function onboarding1TelaLigado(modo: ModoOnboarding1Tela = ONBOARDING_1TELA): boolean {
+  if (modo1012()) return false; // 1.0.21 modo 1.0.12: os 3 "Claro!" + o contrato assinado
   const f = forcaOnboarding1Tela();
   if (f === "on") return true;
   if (f === "off") return false;

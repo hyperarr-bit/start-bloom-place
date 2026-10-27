@@ -63,6 +63,7 @@
  */
 import { localDayKey } from "@/lib/utils";
 import { v14Ligada } from "@/lib/v14-qa";
+import { modo1012 } from "@/lib/modo-1012";
 import { plataformaApp } from "@/lib/native-shell";
 
 export type ModoDia1Cheio = "off" | "ab" | "on";
@@ -207,6 +208,7 @@ export function modoTourHomeRemoto(): ModoTourHome | null {
  * senão a última resposta guardada no aparelho, senão "off" (RevenueCat nunca respondeu = o de hoje).
  */
 export function modoUmPorDia(): ModoUmPorDia {
+  if (modo1012()) return "on"; // 1.0.21 modo 1.0.12: UMA dose por dia pra todo mundo (a metadata não muda)
   if (plataformaApp() !== "ios") return "off";
   if (umPorDiaRemoto) return umPorDiaRemoto;
   return modoUmPorDiaDe(ls.get(CHAVE_UM_POR_DIA_APARELHO)) ?? "off";
@@ -214,6 +216,7 @@ export function modoUmPorDia(): ModoUmPorDia {
 
 /** O modo que vale AQUI: força de QA > metadata `missao_1_por_dia` ("ab"/"on") > build de QA/loja (→ "on") > constante. */
 export function modoDia1Cheio(modo: ModoDia1Cheio = DIA1_CHEIO): ModoDia1Cheio {
+  if (modo1012()) return "ab"; // 1.0.21 modo 1.0.12: o teste ligado com o braço A fixo (bracoFixo)
   const f = forcaDia1Cheio();
   if (f) return f;
   // 1.0.16: o teste remoto liga o sorteio (ou, em "on", o braço A pra todos — bracoFixo)
@@ -232,6 +235,7 @@ export function dia1CheioLigado(modo: ModoDia1Cheio = DIA1_CHEIO): boolean {
  * QA) → A pra todo mundo. null nos outros casos (sorteio, ou chave desligada).
  */
 export const bracoFixo = (modo: ModoDia1Cheio = DIA1_CHEIO): BracoDia1 | null => {
+  if (modo1012()) return "A";
   const m = modoDia1Cheio(modo);
   if (m === "on") return "B";
   if (m === "ab" && !forcaDia1Cheio() && modoUmPorDia() === "on") return "A";

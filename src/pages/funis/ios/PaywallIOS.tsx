@@ -177,6 +177,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { agendarRecuperacaoDoPaywall, agendarResgateDoPlano, cancelarRecuperacaoDoPaywall, cancelarResgateDoPlano, cancelarReguaDoTeste, pedirLembreteDoTeste } from "@/lib/notificacoes";
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
 import { guardarForcaDasOfertas, ofertaLigada } from "@/lib/ofertas-saida";
+import { modo1012 } from "@/lib/modo-1012";
 import { Presente69Folha, prepararPresente, type OfertaDoPresente } from "@/components/app/Presente69";
 import { Mensal19Folha, carregarOfertaMensal19, prepararMensal19, type OfertaDoMensal19 } from "@/components/paywall/OfertaMensal19";
 import { MensalHeroi } from "@/components/paywall/MensalHeroi";
@@ -656,6 +657,9 @@ export function PaywallIOS({
    * apareceu ainda), o presente 69,90; senão, ou se ele não vier, o cartão de sempre. A folha
    * do PRÓPRIO 69,90 fechada fica dentro do Presente69 (erro/"Agora não") e nunca volta aqui. */
   const depoisDaFolhaCancelada = () => {
+    /* 1.0.21 modo 1.0.12 (dono 27/10): fechou a folha → a 2ª chance da 1.0.12 ("Hoje você não paga nada · cancela em 2
+     * toques — Tentar de novo"), sempre. Sem o presente 69,90 e sem "O que te fez parar?" neste ponto. */
+    if (modo1012()) { cartaoDeSempre(); return; }
     if (folhaCanceladaTratadaRef.current || presenteMostradoRef.current) { cartaoDeSempre(); return; }
     folhaCanceladaTratadaRef.current = true;
     // 1.0.18 (motivos_folha "com"): a folha "O que te fez parar?" no lugar do presente direto — 1x por sessão
@@ -925,6 +929,7 @@ export function PaywallIOS({
   /* 16/10 — a folha do anual já foi fechada nesta sessão e este produto ainda não foi explicado:
    * a meia-folha ExplicaFolha vem antes (1x por produto por sessão). true = abriu a explicação. */
   const explicarAntesDaFolha = (): boolean => {
+    if (modo1012()) return false; // 1.0.21 modo 1.0.12: "Tentar de novo" abre a folha direto, como na 1.0.12
     if (!comTrial || folhasCanceladasRef.current < 1 || explicadosRef.current.has(oferta.produto)) return false;
     explicadosRef.current.add(oferta.produto);
     setExplica({ produto: oferta.produto, preco: precoAnualTxt, precoTeste, dias, continuar: () => { void comprar("anual"); } });

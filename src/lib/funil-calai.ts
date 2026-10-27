@@ -36,6 +36,7 @@
  * aparelho. A build `VITE_V14_QA=1` (lib/v14-qa) liga.
  */
 import { v14Ligada } from "@/lib/v14-qa";
+import { modo1012 } from "@/lib/modo-1012";
 
 export type ModoFunilCalai = "off" | "on";
 export const FUNIL_CALAI: ModoFunilCalai = "off";
@@ -71,6 +72,7 @@ export const forcaFunilCalai = (): "on" | "off" | null => {
 
 /** O funil enxuto está ligado AQUI? força de QA > build de QA > chave. */
 export function funilCalaiLigado(modo: ModoFunilCalai = FUNIL_CALAI): boolean {
+  if (modo1012()) return false; // 1.0.21 modo 1.0.12: o funil antigo, com a demo
   const f = forcaFunilCalai();
   if (f === "on") return true;
   if (f === "off") return false;

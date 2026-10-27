@@ -1,3 +1,4 @@
+import { modo1012 } from "@/lib/modo-1012";
 /**
  * DIAS 2 E 3 DO TESTE (1.0.18, dono 22/10 — plano novidades-guardadas/2026-10-21/trial-plano/RELATORIO.md).
  *
@@ -73,6 +74,7 @@ export function guardarForcaDias23(busca?: string | URLSearchParams): void {
 
 /** O modo AQUI: força de QA > o que o RevenueCat disse nesta abertura > a última resposta do aparelho > "off". */
 export function modoDias23(): ModoDias23 {
+  if (modo1012()) return "off"; // 1.0.21 modo 1.0.12: dias 2 e 3 da missão como na 1.0.12
   const f = modoDe(ls.get(CHAVE_FORCA_DIAS23));
   if (f) return f;
   if (remoto) return remoto;

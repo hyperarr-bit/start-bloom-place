@@ -472,3 +472,57 @@ describe("Paywall do iPhone", () => {
     expect(screen.getByText("mês")).toBeInTheDocument();
   });
 });
+
+/* 1.0.21 — MODO 1.0.12 (VITE_MODO_1012=1, lib/modo-1012): o paywall LONGO da 1.0.12 com a promessa "a gente te avisa
+ * 1 dia antes" nos mesmos lugares; folha da Apple fechada → a 2ª chance (sem presente 69,90, sem "O que te fez parar?"),
+ * e "Tentar de novo" abre a folha direto (sem a explicação da 2ª vez); sem X/Voltar; nenhuma oferta de saída. */
+describe("modo 1.0.12 (paywall longo + 2ª chance)", () => {
+  const G = globalThis as { __MODO_1012__?: unknown };
+  beforeEach(() => {
+    G.__MODO_1012__ = true;
+    (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" };
+    // as chaves que contrariam a 1.0.12, como se o RevenueCat dos apps no ar as mandasse
+    localStorage.setItem("ofertas-saida-force", "on");
+  });
+  afterEach(() => { delete G.__MODO_1012__; delete (window as { Capacitor?: unknown }).Capacitor; });
+  const vezes = (evento: string) => vi.mocked(trackEvent).mock.calls.filter((c) => c[0] === evento).length;
+
+  it("o layout LONGO com a promessa da 1.0.12: 'Dia 2 · a gente te avisa', o selo e o rodapé; sem Voltar/X", async () => {
+    montar();
+    await screen.findByText("por mês · R$ 97,90/ano");
+    expect(screen.getByText(/Dia 2 · a gente te avisa/)).toBeInTheDocument();
+    expect(screen.getByText("Notificação 1 dia antes do teste acabar. Nada é cobrado sem aviso.")).toBeInTheDocument();
+    expect(screen.getByText("Aviso 1 dia antes de cobrar")).toBeInTheDocument();
+    expect(document.body.textContent).toMatch(/avisamos 1 dia antes|a gente te avisa 1 dia antes/i);
+    expect(screen.queryByTestId("ios-curto-voltar")).toBeNull();
+    expect(screen.queryByTestId("ios-mini-voltar")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Voltar" })).toBeNull();
+    expect(screen.queryByTestId("ios-apple-confirma")).toBeNull(); // PAYWALL_TEXTOS (1.0.14) desligado
+  });
+
+  it("fechou a folha do 97,90 (com o presente 69,90 disponível na loja): a 2ª CHANCE, nunca o presente; 'Tentar de novo' abre a folha direto", async () => {
+    const onPago = vi.fn();
+    montar({ onPago });
+    await screen.findByText("por mês · R$ 97,90/ano");
+    loja.compraOk = false; loja.motivo = "cancelou";
+    fireEvent.click(await screen.findByRole("button", { name: /Começar 3 dias grátis/ }));
+    expect(await screen.findByText("Hoje você não paga nada · cancela em 2 toques")).toBeInTheDocument();
+    expect(screen.queryByTestId("presente69")).toBeNull();
+    expect(screen.queryByText(/O que te fez parar/)).toBeNull();
+    expect(vezes("presente69_view")).toBe(0);
+    loja.compraOk = true; loja.motivo = null;
+    fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+    await waitFor(() => expect(onPago).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId("explica-folha-continuar")).toBeNull();
+    expect(comprarAnualIos).toHaveBeenCalledTimes(2);
+    expect(comprarPresente69).not.toHaveBeenCalled();
+  });
+
+  it("o 'core:voltar' (Voltar do Android/gesto) não abre presente nenhum", async () => {
+    montar();
+    await screen.findByText("por mês · R$ 97,90/ano");
+    window.dispatchEvent(new Event("core:voltar"));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByTestId("presente69")).toBeNull();
+  });
+});

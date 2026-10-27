@@ -1,3 +1,4 @@
+import { modo1012 } from "@/lib/modo-1012";
 /**
  * PEDIDO DE AVALIAÇÃO PRA QUEM ESTÁ NO TESTE E VOLTOU NO DIA 2 — iPhone (1.0.18, dono 22/10).
  *
@@ -70,6 +71,7 @@ export function guardarForcaAvaliacaoTesteDia2(busca?: string | URLSearchParams)
 
 /** O modo AQUI: força de QA > RevenueCat desta abertura > última resposta do aparelho > constante (off). */
 export function modoAvaliacaoTesteDia2(): ModoAvaliacaoTesteDia2 {
+  if (modo1012()) return "off"; // 1.0.21 modo 1.0.12: sem a avaliação no dia 2 do teste
   const f = modoDe(ls.get(CHAVE_FORCA_AVALIACAO_TESTE_DIA2));
   if (f) return f;
   if (remoto) return remoto;

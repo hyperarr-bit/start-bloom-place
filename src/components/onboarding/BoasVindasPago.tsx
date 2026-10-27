@@ -82,22 +82,26 @@ export const pulaPelaMissao = (criadoEm?: string | null): boolean => {
   try { return isNativeShell() && missaoDosesMandaNoApp(criadoEm); } catch { return false; }
 };
 
-export const BoasVindasPago = ({ nome, onComecar, imediato }: {
+export const BoasVindasPago = ({ nome, onComecar, imediato, nuncaPula = false }: {
   nome?: string;
   onComecar: () => void;
   /** Compra recém-confirmada: mostra na hora, sem consultar nada. */
   imediato?: boolean;
+  /** 1.0.21 modo 1.0.12 (dono 27/10): a boas-vindas da 1.0.12 APARECE mesmo com a missão em doses vindo depois
+   *  (na 1.0.12 as duas conviviam: "Pronto, Nome." → "Seu CORE tá pronto."). */
+  nuncaPula?: boolean;
 }) => {
   const { loaded } = useUserData();
   const user = useAuthOpcional()?.user;
-  const [visivel, setVisivel] = useState(!!imediato && !pulaPelaMissao(user?.created_at));
+  const pula = (criadoEm?: string | null) => !nuncaPula && pulaPelaMissao(criadoEm);
+  const [visivel, setVisivel] = useState(!!imediato && !pula(user?.created_at));
   const pulou = useRef(false);
 
   useEffect(() => {
     if (pulou.current) return;
     const origem = imediato ? "compra" : "abertura";
     if (!imediato && (!loaded || jaViu())) return;
-    if (pulaPelaMissao(user?.created_at)) {
+    if (pula(user?.created_at)) {
       pulou.current = true;
       marcarVisto();
       trackEvent("boas_vindas_pago_visto", { origem, pulada: true });
@@ -133,6 +137,11 @@ export const BoasVindasPago = ({ nome, onComecar, imediato }: {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          /* 1.0.21: camada declarada — nenhuma festa de figurinha abre por cima da boas-vindas (Momentos) */
+          role="dialog"
+          aria-label="Boas-vindas"
+          data-camada-guia="boas-vindas-pago"
+          data-testid="boas-vindas-pago"
           className="fixed inset-0 z-[300] overflow-hidden flex flex-col justify-center px-7
                      pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+var(--app-safe-bottom,0px))]"
           style={{ background: "linear-gradient(180deg,#FFFFFF 0%,#FFF7FB 58%,#FDEEF5 100%)" }}
@@ -237,6 +246,7 @@ export const BoasVindasPago = ({ nome, onComecar, imediato }: {
           >
             <Button
               onClick={seguir}
+              data-testid="boas-vindas-comecar"
               size="lg"
               style={{ background: MAGENTA }}
               className="w-full h-14 text-base font-bold rounded-2xl text-white hover:opacity-90"

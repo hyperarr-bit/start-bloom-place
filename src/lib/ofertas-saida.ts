@@ -52,6 +52,7 @@
  * Só iPhone: as telas que leem isto já estão atrás de ehApple(); na web e no Android nada muda.
  */
 import { v14Qa, v14Loja } from "@/lib/v14-qa";
+import { modo1012 } from "@/lib/modo-1012";
 
 export type ModoOferta = "off" | "on";
 export type NomeDaOferta = "x_paywall" | "mensal_19" | "escada" | "textos" | "enxuto" | "recuperacao" | "curto" | "cadeado" | "direto_19";
@@ -178,6 +179,8 @@ export const apagarMarcasDeVisto = (): void => { for (const k of CHAVES_DE_VISTO
 /* ───────────── a resposta ───────────── */
 /** A oferta está ligada AQUI, agora? força de QA > build de QA > metadata do RevenueCat > constante local. */
 export function ofertaLigada(nome: NomeDaOferta): boolean {
+  // 1.0.21 modo 1.0.12: nenhuma oferta de saída da 1.0.14 (paywall longo, sem X → presente, sem recuperação…)
+  if (modo1012()) return false;
   const soPorNome = SO_POR_NOME.has(nome);
   const f = forcaDasOfertas(nome);
   // `?ofertas-saida=on` não liga as "só por nome" (mas `off` desliga): cai na metadata/constante

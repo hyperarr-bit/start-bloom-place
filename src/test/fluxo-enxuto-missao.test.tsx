@@ -137,6 +137,7 @@ describe("conta nova no iPhone com o enxuto (padrão)", () => {
     const r = porQueNaoMostrar("casa", s.valor().get);
     expect(r).toBe("desligada");
     const opcoes = opcoesDoDia2(m, "dinheiro", (mod) => { const x = porQueNaoMostrar(mod, s.valor().get, { ignorarChave: true }); return x === null || x === "missao" || x === "outra_guia"; });
-    expect(opcoes).toEqual(["casa", "beleza", "estudos"]);
+    // 1.0.21 (dono 27/10, "sim, tira"): com o enxuto a Beleza sai das opções (a dose dela pede montar a rotina antes)
+    expect(opcoes).toEqual(["casa", "estudos", "dieta"]);
   });
 });

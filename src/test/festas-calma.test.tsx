@@ -1,8 +1,8 @@
 /**
- * 1.0.21 — CONQUISTAS COM CALMA NOS 3 PRIMEIROS DIAS (lib/festas-calma, atrás do FLUXO ENXUTO). Dono 27/10: "Conquistas
- * deixa mas tenta não deixar chato aparecer toda hora". O visual das festas não muda; só QUANDO/QUANTAS:
- * no máximo 1 festa por abertura do app e 2 por dia; o resto entra em silêncio no álbum (vira "visto"); reabrir não
- * repete festa.
+ * 1.0.21 — CONQUISTAS COM CALMA NOS 3 PRIMEIROS DIAS (lib/festas-calma, atrás do FLUXO ENXUTO e fixa no modo 1.0.12).
+ * REGRA DO DONO (27/10, no lugar da de 1/abertura e 2/dia nas 72 h): dia 1 até 3 festas, dias 2 e 3 até 2 por dia,
+ * no máximo 1 por abertura; a figurinha RARA sempre comemora (não conta); o resto entra quieto no álbum; reabrir não
+ * repete; do 4º dia em diante, a fila de sempre. O visual das festas não muda.
  */
 process.env.TZ = "America/Sao_Paulo";
 
@@ -19,7 +19,7 @@ vi.mock("sonner", () => ({ toast: Object.assign(() => {}, { success: () => {}, e
 
 import { UserDataContext } from "@/hooks/use-user-data";
 import { MomentosConquistas } from "@/components/conquistas/Momentos";
-import { CHAVE_FESTAS_CALMA, MAX_FESTAS_POR_ABERTURA, MAX_FESTAS_POR_DIA, _novaAberturaFestas, aplicarCalma, calmaDasFestasVale, registrarFestaNaCalma } from "@/lib/festas-calma";
+import { CHAVE_FESTAS_CALMA, MAX_FESTAS_DIAS_2_E_3, MAX_FESTAS_POR_ABERTURA, _novaAberturaFestas, aplicarCalma, calmaDasFestasVale, registrarFestaNaCalma } from "@/lib/festas-calma";
 
 function montarStore(inicial: Record<string, unknown>) {
   const dados: Record<string, unknown> = { ...inicial };
@@ -89,10 +89,10 @@ describe("a regra (pura)", () => {
     localStorage.setItem("fluxo-enxuto-force", "off");
     expect(calmaDasFestasVale("2026-09-26T09:00:00-03:00", agora)).toBe(false);
   });
-  it("1 por abertura, 2 por dia; o que já está na tela fica; marcos não contam", () => {
+  it("1 por abertura; dias 2–3 até 2 por dia; o que já está na tela fica; marcos não contam", () => {
     _novaAberturaFestas();
     const it = (k: string, tipo = "adesivo") => ({ k, tipo });
-    const ap = (fila: Array<{ k: string; tipo: string }>) => aplicarCalma(fila, (i) => i.k, (i) => [i.k], (i) => i.tipo !== "marco", "2026-09-26");
+    const ap = (fila: Array<{ k: string; tipo: string }>) => aplicarCalma(fila, (i) => i.k, (i) => [i.k], (i) => i.tipo !== "marco", "2026-09-26", 2);
     expect(ap([it("a"), it("b"), it("m", "marco")])).toEqual({ fila: [it("a"), it("m", "marco")], silenciar: ["b"] });
     registrarFestaNaCalma("a", "2026-09-26");
     expect(ap([it("a"), it("c")])).toEqual({ fila: [it("a")], silenciar: ["c"] });
@@ -101,47 +101,47 @@ describe("a regra (pura)", () => {
     registrarFestaNaCalma("d", "2026-09-26");
     _novaAberturaFestas();
     expect(ap([it("e")])).toEqual({ fila: [], silenciar: ["e"] }); // 2 no dia
-    expect(JSON.parse(localStorage.getItem(CHAVE_FESTAS_CALMA)!)).toEqual({ dia: "2026-09-26", n: MAX_FESTAS_POR_DIA });
+    expect(JSON.parse(localStorage.getItem(CHAVE_FESTAS_CALMA)!)).toEqual({ dia: "2026-09-26", n: MAX_FESTAS_DIAS_2_E_3 });
     expect(ap([it("f")]).fila.length).toBe(0);
-    expect(aplicarCalma([it("g")], (i) => i.k, (i) => [i.k], () => true, "2026-09-27").fila.length).toBe(MAX_FESTAS_POR_ABERTURA); // dia novo
+    expect(aplicarCalma([it("g")], (i) => i.k, (i) => [i.k], () => true, "2026-09-27", 3).fila.length).toBe(MAX_FESTAS_POR_ABERTURA); // dia novo
+    // dia 1 da conta: o 3º ainda passa
+    _novaAberturaFestas();
+    expect(aplicarCalma([it("h")], (i) => i.k, (i) => [i.k], () => true, "2026-09-26", 1).fila.length).toBe(1);
   });
 });
 
 describe("conta nova faz 7 coisas que dão figurinha no dia 1", () => {
-  it("vê no máximo 1 festa por abertura e 2 no dia; o resto entra em silêncio; reabrir não repete festa", { timeout: 60_000 }, async () => {
+  it("dia 1: no máximo 1 festa comum por abertura e 3 no dia; a rara sempre comemora; o resto entra quieto; reabrir não repete", { timeout: 60_000 }, async () => {
     const store = montarStore({ "core-user-name": "Ana" });
     let r = abrirApp(store);
     await espera(2000);
     expect(festa()).toBeNull(); // linha de base: nada
-    const porAbertura: number[] = [];
-    // 1ª abertura: 3 ações
-    let n = 0;
-    for (const a of ACOES.slice(0, 3)) if (await fazer(store, a)) n++;
-    porAbertura.push(n);
+    const comunsPorAbertura: number[] = [];
+    const comuns = () => eventos.filter(([e, d]) => e === "festa_view" && d.raridade === "comum").length;
+    const raras = () => eventos.filter(([e, d]) => e === "festa_view" && d.raridade !== "comum").length;
+    // 4 aberturas no dia 1, as 7 ações espalhadas
+    const lotes = [ACOES.slice(0, 3), ACOES.slice(3, 5), ACOES.slice(5, 6), ACOES.slice(6)];
+    for (const [i, lote] of lotes.entries()) {
+      if (i > 0) { r.unmount(); r = abrirApp(store); await espera(2000); if (festa()) { fireEvent.click(screen.getByRole("button", { name: "Guardar para depois" })); await espera(400); } }
+      const antes = comuns();
+      for (const a of lote) await fazer(store, a);
+      comunsPorAbertura.push(comuns() - antes);
+    }
     r.unmount();
-    // 2ª abertura: 2 ações
-    r = abrirApp(store); n = 0;
-    await espera(2000); if (festa()) n++;
-    for (const a of ACOES.slice(3, 5)) if (await fazer(store, a)) n++;
-    porAbertura.push(n);
-    r.unmount();
-    // 3ª abertura: 2 ações (o dia já deu 2)
-    r = abrirApp(store); n = 0;
-    await espera(2000); if (festa()) n++;
-    for (const a of ACOES.slice(5)) if (await fazer(store, a)) n++;
-    porAbertura.push(n);
-    r.unmount();
-    expect(porAbertura).toEqual([1, 1, 0]);
+    expect(comunsPorAbertura.every((n) => n <= 1)).toBe(true);
+    expect(comuns()).toBeLessThanOrEqual(3);
+    expect(comuns()).toBeGreaterThanOrEqual(2);
+    expect(raras()).toBeGreaterThanOrEqual(1); // "1º Livro Lido" (rara) comemora mesmo com a comum da abertura já vista
     // tudo o que destravou está "visto" (no álbum, esperando ser colado) — nada vira festa atrasada
     const vistas = (store.dados["conquistas-vistas"] as { adesivos: string[] }).adesivos;
     expect(vistas).toEqual(expect.arrayContaining(["first-expense", "first-income", "leitura-1", "investor-1k"]));
-    expect(vistas.length).toBeGreaterThanOrEqual(5); // 5+ figurinhas no dia 1, só 2 festas
-    // 4ª abertura sem fazer nada: nenhuma festa repete
+    // mais uma abertura sem fazer nada: nenhuma festa repete
+    const total = eventos.filter(([e]) => e === "festa_view").length;
     r = abrirApp(store);
     await espera(2600);
     expect(festa()).toBeNull();
     r.unmount();
-    expect(eventos.filter(([e]) => e === "festa_view")).toHaveLength(2);
+    expect(eventos.filter(([e]) => e === "festa_view")).toHaveLength(total);
   });
 
   it("fora da calma (4º dia da conta): a fila de sempre (mais de 1 festa por abertura)", { timeout: 30_000 }, async () => {

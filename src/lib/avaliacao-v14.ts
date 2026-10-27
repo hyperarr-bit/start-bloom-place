@@ -17,6 +17,7 @@
  * A build `VITE_V14_QA=1` (lib/v14-qa) liga.
  */
 import { v14Ligada } from "@/lib/v14-qa";
+import { modo1012 } from "@/lib/modo-1012";
 
 export type ModoAvaliacaoV14 = "off" | "on";
 /** A chave da versão. ROLLBACK = "off". */
@@ -40,6 +41,7 @@ export function guardarForcaDaAvaliacaoV14(busca?: string | URLSearchParams): vo
 }
 
 export const avaliacaoV14Ligada = (): boolean => {
+  if (modo1012()) return false; // 1.0.21 modo 1.0.12: só os momentos de uso (sem os da missão nem o "Avaliar" do menu)
   const f = ls.get(CHAVE_FORCA_AVALIACAO_V14);
   if (f === "on" || f === "off") return f === "on";
   if (v14Ligada()) return true;

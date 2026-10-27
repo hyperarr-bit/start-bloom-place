@@ -1,5 +1,6 @@
 import { idDoAparelho } from "@/lib/dia1-cheio";
 import { isIOS, isNativeShell } from "@/lib/native-shell";
+import { modo1012 } from "@/lib/modo-1012";
 
 /**
  * HOME NOVA — OPÇÃO E (1.0.19, 26/10): a Home do carrossel do dia (src/components/home-nova/e), aprovada pelo
@@ -237,6 +238,8 @@ export function forcaHomeNova(): "on" | "off" | null {
 /** O modo que valeria AGORA, sem o fixado: o que o RevenueCat disse nesta abertura > a última resposta do aparelho >
  *  o padrão da plataforma (app "novas+admin", site "off"). */
 function modoVivo(): ModoHomeNova {
+  // 1.0.21 modo 1.0.12: a Home nova pra conta nova é parte da versão (um "off" remoto pensado pros apps antigos não a tira)
+  if (modo1012() && isNativeShell() && isIOS()) return MODO_PADRAO_APP;
   if (remoto) return remoto;
   return modoDe(ls.get(CHAVE_HOME_NOVA_APARELHO)) ?? padraoHomeNova();
 }

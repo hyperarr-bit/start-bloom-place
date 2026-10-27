@@ -47,6 +47,7 @@ import { AREA_TUTORIAL, FUNNEL_AREA_KEY, type AreaKey } from "@/lib/funnel";
 import { BoasVindasPago, marcarBoasVindasPagoVista, pulaPelaMissao } from "@/components/onboarding/BoasVindasPago";
 import { TelaParabens } from "@/components/onboarding/TelaParabens";
 import { fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
+import { modo1012 } from "@/lib/modo-1012";
 import { EntrarComCodigo } from "@/components/auth/EntrarComCodigo";
 import { ultimaCompraAnualFoiTrial } from "@/lib/revenuecat";
 import { EVENTO_MISSAO_DOSES, lerMissao } from "@/lib/missao-doses";
@@ -456,7 +457,8 @@ export function LiberandoIOS() {
    * conferido por baixo); "Entrar" espera o acesso estar pronto (as mesmas regras de cima: SPA com acesso + missão, ou o
    * recarregamento de antes) — enquanto isso, o "Guardando seu acesso…" de sempre. Sem BoasVindasPago e sem o "Tá
    * dentro!" da missão (MissaoDosesNaWeb dá as boas-vindas da missão sozinha). Decidido 1x por montagem. */
-  const [enxuto] = useState(() => fluxoEnxutoLigado());
+  const [m1012] = useState(() => modo1012());
+  const [enxuto] = useState(() => fluxoEnxutoLigado() && !m1012);
   const [querEntrar, setQuerEntrar] = useState(false);
   useEffect(() => {
     if (enxuto) trackEvent("parabens_view", { funil: "ios" });
@@ -464,12 +466,30 @@ export function LiberandoIOS() {
   }, []);
   const foiPraHome = useRef(false);
   useEffect(() => {
-    if (!enxuto || !querEntrar || !pronto || foiPraHome.current) return;
+    if (!(enxuto || m1012) || !querEntrar || !pronto || foiPraHome.current) return;
     foiPraHome.current = true;
     irPraHome();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enxuto, querEntrar, pronto]);
+  }, [enxuto, m1012, querEntrar, pronto]);
 
+  /* 1.0.21 MODO 1.0.12 (dono 27/10): no lugar da TelaParabens, a BOAS-VINDAS DA 1.0.12 ("Pronto, Nome." + círculo magenta +
+   * confete + "Começar") — sempre, mesmo com a missão em doses vindo depois (nuncaPula). Aparece já (o acesso é conferido
+   * por baixo, como na Parabéns); o "Começar" espera o acesso + a missão pela mesma regra (SPA ou o recarregamento). */
+  if (m1012 && querEntrar && pronto) return <div className="fixed inset-0 bg-background" aria-hidden data-testid="pos-compra-saindo" />;
+  if (m1012 && !querEntrar) {
+    return (
+      <BoasVindasPago
+        imediato
+        nuncaPula
+        nome={nome}
+        onComecar={() => {
+          trackEvent("boas_vindas_1012_comecar", { funil: "ios", pronto });
+          marcarBoasVindasPagoVista();
+          setQuerEntrar(true);
+        }}
+      />
+    );
+  }
   // depois do toque, com o acesso pronto, a Parabéns fica na tela até a rota trocar (sem piscar o "Guardando…")
   if (enxuto && (!querEntrar || pronto)) {
     return (
@@ -483,7 +503,7 @@ export function LiberandoIOS() {
       />
     );
   }
-  if (pronto && !enxuto) {
+  if (pronto && !enxuto && !m1012) {
     return <BoasVindasPago imediato nome={nome} onComecar={irPraHome} />;
   }
   return (

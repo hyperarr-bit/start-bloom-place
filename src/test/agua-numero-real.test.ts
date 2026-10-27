@@ -27,16 +27,18 @@ import { contasSemVencimento } from "@/lib/home-widgets-e";
 describe("Próxima conta: contas sem vencimento", () => {
   const vazio = { nextBillName: null, nextBillDaysUntil: null } as unknown as LifeHubData;
   const conta = (dados: Record<string, unknown>) => <T,>(k: string, f: T): T => (k in dados ? (dados[k] as T) : f);
-  it("contas do Montar sem dia: o widget mostra a conta, honesto ('sem data'), com 'Pôr o dia'", () => {
+  // 1.0.19 (novato polido, 51c5f443): os vazios viraram CONVITE curto — "Que dia vencem Aluguel e mais 1?" (era
+  // "Aluguel e mais 1 · sem data") e, sem conta nenhuma, "Te aviso antes de vencer" (era "Nenhuma conta cadastrada")
+  it("contas do Montar sem dia: o widget mostra a conta, honesto (pergunta o dia), com 'Pôr o dia'", () => {
     const get = conta({ "finance-fixed-expenses": [{ id: "a", description: "Aluguel", value: 900 }, { id: "b", description: "Luz", value: 150 }] });
     expect(contasSemVencimento(get)).toEqual(["Aluguel", "Luz"]);
     const w = dadoDoWidgetE("proxima-conta", vazio, get);
-    expect(w.vazio).toEqual({ texto: "Aluguel e mais 1 · sem data", cta: "Pôr o dia" });
+    expect(w.vazio).toEqual({ texto: "Que dia vencem Aluguel e mais 1?", cta: "Pôr o dia" });
     const um = dadoDoWidgetE("proxima-conta", vazio, conta({ "finance-fixed-expenses": [{ id: "a", description: "Aluguel", value: 900 }] }));
-    expect(um.vazio?.texto).toBe("Aluguel · sem data");
+    expect(um.vazio?.texto).toBe("Que dia vence Aluguel?");
   });
-  it("conta com dia: não entra; nada cadastrado: o vazio de sempre", () => {
+  it("conta com dia: não entra; nada cadastrado: o convite de cadastrar", () => {
     expect(contasSemVencimento(conta({ "finance-fixed-expenses": [{ id: "a", description: "Aluguel", value: 900, day: 10 }] }))).toEqual([]);
-    expect(dadoDoWidgetE("proxima-conta", vazio, conta({})).vazio).toEqual({ texto: "Nenhuma conta cadastrada", cta: "Cadastrar conta" });
+    expect(dadoDoWidgetE("proxima-conta", vazio, conta({})).vazio).toEqual({ texto: "Te aviso antes de vencer", cta: "Cadastrar conta" });
   });
 });

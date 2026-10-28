@@ -339,7 +339,7 @@ describe("aba Você", () => {
     expect(screen.queryByTestId("barra-de-abas")).toBeNull();
   });
 
-  it("Rever tutorial → Hoje com o pedido no state; Sair chama signOut", async () => {
+  it("Ver tutorial → Hoje com o pedido no state; Sair chama signOut", async () => {
     await abrirVoce();
     fireEvent.click(screen.getByTestId("voce-tutorial"));
     await quadro();

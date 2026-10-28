@@ -32,6 +32,7 @@ import { missaoDosesMandaNoApp } from "@/lib/missao-doses";
 import { guardarForcasDaUrl, varianteDoTour } from "@/lib/tour-home";
 import { TourDaHome, useTourDaHome } from "@/components/home/TourDaHome";
 import { useHomeNova } from "@/hooks/use-home-nova";
+import { tutorialNestaAbertura } from "@/lib/tutorial-abertura";
 import { useTheme, palettes, type ThemePalette } from "@/hooks/use-theme";
 import { CHAVE_COR_ANTES_HOME_NOVA, origemJaTentada } from "@/lib/home-nova";
 import { contaCarregadaDeVerdade, decidirOrigemDaConta } from "@/components/home-nova/OrigemDaConta";
@@ -333,6 +334,17 @@ const HomePage = () => {
     navigate(location.pathname, { replace: true, state: null });
   }, [pedeReverTutorial, loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Fechou e reabriu o app no meio do "Ver tutorial" (27/10): a fila que ficou na conta é sobra — apaga em silêncio
+  // e a Home abre normal. Sem isso, a reabertura caía direto no seletor do tutorial e o holofote ligava sozinho no
+  // próximo módulo da fila que a pessoa abrisse.
+  const filaGuardada = get<ModuleKey[]>("tutorial-replay-modules", []);
+  const sobraDeFila = loaded && !!user && Array.isArray(filaGuardada) && filaGuardada.length > 0 && !tutorialNestaAbertura();
+  useEffect(() => {
+    if (!sobraDeFila) return;
+    setData("tutorial-replay-modules", []);
+    setData("tutorial-replay-pelo-menu", "");
+  }, [sobraDeFila, setData]);
+
   const handleWidgetToggle = (id: WidgetId) => {
     if (isActive(id)) removeWidget(id);
     else addWidget(id);
@@ -349,7 +361,8 @@ const HomePage = () => {
   // do tutorial — é o que faz o "voltar" de um módulo cair na ESCOLHA de
   // módulos (pedido do dono 19/07), com "Encerrar tutorial" sempre à mão.
   const replayQueue = get<ModuleKey[]>("tutorial-replay-modules", []);
-  const replayPendente = Array.isArray(replayQueue) && replayQueue.length > 0;
+  // fila só vale se o tutorial foi aberto NESTA abertura do app (lib/tutorial-abertura) — a sobra é apagada no efeito acima
+  const replayPendente = Array.isArray(replayQueue) && replayQueue.length > 0 && tutorialNestaAbertura();
   if (showReplayTutorial || (loaded && !!user && replayPendente)) {
     return (
       <AnimatePresence>

@@ -6,6 +6,7 @@ import { ArrowDown, ArrowUp, ArrowLeft, CheckCircle2, X } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import { tutorialAntigoPodeMarcarVisto } from "@/lib/intro-modulo";
+import { tutorialNestaAbertura } from "@/lib/tutorial-abertura";
 
 export interface SpotlightStep {
   selector: string;
@@ -45,6 +46,8 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
   const [rect, setRect] = useState<Rect | null>(null);
   const [showFallback, setShowFallback] = useState(false);
   const [showCompletion, setShowCompletion] = useState(false);
+  /** 27/10: o que ainda está na fila do tutorial quando este módulo termina (o cartão de fim leva de volta ao seletor). */
+  const [restantesNoFim, setRestantesNoFim] = useState<string[]>([]);
 
   // Refs keep the activation listener stable across step changes,
   // so events fired in the same tick aren't lost.
@@ -68,7 +71,8 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
     // abaixo só liga pra guest/recém-cadastrado e o else re-marcava como visto
     // na hora — clicava e caía na aba normal, bug real do dono.)
     const replayList = get<string[]>("tutorial-replay-modules", []);
-    const replayPending = Array.isArray(replayList) && replayList.includes(moduleKey);
+    // …e só se o tutorial foi pedido NESTA abertura do app (27/10): fila que sobrou de antes não liga holofote sozinho
+    const replayPending = Array.isArray(replayList) && replayList.includes(moduleKey) && tutorialNestaAbertura();
 
     // Tutorial guiado (spotlight) roda no modo convidado OU para recém-cadastrados.
     //
@@ -153,6 +157,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
       if (onComplete) {
         try { onComplete(); } catch {}
       } else {
+        setRestantesNoFim((Array.isArray(rl) ? rl : []).filter((k) => k !== moduleKey));
         setShowCompletion(true);
       }
     }
@@ -388,22 +393,32 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
               <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
               <CheckCircle2 className="relative w-9 h-9 text-primary" strokeWidth={2.5} />
             </motion.div>
+            {/* 27/10 (QA do "Ver tutorial"): com mais módulos na fila, o cartão leva de volta ao seletor — antes ele
+                mandava procurar "a seta no canto superior esquerdo" (no fim do ÚLTIMO módulo, inclusive). */}
             <h3 className="relative text-lg font-bold text-foreground mb-2">
-              Tutorial concluído! 🎉
+              {restantesNoFim.length > 0 ? "Módulo concluído!" : "Tutorial concluído! 🎉"}
             </h3>
             <p className="relative text-sm text-muted-foreground leading-relaxed mb-5">
-              Toque na seta
-              <span className="inline-flex items-center justify-center w-6 h-6 mx-1.5 rounded-md bg-primary/15 align-middle">
-                <ArrowLeft className="w-3.5 h-3.5 text-primary" strokeWidth={2.5} />
-              </span>
-              no canto superior esquerdo para voltar e explorar outro módulo.
+              {restantesNoFim.length > 0
+                ? `Ainda ${restantesNoFim.length === 1 ? "falta 1 módulo" : `faltam ${restantesNoFim.length} módulos`} no seu tutorial.`
+                : "Agora é só usar."}
             </p>
-            <button
-              onClick={() => setShowCompletion(false)}
-              className="relative w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
-            >
-              Entendi
-            </button>
+            {restantesNoFim.length > 0 ? (
+              <button
+                onClick={() => { setShowCompletion(false); navigate("/home"); }}
+                className="relative w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Voltar e ver os outros
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowCompletion(false)}
+                className="relative w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
+              >
+                Entendi
+              </button>
+            )}
           </motion.div>
         </motion.div>
       )}

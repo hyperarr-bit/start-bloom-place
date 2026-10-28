@@ -36,6 +36,7 @@ import { localDayKey, parseLocalDay, semanaAtualId } from "@/lib/utils";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { tutorialNestaAbertura } from "@/lib/tutorial-abertura";
 import { useUserData } from "@/hooks/use-user-data";
 import { ProximoPasso } from "@/components/modules/ProximoPasso";
 import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
@@ -177,6 +178,10 @@ const Treino = () => {
   // Garantir que o tutorial encontra o alvo: força aba "hoje" quando há tutorial pendente.
   const { get: getUserData, set: setUserData, isGuest, loaded } = useUserData();
   const tutorialPendente = useCallback(() => {
+    // 27/10 (QA do "Ver tutorial", conta vazia): o tutorial pedido pelo menu também — sem isso o plano vazio abria no
+    // PLANO (modelos prontos) e o passo único caía no "Não achei esse item aqui"
+    const fila = getUserData<string[]>("tutorial-replay-modules", []);
+    if (Array.isArray(fila) && fila.includes("treino") && tutorialNestaAbertura()) return true;
     const forceNewUser = !!getUserData<string>("force-new-user-tutorial", "") || (typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true");
     if (!isGuest && !forceNewUser) return false;
     return getUserData<string>("quickstart-target-module", "") === "treino" && !getUserData<string>("spotlight-done-treino", "");
@@ -765,7 +770,7 @@ const Treino = () => {
       <SpotlightOverlay
         moduleKey="treino"
         steps={[
-          { selector: '[data-spotlight="add-exercise"]', label: "Digite o exercício e toque no + para adicionar o treino de hoje.", advanceOnAction: "first_workout" },
+          { selector: '[data-spotlight="add-exercise"]', label: "Digite o exercício e toque no + para adicionar o treino de hoje.", advanceOnAction: "first_workout", onEnter: () => setActiveTab("hoje") },
         ]}
       />
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur">

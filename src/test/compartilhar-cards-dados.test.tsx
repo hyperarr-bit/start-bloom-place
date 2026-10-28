@@ -115,7 +115,8 @@ describe("a chave COMPARTILHAR_V2", () => {
     const B = await Botao();
     render(<UserDataContext.Provider value={ctx(semente())}><B tipo="treinos" origem="teste" /></UserDataContext.Provider>);
     // a parte pesada carrega sob demanda (só com a chave ligada)
-    expect(await screen.findByTestId("postar-card-treinos")).toBeTruthy();
+    // 27/10: a importação sob demanda passava de 1 s (o padrão do findBy) com a máquina ocupada e travava o build
+    expect(await screen.findByTestId("postar-card-treinos", {}, { timeout: 5000 })).toBeTruthy();
   });
 
   it("fora do provedor de dados, nunca quebra (sem cards)", async () => {

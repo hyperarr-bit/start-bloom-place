@@ -277,7 +277,10 @@ describe("o fundo da tela até o topo (adendo 26/10: a faixa do relógio na cor 
   });
   it("o CSS: a faixa do relógio na cor do topo da E com desfoque, e a casca no fundo da E — claro e escuro", () => {
     expect(css).toMatch(/html\.he-fundo-da-tela \{ --safe-top-cor: hsl\(40 8% 95% \/ 0\.82\); \}/);
-    expect(css).toMatch(/html\.he-fundo-da-tela \.app-safe-top-guard \{[^}]*backdrop-filter: blur\(14px\)/);
+    // 1.0.22: o desfoque da faixa vale pra todas as telas (index.css) — vidro que some pra baixo, sem corte reto
+    const global = readFileSync(resolve(__dirname, "../index.css"), "utf8");
+    expect(global).toMatch(/\.app-safe-top-guard \{[^}]*backdrop-filter: blur\(12px\)[^}]*mask-image: linear-gradient\(180deg, #000 0%, #000 52%, transparent 100%\)/);
+    expect(global).toMatch(/html\.faixa-relogio-transparente \.app-safe-top-guard \{\s*background: transparent;\s*\}/);
     expect(css).toMatch(/html\.he-fundo-da-tela, html\.he-fundo-da-tela body, html\.he-fundo-da-tela \.app-safe-shell \{ background-color: hsl\(0 0% 98%\); \}/);
     expect(css).toMatch(/html\.dark\.he-fundo-da-tela \{ --safe-top-cor: hsl\(222 14% 10% \/ 0\.82\); \}/);
     expect(css).toMatch(/html\.dark\.he-fundo-da-tela, html\.dark\.he-fundo-da-tela body, html\.dark\.he-fundo-da-tela \.app-safe-shell \{ background-color: hsl\(222 16% 7%\); \}/);

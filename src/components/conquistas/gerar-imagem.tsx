@@ -148,8 +148,58 @@ async function comElementoMontado<T>(elemento: ReactElement, { largura, altura }
 // da manchete caía na Georgia). Embutir woff2 + woff custa ~40 KB e acerta sempre.
 const opcoesDe = ({ largura, altura }: Medidas) => ({ width: largura, height: altura, pixelRatio: 1, cacheBust: false });
 
+/*
+ * FIGURINHA SUMIA DO STORY NO IPHONE (dono, 27/10): a arte da figurinha é um WebP dentro de um <svg><image>, e o WebKit
+ * desenha a foto (SVG com foreignObject) antes de decodificar a imagem embutida — o cartão saía com a frase e o nome e
+ * um buraco no meio. Quem marca `data-foto-arte="<url>"` (+ `data-foto-giro` em graus) sai da foto e é pintado DEPOIS,
+ * direto no canvas, na mesma caixa (offsetLeft/Top/Width/Height: sem o transform) girada em torno do centro.
+ */
+interface ArtePorCima { url: string; x: number; y: number; w: number; h: number; giro: number }
+
+function artesPorCima(alvo: HTMLElement): ArtePorCima[] {
+  return Array.from(alvo.querySelectorAll<HTMLElement>("[data-foto-arte]")).map((el) => {
+    let x = 0, y = 0;
+    for (let n: HTMLElement | null = el; n && n !== alvo; n = n.offsetParent as HTMLElement | null) { x += n.offsetLeft; y += n.offsetTop; }
+    return { url: el.dataset.fotoArte ?? "", x, y, w: el.offsetWidth, h: el.offsetHeight, giro: Number(el.dataset.fotoGiro) || 0 };
+  }).filter((a) => a.url && a.w > 0);
+}
+
+const carregar = (url: string) => new Promise<HTMLImageElement>((ok, falha) => {
+  const img = new Image();
+  img.onload = () => ok(img);
+  img.onerror = falha;
+  img.src = url;
+});
+
+async function pintarPorCima(canvas: HTMLCanvasElement, artes: ArtePorCima[]) {
+  const g = canvas.getContext("2d");
+  if (!g) return;
+  for (const a of artes) {
+    const img = await carregar(a.url);
+    await img.decode?.().catch(() => undefined);
+    g.save();
+    g.translate(a.x + a.w / 2, a.y + a.h / 2);
+    g.rotate((a.giro * Math.PI) / 180);
+    g.drawImage(img, -a.w / 2, -a.h / 2, a.w, a.h);
+    g.restore();
+  }
+}
+
+const paraBlob = (canvas: HTMLCanvasElement) => new Promise<Blob | null>((ok) => canvas.toBlob(ok, "image/png"));
+
 export async function gerarPng(elemento: ReactElement, medidas: Medidas): Promise<Blob | null> {
   return comElementoMontado(elemento, medidas, async (alvo, lib) => {
+    const artes = artesPorCima(alvo);
+    if (artes.length) {
+      const opcoes = { ...opcoesDe(medidas), filter: (n: HTMLElement) => !(n instanceof HTMLElement && n.dataset?.fotoArte) };
+      let canvas = await lib.toCanvas(alvo, opcoes);
+      if (ehWebKit()) {
+        await esperar(80);
+        canvas = await lib.toCanvas(alvo, opcoes);
+      }
+      await pintarPorCima(canvas, artes);
+      return paraBlob(canvas);
+    }
     const opcoes = opcoesDe(medidas);
     let blob = await lib.toBlob(alvo, opcoes);
     if (ehWebKit()) {

@@ -56,7 +56,6 @@ const AbaVidro = ({ id, ativa, rotulo, onIr, children }: { id: AbaNova; ativa: A
       aria-label={rotulo}
       data-testid={`hn-aba-${id}`}
       className={`flex-1 h-full rounded-full flex flex-col items-center justify-center gap-[3px] transition-colors ${on ? "he-vidro-aba text-foreground" : "text-muted-foreground"}`}
-      style={on ? { boxShadow: "inset 0 1px 0 var(--he-vidro-fio), 0 1px 3px rgb(0 0 0 / 0.06)" } : undefined}
     >
       {children}
       <span className={`text-[11px] leading-none ${on ? "font-bold" : "font-medium"}`}>{rotulo}</span>
@@ -97,7 +96,7 @@ export const BarraVidro = ({ ativa, iniciais, onIr, onMais, rotulos, dica, seloC
         aria-label="Registrar agora"
         data-testid="hn-mais"
         className="w-[56px] h-[56px] rounded-full grid place-items-center shrink-0 active:scale-95 transition-transform"
-        style={{ background: "var(--hn-mais)", color: "var(--hn-mais-texto)", boxShadow: "var(--he-vidro-sombra)" }}
+        style={{ background: "var(--hn-mais)", color: "var(--hn-mais-texto)", boxShadow: "var(--he-mais-aro, inset 0 0 0 0 transparent), var(--he-vidro-sombra)" }}
       >
         <Plus className="w-7 h-7" strokeWidth={2.4} aria-hidden />
       </button>

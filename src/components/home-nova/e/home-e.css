@@ -24,14 +24,24 @@
      claro na borda; o que passa por baixo (os azulejos coloridos) aparece nitidamente desfocado */
   /* rodada 4 (dono): o vidro "Cal AI" é o PADRÃO — ~26 % branco, desfoque 14 px, saturação 1,7, realce fino, fio de 0,5 px,
      sombra difusa leve; a aba ativa um pouco mais branca pra o rótulo seguir legível (o antigo fica em html.he-vidro-antigo) */
-  --he-vidro: rgb(255 255 255 / 0.26);
-  --he-vidro-aba: rgb(255 255 255 / 0.62);
-  --he-vidro-fio: rgb(255 255 255 / 0.9);
-  --he-vidro-borda: rgb(255 255 255 / 0.5);
-  --he-vidro-brilho: rgb(255 255 255 / 0.55);
-  --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.04), 0 10px 28px rgb(0 0 0 / 0.09);
-  --he-vidro-blur: 14px;
-  --he-vidro-sat: 1.7;
+  /* 1.0.22 (dono, 27/10 — vídeo do Cal AI rolando: "não é só um borrão"): o vidro ficou mais LÍQUIDO — menos branco e
+     menos desfoque (o que passa atrás aparece, como no Cal AI), um contorno fino que separa a pílula do fundo claro, o
+     brilho especular nas duas bordas (luz em cima à esquerda, reflexo embaixo à direita) e um brilho interno na borda
+     que dá espessura; a aba ativa vira uma bolha cinza translúcida (antes: pílula branca com cara de botão). A refração
+     de verdade (o conteúdo entortando na borda) o WebView não faz — só o vidro nativo do iOS 26. */
+  --he-vidro: rgb(255 255 255 / 0.2);
+  --he-vidro-aba: rgb(120 120 128 / 0.13);
+  --he-vidro-aba-sombra: inset 0 0 0 0.5px rgb(255 255 255 / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.65);
+  --he-vidro-fio: rgb(255 255 255 / 0.95);
+  --he-vidro-borda: rgb(255 255 255 / 0.6);
+  --he-vidro-brilho: rgb(255 255 255 / 0.3);
+  --he-vidro-espessura: rgb(255 255 255 / 0.35);
+  --he-vidro-contorno: rgb(0 0 0 / 0.09);
+  --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.08);
+  --he-mais-aro: inset 0 1px 0 rgb(255 255 255 / 0.22), inset 0 0 0 0.5px rgb(255 255 255 / 0.14);
+  --he-vidro-halo: rgb(255 255 255 / 0.6);
+  --he-vidro-blur: 9px;
+  --he-vidro-sat: 1.8;
   background: linear-gradient(180deg, hsl(40 8% 95%) 0px, hsl(40 6% 96.5%) 160px, hsl(var(--hn-fundo)) 420px, hsl(var(--hn-fundo)) 100%);
 }
 .dark .hn.he {
@@ -44,12 +54,17 @@
   --hn-fundo: 222 16% 7%;
   --hn-sombra: 0 0 0 1px rgb(255 255 255 / 0.045);
   --hn-sombra-forte: 0 0 0 1px rgb(255 255 255 / 0.08), 0 8px 24px rgb(0 0 0 / 0.5);
-  --he-vidro: rgb(26 28 34 / 0.28);
-  --he-vidro-aba: rgb(255 255 255 / 0.16);
-  --he-vidro-fio: rgb(255 255 255 / 0.22);
-  --he-vidro-borda: rgb(255 255 255 / 0.12);
-  --he-vidro-brilho: rgb(255 255 255 / 0.14);
+  --he-vidro: rgb(26 28 34 / 0.26);
+  --he-vidro-aba: rgb(255 255 255 / 0.13);
+  --he-vidro-aba-sombra: inset 0 0 0 0.5px rgb(255 255 255 / 0.14), inset 0 1px 0 rgb(255 255 255 / 0.16);
+  --he-vidro-fio: rgb(255 255 255 / 0.3);
+  --he-vidro-borda: rgb(255 255 255 / 0.14);
+  --he-vidro-brilho: rgb(255 255 255 / 0.1);
+  --he-vidro-espessura: rgb(255 255 255 / 0.06);
+  --he-vidro-contorno: rgb(255 255 255 / 0.1);
   --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.5);
+  --he-mais-aro: inset 0 1px 0 rgb(255 255 255 / 0.2), inset 0 0 0 0.5px rgb(255 255 255 / 0.16);
+  --he-vidro-halo: rgb(0 0 0 / 0.6);
   background: linear-gradient(180deg, hsl(222 14% 10%) 0px, hsl(var(--hn-fundo)) 360px, hsl(var(--hn-fundo)) 100%);
 }
 
@@ -63,7 +78,7 @@
    por trás, sem faixa branca), e a casca (html/body/.app-safe-shell) pinta o fundo da E — nada de branco em volta,
    nem no elástico da rolagem nem depois do fim da página. Claro e escuro. */
 html.he-fundo-da-tela { --safe-top-cor: hsl(40 8% 95% / 0.82); }
-html.he-fundo-da-tela .app-safe-top-guard { -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4); }
+/* (o desfoque da faixa agora vale pra todas as telas — index.css, .app-safe-top-guard) */
 html.he-fundo-da-tela, html.he-fundo-da-tela body, html.he-fundo-da-tela .app-safe-shell { background-color: hsl(0 0% 98%); }
 html.dark.he-fundo-da-tela { --safe-top-cor: hsl(222 14% 10% / 0.82); }
 html.dark.he-fundo-da-tela, html.dark.he-fundo-da-tela body, html.dark.he-fundo-da-tela .app-safe-shell { background-color: hsl(222 16% 7%); }
@@ -138,10 +153,13 @@ html.dark.he-mock-gradiente.he-fundo-da-tela .app-safe-shell {
   -webkit-backdrop-filter: blur(var(--he-vidro-blur, 14px)) saturate(var(--he-vidro-sat, 1.7)) brightness(1.02);
   backdrop-filter: blur(var(--he-vidro-blur, 14px)) saturate(var(--he-vidro-sat, 1.7)) brightness(1.02);
   /* legibilidade sobre os azulejos coloridos: um halo claro atrás do texto e dos ícones (escuro: halo escuro) */
-  text-shadow: 0 1px 6px rgb(255 255 255 / 0.85);
+  text-shadow: 0 0 4px var(--he-vidro-halo, rgb(255 255 255 / 0.85));
   box-shadow:
-    inset 0 1px 0 var(--he-vidro-fio),
+    inset 1px 1.5px 0 -0.5px var(--he-vidro-fio),
+    inset -1px -1.5px 0 -0.5px var(--he-vidro-borda),
     inset 0 0 0 0.5px var(--he-vidro-borda),
+    inset 0 0 8px var(--he-vidro-espessura, transparent),
+    0 0 0 0.5px var(--he-vidro-contorno, transparent),
     var(--he-vidro-sombra);
 }
 /* o realce especular: um brilho que começa no topo e some no meio da pílula (como o vidro do iOS 26) */
@@ -152,9 +170,9 @@ html.dark.he-mock-gradiente.he-fundo-da-tela .app-safe-shell {
   border-radius: inherit;
   z-index: -1;
   pointer-events: none;
-  background: linear-gradient(180deg, var(--he-vidro-brilho) 0%, rgb(255 255 255 / 0.04) 42%, rgb(255 255 255 / 0) 62%);
+  background: linear-gradient(180deg, var(--he-vidro-brilho) 0%, rgb(255 255 255 / 0.03) 38%, rgb(255 255 255 / 0) 58%);
 }
-.he-vidro-aba { background: var(--he-vidro-aba); }
+.he-vidro-aba { background: var(--he-vidro-aba); box-shadow: var(--he-vidro-aba-sombra); }
 /* o "+" segue sólido (grafite / tinta de noite): é o único botão de ação da tela, precisa de contraste */
 
 /* ---- o fogo da pílula (rodada 2, porte da direção A v3): apagado enquanto o dia não está garantido;
@@ -180,6 +198,10 @@ html.he-vidro-antigo .hn.he {
   --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.05), 0 10px 30px rgb(0 0 0 / 0.1);
   --he-vidro-blur: 24px;
   --he-vidro-sat: 1.9;
+  --he-vidro-aba-sombra: inset 0 1px 0 rgb(255 255 255 / 0.95), 0 1px 3px rgb(0 0 0 / 0.06);
+  --he-vidro-espessura: transparent;
+  --he-vidro-contorno: transparent;
+  --he-vidro-halo: rgb(255 255 255 / 0.85);
 }
 html.he-vidro-antigo.dark .hn.he, html.dark.he-vidro-antigo .hn.he {
   --he-vidro: rgb(26 28 34 / 0.45);
@@ -188,10 +210,10 @@ html.he-vidro-antigo.dark .hn.he, html.dark.he-vidro-antigo .hn.he {
   --he-vidro-borda: rgb(255 255 255 / 0.1);
   --he-vidro-brilho: rgb(255 255 255 / 0.12);
   --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.55);
+  --he-vidro-aba-sombra: inset 0 1px 0 rgb(255 255 255 / 0.24), 0 1px 3px rgb(0 0 0 / 0.06);
+  --he-vidro-halo: rgb(0 0 0 / 0.75);
 }
-.dark .he-vidro { text-shadow: 0 1px 6px rgb(0 0 0 / 0.75); }
-.he-vidro svg { filter: drop-shadow(0 0 3px rgb(255 255 255 / 0.9)); }
-.dark .he-vidro svg { filter: drop-shadow(0 0 3px rgb(0 0 0 / 0.8)); }
+.he-vidro svg { filter: drop-shadow(0 0 2px var(--he-vidro-halo, rgb(255 255 255 / 0.9))); }
 
 /* ---- o FIM das telas com a barra de vidro (rodada 4, dono: "Você e Conquistas rolam demais no fim"): só o respiro da
    barra (72 px + área segura), como na Home — a casca não soma a área segura de novo ---- */

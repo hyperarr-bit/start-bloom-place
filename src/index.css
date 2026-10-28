@@ -734,22 +734,36 @@ body {
    passos céu/grafite do funil) pinta a faixa com a própria cor via
    --safe-top-cor; sem a variável, branco de sempre. Era a "faixa branca
    como um cabeçalho" da foto do dono (28/08): real, não artefato. */
+/* 1.0.22 (dono, 27/10 — "compara o topo com o do Cal AI"): a faixa deixou de ser um bloco sólido com corte reto. É um
+   VIDRO que some pra baixo, como o do iOS 26: a cor do fundo quase cheia junto do relógio, desfoque, e os dois vão a
+   zero na borda de baixo (máscara) — o conteúdo que rola passa por trás borrado e reaparece sem linha. Cobre só a área
+   segura (+ 8 px de cauda quase invisível; sem área segura, como na web, nem a cauda): os cabeçalhos fixos começam em --app-safe-top e não são borrados. WebView
+   sem color-mix fica com a cor cheia da 1ª declaração (a faixa de antes). */
 .app-safe-top-guard {
   position: fixed;
   z-index: 2147483647;
   top: 0;
   left: 0;
   right: 0;
-  height: var(--app-safe-top);
+  height: calc(var(--app-safe-top) + min(8px, var(--app-safe-top)));
   pointer-events: none;
   background: var(--safe-top-cor, hsl(var(--background)));
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--safe-top-cor, hsl(var(--background))) 92%, transparent) 0%,
+    color-mix(in srgb, var(--safe-top-cor, hsl(var(--background))) 70%, transparent) 55%,
+    color-mix(in srgb, var(--safe-top-cor, hsl(var(--background))) 0%, transparent) 100%);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 52%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 52%, transparent 100%);
 }
 
-/* Faixa do relógio transparente (components/app/faixaDoRelogio.ts: folha aberta, álbum, "Dia completo") — sem o
-   desfoque da Home nova (home-e.css), senão o topo fica borrado por cima do escurecido. */
+/* Faixa do relógio transparente (components/app/faixaDoRelogio.ts: folha aberta, álbum, "Dia completo"): sem a cor (o
+   escurecido/fundo da tela de cima aparece atrás do relógio), mas o DESFOQUE fica — antes saía junto e o título da
+   página de trás ("← Conquistas", "Você") aparecia nítido embaixo do relógio, letra por cima de letra (print do dono
+   27/10). Sobre fundo liso (álbum) o desfoque não muda nada. */
 html.faixa-relogio-transparente .app-safe-top-guard {
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
+  background: transparent;
 }
 
 /* 1.0.21 (QA do v1020): a figurinha COMUM (o aviso de baixo, .cf-chegada z 400) ficava ~2 s por cima da folha do score
@@ -786,6 +800,20 @@ header.sticky.top-0 {
   position: sticky;
   top: var(--app-safe-top);
   z-index: 40;
+}
+/* 1.0.22: com a faixa do relógio em vidro que some pra baixo (acima), o conteúdo que rola por trás do cabeçalho
+   reapareceria EM CIMA dele, borrado, entre o cabeçalho e o relógio. O fundo do cabeçalho sobe até a borda da tela
+   (como a barra de navegação do iOS): telas com cabeçalho fixo ficam com o topo liso de sempre; o vidro que some é das
+   telas sem cabeçalho (Home, Conquistas, listas). */
+header.sticky.top-0::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: var(--app-safe-top);
+  background: inherit;
+  pointer-events: none;
 }
 
 /* ============================================================

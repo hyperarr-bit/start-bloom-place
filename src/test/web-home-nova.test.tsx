@@ -49,6 +49,8 @@ vi.mock("@/integrations/supabase/client", () => {
 });
 
 import HomePage from "@/pages/Home";
+import { useLifeHubData } from "@/hooks/use-life-hub-data";
+import { scoreDaContaNovaNoSite } from "@/lib/web-home-nova";
 import { BarraVidroGlobal } from "@/components/home-nova/e/BarraVidroGlobal";
 import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
 import { OrigemDaContaNaSessao, contaCarregadaDeVerdade, decidirOrigemDaConta } from "@/components/home-nova/OrigemDaConta";
@@ -304,3 +306,44 @@ describe("site com WEB_HOME_NOVA 'on' — a dica do '+' (a única que fica)", ()
     expect(document.querySelector('[data-testid="hn-dica-mais"]')).toBeNull();
   }, 30_000);
 });
+
+/* ================================================================== o score da conta nova do site (dono 27/10) */
+describe("score da conta nova do SITE = os 3 cards da 1ª página (Gasto, Hábitos, Água), peso igual", () => {
+  const Sonda = () => { const d = useLifeHubData(); return <div data-testid="sonda" data-score={d.dayScore} />; };
+  const score = async (conta: Conta) => {
+    render(<conta.Provedor><OrigemDaContaNaSessao /><Sonda /></conta.Provedor>);
+    await respirar(20);
+    return Number(document.querySelector('[data-testid="sonda"]')!.getAttribute("data-score"));
+  };
+  const MARCA = { [CHAVE_ORIGEM_CONTA]: { tipo: "nova", em: new Date().toISOString(), versao: "1.0.19", regra: "r" } };
+  const GASTO = { "finance-expenses": [{ id: "g1", date: hoje, value: 25, category: "Outros" }] };
+  const HABITO = { "rotina-habits": [{ id: "h1", name: "Meditar" }], "core-rotina-habit-log": { [hoje]: { h1: true } } };
+  const AGUA = { "core-saude-water": { [hoje]: 8 } };
+
+  it("a conta pura: 1/3 cada, escondido sai, nenhum = 0", () => {
+    const b = [{ tipo: "gasto", pontos: 5, max: 5 }, { tipo: "habitos", pontos: 0, max: 20 }, { tipo: "agua", pontos: 0, max: 15 }, { tipo: "humor", pontos: 5, max: 5 }];
+    expect(scoreDaContaNovaNoSite(b)).toBe(33);
+    expect(scoreDaContaNovaNoSite(b, ["habitos", "agua"])).toBe(100);
+    expect(scoreDaContaNovaNoSite(b, ["gasto", "habitos", "agua"])).toBe(0);
+  });
+  it("site, conta nova: vazio = 0; 1 gasto = 33 (não 100); gasto + hábito = 67; os 3 = 100", async () => {
+    site("on");
+    expect(await score(criarConta({ ...BASE, ...MARCA }))).toBe(0);
+    fechar();
+    expect(await score(criarConta({ ...BASE, ...MARCA, ...GASTO }))).toBe(33);
+    fechar();
+    expect(await score(criarConta({ ...BASE, ...MARCA, ...GASTO, ...HABITO }))).toBe(67);
+    fechar();
+    expect(await score(criarConta({ ...BASE, ...MARCA, ...GASTO, ...HABITO, ...AGUA }))).toBe(100);
+  });
+  it("site com a chave off: a conta de antes (Home de hoje, os 12 blocos)", async () => {
+    site("off");
+    const s = await score(criarConta({ ...BASE, ...MARCA, ...GASTO }));
+    expect(s).not.toBe(33);
+  });
+  it("iPhone, conta nova sem missão: igual a antes — 1 gasto = 100 pela régua do novato (a do site não vale lá)", async () => {
+    plat.nativo = true; G.__WEB_HOME_NOVA__ = "on";
+    expect(await score(criarConta({ ...BASE, ...MARCA, ...GASTO }))).toBe(100);
+  });
+});
+

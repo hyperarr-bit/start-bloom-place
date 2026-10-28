@@ -15,6 +15,7 @@ import { moduloOcultaPendenciasLigado } from "@/lib/tour-home";
 import { CHAVE_ORIGEM_CONTA, contaEhNova, criadoEmDaContaHomeNova, homeNovaLigada, lerMarcadorOrigem } from "@/lib/home-nova";
 import { modulosDaMissaoQueContam, pendenciasDeNovato, tiposAdotados, tiposDoNovato } from "@/lib/pendencias-novato";
 import { EVENTO_MISSAO_DOSES, lerMissao } from "@/lib/missao-doses";
+import { TIPOS_DO_SCORE_SITE_NOVO, scoreDaContaNovaNoSite, webHomeNovaLigada } from "@/lib/web-home-nova";
 
 /**
  * Os seis registros diários de 5 pontos do Score do Dia (humor, gasto, peso,
@@ -482,11 +483,17 @@ export function useLifeHubData(): LifeHubData {
     const marcadorOrigem = get<{ em?: unknown } | null>(CHAVE_ORIGEM_CONTA, null);
     const criadoEm = criadoEmDaContaHomeNova() ?? (typeof marcadorOrigem?.em === "string" ? marcadorOrigem.em : null);
     const novato = semPontosDeGraca && homeNovaLigada(null, "nova") && pendenciasDeNovato({ origemNova: true, criadoEm });
+    // 27/10 (lib/web-home-nova): conta nova do SITE — o score são os 3 cards da 1ª página (Gasto, Hábitos, Água), peso igual
+    const siteNovo = !!novato && webHomeNovaLigada();
+    const adotados = tiposAdotados(get);
+    if (siteNovo) for (const t of TIPOS_DO_SCORE_SITE_NOVO) adotados.add(t);
     const permitidos = novato
-      ? tiposDoNovato({ adotados: tiposAdotados(get), modulosDaMissao: modulosDaMissaoQueContam(lerMissao()), prefs: pendenciasPrefs })
+      ? tiposDoNovato({ adotados, modulosDaMissao: modulosDaMissaoQueContam(lerMissao()), prefs: pendenciasPrefs })
       : null;
     const cobrados = permitidos ? new Set([...cobradosDeSempre].filter((t) => permitidos.has(t))) : cobradosDeSempre;
-    const dayScore = permitidos && cobrados.size === 0 ? 0 : scoreDosBlocos(blocos, cobrados);
+    const dayScore = siteNovo
+      ? scoreDaContaNovaNoSite(blocos, pendenciasPrefs?.ocultos ?? [])
+      : permitidos && cobrados.size === 0 ? 0 : scoreDosBlocos(blocos, cobrados);
     const userName = nomeDaHome(get);
 
     return {

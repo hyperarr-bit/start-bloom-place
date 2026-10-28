@@ -1172,7 +1172,10 @@ html.core-shell [data-sem-expansao-toque] :is(button, a[href], [role="button"]):
   body.com-trilho .fixed.left-0.right-0 { left: 232px; }
   /* 27/10 (Home nova no site, lib/web-home-nova): a barra de vidro (`.hn-barra`, fixed inset-x-4 + max-w-lg mx-auto)
      centra na coluna do conteúdo, não na janela inteira — sem isto ela ficava ~116 px à esquerda da Home no PC */
-  body.com-trilho .hn-barra { left: calc(232px + 1rem); }
+  body.com-trilho .hn-barra { left: calc(232px + 1rem); justify-content: flex-end; }
+  /* 27/10 (dono): no PC o trilho já é a navegação — a pílula Início/Conquistas/Você sai e fica só o "+", no canto
+     direito da coluna da Home. No celular (e onde o trilho não aparece) a barra é a de sempre. */
+  body.com-trilho .hn-barra > nav { display: none; }
 }
 
 /* Barra de abas (1.0.17, components/nav/BarraDeAbas.tsx): nas 3 raízes o fim do conteúdo não pode morar

@@ -32,3 +32,18 @@ export function webHomeNovaLigada(): boolean {
     return WEB_HOME_NOVA === "on";
   } catch { return false; }
 }
+
+/**
+ * SCORE DA CONTA NOVA DO SITE (dono 27/10, depois do teste: "1 gasto já dá 100 · Dia completo"). No site não há missão
+ * em doses, e a régua do novato (lib/pendencias-novato) conta só o que a pessoa usa — o 1º gasto virava 100. Na conta
+ * NOVA do site (chave on, régua do novato valendo) o score conta os 3 cards da 1ª página do carrossel, com o MESMO peso:
+ * Gasto, Hábitos e Água — 1 gasto = 33, os 3 completos = 100. Os 3 também entram na lista de pendências do novato.
+ * Escondido em "Personalizar" sai da conta; nenhum visível = 0. App das lojas e conta antiga: a conta de sempre.
+ */
+export const TIPOS_DO_SCORE_SITE_NOVO = ["gasto", "habitos", "agua"] as const;
+export function scoreDaContaNovaNoSite(blocos: ReadonlyArray<{ tipo: string; pontos: number; max: number }>, ocultos: readonly string[] = []): number {
+  const tipos = TIPOS_DO_SCORE_SITE_NOVO.filter((t) => !ocultos.includes(t));
+  if (tipos.length === 0) return 0;
+  const fracao = (t: string) => { const b = blocos.find((x) => x.tipo === t); return b && b.max > 0 ? Math.min(1, Math.max(0, b.pontos / b.max)) : 0; };
+  return Math.round((tipos.reduce((s, t) => s + fracao(t), 0) / tipos.length) * 100);
+}

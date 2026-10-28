@@ -27,6 +27,7 @@ vi.mock("@/lib/analytics", async (orig) => ({
 vi.mock("@/lib/native-shell", async (orig) => ({ ...(await orig<typeof import("@/lib/native-shell")>()), isNativeShell: () => nativo.v }));
 vi.mock("@/hooks/use-auth", () => ({
   useAuth: () => ({ ...auth, session: null, loading: false, trialExpired: false, noTrial: false, trialDay: 1, trialHoursLeft: 0, graceDaysLeft: null, paymentMethod: null }),
+  useAuthOpcional: () => ({ ...auth }),
   AuthProvider: ({ children }: { children: ReactNode }) => children,
 }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn(), message: vi.fn() }), Toaster: () => null }));

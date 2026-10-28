@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { checkIsAdmin } from "@/lib/admin";
 import { isNativeShell } from "@/lib/native-shell";
+import { webHomeNovaLigada } from "@/lib/web-home-nova";
 import {
   EVENTO_ORIGEM_HOME_NOVA, adminHomeNovaConhecido, fixarModoDaAbertura, forcaHomeNova, guardarAdmin, homeNovaLigada, homeNovaPrecisaDeAdmin,
   informarAdminHomeNova, lerAdminGuardado, modoHomeNova, origemConhecida, origemJaTentada, type ModoHomeNova,
@@ -54,7 +55,7 @@ function ouvirAdmin(userId: string, ouvinte: (ok: boolean) => void): () => void 
  * carregada (o render de troca convidado→conta, ou a conta ainda chegando). Conta nova nunca vê a Home antiga por um quadro.
  */
 export function esperaOrigemDaConta(userId: string | null | undefined, modo: ModoHomeNova): boolean {
-  if (!userId || !isNativeShell() || forcaHomeNova() !== null) return false;
+  if (!userId || (!isNativeShell() && !webHomeNovaLigada()) || forcaHomeNova() !== null) return false; // 27/10: no site com WEB_HOME_NOVA também
   if (modo !== "novas" && modo !== "novas+admin") return false;
   return origemConhecida(userId) === null && !origemJaTentada(userId);
 }

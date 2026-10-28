@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useAuthOpcional } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { isNativeShell } from "@/lib/native-shell";
+import { webHomeNovaLigada } from "@/lib/web-home-nova";
 import { localDayKey } from "@/lib/utils";
 import { CHAVE_MISSAO_NA_CONTA, lerMissao, missaoDaConta, missaoDeAntesDa1019, missaoValida } from "@/lib/missao-doses";
 import {
@@ -28,8 +29,11 @@ export const contaCarregadaDeVerdade = (loaded: boolean, contaCompleta: boolean 
  *   2. já decidida nesta abertura (memória) ou neste aparelho (espelho) → vale ela (e sobe pra conta se faltar);
  *   3. senão, no app: a regra (classificarOrigem) — conta < 48 h e sem missão de antes = "nova"; o resto "antiga".
  *      Sem created_at: null (indecidível — não grava nada; a Home fica com a de hoje nesta abertura).
- * No site: só o marcador da conta (nada é decidido nem gravado).
+ * No site: só o marcador da conta (nada é decidido nem gravado) — a não ser com WEB_HOME_NOVA "on" (27/10,
+ * lib/web-home-nova): aí o site decide e grava com a MESMA régua do app.
  */
+export const origemDecideAqui = (): boolean => isNativeShell() || webHomeNovaLigada();
+
 export function decidirOrigemDaConta(user: Conta, get: Leitor): { origem: OrigemDaConta | null; faltaNaConta: boolean } {
   const uid = user?.id;
   if (!uid) return { origem: null, faltaNaConta: false };
@@ -39,7 +43,7 @@ export function decidirOrigemDaConta(user: Conta, get: Leitor): { origem: Origem
   if (!origem) {
     origem = origemEmMemoria(uid) ?? origemConhecida(uid);
     const criada = user?.created_at;
-    if (!origem && isNativeShell() && criada) {
+    if (!origem && origemDecideAqui() && criada) {
       let temMissaoDeAntes = false;
       try {
         // P1 (varredura novato, 26/10): só conta a missão de ANTES da 1.0.19 (sem o carimbo `criadaNa`). A missão que a
@@ -54,7 +58,7 @@ export function decidirOrigemDaConta(user: Conta, get: Leitor): { origem: Origem
     }
   }
   if (origem && origemEmMemoria(uid) !== origem) anotarOrigemEmMemoria(uid, origem);
-  return { origem, faltaNaConta: !naConta && !!origem && isNativeShell() };
+  return { origem, faltaNaConta: !naConta && !!origem && origemDecideAqui() };
 }
 
 /**

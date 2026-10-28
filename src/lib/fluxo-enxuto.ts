@@ -1,6 +1,8 @@
 import { idDoAparelho } from "@/lib/dia1-cheio";
 import { modo1012 } from "@/lib/modo-1012";
 import { isIOS, isNativeShell } from "@/lib/native-shell";
+import { contaEhNova } from "@/lib/home-nova";
+import { webHomeNovaLigada } from "@/lib/web-home-nova";
 
 /**
  * FLUXO ENXUTO (1.0.21, dono 27/10): "Tira o montar finanças e todos os tutorial, talvez deixa só o da home. Aí a tela
@@ -27,7 +29,8 @@ import { isIOS, isNativeShell } from "@/lib/native-shell";
  *   · "off" → o fluxo de hoje (rollback);
  *   · "ab"  → 50/50 pelo id do aparelho (FNV-1a, sal próprio "fluxo-enxuto:"), sorteado 1x e gravado;
  *   · ausente/estranho → nada muda (vale o guardado no aparelho, senão o PADRÃO).
- * PADRÃO: app do iPhone = "on" (dono 27/10, "liga pra todo mundo"); site e Android = "off". A metadata das offerings é
+ * PADRÃO: app do iPhone = "on" (dono 27/10, "liga pra todo mundo"); site e Android = "off" — no site, a conta NOVA
+ * liga pela chave WEB_HOME_NOVA (lib/web-home-nova, 27/10). A metadata das offerings é
  * a mesma pras duas lojas, então a chave remota SÓ vale no iPhone — no Android e no site o enxuto só liga pela força de QA.
  * A última resposta válida fica no aparelho (`core-fluxo-enxuto`), o braço do "ab" em `core-fluxo-enxuto-braco`.
  * QA: `?fluxo-enxuto=on|off|ab|auto` grava uma força neste aparelho/navegador (`fluxo-enxuto-force`, fora dos prefixos
@@ -130,10 +133,20 @@ export function bracoFluxoEnxuto(): BracoFluxoEnxuto {
   return sorteado;
 }
 
+/** 27/10 (lib/web-home-nova): no SITE, com WEB_HOME_NOVA "on", a conta NOVA (marcador de origem da conta da sessão) tem
+ *  o enxuto — sem força de QA por cima. Conta antiga e chave "off": o site de hoje. */
+export const enxutoDaContaNovaNoSite = (): boolean => {
+  try {
+    if (!webHomeNovaLigada() || modoDe(ls.get(CHAVE_FORCA_FLUXO_ENXUTO))) return false;
+    return contaEhNova();
+  } catch { return false; }
+};
+
 /** O enxuto está ligado AQUI? */
 export function fluxoEnxutoLigado(): boolean {
   try {
     if (modo1012()) return true; // 1.0.21 modo 1.0.12: sem tutorial nem dicas, fixo (a chave remota não desliga)
+    if (enxutoDaContaNovaNoSite()) return true;
     const m = modoFluxoEnxuto();
     if (m === "off") return false;
     if (m === "on") return true;
@@ -144,7 +157,7 @@ export function fluxoEnxutoLigado(): boolean {
 /** Os campos dos eventos: com o modo diferente de "off", qual fluxo a pessoa vê. "off" = nada (eventos idênticos). */
 export function camposFluxoEnxuto(): { fluxo_enxuto?: BracoFluxoEnxuto } {
   try {
-    if (modo1012()) return { fluxo_enxuto: "enxuto" };
+    if (modo1012() || enxutoDaContaNovaNoSite()) return { fluxo_enxuto: "enxuto" };
     if (modoFluxoEnxuto() === "off") return {};
     return { fluxo_enxuto: fluxoEnxutoLigado() ? "enxuto" : "atual" };
   } catch { return {}; }

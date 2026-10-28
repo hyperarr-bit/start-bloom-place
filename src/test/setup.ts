@@ -10,6 +10,10 @@ import { afterAll } from "vitest";
  * (src/test/fluxo-enxuto*.test.tsx, o pós-compra) apagam este global e veem o padrão de verdade. */
 (globalThis as { __FLUXO_ENXUTO_PADRAO_APP__?: string }).__FLUXO_ENXUTO_PADRAO_APP__ = "off";
 
+/* 27/10 — HOME NOVA NO SITE (lib/web-home-nova): a chave WEB_HOME_NOVA é "on", mas a suíte de antes descreve o site de
+ * hoje (nada classificado, Home de hoje). Aqui ela vira "off"; os testes da chave (web-home-nova.test.tsx) apagam o global. */
+(globalThis as { __WEB_HOME_NOVA__?: string }).__WEB_HOME_NOVA__ = "off";
+
 /**
  * REDE EXTERNA BLOQUEADA NOS TESTES (28/09). O cliente do Supabase aponta pra
  * PRODUÇÃO (endereço fixo em integrations/supabase/client) e o trackEvent

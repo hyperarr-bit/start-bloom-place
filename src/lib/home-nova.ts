@@ -1,6 +1,7 @@
 import { idDoAparelho } from "@/lib/dia1-cheio";
 import { isIOS, isNativeShell } from "@/lib/native-shell";
 import { modo1012 } from "@/lib/modo-1012";
+import { webHomeNovaLigada } from "@/lib/web-home-nova";
 
 /**
  * HOME NOVA — OPÇÃO E (1.0.19, 26/10): a Home do carrossel do dia (src/components/home-nova/e), aprovada pelo
@@ -40,7 +41,8 @@ import { modo1012 } from "@/lib/modo-1012";
  *   · "antiga" = todo o resto: conta com mais de 48 h (inclusive quem já tinha conta e só agora começa o teste),
  *                conta antiga reinstalando o app, conta com missão de uma versão anterior.
  *   No site (navegador) nada é classificado nem gravado: a conta criada pela Porta/site é decidida quando abrir o app
- *   (dentro de 48 h = nova). Reinstalar no mesmo dia: o marcador volta da conta (ou, se não chegou a subir, a regra
+ *   (dentro de 48 h = nova). 27/10: com WEB_HOME_NOVA "on" (lib/web-home-nova) o SITE também decide e grava, com a
+ *   MESMA régua, e o modo do site vira "novas" (conta nova vê a Home nova; antiga e admin, a de hoje). Reinstalar no mesmo dia: o marcador volta da conta (ou, se não chegou a subir, a regra
  *   decide de novo — a missão só sobe pra conta DEPOIS do marcador). Sem created_at: nada é gravado e esta abertura
  *   fica com a Home de hoje (nunca liga a nova na dúvida).
  *   A decisão só usa a conta QUANDO ELA É DESTA conta (loaded + contaCompleta: o render de troca convidado→conta
@@ -113,7 +115,11 @@ const bracoDe = (v: unknown): BracoHomeNova | null => (v === "nova" || v === "at
  *  passou pelo QA da Home nova — liga por lá só pela chave remota, quando o dono decidir). */
 export const MODO_PADRAO_APP: ModoHomeNova = "novas+admin";
 export const MODO_PADRAO_WEB: ModoHomeNova = "off";
-export const padraoHomeNova = (): ModoHomeNova => (isNativeShell() && isIOS() ? MODO_PADRAO_APP : MODO_PADRAO_WEB);
+/** 27/10 (lib/web-home-nova): no site, com WEB_HOME_NOVA "on", o padrão é "novas" — só a conta NOVA (marcador de origem) vê a
+ *  Home nova; o admin, como todo cliente antigo, fica com a de hoje. "off" = MODO_PADRAO_WEB, como antes. */
+export const MODO_SITE_HOME_NOVA: ModoHomeNova = "novas";
+export const padraoHomeNova = (): ModoHomeNova =>
+  (isNativeShell() && isIOS() ? MODO_PADRAO_APP : webHomeNovaLigada() ? MODO_SITE_HOME_NOVA : MODO_PADRAO_WEB);
 
 /** Em memória: o que o getOfferings DESTA abertura disse (undefined = ainda não respondeu). */
 let remoto: ModoHomeNova | undefined;

@@ -23,7 +23,7 @@ export const StoriesAdesivo = ({id,titulo,raridade="comum",transparente=false}: 
     <div style={{position:"absolute",left:62,right:62,top:198,bottom:198,borderRadius:40,background:"#fcf8ee",border:"2px solid #d9d0be"}}/>
     <div style={{position:"absolute",left:114,right:114,top:274,fontSize:24,fontWeight:650,letterSpacing:".16em",color:cor.tinta}}>DA MINHA COLEÇÃO</div>
     <div style={{position:"absolute",left:114,right:114,top:344,fontFamily:"'Instrument Serif',Georgia,serif",fontSize:90,lineHeight:1.08,letterSpacing:"-.025em"}}>{textoDoStory(id)}</div>
-    <div data-foto-arte={ARTES_CADERNO[id]} data-foto-giro="-5" style={{position:"absolute",left:190,top:686,width:700,height:700,transform:"rotate(-5deg)"}}><Adesivo id={id} tamanho={700}/></div>
+    <div data-foto-arte={ARTES_CADERNO[id]} style={{position:"absolute",left:190,top:686,width:700,height:700,transform:"rotate(-5deg)"}}><Adesivo id={id} tamanho={700}/></div>
     <div style={{position:"absolute",left:114,right:114,top:1430,textAlign:"center"}}>
       <div style={{fontSize:46,lineHeight:1.15,fontWeight:750,letterSpacing:"-.025em"}}>{titulo}</div>
       <div style={{marginTop:18,color:cor.tinta,fontSize:22,letterSpacing:".03em"}}>{raridades[raridade] ? `Figurinha ${raridades[raridade].toLowerCase()} · ` : ""}Um pedaço da minha história.</div>

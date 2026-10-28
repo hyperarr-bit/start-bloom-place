@@ -44,6 +44,8 @@ const versaoDoAppIos = (() => {
 const rotaDaMissao = () => {
   const reescrever = (req: { url?: string }, _res: unknown, next: () => void) => {
     if (req.url === "/missao" || req.url?.startsWith("/missao?")) req.url = req.url.replace("/missao", "/missao.html");
+    // 28/10: a LANDING NOVA (/organizar → landing.html; a demo /organizar/demo continua no SPA)
+    else if (req.url === "/organizar" || req.url?.startsWith("/organizar?")) req.url = req.url.replace("/organizar", "/landing.html");
     next();
   };
   return {
@@ -120,6 +122,8 @@ export default defineConfig(({ mode }) => ({
       input: {
         main: path.resolve(__dirname, "index.html"),
         missao: path.resolve(__dirname, "missao.html"),
+        // 28/10: a LANDING NOVA (/organizar, chave LANDING_NOVA "off" no próprio HTML) — HTML + CSS + src/landing/landing.ts
+        landing: path.resolve(__dirname, "landing.html"),
       },
     },
   },

@@ -21,6 +21,10 @@
       "destination": "/missao.html"
     },
     {
+      "source": "/organizar",
+      "destination": "/landing.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

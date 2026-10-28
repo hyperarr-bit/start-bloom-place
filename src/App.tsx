@@ -437,6 +437,9 @@ const VendaWeb = lazyPage(() => import("./pages/venda/VendaWeb"));
 // 16/10: a DEMO QUE VENDE (/liberar?m=…) — o app de verdade com dados de exemplo (como o /experimente), e todo
 // "Liberar meu CORE" abre o PAYWALL do /assinar (anual 97,90 no Pix) → nome + e-mail → Pix → sucesso. Só na WEB.
 const Liberar = lazyPage(() => import("./pages/liberar/Liberar"));
+// 28/10: a DEMO DA LANDING NOVA (/organizar → iframe /organizar/demo?m=…): só o módulo de verdade com dados de exemplo,
+// sem moldura de funil; aberta fora do iframe volta pra /organizar. A landing em si é o landing.html (HTML leve).
+const DemoDaLanding = lazyPage(() => import("./pages/organizar/DemoDaLanding"));
 // 16/10: o FUNIL DO APP NA WEB (/assinatura) — as telas do iPhone 1.0.15 (welcome com vídeo → porta → 2 perguntas →
 // sem × com → lembretes → prova → resultado → plano de 3 dias) e o paywall da WEB no Pix com a escada: anual 97,90 →
 // presente anual 69,90 → mensal 24,90 (30 dias, sem renovação). Só na WEB (SoNaWeb), noindex. O app não muda.
@@ -736,6 +739,7 @@ const AnimatedRoutes = () => {
         <Route path="/abrir" element={<SoNaWeb><RouteErrorBoundary routeName="porta-abrir"><AbrirPorta /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/assinar" element={<SoNaWeb><RouteErrorBoundary routeName="venda-web"><VendaWeb /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/liberar" element={<SoNaWeb><RouteErrorBoundary routeName="liberar"><Liberar /></RouteErrorBoundary></SoNaWeb>} />
+        <Route path="/organizar/demo" element={<SoNaWeb><RouteErrorBoundary routeName="landing-demo"><DemoDaLanding /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/assinatura" element={<SoNaWeb><RouteErrorBoundary routeName="assinatura-app"><AssinaturaApp /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/missao/app" element={<SoNaWeb><RouteErrorBoundary routeName="funil-missao"><EntradaMissao /></RouteErrorBoundary></SoNaWeb>} />
         {/* "voltar" do navegador no meio do tutorial cai no /missao DENTRO do SPA (a tela 2 foi trocada pelo módulo com

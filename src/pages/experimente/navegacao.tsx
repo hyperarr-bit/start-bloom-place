@@ -30,14 +30,19 @@ type Path = { pathname?: string; search?: string; hash?: string };
 const textoDo = (to: string | Path): string =>
   typeof to === "string" ? to : `${to.pathname ?? ""}${to.search ?? ""}${to.hash ?? ""}`;
 
-export function NavegacaoDaDemo({ aoDesviar, children }: { aoDesviar: (d: NonNullable<Desvio>) => void; children: ReactNode }) {
+/**
+ * `desviar` (28/10, landing nova /organizar/demo): quem passa decide sozinho (true = tratou, a navegação não acontece).
+ * Sem ele, a regra dos 5 módulos acima com `aoDesviar` — o /experimente e o /liberar não mudam.
+ */
+export function NavegacaoDaDemo({ aoDesviar, desviar, children }: { aoDesviar?: (d: NonNullable<Desvio>) => void; desviar?: (destino: string) => boolean; children: ReactNode }) {
   const ctx = useContext(UNSAFE_NavigationContext);
   const valor = useMemo(() => {
     const nav = ctx.navigator;
     const desviou = (to: string | Path): boolean => {
+      if (desviar) return desviar(textoDo(to));
       const d = desvioNaDemo(textoDo(to));
       if (!d) return false;
-      aoDesviar(d);
+      aoDesviar?.(d);
       return true;
     };
     const navigator = {
@@ -49,7 +54,7 @@ export function NavegacaoDaDemo({ aoDesviar, children }: { aoDesviar: (d: NonNul
       ...(nav.encodeLocation ? { encodeLocation: nav.encodeLocation.bind(nav) } : {}),
     } as typeof nav;
     return { ...ctx, navigator };
-  }, [ctx, aoDesviar]);
+  }, [ctx, aoDesviar, desviar]);
 
   /* <a href="/…"> que não é <Link> (navegação inteira da página) */
   const aoClicar = (e: React.MouseEvent) => {
@@ -58,10 +63,11 @@ export function NavegacaoDaDemo({ aoDesviar, children }: { aoDesviar: (d: NonNul
     if (!a || (a.target && a.target !== "_self") || a.hasAttribute("download")) return;
     const href = a.getAttribute("href") ?? "";
     if (!href.startsWith("/") || href.startsWith("//")) return;
+    if (desviar) { if (desviar(href)) e.preventDefault(); return; }
     const d = desvioNaDemo(href);
     if (!d) return;
     e.preventDefault();
-    aoDesviar(d);
+    aoDesviar?.(d);
   };
 
   return (

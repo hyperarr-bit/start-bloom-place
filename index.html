@@ -8,6 +8,45 @@
     <!-- 01/10: faixa nativa do Safari no iPhone ("Abrir na App Store") — o WKWebView do app ignora -->
     <meta name="apple-itunes-app" content="app-id=6806913181" />
     <link rel="manifest" href="/manifest.json" />
+    <script>
+      // ─── LANDING NOVA × /inicio — a divisão 50/50 do MESMO link da campanha (28/10, PREPARADA E DESLIGADA) ───
+      // Ligar SÓ junto com LANDING_NOVA = "on" no landing.html. Com "on", quem chega no /inicio (sem ld=1) é sorteado
+      // UMA vez por aparelho: metade vai pra /organizar (a landing nova) com a MESMA query, antes de o bundle baixar;
+      // a outra metade segue no /inicio. ld=1 marca quem já passou pela divisão (e quem a landing desligada devolveu)
+      // — nunca há laço. Forçar neste navegador: ?landing-divisao=nova|inicio. Evento: landing_divisao {braco}.
+      (function () {
+        var DIVISAO_INICIO_LANDING = "off";
+        try {
+          if (location.pathname !== "/inicio") return;
+          var sp = new URLSearchParams(location.search);
+          if (sp.get("ld") === "1") return;
+          var f = sp.get("landing-divisao");
+          var ls = null; try { ls = window.localStorage; } catch (e0) {}
+          if (f === "nova" || f === "inicio") { try { ls && ls.setItem("landing-divisao-force", f); } catch (e1) {} }
+          var forca = null; try { forca = ls && ls.getItem("landing-divisao-force"); } catch (e2) {}
+          if (DIVISAO_INICIO_LANDING !== "on" && forca !== "nova" && forca !== "inicio") return;
+          var braco = forca === "nova" || forca === "inicio" ? forca : null;
+          if (!braco) { try { braco = ls && ls.getItem("landing-divisao"); } catch (e3) {} }
+          if (braco !== "nova" && braco !== "inicio") { braco = Math.random() < 0.5 ? "nova" : "inicio"; try { ls && ls.setItem("landing-divisao", braco); } catch (e4) {} }
+          window.__landingDivisao = braco;
+          try {
+            if (/(^|\.)coreaplicativo\.com\.br$/.test(location.hostname) && typeof fetch === "function") {
+              var sid = null; try { sid = sessionStorage.getItem("core_session_id"); } catch (e6) {}
+              var K = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0b3lsZW56dmFoYnNjZ2pndHFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMTc4NzUsImV4cCI6MjA4OTg5Mzg3NX0.G3bJEdD5B5lmc1cic6UYGeu2xv4XrbmZ9MA_afoYnLg";
+              fetch("https://itoylenzvahbscgjgtqf.supabase.co/rest/v1/analytics_events", { method: "POST", keepalive: true,
+                headers: { "Content-Type": "application/json", apikey: K, Authorization: "Bearer " + K, Prefer: "return=minimal" },
+                body: JSON.stringify({ user_id: null, session_id: sid, event_name: "landing_divisao", event_data: { braco: braco, forcado: !!forca, utm_campaign: sp.get("utm_campaign"), utm_content: sp.get("utm_content"), ad_id: sp.get("ad_id"), path: "/inicio" } })
+              })["catch"](function () {});
+            }
+          } catch (e7) {}
+          if (braco === "nova") {
+            sp.set("ld", "1");
+            if (forca === "nova") sp.set("landing", "on");
+            location.replace("/organizar?" + sp.toString() + location.hash);
+          }
+        } catch (e5) {}
+      })();
+    </script>
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0f0f0f" media="(prefers-color-scheme: dark)" />
     <meta name="color-scheme" content="light dark" />
@@ -372,9 +411,12 @@
       if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
       n.queue=[];/* 02/09: o fbevents.js entra no carregador adiado; aqui só a fila */}(window, document,'script',
       'https://connect.facebook.net/en_US/fbevents.js');
+      // 28/10: a demo DENTRO da landing nova (/organizar → iframe /organizar/demo) não conta PageView: a página de fora já contou
+      if (location.pathname !== '/organizar/demo') {
       fbq('init', '998037194527241');
       fbq('init', '1104688251942954'); // 19/10: pixel iris (conta de anúncios nova) — recebe os mesmos eventos
       fbq('track', 'PageView');
+      }
     </script>
     <!-- End Meta Pixel Code -->
 
@@ -404,6 +446,7 @@
         }
         function pixels() {
           if (feito) return; feito = true;
+          if (location.pathname === "/organizar/demo") return; // 28/10: a demo dentro da landing nova não carrega pixel
           carregar("https://connect.facebook.net/en_US/fbevents.js");
           carregar("https://www.googletagmanager.com/gtag/js?id=AW-18254888989");
           carregar("https://cdn.utmify.com.br/scripts/utms/latest.js", { "data-utmify-prevent-xcod-sck": "", "data-utmify-prevent-subids": "" });

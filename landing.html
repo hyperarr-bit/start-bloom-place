@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>CORE · Sua vida inteira, num app só</title>
+    <meta name="description" content="Dinheiro, rotina, treino, saúde e mais 12 áreas organizados num app só. App Store, Google Play e computador." />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="color-scheme" content="light" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!--
+      LANDING NOVA (28/10) — coreaplicativo.com.br/organizar. A página INTEIRA é HTML + CSS daqui (sem React, sem o
+      bundle do app): a 1ª tela pinta com o que chega no próprio documento (só a fonte Inter, pré-carregada, troca por
+      cima — font-display: swap). O comportamento é src/landing/landing.ts (vanilla, pequeno). A demo é o APP DE
+      VERDADE num iframe (/organizar/demo, a mesma origem), que só começa a baixar DEPOIS da 1ª pintura; até chegar,
+      uma imagem leve do mesmo módulo ocupa a MESMA caixa (sem salto). O Pix de verdade (src/landing/pagamento.ts)
+      só baixa no toque em pagar.
+
+      A CHAVE e os A/B rodam AQUI, antes de pintar (sem piscar). Padrão: tudo desligado.
+        LANDING_NOVA "off"  → /organizar volta pro /inicio (mesma query). Teste: ?landing=on (fica neste navegador;
+                              ?landing=off tira).
+        AB_TITULO    "off"  → sempre o título A. "on" = sorteio estável por aparelho entre BRACOS_TITULO.
+                              Forçar: ?t=a|b|c (fica neste navegador).
+        AB_OFERTA    "off"  → sempre a oferta "ano". "on" = 50/50 estável por aparelho. Forçar: ?oferta=ano|sempre.
+      A divisão 50/50 do /inicio (o mesmo link da campanha) mora no index.html (DIVISAO_INICIO_LANDING, "off").
+    -->
+    <script>
+      (function () {
+        var LANDING_NOVA = "off";
+        var AB_TITULO = "off";
+        var BRACOS_TITULO = ["a", "b", "c"];
+        var AB_OFERTA = "off";
+        var d = document.documentElement, q = null, mem = {};
+        try { q = new URLSearchParams(location.search); } catch (e0) {}
+        var pega = function (k) { try { return q ? q.get(k) : null; } catch (e) { return null; } };
+        var le = function (k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } };
+        var grava = function (k, v) { try { if (v === null) window.localStorage.removeItem(k); else window.localStorage.setItem(k, v); } catch (e) {} };
+        var sorteia = function (lista) { return lista[Math.floor(Math.random() * lista.length) % lista.length]; };
+
+        var pl = pega("landing");
+        if (pl === "on") grava("landing-nova-force", "on");
+        if (pl === "off") grava("landing-nova-force", null);
+        var ligada = LANDING_NOVA === "on" || pl === "on" || (pl !== "off" && le("landing-nova-force") === "on");
+        if (!ligada) {
+          d.setAttribute("data-desligada", "");
+          // o site de sempre: /inicio com a MESMA query (utm/fbclid), sem voltar pra cá (ld=1 trava a divisão)
+          var busca = location.search ? location.search + "&ld=1" : "?ld=1";
+          try { location.replace("/inicio" + busca + location.hash); } catch (e1) {}
+          return;
+        }
+
+        var pt = pega("t");
+        if (pt === "a" || pt === "b" || pt === "c") grava("landing-t-force", pt);
+        var t = (pt === "a" || pt === "b" || pt === "c") ? pt : le("landing-t-force");
+        mem.t_forcado = !!t;
+        if (t !== "a" && t !== "b" && t !== "c") {
+          if (AB_TITULO === "on") {
+            t = le("landing-t");
+            if (BRACOS_TITULO.indexOf(t) < 0) { t = sorteia(BRACOS_TITULO); grava("landing-t", t); }
+          } else t = "a";
+        }
+
+        var po = pega("oferta");
+        if (po === "ano" || po === "sempre") grava("landing-oferta-force", po);
+        var o = (po === "ano" || po === "sempre") ? po : le("landing-oferta-force");
+        mem.oferta_forcada = !!o;
+        if (o !== "ano" && o !== "sempre") {
+          if (AB_OFERTA === "on") {
+            o = le("landing-oferta");
+            if (o !== "ano" && o !== "sempre") { o = Math.random() < 0.5 ? "ano" : "sempre"; grava("landing-oferta", o); }
+          } else o = "ano";
+        }
+        mem.t = t; mem.oferta = o; mem.ab_titulo = AB_TITULO; mem.ab_oferta = AB_OFERTA;
+        mem.divisao = pega("ld") === "1" ? "inicio" : null;
+        d.setAttribute("data-t", t);
+        d.setAttribute("data-oferta", o);
+        window.__landing = mem;
+      })();
+    </script>
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-latin.woff2" crossorigin />
+    <style>
+      @font-face { font-family: 'Inter'; font-style: normal; font-weight: 300 900; font-display: swap; src: url(/fonts/inter-latin.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+      :root {
+        --tx: #1c1a1f; --suave: #6b6670; --fraco: #9a95a0; --borda: #ebe8ee; --papel: #f7f5f8;
+        --grafite: #262626; --magenta: #d6338a; --magenta-escuro: #b0256f; --magenta-suave: #fdf0f6;
+        --verde: #16a34a; --verde-suave: #ecfdf3; --raio: 18px;
+      }
+      html[data-desligada] body { visibility: hidden; }
+      html, body { margin: 0; background: #fff; color: var(--tx); font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
+      body { overflow-x: hidden; overflow-x: clip; }
+      * { box-sizing: border-box; }
+      button { font-family: inherit; cursor: pointer; }
+      img { max-width: 100%; }
+      .lp { max-width: 480px; margin: 0 auto; }
+      .lp-sec { padding: 56px 20px 0; }
+      .lp-kicker { font-size: 11.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--magenta); }
+      .lp-h2 { font-size: 27px; line-height: 1.12; font-weight: 800; letter-spacing: -.025em; margin: 8px 0 0; text-wrap: balance; }
+      .lp-p { font-size: 15.5px; line-height: 1.45; color: var(--suave); margin: 10px 0 0; text-wrap: pretty; }
+      html:not([data-t="a"]) [data-so-t="a"], html:not([data-t="b"]) [data-so-t="b"], html:not([data-t="c"]) [data-so-t="c"] { display: none !important; }
+      html:not([data-oferta="ano"]) [data-so-oferta="ano"], html:not([data-oferta="sempre"]) [data-so-oferta="sempre"] { display: none !important; }
+
+      /* ───────── 1. topo ───────── */
+      .lp-barra { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 0; height: 50px; }
+      .lp-marca { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 900; letter-spacing: .14em; color: var(--tx); text-decoration: none; }
+      .lp-marca img { width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--borda); }
+      .lp-barra-dir { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--suave); }
+      .lp-topo { padding: 22px 20px 0; }
+      .lp-h1 { font-size: 35px; line-height: 1.04; font-weight: 850; letter-spacing: -.035em; margin: 0; text-wrap: balance; }
+      .lp-h1 em { font-style: normal; color: var(--magenta); }
+      .lp-sub { font-size: 16px; line-height: 1.42; color: var(--suave); margin: 12px 0 0; text-wrap: pretty; }
+      .lp-pergunta { margin: 26px 0 0; font-size: 17px; font-weight: 750; letter-spacing: -.01em; }
+      .lp-areas { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+      button.lp-area { position: relative; display: flex; align-items: center; gap: 14px; width: 100%; min-height: 68px; padding: 10px 14px 10px 12px; border-radius: var(--raio); border: 1.5px solid var(--borda); background: #fff; color: var(--tx); text-align: left; box-shadow: 0 1px 0 rgba(0,0,0,.03); transition: border-color .15s, background-color .15s, transform .1s; }
+      button.lp-area:active { transform: scale(.985); }
+      button.lp-area[aria-pressed="true"] { border-color: var(--magenta); background: var(--magenta-suave); }
+      button.lp-area[data-a="tudo"] { border-color: #e8d3df; }
+      .lp-area-ico { width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; font-size: 22px; flex-shrink: 0; }
+      .lp-area-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+      .lp-area-txt b { font-size: 16.5px; font-weight: 700; letter-spacing: -.01em; }
+      .lp-area-txt span { font-size: 13.5px; color: var(--suave); }
+      .lp-area > svg { margin-left: auto; color: #c4c0c8; flex-shrink: 0; }
+      .lp-selo-mais { position: absolute; top: -9px; right: 14px; padding: 3px 8px; border-radius: 99px; background: var(--magenta); color: #fff; font-size: 10.5px; font-weight: 800; letter-spacing: .04em; }
+      .lp-onde { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 18px 0 0; font-size: 12.5px; font-weight: 600; color: var(--suave); }
+      .lp-onde span { display: inline-flex; align-items: center; gap: 5px; }
+      .lp-onde svg { width: 14px; height: 14px; }
+
+      /* ───────── 2. demo ───────── */
+      .lp-pilulas { display: flex; gap: 8px; overflow-x: auto; margin: 18px -20px 0; padding: 2px 20px 4px; scrollbar-width: none; }
+      .lp-pilulas::-webkit-scrollbar { display: none; }
+      button.lp-pilula { flex-shrink: 0; height: 36px; padding: 0 14px; border-radius: 99px; border: 1.5px solid var(--borda); background: #fff; color: var(--tx); font-size: 14px; font-weight: 650; white-space: nowrap; transition: background-color .15s, color .15s, border-color .15s; }
+      button.lp-pilula[aria-pressed="true"] { background: var(--grafite); border-color: var(--grafite); color: #fff; }
+      button.lp-pilula.lp-pilula-16 { color: var(--magenta); border-style: dashed; border-color: #ecc6da; }
+      .lp-celular { position: relative; margin: 14px auto 0; height: clamp(540px, 74svh, 680px); border-radius: 34px; border: 6px solid #16121c; background: #fff; overflow: hidden; box-shadow: 0 24px 50px -20px rgba(22,18,28,.35), 0 2px 0 rgba(0,0,0,.04); isolation: isolate; }
+      .lp-celular img, .lp-celular iframe { position: absolute; inset: 0; top: 0; left: 0; width: 100%; height: 100%; border: 0; display: block; }
+      .lp-celular img { object-fit: cover; object-position: top center; background: #fff; transition: opacity .25s ease; z-index: 1; }
+      .lp-celular iframe { z-index: 0; background: #fff; }
+      .lp-celular[data-pronta] img { opacity: 0; pointer-events: none; }
+      .lp-celular[data-pronta] iframe { z-index: 2; }
+      .lp-demo-carregando { position: absolute; z-index: 3; left: 50%; bottom: 16px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 99px; background: rgba(22,18,28,.82); color: #fff; font-size: 12.5px; font-weight: 650; white-space: nowrap; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+      .lp-celular[data-pronta] .lp-demo-carregando { display: none; }
+      .lp-gira { width: 13px; height: 13px; border-radius: 50%; border: 2.2px solid rgba(255,255,255,.35); border-top-color: #fff; animation: lp-gira .8s linear infinite; }
+      @keyframes lp-gira { to { transform: rotate(360deg); } }
+      .lp-demo-nota { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 12px 0 0; font-size: 12.5px; color: var(--fraco); font-weight: 600; text-align: center; }
+
+      /* ───────── 3. os 16 ───────── */
+      .lp-grade { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px 8px; margin-top: 22px; }
+      button.lp-mod { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 0; border: 0; background: none; color: var(--tx); transition: transform .1s; }
+      button.lp-mod:active { transform: scale(.94); }
+      .lp-mod-ico { width: 58px; height: 58px; border-radius: 18px; display: grid; place-items: center; }
+      .lp-mod-ico svg { width: 25px; height: 25px; }
+      .lp-mod-nome { font-size: 12.5px; font-weight: 600; letter-spacing: -.005em; }
+      .lp-esconde { display: flex; align-items: center; gap: 10px; margin-top: 22px; padding: 14px 16px; border-radius: 14px; background: var(--papel); font-size: 14px; line-height: 1.4; color: var(--suave); }
+      .lp-esconde b { color: var(--tx); }
+      .lp-esconde svg { flex-shrink: 0; width: 20px; height: 20px; color: var(--magenta); }
+
+      /* ───────── 4. antes e depois + avaliações ───────── */
+      .lp-folha { margin-top: 18px; border: 1px solid var(--borda); border-radius: 14px; overflow: hidden; background: #fff; }
+      .lp-folha-faixa { display: flex; align-items: center; gap: 8px; padding: 9px 14px; font-size: 11.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+      .lp-folha-faixa.cinza { background: #f1eff3; color: #6b6670; }
+      .lp-folha-faixa.rosa { background: var(--magenta); color: #fff; }
+      .lp-folha ul { list-style: none; margin: 0; padding: 4px 14px; }
+      .lp-folha li { display: flex; align-items: center; gap: 12px; padding: 11px 0; font-size: 15px; font-weight: 600; line-height: 1.3; border-bottom: 1px solid #f1eff3; }
+      .lp-folha li:last-child { border-bottom: 0; }
+      .lp-folha.antes li { color: #8a8590; font-weight: 550; }
+      .lp-folha.antes li i { font-style: normal; font-size: 18px; width: 24px; text-align: center; filter: grayscale(.6); opacity: .8; }
+      .lp-folha.depois { border-color: #f0cfe0; box-shadow: 0 10px 30px -18px rgba(214,51,138,.45); }
+      .lp-quadrinho { width: 22px; height: 22px; border-radius: 6px; background: var(--magenta); display: grid; place-items: center; flex-shrink: 0; }
+      .lp-quadrinho svg { width: 14px; height: 14px; color: #fff; }
+      .lp-seta { display: grid; place-items: center; height: 34px; color: var(--fraco); }
+      .lp-avals { display: flex; flex-direction: column; gap: 12px; margin-top: 18px; }
+      .lp-aval { margin: 0; padding: 16px 16px 14px; border-radius: 16px; background: var(--papel); }
+      .lp-aval blockquote { margin: 0; font-size: 16px; line-height: 1.4; font-weight: 600; letter-spacing: -.01em; text-wrap: pretty; }
+      .lp-aval figcaption { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 12.5px; font-weight: 600; color: var(--suave); }
+      .lp-aval figcaption svg { width: 13px; height: 13px; }
+
+      /* ───────── 5. como funciona ───────── */
+      .lp-passos { list-style: none; margin: 20px 0 0; padding: 0; display: flex; flex-direction: column; }
+      .lp-passos > li { position: relative; display: flex; gap: 14px; padding-bottom: 22px; }
+      .lp-passos > li:not(:last-child)::before { content: ""; position: absolute; left: 15px; top: 34px; bottom: 4px; width: 2px; background: var(--borda); }
+      .lp-num { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; background: var(--grafite); color: #fff; font-size: 14px; font-weight: 800; }
+      .lp-passo b { display: block; font-size: 16.5px; font-weight: 750; letter-spacing: -.01em; line-height: 1.3; padding-top: 4px; }
+      .lp-passo span { display: block; font-size: 14px; color: var(--suave); line-height: 1.4; margin-top: 3px; }
+      .lp-selos { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+      .lp-selos a { display: inline-flex; }
+      .lp-selos img { height: 40px; width: auto; display: block; }
+
+      /* ───────── 6–8. oferta + Pix + depois de pagar ───────── */
+      .lp-oferta { padding: 56px 16px 0; scroll-margin-top: 12px; }
+      .lp-card { border-radius: 24px; border: 1.5px solid #ecdfe7; background: #fff; overflow: hidden; box-shadow: 0 30px 60px -30px rgba(22,18,28,.28); }
+      .lp-card-faixa { display: flex; align-items: center; justify-content: space-between; padding: 11px 18px; background: var(--grafite); color: #fff; font-size: 11.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+      .lp-card-faixa .lp-faixa-dir { color: #f6b8d6; letter-spacing: .04em; text-transform: none; font-weight: 700; font-size: 12px; }
+      .lp-card-corpo { padding: 22px 18px 20px; }
+      .lp-preco-tit { font-size: 25px; line-height: 1.12; font-weight: 800; letter-spacing: -.025em; margin: 0; }
+      .lp-preco-tit b { display: block; font-size: 44px; letter-spacing: -.04em; margin-top: 4px; font-weight: 850; }
+      .lp-preco-sub { margin: 8px 0 0; font-size: 14.5px; color: var(--suave); font-weight: 600; }
+      .lp-checks { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
+      .lp-checks li { display: flex; gap: 10px; font-size: 14.5px; line-height: 1.4; color: #3d3a40; }
+      .lp-checks li svg { flex-shrink: 0; width: 18px; height: 18px; color: var(--verde); margin-top: 1px; }
+      .lp-checks b { color: var(--tx); }
+      label.lp-caixinha { display: flex; gap: 12px; align-items: flex-start; margin-top: 18px; padding: 14px; border-radius: 14px; border: 1.5px dashed #d9cdd5; background: #fffafc; cursor: pointer; transition: border-color .15s, background-color .15s; }
+      label.lp-caixinha:has(input:checked) { border-style: solid; border-color: var(--magenta); background: var(--magenta-suave); }
+      .lp-caixinha input { appearance: none; -webkit-appearance: none; margin: 1px 0 0; width: 22px; height: 22px; border-radius: 6px; border: 2px solid #bdb6c2; background: #fff; flex-shrink: 0; display: grid; place-items: center; transition: background-color .12s, border-color .12s; }
+      .lp-caixinha input:checked { background: var(--magenta); border-color: var(--magenta); }
+      .lp-caixinha input:checked::after { content: ""; width: 6px; height: 11px; border: solid #fff; border-width: 0 2.5px 2.5px 0; transform: translateY(-1px) rotate(45deg); }
+      .lp-caixinha-txt { font-size: 14.5px; line-height: 1.38; color: #3d3a40; }
+      .lp-caixinha-txt b { color: var(--tx); font-weight: 750; }
+      .lp-caixinha-txt small { display: block; margin-top: 4px; font-size: 13px; color: var(--suave); line-height: 1.4; }
+      .lp-card[data-fase]:not([data-fase="oferta"]) .lp-so-oferta { display: none !important; }
+      button.lp-cta { width: 100%; min-height: 58px; border-radius: 16px; border: 0; background: var(--grafite); color: #fff; font-size: 17px; font-weight: 750; letter-spacing: -.01em; display: inline-flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 8px 20px -6px rgba(0,0,0,.35); transition: transform .1s, opacity .15s; }
+      button.lp-cta:active { transform: scale(.985); }
+      button.lp-cta:disabled { opacity: .45; }
+      button.lp-cta svg { width: 20px; height: 20px; }
+      .lp-pagar { margin-top: 18px; }
+      .lp-seguro { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 12px 0 0; font-size: 12px; font-weight: 600; color: var(--fraco); text-align: center; }
+      .lp-seguro svg { width: 13px; height: 13px; flex-shrink: 0; }
+      .lp-garantia { display: flex; gap: 12px; align-items: center; margin: 16px 2px 0; padding: 14px 16px; border-radius: 16px; background: var(--verde-suave); color: #14532d; font-size: 14px; line-height: 1.4; }
+      .lp-garantia svg { width: 26px; height: 26px; flex-shrink: 0; color: var(--verde); }
+      .lp-garantia b { display: block; font-size: 15px; }
+
+      /* o Pix (preenchido pelo landing.ts) */
+      .lp-pix { margin-top: 2px; }
+      .lp-pix-gerando { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 26px 0 12px; text-align: center; }
+      .lp-pix-gerando b { font-size: 18px; font-weight: 800; letter-spacing: -.01em; }
+      .lp-pix-gerando span { font-size: 13.5px; color: var(--suave); }
+      .lp-pix-logo { width: 58px; height: 58px; border-radius: 18px; display: grid; place-items: center; background: #e9faf6; color: #32bcad; animation: lp-pulsa 1.1s ease-in-out infinite; }
+      .lp-pix-logo svg { width: 30px; height: 30px; }
+      @keyframes lp-pulsa { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+      .lp-progresso { width: 180px; height: 5px; border-radius: 5px; background: #f0eef2; overflow: hidden; }
+      .lp-progresso i { display: block; height: 100%; width: 0; border-radius: 5px; background: #32bcad; animation: lp-enche 1.2s ease-out forwards; }
+      @keyframes lp-enche { to { width: 100%; } }
+      .lp-pix-valor { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 2px 0 14px; border-bottom: 1px solid var(--borda); }
+      .lp-pix-valor b { font-size: 26px; font-weight: 850; letter-spacing: -.03em; }
+      .lp-pix-valor span { font-size: 13px; color: var(--suave); font-weight: 600; text-align: right; }
+      .lp-copiado { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 13px 14px; border-radius: 14px; background: var(--verde-suave); color: #14532d; font-size: 14px; line-height: 1.35; animation: lp-surge .3s ease-out both; }
+      .lp-copiado svg { width: 22px; height: 22px; flex-shrink: 0; padding: 4px; border-radius: 50%; background: var(--verde); color: #fff; }
+      .lp-copiado b { display: block; font-size: 15.5px; }
+      @keyframes lp-surge { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+      .lp-qr-linha { display: flex; gap: 14px; align-items: center; margin-top: 16px; }
+      .lp-qr { width: 132px; height: 132px; flex-shrink: 0; padding: 8px; border-radius: 14px; border: 1px solid var(--borda); background: #fff; display: grid; place-items: center; }
+      .lp-qr img, .lp-qr svg { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+      .lp-qr-dica { font-size: 13.5px; line-height: 1.45; color: var(--suave); }
+      .lp-qr-dica b { color: var(--tx); }
+      .lp-codigo { margin-top: 14px; padding: 10px 12px; border-radius: 12px; background: var(--papel); font: 500 11.5px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: #6b6670; word-break: break-all; max-height: 52px; overflow: hidden; -webkit-user-select: all; user-select: all; }
+      button.lp-copiar { width: 100%; min-height: 52px; margin-top: 10px; border-radius: 14px; border: 1.5px solid var(--grafite); background: #fff; color: var(--grafite); font-size: 15.5px; font-weight: 750; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+      button.lp-copiar.cheio { background: var(--grafite); color: #fff; }
+      button.lp-copiar svg { width: 18px; height: 18px; }
+      .lp-esperando { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--borda); font-size: 13.5px; line-height: 1.4; color: var(--suave); }
+      .lp-esperando b { color: var(--tx); display: block; font-size: 14.5px; }
+      .lp-ponto { width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; background: #f59e0b; flex-shrink: 0; box-shadow: 0 0 0 0 rgba(245,158,11,.5); animation: lp-onda 1.6s ease-out infinite; }
+      @keyframes lp-onda { 0% { box-shadow: 0 0 0 0 rgba(245,158,11,.5); } 100% { box-shadow: 0 0 0 10px rgba(245,158,11,0); } }
+      .lp-validade { margin-top: 8px; font-size: 12.5px; color: var(--fraco); text-align: center; font-weight: 600; }
+      .lp-email-opc { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--borda); }
+      .lp-email-opc label { display: block; font-size: 13px; font-weight: 650; color: var(--suave); margin-bottom: 7px; }
+      .lp-linha { display: flex; gap: 8px; }
+      .lp-campo { flex: 1; min-width: 0; height: 46px; padding: 0 13px; border-radius: 12px; border: 1.5px solid var(--borda); background: #fff; font: 500 16px Inter, -apple-system, sans-serif; color: var(--tx); outline: none; transition: border-color .15s; }
+      .lp-campo:focus { border-color: var(--magenta); }
+      .lp-campo.grande { flex: none; width: 100%; height: 54px; font-size: 17px; }
+      button.lp-mini { height: 46px; padding: 0 16px; border-radius: 12px; border: 0; background: var(--grafite); color: #fff; font-size: 14.5px; font-weight: 700; }
+      button.lp-mini:disabled { opacity: .35; }
+      .lp-ok-linha { display: flex; gap: 8px; align-items: center; font-size: 13.5px; color: #14532d; }
+      .lp-ok-linha svg { width: 16px; height: 16px; color: var(--verde); flex-shrink: 0; }
+      .lp-links { display: flex; justify-content: center; gap: 18px; margin-top: 14px; }
+      button.lp-link { padding: 6px 2px; border: 0; background: none; color: var(--suave); font-size: 13.5px; font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
+      .lp-erro { margin: 10px 0 0; font-size: 13.5px; color: #b91c1c; font-weight: 600; }
+      .lp-aviso { margin: 10px 0 0; font-size: 13.5px; color: #92400e; background: #fffbeb; padding: 10px 12px; border-radius: 10px; line-height: 1.4; }
+      .lp-pago { text-align: center; padding: 10px 0 4px; }
+      .lp-pago-check { width: 68px; height: 68px; margin: 4px auto 0; border-radius: 50%; display: grid; place-items: center; background: var(--verde); color: #fff; animation: lp-pop .45s cubic-bezier(.2,1.4,.4,1) both; box-shadow: 0 0 0 10px var(--verde-suave); }
+      .lp-pago-check svg { width: 34px; height: 34px; }
+      @keyframes lp-pop { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+      .lp-pago h3 { margin: 18px 0 0; font-size: 23px; font-weight: 850; letter-spacing: -.025em; }
+      .lp-pago p { margin: 6px 0 0; font-size: 15px; color: var(--suave); line-height: 1.4; }
+      .lp-form { margin-top: 18px; text-align: left; display: flex; flex-direction: column; gap: 10px; }
+      .lp-form label { font-size: 13px; font-weight: 650; color: var(--suave); }
+      .lp-loja-bloco { margin-top: 18px; padding: 16px; border-radius: 16px; background: var(--papel); text-align: left; }
+      .lp-loja-bloco b { display: block; font-size: 15.5px; letter-spacing: -.01em; }
+      .lp-loja-bloco p { margin: 4px 0 0; font-size: 13.5px; color: var(--suave); line-height: 1.4; text-align: left; }
+      .lp-loja-bloco p strong { color: var(--tx); word-break: break-all; }
+
+      /* ───────── 9. dúvidas + fim ───────── */
+      .lp-duvidas { margin-top: 16px; border-top: 1px solid var(--borda); }
+      .lp-duvidas details { border-bottom: 1px solid var(--borda); }
+      .lp-duvidas summary { list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 17px 2px; font-size: 16px; font-weight: 700; letter-spacing: -.01em; cursor: pointer; }
+      .lp-duvidas summary::-webkit-details-marker { display: none; }
+      .lp-duvidas summary svg { width: 20px; height: 20px; flex-shrink: 0; color: var(--fraco); transition: transform .2s; }
+      .lp-duvidas details[open] summary svg { transform: rotate(180deg); }
+      .lp-duvidas details p { margin: -4px 2px 18px; font-size: 15px; line-height: 1.5; color: var(--suave); }
+      .lp-duvidas a { color: var(--magenta); font-weight: 650; }
+      .lp-fim { margin: 56px 0 0; padding: 44px 24px 40px; background: #16121c; color: #fff; text-align: center; }
+      .lp-fim h2 { margin: 0 auto; max-width: 340px; font-size: 28px; line-height: 1.12; font-weight: 850; letter-spacing: -.03em; text-wrap: balance; }
+      .lp-fim p { margin: 10px 0 22px; font-size: 14.5px; color: #b9b3bf; }
+      .lp-fim button.lp-cta { background: #fff; color: #16121c; max-width: 400px; }
+      .lp-rodape { padding: 26px 20px calc(110px + env(safe-area-inset-bottom)); background: #16121c; color: #8d8794; font-size: 12px; line-height: 1.6; text-align: center; border-top: 1px solid #2a2530; }
+      .lp-rodape a { color: #c9c3cf; }
+
+      /* ───────── botão fixo (só depois da demo) ───────── */
+      .lp-fixo { position: fixed; z-index: 50; left: 0; right: 0; bottom: 0; padding: 18px 16px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(to bottom, rgba(255,255,255,0), #fff 22px); transform: translateY(120%); transition: transform .28s ease; pointer-events: none; }
+      .lp-fixo[data-on] { transform: none; pointer-events: auto; }
+      .lp-fixo .lp-cta { max-width: 448px; margin: 0 auto; display: flex; }
+      .lp-fixo .lp-cta small { font-weight: 600; opacity: .7; font-size: 14px; }
+
+      @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+      @media (min-width: 720px) {
+        .lp-h1 { font-size: 44px; }
+        .lp-topo, .lp-sec { padding-left: 24px; padding-right: 24px; }
+      }
+    </style>
+    <!-- Meta Pixel (só a fila aqui; o fbevents.js entra no carregador adiado do landing.ts, depois da 1ª pintura) -->
+    <script>
+      !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];}(window,document,'script');
+      if (!document.documentElement.hasAttribute("data-desligada")) {
+        fbq('init', '998037194527241');
+        fbq('init', '1104688251942954');
+        fbq('track', 'PageView');
+      }
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'AW-18254888989');
+    </script>
+  </head>
+  <body>
+    <main class="lp" id="lp">
+      <!-- ═════════ 1. TOPO ═════════ -->
+      <header class="lp-barra">
+        <span class="lp-marca"><img src="/apple-touch-icon.png" alt="" width="26" height="26" fetchpriority="low" />CORE</span>
+        <span class="lp-barra-dir">App Store · Google Play</span>
+      </header>
+      <section class="lp-topo" id="topo" data-bloco="topo">
+        <h1 class="lp-h1" data-so-t="a">Sua vida inteira, num app só.</h1>
+        <h1 class="lp-h1" data-so-t="b">Organize tudo num app só.</h1>
+        <h1 class="lp-h1" data-so-t="c">Sua vida organizada em <em>5 minutos</em> por dia.</h1>
+        <p class="lp-sub" data-so-t="a">Dinheiro, rotina, treino, saúde e mais 12 áreas, organizados num lugar só.</p>
+        <p class="lp-sub" data-so-t="b">Dinheiro, rotina e corpo no mesmo painel, em 5 minutos por dia.</p>
+        <p class="lp-sub" data-so-t="c">Dinheiro, rotina, treino e mais 13 áreas, num app só.</p>
+        <p class="lp-pergunta">Por onde você quer começar?</p>
+        <div class="lp-areas" role="list">
+          <button type="button" class="lp-area" data-a="tudo" role="listitem" aria-pressed="false"><span class="lp-selo-mais">O MAIS ESCOLHIDO</span><span class="lp-area-ico" style="background:#fce7f3">🎯</span><span class="lp-area-txt"><b>Tudo, sinceramente</b><span>Dinheiro, rotina e o resto, juntos</span></span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+          <button type="button" class="lp-area" data-a="dinheiro" role="listitem" aria-pressed="false"><span class="lp-area-ico" style="background:#fef3c7">💰</span><span class="lp-area-txt"><b>Meu dinheiro</b><span>Ver pra onde ele vai</span></span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+          <button type="button" class="lp-area" data-a="rotina" role="listitem" aria-pressed="false"><span class="lp-area-ico" style="background:#d1fae5">⏰</span><span class="lp-area-txt"><b>Minha rotina</b><span>Acordar sabendo o que fazer</span></span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+          <button type="button" class="lp-area" data-a="corpo" role="listitem" aria-pressed="false"><span class="lp-area-ico" style="background:#dbeafe">💪</span><span class="lp-area-txt"><b>Treino e dieta</b><span>Parar de recomeçar toda segunda</span></span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+        </div>
+        <p class="lp-onde"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"></rect><path d="M12 18h.01"></path></svg>iPhone e Android</span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"></rect><line x1="8" x2="16" y1="21" y2="21"></line><line x1="12" x2="12" y1="17" y2="21"></line></svg>Computador</span><span>Mesma conta</span></p>
+      </section>
+
+      <!-- ═════════ 2. DEMO (o app de verdade) ═════════ -->
+      <section class="lp-sec" id="demo" data-bloco="demo" style="padding-top:48px">
+        <div class="lp-kicker" id="lp-demo-kicker">Seu CORE · Finanças</div>
+        <h2 class="lp-h2">Isso é o app de verdade, não um vídeo.</h2>
+        <p class="lp-p">Toque, anote, mexa à vontade. São dados de exemplo.</p>
+        <div class="lp-pilulas" role="tablist" aria-label="Módulos da demonstração">
+          <button type="button" class="lp-pilula" data-m="financas" aria-pressed="true">💰 Finanças</button>
+          <button type="button" class="lp-pilula" data-m="rotina" aria-pressed="false">📅 Rotina</button>
+          <button type="button" class="lp-pilula" data-m="treino" aria-pressed="false">💪 Treino</button>
+          <button type="button" class="lp-pilula" data-m="dieta" aria-pressed="false">🥗 Dieta</button>
+          <button type="button" class="lp-pilula" data-m="saude" aria-pressed="false">❤️ Saúde</button>
+          <button type="button" class="lp-pilula lp-pilula-16" data-ir="modulos">Ver as 16 ↓</button>
+        </div>
+        <div class="lp-celular" id="lp-celular" data-modulo="financas">
+          <img id="lp-demo-img" src="/landing/demo-financas.webp" alt="O módulo Finanças do CORE com dados de exemplo" width="360" height="640" loading="lazy" decoding="async" />
+          <iframe id="lp-demo-frame" title="Demonstração do CORE" loading="eager" tabindex="-1"></iframe>
+          <span class="lp-demo-carregando"><i class="lp-gira"></i>Abrindo o app…</span>
+        </div>
+        <p class="lp-demo-nota">Nada do que você mexer aqui é salvo.</p>
+      </section>
+
+      <!-- ═════════ 3. OS 16 ═════════ -->
+      <section class="lp-sec" id="modulos" data-bloco="modulos">
+        <div class="lp-kicker">16 áreas, 1 app</div>
+        <h2 class="lp-h2">Use as que quiser e esconda o resto.</h2>
+        <p class="lp-p">Toque numa área pra ver ela funcionando aqui em cima.</p>
+        <div class="lp-grade">
+          <button type="button" class="lp-mod" data-m="financas" aria-label="Ver Finanças na demonstração"><span class="lp-mod-ico" style="background:rgba(251,191,36,.2);color:#d97706"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" x2="12" y1="2" y2="22"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></span><span class="lp-mod-nome">Finanças</span></button>
+          <button type="button" class="lp-mod" data-m="rotina" aria-label="Ver Rotina na demonstração"><span class="lp-mod-ico" style="background:rgba(52,211,153,.2);color:#059669"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"></path><path d="M16 2v4"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><path d="M3 10h18"></path><path d="m9 16 2 2 4-4"></path></svg></span><span class="lp-mod-nome">Rotina</span></button>
+          <button type="button" class="lp-mod" data-m="treino" aria-label="Ver Treino na demonstração"><span class="lp-mod-ico" style="background:rgba(96,165,250,.2);color:#2563eb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.4 14.4 9.6 9.6"></path><path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z"></path><path d="m21.5 21.5-1.4-1.4"></path><path d="M3.9 3.9 2.5 2.5"></path><path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"></path></svg></span><span class="lp-mod-nome">Treino</span></button>
+          <button type="button" class="lp-mod" data-m="dieta" aria-label="Ver Dieta na demonstração"><span class="lp-mod-ico" style="background:rgba(74,222,128,.2);color:#16a34a"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z"></path><path d="M10 2c1 .5 2 2 2 5"></path></svg></span><span class="lp-mod-nome">Dieta</span></button>
+          <button type="button" class="lp-mod" data-m="saude" aria-label="Ver Saúde na demonstração"><span class="lp-mod-ico" style="background:rgba(248,113,113,.2);color:#dc2626"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path></svg></span><span class="lp-mod-nome">Saúde</span></button>
+          <button type="button" class="lp-mod" data-m="desenvolvimento" aria-label="Ver Metas na demonstração"><span class="lp-mod-ico" style="background:rgba(192,132,252,.2);color:#9333ea"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"></path><path d="M20 3v4"></path><path d="M22 5h-4"></path><path d="M4 17v2"></path><path d="M5 18H3"></path></svg></span><span class="lp-mod-nome">Metas</span></button>
+          <button type="button" class="lp-mod" data-m="casa" aria-label="Ver Casa na demonstração"><span class="lp-mod-ico" style="background:rgba(34,211,238,.2);color:#0891b2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"></path><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></span><span class="lp-mod-nome">Casa</span></button>
+          <button type="button" class="lp-mod" data-m="estudos" aria-label="Ver Estudos na demonstração"><span class="lp-mod-ico" style="background:rgba(129,140,248,.2);color:#4f46e5"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"></path><path d="M22 10v6"></path><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"></path></svg></span><span class="lp-mod-nome">Estudos</span></button>
+          <button type="button" class="lp-mod" data-m="carreira" aria-label="Ver Carreira na demonstração"><span class="lp-mod-ico" style="background:rgba(148,163,184,.2);color:#475569"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path><rect width="20" height="14" x="2" y="6" rx="2"></rect></svg></span><span class="lp-mod-nome">Carreira</span></button>
+          <button type="button" class="lp-mod" data-m="biblioteca" aria-label="Ver Leitura na demonstração"><span class="lp-mod-ico" style="background:rgba(251,146,60,.2);color:#ea580c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"></path><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path></svg></span><span class="lp-mod-nome">Leitura</span></button>
+          <button type="button" class="lp-mod" data-m="beleza" aria-label="Ver Beleza na demonstração"><span class="lp-mod-ico" style="background:rgba(244,114,182,.2);color:#db2777"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"></path><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"></path></svg></span><span class="lp-mod-nome">Beleza</span></button>
+          <button type="button" class="lp-mod" data-m="viagens" aria-label="Ver Viagens na demonstração"><span class="lp-mod-ico" style="background:rgba(45,212,191,.2);color:#0d9488"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"></path></svg></span><span class="lp-mod-nome">Viagens</span></button>
+          <button type="button" class="lp-mod" data-m="hiperfoco" aria-label="Ver Mente na demonstração"><span class="lp-mod-ico" style="background:rgba(167,139,250,.2);color:#7c3aed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"></path><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"></path><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"></path><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"></path><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"></path><path d="M3.477 10.896a4 4 0 0 1 .585-.396"></path><path d="M19.938 10.5a4 4 0 0 1 .585.396"></path><path d="M6 18a4 4 0 0 1-1.967-.516"></path><path d="M19.967 17.484A4 4 0 0 1 18 18"></path></svg></span><span class="lp-mod-nome">Mente</span></button>
+          <button type="button" class="lp-mod" data-m="relacionamentos" aria-label="Ver Relações na demonstração"><span class="lp-mod-ico" style="background:rgba(251,113,133,.2);color:#e11d48"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span><span class="lp-mod-nome">Relações</span></button>
+          <button type="button" class="lp-mod" data-m="pet" aria-label="Ver Pet na demonstração"><span class="lp-mod-ico" style="background:rgba(251,191,36,.2);color:#f59e0b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="4" r="2"></circle><circle cx="18" cy="8" r="2"></circle><circle cx="20" cy="16" r="2"></circle><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"></path></svg></span><span class="lp-mod-nome">Pet</span></button>
+          <button type="button" class="lp-mod" data-m="detox" aria-label="Ver Detox na demonstração"><span class="lp-mod-ico" style="background:rgba(163,230,53,.2);color:#65a30d"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"></path><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"></path></svg></span><span class="lp-mod-nome">Detox</span></button>
+        </div>
+        <div class="lp-esconde"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span>Começou só pelo dinheiro? <b>As outras ficam guardadas</b> até você querer.</span></div>
+      </section>
+
+      <!-- ═════════ 4. ANTES E DEPOIS + AVALIAÇÕES ═════════ -->
+      <section class="lp-sec" id="antes" data-bloco="antes">
+        <div class="lp-kicker">Antes e depois</div>
+        <h2 class="lp-h2">Chega de um app pra cada coisa.</h2>
+        <div class="lp-folha antes">
+          <div class="lp-folha-faixa cinza">Antes</div>
+          <ul>
+            <li><i>📒</i>Contas num caderno</li>
+            <li><i>💬</i>Tarefas perdidas no WhatsApp</li>
+            <li><i>🧠</i>Treino e metas só na cabeça</li>
+          </ul>
+        </div>
+        <div class="lp-seta" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></div>
+        <div class="lp-folha depois" style="margin-top:0">
+          <div class="lp-folha-faixa rosa">Com o CORE</div>
+          <ul>
+            <li><span class="lp-quadrinho"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span>As contas do mês com o dia de vencer</li>
+            <li><span class="lp-quadrinho"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span>O dia com o que fazer, marcado na hora</li>
+            <li><span class="lp-quadrinho"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span>Treino, dieta e metas no mesmo painel</li>
+          </ul>
+        </div>
+      </section>
+      <section class="lp-sec" id="avaliacoes" data-bloco="avaliacoes" style="padding-top:44px">
+        <div class="lp-kicker">Quem usa conta</div>
+        <h2 class="lp-h2">Avaliações de verdade, das lojas.</h2>
+        <div class="lp-avals">
+          <figure class="lp-aval"><blockquote>“Tudo que eu sempre quis num planner online.”</blockquote><figcaption><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 2.5v19l10-9.5z"/><path d="M14.5 13.9 4.7 22.2 17.4 15z" opacity=".75"/><path d="M14.5 11.1 4.7 1.8 17.4 9z" opacity=".75"/><path d="M18.6 9.7 21 11c.9.5.9 1.5 0 2l-2.4 1.3-2.7-2.3z"/></svg>Avaliação na Google Play</figcaption></figure>
+          <figure class="lp-aval"><blockquote>“Muito bom pra quem quer se organizar em todas as áreas da vida.”</blockquote><figcaption><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9s-2-.9-3.4-.9c-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.4.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.7-1-2.7-4.1zM13.9 5c.7-.9 1.2-2 1-3.2-1 .1-2.2.7-3 1.6-.6.7-1.2 1.9-1 3.1 1.1.1 2.3-.6 3-1.5z"/></svg>Avaliação na App Store</figcaption></figure>
+          <figure class="lp-aval"><blockquote>“É maravilhoso pra se organizar e motivar. Vale cada centavo.”</blockquote><figcaption><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 2.5v19l10-9.5z"/><path d="M14.5 13.9 4.7 22.2 17.4 15z" opacity=".75"/><path d="M14.5 11.1 4.7 1.8 17.4 9z" opacity=".75"/><path d="M18.6 9.7 21 11c.9.5.9 1.5 0 2l-2.4 1.3-2.7-2.3z"/></svg>Avaliação na Google Play</figcaption></figure>
+          <figure class="lp-aval"><blockquote>“Design ótimo, interfaces completas sem ser complexas. Agradável de usar.”</blockquote><figcaption><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 2.5v19l10-9.5z"/><path d="M14.5 13.9 4.7 22.2 17.4 15z" opacity=".75"/><path d="M14.5 11.1 4.7 1.8 17.4 9z" opacity=".75"/><path d="M18.6 9.7 21 11c.9.5.9 1.5 0 2l-2.4 1.3-2.7-2.3z"/></svg>Avaliação na Google Play</figcaption></figure>
+          <figure class="lp-aval"><blockquote>“Sem dúvidas, o mais completo que já usei até hoje.”</blockquote><figcaption><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9s-2-.9-3.4-.9c-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.4.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.7-1-2.7-4.1zM13.9 5c.7-.9 1.2-2 1-3.2-1 .1-2.2.7-3 1.6-.6.7-1.2 1.9-1 3.1 1.1.1 2.3-.6 3-1.5z"/></svg>Avaliação na App Store</figcaption></figure>
+        </div>
+      </section>
+
+      <!-- ═════════ 5. COMO FUNCIONA ═════════ -->
+      <section class="lp-sec" id="como" data-bloco="como">
+        <div class="lp-kicker">Como funciona</div>
+        <h2 class="lp-h2">Em 3 passos, hoje mesmo.</h2>
+        <ol class="lp-passos">
+          <li><span class="lp-num">1</span><div class="lp-passo"><b>Pague uma vez no Pix</b><span>Leva 1 minuto, aqui nesta página.</span></div></li>
+          <li><span class="lp-num">2</span><div class="lp-passo"><b>Baixe na App Store ou Google Play e entre com o mesmo e-mail</b><span>No computador, é só entrar no site com a mesma conta.</span>
+            <div class="lp-selos"><a href="https://apps.apple.com/br/app/id6806913181" target="_blank" rel="noopener" data-loja="ios"><img src="/selos/app-store.svg" alt="Baixar na App Store" width="120" height="40" loading="lazy" /></a><a href="https://play.google.com/store/apps/details?id=br.com.coreaplicativo.app&amp;referrer=utm_source%3Dweb%26utm_medium%3Dlanding%26utm_campaign%3Dweb_landing" target="_blank" rel="noopener" data-loja="android"><img src="/selos/google-play.png" alt="Disponível no Google Play" width="103" height="40" loading="lazy" /></a></div></div></li>
+          <li><span class="lp-num">3</span><div class="lp-passo"><b>Escolha por onde começar</b><span>5 minutos por dia já colocam o resto no lugar.</span></div></li>
+        </ol>
+      </section>
+
+      <!-- ═════════ 6–8. OFERTA + PIX + DEPOIS DE PAGAR ═════════ -->
+      <section class="lp-oferta" id="oferta" data-bloco="oferta">
+        <div class="lp-card" id="lp-card" data-fase="oferta">
+          <div class="lp-card-faixa"><span>Seu CORE</span><span class="lp-faixa-dir" data-so-oferta="ano">menos de R$ 0,08 por dia</span><span class="lp-faixa-dir" data-so-oferta="sempre">pagamento único</span></div>
+          <div class="lp-card-corpo">
+            <div class="lp-so-oferta">
+              <h2 class="lp-preco-tit" data-so-oferta="ano">1 ano inteiro por <b>R$ 27,90</b></h2>
+              <h2 class="lp-preco-tit" data-so-oferta="sempre">Pra sempre por <b>R$ 27,90</b></h2>
+              <p class="lp-preco-sub" data-so-oferta="ano">Pagamento único no Pix · menos de R$ 0,08 por dia</p>
+              <p class="lp-preco-sub" data-so-oferta="sempre">Pagamento único no Pix · nunca mais paga</p>
+              <ul class="lp-checks">
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span>As <b>16 áreas</b> no celular e no computador</span></li>
+                <li data-so-oferta="ano"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span><b>Sem renovação automática.</b> Daqui a 1 ano, você decide.</span></li>
+                <li data-so-oferta="sempre"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span><b>Pague uma vez e é seu pra sempre.</b> Nada é cobrado depois.</span></li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span><b>7 dias de garantia.</b> Não gostou? Devolvemos 100%.</span></li>
+              </ul>
+              <label class="lp-caixinha" data-so-oferta="ano">
+                <input type="checkbox" id="lp-caixinha" />
+                <span class="lp-caixinha-txt"><b>Quero pra sempre: +R$ 19,90</b> <span style="white-space:nowrap">(total R$ 47,80)</span><small>Em vez de 1 ano, o CORE fica seu pra sempre. No mesmo Pix, pagamento único, nunca mais paga.</small></span>
+              </label>
+              <div class="lp-pagar">
+                <button type="button" class="lp-cta" id="lp-pagar"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.2" y="5.2" width="13.6" height="13.6" rx="3.2" transform="rotate(45 12 12)" fill="none" stroke="currentColor" stroke-width="2.2"/><rect x="9.6" y="9.6" width="4.8" height="4.8" rx="1" transform="rotate(45 12 12)" fill="currentColor"/></svg><span id="lp-pagar-txt">Pagar R$ 27,90 no Pix</span></button>
+                <p class="lp-seguro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>O Pix sai aqui mesmo · CORE · CNPJ 55.041.112/0001-82</p>
+              </div>
+            </div>
+            <div class="lp-pix" id="lp-pix" aria-live="polite"></div>
+          </div>
+        </div>
+        <div class="lp-garantia lp-so-oferta-fora"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg><span><b>7 dias pra testar tudo.</b>Não gostou? Devolvemos 100% no Pix, é só mandar um e-mail.</span></div>
+      </section>
+
+      <!-- ═════════ 9. DÚVIDAS + CHAMADA FINAL ═════════ -->
+      <section class="lp-sec" id="duvidas" data-bloco="duvidas" style="padding-top:48px">
+        <h2 class="lp-h2">Dúvidas</h2>
+        <div class="lp-duvidas">
+          <details><summary>É um app de verdade?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Sim. O CORE está na App Store e na Google Play, e também abre no computador. É a mesma conta em todos.</p></details>
+          <details data-so-oferta="ano"><summary>Renova sozinho?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Não. É 1 pagamento no Pix por 1 ano. Nada é cobrado sozinho.</p></details>
+          <details data-so-oferta="ano"><summary>E depois de 1 ano?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>A gente te avisa antes e você decide se quer continuar. Se não quiser, não paga nada.</p></details>
+          <details data-so-oferta="sempre"><summary>Renova sozinho?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Não. Você paga uma vez no Pix e o CORE é seu pra sempre. Nada é cobrado depois.</p></details>
+          <details><summary>Funciona no computador?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Sim. Entre no site com o mesmo e-mail e está tudo lá.</p></details>
+          <details><summary>Conecta no meu banco?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Não. Você lança um gasto em segundos, e pode importar o extrato do banco (OFX ou CSV) quando quiser.</p></details>
+          <details><summary>Tem versão grátis?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Não, mas você tem 7 dias de garantia: se não gostar, devolvemos 100% no Pix. É só mandar um e-mail.</p></details>
+          <details><summary>Como falo com vocês?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Pelo e-mail <a href="mailto:contato@coreaplicativo.com.br">contato@coreaplicativo.com.br</a>. A gente responde rápido.</p></details>
+        </div>
+      </section>
+    </main>
+    <section class="lp-fim" id="fim" data-bloco="fim">
+      <h2 data-so-oferta="ano">Sua vida inteira num app só, por R$ 27,90 o ano.</h2>
+      <h2 data-so-oferta="sempre">Sua vida inteira num app só, por R$ 27,90. Pra sempre.</h2>
+      <p>Pix na hora · 7 dias de garantia</p>
+      <button type="button" class="lp-cta" data-ir="oferta">Quero organizar tudo</button>
+    </section>
+    <footer class="lp-rodape">
+      CORE · CNPJ 55.041.112/0001-82<br />
+      <a href="mailto:contato@coreaplicativo.com.br">contato@coreaplicativo.com.br</a> · <a href="/termos">Termos</a> · <a href="/privacidade">Privacidade</a>
+    </footer>
+    <div class="lp-fixo" id="lp-fixo" aria-hidden="true">
+      <button type="button" class="lp-cta" data-ir="oferta" tabindex="-1">Quero organizar tudo <small>· R$ 27,90</small></button>
+    </div>
+    <script type="module" src="/src/landing/landing.ts"></script>
+  </body>
+</html>

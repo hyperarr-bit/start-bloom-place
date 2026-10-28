@@ -222,6 +222,8 @@ describe("as ofertas batem com o servidor", () => {
     const servidor: Record<string, number> = { ...PRECOS_HOJE, ...PRECOS_PRESENTE, ...PRECOS_PLANO30 };
     // 26/10: o plano anual da oferta "anual" do /inicio (OFB_anual27) é cobrado pelo PixCheckout (PIX_PRICES), não pelo PixHoje
     delete servidor.OFB_anual27;
+    // 28/10: as ofertas da landing nova (/organizar) são cobradas pela própria landing (src/landing/regras.ts — teste landing-nova)
+    for (const o of Object.keys(servidor)) if (o.startsWith("LN_")) delete servidor[o];
     for (const [o, v] of Object.entries(VALOR_OFERTA)) expect(servidor[o]).toBe(Math.round(v * 100));
     expect(Object.keys(servidor).sort()).toEqual(Object.keys(VALOR_OFERTA).sort());
   });

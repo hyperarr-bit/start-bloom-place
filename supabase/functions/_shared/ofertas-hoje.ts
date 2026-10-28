@@ -23,6 +23,8 @@
 /* 26/10: a oferta "anual" do /inicio (OFB_anual27 / OFB_up47 / OFB_down27) mora em ./ofertas-anual-inicio.ts e entra
  * AQUI nos 3 mapas — é o caminho que já leva uma oferta nova pras 3 funções (asaas-pix, asaas-webhook, pix-reconcile). */
 import { CONCESSAO_ANUAL_INICIO, DESCRICAO_ANUAL_INICIO, PRECOS_ANUAL_INICIO } from "./ofertas-anual-inicio.ts";
+/* 28/10: as ofertas da LANDING NOVA (/organizar, desligada) moram em ./ofertas-landing.ts e entram aqui (mapas + planos). */
+import { CONCESSAO_LANDING, DESCRICAO_LANDING, OFERTAS_PLANO_LANDING, PRECOS_LANDING } from "./ofertas-landing.ts";
 
 export const PRECOS_HOJE: Record<string, number> = {
   h279: 2790, h149: 1490, h279k: 3780, h149k: 2480, hv279: 2790, hv47: 4700, hv27: 2700, hc199: 1990,
@@ -30,6 +32,7 @@ export const PRECOS_HOJE: Record<string, number> = {
   // grava o pacote na conta de quem pagou (_shared/pacote-2027.ts). Aqui pra entrar nas 3 funções pelo `...PRECOS_HOJE`.
   u2027: 1990,
   ...PRECOS_ANUAL_INICIO,
+  ...PRECOS_LANDING,
 };
 
 export type ConcessaoHoje = { plano: string; periodo: string; dias: number | null; linhaNova?: boolean };
@@ -43,16 +46,18 @@ export const CONCESSAO_HOJE: Record<string, ConcessaoHoje> = {
   hv47: { plano: "lifetime", periodo: "lifetime", dias: null, linhaNova: true },
   hv27: { plano: "lifetime", periodo: "lifetime", dias: null, linhaNova: true },
   ...CONCESSAO_ANUAL_INICIO,
+  ...CONCESSAO_LANDING,
 };
 
 export const DESCRICAO_HOJE: Record<string, string> = {
   h279: "CORE 1 ano", h149: "CORE 30 dias", h279k: "CORE 1 ano + kit", h149k: "CORE 30 dias + kit", hv279: "CORE vitalicio",
   hv47: "CORE pra sempre", hv27: "CORE pra sempre", hc199: "CORE a dois", u2027: "CORE seu 2027",
   ...DESCRICAO_ANUAL_INICIO,
+  ...DESCRICAO_LANDING,
 };
 
 /** Os planos (a compra principal do /hoje) — são eles que levam as boas-vindas. */
-export const OFERTAS_PLANO_HOJE: readonly string[] = ["h279", "h149", "h279k", "h149k", "hv279"];
+export const OFERTAS_PLANO_HOJE: readonly string[] = ["h279", "h149", "h279k", "h149k", "hv279", ...OFERTAS_PLANO_LANDING];
 /** 20/10: o plano VITALÍCIO do /hoje (o e-mail de boas-vindas diz "pra sempre"). */
 export const OFERTA_VITALICIO_HOJE = "hv279";
 /** Os upsells (sem boas-vindas próprias: quem comprou já recebe a do plano). */

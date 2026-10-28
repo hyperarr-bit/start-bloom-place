@@ -12,7 +12,9 @@
 export const ehCaminhoDeDemo = (pathname: string | null | undefined): boolean => {
   const p = String(pathname ?? "");
   return p.startsWith("/preview") || p === "/experimente" || p.startsWith("/experimente/") || p === "/liberar" || p.startsWith("/liberar/")
-    || p === "/hoje/demo" || p.startsWith("/hoje/demo/");
+    || p === "/hoje/demo" || p.startsWith("/hoje/demo/")
+    // 28/10: a demo dentro da landing nova (/organizar → iframe /organizar/demo)
+    || p === "/organizar/demo";
 };
 
 /** O mesmo, lendo o endereço da página (fora de componente). Sem window = false. */

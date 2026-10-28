@@ -102,6 +102,13 @@
       html:not([data-oferta="ano"]) [data-so-oferta="ano"], html:not([data-oferta="sempre"]) [data-so-oferta="sempre"] { display: none !important; }
 
       /* ───────── 1. topo ───────── */
+      /* 28/10 (dono): faixa de oferta no topo + âncora do preço normal (o anual nas lojas é R$ 97,90). Sem "do site"/"no app" na copy: o lead entendia que estava comprando um site e não o app */
+      .lp-promo { display: flex; align-items: center; justify-content: center; gap: 6px; height: 34px; padding: 0 12px; background: var(--magenta); color: #fff; font-size: 12.5px; font-weight: 800; letter-spacing: .02em; text-align: center; white-space: nowrap; overflow: hidden; }
+      .lp-promo span { font-weight: 600; opacity: .95; }
+      .lp-ancora { margin: 0 0 6px; font-size: 13px; font-weight: 700; color: var(--magenta); }
+      .lp-ancora s { color: var(--suave); font-weight: 600; margin-right: 4px; }
+      .lp-disp { display: inline-flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; font-size: 13px; font-weight: 700; color: var(--suave); }
+      .lp-disp span { padding: 5px 10px; border-radius: 99px; background: #f4f4f5; }
       .lp-barra { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 0; height: 50px; }
       .lp-marca { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 900; letter-spacing: .14em; color: var(--tx); text-decoration: none; }
       .lp-marca img { width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--borda); }
@@ -323,9 +330,13 @@
   <body>
     <main class="lp" id="lp">
       <!-- ═════════ 1. TOPO ═════════ -->
+      <div class="lp-promo" role="note">🔥 OFERTA ESPECIAL <span>· válida só hoje<b id="lp-promo-data"></b></span></div>
+      <script>
+        // a data de hoje no fuso de Brasília ("· válida hoje, 28/10") — sem ela, fica só "válida hoje"
+        try { var dd = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" }).format(new Date()); document.getElementById("lp-promo-data").textContent = ", " + dd; } catch (e) {}
+      </script>
       <header class="lp-barra">
-        <span class="lp-marca"><img src="/apple-touch-icon.png" alt="" width="26" height="26" fetchpriority="low" />CORE</span>
-        <span class="lp-barra-dir">App Store · Google Play</span>
+        <span class="lp-marca">CORE</span>
       </header>
       <section class="lp-topo" id="topo" data-bloco="topo">
         <h1 class="lp-h1" data-so-t="a">Sua vida inteira, num app só.</h1>
@@ -431,8 +442,9 @@
         <h2 class="lp-h2">Em 3 passos, hoje mesmo.</h2>
         <ol class="lp-passos">
           <li><span class="lp-num">1</span><div class="lp-passo"><b>Pague uma vez no Pix</b><span>Leva 1 minuto, aqui nesta página.</span></div></li>
-          <li><span class="lp-num">2</span><div class="lp-passo"><b>Baixe na App Store ou Google Play e entre com o mesmo e-mail</b><span>No computador, é só entrar no site com a mesma conta.</span>
-            <div class="lp-selos"><a href="https://apps.apple.com/br/app/id6806913181" target="_blank" rel="noopener" data-loja="ios"><img src="/selos/app-store.svg" alt="Baixar na App Store" width="120" height="40" loading="lazy" /></a><a href="https://play.google.com/store/apps/details?id=br.com.coreaplicativo.app&amp;referrer=utm_source%3Dweb%26utm_medium%3Dlanding%26utm_campaign%3Dweb_landing" target="_blank" rel="noopener" data-loja="android"><img src="/selos/google-play.png" alt="Disponível no Google Play" width="103" height="40" loading="lazy" /></a></div></div></li>
+          <li><span class="lp-num">2</span><div class="lp-passo"><b>Depois de pagar, entre no app com o mesmo e-mail</b><span>Tem na App Store e no Google Play, e no computador é só entrar no site. Os links aparecem logo depois do pagamento.</span>
+            <!-- 28/10 (dono): sem selo/link de loja antes do preço — quem sai pra loja aqui some da venda do site e do pixel; os selos ficam só no pós-compra -->
+            <div class="lp-disp"><span>📱 iPhone</span><span>🤖 Android</span><span>💻 Computador</span></div></div></li>
           <li><span class="lp-num">3</span><div class="lp-passo"><b>Escolha por onde começar</b><span>5 minutos por dia já colocam o resto no lugar.</span></div></li>
         </ol>
       </section>
@@ -440,9 +452,10 @@
       <!-- ═════════ 6–8. OFERTA + PIX + DEPOIS DE PAGAR ═════════ -->
       <section class="lp-oferta" id="oferta" data-bloco="oferta">
         <div class="lp-card" id="lp-card" data-fase="oferta">
-          <div class="lp-card-faixa"><span>Seu CORE</span><span class="lp-faixa-dir" data-so-oferta="ano">menos de R$ 0,08 por dia</span><span class="lp-faixa-dir" data-so-oferta="sempre">pagamento único</span></div>
+          <div class="lp-card-faixa"><span>Oferta especial · hoje</span><span class="lp-faixa-dir" data-so-oferta="ano">menos de R$ 0,08 por dia</span><span class="lp-faixa-dir" data-so-oferta="sempre">pagamento único</span></div>
           <div class="lp-card-corpo">
             <div class="lp-so-oferta">
+              <p class="lp-ancora"><s>De R$ 97,90 por ano</s> Só hoje</p>
               <h2 class="lp-preco-tit" data-so-oferta="ano">1 ano inteiro por <b>R$ 27,90</b></h2>
               <h2 class="lp-preco-tit" data-so-oferta="sempre">Pra sempre por <b>R$ 27,90</b></h2>
               <p class="lp-preco-sub" data-so-oferta="ano">Pagamento único no Pix · menos de R$ 0,08 por dia</p>

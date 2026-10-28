@@ -71,6 +71,8 @@ describe("cabeçalhos de segurança do site (vercel.json)", () => {
     expect(valor("Referrer-Policy")).toBe("strict-origin-when-cross-origin");
   });
   it("as rotas continuam as mesmas", () => {
-    expect(cfg.rewrites).toHaveLength(3);
+    // 28/10: + /organizar → /landing.html (a landing nova, desligada por LANDING_NOVA; a página não carrega o app)
+    expect(cfg.rewrites).toHaveLength(4);
+    expect((cfg.rewrites as Array<{ source: string }>).map((r) => r.source)).toContain("/organizar");
   });
 });

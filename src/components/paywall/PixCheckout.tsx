@@ -23,6 +23,9 @@ import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
 import { SelosDasLojas } from "@/components/site/SelosDasLojas";
 /* 21/10: o UPSELL DE PRESENTE e o plano de 30 dias (src/presente) só carregam com a chave central ligada (OFERTAS_POS_COMPRA) */
 const FluxoPresente = lazy(() => import("@/presente/FluxoPresente").then((m) => ({ default: m.FluxoPresente })));
+/* 26/10: o upsell/downsell pro vitalício da oferta "anual" do /inicio (src/oferta-anual) — só carrega no Pix do anual */
+const FluxoUpgrade = lazy(() => import("@/oferta-anual/FluxoUpgrade").then((m) => ({ default: m.FluxoUpgrade })));
+import { OFERTA_ANUAL, fimDoAnual, marcarEtapaOferta, segurarPosCompra, type ResultadoUpgrade } from "@/lib/oferta-anual";
 
 /**
  * Checkout Pix DENTRO do app (13/07). Substitui o redirect pro checkout
@@ -45,7 +48,9 @@ const FluxoPresente = lazy(() => import("@/presente/FluxoPresente").then((m) => 
 /* 07/09 (ordem do dono): vitalício da web a R$ 27,90 (`w27`) no paywall do
  * dia 14. Na Cakto é a MESMA oferta de 27,90 de sempre (CAKTO_OFFER_LIFETIME);
  * nas outras functions, 2790. */
-export type PixOffer = "lifetime" | "downsell" | "w97" | "w25" | "w47" | "w27";
+/* 26/10: `OFB_anual27` = o PLANO ANUAL R$ 27,90 da oferta "anual" do /inicio (src/lib/oferta-anual.ts) — 365 dias,
+ * NÃO renova. Só Asaas (fora de OFERTAS_NA_CAKTO). */
+export type PixOffer = "lifetime" | "downsell" | "w97" | "w25" | "w47" | "w27" | "OFB_anual27";
 
 /* 03/09 (ordem do dono, "97,90 em tudo"): a WEB passa a ter UM preço só.
  * A oferta `lifetime` — que a demo, o portão do /home, o /comecar e o
@@ -66,10 +71,11 @@ export const PIX_PRICES: Record<PixOffer, string> = {
   w25: "24,90",
   w47: "47,90",
   w27: "27,90",
+  OFB_anual27: "27,90",
 };
 /** Quais ofertas são acesso VITALÍCIO — o recibo e a copy mudam por isso. */
 export const OFERTA_VITALICIA: Record<PixOffer, boolean> = {
-  lifetime: true, downsell: true, w97: true, w25: false, w47: true, w27: true,
+  lifetime: true, downsell: true, w97: true, w25: false, w47: true, w27: true, OFB_anual27: false,
 };
 
 /** Linha do recibo (27/09, funil ROI 2 — só COPY): a dúvida "mensal ou taxa
@@ -77,6 +83,7 @@ export const OFERTA_VITALICIA: Record<PixOffer, boolean> = {
  *  literal. Vitalício passa a dizer "pagamento único (não renova)"; o mês
  *  pré-pago continua "30 dias de acesso". Rollback = FUNIL_ROI2 = false. */
 export const linhaRecibo = (offer: PixOffer): string =>
+  offer === "OFB_anual27" ? "16 módulos · 1 ano de acesso · não renova sozinho" :
   OFERTA_VITALICIA[offer]
     ? (ehFunilRoi2() ? "16 módulos · acesso vitalício · pagamento único (não renova)" : "16 módulos · acesso vitalício")
     : "16 módulos · 30 dias de acesso";
@@ -288,6 +295,12 @@ const PRAZO_CAKTO_MS = 12_000;
 const prazoCakto = () => new Promise<never>((_, rejeita) => setTimeout(() => rejeita(new Error("prazo_cakto")), PRAZO_CAKTO_MS));
 const PREPARO_LINHAS = [
   "Criando seu acesso vitalício",
+  "Gerando seu Pix seguro",
+  "Reservando sua condição de hoje",
+];
+/** 26/10: o plano anual do /inicio (OFB_anual27) não é vitalício — a 1ª linha diz o que é. */
+const PREPARO_LINHAS_ANUAL = [
+  "Criando seu acesso de 1 ano",
   "Gerando seu Pix seguro",
   "Reservando sua condição de hoje",
 ];
@@ -689,12 +702,23 @@ export function PixCheckout({ offer, onClose, context, v2, funilB, backFunil }: 
   }, [step, pix?.orderId]);
   const [emailEmDestaque, setEmailEmDestaque] = useState(false);
   const price = PIX_PRICES[offer];
+  /* 26/10 (oferta "anual" do /inicio, src/lib/oferta-anual.ts): o Pix do PLANO ANUAL. Copy de 1 ano (não renova) em
+   * todas as telas e, depois de pago, o upsell/downsell pro vitalício por cima do "Pagamento confirmado". */
+  const anual = offer === OFERTA_ANUAL;
+  /** o funil do /inicio de verdade (não o gate do app, nem o /planos, nem o B/v2) — onde a medição da oferta vale */
+  const [funilDoInicio] = useState<boolean>(() =>
+    context === "funnel" && !funilB && !v2 && typeof window !== "undefined" && window.location.pathname.startsWith("/inicio"));
+  const upgradeAtivo = anual && funilDoInicio;
+  /** o upsell/downsell terminou: null = ainda não; "vitalicio" (pagou um dos dois) | "anual" (recusou os dois) */
+  const [upgradeFim, setUpgradeFim] = useState<ResultadoUpgrade | null>(null);
+  const [pagoEm, setPagoEm] = useState<number | null>(null);
 
   // AbacatePay: sem form pra NINGUÉM — gera direto (nome vem do profile no
   // servidor; CPF é opcional no gateway). Cakto: prefill do profile — com CPF
   // já salvo, pula o form direto pro QR.
   useEffect(() => {
     trackEvent("pix_checkout_open", { offer, context, gateway: braco, ...marca });
+    if (funilDoInicio) marcarEtapaOferta("checkout", { offer });
     // Cakto: aquece instância+token OAuth enquanto a pessoa digita o CPF —
     // o create dela leva 5-7s frio; isso tira 1-2s da espera real.
     if (braco === "cakto") aquecerCakto();
@@ -994,6 +1018,7 @@ export function PixCheckout({ offer, onClose, context, v2, funilB, backFunil }: 
        * e-mail de Pix pendente e o ROI da web. 26/09: + adiantado e espera_ms
        * (do toque até o QR). O pedido adiantado que ninguém viu não vira evento. */
       trackEvent("pix_generated", { offer, context, order_id: data.orderId, gateway: gwUsado, braco, adiantado: !!usado, espera_ms: Date.now() - tToque, ...marca });
+      if (funilDoInicio) marcarEtapaOferta("pix", { offer, order_id: data.orderId ?? null });
       if (usado) relatarAdiantado(usado.reg, "ok", { idade_ms: usado.idadeMs, esperou_ms: usado.esperouMs, pronto: usado.pronto });
       // dia-14: o CPF digitado vira tax_id no perfil → próximo open pula o
       // form. Pagar.me/Cakto salvam no servidor; Asaas/Abacate ignoram o doc,
@@ -1091,6 +1116,9 @@ export function PixCheckout({ offer, onClose, context, v2, funilB, backFunil }: 
         if (proprio ? data?.paid : data?.subscribed) {
           doneRef.current = true;
           trackEvent("pix_confirmed", { offer, context, gateway: gwDoPix, braco, ...marca });
+          if (funilDoInicio) marcarEtapaOferta("pago", { offer, order_id: orderId ?? null, valor: Number(String(price).replace(",", ".")) });
+          // 26/10: o upsell do anual vive por cima do "confirmado" — o /inicio não manda pro app enquanto ele está aberto
+          if (upgradeAtivo) { segurarPosCompra(true); setPagoEm(Date.now()); }
           // Purchase (Meta+Google) via marca-única: dispara aqui OU no rescue
           // do app se a pessoa já tiver voltado paga. eventID = orderId dedup.
           firePixPurchaseOnce("checkout");
@@ -1295,6 +1323,14 @@ export function PixCheckout({ offer, onClose, context, v2, funilB, backFunil }: 
           onSair={() => { setBackPix(false); sairDeVerdade(); }}
         />
       )}
+      {upgradeAtivo && step === "confirmed" && !upgradeFim && (
+        <Suspense fallback={null}>
+          <div className="fn ua ofa-sobre" data-testid="inicio-upgrade"><div className="fn-corpo">
+            <FluxoUpgrade compra={pix?.orderId ?? "inicio"} valorPago={Number(pix?.amount) || 27.9}
+              onFim={(r) => setUpgradeFim(r)} />
+          </div></div>
+        </Suspense>
+      )}
       {pacote2027Ativo && step === "confirmed" && !pacote2027Fim && (
         <Suspense fallback={null}>
           <div className="fn u27 u27-sobre" data-testid="inicio-2027"><div className="fn-corpo">
@@ -1419,7 +1455,7 @@ export function PixCheckout({ offer, onClose, context, v2, funilB, backFunil }: 
             <motion.div key="form" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} className="w-full max-w-sm">
               <div className="text-center mb-5">
                 <h2 className="text-[24px] font-bold tracking-tight leading-tight">Falta só o Pix.</h2>
-                <p className="text-sm text-muted-foreground mt-1.5">Pagamento único — sem mensalidade, nunca.</p>
+                <p className="text-sm text-muted-foreground mt-1.5">{anual ? "Pagamento único — 1 ano de acesso, não renova sozinho." : "Pagamento único — sem mensalidade, nunca."}</p>
               </div>
 
               {/* Resumo do pedido estilo recibo — a pessoa vê O QUE está pagando.
@@ -1507,7 +1543,7 @@ export function PixCheckout({ offer, onClose, context, v2, funilB, backFunil }: 
             <motion.div key="preparo" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} className="w-full max-w-sm">
               <div className="text-center mb-5">
                 <h2 className="text-[24px] font-bold tracking-tight leading-tight">Preparando seu acesso…</h2>
-                <p className="text-sm text-muted-foreground mt-1.5">Pagamento único — sem mensalidade, nunca.</p>
+                <p className="text-sm text-muted-foreground mt-1.5">{anual ? "Pagamento único — 1 ano de acesso, não renova sozinho." : "Pagamento único — sem mensalidade, nunca."}</p>
               </div>
 
               {/* Recibo: a pessoa VÊ o que está pagando enquanto o Pix real é
@@ -1546,7 +1582,7 @@ export function PixCheckout({ offer, onClose, context, v2, funilB, backFunil }: 
                     Pix chegar de verdade e o último marca logo depois. Com a
                     Asaas (<1 s) fica igual a antes; com a Cakto (~4 s) a tela
                     mostra que está trabalhando em vez de parar com tudo marcado. */}
-                {PREPARO_LINHAS.map((txt, i) => {
+                {(anual ? PREPARO_LINHAS_ANUAL : PREPARO_LINHAS).map((txt, i) => {
                   const marcado = i === 0 || pixChegou;
                   return (
                     <motion.div
@@ -1645,6 +1681,13 @@ export function PixCheckout({ offer, onClose, context, v2, funilB, backFunil }: 
                           precisa ler o que está pagando antes disso. */}
                       <p className="text-[12px] font-semibold text-foreground/85 leading-snug mb-1" data-testid="pix-recibo-qr">
                         CORE completo · 16 módulos · acesso vitalício · pagamento único (não renova)
+                      </p>
+                    </>
+                  ) : anual ? (
+                    <>
+                      <h2 className="text-[22px] font-bold tracking-tight mb-1">Pague R$ {fmtBRL(pix.amount)} no Pix</h2>
+                      <p className="text-[12px] font-semibold text-foreground/85 leading-snug mb-1" data-testid="pix-recibo-anual">
+                        CORE completo · 16 módulos · 1 ano de acesso · não renova sozinho
                       </p>
                     </>
                   ) : (
@@ -1793,7 +1836,26 @@ export function PixCheckout({ offer, onClose, context, v2, funilB, backFunil }: 
               >
                 <Check className="w-10 h-10" strokeWidth={3} />
               </motion.div>
-              {roi2Vitalicio ? (
+              {anual ? (
+                upgradeFim === "vitalicio" ? (
+                  <>
+                    <h2 className="text-2xl font-bold tracking-tight mb-2">Pronto! Seu CORE agora<br />é vitalício 🎉</h2>
+                    <p className="text-[15px] text-muted-foreground leading-relaxed mb-8" data-testid="pix-confirmado-vitalicio">
+                      Os 16 módulos são <strong className="text-foreground">seus pra sempre</strong> — nenhuma cobrança depois, nunca.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h2 className="text-2xl font-bold tracking-tight mb-2">Pagamento confirmado 🎉</h2>
+                    <div className="mx-auto mb-3 inline-flex items-center gap-1.5 rounded-full bg-accent/10 text-accent px-3 py-1 text-[12px] font-bold" data-testid="pix-confirmado-anual-selo">
+                      1 ANO DE ACESSO · até {fimDoAnual(pagoEm ?? Date.now())}
+                    </div>
+                    <p className="text-[15px] text-muted-foreground leading-relaxed mb-8" data-testid="pix-confirmado-anual">
+                      Os 16 módulos estão liberados por <strong className="text-foreground">1 ano</strong>. Não é assinatura: <strong className="text-foreground">nada é cobrado sozinho</strong> — daqui a 1 ano você decide se renova.
+                    </p>
+                  </>
+                )
+              ) : roi2Vitalicio ? (
                 <>
                   <h2 className="text-2xl font-bold tracking-tight mb-2">Pronto! Os 16 módulos<br />estão liberados.</h2>
                   <p className="text-[15px] text-muted-foreground leading-relaxed mb-8">
@@ -1812,7 +1874,7 @@ export function PixCheckout({ offer, onClose, context, v2, funilB, backFunil }: 
               )}
               <Button
                 size="lg" className="w-full h-[52px] text-base font-bold rounded-full"
-                onClick={v2?.onConfirmado ?? enterApp}
+                onClick={v2?.onConfirmado ?? (anual ? () => { segurarPosCompra(false); enterApp(); } : enterApp)}
               >
                 {v2?.onConfirmado ? "Ativar minha central →" : "Entrar no meu app"}
               </Button>

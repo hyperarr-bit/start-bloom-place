@@ -239,9 +239,12 @@ describe("ofertas do checkout da web", () => {
   it("o 27,90 só existe na w27 (07/09, ordem do dono); a lifetime segue 97,90", async () => {
     // 03/09 o 27,90 tinha saído de toda oferta ("97,90 em tudo"). 07/09 voltou,
     // mas numa CHAVE PRÓPRIA (w27), pra não mudar o valor de oferta viva.
-    const { PIX_PRICES } = await import("@/components/paywall/PixCheckout");
+    const { PIX_PRICES, OFERTA_VITALICIA } = await import("@/components/paywall/PixCheckout");
+    const OFERTA_VITALICIA_ANUAL = () => OFERTA_VITALICIA.OFB_anual27;
     const com2790 = Object.entries(PIX_PRICES).filter(([, p]) => p === "27,90").map(([k]) => k);
-    expect(com2790).toEqual(["w27"]);
+    // 26/10: + OFB_anual27 — o PLANO ANUAL da oferta "anual" do /inicio (1 ano, não vitalício), também numa chave própria
+    expect(com2790).toEqual(["w27", "OFB_anual27"]);
+    expect(OFERTA_VITALICIA_ANUAL()).toBe(false);
     expect(PIX_PRICES.lifetime).toBe("97,90");
   });
 });

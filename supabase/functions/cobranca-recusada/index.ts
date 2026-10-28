@@ -1,6 +1,12 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { assuntoEmailPix, htmlEmailPix, textoEmailPix } from "../_shared/email-cobranca-pix.ts";
+import {
+  classificarEstadoApple, decidirPasso, dentroDoHorario, JANELA_DIAS, linkSair, MARCADOR_FIM, MARCADOR_SAIR,
+  montarHistorico, sequenciaLigada, tokenSair, tokenSairValido,
+  type EstadoApple, type Evento, type Passo, type SubRC,
+} from "../_shared/cobranca-sequencia.ts";
+import { assuntoSequencia, htmlSequencia, textoSequencia } from "../_shared/email-cobranca-sequencia.ts";
 
 /**
  * cobranca-recusada — e-mail pra quem quis continuar no CORE e o cartão não
@@ -37,6 +43,24 @@ import { assuntoEmailPix, htmlEmailPix, textoEmailPix } from "../_shared/email-c
  *  Endereços @privaterelay.appleid.com saem contados à parte no dry_run: só
  *  chegam se o domínio de envio estiver registrado na Apple (Sign in with
  *  Apple → "Configure Email Communication").
+ *
+ * SEQUÊNCIA D0/D2/D5/D10 (20/10) — atrás da chave COBRANCA_SEQUENCIA (padrão
+ * desligada; só "on" liga). A régua mora em _shared/cobranca-sequencia.ts e
+ * os textos em _shared/email-cobranca-sequencia.ts (os dois testados).
+ *  - Desligada: o D0 do webhook sai IGUAL ao de 28/09 (só ganha passo:"d0"
+ *    no marcador) e a porta do cron responde {desligada:true} sem fazer nada.
+ *  - Ligada: o D0 sai com o texto novo (curto + "não quero mais receber") e
+ *    o cron (POST {modo:"cron"}, de hora em hora, 9h–20h de Brasília) manda
+ *    D2/D5/D10 contados do D0, conferindo antes de cada envio o estado no
+ *    RevenueCat: voltou a pagar / cancelou / expirou / pediu pra sair →
+ *    marcador `cobranca_recusada_fim` {motivo} e a sequência acaba. Nunca 2
+ *    e-mails de cobrança no mesmo dia; recusa com mais de 14 dias não recebe.
+ *  - Sair da lista: GET/POST ?sair=1&u=<id>&t=<HMAC> (link do rodapé e o
+ *    List-Unsubscribe de 1 clique do Gmail/iCloud) → `cobranca_recusada_sair`.
+ *  - QA do dono: admin logado POST {modo:"sequencia", preview:true} recebe
+ *    os 4 e-mails no próprio e-mail, sem marcador.
+ *  Cada envio grava `cobranca_recusada_email` {passo, via, dias} — dá pra
+ *  medir a recuperação por passo.
  */
 
 const log = (step: string, d?: unknown) =>
@@ -54,29 +78,25 @@ const SITE = "https://www.coreaplicativo.com.br";
 const DESTINO_PIX = "/planos?oferta=w97&from=cobranca_recusada_pix";
 // Cartão recusado com a pessoa ainda querendo continuar: na carência (com
 // acesso) ou depois dela, com a Apple ainda tentando (sem acesso).
-const RECUSADO = new Set(["in_grace_period", "in_billing_retry"]);
 const EH_TESTE = (email?: string | null) => !!email && /(^|[+.])teste|testeghg|jv20101958/i.test(email);
 const EH_PRIVATERELAY = (email: string) => /@privaterelay\.appleid\.com$/i.test(email);
 
 type Modo = "apple" | "pix";
-type SubRC = { id?: string; status?: string; store?: string; gives_access?: boolean; auto_renewal_status?: string };
 type Alvo = { id: string; email: string; nome: string; comAcesso: boolean };
+const LIGADA = () => sequenciaLigada(Deno.env.get("COBRANCA_SEQUENCIA"));
+const SEGREDO_SAIR = () => Deno.env.get("COBRANCA_SAIR_SECRET") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const URL_FUNCAO = () => `${Deno.env.get("SUPABASE_URL") ?? ""}/functions/v1/cobranca-recusada`;
 
-// O id da assinatura no RevenueCat diz a loja: subAap… = App Store,
-// subGps… = Google Play (conferido na tabela subscriptions em 28/09).
-const daApple = (s: SubRC) =>
-  String(s?.id ?? "").startsWith("subAap") || String(s?.store ?? "").toLowerCase() === "app_store";
-
-async function estadoNaApple(userId: string, secret: string): Promise<{ recusada: boolean; comAcesso: boolean }> {
+/** Estado da assinatura da App Store no RevenueCat (null = API falhou: não
+ *  manda e não encerra — tenta na próxima rodada). */
+async function estadoNaApple(userId: string, secret: string): Promise<EstadoApple | null> {
   const r = await fetch(`${RC_API}/projects/${PROJETO}/customers/${encodeURIComponent(userId)}/subscriptions`, {
     headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
   });
-  if (!r.ok) return { recusada: false, comAcesso: false };
+  if (!r.ok) return null;
   const j = await r.json().catch(() => null);
-  const s = ((j?.items ?? []) as SubRC[]).find((x) =>
-    daApple(x) && RECUSADO.has(String(x?.status)) && x?.auto_renewal_status !== "will_not_renew"
-  );
-  return { recusada: !!s, comAcesso: !!s?.gives_access };
+  if (!j) return null;
+  return classificarEstadoApple((j?.items ?? []) as SubRC[]);
 }
 
 const primeiroNome = (nome?: string | null) => {
@@ -101,10 +121,19 @@ const emailHtml = (nome: string, comAcesso: boolean) => `
   <p>Se o cartão continuar recusando, dá pra cadastrar outro (muitos bancos têm cartão virtual no app) ou pôr saldo na sua Conta Apple com um cartão-presente da Apple.</p>
   <p>Depois de atualizar, a Apple cobra sozinha — não precisa fazer mais nada no app.</p>
   <p>Qualquer dúvida, é só responder este e-mail.</p>
-  <p>Um abraço,<br/>João, do CORE</p>
+  <p>Um abraço,<br/>Equipe CORE</p>
 </div>`;
 
 async function montarAlvo(supabase: SupabaseClient, uid: string, secret: string): Promise<Alvo | null> {
+  const r = await montarAlvoComEstado(supabase, uid, secret);
+  return r && "alvo" in r ? r.alvo : null;
+}
+
+/** Igual ao montarAlvo, mas diz POR QUE não é alvo quando é a Apple que
+ *  mudou (voltou a pagar, cancelou, expirou) — é o que encerra a sequência. */
+async function montarAlvoComEstado(
+  supabase: SupabaseClient, uid: string, secret: string,
+): Promise<{ alvo: Alvo } | { parar: Exclude<EstadoApple["estado"], "recusada"> } | null> {
   const { data: u } = await supabase.auth.admin.getUserById(uid);
   const user = u?.user;
   const email = user?.email;
@@ -112,9 +141,15 @@ async function montarAlvo(supabase: SupabaseClient, uid: string, secret: string)
   const { data: teste } = await supabase.rpc("is_test_user", { _user_id: uid });
   if (teste) return null;
   const est = await estadoNaApple(uid, secret);
-  if (!est.recusada) return null;
+  if (!est) return null;
+  if (est.estado !== "recusada") return { parar: est.estado };
   const nome = primeiroNome((user.user_metadata?.display_name || user.user_metadata?.name || "") as string);
-  return { id: uid, email, nome, comAcesso: est.comAcesso };
+  return { alvo: { id: uid, email, nome, comAcesso: est.comAcesso } };
+}
+
+async function saiuDaLista(supabase: SupabaseClient, uid: string): Promise<boolean> {
+  const { data } = await supabase.from("analytics_events").select("id").eq("event_name", MARCADOR_SAIR).eq("user_id", uid).limit(1);
+  return !!data?.length;
 }
 
 /** Quem já recebeu: o marcador do modo. Apple = 1 a cada 20 dias; Pix = 1 na vida. */
@@ -130,18 +165,113 @@ async function jaRecebeu(supabase: SupabaseClient, ids: string[], modo: Modo): P
   return new Set((data || []).map((r: { user_id: string }) => r.user_id));
 }
 
-async function enviar(supabase: SupabaseClient, a: Alvo, via: string, resendKey: string, from: string) {
+/** Um e-mail da sequência. Chave desligada + D0 = o e-mail de 28/09 tal e
+ *  qual; ligada = o texto novo com "não quero mais receber" (rodapé + o
+ *  List-Unsubscribe de 1 clique). `gravar:false` = preview do dono. */
+async function enviar(
+  supabase: SupabaseClient, a: Alvo, via: string, resendKey: string, from: string,
+  opts: { passo?: Passo; dias?: number; diasRestantes?: number; gravar?: boolean } = {},
+) {
+  const passo = opts.passo ?? "d0";
+  const novo = LIGADA() || passo !== "d0" || opts.gravar === false;
+  let payload: Record<string, unknown>;
+  if (novo) {
+    const sair = linkSair(URL_FUNCAO(), a.id, await tokenSair(a.id, SEGREDO_SAIR()));
+    const d = { passo, nome: a.nome, comAcesso: a.comAcesso, diasRestantes: opts.diasRestantes ?? 28, linkSair: sair };
+    payload = {
+      from, to: [a.email], subject: assuntoSequencia(d), html: htmlSequencia(d), text: textoSequencia(d),
+      headers: { "List-Unsubscribe": `<${sair}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
+    };
+  } else {
+    payload = { from, to: [a.email], subject: assunto(a.nome), html: emailHtml(a.nome, a.comAcesso) };
+  }
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from, to: [a.email], subject: assunto(a.nome), html: emailHtml(a.nome, a.comAcesso) }),
+    body: JSON.stringify(payload),
   });
   if (!r.ok) throw new Error(`Resend ${r.status}: ${(await r.text()).slice(0, 150)}`);
+  if (opts.gravar === false) return;
   await supabase.from("analytics_events").insert({
     user_id: a.id,
     event_name: MARCADOR,
-    event_data: { via, loja: "app_store", com_acesso: a.comAcesso },
+    event_data: {
+      via, loja: "app_store", com_acesso: a.comAcesso, passo, dias: opts.dias ?? 0,
+      texto: novo ? "sequencia_2010" : "apple_2809", privaterelay: EH_PRIVATERELAY(a.email),
+    },
   });
+}
+
+/** Sair da lista: valida o HMAC e grava o marcador (1 vez). */
+async function sair(supabase: SupabaseClient, url: URL, via: string): Promise<Response> {
+  const uid = url.searchParams.get("u") ?? "";
+  const ok = await tokenSairValido(uid, url.searchParams.get("t") ?? "", SEGREDO_SAIR());
+  const txt = (s: string, status = 200) => new Response(s, { status, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+  if (!ok) return txt("Link inválido.", 400);
+  if (!(await saiuDaLista(supabase, uid))) {
+    await supabase.from("analytics_events").insert({ user_id: uid, event_name: MARCADOR_SAIR, event_data: { via } });
+    log("saiu da lista", { uid: uid.slice(0, 8), via });
+  }
+  return txt("Pronto. Você não vai mais receber os avisos de pagamento do CORE.");
+}
+
+/** A porta do cron: D2/D5/D10 de quem está com o D0 nos últimos 14 dias. */
+async function rodarSequencia(
+  supabase: SupabaseClient, secret: string, resendKey: string, from: string, dryRun: boolean,
+) {
+  const agora = new Date();
+  if (!dryRun && !dentroDoHorario(agora)) return { fora_do_horario: true };
+  const desde = new Date(agora.getTime() - (JANELA_DIAS + 2) * 86400_000).toISOString();
+  const { data: evs, error } = await supabase
+    .from("analytics_events")
+    .select("user_id, event_name, created_at, event_data")
+    .in("event_name", [MARCADOR, MARCADOR_PIX, MARCADOR_FIM])
+    .gte("created_at", desde)
+    .not("user_id", "is", null)
+    .limit(10000);
+  if (error) throw error;
+  const porPessoa = new Map<string, Evento[]>();
+  for (const e of (evs ?? []) as (Evento & { user_id: string })[]) {
+    if (!porPessoa.has(e.user_id)) porPessoa.set(e.user_id, []);
+    porPessoa.get(e.user_id)!.push(e);
+  }
+  const ids = [...porPessoa.keys()];
+  const sairam = new Set<string>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data } = await supabase.from("analytics_events").select("user_id")
+      .eq("event_name", MARCADOR_SAIR).in("user_id", ids.slice(i, i + 200));
+    for (const r of data ?? []) sairam.add((r as { user_id: string }).user_id);
+  }
+
+  const resumo: Record<string, number> = {};
+  const conta = (k: string) => { resumo[k] = (resumo[k] ?? 0) + 1; };
+  const encerrar = async (uid: string, motivo: string, dias: number, ultimo: Passo | undefined) => {
+    conta(`fim_${motivo}`);
+    if (dryRun) return;
+    await supabase.from("analytics_events").insert({
+      user_id: uid, event_name: MARCADOR_FIM, event_data: { motivo, ultimo_passo: ultimo ?? null, dias },
+    });
+  };
+  for (const [uid, lista] of porPessoa) {
+    try {
+      const h = montarHistorico(lista, sairam.has(uid));
+      const d = decidirPasso(h, agora);
+      const ultimo = h.enviados[h.enviados.length - 1];
+      if (d.acao === "esperar") { conta(d.motivo); continue; }
+      if (d.acao === "parar") { await encerrar(uid, d.motivo, d.dias, ultimo); continue; }
+      const r = await montarAlvoComEstado(supabase, uid, secret);
+      if (!r) { conta("fora_do_alvo"); continue; }
+      if ("parar" in r) { await encerrar(uid, r.parar, d.dias, ultimo); continue; }
+      conta(`envia_${d.passo}`);
+      if (dryRun) continue;
+      await enviar(supabase, r.alvo, "cron", resendKey, from, { passo: d.passo, dias: d.dias, diasRestantes: d.diasRestantes });
+      conta("enviados");
+    } catch (e) {
+      conta("erros");
+      log("sequencia erro", { uid: uid.slice(0, 8), erro: String(e).slice(0, 120) });
+    }
+  }
+  return { pessoas: ids.length, ...resumo };
 }
 
 /** Link do e-mail do Pix: mágico (entra logado e cai na oferta) ou, se o
@@ -182,11 +312,42 @@ async function enviarPix(
 }
 
 serve(async (req) => {
-  if (req.method !== "POST") return new Response("método", { status: 405 });
-
+  const url = new URL(req.url);
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", serviceKey, { auth: { persistSession: false } });
+
+  // Sair da lista: o link do rodapé (GET) e o 1 clique do Gmail/iCloud (POST).
+  if (url.searchParams.get("sair") === "1" && (req.method === "GET" || req.method === "POST")) {
+    return sair(supabase, url, req.method === "GET" ? "link" : "um_clique").catch((e) => {
+      log("sair ERRO", { msg: String(e).slice(0, 120) });
+      return new Response("Erro, tente de novo.", { status: 500 });
+    });
+  }
+  if (req.method !== "POST") return new Response("método", { status: 405 });
   const jwt = (req.headers.get("Authorization") || "").replace("Bearer ", "");
+  const body = await req.json().catch(() => ({}));
+
+  // Porta do cron (chave anon, como o pix-pendente-email): só manda passo
+  // devido, idempotente e com o estado conferido no RevenueCat — nenhum
+  // input do corpo escolhe destinatário. Desligada = não faz nada.
+  if (body?.modo === "cron") {
+    const dryRun = body?.dry_run === true;
+    if (!LIGADA() && !dryRun) return Response.json({ desligada: true });
+    const secret = Deno.env.get("REVENUECAT_SECRET_KEY") ?? "";
+    const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
+    if (!secret || !resendKey) return Response.json({ error: "sem REVENUECAT_SECRET_KEY/RESEND_API_KEY" }, { status: 500 });
+    const fromBase = Deno.env.get("RECOVERY_EMAIL_FROM") || Deno.env.get("WELCOME_EMAIL_FROM") || "CORE <onboarding@resend.dev>";
+    const from = fromBase.includes("<") ? `Equipe CORE <${fromBase.split("<")[1]}` : fromBase;
+    try {
+      const r = await rodarSequencia(supabase, secret, resendKey, from, dryRun);
+      log(dryRun ? "sequencia dry_run" : "sequencia", r);
+      return Response.json({ dry_run: dryRun, ...r });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      log("sequencia ERROR", { message });
+      return Response.json({ error: message }, { status: 500 });
+    }
+  }
 
   // Quem chama: o revenuecat-webhook (service role) ou um admin logado.
   const doWebhook = !!serviceKey && jwt === serviceKey;
@@ -201,12 +362,11 @@ serve(async (req) => {
     adminEmail = quem.user.email ?? null;
   }
 
-  const body = await req.json().catch(() => ({}));
   const secret = Deno.env.get("REVENUECAT_SECRET_KEY") ?? "";
   const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
   if (!secret || !resendKey) return Response.json({ error: "sem REVENUECAT_SECRET_KEY/RESEND_API_KEY" }, { status: 500 });
   const fromBase = Deno.env.get("RECOVERY_EMAIL_FROM") || Deno.env.get("WELCOME_EMAIL_FROM") || "CORE <onboarding@resend.dev>";
-  const from = fromBase.includes("<") ? `João do CORE <${fromBase.split("<")[1]}` : fromBase;
+  const from = fromBase.includes("<") ? `Equipe CORE <${fromBase.split("<")[1]}` : fromBase;
   const modo: Modo = body?.modo === "pix" ? "pix" : "apple";
 
   try {
@@ -215,11 +375,22 @@ serve(async (req) => {
       const uid = String(body?.userId ?? "");
       if (!/^[0-9a-f-]{36}$/i.test(uid)) return Response.json({ error: "userId" }, { status: 400 });
       if ((await jaRecebeu(supabase, [uid], "apple")).has(uid)) return Response.json({ enviado: false, motivo: "ja_recebeu" });
+      if (await saiuDaLista(supabase, uid)) return Response.json({ enviado: false, motivo: "saiu" });
       const alvo = await montarAlvo(supabase, uid, secret);
       if (!alvo) return Response.json({ enviado: false, motivo: "fora_do_alvo" });
-      await enviar(supabase, alvo, "webhook", resendKey, from);
+      await enviar(supabase, alvo, "webhook", resendKey, from, { passo: "d0" });
       log("enviado", { uid: uid.slice(0, 8), comAcesso: alvo.comAcesso });
       return Response.json({ enviado: true });
+    }
+
+    // QA do dono: os 4 e-mails da sequência pra ele mesmo, sem marcador.
+    if (body?.modo === "sequencia" && body?.preview === true) {
+      if (!adminEmail) return Response.json({ error: "sem e-mail do admin" }, { status: 400 });
+      const eu: Alvo = { id: "00000000-0000-0000-0000-000000000000", email: adminEmail, nome: "João", comAcesso: true };
+      for (const [passo, dias] of [["d0", 0], ["d2", 2], ["d5", 5], ["d10", 10]] as [Passo, number][]) {
+        await enviar(supabase, eu, "preview", resendKey, from, { passo, dias, diasRestantes: 28 - dias, gravar: false });
+      }
+      return Response.json({ preview: true, para: adminEmail.slice(0, 3) + "***" });
     }
 
     // QA do dono: o e-mail do Pix pra ele mesmo, com link de verdade, sem marcador.

@@ -87,7 +87,7 @@ describe("as ofertas do /hoje nas 3 funções (uma fonte só)", () => {
     expect(fonte("asaas-pix/index.ts")).toContain("...DESCRICAO_HOJE");
   });
   it("preços e prazos (decisão do dono): 27,90 1º ano / 14,90 mês, sem renovação; kit +9,90 no mesmo Pix; 47 e 27 vitalício; 19,90 casal", () => {
-    expect(PRECOS_HOJE).toEqual({ h279: 2790, h149: 1490, h279k: 3780, h149k: 2480, hv279: 2790, hv47: 4700, hv27: 2700, hc199: 1990, u2027: 1990 }); // 21/10: + o "Seu 2027" (u2027)
+    expect(PRECOS_HOJE).toEqual({ h279: 2790, h149: 1490, h279k: 3780, h149k: 2480, hv279: 2790, hv47: 4700, hv27: 2700, hc199: 1990, u2027: 1990, OFB_anual27: 2790, OFB_up47: 4790, OFB_down27: 2790 }); // 21/10: + o "Seu 2027" (u2027); 26/10: + a oferta anual do /inicio (_shared/ofertas-anual-inicio.ts)
     expect(ehPlanoHoje("h279k")).toBe(true);
     expect(ehUpsellHoje("hv27")).toBe(true);
     expect(ehOfertaCasal("hc199")).toBe(true);

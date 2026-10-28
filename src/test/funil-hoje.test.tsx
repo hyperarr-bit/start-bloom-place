@@ -220,6 +220,8 @@ describe("o número e o que vai pra Finanças", () => {
 describe("as ofertas batem com o servidor", () => {
   it("VALOR_OFERTA (reais) = PRECOS_HOJE (centavos) do ofertas-hoje.ts (+ 21/10: o presente e o plano de 30 dias, presente.ts)", () => {
     const servidor: Record<string, number> = { ...PRECOS_HOJE, ...PRECOS_PRESENTE, ...PRECOS_PLANO30 };
+    // 26/10: o plano anual da oferta "anual" do /inicio (OFB_anual27) é cobrado pelo PixCheckout (PIX_PRICES), não pelo PixHoje
+    delete servidor.OFB_anual27;
     for (const [o, v] of Object.entries(VALOR_OFERTA)) expect(servidor[o]).toBe(Math.round(v * 100));
     expect(Object.keys(servidor).sort()).toEqual(Object.keys(VALOR_OFERTA).sort());
   });
@@ -603,3 +605,6 @@ describe("OFERTA_HOJE = 'vitalicio' (padrão, dono 20/10): a MESMA oferta do /in
     for (const nome of ["hoje_view", "funnel_view", "hoje_faixa", "hoje_resultado"]) expect(eventos(nome).every((x) => x.oferta_hoje === "vitalicio")).toBe(true);
   });
 });
+
+// 22/10: a 1ª pergunta leve está ligada pra todos (HOJE_P1 = "leve"); este arquivo testa o resto do /hoje com a ordem de antes
+beforeEach(async () => { (await import("@/pages/hoje/conteudo")).modoP1("?hoje-p1=off"); });

@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { assuntoParceiro, assuntoVenda, ehOfertaHoje, htmlParceiro, htmlVenda, nomeDoProduto, periodoDoEmailVenda, planoUtmify } from "../_shared/email-venda.ts";
+import { assuntoParceiro, assuntoVenda, ehOfertaHoje, emailVendaComLojas, htmlParceiro, htmlVenda, nomeDoProduto, periodoDoEmailVenda, planoUtmify } from "../_shared/email-venda.ts";
 import { creditarPedido } from "../_shared/grant-pix.ts";
 import { confirmarPacote2027, eh2027 } from "../_shared/pacote-2027.ts";
 import { registroDoPedido } from "../_shared/registro-pedido.ts";
@@ -661,7 +661,7 @@ serve(async (req) => {
               // 15/10: o anual da venda da web (sem senha, 1 ano) tem e-mail próprio; 16/10: o a69 e o mês (w25, 30 dias,
               // sem renovação) também — o antigo dizia "vitalício". O resto segue igual
               body: JSON.stringify(periodoVenda
-                ? { from, to: [user.email], subject: assuntoVenda(periodoVenda), html: htmlVenda({ email: user.email, nome: displayName, periodo: periodoVenda, fim: g.fim }) }
+                ? { from, to: [user.email], subject: assuntoVenda(periodoVenda), html: htmlVenda({ email: user.email, nome: displayName, periodo: periodoVenda, fim: g.fim, hoje: emailVendaComLojas(offer) }) }
                 : { from, to: [user.email], subject: vitalicio ? "Seu acesso vitalício ao CORE tá ativo ✅" : "Seu mês de CORE tá ativo ✅", html: welcomeHtml(firstName, user.email) }),
             });
           }

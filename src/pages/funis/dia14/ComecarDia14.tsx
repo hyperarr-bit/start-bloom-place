@@ -36,6 +36,7 @@ import { portaAntigaNesteAparelho } from "@/lib/porta-aparelho";
 import { buscarProvaSocial } from "@/lib/prova-social";
 import { Faixa, Grade16, LinhaInclusos } from "./pecas-roi2";
 import { BotaoDoFunil } from "@/pages/funis/w/BotaoDoFunil";
+import { capturarOferta, ehOfertaAnual, marcarEtapaOferta, usePosCompraSegurado } from "@/lib/oferta-anual";
 
 // Marca que o OAuth partiu do funil: o /auth/callback lê isso pra devolver o
 // usuário NOVO pro paywall do funil (em vez de pular direto pro app).
@@ -188,7 +189,9 @@ function StartScreen({ onPick }: { onPick: (firstAnswer: string) => void }) {
 
 /** Porta do criativo "vida inteira": o vídeo vendeu a casa, a porta faz a
  *  pessoa escolher um cômodo — amplitude vira especificidade em 1 toque. */
-export function VitrineStartScreen({ onPickArea }: { onPickArea: (area: AreaKey, label: string) => void }) {
+/* `anual` (26/10, oferta "anual" do /inicio): "pra vida inteira" lê como VITALÍCIO pra quem vai comprar 1 ano — a
+ * variante troca só a frase do topo por "Tudo da sua vida, num app só" (sem preço na 1ª tela, regra do dono). */
+export function VitrineStartScreen({ onPickArea, anual = false }: { onPickArea: (area: AreaKey, label: string) => void; anual?: boolean }) {
   const options: Array<{ area: AreaKey; emoji: string; label: string; sub: string }> = [
     ...DOOR_AREAS.map((key) => ({ area: key, emoji: AREAS[key].emoji, label: AREAS[key].label, sub: AREAS[key].sub })),
     // "Tudo" não é uma trilha — é pedido de priorização. Começa pelo que
@@ -221,7 +224,7 @@ export function VitrineStartScreen({ onPickArea }: { onPickArea: (area: AreaKey,
           <span className="inline-flex items-center gap-1 rounded-full bg-secondary text-[10.5px] font-bold px-2 py-1 whitespace-nowrap">📱 App Store · Google Play</span>
         </div>
         <h1 className="text-[clamp(27px,7.5vw,38px)] font-extrabold leading-[1.06] tracking-tight mb-2 text-center">
-          Sua vida inteira,<br />num app só.
+          {anual ? <>Tudo da sua vida,<br />num app só.</> : <>Sua vida inteira,<br />num app só.</>}
         </h1>
         <p className="text-[15px] text-muted-foreground text-center leading-snug mb-4">
           São 16 módulos e <strong className="text-foreground font-semibold">todos vêm juntos</strong> no mesmo acesso. Só me diz por onde a gente começa:
@@ -266,7 +269,7 @@ export function VitrineStartScreen({ onPickArea }: { onPickArea: (area: AreaKey,
         ))}
       </div>
       <h1 className="text-[clamp(27px,7.5vw,40px)] font-bold leading-[1.06] tracking-tight mb-2 text-center">
-        Um app pra<br />vida inteira
+        {anual ? <>Tudo da sua vida<br />num app só</> : <>Um app pra<br />vida inteira</>}
       </h1>
       <p className="text-[15px] text-muted-foreground text-center mb-6">
         Qual área tá mais fora de controle hoje?
@@ -1312,8 +1315,14 @@ export default function ComecarDia14() {
   // Funil vitrine: /inicio (URL limpa dos anúncios) ou ?porta=vida (compat).
   // Criativo "app pra vida inteira". A área escolhida persiste — quem volta
   // da demo (?step=signup) segue na trilha.
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const vitrine = pathname.startsWith("/inicio") || params.get("porta") === "vida";
+  /* OFERTA "ANUAL" (26/10, src/lib/oferta-anual.ts): o link da campanha nova (?oferta=anual) grava a marca no aparelho
+   * ANTES de qualquer tela montar (o paywall lê a marca no mount). Sem o parâmetro e sem marca, nada muda. */
+  useState(() => { if (pathname.startsWith("/inicio")) capturarOferta(search, pathname); return null; });
+  /** o upsell do anual está aberto por cima do "Pagamento confirmado": não manda pro app no meio dele */
+  const posCompraSegurado = usePosCompraSegurado();
+  const [ofertaAnualNaPorta] = useState<boolean>(() => pathname.startsWith("/inicio") && ehOfertaAnual());
   /* FUNIL B (30/09, src/lib/funil-b.ts). A decisão é tomada NA PORTA, pela
    * campanha (chave "kenny" = só a kenny g); dali em diante o braço viaja na
    * URL (`f=b`): a volta da demo chega em `?step=guardando&f=b`. Quem está no
@@ -1414,8 +1423,12 @@ export default function ComecarDia14() {
   // qual campanha/origem trouxe cada sessão.
   useEffect(() => {
     captureLandingMeta();
+    // 26/10: a 1ª etapa da medição da oferta (1 por aparelho; variante "anual" ou "controle") — só no /inicio, depois
+    // do captureLandingMeta (o evento leva as utm da chegada)
+    if (pathname.startsWith("/inicio")) marcarEtapaOferta("landing", { step });
     // Meta Pixel: visitante entrou no funil (topo). A Compra vem da Cakto.
     fireMetaEvent("ViewContent", { content_name: "funil_comecar" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Telemetria do funil: cada tela vista (a "quiz" emite quiz_1/2/3 por dentro
@@ -1452,7 +1465,7 @@ export default function ComecarDia14() {
    * "Pronto" (aoConfirmar); se a checagem periódica chegar antes, o efeito
    * abaixo faz o mesmo. */
   const noPosPagoDoB = bracoB && (step === "offer" || step === "pronto");
-  if (user && subLoaded && isSubscribed && !noPosPagoDoB) {
+  if (user && subLoaded && isSubscribed && !noPosPagoDoB && !posCompraSegurado) {
     return <Navigate to={area && area !== "dinheiro" ? `/${AREAS[area].module}` : "/financas"} replace />;
   }
 
@@ -1470,6 +1483,7 @@ export default function ComecarDia14() {
           <motion.div key={step} {...fade} className={step === "start" ? "w-full flex-1 flex flex-col" : "w-full"}>
             {step === "start" && (vitrine ? (
               <VitrineStartScreen
+                anual={ofertaAnualNaPorta}
                 onPickArea={(picked, label) => {
                   portaRef.current.tocou = true;
                   portaRef.current.tocouEm = Date.now();

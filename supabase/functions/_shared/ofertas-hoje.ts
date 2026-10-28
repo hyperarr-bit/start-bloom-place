@@ -20,11 +20,16 @@
  * hv47/hv27 gravam numa LINHA NOVA (grant-pix `linhaNova`): o plano comprado antes continua na linha dele (valor e
  * pedido preservados pra receita e pra trava de "1 pedido = 1 crédito").
  */
+/* 26/10: a oferta "anual" do /inicio (OFB_anual27 / OFB_up47 / OFB_down27) mora em ./ofertas-anual-inicio.ts e entra
+ * AQUI nos 3 mapas — é o caminho que já leva uma oferta nova pras 3 funções (asaas-pix, asaas-webhook, pix-reconcile). */
+import { CONCESSAO_ANUAL_INICIO, DESCRICAO_ANUAL_INICIO, PRECOS_ANUAL_INICIO } from "./ofertas-anual-inicio.ts";
+
 export const PRECOS_HOJE: Record<string, number> = {
   h279: 2790, h149: 1490, h279k: 3780, h149k: 2480, hv279: 2790, hv47: 4700, hv27: 2700, hc199: 1990,
   // 21/10: o upsell "Seu 2027 já organizado" (R$ 19,90, uma vez) — NÃO é assinatura: fora do CONCESSAO_HOJE; o pagamento
   // grava o pacote na conta de quem pagou (_shared/pacote-2027.ts). Aqui pra entrar nas 3 funções pelo `...PRECOS_HOJE`.
   u2027: 1990,
+  ...PRECOS_ANUAL_INICIO,
 };
 
 export type ConcessaoHoje = { plano: string; periodo: string; dias: number | null; linhaNova?: boolean };
@@ -37,11 +42,13 @@ export const CONCESSAO_HOJE: Record<string, ConcessaoHoje> = {
   hv279: { plano: "lifetime", periodo: "lifetime", dias: null },
   hv47: { plano: "lifetime", periodo: "lifetime", dias: null, linhaNova: true },
   hv27: { plano: "lifetime", periodo: "lifetime", dias: null, linhaNova: true },
+  ...CONCESSAO_ANUAL_INICIO,
 };
 
 export const DESCRICAO_HOJE: Record<string, string> = {
   h279: "CORE 1 ano", h149: "CORE 30 dias", h279k: "CORE 1 ano + kit", h149k: "CORE 30 dias + kit", hv279: "CORE vitalicio",
   hv47: "CORE pra sempre", hv27: "CORE pra sempre", hc199: "CORE a dois", u2027: "CORE seu 2027",
+  ...DESCRICAO_ANUAL_INICIO,
 };
 
 /** Os planos (a compra principal do /hoje) — são eles que levam as boas-vindas. */

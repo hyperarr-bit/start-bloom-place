@@ -30,16 +30,23 @@
  * (firePixPurchaseOnce, mesmo id da CAPI do servidor).
  */
 import {
+
   EMAIL_OK, MODULO_DA_AREA, NOME_DO_MODULO, ROTULO_OFERTA, VALOR_OFERTA, URL_APP_STORE,
   bracoOfertaDoHtml, bracoTituloDoHtml, ehArea, ehModuloLanding, estadoQueVolta, mmss, ofertaEscolhida, reais, urlPlay, venceEm,
   type Area, type EstadoLanding, type MensagemDaDemo, type ModuloLanding, type OfertaLanding, type PixLanding,
 } from "./regras";
 
+// o Pix de verdade carrega sob demanda — declarado antes do observador dos blocos, que pode pré-aquecê-lo (com PIX_REAL)
+type Pagamento = typeof import("./pagamento");
+let pagamento: Promise<Pagamento> | null = null;
+const pg = () => (pagamento ??= import("./pagamento"));
+
 /** O Pix de verdade (asaas-pix com as ofertas LN_*). Só ligar DEPOIS do deploy das funções (RELATORIO). */
 export const PIX_REAL = true; // 28/10: ligado depois do deploy de pix-reconcile, asaas-webhook, asaas-pix e pix-vincular com as ofertas LN_*
 
 const PRODUCAO = /(^|\.)coreaplicativo\.com\.br$/.test(location.hostname);
-const SIMULADO = !PIX_REAL && !PRODUCAO;
+// fora do domínio de produção (dev, preview, testes) o Pix é SEMPRE simulado; no domínio, de verdade se PIX_REAL
+const SIMULADO = !PRODUCAO;
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const agora = () => Math.round(performance.now());
 type Janela = Window & {
@@ -250,7 +257,7 @@ if ("IntersectionObserver" in window) {
           ofertaVista = true;
           evento("landing_oferta_vista", {});
           pixel("ViewContent", { content_name: "landing_oferta", value: 27.9, currency: "BRL" });
-          if (PIX_REAL) void pg().catch(() => null); // pré-aquece o Pix de verdade
+          if (PIX_REAL && !SIMULADO) void pg().catch(() => null); // pré-aquece o Pix de verdade
         }
       } else naTela.delete(bloco);
       // passou da demo = o fim da demo já subiu acima do meio da tela
@@ -293,9 +300,6 @@ let aviso: string | null = null;
 let faseConta: "email" | "salvando" | "codigo" | "entrando" = "email";
 let emailDigitado = "";
 
-type Pagamento = typeof import("./pagamento");
-let pagamento: Promise<Pagamento> | null = null;
-const pg = () => (pagamento ??= import("./pagamento"));
 
 /* ── simulação (dev) ── */
 const CODIGO_SIMULADO = "00020101021226870014br.gov.bcb.pix2565qrcode.exemplo.com/pix/v2/SIMULACAO-SEM-COBRANCA-CORE52040000530398654052790" + "5802BR5904CORE6009SAO PAULO62070503***6304ABCD";

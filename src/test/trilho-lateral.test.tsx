@@ -34,6 +34,23 @@ const montar = (rota: string, prefs: Record<string, unknown> = {}) => {
 };
 
 describe("TrilhoLateral", () => {
+  it("Home nova ligada (28/10): o trilho também aparece em /conquistas e /voce, com Conquistas e Você no pé", () => {
+    localStorage.setItem("forcar-home-nova", "on");
+    try {
+      montar("/conquistas");
+      expect(screen.getByTestId("trilho-lateral")).toBeInTheDocument();
+      expect(screen.getByTestId("trilho-conquistas")).toHaveAttribute("aria-current", "page");
+      fireEvent.click(screen.getByTestId("trilho-voce"));
+      expect(screen.getByTestId("onde").textContent).toBe("/voce");
+      expect(document.body.classList.contains("com-trilho")).toBe(true);
+    } finally { localStorage.removeItem("forcar-home-nova"); }
+  });
+
+  it("Home nova desligada: /conquistas e /voce seguem sem trilho", () => {
+    montar("/voce");
+    expect(screen.queryByTestId("trilho-lateral")).not.toBeInTheDocument();
+  });
+
   it("segue a ordem da pessoa, esconde os ocultos e marca o módulo ativo", () => {
     montar("/treino", { order: ["treino", "biblioteca", "financas"], hidden: ["pet", "detox"], favorites: [] });
     const nav = screen.getByTestId("trilho-lateral").querySelector("nav") as HTMLElement;

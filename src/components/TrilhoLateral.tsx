@@ -1,10 +1,12 @@
 import { useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { LayoutGrid, CircleUserRound } from "lucide-react";
+import { LayoutGrid, CircleUserRound, Trophy } from "lucide-react";
 import { MODULOS } from "@/lib/modulos";
 import { useUserData } from "@/hooks/use-user-data";
 import { isNativeShell } from "@/lib/native-shell";
 import { navAbasLigada } from "@/lib/nav-abas";
+import { useAuthOpcional } from "@/hooks/use-auth";
+import { useHomeNova } from "@/hooks/use-home-nova";
 
 /**
  * Trilho lateral do COMPUTADOR (11/09, "melhorar a experiência da web").
@@ -26,6 +28,10 @@ const ROTAS_COM_TRILHO = new Set(["/home", ...MODULOS.map((m) => m.path)]);
    rotas das abas novas, "Hoje" no lugar de "Início", "Organizar" (a aba Módulos) e "Você" no pé (a conta
    saiu do avatar da Home). Com a chave desligada, o trilho de sempre. */
 const ROTAS_DAS_ABAS = ["/modulos", "/voce", "/voce/aparencia"];
+/* 28/10 (PC, Home nova): com a Home nova ligada pra conta, Conquistas e Você são as outras 2 abas da barra de vidro
+   (no PC a pílula some e o trilho faz o papel dela) — sem isto o trilho sumia ao sair da Home e o conteúdo pulava
+   232 px pro lado. Ganham as mesmas rotas e dois itens no pé do trilho. */
+const ROTAS_DA_HOME_NOVA = ["/conquistas", "/voce", "/voce/aparencia"];
 const LARGURA_MINIMA = "(min-width: 1024px)";
 
 interface Prefs { hidden?: unknown; order?: unknown; favorites?: unknown }
@@ -36,7 +42,9 @@ export const TrilhoLateral = () => {
   const navigate = useNavigate();
   const { get } = useUserData();
   const comAbas = navAbasLigada();
-  const visivel = !isNativeShell() && (ROTAS_COM_TRILHO.has(pathname) || (comAbas && ROTAS_DAS_ABAS.includes(pathname)));
+  const user = useAuthOpcional()?.user;
+  const homeNova = useHomeNova(user).ligada;
+  const visivel = !isNativeShell() && (ROTAS_COM_TRILHO.has(pathname) || (comAbas && ROTAS_DAS_ABAS.includes(pathname)) || (homeNova && ROTAS_DA_HOME_NOVA.includes(pathname)));
 
   // Leitura pura das preferências (sem o hook, que grava): o trilho nunca
   // escreve, então não pode disputar a chave com a grade da Home.
@@ -123,21 +131,42 @@ export const TrilhoLateral = () => {
         })}
       </nav>
 
-      {comAbas && (
-        <button
-          type="button"
-          onClick={() => navigate("/voce")}
-          aria-current={pathname.startsWith("/voce") ? "page" : undefined}
-          data-testid="trilho-voce"
-          className={`flex items-center gap-3 mx-3 mb-3 px-2.5 py-2 rounded-lg text-sm transition-colors ${
-            pathname.startsWith("/voce") ? "bg-muted font-semibold" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-          }`}
-        >
-          <span className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
-            <CircleUserRound className="w-4 h-4" />
-          </span>
-          Você
-        </button>
+      {(comAbas || homeNova) && (
+        <div className="border-t border-border px-3 pt-2 pb-3 shrink-0 space-y-0.5">
+        {homeNova && !comAbas && (
+          <button
+            type="button"
+            onClick={() => navigate("/conquistas")}
+            aria-current={pathname === "/conquistas" ? "page" : undefined}
+            data-testid="trilho-conquistas"
+            className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm transition-colors ${
+              pathname === "/conquistas" ? "bg-muted font-semibold" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            }`}
+          >
+            <span className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
+              <Trophy className="w-4 h-4" />
+            </span>
+            Conquistas
+          </button>
+        )}
+
+        {(comAbas || homeNova) && (
+          <button
+            type="button"
+            onClick={() => navigate("/voce")}
+            aria-current={pathname.startsWith("/voce") ? "page" : undefined}
+            data-testid="trilho-voce"
+            className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm transition-colors ${
+              pathname.startsWith("/voce") ? "bg-muted font-semibold" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            }`}
+          >
+            <span className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
+              <CircleUserRound className="w-4 h-4" />
+            </span>
+            Você
+          </button>
+        )}
+        </div>
       )}
     </aside>
   );

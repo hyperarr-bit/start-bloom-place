@@ -586,12 +586,12 @@ const Biblioteca = () => {
       </header>
 
       {/* 16/10: a intro do módulo fica dentro da calha da página (o "Dicas" antigo segue como era, colado na borda) */}
-      <div className={introLigada() ? "px-4 pt-4 [&:empty]:hidden" : undefined}>
+      <div className={introLigada() ? "px-4 pt-4 [&:empty]:hidden max-w-5xl mx-auto" : "max-w-5xl mx-auto lg:px-4 lg:pt-4 [&:empty]:hidden"}>
       <BoasVindasDoModulo moduleId="biblioteca" tips={["📚 Adicione livros por link (Amazon, Goodreads) para importar capa e dados automaticamente!", "💡 Salve citações dos seus livros e filtre por tags depois!", "🏆 Defina sua meta anual de leitura na aba Desafio!"]} />
       </div>
 
       {/* Stats */}
-      <div className="px-4 py-2">
+      <div className="px-4 py-2 lg:pt-4 max-w-5xl mx-auto">
         <div className="grid grid-cols-4 gap-2">
           {[
             { icon: "📚", val: books.length, label: "Total" },
@@ -608,7 +608,7 @@ const Biblioteca = () => {
         </div>
       </div>
 
-      <div className="px-4">
+      <div className="px-4 max-w-5xl mx-auto">
 
           {/* ══════ TAB: LENDO AGORA ══════ */}
           {tab === "lendo" && <div className="space-y-4 mt-4">

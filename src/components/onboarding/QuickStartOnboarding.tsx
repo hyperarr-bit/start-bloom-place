@@ -9,6 +9,7 @@ import {
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import { TutorialDonePopup } from "@/components/onboarding/TutorialDonePopup";
+import { desmarcarTutorialNestaAbertura, marcarTutorialNestaAbertura, tutorialNestaAbertura } from "@/lib/tutorial-abertura";
 
 
 
@@ -26,8 +27,8 @@ interface QuickStartOnboardingProps {
   /** Newly signed-up (already authenticated) user — skip welcome and show tutorial-done popup instead of QuickSignup. */
   forNewUser?: boolean;
   /**
-   * Aberto pelo menu "Rever tutorial" — MUDA SÓ O TEXTO ("rever" em vez de
-   * "começar"). A mecânica de fila é a mesma pros dois desde 27/07.
+   * Aberto pelo menu "Ver tutorial" (era "Rever tutorial" até 27/10) — MUDA SÓ O TEXTO
+   * ("Qual módulo quer ver?" em vez de "Por onde você quer começar?"). A mecânica de fila é a mesma pros dois desde 27/07.
    */
   aberturaPeloMenu?: boolean;
   /**
@@ -98,7 +99,8 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
   // módulo reabre via Home, e o Encerrar zera).
   const replayQueueRaw = get<ModuleKey[]>("tutorial-replay-modules", []);
   const replayQueue = Array.isArray(replayQueueRaw) ? replayQueueRaw.filter(k => ALL_KEYS.includes(k)) : [];
-  const retomandoReplay = !!replay && replayQueue.length > 0;
+  // fila de uma abertura ANTERIOR do app não retoma (lib/tutorial-abertura): a Home apaga, aqui começa do zero
+  const retomandoReplay = !!replay && replayQueue.length > 0 && tutorialNestaAbertura();
 
   const effectiveSelected = replay || hasStoredSelection ? selectedModules : [...DEFAULT_SELECTED];
   // replay: mostra a FILA (retomada) ou o que a pessoa marcou agora
@@ -166,6 +168,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
       // quem tem o módulo nela, o voltar do módulo reabre este picker (Home
       // mostra enquanto a fila viver) e o Encerrar zera tudo.
       set("tutorial-replay-modules", selectedModules);
+      marcarTutorialNestaAbertura();
       trackEvent("tutorial_replay_started", { modules: selectedModules });
       setStep(2);
       return;
@@ -182,6 +185,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
      * pra mesma coisa — e a de estreia, que é a que mais gente vê, era a pior.
      */
     set("tutorial-replay-modules", selectedModules);
+    marcarTutorialNestaAbertura();
     trackEvent("tutorial_modules_selected", { count: selectedModules.length, modules: selectedModules, is_guest: isGuest });
     setStep(2);
   };
@@ -193,6 +197,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
    */
   const encerrarReplay = () => {
     set("tutorial-replay-modules", []);
+    desmarcarTutorialNestaAbertura();
     // a intenção "abri pelo menu" morre junto com a fila (ver Home.tsx)
     set("tutorial-replay-pelo-menu", "");
     // no primeiro uso é este flag que faz o tour renascer a cada abertura
@@ -371,6 +376,11 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
 
               <div className="flex flex-col gap-2.5 max-h-[55dvh] overflow-y-auto pr-1 -mr-1">
 
+                {/* O PISCA DA ENTRADA (dono 27/10, vídeo no iPhone: "brilhos/stuttering"): as linhas tinham
+                    `transition-all` (CSS) E a entrada do framer-motion (opacity/x) no MESMO elemento. No WebKit a
+                    entrada roda como animação nativa; ao terminar, o framer grava o valor final no style e a
+                    transição CSS de 150 ms reprisa a opacidade de 0 → 1 — a linha aparecia, SUMIA e voltava, uma a
+                    uma (Chromium não mostra). A lista nunca remontou (medido). Agora só as cores transitam. */}
                 {OPTIONS.map((opt, i) => {
                   const checked = selectedModules.includes(opt.key);
                   return (
@@ -380,7 +390,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.06 }}
                       onClick={() => toggleModule(opt.key)}
-                      className={`group flex items-center gap-3.5 p-3.5 rounded-xl bg-card border transition-all text-left active:scale-[0.99] ${
+                      className={`group flex items-center gap-3.5 p-3.5 rounded-xl bg-card border transition-colors text-left active:scale-[0.99] ${
                         checked ? "border-foreground/60" : "border-border"
                       }`}
                     >
@@ -445,7 +455,8 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
             >
               <div className="space-y-1.5 text-center mb-2">
                 <h2 className="text-xl font-bold text-foreground">
-                  {revendo ? "Qual módulo quer rever?" : "Por onde você quer começar?"}
+                  {/* 27/10 (dono): o menu virou "Ver tutorial" — no app novo (fluxo enxuto) quase todo mundo vê pela 1ª vez */}
+                  {revendo ? "Qual módulo quer ver?" : "Por onde você quer começar?"}
                 </h2>
                 <p className="text-xs text-muted-foreground">
                   {revendo
@@ -462,7 +473,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.06 }}
                     onClick={() => handlePick(opt)}
-                    className="group flex items-center gap-3.5 p-3.5 rounded-xl bg-card border border-border hover:border-foreground/30 active:scale-[0.99] transition-all text-left"
+                    className="group flex items-center gap-3.5 p-3.5 rounded-xl bg-card border border-border hover:border-foreground/30 active:scale-[0.99] transition-colors text-left"
                   >
                     <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${opt.tone}`}>
                       <opt.Icon className="w-5 h-5" strokeWidth={2.2} />

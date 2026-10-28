@@ -221,7 +221,7 @@ describe("o menu novo: 3 grupos + Sair", () => {
     fireEvent.click(screen.getByText("Termos de uso"));
     expect(screen.getByTestId("onde").textContent).toBe("/termos");
   });
-  it("Rever tutorial fecha a folha e chama o tutorial; Sair chama signOut", () => {
+  it("Ver tutorial fecha a folha e chama o tutorial; Sair chama signOut", () => {
     const rever = vi.fn();
     const fechar = vi.fn();
     montarMenu({ onReplayTutorial: rever, onOpenChange: fechar });
@@ -315,7 +315,7 @@ describe("chave off = o menu e o topo de hoje (1.0.17)", () => {
     nativo.v = true;
     montarMenu();
     expect(screen.getByText("Menu")).toBeTruthy();
-    for (const t of ["Minha conta", "Meu acesso", "Retrospectiva", "Conquistas", "Notificações", "Usar no computador", "Ajuda e suporte", "Rever tutorial", "Sair"]) expect(screen.getByText(t)).toBeTruthy();
+    for (const t of ["Minha conta", "Meu acesso", "Retrospectiva", "Conquistas", "Notificações", "Usar no computador", "Ajuda e suporte", "Ver tutorial", "Sair"]) expect(screen.getByText(t)).toBeTruthy();
     expect(screen.queryByTestId("menu-novo")).toBeNull();
     expect(screen.queryByText("Aparência")).toBeNull();
     fireEvent.click(screen.getByText("Retrospectiva"));

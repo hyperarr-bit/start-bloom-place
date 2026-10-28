@@ -217,7 +217,7 @@ export const AccountDrawer = ({
         // item é a porta que faltava, e vale na web também.
         { icon: LifeBuoy, label: "Ajuda e suporte", onClick: () => go("/ajuda") },
         ...itemAvaliar,
-        { icon: RotateCcw, label: "Rever tutorial", onClick: handleReplayTutorial },
+        { icon: RotateCcw, label: "Ver tutorial", onClick: handleReplayTutorial },
       ];
 
   return (
@@ -534,7 +534,7 @@ function MenuNovo({ isGuest, nome, email, iniciais, acoes }: { isGuest: boolean;
     // Notificações são locais do app da loja — na web não existe como entregar (30/07)
     ...(nativo && !isGuest ? [{ id: "lembretes", grupo: "app" as const, Icone: Bell, rotulo: "Lembretes", onClick: clicar("lembretes", "app", acoes.lembretes) }] : []),
     ...(nativo && !isGuest ? [{ id: "computador", grupo: "app" as const, Icone: Monitor, rotulo: "Usar no computador", onClick: clicar("computador", "app", acoes.computador) }] : []),
-    ...(!isGuest ? [{ id: "tutorial", grupo: "app" as const, Icone: RotateCcw, rotulo: "Rever tutorial", onClick: clicar("tutorial", "app", acoes.tutorial) }] : []),
+    ...(!isGuest ? [{ id: "tutorial", grupo: "app" as const, Icone: RotateCcw, rotulo: "Ver tutorial", onClick: clicar("tutorial", "app", acoes.tutorial) }] : []),
   ];
   const ajuda: ItemDoMenu[] = [
     { id: "ajuda", grupo: "ajuda", Icone: LifeBuoy, rotulo: "Ajuda e suporte", onClick: clicar("ajuda", "ajuda", acoes.ajuda) },

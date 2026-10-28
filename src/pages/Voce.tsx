@@ -134,7 +134,7 @@ export default function Voce() {
     // Notificações são locais do app da loja — na web não existe como entregar (30/07)
     ...(nativo ? [{ id: "lembretes", Icone: Bell, rotulo: "Lembretes", onClick: () => ir("lembretes", "/notificacoes") }] : []),
     ...(nativo ? [{ id: "computador", Icone: Monitor, rotulo: "Usar no computador", onClick: () => { clicar("computador"); setFolha("computador"); } }] : []),
-    { id: "tutorial", Icone: RotateCcw, rotulo: "Rever tutorial", onClick: () => { clicar("tutorial"); navigate("/home", { state: { reverTutorial: true } }); } },
+    { id: "tutorial", Icone: RotateCcw, rotulo: "Ver tutorial", onClick: () => { clicar("tutorial"); navigate("/home", { state: { reverTutorial: true } }); } },
   ];
   const ajuda: Item[] = [
     { id: "ajuda", Icone: LifeBuoy, rotulo: "Ajuda e suporte", onClick: () => ir("ajuda", "/ajuda") },
@@ -154,7 +154,7 @@ export default function Voce() {
         id: "inicio", titulo: "Início",
         itens: [
           { id: "personalizar-inicio", Icone: SlidersHorizontal, rotulo: "Personalizar início", onClick: () => empilhar("personalizar-inicio", "/voce/inicio") }, // sem detalhe: no iPhone o rótulo truncava
-          { id: "tutorial", Icone: RotateCcw, rotulo: "Rever tutorial", onClick: () => { clicar("tutorial"); navigate("/home", { state: { reverTutorial: true } }); } },
+          { id: "tutorial", Icone: RotateCcw, rotulo: "Ver tutorial", onClick: () => { clicar("tutorial"); navigate("/home", { state: { reverTutorial: true } }); } },
         ],
       },
       {

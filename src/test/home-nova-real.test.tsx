@@ -551,7 +551,7 @@ describe("Home nova — a barra de vidro e as folhas padrão (revisor 26/10: a b
   });
 });
 
-describe("Home nova — o '+' fora da Home e o Rever tutorial", () => {
+describe("Home nova — o '+' fora da Home e o Ver tutorial", () => {
   it("o '+' em outra aba volta pra Home SEM empilhar (POP: a Home estava logo abaixo), sem estado no histórico, e a folha abre ao chegar", async () => {
     ligar();
     await montar();
@@ -579,7 +579,7 @@ describe("Home nova — o '+' fora da Home e o Rever tutorial", () => {
     await waitFor(() => expect(screen.getByTestId("hn-folha-mais")).toBeTruthy());
   });
 
-  it("Rever tutorial (aba Você → /home com reverTutorial) continua funcionando com a Home nova ligada: o replay entra, não a Home nova", async () => {
+  it("Ver tutorial (aba Você → /home com reverTutorial) continua funcionando com a Home nova ligada: o replay entra, não a Home nova", async () => {
     ligar();
     const n = criarNuvem(DADOS);
     render(<MemoryRouter initialEntries={[{ pathname: "/home", state: { reverTutorial: true } }]}><n.Provedor><App /></n.Provedor></MemoryRouter>);

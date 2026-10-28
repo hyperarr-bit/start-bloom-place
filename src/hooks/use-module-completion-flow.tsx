@@ -7,28 +7,33 @@ import { trackEvent } from "@/lib/analytics";
 
 export type CoreModuleKey = "financas" | "rotina" | "dieta" | "metas";
 
-// App é só finanças: o tutorial conclui com um único módulo.
-const ALL_MODULES: CoreModuleKey[] = ["financas"];
-
-const LABELS: Record<CoreModuleKey, string> = {
-  financas: "Finanças",
-  rotina: "Rotina",
-  dieta: "Dieta",
-  metas: "Metas",
+/*
+ * O QUE FALTA = A FILA DO TUTORIAL (27/10, QA do "Ver tutorial").
+ *
+ * Até aqui "faltam" vinha de `ALL_MODULES = ["financas"]` (resto do pivô "só finanças" de 12/07) cruzado com
+ * spotlight-done-*. Com a fila de 16 módulos isso mentia nos dois sentidos: terminar Finanças com mais 4 módulos
+ * escolhidos dava "Tudo pronto! Seu painel está montado" e o Continuar deixava a pessoa parada em Finanças (o resto
+ * do tutorial só voltava se ela achasse sozinha o caminho até a Home); terminar Hábitos/Dieta/Metas dizia "Ainda
+ * falta Finanças" mesmo sem Finanças na fila. Agora vale `tutorial-replay-modules` — a mesma fila que o seletor
+ * mostra (o SpotlightOverlay tira o módulo atual dela logo antes de chamar o onComplete; o `get` aqui ainda pode
+ * ver o valor de antes, por isso o filtro pelo atual).
+ */
+const LABELS: Record<string, string> = {
+  financas: "Finanças", rotina: "Hábitos", dieta: "Dieta", treino: "Treino", saude: "Saúde", metas: "Metas",
+  hiperfoco: "Hiperfoco", estudos: "Estudos", carreira: "Carreira", biblioteca: "Biblioteca", casa: "Casa",
+  beleza: "Beleza", viagens: "Viagens", relacionamentos: "Relacionamentos", pet: "Pet", detox: "Detox",
 };
 
 export const useModuleCompletionFlow = (currentModule: CoreModuleKey) => {
   const { get, set, isGuest } = useUserData();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [pending, setPending] = useState<CoreModuleKey[]>([]);
+  const [pending, setPending] = useState<string[]>([]);
   const [allDone, setAllDone] = useState(false);
 
   const onModuleComplete = useCallback(() => {
-    // SpotlightOverlay already set spotlight-done-<module> before calling onComplete.
-    const remaining = ALL_MODULES.filter(
-      (m) => m !== currentModule && !get<string>(`spotlight-done-${m}`, "")
-    );
+    const fila = get<string[]>("tutorial-replay-modules", []);
+    const remaining = (Array.isArray(fila) ? fila : []).filter((m) => m !== currentModule && !!LABELS[m]);
     setPending(remaining);
     const done = remaining.length === 0;
     setAllDone(done);
@@ -94,7 +99,7 @@ export const useModuleCompletionFlow = (currentModule: CoreModuleKey) => {
                 <p className="relative text-sm text-muted-foreground leading-relaxed mb-5">
                   {isGuest
                     ? "Tudo pronto! Vamos liberar seu teste grátis de 7 dias."
-                    : "Seu painel está montado. É só começar a usar. 🎉"}
+                    : "Tutorial terminado. Agora é só usar. 🎉"}
                 </p>
                 <button
                   onClick={handleClose}
@@ -111,7 +116,7 @@ export const useModuleCompletionFlow = (currentModule: CoreModuleKey) => {
                 <p className="relative text-sm text-muted-foreground leading-relaxed mb-2">
                   {isGuest
                     ? `Falta ${pending.length} módulo${pending.length > 1 ? "s" : ""} pra desbloquear seu teste grátis.`
-                    : `Ainda faltam ${pending.length} módulo${pending.length > 1 ? "s" : ""} no tutorial.`}
+                    : pending.length === 1 ? "Ainda falta 1 módulo no tutorial." : `Ainda faltam ${pending.length} módulos no tutorial.`}
                 </p>
                 <p className="relative text-xs text-muted-foreground mb-5">
                   Pendentes: {pending.map((m) => LABELS[m]).join(", ")}

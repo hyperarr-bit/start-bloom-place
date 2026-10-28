@@ -89,7 +89,12 @@ const Pet = () => {
     <div className="tema-pet min-h-screen bg-background text-foreground">
       <SpotlightOverlay
         moduleKey="pet"
-        steps={[
+        // 27/10 (QA do "Ver tutorial"): com pet já cadastrado a escolha de espécie não existe — o passo único caía no
+        // cartão "Não achei esse item aqui". Quem já tem pet vê as abas que ainda não conhece.
+        steps={loaded && pets.length > 0 ? [
+          { selector: '[data-spotlight="tab-saude"]', label: "Vacinas, vermífugo e consultas do seu pet ficam aqui, com a próxima data de cada um.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-diario"]', label: "E no Diário você guarda fotos e momentos dele.", advanceOnClick: true },
+        ] : [
           { selector: '[data-spotlight="pet-especie"]', label: "Comece por aqui: diga quem é o seu pet. Em 3 toques ele ganha RG, rotina e carteirinha.", advanceOnClick: true },
         ]}
       />

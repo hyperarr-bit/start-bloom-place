@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Mail, Clock, ArrowLeft, ExternalLink } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
-import { EMPRESA } from "@/lib/empresa";
+import { EMPRESA, enderecoVisivel } from "@/lib/empresa";
 import { RodapeSite } from "@/components/site/RodapeSite";
 
 /**
@@ -138,7 +138,7 @@ export default function Suporte() {
           <div className="mt-4 rounded-xl border border-border bg-muted/40 p-6 text-[14.5px] leading-relaxed">
             <p className="font-bold text-foreground">{EMPRESA.razaoSocial}</p>
             {EMPRESA.cnpj && <p className="mt-1 text-muted-foreground">CNPJ {EMPRESA.cnpj}</p>}
-            {EMPRESA.endereco && <p className="text-muted-foreground">{EMPRESA.endereco}</p>}
+            {enderecoVisivel() && <p className="text-muted-foreground">{enderecoVisivel()}</p>}
             <p className="mt-3 text-muted-foreground">
               Contato:{" "}
               <a href={`mailto:${EMPRESA.email}`} className="font-semibold text-accent hover:underline">

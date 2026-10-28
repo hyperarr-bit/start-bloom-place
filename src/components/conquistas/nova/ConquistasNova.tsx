@@ -34,6 +34,7 @@ import { CelebracaoMarco, ColecaoTela, DetalheSequencia, ToastAdesivo } from "./
 import "../conquistas.css";
 import "./conquistas-nova.css";
 import "./conquistas-caderno.css";
+import { DEPOIS_DA_SAIDA_MS } from "@/components/home-nova/e/folha-arrasto";
 
 /** Álbum, sequência e coleção com foco nas artes de caderno.
  * Dados, critérios de desbloqueio e telemetria continuam nos hooks existentes. */
@@ -263,7 +264,8 @@ export const ConquistasNova = ({ testeDia: testeDiaProp, camada = null, prototip
   /** Toque na coleção ou prévia: amplia só a figurinha. */
   const tocarAdesivo = (b: Badge) => {
     trackEvent(EVENTOS2.adesivoToque, { id: b.id, aberto: b.unlocked, colecao: b.category });
-    setDetalhe(false);
+    // 1.0.22: vindo da folha da sequência, a figurinha só sobe depois que a folha desceu inteira (sem uma por cima da outra)
+    if (detalhe) { setDetalhe(false); window.setTimeout(() => setFigurinhaEmFoco(b), DEPOIS_DA_SAIDA_MS); return; }
     setFigurinhaEmFoco(b);
   };
   const usarNaCapa = (b: Badge) => {

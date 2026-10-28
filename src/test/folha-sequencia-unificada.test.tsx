@@ -26,6 +26,7 @@ import type { Sequencia } from "@/components/conquistas/use-conquistas";
 import type { Badge } from "@/components/gamification/types";
 import { faixaDoFogo } from "@/lib/fogo-sequencia";
 import { criarNuvem, prepararJsdom, type Dados } from "./compat-comum";
+import { DEPOIS_DA_SAIDA_MS } from "@/components/home-nova/e/folha-arrasto";
 
 // quarta-feira 28/10/2026: a semana vai de 26 (seg) a 1/11 (dom)
 const HOJE = "2026-10-28";
@@ -91,7 +92,7 @@ describe("cabeçalho e status", () => {
       expect(eventos.some(([e, d]) => e === "sequencia_folha_aberta" && d.origem === "conquistas" && d.garantido === false)).toBe(true);
       vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-10-28T12:00:00"));
       r();
-    }, 250));
+    }, DEPOIS_DA_SAIDA_MS + 40)); // 1.0.22: a tela seguinte espera a folha descer inteira
   });
 });
 
@@ -187,7 +188,7 @@ describe("o lembrete da sequência na folha (26/10)", () => {
     expect(onFechar).toHaveBeenCalled();
     expect(eventos.some(([e, d]) => e === "sequencia_folha_acao" && d.acao === "lembretes" && d.destino === "/notificacoes" && d.origem === "conquistas")).toBe(true);
     vi.useRealTimers();
-    await new Promise((r) => setTimeout(r, 250));
+    await new Promise((r) => setTimeout(r, DEPOIS_DA_SAIDA_MS + 40));
     expect(onIr).toHaveBeenCalledWith("/notificacoes");
     vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-10-28T12:00:00"));
   });

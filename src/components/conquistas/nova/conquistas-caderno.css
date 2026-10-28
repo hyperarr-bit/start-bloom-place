@@ -55,6 +55,9 @@
 .cn .cn-seq-semana .cn-b-letra { font-size: 10px; gap: 5px; }
 .cn button.cn-acao-chip, .cn .cn-seq-feito { min-height: 44px; height: auto; background: transparent; border-color: #dedbd3; color: var(--cn-ink); border-radius: 10px; font-size: 12px; font-weight: 600; gap: 7px; }
 .cn .cn-seq-feito { color: #52745d; border-color: #d5e0d6; }
+/* 1.0.22 (dono 27/10): no escuro o "Hoje garantido" ficava com a borda clara do tema claro (#d5e0d6) sobre o verde
+   escuro — um contorno branco que não combinava. A borda acompanha o verde escuro. */
+.dark .cn .cn-seq-feito { border-color: #3a5a4b; }
 .cn .cn-acao-chip > svg { width: 16px; height: 16px; }
 .cn .cn-proxima { margin-top: 14px; padding-top: 14px; gap: 12px; border-color: #eeebe4; }
 .cn-proxima-marco { display: grid; place-items: center; width: 40px; height: 44px; flex-shrink: 0; font-size: 23px; font-weight: 750; letter-spacing: -1px; color: #bc423d; background: #f6ece5; border-radius: 10px; transform: rotate(-5deg); }

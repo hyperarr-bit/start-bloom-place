@@ -34,6 +34,7 @@ import { PetWidget } from "@/components/home/widgets/PetWidget";
 import { RelacoesWidget } from "@/components/home/widgets/RelacoesWidget";
 import { SkincareWidget } from "@/components/home/widgets/SkincareWidget";
 import { CuidadosWidget } from "@/components/home/widgets/CuidadosWidget";
+import { DEPOIS_DA_SAIDA_MS } from "./e/folha-arrasto";
 
 type WidgetComponent = React.FC<{ size?: "small" | "large" }>;
 const WIDGETS: Record<WidgetId, WidgetComponent> = {
@@ -229,8 +230,8 @@ export const SecaoHoje = ({ data, pendencias, widgets, onToggleWidget, onToggleS
         onFechar={() => setPersonalizar(false)}
         widgetsAtivos={widgets.length}
         ocultos={prefs.ocultos.length}
-        onWidgets={() => { setPersonalizar(false); window.setTimeout(() => setPicker(true), 180); }}
-        onPendencias={() => { setPersonalizar(false); window.setTimeout(() => setPrefsAbertas(true), 180); }}
+        onWidgets={() => { setPersonalizar(false); window.setTimeout(() => setPicker(true), DEPOIS_DA_SAIDA_MS); }}
+        onPendencias={() => { setPersonalizar(false); window.setTimeout(() => setPrefsAbertas(true), DEPOIS_DA_SAIDA_MS); }}
       />
       <WidgetPicker open={picker} onOpenChange={setPicker} activeWidgets={widgets} onToggle={onToggleWidget} onToggleSize={onToggleSize} />
       <PersonalizarPendencias open={prefsAbertas} onOpenChange={setPrefsAbertas} prefs={prefs} onChange={(p) => set(CHAVE_PENDENCIAS_PREFS, p)} porModulo={data.pendenciasPorModulo} />

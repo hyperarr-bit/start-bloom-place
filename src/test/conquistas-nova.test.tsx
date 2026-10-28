@@ -31,6 +31,7 @@ import { CHAVE_FORCA_CONQUISTAS2, _zerarChaveRemotaConquistas2, conquistas2Ligad
 import { IDS_COM_ARTE } from "@/components/conquistas/adesivos-arte";
 import { somarDias } from "@/lib/sequencia";
 import { gravarMissao, iniciarMissao } from "@/lib/missao-doses";
+import { DEPOIS_DA_SAIDA_MS } from "@/components/home-nova/e/folha-arrasto";
 
 const HOJE = "2026-10-16"; // sexta
 const corrida = (fim: string, n: number) => Array.from({ length: n }, (_, i) => somarDias(fim, -(n - 1 - i)));
@@ -329,6 +330,9 @@ describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
     expect(evolucao.textContent).toContain("Faltam 2 dias");
     expect(screen.getByTestId("he-seq-evolucao").getAttribute("data-destaque")).toBe("sequencia-14");
     fireEvent.click(screen.getByRole("button", { name: "14 Dias Seguidos: faltam 2 dias" }));
+    // 1.0.22: a figurinha sobe depois que a folha da sequência desceu inteira (DEPOIS_DA_SAIDA_MS)
+    expect(screen.queryByTestId("cn-figurinha-em-foco")).toBeNull();
+    act(() => { vi.advanceTimersByTime(DEPOIS_DA_SAIDA_MS); });
     expect(screen.getByTestId("cn-figurinha-em-foco")).toBeTruthy();
     expect(screen.queryByTestId("album-tela")).toBeNull();
   });
@@ -357,6 +361,7 @@ describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
     expect(store.dados["core-dias-anotados"]).toEqual(registros);
     expect(Object.prototype.hasOwnProperty.call(store.dados["conquistas-desbloqueadas"], "sequencia-1")).toBe(conquistada);
     fireEvent.click(inicio);
+    act(() => { vi.advanceTimersByTime(DEPOIS_DA_SAIDA_MS); });
     expect(screen.getByTestId("cn-figurinha-em-foco")).toHaveTextContent("1 Dia Anotado");
     expect(screen.queryByTestId("album-tela")).toBeNull();
   });

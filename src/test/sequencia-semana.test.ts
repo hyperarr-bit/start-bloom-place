@@ -33,8 +33,13 @@ describe("semana da sequência", () => {
     expect(semanaDaSequencia(lista, seq.usados, SABADO).map((d) => d.rotulo)).toEqual(["SEG", "TER", "QUA", "QUI", "SEX", "SÁB", "DOM"]);
   });
 
-  it("hoje anotado vira feito; dia vazio sem protetor vira 'vazio' (a sequência quebrou ali)", () => {
-    expect(estados(["2026-09-25", "2026-09-26"], SABADO)).toEqual(["vazio", "vazio", "vazio", "vazio", "feito", "feito", "futuro"]);
+  it("hoje anotado vira feito; dia de ANTES do 1º registro é 'antes' (neutro, 1.0.22); falha depois de começar é 'vazio'", () => {
+    // começou na sexta: seg–qui ainda nem usava o app → neutros (antes era 'vazio', o anel branco de dia perdido)
+    expect(estados(["2026-09-25", "2026-09-26"], SABADO)).toEqual(["antes", "antes", "antes", "antes", "feito", "feito", "futuro"]);
+    // começou na segunda e pulou a quarta (sem protetor): a quarta é 'vazio' — a sequência quebrou ali
+    expect(estados(["2026-09-21", "2026-09-22", "2026-09-24", "2026-09-25", "2026-09-26"], SABADO)).toEqual(["feito", "feito", "vazio", "feito", "feito", "feito", "futuro"]);
+    // conta nova, nada anotado ainda: tudo antes de hoje é neutro
+    expect(estados([], SABADO)).toEqual(["antes", "antes", "antes", "antes", "antes", "hoje", "futuro"]);
   });
 
   it("semana completa só com os 7 discos cheios (feito ou gelo) — no domingo, com hoje garantido", () => {

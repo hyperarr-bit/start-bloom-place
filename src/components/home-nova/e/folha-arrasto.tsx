@@ -27,6 +27,10 @@ export const MOLA_FOLHA = { type: "spring" as const, stiffness: 300, damping: 35
 /** A descida: tween com aceleração (easeIn), 260 ms — contínua, sempre igual, e a folha desmonta assim que sai (a mola
  *  crítica demorava ~0,8 s pra "assentar" fora da tela: a folha ficava montada invisível e o teste de reabrir oscilava). */
 export const SAIDA_FOLHA = { type: "tween" as const, ease: "easeIn" as const, duration: 0.26 };
+/** 1.0.22 (dono 27/10, vídeo): "fechar a folha e ir pra outro lugar" esperava 180 ms — a descida leva 260 ms com
+ *  aceleração, então a tela seguinte entrava com a folha ainda na metade. Quem fecha e navega/abre outra camada espera
+ *  a descida INTEIRA (+20 ms de folga) — o mesmo ritmo, sem uma coisa por cima da outra. */
+export const DEPOIS_DA_SAIDA_MS = Math.round(SAIDA_FOLHA.duration * 1000) + 20;
 export const alturaDaSaida = (): number => (typeof window !== "undefined" ? Math.max(window.innerHeight, 600) : 1000);
 export const propsDaFolha = (semMovimento: boolean) => ({
   initial: { y: alturaDaSaida() }, animate: { y: 0 },

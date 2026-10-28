@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { EMPRESA, assinaturaEmpresa } from "@/lib/empresa";
+import { EMPRESA, assinaturaEmpresa, enderecoVisivel } from "@/lib/empresa";
 
 /**
  * Rodapé institucional — vive em TODA página pública da web (home, suporte,
@@ -39,7 +39,7 @@ export const RodapeSite = () => (
 
       <div className="space-y-1 text-xs leading-relaxed text-muted-foreground">
         <p>{assinaturaEmpresa()}</p>
-        {EMPRESA.endereco && <p>{EMPRESA.endereco}</p>}
+        {enderecoVisivel() && <p>{enderecoVisivel()}</p>}
         <p>© {new Date().getFullYear()} — todos os direitos reservados.</p>
       </div>
     </div>

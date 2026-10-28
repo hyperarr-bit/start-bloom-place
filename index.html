@@ -9,6 +9,41 @@
     <meta name="apple-itunes-app" content="app-id=6806913181" />
     <link rel="manifest" href="/manifest.json" />
     <script>
+      // 28/10 (dono, iPhone): a DEMO da landing nova roda o app dentro de um iframe. No Safari do iPhone, rolar a janela
+      // da demo (window.scrollTo do app ao abrir/trocar de tela) ou trazer um elemento pra vista (scrollIntoView/focus)
+      // rolava TAMBÉM a página de fora — ela descia sozinha até a demo ao entrar. Dentro do iframe, toda rolagem fica
+      // na própria demo: scrollTo mexe só no scroll do documento dela; scrollIntoView só no contêiner rolável mais
+      // próximo de dentro; focus sempre com preventScroll.
+      (function () {
+        try {
+          if (location.pathname !== "/organizar/demo" || window.top === window) return;
+          var raiz = function () { return document.scrollingElement || document.documentElement; };
+          window.scrollTo = function (a, b) {
+            var y = typeof a === "object" && a ? a.top : b;
+            var x = typeof a === "object" && a ? a.left : a;
+            var r = raiz();
+            if (typeof y === "number") r.scrollTop = y;
+            if (typeof x === "number") r.scrollLeft = x;
+          };
+          window.scroll = window.scrollTo;
+          var rolavel = function (el) {
+            for (var n = el.parentElement; n; n = n.parentElement) {
+              var cs = getComputedStyle(n);
+              if (/(auto|scroll)/.test(cs.overflowY + cs.overflowX) && (n.scrollHeight > n.clientHeight || n.scrollWidth > n.clientWidth)) return n;
+            }
+            return raiz();
+          };
+          Element.prototype.scrollIntoView = function () {
+            var c = rolavel(this), r = this.getBoundingClientRect(), cr = c === raiz() ? { top: 0, left: 0 } : c.getBoundingClientRect();
+            c.scrollTop += r.top - cr.top - 8;
+            if (r.left < cr.left || r.right > cr.left + c.clientWidth) c.scrollLeft += r.left - cr.left - 8;
+          };
+          var foco = HTMLElement.prototype.focus;
+          HTMLElement.prototype.focus = function (o) { return foco.call(this, Object.assign({}, o || {}, { preventScroll: true })); };
+        } catch (e) {}
+      })();
+    </script>
+    <script>
       // ─── LANDING NOVA × /inicio — a divisão 50/50 do MESMO link da campanha (28/10, PREPARADA E DESLIGADA) ───
       // Ligar SÓ junto com LANDING_NOVA = "on" no landing.html. Com "on", quem chega no /inicio (sem ld=1) é sorteado
       // UMA vez por aparelho: metade vai pra /organizar (a landing nova) com a MESMA query, antes de o bundle baixar;

@@ -28,6 +28,8 @@ const INDEX = readFileSync(resolve(raiz, "index.html"), "utf8");
 
 /* ───────── o script do <head>, rodado de verdade num ambiente falso ───────── */
 const scriptDaCabeca = HTML.match(/<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
+/** 28/10: a /organizar foi LIGADA pelo dono (link simples); o comportamento "desligada" segue testado com a chave trocada. */
+const scriptDesligado = scriptDaCabeca.replace(/var LANDING_NOVA = "on";[^\n]*/, 'var LANDING_NOVA = "off";');
 const scriptDaDivisao = INDEX.match(/<script>\s*\/\/ ─── LANDING NOVA × \/inicio[\s\S]*?(\(function \(\) \{[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
 
 function rodar(fonte: string, url: string, store: Record<string, string> = {}, aleatorio = 0.3) {
@@ -51,15 +53,15 @@ function rodar(fonte: string, url: string, store: Record<string, string> = {}, a
 }
 
 describe("a chave da landing (head do landing.html)", () => {
-  it("as chaves vêm DESLIGADAS no código", () => {
-    expect(HTML).toMatch(/var LANDING_NOVA = "off";/);
+  it("a página ligada (28/10, link simples /organizar); os A/B e a divisão do /inicio vêm DESLIGADOS no código", () => {
+    expect(HTML).toMatch(/var LANDING_NOVA = "on";/);
     expect(HTML).toMatch(/var AB_TITULO = "off";/);
     expect(HTML).toMatch(/var AB_OFERTA = "off";/);
     expect(INDEX).toMatch(/var DIVISAO_INICIO_LANDING = "off";/);
   });
 
   it("desligada: volta pro /inicio com a MESMA query (+ ld=1) e não pinta nada", () => {
-    const r = rodar(scriptDaCabeca, "/organizar?utm_campaign=x&fbclid=abc");
+    const r = rodar(scriptDesligado, "/organizar?utm_campaign=x&fbclid=abc");
     expect(r.replace).toHaveBeenCalledWith("/inicio?utm_campaign=x&fbclid=abc&ld=1");
     expect(r.attrs["data-desligada"]).toBe("");
     expect(r.attrs["data-t"]).toBeUndefined();
@@ -67,12 +69,12 @@ describe("a chave da landing (head do landing.html)", () => {
 
   it("?landing=on liga neste navegador (e ?landing=off tira)", () => {
     const store: Record<string, string> = {};
-    const a = rodar(scriptDaCabeca, "/organizar?landing=on", store);
+    const a = rodar(scriptDesligado, "/organizar?landing=on", store);
     expect(a.replace).not.toHaveBeenCalled();
     expect(a.attrs).toMatchObject({ "data-t": "a", "data-oferta": "ano" });
-    expect(rodar(scriptDaCabeca, "/organizar", store).replace).not.toHaveBeenCalled(); // ficou
-    expect(rodar(scriptDaCabeca, "/organizar?landing=off", store).replace).toHaveBeenCalled();
-    expect(rodar(scriptDaCabeca, "/organizar", store).replace).toHaveBeenCalled();
+    expect(rodar(scriptDesligado, "/organizar", store).replace).not.toHaveBeenCalled(); // ficou
+    expect(rodar(scriptDesligado, "/organizar?landing=off", store).replace).toHaveBeenCalled();
+    expect(rodar(scriptDesligado, "/organizar", store).replace).toHaveBeenCalled();
   });
 
   it("A/B desligados: sempre título A e oferta ano; forçáveis por ?t= e ?oferta=", () => {
@@ -115,7 +117,7 @@ describe("a divisão 50/50 do /inicio (index.html)", () => {
     expect(rodar(ligada, "/inicio?a=1", {}, 0.9).replace).not.toHaveBeenCalled(); // braço inicio
     expect(rodar(ligada, "/inicio?a=1&ld=1", store, 0.2).replace).not.toHaveBeenCalled();
     // a landing desligada devolve com ld=1 → a divisão não manda de volta
-    const volta = rodar(scriptDaCabeca, "/organizar?a=1&ld=1").replace.mock.calls[0][0] as string;
+    const volta = rodar(scriptDesligado, "/organizar?a=1&ld=1").replace.mock.calls[0][0] as string;
     expect(new URL(volta, "https://x.br").searchParams.get("ld")).toBe("1");
   });
   it("a demo dentro da landing não conta PageView do pixel", () => {

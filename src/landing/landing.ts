@@ -42,7 +42,7 @@ let pagamento: Promise<Pagamento> | null = null;
 const pg = () => (pagamento ??= import("./pagamento"));
 
 /** O Pix de verdade (asaas-pix com as ofertas LN_*). Só ligar DEPOIS do deploy das funções (RELATORIO). */
-export const PIX_REAL = true; // 28/10: ligado depois do deploy de pix-reconcile, asaas-webhook, asaas-pix e pix-vincular com as ofertas LN_*
+export const PIX_REAL = false; // volta pra true DEPOIS do deploy de pix-reconcile, asaas-webhook, asaas-pix e pix-vincular (ofertas LN_*)
 
 const PRODUCAO = /(^|\.)coreaplicativo\.com\.br$/.test(location.hostname);
 // fora do domínio de produção (dev, preview, testes) o Pix é SEMPRE simulado; no domínio, de verdade se PIX_REAL

@@ -49,6 +49,7 @@ vi.mock("@/integrations/supabase/client", () => {
 });
 
 import HomePage from "@/pages/Home";
+import { BarraVidroGlobal } from "@/components/home-nova/e/BarraVidroGlobal";
 import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
 import { OrigemDaContaNaSessao, contaCarregadaDeVerdade, decidirOrigemDaConta } from "@/components/home-nova/OrigemDaConta";
 import { _zerarConsultaAdmin } from "@/hooks/use-home-nova";
@@ -267,4 +268,39 @@ describe("app das lojas — a chave do site não muda nada", () => {
     await abrir(conta);
     await waitFor(() => expect(antiga()).toBe(true), { timeout: 8000 });
   });
+});
+
+describe("site com WEB_HOME_NOVA 'on' — a dica do '+' (a única que fica)", () => {
+  const abrirComBarra = async (conta: Conta) => {
+    vigiar();
+    render(
+      <MemoryRouter initialEntries={["/home"]}>
+        <conta.Provedor>
+          <OrigemDaContaNaSessao />
+          <Routes><Route path="/home" element={<><HomePage /><BarraVidroGlobal /></>} /><Route path="*" element={<div />} /></Routes>
+        </conta.Provedor>
+      </MemoryRouter>,
+    );
+    await respirar(30);
+  };
+  it("conta nova do site (sem missão em doses): a dica do '+' aparece na Home nova", async () => {
+    site("on");
+    await abrirComBarra(criarConta(BASE));
+    await waitFor(() => expect(nova()).toBe(true), { timeout: 8000 });
+    await waitFor(() => expect(document.querySelector('[data-testid="hn-dica-mais"]')).not.toBeNull(), { timeout: 8000 });
+  }, 30_000);
+  it("dica já 'feita' na conta não volta", async () => {
+    site("on");
+    await abrirComBarra(criarConta({ ...BASE, "core-home-nova-dica-mais": { feita: "2026-10-27", via: "mais" } }));
+    await waitFor(() => expect(nova()).toBe(true), { timeout: 8000 });
+    await respirar(3600);
+    expect(document.querySelector('[data-testid="hn-dica-mais"]')).toBeNull();
+  }, 30_000);
+  it("iPhone sem missão: sem dica, como antes (a regra do app não muda)", async () => {
+    plat.nativo = true; G.__WEB_HOME_NOVA__ = "on";
+    await abrirComBarra(criarConta(BASE));
+    await waitFor(() => expect(nova()).toBe(true), { timeout: 8000 });
+    await respirar(3600);
+    expect(document.querySelector('[data-testid="hn-dica-mais"]')).toBeNull();
+  }, 30_000);
 });

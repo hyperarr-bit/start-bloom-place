@@ -11,8 +11,8 @@ import { marcarTrocaDeAba } from "@/lib/troca-de-rota";
 import { BarraVidro, DicaDoMais, SeloNovas } from "./BarraVidro";
 import { useConquistas } from "@/components/conquistas/use-conquistas";
 import { CHAVE_ALBUM_VISTO } from "@/lib/conquistas-registro";
-import { fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
-import { CHAVE_DICA_MAIS, ESPERA_DICA_MAIS_MS, dicaDoMaisDevida, encerrarDicaMais, registrarAparicaoDicaMais } from "@/lib/dica-mais";
+import { enxutoDaContaNovaNoSite, fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
+import { CHAVE_DICA_MAIS, ESPERA_DICA_MAIS_MS, dicaDoMaisDevida, dicaDoMaisEncerrada, encerrarDicaMais, registrarAparicaoDicaMais } from "@/lib/dica-mais";
 import { EVENTO_MISSAO_DOSES, lerMissao } from "@/lib/missao-doses";
 import { iniciaisDe } from "../HomeNova";
 import type { AbaNova } from "../BarraFlutuante";
@@ -118,7 +118,16 @@ export function BarraVidroGlobal() {
     return () => window.removeEventListener(EVENTO_MISSAO_DOSES, reler);
   }, []);
   const marcaNaConta = get<unknown>(CHAVE_DICA_MAIS, null);
-  const dicaCandidata = visivel && aba === "inicio" && (() => { try { return dicaDoMaisDevida(lerMissao(), marcaNaConta, undefined, dicaContadaNestaAbertura); } catch { return false; } })();
+  const dicaCandidata = visivel && aba === "inicio" && (() => {
+    try {
+      const m = lerMissao();
+      // 27/10 (lib/web-home-nova): no SITE a conta nova não tem missão em doses (MISSAO_DOSES off na web) — sem isto a dica
+      // do "+" (a única que o dono quis no enxuto) nunca aparecia lá. Sem missão, a conta nova do site vê a dica já na
+      // 1ª Home, com o mesmo limite de aparições e o mesmo "feita" ao tocar no "+". App das lojas: igual a antes.
+      if (!m && enxutoDaContaNovaNoSite()) return !dicaDoMaisEncerrada(marcaNaConta, dicaContadaNestaAbertura);
+      return dicaDoMaisDevida(m, marcaNaConta, undefined, dicaContadaNestaAbertura);
+    } catch { return false; }
+  })();
   const [dicaNaTela, setDicaNaTela] = useState(false);
   useEffect(() => {
     if (!dicaCandidata) { setDicaNaTela(false); return; }

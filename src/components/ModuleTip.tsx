@@ -95,7 +95,6 @@ export const ModuleTip = ({ moduleId, tips, tema = "app" }: ModuleTipProps) => {
                       type="button"
                       onClick={() => irParaDica(moduleId, d, i)}
                       data-testid={`dica-${i + 1}`}
-                      data-track={`dica:${moduleId}:${i + 1}`}
                       className={`w-full min-h-[40px] flex items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors ${t.botao}`}
                     >
                       <span className="flex-1">{d.texto}</span>

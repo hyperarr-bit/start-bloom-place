@@ -39,8 +39,10 @@ beforeEach(() => { toasts.length = 0; });
 
 describe("desafios semanais: desligar e ligar de novo no Painel", () => {
   it("ocultar avisa que religa no Painel e deixa a linha tracejada no lugar do card", () => {
-    const store = montarStore({});
-    render(<Provedor store={store}><WeeklyChallenge expenses={[]} /></Provedor>);
+    // 29/10: o card espera o 1º gasto — com 1 gasto anotado ele aparece
+    const umGasto = [{ id: "g1", date: new Date().toISOString().slice(0, 10), value: 35, category: "restaurante", description: "almoço" }];
+    const store = montarStore({ "finance-expenses": umGasto });
+    render(<Provedor store={store}><WeeklyChallenge expenses={umGasto} /></Provedor>);
     expect(screen.getByText("DESAFIO DA SEMANA")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Ocultar desafios" }));
     expect(store.dados["finance-challenges-hidden"]).toBe(true);

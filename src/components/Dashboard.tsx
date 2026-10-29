@@ -1183,7 +1183,10 @@ export const Dashboard = ({
      PREVISÃO DO FIM DO MÊS fica onde estava. `?cards-simples=off` continua devolvendo o card antigo (agora no topo).
      `depoisDoTopo` (o Desafio da semana, que o Index punha ACIMA do Dashboard) entra logo depois dele, como no painel limpo. */
   /* 29/10 (dono: "quebrou a ordem do dashboard"): os 4 números (Receitas, Despesas, Saldo, Investimentos) voltam pro
-     topo; logo abaixo deles o QUANTO POSSO GASTAR HOJE (antes era o último card) e então o Desafio da semana. */
+     topo; logo abaixo deles o QUANTO POSSO GASTAR HOJE (antes era o último card) e então o Desafio da semana.
+     29/10 (1ª entrada da conta nova, painel limpo desligado): a MESMA ordem — "Dicas para começar" (ModuleTip, acima do
+     Dashboard) → 4 números → QUANTO POSSO GASTAR HOJE (vazio: "Anotar minha renda") → Desafio da semana, que só aparece
+     depois do 1º gasto (components/challenges/WeeklyChallenge). */
   return (
     <div className="space-y-4">
       {blocoNumeros}

@@ -4,7 +4,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { useHomeNova } from "@/hooks/use-home-nova";
 import { trackEvent } from "@/lib/analytics";
 import {
-  CHAVE_HOME_ESCOLHA, escolhaDaHomeVale, marcadorDaEscolha, registrarEscolhaDaHome, type EscolhaDaHome, type ViaDaEscolha,
+  CHAVE_HOME_ESCOLHA, escolhaDaHomeVale, origemConhecida, marcadorDaEscolha, registrarEscolhaDaHome, type EscolhaDaHome, type ViaDaEscolha,
 } from "@/lib/home-nova";
 
 /**
@@ -24,7 +24,8 @@ export function useEscolhaDaHome(): { disponivel: boolean; atual: EscolhaDaHome;
   const homeNova = useHomeNova(user);
   const atual: EscolhaDaHome = homeNova.ligada ? "nova" : "classica";
   const uid = user?.id ?? null;
-  const disponivel = !!uid && !isGuest && escolhaDaHomeVale(homeNova.modo);
+  // 1.0.22 (dono 28/10): conta NOVA não vê a escolha (nem a linha em Você) — é só a Home nova
+  const disponivel = !!uid && !isGuest && origemConhecida(uid) !== "nova" && escolhaDaHomeVale(homeNova.modo);
 
   const escolher = useCallback((para: EscolhaDaHome, via: ViaDaEscolha) => {
     if (!uid) return;

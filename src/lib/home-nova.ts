@@ -311,8 +311,9 @@ export function homeNovaLigada(admin: boolean | null, origem: OrigemDaConta | nu
   const f = forcaHomeNova();
   if (f) return f === "on";
   const modo = modoHomeNova();
-  // 1.0.22 (dono 28/10): a ESCOLHA da pessoa (Você › Home, ou o convite) vence a regra da origem — ver ESCOLHA DA HOME
-  if (escolha && escolhaDaHomeVale(modo)) return escolha === "nova";
+  // 1.0.22 (dono 28/10): a ESCOLHA da pessoa (Você › Home, ou o convite) vence a regra da origem — SÓ pra conta ANTIGA.
+  // Conta NOVA é só a Home nova, sem nenhuma menção da antiga (nem convite, nem linha em Você): a escolha não vale pra ela.
+  if (escolha && origem !== "nova" && escolhaDaHomeVale(modo)) return escolha === "nova";
   if (modo === "off") return false;
   if (modo === "on") return true;
   if (modo === "admin") return admin === true;

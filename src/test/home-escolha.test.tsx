@@ -135,12 +135,12 @@ describe("a regra (lib/home-nova)", () => {
     _zerarHomeNova(); localStorage.setItem(CHAVE_HOME_NOVA_APARELHO, "admin");
     expect(deveConvidarHomeNova(base2)).toBe(false);
   });
-  it("a escolha vence a origem (antiga→nova, nova→clássica); 'off' no iPhone, o Android e a força de QA mandam mais", () => {
+  it("a escolha vence a origem só na conta ANTIGA (antiga→nova); conta nova fica na nova; 'off' no iPhone, o Android e a força de QA mandam mais", () => {
     plat.p = "ios"; _zerarHomeNova();
     expect(homeNovaLigada(false, "antiga", null)).toBe(false);
     expect(homeNovaLigada(false, "antiga", "nova")).toBe(true);
     expect(homeNovaLigada(false, "nova", null)).toBe(true);
-    expect(homeNovaLigada(false, "nova", "classica")).toBe(false);
+    expect(homeNovaLigada(false, "nova", "classica")).toBe(true); // dono 28/10: conta NOVA é só a Home nova — a escolha não vale pra ela
     localStorage.setItem(CHAVE_HOME_NOVA_APARELHO, "off"); _zerarHomeNova();
     expect(homeNovaLigada(false, "antiga", "nova")).toBe(false); // desligar de emergência
     localStorage.clear(); plat.p = "android"; _zerarHomeNova();

@@ -360,7 +360,7 @@ describe("aba Você", () => {
     expect(screen.getByText("MS")).toBeTruthy();
     fireEvent.click(screen.getByTestId("voce-conta"));
     await quadro();
-    expect(screen.getByText("Redefinir senha")).toBeTruthy();
+    expect(screen.getByText("Trocar senha")).toBeTruthy(); // 29/10: o "Redefinir senha" por link virou trocar logada (pages/conta)
     expect(screen.getByText("Excluir minha conta")).toBeTruthy();
     expect(dos("account_drawer_open")).toEqual([{ via: "voce" }]);
   });

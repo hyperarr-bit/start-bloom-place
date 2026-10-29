@@ -1,12 +1,11 @@
 import { useState, useEffect, startTransition, type CSSProperties, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, ChevronRight, Mail, KeyRound, RotateCcw, Trash2, Bell, Sparkles, Monitor, Copy, LifeBuoy, Eraser, Star, Palette, Shield, FileText, NotebookPen, type LucideIcon } from "lucide-react";
+import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, ChevronRight, Mail, AtSign, KeyRound, RotateCcw, Trash2, Bell, Sparkles, Monitor, Copy, LifeBuoy, Eraser, Star, Palette, Shield, FileText, NotebookPen, type LucideIcon } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
-import { supabase } from "@/integrations/supabase/client";
-import { getAuthRedirectUrl } from "@/lib/utils";
+import { comoEntra, podeGerenciarConta } from "@/lib/conta-acesso";
 import { trackEvent } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
 import { abrirPaginaDeAvaliacao } from "@/lib/avaliacao";
@@ -118,6 +117,9 @@ export const AccountDrawer = ({
     startTransition(() => navigate(path, state ? { state } : undefined));
   };
 
+  const entra = comoEntra(user);
+  const emailPendente = !!(user as { new_email?: string | null } | null)?.new_email;
+
   const initials = displayName
     ? displayName.slice(0, 2).toUpperCase()
     : user?.email?.slice(0, 2).toUpperCase() || "?";
@@ -125,18 +127,6 @@ export const AccountDrawer = ({
   const handleNameSave = (name: string) => {
     setUserData("core-user-name", name);
     onNameChange?.(name);
-  };
-
-  const handleResetPassword = async () => {
-    if (!user?.email) return;
-    const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-      redirectTo: getAuthRedirectUrl("/update-password"),
-    });
-    if (error) {
-      toast.error("Erro ao enviar email de redefinição");
-    } else {
-      toast.success("Email de redefinição enviado!");
-    }
   };
 
   const handleManageSubscription = () => go("/planos");
@@ -400,24 +390,42 @@ export const AccountDrawer = ({
                   </button>
                 </div>
 
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1.5 pl-1">E-mail</p>
-                  <div className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-card border border-border text-sm text-foreground">
-                    <Mail className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                    <span className="truncate">{user?.email}</span>
+                {/* 29/10: "Sua conta" — o e-mail, como entra, e criar/trocar senha e trocar e-mail LOGADA (pages/conta). Antes era
+                    só "Redefinir senha", que manda um link pro e-mail — justamente o que não chegava pra quem pedia ajuda.
+                    Conta anônima (sem e-mail) não vê: ela tem a folha "Salve seu acesso". */}
+                {podeGerenciarConta(user) && (
+                  <div data-testid="conta-sua-conta">
+                    <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1.5 pl-1">Sua conta</p>
+                    <div className="rounded-xl bg-card border border-border divide-y divide-border overflow-hidden">
+                      <div className="flex items-start gap-3 px-3 py-2.5">
+                        <Mail className="w-3.5 h-3.5 mt-[3px] text-muted-foreground flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm text-foreground truncate" data-testid="conta-email-atual">{user?.email}</p>
+                          <p className="text-[12px] text-muted-foreground" data-testid="conta-como-entra">Entra com {entra.rotulo.replace(/^E-mail/, "e-mail")}</p>
+                          {emailPendente && <p className="text-[12px] text-foreground mt-0.5" data-testid="conta-email-pendente-linha">Troca pendente: confirme no e-mail novo</p>}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => { trackEvent("conta_email_open", {}); go("/conta/email"); }}
+                        data-testid="conta-trocar-email"
+                        className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-muted/50 transition-colors text-left"
+                      >
+                        <AtSign className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                        <span className="flex-1">Trocar e-mail</span>
+                        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60" />
+                      </button>
+                      <button
+                        onClick={() => { trackEvent("conta_senha_open", { criar: !entra.senha }); go("/conta/senha"); }}
+                        data-testid="conta-trocar-senha"
+                        className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-muted/50 transition-colors text-left"
+                      >
+                        <KeyRound className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                        <span className="flex-1">{entra.senha ? "Trocar senha" : "Criar senha"}</span>
+                        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1.5 pl-1">Senha</p>
-                  <button
-                    onClick={handleResetPassword}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-card border border-border text-sm text-foreground hover:bg-muted/50 transition-colors"
-                  >
-                    <KeyRound className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                    Redefinir senha
-                  </button>
-                </div>
+                )}
 
                 {/* Exigência do Google Play (24/07): app com login precisa de
                     caminho de exclusão DENTRO do app. Fica no fim, discreto e

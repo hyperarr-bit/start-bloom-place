@@ -215,7 +215,7 @@ describe("o menu novo: 3 grupos + Sair", () => {
     montarMenu();
     fireEvent.click(screen.getByTestId("menu-conta"));
     expect(dos("menu_item_click")).toEqual([{ item: "conta", grupo: "voce", menu: "novo" }]);
-    expect(screen.getByText("Redefinir senha")).toBeTruthy();
+    expect(screen.getByText("Trocar senha")).toBeTruthy(); // 29/10: o "Redefinir senha" por link virou trocar logada (pages/conta)
     fireEvent.click(screen.getByLabelText("Voltar"));
     fireEvent.click(screen.getByTestId("menu-legal"));
     fireEvent.click(screen.getByText("Termos de uso"));

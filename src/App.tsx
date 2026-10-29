@@ -531,6 +531,9 @@ const SoComAbas = ({ children }: { children: ReactNode }) => {
 const BarraVidroGlobal = lazy(() => import("@/components/home-nova/e/BarraVidroGlobal").then((m) => ({ default: m.BarraVidroGlobal })));
 const Modulos = lazyPage(() => import("./pages/Modulos"));
 const Voce = lazyPage(() => import("./pages/Voce"));
+// 29/10: criar/trocar senha e trocar e-mail logada — abre pelo "Minha conta" nas duas Homes (por isso fora do SoComAbas)
+const TrocarSenha = lazyPage(() => import("./pages/conta/Conta").then((m) => ({ default: m.TrocarSenha })));
+const TrocarEmail = lazyPage(() => import("./pages/conta/Conta").then((m) => ({ default: m.TrocarEmail })));
 const Aparencia = lazyPage(() => import("./pages/Voce").then((m) => ({ default: m.Aparencia })));
 const PersonalizarInicio = lazyPage(() => import("./pages/Voce").then((m) => ({ default: m.PersonalizarInicio })));
 const Preview = lazyPage(() => import("./pages/Preview"));
@@ -896,6 +899,8 @@ const AnimatedRoutes = () => {
         <Route path="/voce" element={<SoComAbas><ProtectedRoute><PageTransition><RouteErrorBoundary routeName="voce"><Voce /></RouteErrorBoundary></PageTransition></ProtectedRoute></SoComAbas>} />
         <Route path="/voce/aparencia" element={<SoComAbas><ProtectedRoute><PageTransition><RouteErrorBoundary routeName="aparencia"><Aparencia /></RouteErrorBoundary></PageTransition></ProtectedRoute></SoComAbas>} />
         <Route path="/voce/inicio" element={<SoComAbas><ProtectedRoute><PageTransition><RouteErrorBoundary routeName="personalizar-inicio"><PersonalizarInicio /></RouteErrorBoundary></PageTransition></ProtectedRoute></SoComAbas>} />
+        <Route path="/conta/senha" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="conta-senha"><TrocarSenha /></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
+        <Route path="/conta/email" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="conta-email"><TrocarEmail /></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         <Route path="/notificacoes" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="notificacoes"><Notificacoes /></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         {/* allowGuest: o convidado do teste grátis também trava, e mandar
             ele pro /auth quando ele foi pedir socorro é o pior desfecho. */}

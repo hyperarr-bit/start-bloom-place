@@ -104,7 +104,23 @@ export interface DefDesafio {
   retrato?: (d: DadosDaSemana) => Record<string, unknown>;
   /** Botão de confirmação dentro do card ("Revisei, todas valem") → grava `meta[chave] = hoje`. */
   confirmacao?: { botao: string; chave: string };
+  /** Desafio que conta DIAS a partir da escolha: escolhido HOJE, ainda dá pra cumprir? Não dando (ex.: "2 dias sem gastar"
+   *  no domingo), a opção não aparece (29/10, conserto do "cumprido" retroativo). Ausente = sempre cabe. */
+  cabeNaSemana?: (nivel: number, d: DadosDaSemana) => boolean;
 }
+
+/**
+ * O dia em que o desafio começou (`active.meta.desde`, "AAAA-MM-DD", gravado na escolha desde 29/10). Desafio escolhido
+ * antes disso não tem o campo → `null` = a regra de antes (a semana inteira), pra não mexer no que já foi conquistado.
+ */
+export const desdeDoDesafio = (d: Pick<DadosDaSemana, "meta">): string | null => {
+  const v = d.meta?.desde;
+  return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+};
+
+/** A opção ainda cabe no que sobra da semana, se escolhida hoje? */
+export const cabeNaSemana = (def: DefDesafio | null, nivel: number, d: DadosDaSemana): boolean =>
+  !def?.cabeNaSemana || (!d.semanaAcabou && def.cabeNaSemana(nivel, d));
 
 /* ───────────────────────────── helpers ───────────────────────────── */
 
@@ -455,11 +471,19 @@ export const CATALOGO: DefDesafio[] = [
     titulo: (n) => (n === 1 ? "2 dias sem gastar" : "3 dias sem gastar"),
     desc: (n) => (n === 1 ? "Dois dias da semana com zero gasto variável — marque 'não gastei nada hoje' na Home" : "Três dias da semana com zero gasto variável"),
     elegivel: () => true,
+    // escolhido hoje: os dias que faltam + hoje, se hoje ainda não teve gasto
+    cabeNaSemana: (n, d) => d.dias.filter((dia) => dia > d.hoje).length + (d.semana.some((g) => g.date === d.hoje) ? 0 : 1) >= (n === 1 ? 2 : 3),
     avaliar: (n, d) => {
       const alvo = n === 1 ? 2 : 3;
       const comGasto = new Set(d.semana.map((g) => g.date ?? ""));
+      /* 29/10 (BUG, print do dono): contava os dias da semana ANTES da escolha — conta nova escolhia na quarta e via
+         "Desafio cumprido! 2 dias sem gastar" na hora (segunda e terça sem nada anotado viravam "dias zerados"). Agora só
+         contam os dias a partir de `meta.desde` (o dia da escolha); sem o campo (escolhido antes do conserto), a regra
+         de antes — o que já foi conquistado não muda. */
+      const desde = desdeDoDesafio(d);
+      const vale = (dia: string) => !desde || dia >= desde;
       // dia passado sem gasto = zerado; hoje só conta zerado se a pessoa marcou "não gastei nada"
-      const zerados = d.dias.filter((dia) => (d.semanaAcabou || dia < d.hoje) ? !comGasto.has(dia) : dia === d.hoje && d.semGasto.has(dia) && !comGasto.has(dia)).length;
+      const zerados = d.dias.filter((dia) => vale(dia) && ((d.semanaAcabou || dia < d.hoje) ? !comGasto.has(dia) : dia === d.hoje && d.semGasto.has(dia) && !comGasto.has(dia))).length;
       const restantes = d.semanaAcabou ? 0 : d.dias.filter((dia) => dia > d.hoje).length + (d.semGasto.has(d.hoje) || comGasto.has(d.hoje) ? 0 : 1);
       const done = zerados >= alvo;
       const failed = !done && zerados + restantes < alvo;

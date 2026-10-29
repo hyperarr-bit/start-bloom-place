@@ -516,3 +516,39 @@ describe("pages/Index — conta nova abre com o painel limpo QUANDO a chave é l
     expect(document.querySelector('[data-painel="limpo"]')).toBeNull();
   });
 });
+
+/* ───────────── 29/10: a 1ª entrada da conta NOVA (painel limpo desligado = o Dashboard de sempre) ───────────── */
+describe("pages/Index — 1ª entrada da conta nova em Finanças (29/10)", () => {
+  // o iPhone de hoje: fluxo enxuto ligado (sem intro/cartões; o "Dicas para começar" é o que abre o módulo)
+  beforeEach(() => localStorage.setItem("fluxo-enxuto-force", "on"));
+  const ordem = (...textos: string[]) => {
+    const t = document.body.textContent ?? "";
+    return textos.map((s) => t.indexOf(s));
+  };
+  it("sem dado nenhum: Dicas para começar (com a lâmpada) → os 4 números → QUANTO POSSO GASTAR HOJE vazio; o DESAFIO DA SEMANA espera o 1º gasto (e não grava opções)", { timeout: 40_000 }, async () => {
+    contaNova();
+    const controle = montarIndex({ "spotlight-done-financas": "true" });
+    await abrirDashboard();
+    expect(document.querySelector('[data-painel="limpo"]')).toBeNull();
+    const [dicas, saldo, pode] = ordem("Dicas para começar", "Saldo do Mês", "QUANTO POSSO GASTAR HOJE");
+    expect(dicas).toBeGreaterThanOrEqual(0);
+    expect(dicas).toBeLessThan(saldo);
+    expect(saldo).toBeLessThan(pode);
+    expect(screen.getByTestId("dicas-lampada")).toBeInTheDocument();
+    expect(screen.getByTestId("pode-gastar-vazio")).toBeInTheDocument();
+    expect(screen.queryByText("DESAFIO DA SEMANA")).toBeNull();
+    expect(controle.escritas().map((e) => e.k)).not.toContain("finance-challenges");
+  });
+  it("com o 1º gasto (sem renda): os 4 números → QUANTO POSSO GASTAR HOJE ('Falta só quanto entra no mês') → DESAFIO DA SEMANA com as opções, sem 'cumprido'", { timeout: 40_000 }, async () => {
+    contaNova();
+    montarIndex({
+      "spotlight-done-financas": "true",
+      "finance-expenses": [{ id: "e1", description: "Restaurante", value: 35, date: "2026-10-16", category: "restaurante", paymentMethod: "pix" }],
+    });
+    await abrirDashboard();
+    expect(secoesNaTela().slice(0, 3)).toEqual(["Saldo do Mês", "QUANTO POSSO GASTAR HOJE", "DESAFIO DA SEMANA"]);
+    expect(screen.getByTestId("pode-gastar-vazio")).toHaveTextContent("Falta só quanto entra no mês");
+    expect(screen.getByTestId("desafio-ofertas")).toBeInTheDocument();
+    expect(screen.queryByText("Desafio cumprido!")).toBeNull();
+  });
+});

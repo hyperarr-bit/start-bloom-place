@@ -36,7 +36,7 @@ import {
   type ChallengesState, type DesafioAtivo, type GastoDoDesafio, type OfertaDaSemana, type OfertasDaSemana, type RegistroDesafio,
   avaliarDesafio, challengeByKey, lerDesafios, mondayOf, segundaAnterior,
 } from "./challenges";
-import { CATALOGO, type DadosDaSemana, type DefDesafio, avaliarNoCatalogo, defDoCatalogo } from "./catalogo";
+import { CATALOGO, type DadosDaSemana, type DefDesafio, avaliarNoCatalogo, cabeNaSemana, defDoCatalogo } from "./catalogo";
 
 export const SEMANAS_DE_DESCANSO = 4;
 export const OPCOES_POR_SEMANA = 4;
@@ -147,18 +147,20 @@ export function montarOfertas(d: DadosDaSemana, estado: ChallengesState): Oferta
 }
 
 /** As ofertas da semana ainda abertas: tira as chaves que já têm resultado nesta semana. */
-export const ofertasVisiveis = (estado: ChallengesState, weekStart: string): OfertaDaSemana[] => {
+export const ofertasVisiveis = (estado: ChallengesState, weekStart: string, d?: DadosDaSemana): OfertaDaSemana[] => {
   if (!estado.ofertas || estado.ofertas.weekStart !== weekStart) return [];
   const fechadas = new Set(estado.history.filter((h) => h.weekStart === weekStart).map((h) => h.key));
-  return estado.ofertas.itens.filter((i) => !fechadas.has(i.key));
+  // 29/10: desafio de dias que já não cabe no que sobra da semana (ex.: "2 dias sem gastar" no domingo) não aparece —
+  // ele só conta a partir da escolha, então escolher seria perder na hora
+  return estado.ofertas.itens.filter((i) => !fechadas.has(i.key) && (!d || cabeNaSemana(defDoCatalogo(i.key), i.nivel, d)));
 };
 
 /** O registro de `active` em `weekStart` (a escolha), com o retrato de segunda quando a definição pede. */
 export const escolher = (oferta: OfertaDaSemana, d: DadosDaSemana): DesafioAtivo => {
   const def = defDoCatalogo(oferta.key);
   const ativo: DesafioAtivo = { key: oferta.key, weekStart: d.weekStart, nivel: oferta.nivel };
-  const meta = def?.retrato?.(d);
-  if (meta && Object.keys(meta).length) ativo.meta = meta;
+  // 29/10: `desde` = o dia da escolha — os desafios que contam dias (ex.: "dias sem gastar") contam só a partir dele
+  ativo.meta = { ...(def?.retrato?.(d) ?? {}), desde: d.hoje };
   return ativo;
 };
 

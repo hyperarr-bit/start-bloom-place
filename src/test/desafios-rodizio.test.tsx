@@ -211,7 +211,7 @@ describe("níveis, retrato e confirmação", () => {
     expect(guarda.titulo(1, d)).toBe("Guarda R$ 42 (semana 42)");
     expect(guarda.titulo(2, d)).toBe("Guarda R$ 84");
     const ativo = escolher({ key: "guarda-da-semana", nivel: 1 }, d);
-    expect(ativo).toEqual({ key: "guarda-da-semana", weekStart: SEMANA, nivel: 1, meta: { base: 500 } });
+    expect(ativo).toEqual({ key: "guarda-da-semana", weekStart: SEMANA, nivel: 1, meta: { base: 500, desde: "2026-10-14" } });
     const depois = dadosDe({ ...habito(), "finance-emergency-fund": { meses: 6, guardado: 520, registrada: true } }, SEMANA, QUARTA, ativo.meta);
     expect(avaliarNoCatalogo(guarda, 1, depois).statusText).toBe("R$ 20 de R$ 42 guardados");
     const venceu = dadosDe({ ...habito(), "finance-emergency-fund": { meses: 6, guardado: 545, registrada: true } }, SEMANA, QUARTA, ativo.meta);
@@ -223,7 +223,7 @@ describe("níveis, retrato e confirmação", () => {
     const d = dadosDe(habito(), SEMANA, QUARTA);
     expect(faxina.desc(1, d)).toBe("Revisar suas 2 assinaturas (R$ 67/mês): cancela o que não usa ou confirma que todas valem");
     const ativo = escolher({ key: "faxina-assinaturas", nivel: 1 }, d);
-    expect(ativo.meta).toEqual({ ids: ["f1", "f2"], total: 67 });
+    expect(ativo.meta).toEqual({ ids: ["f1", "f2"], total: 67, desde: "2026-10-14" });
     expect(avaliarNoCatalogo(faxina, 1, d).statusText).toBe("2 assinaturas · R$ 67/mês · revisa e confirma");
     const semSpotify = dadosDe({ ...habito(), "finance-fixed-expenses": [{ id: "f1", description: "Netflix", value: 45, category: "assinaturas" }] }, SEMANA, QUARTA, ativo.meta);
     expect(avaliarNoCatalogo(faxina, 1, semSpotify)).toMatchObject({ done: true, statusText: "Faxina feita: 1 assinatura a menos 🧹" });
@@ -236,7 +236,7 @@ describe("níveis, retrato e confirmação", () => {
     const antes = { "finance-installments": [parcela("p1", "2026-09-22")], "finance-expenses": [gasto("2026-10-12", 30), gasto("2026-10-13", 25)] };
     const d = dadosDe(antes, SEMANA, QUARTA);
     const ativo = escolher({ key: "sem-parcelar", nivel: 1 }, d);
-    expect(ativo.meta).toEqual({ parcelas: ["id:p1"] });
+    expect(ativo.meta).toEqual({ parcelas: ["id:p1"], desde: "2026-10-14" });
     // nada novo no meio da semana
     expect(avaliarNoCatalogo(sem, 1, d).statusText).toBe("nenhuma parcela nova");
     // entrou uma parcela comprada na quarta: perdeu pela regra
@@ -253,7 +253,7 @@ describe("níveis, retrato e confirmação", () => {
     const fim = dadosDe(antes, SEMANA, new Date(2026, 9, 19, 9), ativo.meta);
     expect(avaliarNoCatalogo(sem, 1, fim)).toMatchObject({ done: true, motivo: "cumpriu", statusText: "Semana sem parcela nova 👑" });
     // o retrato é campo opcional de `active.meta`: o leitor novo mantém, o antigo ignora
-    expect(lerDesafios({ active: { ...ativo }, history: [] }).active?.meta).toEqual({ parcelas: ["id:p1"] });
+    expect(lerDesafios({ active: { ...ativo }, history: [] }).active?.meta).toEqual({ parcelas: ["id:p1"], desde: "2026-10-14" });
   });
 
   it("'dias sem gastar': hoje só conta zerado com 'não gastei nada hoje'; dia passado sem gasto é zerado", () => {
@@ -529,6 +529,8 @@ const criarStore = (inicial: Record<string, unknown>) => {
   return { dados, sistema, valor };
 };
 const desafios = (dados: Record<string, unknown>) => dados["finance-challenges"] as ChallengesState;
+/** Conta sem hábito, com 1 gasto (quinta da semana anterior, no balde vivo de outubro). */
+const UM_GASTO = (): Record<string, unknown> => ({ "finance-expenses": [gasto("2026-10-08", 35, "restaurante")] });
 const eventos = (nome: string) => (trackEvent as Mock).mock.calls.filter((c) => c[0] === nome).map((c) => c[1]);
 const montar = (store: ReturnType<typeof criarStore>) =>
   render(<UserDataContext.Provider value={store.valor}><WeeklyChallenge expenses={(store.dados["finance-expenses"] as never) ?? []} /></UserDataContext.Provider>);
@@ -536,7 +538,8 @@ const montar = (store: ReturnType<typeof criarStore>) =>
 describe("o card: segunda com as opções, escolha, meio da semana, virada", () => {
   it("conta vazia: 4 opções — as 3 sem hábito + a guarda da semana (o print #103 tinha 3) —, sem nota de regra de registro, ofertas gravadas como ESCRITA DE SISTEMA e o evento desafio_ofertas (1x)", async () => {
     quando(2026, 10, 12);
-    const store = criarStore({});
+    // 29/10: o card espera o 1º gasto — "conta vazia" aqui = sem hábito nenhum, com 1 gasto na semana anterior
+    const store = criarStore(UM_GASTO());
     montar(store);
     await act(async () => {});
     expect(screen.getByText("DESAFIO DA SEMANA")).toBeInTheDocument();
@@ -566,12 +569,12 @@ describe("o card: segunda com as opções, escolha, meio da semana, virada", () 
 
   it("escolher grava active com nivel (gesto da pessoa, sem system) e dispara desafio_escolhido; o card vira progresso", async () => {
     quando(2026, 10, 12);
-    const store = criarStore({});
+    const store = criarStore(UM_GASTO());
     montar(store);
     await act(async () => {});
     fireEvent.click(screen.getByTestId("oferta-registro-5-dias"));
     await act(async () => {});
-    expect(desafios(store.dados).active).toEqual({ key: "registro-5-dias", weekStart: "2026-10-12", nivel: 1 });
+    expect(desafios(store.dados).active).toEqual({ key: "registro-5-dias", weekStart: "2026-10-12", nivel: 1, meta: { desde: "2026-10-12" } });
     expect(eventos("desafio_escolhido")[0]).toMatchObject({ key: "registro-5-dias", nivel: 1 });
     expect(screen.getByTestId("desafio-ativo")).toBeInTheDocument();
     expect(screen.getByTestId("desafio-status")).toHaveTextContent("0 de 5 dias anotados");
@@ -655,7 +658,7 @@ describe("o card: segunda com as opções, escolha, meio da semana, virada", () 
   it("chave DESLIGADA (força de QA 'off'): o card de sempre, com as 4 opções antigas e sem gravar ofertas", async () => {
     quando(2026, 10, 12);
     localStorage.setItem(CHAVE_FORCA_DESAFIOS_RODIZIO, "off");
-    const store = criarStore({});
+    const store = criarStore(UM_GASTO());
     montar(store);
     await act(async () => {});
     for (const t of ["Semana sem delivery", "3 dias sem gastar", "Registrar em 5 dias", "Gastar menos que semana passada"]) expect(screen.getByText(t)).toBeInTheDocument();

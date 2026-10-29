@@ -99,7 +99,7 @@ describe("Parcelamentos — número que não é número", () => {
     fireEvent.click(screen.getByRole("button", { name: /Novo Parcelamento/ }));
     fireEvent.change(screen.getByPlaceholderText("Nome do item"), { target: { value: "Celular" } });
     fireEvent.change(screen.getByPlaceholderText("Valor total"), { target: { value: "1200" } });
-    fireEvent.change(screen.getByPlaceholderText("Total parcelas"), { target: { value: "0" } });
+    fireEvent.change(screen.getByLabelText("Total de parcelas"), { target: { value: "0" } });
     fireEvent.click(screen.getByRole("button", { name: /^Salvar$/ }));
     expect(gravado).toBeNull();
     expect(erros().join(" ")).toMatch(/parcelas/i);
@@ -118,8 +118,8 @@ describe("Parcelamentos — número que não é número", () => {
     fireEvent.click(screen.getByRole("button", { name: /Novo Parcelamento/ }));
     fireEvent.change(screen.getByPlaceholderText("Nome do item"), { target: { value: "Celular" } });
     fireEvent.change(screen.getByPlaceholderText("Valor total"), { target: { value: "1200" } });
-    fireEvent.change(screen.getByPlaceholderText("Total parcelas"), { target: { value: "10" } });
-    fireEvent.change(screen.getByPlaceholderText("Pagas"), { target: { value: "15" } });
+    fireEvent.change(screen.getByLabelText("Total de parcelas"), { target: { value: "10" } });
+    fireEvent.change(screen.getByLabelText("Já paguei"), { target: { value: "15" } });
     fireEvent.click(screen.getByRole("button", { name: /^Salvar$/ }));
     expect(gravado).toHaveLength(1);
     expect(gravado[0].installmentValue).toBe(120);

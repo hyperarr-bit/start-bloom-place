@@ -262,10 +262,10 @@ describe("pages/Index — cliente antigo fica com o painel de hoje", () => {
     const controle = montarIndex(MES_COM_DADO);
     await abrirDashboard();
     expect(secoesNaTela()).toEqual([
-      "DESAFIO DA SEMANA", "Saldo do Mês", "ALERTAS INTELIGENTES", "GASTOS POR CATEGORIA", "RECEITAS VS DESPESAS", "EVOLUÇÃO DO PATRIMÔNIO",
+      // 1.0.22 (28/10, dono): QUANTO POSSO GASTAR HOJE abre o Dashboard; o Desafio da semana vem logo depois
+      "QUANTO POSSO GASTAR HOJE", "DESAFIO DA SEMANA", "Saldo do Mês", "ALERTAS INTELIGENTES", "GASTOS POR CATEGORIA", "RECEITAS VS DESPESAS", "EVOLUÇÃO DO PATRIMÔNIO",
       "PROGRESSO DO MÊS", "GASTO POR MÉTODO", "FIXOS VS VARIÁVEIS", "TOP 5 MAIORES GASTOS", "ÚLTIMAS TRANSAÇÕES",
-      // 17/10 (dono): os CARDS SIMPLES são o padrão pra todo mundo (lib/financas-cards-simples) — o gastar sobe pra antes da previsão
-      "QUANTO POSSO GASTAR HOJE", "PREVISÃO DO FIM DO MÊS", "COMPARAÇÃO MENSAL", "COMPARAÇÃO ANUAL",
+      "PREVISÃO DO FIM DO MÊS", "COMPARAÇÃO MENSAL", "COMPARAÇÃO ANUAL",
     ]);
     expect(document.querySelector('[data-painel="limpo"]')).toBeNull();
     expect(screen.queryByTestId("sobram-pra-hoje")).toBeNull(); // sem gasto HOJE: o card de sempre, sem a linha "pra hoje"

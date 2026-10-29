@@ -9,6 +9,7 @@ import { PhotoPicker } from "@/components/ui/PhotoPicker";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useHumorDoDia } from "@/hooks/use-humor-do-dia";
 import { useLocation } from "react-router-dom";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { toast } from "sonner";
@@ -410,7 +411,9 @@ const DesenvolvimentoPessoal = () => {
   const [todayPrompt] = useState(() => journalEntries[today]?.prompt || journalPrompts[Math.floor(Math.random() * journalPrompts.length)]);
 
   // === NEW: MOOD TRACKER ===
-  const [moodLog, setMoodLog] = usePersistedState<Record<string, number>>("dp-mood-log", {});
+  // 1.0.22 (28/10): o humor do dia é um só (lib/humor-do-dia) — lê `dp-mood-log`, o `mood-log` da Rotina e o
+  // `core-mood-log` do "+" da Home; grava nas 3. `moodLog` aqui é o histórico UNIFICADO { dia: 1–5 }.
+  const { historico: moodLog, registrar: registrarHumor } = useHumorDoDia(today);
 
   // === NEW: BREATHING TIMER ===
   const [breathPhase, setBreathPhase] = useState<"idle" | "in" | "hold" | "out">("idle");
@@ -649,7 +652,7 @@ const DesenvolvimentoPessoal = () => {
                   abaixo de ~430 px (a 360 saíam 5 px pra cada lado). */}
               <div className="flex justify-center gap-2 sm:gap-3 mb-4">
                 {moodOptions.map(m => (
-                  <button key={m.value} onClick={() => setMoodLog({ ...moodLog, [today]: m.value })} aria-label={m.label} aria-pressed={moodLog[today] === m.value}
+                  <button key={m.value} onClick={() => registrarHumor(m.value)} aria-label={m.label} aria-pressed={moodLog[today] === m.value}
                     className={`text-2xl sm:text-3xl p-2 sm:p-3 rounded-xl border-2 transition-all ${moodLog[today] === m.value ? `${m.color} border-primary scale-110` : "border-border hover:scale-105"}`}>
                     {m.emoji}
                   </button>

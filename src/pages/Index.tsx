@@ -63,6 +63,7 @@ import { type Parcela, viradaDeParcelas, mesesAnteriores, chaveArquivadaDeParcel
 import { variaveisDoMes } from "@/lib/finance-fatura";
 import { CHAVE_FATURAS_PAGAS, chaveDaFatura, ehEstimativaDaFatura, extrairFaturas, faturasAVencer, injetarFaturas, mesDeFechamento, parcelasDoMesPassado } from "@/lib/finance-faturas";
 import { TotalPorCartao } from "@/components/finance/TotalPorCartao";
+import { PodeGastarCompacto } from "@/components/finance/PodeGastarCompacto";
 import { usePainelLimpo } from "@/hooks/use-painel-limpo";
 import { useFinanceCards } from "@/lib/finance-cards";
 import { chaveArquivada } from "@/lib/virada-do-mes";
@@ -685,11 +686,8 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 lembrar queima a única chance no Android 13+. */}
             <PedirLembretes dueDays={dueDaysTodos as never} />
             {temKit && <KitHojeNoPainel abrirKit={() => { setActiveTab("kit"); window.scrollTo({ top: 0 }); }} />}
-            {!demoDoFunil && (
-              <TrackedCard cardKey="weekly-challenge" tab="dashboard">
-                <WeeklyChallenge expenses={expenses} />
-              </TrackedCard>
-            )}
+            {/* 1.0.22 (28/10): o DESAFIO DA SEMANA desce pra logo DEPOIS do QUANTO POSSO GASTAR HOJE (`depoisDoTopo`),
+                que agora abre o Dashboard — o número da promessa é o 1º card da aba. */}
             <TrackedCard cardKey="dashboard" tab="dashboard">
               <Dashboard
                 totalIncome={totalIncome}
@@ -705,6 +703,11 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 onNavigate={(tab) => setActiveTab(tab)}
                 perfil={perfilValido}
                 gastoDeHoje={gastoDeHoje}
+                depoisDoTopo={!demoDoFunil ? (
+                  <TrackedCard cardKey="weekly-challenge" tab="dashboard">
+                    <WeeklyChallenge expenses={expenses} />
+                  </TrackedCard>
+                ) : undefined}
             />
             </TrackedCard>
             <TrackedCard cardKey="month-comparison" tab="dashboard">
@@ -724,6 +727,19 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
               <MonthlySheet month={openMonth.month} year={openMonth.year} onClose={() => setOpenMonth(null)} />
             ) : (
               <>
+                {/* 1.0.22 (28/10): o número do QUANTO POSSO GASTAR HOJE no topo da aba mais usada, compacto; o toque
+                    leva ao card inteiro no topo do Dashboard (mesma conta, mesmos valores — components/finance/PodeGastarCompacto) */}
+                <TrackedCard cardKey="pode-gastar-topo" tab="financeiro">
+                  <PodeGastarCompacto
+                    totalIncome={totalIncome}
+                    totalExpenses={monthlyOutflow}
+                    dueDays={dueDaysComFaturas as unknown[]}
+                    fixedExpenses={fixedExpenses}
+                    gastoDeHoje={gastoDeHoje}
+                    onVerNoPainel={() => { setActiveTab("dashboard"); window.scrollTo({ top: 0 }); }}
+                    onAnotarRenda={() => document.getElementById("fin-receitas")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  />
+                </TrackedCard>
                 {getUserData<string>("spotlight-done-financas", "") !== "true" && (
                   <>
                     <QuizWelcome />
@@ -773,7 +789,10 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 <div className="grid lg:grid-cols-[1fr_280px] gap-4 min-w-0">
                   <div className="min-w-0">
                     <TrackedCard cardKey="incomes" tab="financeiro">
+                      {/* id: alvo do "Anotar minha renda" do QUANTO POSSO GASTAR HOJE compacto (1.0.22) */}
+                      <div id="fin-receitas" className="scroll-mt-20">
                       <IncomeTable incomes={incomes} setIncomes={setIncomes} prefillExample={getUserData<string>("spotlight-done-financas", "") !== "true" && incomes.length === 0} />
+                      </div>
                     </TrackedCard>
                   </div>
                   <TrackedCard cardKey="calculator" tab="financeiro">

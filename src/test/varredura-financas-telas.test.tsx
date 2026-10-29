@@ -284,7 +284,7 @@ describe("PARCELAMENTOS no celular", () => {
     const ths = [...tabela.querySelectorAll("thead th")];
     const escondidas = ths.filter((th) => th.className.includes("hidden sm:table-cell")).map((th) => th.textContent);
     expect(escondidas).toEqual(["Parcela", "Data", "Cartão", "Categoria"]);
-    expect(screen.getByText("10 de 12 · Nubank")).toBeInTheDocument();
+    expect(screen.getByText("parcela 10 de 12 · Nubank")).toBeInTheDocument();
     const rodapeCelular = tabela.querySelector("tfoot tr.sm\\:hidden")!;
     expect(within(rodapeCelular as HTMLElement).getByText("R$ 150,00")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: /Marcar parcela 10 de Celular como paga/ })).toBeInTheDocument();

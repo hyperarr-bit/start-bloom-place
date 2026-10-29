@@ -8,6 +8,7 @@ import { lancarGasto } from "@/lib/finance-lancar";
 import { numeroBR } from "@/lib/data-normalizers";
 import { marcarCheckin } from "@/lib/detox";
 import { anotarAcaoRapida } from "@/lib/intro-modulo";
+import { gravarHumorNasTres } from "@/lib/humor-do-dia";
 import { avisoDaTarefa, avisoJaPassou, diaDoAviso, horaDaTarefa, horaDoAviso, rotuloDoDia } from "@/lib/tarefas";
 
 /**
@@ -63,7 +64,8 @@ export function gravarAgua(ctx: ContextoAcao, aoGravar?: () => void): { proximo:
   vibrar();
   aoGravar?.();
   const faltam = (ctx.waterGoal ?? 8) - proximo;
-  toast.success(`💧 ${proximo * copoMl}ml — ${faltam > 0 ? `faltam ${faltam} copos` : "meta batida! 🎉"}`);
+  // 1.0.22 (28/10): 102 de 475 pagantes que registram água pelo "+" nunca abriram a Saúde — o aviso leva lá
+  toast.success(`💧 ${proximo * copoMl}ml — ${faltam > 0 ? `faltam ${faltam} copos` : "meta batida! 🎉"}`, { action: { label: "Ver Saúde", onClick: () => ctx.navigate("/saude") } });
   return { proximo, copoMl, faltam };
 }
 
@@ -164,14 +166,15 @@ export function gravarGratidao(ctx: ContextoAcao, { texto }: { texto: string }, 
 }
 
 export function gravarHumor(ctx: ContextoAcao, { value, emoji }: { value: number; emoji: string }, aoGravar?: () => void): void {
-  const { get, set } = ctx;
+  const { get, set, navigate } = ctx;
   const tStr = hojeStr();
-  const moodLog = get<Record<string, { value: number; emoji: string; time: string }>>("core-mood-log", {});
-  moodLog[tStr] = { value, emoji, time: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) };
-  set("core-mood-log", moodLog);
+  /* 1.0.22 (28/10): o humor do "+" gravava SÓ em `core-mood-log`, que módulo nenhum mostrava. Agora grava o mesmo
+     valor nas 3 chaves do humor (cada uma no seu formato — lib/humor-do-dia): aparece no "Como você está hoje?" da
+     Rotina (e no histórico) e no Dev. Pessoal › Humor, inclusive no app antigo, que lê só a sua chave. */
+  gravarHumorNasTres(get, set, tStr, value, { emoji });
   vibrar();
   aoGravar?.();
-  toast.success(`${emoji} Humor registrado!`);
+  toast.success(`${emoji} Humor registrado!`, { action: { label: "Ver na Rotina", onClick: () => navigate("/rotina") } });
 }
 
 export function gravarSono(ctx: ContextoAcao, { horasTexto }: { horasTexto: string }, aoGravar?: () => void): boolean {

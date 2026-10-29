@@ -568,7 +568,7 @@ function render() {
         : `<label for="lp-email-pix">Seu e-mail pra garantir o acesso <span style="font-weight:500">(opcional)</span></label>
            <div class="lp-linha"><input class="lp-campo" id="lp-email-pix" type="email" inputmode="email" autocomplete="email" autocapitalize="none" placeholder="voce@email.com" /><button type="button" class="lp-mini" id="lp-email-pix-ok" disabled>Salvar</button></div>
            ${erroEmail ? `<p class="lp-erro" role="alert">${esc(erroEmail)}</p>` : ""}`}</div>
-      <div class="lp-links"><button type="button" class="lp-link" id="lp-ja-paguei">Já paguei</button><button type="button" class="lp-link" id="lp-mudar">Mudar o plano</button></div>`;
+      <div class="lp-links"><button type="button" class="lp-link" id="lp-ja-paguei">Já paguei</button>${brOferta === "ano" ? `<button type="button" class="lp-link" id="lp-mudar">Mudar o plano</button>` : ""}</div>`;
     void desenharQr($("lp-qr"), p);
     $("lp-copiar").addEventListener("click", async () => {
       const ok = await copiarTexto(p.qrCode);
@@ -577,7 +577,8 @@ function render() {
       render();
     });
     $("lp-ja-paguei").addEventListener("click", () => { void jaPaguei(); });
-    $("lp-mudar").addEventListener("click", () => { evento("landing_cta", { onde: "mudar_plano" }); aviso = null; salvar({ fase: "oferta" }); });
+    // 29/10 (dono): no vitalício só existe 1 plano — o "Mudar o plano" só tirava a pessoa do Pix gerado; fica só no braço "ano" (caixinha)
+    document.getElementById("lp-mudar")?.addEventListener("click", () => { evento("landing_cta", { onde: "mudar_plano" }); aviso = null; salvar({ fase: "oferta" }); });
     const campo = document.getElementById("lp-email-pix") as HTMLInputElement | null;
     if (campo) {
       const btn = $<HTMLButtonElement>("lp-email-pix-ok");

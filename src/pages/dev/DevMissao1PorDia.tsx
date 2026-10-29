@@ -7,6 +7,7 @@ import { ConstruiuEm3Dias } from "@/components/missao-doses/ConstruiuEm3Dias";
 import { LinhaDoseDeHoje } from "@/components/missao-doses/LinhaDoseDeHoje";
 import { guardarForcaDia1Cheio } from "@/lib/dia1-cheio";
 import { guardarForcaDias23 } from "@/lib/dias23";
+import { bracoConstruiu, guardarForcaConstruiu } from "@/lib/construiu-ab";
 import { porDiaDasFinancas } from "@/lib/lembrete-dia2";
 import { ROTULO_DOSE_PELA_INTRO } from "@/lib/missao-doses";
 import { BoasVindasDoses } from "@/components/missao-doses/BoasVindasDoses";
@@ -26,6 +27,9 @@ import "@/components/missao-doses/missao-doses.css";
  * 1.0.18 (chave `dias23`): ?cena=d23-dia1 | d23-dia1-sem | d23-dia2 | d23-dia2-sem | d23-linha | d23-dia3 — liga a força
  * de QA `?dia1-cheio=a` + `?dias23=on` NESTE navegador e monta uma conta de mentira em memória (Finanças com renda e
  * 1 conta fixa nas cenas com número; vazia nas "-sem").
+ * 29/10 (A/B do resumo, lib/construiu-ab): ?cena=construiu&caso=ativa|pouca|abrir&construiu=a|b — o resumo dos 3 dias
+ * nos 3 casos (ativa: 4 dias seguidos, 3 doses, 8 figurinhas; pouca: 1 dose, sem sequência/figurinha, aberta no dia 3;
+ * abrir: dia 3 com 2 dias seguidos e a dose 3 por fazer). O `?construiu=` grava a força de QA deste navegador.
  * O estado da missão é montado aqui, em memória (nada é gravado no aparelho).
  */
 const HOJE = localDayKey();
@@ -98,9 +102,35 @@ function CenaDias23({ cena, p23 }: { cena: string; p23?: string | null }) {
   return <ContaDeMentira dados={{ ...FINANCAS, "core-dias-anotados": usou }}><ConstruiuEm3Dias missao={m} aoAbrir aoContinuar={nada} /></ContaDeMentira>;
 }
 
+/** 29/10: o resumo dos 3 dias nos 3 casos do A/B (os dados de mentira são os do teste construiu-ab) */
+function CenaConstruiu({ caso }: { caso: string }) {
+  useState(() => { guardarForcaConstruiu(); return 0; });
+  const d = (n: number) => somarDias(HOJE, n);
+  const base = (inicio: string): EstadoMissaoDoses => ({ v: 1, inicio, modulos: ["financas", "rotina", "saude"], feitos: {}, boasVindas: true, braco: "A", lembrete: "20h" });
+  let m: EstadoMissaoDoses;
+  let dados: Record<string, unknown>;
+  let aoAbrir = true;
+  if (caso === "pouca") {
+    m = { ...base(d(-2)), feitos: { 1: { dia: d(-2), rotulo: "Pode gastar R$ 61 por dia" } } };
+    dados = { ...FINANCAS, "finance-expenses": [] };
+  } else if (caso === "abrir") {
+    m = { ...base(d(-2)), feitos: { 1: { dia: d(-2), rotulo: "Pode gastar R$ 61 por dia" }, 2: { dia: d(-1), rotulo: "Beber água ao acordar" } } };
+    dados = { ...FINANCAS, "finance-expenses": [], "core-dias-anotados": [d(-2), d(-1)], "conquistas-desbloqueadas": { "sequencia-1": d(-2), "first-income": d(-2), "sequencia-2": d(-1), "rotina-1": d(-1), "habito-criado": d(-1) } };
+  } else {
+    aoAbrir = false;
+    m = { ...base(d(-3)), feitos: { 1: { dia: d(-3), rotulo: "Pode gastar R$ 61 por dia" }, 2: { dia: d(-2), rotulo: "Beber água ao acordar" }, 3: { dia: HOJE, rotulo: "1 copo d'água · meta 8" } } };
+    dados = {
+      ...FINANCAS, "core-user-name": "João Victor", "core-dias-anotados": [d(-3), d(-2), d(-1), HOJE],
+      "conquistas-desbloqueadas": { "sequencia-1": d(-3), "first-expense": d(-3), "first-income": d(-3), "sequencia-2": d(-2), "rotina-1": d(-2), "habito-criado": d(-2), "sequencia-3": d(-1), "agua-1": HOJE },
+    };
+  }
+  return <ContaDeMentira dados={dados}><HomeDeFundo titulo="Home" /><ConstruiuEm3Dias missao={m} aoAbrir={aoAbrir} braco={bracoConstruiu(null)} aoContinuar={nada} aoFazerDose={aoAbrir ? nada : undefined} /></ContaDeMentira>;
+}
+
 export default function DevMissao1PorDia() {
   const [p] = useSearchParams();
   const cena = p.get("cena") ?? "festa1";
+  if (cena === "construiu") return <CenaConstruiu caso={p.get("caso") ?? "ativa"} />;
   if (cena.startsWith("d23-")) return <CenaDias23 cena={cena} p23={p.get("caso")} />;
   if (cena === "boas") {
     const m = { ...missaoNoDia(1, 0), boasVindas: false };

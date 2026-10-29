@@ -132,6 +132,8 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-home-nova-dica-mais", // 1.0.19 (26/10): a dica do "+" já tocada/aparições (lib/dica-mais) — nunca volta; a mesma chave vai pra conta
   "core-fluxo-enxuto", // 1.0.21 (27/10): a última resposta do RevenueCat pro fluxo enxuto (metadata fluxo_enxuto: on|off|ab, lib/fluxo-enxuto)
   "core-fluxo-enxuto-braco", // 1.0.21: o braço sorteado no "ab" do fluxo enxuto (enxuto|atual), estável entre aberturas
+  "core-construiu-ab", // 29/10: a última resposta do RevenueCat pro A/B do resumo dos 3 dias (metadata construiu_ab: ab|a|b, lib/construiu-ab)
+  "core-construiu-braco", // 29/10: o braço do resumo dos 3 dias por conta ({hash da conta: a|b}), estável — não troca de braço
   "core-festas-calma", // 1.0.21: as festas de conquista já mostradas HOJE nos 3 primeiros dias da conta ({ dia, n }, lib/festas-calma)
 ]);
 

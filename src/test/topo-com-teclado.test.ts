@@ -29,11 +29,11 @@ describe("topo com o teclado (--vv-topo)", () => {
     }
   });
 
-  it("o CSS soma --vv-topo no cabeçalho fixo, nas faixas e na faixa do relógio; cabeçalho de vidro só no app", () => {
+  it("o CSS soma --vv-topo no cabeçalho fixo, nas faixas e na faixa do relógio; cabeçalho continua liso (dono 29/10: \"deixa como tá hoje\")", () => {
     const css = readFileSync(resolve(__dirname, "../index.css"), "utf8");
     expect(css).toMatch(/header\.sticky\.top-0 \{\s*position: sticky;[^}]*top: calc\(var\(--app-safe-top\) \+ var\(--vv-topo, 0px\)\);/);
     expect(css).toMatch(/\.app-safe-top-guard \{[^}]*top: var\(--vv-topo, 0px\);/);
-    expect(css).toMatch(/html\.core-shell header\.sticky\.top-0:is\([^)]*\)::before \{[^}]*top: calc\(-1 \* var\(--app-safe-top\)\);[^}]*backdrop-filter: blur\(20px\)/);
+    expect(css).not.toMatch(/--cab-vidro/); // o vidro do cabeçalho ficou de fora
     const intro = readFileSync(resolve(__dirname, "../components/intro-modulo/intro-modulo.css"), "utf8");
     const missao = readFileSync(resolve(__dirname, "../components/missao-doses/missao-doses.css"), "utf8");
     expect(intro.match(/var\(--vv-topo, 0px\)/g)?.length).toBe(4);

@@ -820,30 +820,7 @@ header.sticky.top-0::before {
   background: inherit;
   pointer-events: none;
 }
-/* 1.0.22 (dono 29/10 — "o borrão não funciona nos módulos"): no APP o cabeçalho fixo dos módulos (e Você, Conquistas,
-   Notificações…) vira VIDRO, como a barra do iOS e o topo da Home: a cor do cabeçalho a 80% + desfoque, do relógio até a
-   linha de baixo, e o conteúdo que rola passa por trás borrado. O vidro mora no ::before (z -1, atrás do conteúdo do
-   cabeçalho) cobrindo o cabeçalho E a área segura: um backdrop-filter no próprio header faria dele a raiz do fundo e o
-   pedaço de cima (área segura) não borraria nada. Só cabeçalhos de fundo do tema (bg-card/bg-background); cabeçalho de
-   outra cor fica liso. Site (sem core-shell) e WebView sem color-mix/backdrop-filter: igual a antes. */
-@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) and (color: color-mix(in srgb, red 50%, transparent)) {
-  html.core-shell header.sticky.top-0:is(.bg-card, [class*="bg-card/"]) { --cab-vidro: hsl(var(--card)); }
-  html.core-shell header.sticky.top-0[class*="bg-background"] { --cab-vidro: hsl(var(--background)); }
-  html.core-shell header.sticky.top-0:is(.bg-card, [class*="bg-card/"], [class*="bg-background"]) {
-    background: transparent;
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-  html.core-shell header.sticky.top-0:is(.bg-card, [class*="bg-card/"], [class*="bg-background"])::before {
-    top: calc(-1 * var(--app-safe-top));
-    bottom: 0;
-    height: auto;
-    z-index: -1;
-    background: color-mix(in srgb, var(--cab-vidro) 80%, transparent);
-    -webkit-backdrop-filter: blur(20px) saturate(1.6);
-    backdrop-filter: blur(20px) saturate(1.6);
-  }
-}
+/* 29/10 (dono: "deixa como tá hoje"): o cabeçalho dos módulos continua LISO — o vidro testado no ramo v1022-borrao-modulos ficou de fora */
 
 /* ============================================================
    Barra do tour da demo (27/07)

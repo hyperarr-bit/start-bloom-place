@@ -91,12 +91,14 @@ const motivationalQuotes = [
   "SEJA MELHOR QUE ONTEM",
 ];
 
+// 1.0.22 (dono 28/10): a MESMA escala do "+" da Home (1 Péssimo · 2 Ruim · 3 Neutro · 4 Bom · 5 Ótimo) — antes aqui o 2 era "Meh"
+// e o 1 "Ruim", e quem tocava "Ruim" no "+" via "Meh" marcado. Só nomes/emojis; os valores gravados não mudam.
 const moodEmojis = [
-  { emoji: "😄", label: "Ótimo", color: "bg-green-400", value: 5 },
-  { emoji: "🙂", label: "Bem", color: "bg-green-300", value: 4 },
+  { emoji: "🤩", label: "Ótimo", color: "bg-green-400", value: 5 },
+  { emoji: "🙂", label: "Bom", color: "bg-green-300", value: 4 },
   { emoji: "😐", label: "Neutro", color: "bg-yellow-300", value: 3 },
-  { emoji: "😕", label: "Meh", color: "bg-orange-300", value: 2 },
-  { emoji: "😞", label: "Ruim", color: "bg-red-300", value: 1 },
+  { emoji: "😔", label: "Ruim", color: "bg-orange-300", value: 2 },
+  { emoji: "😡", label: "Péssimo", color: "bg-red-300", value: 1 },
 ];
 
 const getHabitName = (habit: unknown) => {

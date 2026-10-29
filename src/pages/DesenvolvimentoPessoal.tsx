@@ -55,12 +55,14 @@ const motivationalQuotes = [
   "Foco no progresso, não na perfeição.", "Cada dia é uma nova chance de mudar sua vida.",
 ];
 
+// 1.0.22 (dono 28/10): a MESMA escala do "+" da Home (1 Péssimo · 2 Ruim · 3 Neutro · 4 Bom · 5 Ótimo) — antes aqui o 2 era "Meh"
+// e o 1 "Ruim", e quem tocava "Ruim" no "+" via "Meh" marcado. Só nomes/emojis; os valores gravados não mudam.
 const moodOptions = [
-  { emoji: "😄", label: "Ótimo", value: 5, color: "bg-green-400" },
-  { emoji: "🙂", label: "Bem", value: 4, color: "bg-green-300" },
+  { emoji: "🤩", label: "Ótimo", value: 5, color: "bg-green-400" },
+  { emoji: "🙂", label: "Bom", value: 4, color: "bg-green-300" },
   { emoji: "😐", label: "Neutro", value: 3, color: "bg-yellow-300" },
-  { emoji: "😕", label: "Meh", value: 2, color: "bg-orange-300" },
-  { emoji: "😞", label: "Ruim", value: 1, color: "bg-red-300" },
+  { emoji: "😔", label: "Ruim", value: 2, color: "bg-orange-300" },
+  { emoji: "😡", label: "Péssimo", value: 1, color: "bg-red-300" },
 ];
 
 /* Abas do módulo, fora do componente (mesma referência em todo render — o

@@ -17,6 +17,8 @@ import { modo1012 } from "@/lib/modo-1012";
  * │ 4. Conta NOVA (origem gravada na conta, ver abaixo) vê a Home nova desde a 1ª Home, sempre; a Home ESPERA a   │
  * │    origem estar decidida (pages/Home: tela de carregamento de sempre, nunca a Home antiga por um quadro).      │
  * │ 5. Conta ANTIGA nunca vê a Home nova (só o admin, no "novas+admin"); uma vez nova/antiga, pra sempre.          │
+ * │ 6. 1.0.22 (28/10): a ESCOLHA da pessoa (`core-home-escolha`, Você › Home ou o convite 1x) VENCE 4 e 5 no iPhone │
+ * │    e no site — ver ESCOLHA DA HOME no fim deste arquivo. Android: sem escolha. "off" segue desligando tudo.      │
  * └────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
  *
  * `home_nova` na metadata de QUALQUER offering do RevenueCat (a `current` vence):
@@ -149,7 +151,7 @@ export function registrarHomeNovaRemoto(offerings: unknown): void {
   } catch { /* metadata estranha: fica como estava */ }
 }
 /** Só testes. */
-export const _zerarHomeNova = (): void => { remoto = undefined; adminAtual = null; maisPendente = false; origens.clear(); origensTentadas.clear(); contaDaSessao = null; criadoEmDaSessao = null; modoFixo = null; };
+export const _zerarHomeNova = (): void => { remoto = undefined; adminAtual = null; maisPendente = false; origens.clear(); origensTentadas.clear(); contaDaSessao = null; criadoEmDaSessao = null; modoFixo = null; escolhas.clear(); };
 
 /* ------------------------------------------------------------------ ORIGEM DA CONTA (modo "novas") */
 
@@ -305,10 +307,12 @@ export const adminHomeNovaConhecido = (): boolean | null => adminAtual;
  * novas → só se a origem da conta for "nova" (desconhecida = não) · novas+admin → origem "nova" OU admin.
  * (A origem DESCONHECIDA nunca chega à Home nas lojas: pages/Home espera a decisão — ver origemJaTentada.)
  */
-export function homeNovaLigada(admin: boolean | null, origem: OrigemDaConta | null = null): boolean {
+export function homeNovaLigada(admin: boolean | null, origem: OrigemDaConta | null = null, escolha: EscolhaDaHome | null = null): boolean {
   const f = forcaHomeNova();
   if (f) return f === "on";
   const modo = modoHomeNova();
+  // 1.0.22 (dono 28/10): a ESCOLHA da pessoa (Você › Home, ou o convite) vence a regra da origem — ver ESCOLHA DA HOME
+  if (escolha && escolhaDaHomeVale(modo)) return escolha === "nova";
   if (modo === "off") return false;
   if (modo === "on") return true;
   if (modo === "admin") return admin === true;
@@ -323,7 +327,7 @@ export function homeNovaLigadaSincrona(userId?: string | null): boolean {
   try {
     const id = userId ?? contaDaSessao;
     if (id) fixarModoDaAbertura();
-    return homeNovaLigada(adminAtual ?? lerAdminGuardado(id), origemConhecida(id));
+    return homeNovaLigada(adminAtual ?? lerAdminGuardado(id), origemConhecida(id), escolhaConhecida(id));
   } catch { return false; }
 }
 
@@ -336,7 +340,129 @@ export const tomDoBotaoDaMissao = (userId?: string | null): "e" | "magenta" => (
 /** Os campos dos eventos: com a chave em qualquer modo que não "off", qual Home a pessoa vê. */
 export function camposHomeNova(userId?: string | null): { home_nova?: BracoHomeNova } {
   try {
-    if (forcaHomeNova() === null && modoHomeNova() === "off") return {};
+    const escolhaVale = escolhaDaHomeVale() && !!escolhaConhecida(userId ?? contaDaSessao);
+    if (forcaHomeNova() === null && modoHomeNova() === "off" && !escolhaVale) return {};
     return { home_nova: homeNovaLigadaSincrona(userId) ? "nova" : "atual" };
   } catch { return {}; }
+}
+
+/* ------------------------------------------------------------------ ESCOLHA DA HOME (1.0.22, dono 28/10) */
+
+/**
+ * ESCOLHA DA HOME — "botar essas melhorias pro antigo também: quando ele entrar no app ter a opção de mudar pra nova
+ * Home, mas se quiser voltar tudo bem, aí deixa visível" (dono 28/10).
+ *
+ * ┌ A REGRA ─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+ * │ 1. A preferência é DA CONTA, numa chave NOVA do user_data: `core-home-escolha` = { home: "nova"|"classica", em,  │
+ * │    via: "convite"|"voce" }. Nenhuma chave existente mudou de tipo (a origem segue { tipo, em, versao, regra }).   │
+ * │ 2. Quando existe, ela VENCE a regra da origem — pra conta antiga (que passa a poder ver a nova) e pra conta nova │
+ * │    (que pode voltar pra clássica: a promessa "dá pra voltar quando quiser" vale pra todo mundo). Sem escolha,     │
+ * │    nada muda: conta nova = nova, conta antiga = clássica (a regra de 26/10).                                     │
+ * │ 3. Só no iPhone (app) e no SITE. No Android não existe (a Home nova não passou pelo QA lá): nem convite, nem a   │
+ * │    linha em Você, e uma escolha feita em outro aparelho é IGNORADA no Android (a Home de sempre).                 │
+ * │ 4. O desligar de emergência continua mandando: `home_nova` = "off" no RevenueCat (iPhone) desliga a Home nova    │
+ * │    pra todos, com ou sem escolha; "admin" (o dono testando) também ignora a escolha. No site o RevenueCat não     │
+ * │    roda — o desligar é ESCOLHA_HOME abaixo ("off" = escolha ignorada, sem convite nem linha; vale com deploy).   │
+ * │ 5. A força de QA (`?home-nova=on|off`) segue vencendo tudo neste aparelho.                                        │
+ * └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+ * Espelho no aparelho (`core-home-escolha-aparelho` = "<uid>:nova|classica") pra decidir antes de a conta chegar
+ * (rotas, barra de vidro) — como o da origem. A conta carregada sempre vence o espelho.
+ * O CONVITE (1x por conta): `core-home-escolha-convite` = { em, resposta } na conta + `core-home-escolha-convite-aparelho`
+ * (o uid) no aparelho — gravado quando a folha APARECE (fechar o app com ela na tela não a repete). Regras em
+ * deveConvidarHomeNova.
+ */
+export type EscolhaDaHome = "nova" | "classica";
+export type ViaDaEscolha = "convite" | "voce";
+/** ROLLBACK (site e app) = "off": a escolha é ignorada e não existe convite nem linha. */
+export const ESCOLHA_HOME: "on" | "off" = "on";
+export const CHAVE_HOME_ESCOLHA = "core-home-escolha";
+export const CHAVE_HOME_ESCOLHA_APARELHO = "core-home-escolha-aparelho";
+export const CHAVE_HOME_CONVITE = "core-home-escolha-convite";
+export const CHAVE_HOME_CONVITE_APARELHO = "core-home-escolha-convite-aparelho";
+/** A escolha de uma conta mudou (quem decide com React relê). */
+export const EVENTO_ESCOLHA_HOME = "home-nova:escolha";
+/** O convite espera a Home assentar antes de olhar a tela — DEPOIS do lembrete do dia (DailyNudge abre aos 1,5 s): com ele
+ *  na tela, o convite espera ele sair (nunca os dois juntos). */
+export const ESPERA_CONVITE_MS = 2500;
+/** Sem convite no 1º dia da conta (quem acabou de criar conta já tem o que aprender). */
+export const JANELA_SEM_CONVITE_MS = 24 * 3600e3;
+
+/** Em memória: a escolha conhecida de cada conta nesta abertura. */
+const escolhas = new Map<string, EscolhaDaHome>();
+
+/** O valor gravado na conta → a escolha (lixo = null). Aceita o objeto { home } e a palavra solta. */
+export function lerEscolhaDaHome(v: unknown): EscolhaDaHome | null {
+  const t = (v && typeof v === "object" ? (v as { home?: unknown }).home : v) as unknown;
+  return t === "nova" || t === "classica" ? t : null;
+}
+export interface MarcadorEscolha { home: EscolhaDaHome; em: string; via: ViaDaEscolha }
+export const marcadorDaEscolha = (home: EscolhaDaHome, via: ViaDaEscolha, agora: number = Date.now()): MarcadorEscolha =>
+  ({ home, em: new Date(agora).toISOString(), via });
+
+/** A escolha existe NESTA plataforma? iPhone (app) e site sim; Android não. */
+export const escolhaDaHomeNaPlataforma = (): boolean => ESCOLHA_HOME === "on" && (!isNativeShell() || isIOS());
+
+/** A escolha da pessoa vale AGORA? (plataforma + o desligar de emergência do iPhone; "admin" = só o dono testando.) */
+export function escolhaDaHomeVale(modo: ModoHomeNova = modoHomeNova()): boolean {
+  if (!escolhaDaHomeNaPlataforma()) return false;
+  if (isNativeShell()) return modo !== "off" && modo !== "admin";
+  return true; // site: sem RevenueCat — o padrão "off" do site é a Home de hoje, não um desligar; o desligar é ESCOLHA_HOME
+}
+
+/** A escolha que esta abertura conhece pra conta: memória > espelho do aparelho > null. */
+export function escolhaConhecida(userId: string | null | undefined): EscolhaDaHome | null {
+  if (!userId) return null;
+  const mem = escolhas.get(userId);
+  if (mem) return mem;
+  const v = ls.get(CHAVE_HOME_ESCOLHA_APARELHO);
+  if (v === `${userId}:nova`) return "nova";
+  if (v === `${userId}:classica`) return "classica";
+  return null;
+}
+
+/** Anota a escolha lida da CONTA na memória (pode ser chamado no render: não grava nem avisa). */
+export const anotarEscolhaEmMemoria = (userId: string, escolha: EscolhaDaHome): void => { escolhas.set(userId, escolha); };
+
+/** Registra a escolha (memória + espelho) e avisa quem decide com React. */
+export function registrarEscolhaDaHome(userId: string, escolha: EscolhaDaHome): void {
+  const antes = ls.get(CHAVE_HOME_ESCOLHA_APARELHO);
+  const mudouNaMemoria = escolhas.get(userId) !== escolha;
+  escolhas.set(userId, escolha);
+  ls.set(CHAVE_HOME_ESCOLHA_APARELHO, `${userId}:${escolha}`);
+  if (mudouNaMemoria || antes !== `${userId}:${escolha}`) {
+    try { window.dispatchEvent(new CustomEvent(EVENTO_ESCOLHA_HOME, { detail: { escolha } })); } catch { /* sem window */ }
+  }
+}
+
+/** O convite já apareceu pra esta conta NESTE aparelho (o espelho; a conta guarda o mesmo em CHAVE_HOME_CONVITE). */
+export const conviteVistoNoAparelho = (userId: string | null | undefined): boolean =>
+  !!userId && (ls.get(CHAVE_HOME_CONVITE_APARELHO) ?? "").split(",").includes(userId);
+export function marcarConviteNoAparelho(userId: string): void {
+  const atuais = (ls.get(CHAVE_HOME_CONVITE_APARELHO) ?? "").split(",").filter(Boolean);
+  if (!atuais.includes(userId)) ls.set(CHAVE_HOME_CONVITE_APARELHO, [...atuais, userId].slice(-5).join(","));
+}
+
+/**
+ * O CONVITE "Tem uma Home nova" aparece AGORA? (pura; a Home ainda confere que nenhuma folha/aviso está na tela.)
+ *   · só onde a escolha vale (iPhone/site, chave não "off"/"admin");
+ *   · só pra quem está na Home CLÁSSICA sem ter escolhido nada (conta nova já está na nova; quem escolheu, escolheu);
+ *   · 1x por conta (o marcador na conta ou o espelho do aparelho);
+ *   · nunca no 1º dia da conta (criada há menos de 24 h ou hoje) nem em convidado;
+ *   · nunca depois de um aviso de cobrança/cancelamento/presente nas últimas 24 h (o cartão recusado tem prioridade).
+ */
+export function deveConvidarHomeNova(p: {
+  userId: string | null | undefined; contaCarregada: boolean; convidado?: boolean; ligada: boolean;
+  escolha: EscolhaDaHome | null; conviteNaConta: unknown; criadoEm?: string | null; momentoRuim?: boolean;
+  agora?: number; diaDeHoje?: string; diaDaConta?: string | null;
+}): boolean {
+  if (!p.userId || !p.contaCarregada || p.convidado) return false;
+  if (!escolhaDaHomeVale()) return false;
+  if (p.ligada || p.escolha) return false;
+  if (p.conviteNaConta || conviteVistoNoAparelho(p.userId)) return false;
+  if (p.momentoRuim) return false;
+  const agora = p.agora ?? Date.now();
+  const t = p.criadoEm ? new Date(p.criadoEm).getTime() : NaN;
+  if (Number.isFinite(t) && agora - t < JANELA_SEM_CONVITE_MS) return false;
+  if (p.diaDaConta && p.diaDeHoje && p.diaDaConta === p.diaDeHoje) return false;
+  return true;
 }

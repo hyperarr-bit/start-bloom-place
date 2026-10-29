@@ -127,6 +127,8 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-home-nova-fogo", // 1.0.19: o dia em que o fogo da pílula da Home nova já acendeu (o pulso toca 1x por dia)
   "core-home-nova-score-100", // 1.0.19 (26/10): o dia em que o card do score da Home nova já fez a festinha do 100 (estrela âmbar, 1x por dia)
   "core-home-nova-origem-aparelho", // 1.0.19 (26/10): o espelho da origem da conta ("<uid>:nova|antiga", lib/home-nova) — modo "novas"
+  "core-home-escolha-aparelho", // 1.0.22 (28/10): o espelho da ESCOLHA da Home ("<uid>:nova|classica", lib/home-nova) — a conta guarda core-home-escolha
+  "core-home-escolha-convite-aparelho", // 1.0.22: as contas (uids, até 5) que já viram o convite "Tem uma Home nova" neste aparelho — nunca repete
   "core-home-nova-dica-mais", // 1.0.19 (26/10): a dica do "+" já tocada/aparições (lib/dica-mais) — nunca volta; a mesma chave vai pra conta
   "core-fluxo-enxuto", // 1.0.21 (27/10): a última resposta do RevenueCat pro fluxo enxuto (metadata fluxo_enxuto: on|off|ab, lib/fluxo-enxuto)
   "core-fluxo-enxuto-braco", // 1.0.21: o braço sorteado no "ab" do fluxo enxuto (enxuto|atual), estável entre aberturas
@@ -172,6 +174,8 @@ export const CHAVES_REVISADAS_DA_CONTA_OU_TRANSITORIAS: Readonly<Record<string, 
     "core-dias-anotados", "core-hub-streak", "core-tip-seen-*", "core-demo-conta", "core-home-widgets-v2",
     "core-home-resumos", // os 3 cards da página 1 da Home nova (lib/home-resumos, gravado por useUserData.set)
     "core-cor-antes-home-nova", // a cor do tema de antes da Home nova (HomeE guarda; pages/Home devolve e apaga com a chave off)
+    "core-home-escolha", // 1.0.22 (28/10): a escolha da Home { home: nova|classica, em, via } (useEscolhaDaHome grava; lib/home-nova)
+    "core-home-escolha-convite", // 1.0.22: o convite "Tem uma Home nova" já apareceu pra conta { em, resposta } (EscolhaDaHome)
     "core-home-nova-origem", // 26/10: o marcador de origem da conta { tipo: nova|antiga } (OrigemDaContaNaSessao grava; lib/home-nova)
     "core-home-widgets-e", // os widgets da Home nova (lib/home-widgets-e: ids na ordem da escolha, até 6)
     "core-intro-vistas", // lista de módulos com intro vista NESTA CONTA (lib/intro-modulo, gravada por useUserData.set)
@@ -194,7 +198,7 @@ export const CHAVES_REVISADAS_DA_CONTA_OU_TRANSITORIAS: Readonly<Record<string, 
     "core-lembretes", // id do canal de notificação do Android
     // 1.0.19 (lib/home-nova): NÃO são chaves de storage — "home-nova" é o parâmetro da URL (?home-nova=on|off|auto),
     // "home-nova:mais" é o nome do evento da barra de vidro, "home-nova:*" é o sal do sorteio do braço (FNV)
-    "home-nova", "home-nova:mais", "home-nova:*", "home-nova:origem",
+    "home-nova", "home-nova:mais", "home-nova:*", "home-nova:origem", "home-nova:escolha",
     "core-vidro-calai", // rodada 4: a chave da rodada 3 (vidro Cal AI opcional) que lib/vidro-calai só APAGA — a vassoura pode apagar também
   ],
   // FUNIL ANTES DA CONTA: progresso/respostas que só valem até o cadastro (a área fica: core-funil-w-area).

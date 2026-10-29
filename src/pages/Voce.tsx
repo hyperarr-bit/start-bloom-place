@@ -1,13 +1,14 @@
 import { startTransition, useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, Bell, BookOpen, CalendarCheck, ChevronRight, CreditCard, Droplets, Dumbbell, FileText, LayoutGrid, LifeBuoy, ListChecks, LogOut, Monitor, Moon, Palette,
+  ArrowLeft, Bell, BookOpen, CalendarCheck, ChevronRight, CreditCard, Droplets, Dumbbell, FileText, LayoutDashboard, LayoutGrid, LifeBuoy, ListChecks, LogOut, Monitor, Moon, Palette,
   RotateCcw, Shield, SlidersHorizontal, Sparkles, Star, Trophy, Utensils, Wallet, type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { useTheme, palettes } from "@/hooks/use-theme";
 import { useHomeNova } from "@/hooks/use-home-nova";
+import { useEscolhaDaHome } from "@/hooks/use-escolha-da-home";
 import { useHomeWidgetsE } from "@/hooks/use-home-widgets-e";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { SUAVIDADE_HOME_NOVA } from "@/lib/home-nova";
@@ -92,10 +93,15 @@ export default function Voce() {
   const { user, signOut } = auth;
   const { get } = useUserData();
   const { mode, palette } = useTheme();
-  const [folha, setFolha] = useState<null | "account" | "computador">(null);
+  const [folha, setFolha] = useState<null | "account" | "computador" | "home">(null);
   const nativo = isNativeShell();
   // rodada 2 da Home nova (26/10): com a chave ligada, a aba no estilo da E — categorias que abrem subcategorias
   const nova = useHomeNova(user).ligada;
+  // 1.0.22 (dono 28/10): a linha "Home: Nova / Clássica", sempre visível onde a escolha existe (iPhone e site; Android não)
+  const escolhaHome = useEscolhaDaHome();
+  const itemHome: Item[] = escolhaHome.disponivel
+    ? [{ id: "home", Icone: LayoutDashboard, rotulo: "Home", detalhe: escolhaHome.atual === "nova" ? "Nova" : "Clássica", onClick: () => { clicar("home"); setFolha("home"); } }]
+    : [];
 
   // aquece os destinos mais tocados (mesmo cuidado da folha antiga: falha aqui é silenciosa)
   useEffect(() => {
@@ -135,6 +141,7 @@ export default function Voce() {
     ...(nativo ? [{ id: "lembretes", Icone: Bell, rotulo: "Lembretes", onClick: () => ir("lembretes", "/notificacoes") }] : []),
     ...(nativo ? [{ id: "computador", Icone: Monitor, rotulo: "Usar no computador", onClick: () => { clicar("computador"); setFolha("computador"); } }] : []),
     { id: "tutorial", Icone: RotateCcw, rotulo: "Ver tutorial", onClick: () => { clicar("tutorial"); navigate("/home", { state: { reverTutorial: true } }); } },
+    ...itemHome,
   ];
   const ajuda: Item[] = [
     { id: "ajuda", Icone: LifeBuoy, rotulo: "Ajuda e suporte", onClick: () => ir("ajuda", "/ajuda") },
@@ -153,6 +160,7 @@ export default function Voce() {
       {
         id: "inicio", titulo: "Início",
         itens: [
+          ...itemHome, // 1.0.22: "Home · Nova" — trocar pra Clássica (e voltar) a qualquer momento
           { id: "personalizar-inicio", Icone: SlidersHorizontal, rotulo: "Personalizar início", onClick: () => empilhar("personalizar-inicio", "/voce/inicio") }, // sem detalhe: no iPhone o rótulo truncava
           { id: "tutorial", Icone: RotateCcw, rotulo: "Ver tutorial", onClick: () => { clicar("tutorial"); navigate("/home", { state: { reverTutorial: true } }); } },
         ],

@@ -134,7 +134,8 @@ describe("o menu novo: 3 grupos + Sair", () => {
   it("web: você (conta, plano, conquistas) · App (aparência, tutorial) · Ajuda (ajuda, privacidade e termos) · Sair — sem Retrospectiva", () => {
     montarMenu();
     expect(ids(screen.getByTestId("menu-grupo-voce"))).toEqual(["conta", "plano", "conquistas"]);
-    expect(ids(screen.getByTestId("menu-grupo-app"))).toEqual(["aparencia", "tutorial"]);
+    // 1.0.22 (28/10): no site o menu ganha "Home · Nova/Clássica" (a escolha da Home — lib/home-nova; Android não tem)
+    expect(ids(screen.getByTestId("menu-grupo-app"))).toEqual(["aparencia", "tutorial", "home"]);
     expect(ids(screen.getByTestId("menu-grupo-ajuda"))).toEqual(["ajuda", "legal"]);
     expect(within(screen.getByTestId("menu-grupo-app")).getByText("App")).toBeTruthy();
     expect(within(screen.getByTestId("menu-grupo-ajuda")).getByText("Ajuda")).toBeTruthy();

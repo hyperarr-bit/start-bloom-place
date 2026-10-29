@@ -197,8 +197,8 @@ export const dicasDoModulo = (moduloId: string): readonly Dica[] => DICAS_DO_MOD
 /* ------------------------------------------------------------------ o toque */
 
 /** Os eventos que a fileira de abas (components/ui/abas-ocultaveis) escuta. */
-export const EVENTO_ABRIR_ABA = "core-dica-abrir-aba";
-export const EVENTO_ORGANIZAR_ABAS = "core-dica-organizar-abas";
+export const EVENTO_ABRIR_ABA = "dicas:abrir-aba";
+export const EVENTO_ORGANIZAR_ABAS = "dicas:organizar-abas";
 export type DetalheAbrirAba = { modulo: string; aba: string };
 export type DetalheOrganizar = { modulo: string };
 

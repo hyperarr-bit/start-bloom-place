@@ -23,7 +23,7 @@
                               ?landing=off tira).
         AB_TITULO    "off"  → sempre o título A. "on" = sorteio estável por aparelho entre BRACOS_TITULO.
                               Forçar: ?t=a|b|c (fica neste navegador).
-        AB_OFERTA    "off"  → sempre a oferta "ano". "on" = 50/50 estável por aparelho. Forçar: ?oferta=ano|sempre.
+        AB_OFERTA    "off"  → sempre a oferta "sempre" (vitalício, desde 29/10). "on" = 50/50 estável por aparelho. Forçar: ?oferta=ano|sempre.
       A divisão 50/50 do /inicio (o mesmo link da campanha) mora no index.html (DIVISAO_INICIO_LANDING, "off").
     -->
     <script>
@@ -70,7 +70,7 @@
           if (AB_OFERTA === "on") {
             o = le("landing-oferta");
             if (o !== "ano" && o !== "sempre") { o = Math.random() < 0.5 ? "ano" : "sempre"; grava("landing-oferta", o); }
-          } else o = "ano";
+          } else o = "sempre"; // 29/10 (dono): vitalício por R$ 27,90 pra todos, sem a caixinha (o "ano" com caixinha vendia pra 5,7% de quem via o preço)
         }
         mem.t = t; mem.oferta = o; mem.ab_titulo = AB_TITULO; mem.ab_oferta = AB_OFERTA;
         mem.divisao = pega("ld") === "1" ? "inicio" : null;
@@ -330,7 +330,7 @@
   <body>
     <main class="lp" id="lp">
       <!-- ═════════ 1. TOPO ═════════ -->
-      <div class="lp-promo" role="note">🔥 OFERTA ESPECIAL <span>· válida só hoje<b id="lp-promo-data"></b></span></div>
+      <div class="lp-promo" role="note"><b data-so-oferta="sempre">🔥 ACESSO VITALÍCIO</b><b data-so-oferta="ano">🔥 OFERTA ESPECIAL</b> <span>· só hoje<b id="lp-promo-data"></b></span></div>
       <script>
         // a data de hoje no fuso de Brasília ("· válida hoje, 28/10") — sem ela, fica só "válida hoje"
         try { var dd = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" }).format(new Date()); document.getElementById("lp-promo-data").textContent = ", " + dd; } catch (e) {}

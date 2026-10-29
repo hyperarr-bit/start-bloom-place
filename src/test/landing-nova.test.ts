@@ -71,17 +71,18 @@ describe("a chave da landing (head do landing.html)", () => {
     const store: Record<string, string> = {};
     const a = rodar(scriptDesligado, "/organizar?landing=on", store);
     expect(a.replace).not.toHaveBeenCalled();
-    expect(a.attrs).toMatchObject({ "data-t": "a", "data-oferta": "ano" });
+    expect(a.attrs).toMatchObject({ "data-t": "a", "data-oferta": "sempre" });
     expect(rodar(scriptDesligado, "/organizar", store).replace).not.toHaveBeenCalled(); // ficou
     expect(rodar(scriptDesligado, "/organizar?landing=off", store).replace).toHaveBeenCalled();
     expect(rodar(scriptDesligado, "/organizar", store).replace).toHaveBeenCalled();
   });
 
-  it("A/B desligados: sempre título A e oferta ano; forçáveis por ?t= e ?oferta=", () => {
-    expect(rodar(scriptDaCabeca, "/organizar?landing=on", {}, 0.9).attrs).toMatchObject({ "data-t": "a", "data-oferta": "ano" });
+  it("A/B desligados: sempre título A e oferta sempre (vitalício, 29/10); forçáveis por ?t= e ?oferta=", () => {
+    expect(rodar(scriptDaCabeca, "/organizar?landing=on", {}, 0.9).attrs).toMatchObject({ "data-t": "a", "data-oferta": "sempre" });
+    expect(rodar(scriptDaCabeca, "/organizar?landing=on&oferta=ano").attrs["data-oferta"]).toBe("ano");
     expect(rodar(scriptDaCabeca, "/organizar?landing=on&t=b&oferta=sempre").attrs).toMatchObject({ "data-t": "b", "data-oferta": "sempre" });
     expect(rodar(scriptDaCabeca, "/organizar?landing=on&t=c").attrs["data-t"]).toBe("c");
-    expect(rodar(scriptDaCabeca, "/organizar?landing=on&t=z&oferta=x").attrs).toMatchObject({ "data-t": "a", "data-oferta": "ano" });
+    expect(rodar(scriptDaCabeca, "/organizar?landing=on&t=z&oferta=x").attrs).toMatchObject({ "data-t": "a", "data-oferta": "sempre" });
   });
 
   it("A/B ligados: sorteio ESTÁVEL por aparelho", () => {
@@ -250,8 +251,10 @@ describe("o Pix na página (simulado, fora do domínio de produção)", () => {
     expect(document.getElementById("lp-pix")!.textContent).toContain("Esse e-mail já tem conta");
   });
 
-  it("a página em si não fala 'vitalício', 'teste grátis' nem 'sem cartão', nem mostra nota/quantidade de avaliações", () => {
-    const texto = document.body.textContent!.toLowerCase();
+  it("a página em si só fala 'vitalício' na faixa do topo (dono 29/10), e nunca 'teste grátis', 'sem cartão' nem nota/quantidade de avaliações", () => {
+    const corpo = document.body.cloneNode(true) as HTMLElement;
+    corpo.querySelector(".lp-promo")?.remove();
+    const texto = corpo.textContent!.toLowerCase();
     expect(texto).not.toContain("vitalício");
     expect(texto).not.toContain("teste grátis");
     expect(texto).not.toContain("sem cartão");

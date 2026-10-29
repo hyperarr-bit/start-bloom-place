@@ -24,6 +24,11 @@
         AB_TITULO    "off"  → sempre o título A. "on" = sorteio estável por aparelho entre BRACOS_TITULO.
                               Forçar: ?t=a|b|c (fica neste navegador).
         AB_OFERTA    "off"  → sempre a oferta "sempre" (vitalício, desde 29/10). "on" = 50/50 estável por aparelho. Forçar: ?oferta=ano|sempre.
+        AB_CHECKOUT  "off"  → todo mundo no checkout de hoje ("livre": Pix na hora, e-mail opcional na tela do QR).
+                              "on" = 50/50 estável por aparelho entre "livre" e "email" (1 campo de e-mail acima do botão
+                              de pagar), pelo landing_device_id (cookie + localStorage — o mesmo id do src/landing/marcador.ts;
+                              a conta é a bracoCheckoutDoAparelho do src/landing/regras.ts). Forçar: ?checkout=livre|email
+                              (fica neste navegador). O braço vai em html[data-checkout] e em todo evento landing_*.
       A divisão 50/50 do /inicio (o mesmo link da campanha) mora no index.html (DIVISAO_INICIO_LANDING, "off").
     -->
     <script>
@@ -32,6 +37,7 @@
         var AB_TITULO = "off";
         var BRACOS_TITULO = ["a", "b", "c"];
         var AB_OFERTA = "off";
+        var AB_CHECKOUT = "off"; // 29/10: e-mail antes do Pix (braço "email") × checkout de hoje ("livre") — ver o comentário acima
         var d = document.documentElement, q = null, mem = {};
         try { q = new URLSearchParams(location.search); } catch (e0) {}
         var pega = function (k) { try { return q ? q.get(k) : null; } catch (e) { return null; } };
@@ -72,6 +78,36 @@
             if (o !== "ano" && o !== "sempre") { o = Math.random() < 0.5 ? "ano" : "sempre"; grava("landing-oferta", o); }
           } else o = "sempre"; // 29/10 (dono): vitalício por R$ 27,90 pra todos, sem a caixinha (o "ano" com caixinha vendia pra 5,7% de quem via o preço)
         }
+        var pc = pega("checkout");
+        if (pc === "livre" || pc === "email") grava("landing-checkout-force", pc);
+        var c = (pc === "livre" || pc === "email") ? pc : le("landing-checkout-force");
+        mem.checkout_forcado = (c === "livre" || c === "email");
+        if (c !== "livre" && c !== "email") {
+          c = "livre";
+          if (AB_CHECKOUT === "on") {
+            // o id do aparelho (o MESMO do marcador.ts: localStorage "landing-device-id" + cookie "landing_device_id", 400 dias)
+            var idOk = /^[A-Za-z0-9-]{8,64}$/;
+            var doLs = le("landing-device-id"), doCk = null;
+            try {
+              var cs = String(document.cookie || "").split(";");
+              for (var i = 0; i < cs.length; i++) { var j = cs[i].indexOf("="); if (j > 0 && cs[i].slice(0, j).trim() === "landing_device_id") doCk = decodeURIComponent(cs[i].slice(j + 1).trim()); }
+            } catch (e2) {}
+            var id = idOk.test(doLs || "") ? doLs : idOk.test(doCk || "") ? doCk : null;
+            if (!id) { try { id = window.crypto.randomUUID(); } catch (e3) { id = "d" + Date.now().toString(36) + Math.random().toString(36).slice(2, 12); } }
+            if (doLs !== id) grava("landing-device-id", id);
+            if (doCk !== id) {
+              try {
+                var dom = /(^|\.)coreaplicativo\.com\.br$/.test(location.hostname || "") ? "; Domain=.coreaplicativo.com.br" : "";
+                document.cookie = "landing_device_id=" + encodeURIComponent(id) + "; Max-Age=34560000; Path=/; SameSite=Lax" + dom + (location.protocol === "https:" ? "; Secure" : "");
+              } catch (e4) {}
+            }
+            var h = 5381;
+            for (var k = 0; k < id.length; k++) h = ((h * 33) ^ id.charCodeAt(k)) >>> 0;
+            c = h % 2 === 0 ? "livre" : "email";
+          }
+        }
+        d.setAttribute("data-checkout", c);
+        mem.checkout = c; mem.ab_checkout = AB_CHECKOUT;
         mem.t = t; mem.oferta = o; mem.ab_titulo = AB_TITULO; mem.ab_oferta = AB_OFERTA;
         mem.divisao = pega("ld") === "1" ? "inicio" : null;
         d.setAttribute("data-t", t);
@@ -100,6 +136,7 @@
       .lp-p { font-size: 15.5px; line-height: 1.45; color: var(--suave); margin: 10px 0 0; text-wrap: pretty; }
       html:not([data-t="a"]) [data-so-t="a"], html:not([data-t="b"]) [data-so-t="b"], html:not([data-t="c"]) [data-so-t="c"] { display: none !important; }
       html:not([data-oferta="ano"]) [data-so-oferta="ano"], html:not([data-oferta="sempre"]) [data-so-oferta="sempre"] { display: none !important; }
+      html:not([data-checkout="email"]) [data-so-checkout="email"] { display: none !important; }
 
       /* ───────── 1. topo ───────── */
       /* 28/10 (dono): faixa de oferta no topo + âncora do preço normal (o anual nas lojas é R$ 97,90). Sem "do site"/"no app" na copy: o lead entendia que estava comprando um site e não o app */
@@ -220,6 +257,15 @@
       button.lp-cta:disabled { opacity: .45; }
       button.lp-cta svg { width: 20px; height: 20px; }
       .lp-pagar { margin-top: 18px; }
+      /* 29/10: braço "email" do AB_CHECKOUT — 1 campo acima do botão de pagar (some no braço "livre") */
+      .lp-email-antes { display: flex; flex-direction: column; gap: 7px; margin: 0 0 12px; }
+      .lp-email-antes label { font-size: 13px; font-weight: 650; color: var(--suave); }
+      .lp-email-antes label span { font-weight: 500; color: var(--fraco); }
+      .lp-email-antes .lp-erro { margin: 0; }
+      .lp-email-antes [hidden] { display: none !important; }
+      .lp-campo[aria-invalid="true"] { border-color: #dc2626; }
+      button.lp-sugestao { align-self: flex-start; padding: 2px 0; border: 0; background: none; color: var(--magenta-escuro); font-size: 13.5px; font-weight: 600; text-align: left; }
+      button.lp-sugestao b { text-decoration: underline; text-underline-offset: 3px; }
       .lp-seguro { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 12px 0 0; font-size: 12px; font-weight: 600; color: var(--fraco); text-align: center; }
       .lp-seguro svg { width: 13px; height: 13px; flex-shrink: 0; }
       .lp-garantia { display: flex; gap: 12px; align-items: center; margin: 16px 2px 0; padding: 14px 16px; border-radius: 16px; background: var(--verde-suave); color: #14532d; font-size: 14px; line-height: 1.4; }
@@ -471,6 +517,12 @@
                 <span class="lp-caixinha-txt"><b>Quero pra sempre: +R$ 19,90</b> <span style="white-space:nowrap">(total R$ 47,80)</span><small>Em vez de 1 ano, o CORE fica seu pra sempre. No mesmo Pix, pagamento único, nunca mais paga.</small></span>
               </label>
               <div class="lp-pagar">
+                <div class="lp-email-antes" data-so-checkout="email">
+                  <label for="lp-email-antes">Seu e-mail <span>· é por onde você entra no CORE</span></label>
+                  <input class="lp-campo grande" id="lp-email-antes" type="email" inputmode="email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" maxlength="254" placeholder="voce@email.com" />
+                  <button type="button" class="lp-sugestao" id="lp-email-antes-sugestao" hidden></button>
+                  <p class="lp-erro" id="lp-email-antes-erro" role="alert" hidden></p>
+                </div>
                 <button type="button" class="lp-cta" id="lp-pagar"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.2" y="5.2" width="13.6" height="13.6" rx="3.2" transform="rotate(45 12 12)" fill="none" stroke="currentColor" stroke-width="2.2"/><rect x="9.6" y="9.6" width="4.8" height="4.8" rx="1" transform="rotate(45 12 12)" fill="currentColor"/></svg><span id="lp-pagar-txt">Pagar R$ 27,90 no Pix</span></button>
                 <p class="lp-seguro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>O Pix sai aqui mesmo · CORE · CNPJ 55.041.112/0001-82</p>
               </div>

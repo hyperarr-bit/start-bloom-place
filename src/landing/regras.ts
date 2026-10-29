@@ -121,7 +121,11 @@ export type MensagemPraDemo = { tipo: "landing:modulo"; m: ModuloLanding };
 
 /* ───────────────────────── o Pix na página (estado guardado: o banco fecha a aba) ───────────────────────── */
 
-export type PixLanding = { orderId: string; qrCode: string; qrCodeBase64: string | null; expiresAt: string | null; criadoEm: number; oferta: OfertaLanding };
+export type PixLanding = {
+  orderId: string; qrCode: string; qrCodeBase64: string | null; expiresAt: string | null; criadoEm: number; oferta: OfertaLanding;
+  /** 29/10: reaberto pelo link do e-mail de lembrete (outra aba/navegador — a página não confirma sozinha) */
+  doEmail?: boolean;
+};
 export const VALIDADE_PIX_MS = 30 * 60_000;
 export const venceEm = (p: Pick<PixLanding, "expiresAt" | "criadoEm">): number => {
   const t = p.expiresAt ? Date.parse(p.expiresAt) : NaN;
@@ -165,3 +169,79 @@ export const EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 export const URL_APP_STORE = "https://apps.apple.com/br/app/id6806913181";
 export const urlPlay = (origem: string): string =>
   `https://play.google.com/store/apps/details?id=br.com.coreaplicativo.app&referrer=${encodeURIComponent(`utm_source=web&utm_medium=${origem}&utm_campaign=web_${origem}`)}`;
+
+/* ───────────────────────── checkout: e-mail ANTES do Pix (29/10, A/B "AB_CHECKOUT" no <head>) ───────────────────────── */
+
+/** "livre" = o checkout de hoje (Pix na hora, e-mail opcional na tela do QR); "email" = 1 campo de e-mail acima do botão. */
+export type BracoCheckout = "livre" | "email";
+export function bracoCheckoutDoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): BracoCheckout {
+  return el.getAttribute("data-checkout") === "email" ? "email" : "livre";
+}
+
+/**
+ * O sorteio do braço pelo id do aparelho (landing_device_id) — a MESMA conta do <head> do landing.html (o teste roda os
+ * dois e compara). Determinístico: o mesmo aparelho cai sempre no mesmo braço, mesmo com o localStorage zerado (o id
+ * sobrevive no cookie).
+ */
+export function bracoCheckoutDoAparelho(id: string): BracoCheckout {
+  let h = 5381;
+  for (let i = 0; i < id.length; i++) h = ((h * 33) ^ id.charCodeAt(i)) >>> 0;
+  return h % 2 === 0 ? "livre" : "email";
+}
+
+/** Os erros de domínio que mais aparecem (sugestão tocável embaixo do campo; nunca bloqueia). */
+const DOMINIO_ERRADO: Record<string, string> = {
+  "gmial.com": "gmail.com", "gmal.com": "gmail.com", "gmai.com": "gmail.com", "gamil.com": "gmail.com", "gnail.com": "gmail.com",
+  "gmail.co": "gmail.com", "gmail.con": "gmail.com", "gmail.cm": "gmail.com", "gmail.om": "gmail.com", "gmaill.com": "gmail.com",
+  "gmail.com.br": "gmail.com", "gimail.com": "gmail.com", "gmeil.com": "gmail.com",
+  "hotmal.com": "hotmail.com", "hotmial.com": "hotmail.com", "hotmai.com": "hotmail.com", "hotmail.co": "hotmail.com",
+  "hotmail.con": "hotmail.com", "hotmil.com": "hotmail.com", "hormail.com": "hotmail.com", "hotamil.com": "hotmail.com",
+  "outlok.com": "outlook.com", "outloo.com": "outlook.com", "outlook.con": "outlook.com", "outllok.com": "outlook.com",
+  "iclod.com": "icloud.com", "icloud.con": "icloud.com", "icoud.com": "icloud.com", "icluod.com": "icloud.com",
+  "yaho.com.br": "yahoo.com.br", "yahoo.com.b": "yahoo.com.br", "yahooo.com.br": "yahoo.com.br",
+};
+
+/** "fulana@gmial.com" → "fulana@gmail.com" (null = nada a sugerir). */
+export function sugestaoDeEmail(bruto: string): string | null {
+  const e = bruto.trim().toLowerCase();
+  const i = e.lastIndexOf("@");
+  if (i < 1) return null;
+  const certo = DOMINIO_ERRADO[e.slice(i + 1)];
+  return certo ? `${e.slice(0, i)}@${certo}` : null;
+}
+
+export type ChecagemEmail = { ok: true; email: string } | { ok: false; motivo: "vazio" | "invalido"; msg: string };
+/** A validação leve do campo antes do Pix (o servidor confere de novo). */
+export function checarEmailAntes(bruto: string): ChecagemEmail {
+  const e = bruto.trim().toLowerCase();
+  if (!e) return { ok: false, motivo: "vazio", msg: "Coloque seu e-mail: é por onde você entra no CORE." };
+  if (!EMAIL_OK.test(e) || e.length > 254) return { ok: false, motivo: "invalido", msg: "Esse e-mail parece errado. Confere?" };
+  return { ok: true, email: e };
+}
+
+/* ───────────────────────── a volta pelo e-mail de lembrete do Pix (?r=t12|t20h) ───────────────────────── */
+
+export type ToqueLembrete = "t12" | "t20h";
+export type VoltaDoLembrete = { toque: ToqueLembrete; pedido: string | null; pix: PixLanding | null };
+const OFERTAS: readonly OfertaLanding[] = ["LN_ano279", "LN_anosempre478", "LN_sempre279"];
+
+/**
+ * O link do e-mail: /organizar?r=t12&pedido=<id>&pix=<copia-e-cola>&vence=<ms>&o=<oferta> (o t12 leva o QR ainda vivo;
+ * o t20h, só r e pedido). Devolve o Pix pra REABRIR na página quando ainda vale ≥ 1 min; senão a pessoa gera outro.
+ * `doEmail`: aberto fora da aba que gerou — sem a sessão de quem pagou, a página não confirma sozinha (o acesso chega
+ * no e-mail quando cair).
+ */
+export function voltaDoLembrete(busca: URLSearchParams, agora: number = Date.now()): VoltaDoLembrete | null {
+  const r = busca.get("r");
+  if (r !== "t12" && r !== "t20h") return null;
+  const pedidoBruto = busca.get("pedido") ?? "";
+  const pedido = /^[A-Za-z0-9_-]{6,80}$/.test(pedidoBruto) ? pedidoBruto : null;
+  const codigo = busca.get("pix") ?? "";
+  const vence = Number(busca.get("vence"));
+  const oferta = busca.get("o") as OfertaLanding | null;
+  let pix: PixLanding | null = null;
+  if (pedido && /^000201[\x20-\x7e]{20,600}$/.test(codigo) && Number.isFinite(vence) && vence - agora > 60_000 && oferta && OFERTAS.includes(oferta)) {
+    pix = { orderId: pedido, qrCode: codigo, qrCodeBase64: null, expiresAt: new Date(vence).toISOString(), criadoEm: vence - VALIDADE_PIX_MS, oferta, doEmail: true };
+  }
+  return { toque: r, pedido, pix };
+}

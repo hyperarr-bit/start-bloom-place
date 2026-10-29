@@ -9,6 +9,9 @@
  *             Purchase: CAPI no servidor (event_id = id do QR) + pixel pelo firePixPurchaseOnce (mesmo id).
  *   e-mail    opcional na tela do QR: e-mail livre → entra na própria anônima; e-mail com conta → `email_pedido`
  *             (o servidor leva a compra pra essa conta quando o Pix cair e manda o acesso).
+ *   antes     (29/10, braço "email" do AB_CHECKOUT) o e-mail ANTES do QR: entra na anônima (updateUser, autoconfirm — o
+ *             padrão do lib/sessao-anonima); e-mail que já tem conta → código do e-mail → a pessoa ENTRA na conta dela e o
+ *             Pix sai nela (nada pago ainda: trocar de sessão aqui é seguro). Conta com vitalício → o `create` responde ja_tem.
  *   depois    o e-mail (se ainda não deu) → conta pronta (updateUser na MESMA conta; e-mail com conta → código do
  *             e-mail + pix-vincular) → boas-vindas 1x por pedido (com as lojas) → "Abrir meu CORE".
  *
@@ -18,7 +21,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { firePixPurchaseOnce, markPixPurchasePending } from "@/lib/purchase-tracking";
 import { cookiesDaMeta } from "@/pages/venda/rastreio";
-import { abrirSessaoParaPagar, emailAtual, gravarAtribuicao, pedirBoasVindas, salvarEmailDaCompra, sessaoViva, trazerCompraParaConta } from "@/pages/hoje/conta";
+import { EMAIL_OK, abrirSessaoParaPagar, emailAtual, gravarAtribuicao, pedirBoasVindas, salvarEmailDaCompra, sessaoViva, trazerCompraParaConta } from "@/pages/hoje/conta";
+import { definirEmailDaCompra, guardarCompraAnonima, limparBatismo, vincularCompraAnonima } from "@/lib/sessao-anonima";
 import type { OfertaLanding, PixLanding } from "./regras";
 
 /** 29/10: o servidor recusou o Pix porque esta pessoa JÁ tem o CORE pra sempre (a página mostra "Você já tem o CORE"). */
@@ -43,7 +47,8 @@ export async function gerarPix(oferta: OfertaLanding, sourceUrl: string, emailCo
 
 /** Uma conferência. true = pago (dispara o Purchase do navegador 1x, mesmo id da CAPI). */
 export async function conferirPix(pix: PixLanding, sourceUrl: string): Promise<boolean> {
-  await sessaoViva();
+  // sem sessão (ex.: Pix reaberto pelo link do e-mail em outro navegador) o `check` só voltaria 401 — nem chama
+  if (!(await sessaoViva())) return false;
   const c = cookiesDaMeta();
   const { data } = await supabase.functions.invoke("asaas-pix", {
     body: { action: "check", id: pix.orderId, offer: pix.oferta, fbp: c.fbp, fbc: c.fbc, sourceUrl: sourceUrl.slice(0, 300) },
@@ -109,4 +114,55 @@ export async function entrarComCodigo(email: string, codigo: string): Promise<{ 
 export async function finalizarConta(pedido: string, atrib: Record<string, unknown>): Promise<void> {
   try { await gravarAtribuicao({ v: 1, landing: true, ...atrib, em: new Date().toISOString() }); } catch { /* noop */ }
   void pedirBoasVindas(pedido);
+}
+
+/* ───────────────────────── 29/10: o e-mail ANTES do Pix (braço "email") ───────────────────────── */
+
+export type EmailAntes =
+  | { ok: true; via: "nova" | "mesma_conta" | "codigo" }
+  | { existe: true }
+  | { erro: string; motivo: "invalido" | "sessao" | "outra_conta" | "falhou" | "codigo_errado" };
+
+/**
+ * Grava o e-mail na sessão que vai pagar, ANTES do QR. E-mail livre → a anônima ganha o e-mail (aplica na hora). E-mail
+ * que já tem conta → `existe` (a página manda o código; a sessão anônima fica guardada pro pix-vincular, por via das
+ * dúvidas). Sessão já com e-mail (entrou com o código, ou voltou depois) → só confere que é o mesmo.
+ */
+export async function emailAntesDoPix(email: string): Promise<EmailAntes> {
+  const limpo = email.trim().toLowerCase();
+  if (!EMAIL_OK.test(limpo)) return { erro: "Esse e-mail parece errado. Confere?", motivo: "invalido" };
+  try {
+    if ((await abrirSessaoParaPagar()) === "indisponivel") return { erro: "Não consegui abrir o pagamento agora. Tenta de novo em alguns segundos.", motivo: "sessao" };
+    const atual = (await emailAtual())?.toLowerCase() ?? null;
+    if (atual) {
+      if (atual === limpo) return { ok: true, via: "mesma_conta" };
+      return { erro: `Neste aparelho você já está com ${atual}. Use esse e-mail pra pagar.`, motivo: "outra_conta" };
+    }
+    const r = await definirEmailDaCompra(limpo);
+    if (!r.erro) { limparBatismo(); return { ok: true, via: "nova" }; }
+    if (r.erro === "email_em_uso") { await guardarCompraAnonima(); return { existe: true }; }
+    if (r.erro === "invalido") return { erro: "Esse e-mail parece errado. Confere?", motivo: "invalido" };
+  } catch { /* cai no falhou */ }
+  return { erro: "Não consegui salvar seu e-mail agora. Tenta de novo em alguns segundos.", motivo: "falhou" };
+}
+
+/**
+ * O e-mail já tinha conta: entra nela com o código (nada foi pago ainda). Se a anônima de antes tiver algum Pix pago
+ * (caso de borda: aparelho que já comprou no checkout de hoje), o pix-vincular traz pra cá — nunca 2ª conta.
+ */
+export async function entrarAntesDoPix(email: string, codigo: string): Promise<EmailAntes> {
+  try {
+    const { error } = await supabase.auth.verifyOtp({ email: email.trim().toLowerCase(), token: codigo.trim(), type: "email" });
+    if (error) return { erro: "Código errado ou vencido. Confere no seu e-mail.", motivo: "codigo_errado" };
+    limparBatismo();
+    await sessaoViva(); // a cópia da sessão no heap passa a ser a da conta (o Instagram zera o storage)
+    try {
+      const { data } = await supabase.auth.getSession();
+      const uid = data?.session?.user?.id;
+      if (uid) await vincularCompraAnonima(uid, true);
+    } catch { /* a guarda fica: o use-auth tenta de novo */ }
+    return { ok: true, via: "codigo" };
+  } catch {
+    return { erro: "Não consegui entrar agora. Tenta de novo em alguns segundos.", motivo: "falhou" };
+  }
 }

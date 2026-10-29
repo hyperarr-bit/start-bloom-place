@@ -29,6 +29,15 @@
  *   (29/10) landing_duvida_aberta {pergunta}              · landing_voltou {fase, ausente_s, com_pix}  (aba visível de novo, ≥5 s fora)
  *   (29/10) landing_ja_tem {via: marcador|servidor|email_pix} · landing_ja_tem_nao_fui_eu {}
  *   (29/10) todo evento leva landing_device_id (id aleatório estável do aparelho, cookie + localStorage — ./marcador.ts)
+ *   (29/10) todo evento leva braco_checkout ("livre" | "email" — AB_CHECKOUT no <head>). No braço "email":
+ *           landing_email_antes_visto {} (1x, junto da oferta) · landing_email_antes_ok {via: nova|mesma_conta|codigo}
+ *           landing_email_antes_erro {motivo: vazio|invalido|sessao|outra_conta|falhou|tem_conta|codigo_errado|codigo_nao_enviado}
+ *           landing_email_antes_sugestao {} (tocou no "Você quis dizer …?")
+ *   (29/10) landing_lembrete_volta {toque: t12|t20h, order_id, restaurado: aba|link|nao} — chegou pelo e-mail de lembrete do Pix
+ * E-mail ANTES do Pix (29/10, braço "email"): o campo fica acima do botão (no HTML, escondido pelo CSS no braço "livre" —
+ * a página do "livre" é IGUAL à de hoje). Ao tocar em pagar: e-mail → sessão anônima (updateUser) → Pix. E-mail que já
+ * tem conta → código do e-mail → entra na conta → Pix nela (conta com vitalício → "Você já tem o CORE"). Na tela do QR,
+ * no lugar do e-mail opcional: "Pagou e a página fechou? O acesso chega em <e-mail>".
  * "Já comprou" (29/10, ./marcador.ts): ao confirmar o pagamento grava um marcador (cookie de 400 dias no domínio + localStorage);
  * com ele a página abre com "Você já tem o CORE" + Abrir meu CORE + lojas no lugar da oferta. O servidor também recusa o
  * Pix (`ja_tem`) de quem já tem o CORE pra sempre. Quem nunca comprou vê a página IGUAL (nada muda no HTML nem no 1º render).
@@ -38,6 +47,7 @@
 import {
 
   EMAIL_OK, MODULO_DA_AREA, NOME_DO_MODULO, ROTULO_OFERTA, VALOR_OFERTA, URL_APP_STORE,
+  bracoCheckoutDoHtml, checarEmailAntes, sugestaoDeEmail, voltaDoLembrete,
   bracoOfertaDoHtml, bracoTituloDoHtml, ehArea, ehModuloLanding, estadoQueVolta, mmss, ofertaEscolhida, reais, urlPlay, venceEm,
   type Area, type EstadoLanding, type MensagemDaDemo, type ModuloLanding, type OfertaLanding, type PixLanding,
 } from "./regras";
@@ -58,7 +68,7 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 const agora = () => Math.round(performance.now());
 type Janela = Window & {
   __landingSimularJaTem?: boolean;
-  __landing?: { t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; divisao?: string | null };
+  __landing?: { t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; divisao?: string | null };
   __eventosLanding?: Record<string, unknown>[];
   __landingSimular?: { pagar: () => void };
   fbq?: (...a: unknown[]) => void;
@@ -72,6 +82,7 @@ const URL_DE_CHEGADA = location.href;
 const BUSCA = new URLSearchParams(location.search);
 const brTitulo = bracoTituloDoHtml();
 const brOferta = bracoOfertaDoHtml();
+const brCheckout = bracoCheckoutDoHtml(); // 29/10: "livre" (o de hoje) | "email" (e-mail antes do Pix)
 
 /* ───────────────────────── sessão + eventos ───────────────────────── */
 const novoId = () => { try { return crypto.randomUUID(); } catch { return `l${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`; } };
@@ -94,7 +105,7 @@ for (const k of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm
 if (BUSCA.get("fbclid")) atrib.tem_fbclid = "1";
 
 export function evento(nome: string, dados: Record<string, unknown> = {}): void {
-  const corpo = { ...dados, landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
+  const corpo = { ...dados, landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
   w.__eventosLanding!.push({ nome, ...corpo });
   if (!PRODUCAO) return;
   try {
@@ -114,7 +125,7 @@ requestAnimationFrame(() => {
   let ttfb: number | null = null;
   try { const n = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined; if (n) ttfb = Math.round(n.responseStart); } catch { /* noop */ }
   const m = w.__landing ?? {};
-  evento("landing_html", { tela1_ms: agora(), ttfb_ms: ttfb, t_forcado: !!m.t_forcado, oferta_forcada: !!m.oferta_forcada, divisao: m.divisao ?? null });
+  evento("landing_html", { tela1_ms: agora(), ttfb_ms: ttfb, t_forcado: !!m.t_forcado, oferta_forcada: !!m.oferta_forcada, checkout_forcado: !!m.checkout_forcado, divisao: m.divisao ?? null });
 });
 
 /* scripts de terceiros (pixel e Google) DEPOIS do load — nunca disputam a 1ª tela */
@@ -269,6 +280,7 @@ if ("IntersectionObserver" in window) {
         if (bloco === "oferta" && !ofertaVista) {
           ofertaVista = true;
           evento("landing_oferta_vista", {});
+          if (brCheckout === "email") evento("landing_email_antes_visto", {});
           pixel("ViewContent", { content_name: "landing_oferta", value: 27.9, currency: "BRL" });
           if (PIX_REAL && !SIMULADO) void pg().catch(() => null); // pré-aquece o Pix de verdade
         }
@@ -340,8 +352,64 @@ async function copiarTexto(c: Promise<string> | string): Promise<boolean> {
   } catch { return false; }
 }
 
-async function gerar(): Promise<void> {
-  if (estado.fase === "gerando") return;
+/* ── 29/10: o e-mail ANTES do Pix (braço "email") ── */
+const campoAntes = document.getElementById("lp-email-antes") as HTMLInputElement | null;
+const erroAntesEl = document.getElementById("lp-email-antes-erro");
+const sugestaoEl = document.getElementById("lp-email-antes-sugestao") as HTMLButtonElement | null;
+/** e-mail que já tem conta: a pessoa entra com o código ANTES do Pix (nada pago ainda) */
+let antes: { fase: "codigo" | "entrando"; email: string; erro: string | null } | null = null;
+let codigoAntes = "";
+
+function mostrarErroAntes(msg: string | null) {
+  if (!erroAntesEl || !campoAntes) return;
+  erroAntesEl.textContent = msg ?? "";
+  erroAntesEl.hidden = !msg;
+  if (msg) campoAntes.setAttribute("aria-invalid", "true"); else campoAntes.removeAttribute("aria-invalid");
+}
+function atualizarSugestao() {
+  if (!sugestaoEl || !campoAntes) return;
+  const s = sugestaoDeEmail(campoAntes.value);
+  sugestaoEl.hidden = !s;
+  sugestaoEl.dataset.v = s ?? "";
+  sugestaoEl.innerHTML = s ? `Você quis dizer <b>${esc(s)}</b>?` : "";
+}
+
+type FalhaEmail = { existe: true } | { erro: string; motivo: string };
+type PassoEmail = { ok: true; via: string } | FalhaEmail;
+type Gerado = PixLanding | { jaTem: true; via: string } | { erro: string; onde: string };
+
+/** o e-mail do campo → a sessão que vai pagar (simulado: "+existe"/"+jatem" = e-mail com conta; "+falha" = erro) */
+function passoDoEmail(email: string): Promise<PassoEmail> {
+  if (SIMULADO) {
+    return espera(450).then(() => (/\+(existe|jatem)@/.test(email) ? { existe: true as const }
+      : /\+falha@/.test(email) ? { erro: "Não consegui salvar seu e-mail agora. Tenta de novo em alguns segundos.", motivo: "falhou" }
+        : { ok: true as const, via: "nova" }));
+  }
+  return pg().then((m) => m.emailAntesDoPix(email)).catch(() => ({ erro: "Não consegui salvar seu e-mail agora. Tenta de novo em alguns segundos.", motivo: "falhou" }));
+}
+function passoDoCodigo(email: string, codigo: string): Promise<PassoEmail> {
+  if (SIMULADO) return espera(500).then(() => (codigo.trim() === "123456" ? { ok: true as const, via: "codigo" } : { erro: "Código errado ou vencido. Confere no seu e-mail.", motivo: "codigo_errado" }));
+  return pg().then((m) => m.entrarAntesDoPix(email, codigo)).catch(() => ({ erro: "Não consegui entrar agora. Tenta de novo em alguns segundos.", motivo: "falhou" }));
+}
+function criarPix(oferta: OfertaLanding, emailConhecido: string | null): Promise<Gerado> {
+  if (SIMULADO) {
+    return espera(700).then(() => (w.__landingSimularJaTem || /\+jatem@/.test(emailConhecido ?? "")
+      ? { jaTem: true as const, via: "servidor" }
+      : { orderId: `simulado-${Date.now().toString(36)}`, qrCode: CODIGO_SIMULADO, qrCodeBase64: null, expiresAt: null, criadoEm: Date.now(), oferta }));
+  }
+  return pg().then((m) => m.gerarPix(oferta, URL_DE_CHEGADA, emailConhecido)).catch((e) => ({ erro: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.", onde: String(e).slice(0, 120) }));
+}
+async function mandarCodigo(email: string): Promise<boolean> {
+  if (SIMULADO) { await espera(300); return true; }
+  return pg().then((m) => m.pedirCodigo(email)).catch(() => false);
+}
+
+/**
+ * O toque em pagar. Braço "livre": igual a sempre (Pix na hora). Braço "email": o e-mail do campo (ou o código, quando o
+ * e-mail já tinha conta) vem antes, NA MESMA promessa — o código do Pix ainda vai pra área de transferência no toque.
+ */
+async function gerar(comCodigo: string | null = null): Promise<void> {
+  if (estado.fase === "gerando" || antes?.fase === "entrando") return;
   const oferta = ofertaAtual();
   if (!SIMULADO && !PIX_REAL) {
     erroPix = "O pagamento por esta página ainda não está ligado.";
@@ -349,26 +417,66 @@ async function gerar(): Promise<void> {
     render();
     return;
   }
+  let emailAntes: string | null = null;
+  if (brCheckout === "email") {
+    if (antes && comCodigo !== null) emailAntes = antes.email;
+    else {
+      const ch = checarEmailAntes(campoAntes?.value ?? "");
+      if ("motivo" in ch) {
+        mostrarErroAntes(ch.msg);
+        evento("landing_email_antes_erro", { motivo: ch.motivo });
+        try { campoAntes?.focus(); } catch { /* noop */ }
+        return;
+      }
+      emailAntes = ch.email;
+      mostrarErroAntes(null);
+    }
+  }
   erroPix = null; copiado = null;
   const anteriores = estado.pix && venceEm(estado.pix) > Date.now() ? [...estado.anteriores, estado.pix] : estado.anteriores;
-  salvar({ fase: "gerando", anteriores });
-  rolarAte(card, "start");
-  evento("landing_cta", { onde: "pagar", oferta });
-  const t0 = Date.now();
-  const emailConhecido = estado.email ?? estado.emailPix ?? lerCompra()?.email ?? null;
-  const pedido: Promise<PixLanding | { jaTem: true; via: string } | { erro: string; onde: string }> = SIMULADO
-    ? espera(700).then(() => (w.__landingSimularJaTem ? { jaTem: true as const, via: "servidor" } : { orderId: `simulado-${Date.now().toString(36)}`, qrCode: CODIGO_SIMULADO, qrCodeBase64: null, expiresAt: null, criadoEm: Date.now(), oferta }))
-    : pg().then((m) => m.gerarPix(oferta, URL_DE_CHEGADA, emailConhecido)).catch((e) => ({ erro: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.", onde: String(e).slice(0, 120) }));
+  let t0 = Date.now();
+  if (antes && comCodigo !== null) { antes = { ...antes, fase: "entrando", erro: null }; render(); }
+  else { salvar({ fase: "gerando", anteriores }); rolarAte(card, "start"); }
+  evento("landing_cta", { onde: comCodigo !== null ? "pagar_codigo" : "pagar", oferta });
+  const emailConhecido = emailAntes ?? estado.email ?? estado.emailPix ?? lerCompra()?.email ?? null;
+  const passo: Promise<PassoEmail> = emailAntes === null ? Promise.resolve({ ok: true as const, via: "livre" })
+    : comCodigo !== null ? passoDoCodigo(emailAntes, comCodigo) : passoDoEmail(emailAntes);
+  const pedido: Promise<Gerado | FalhaEmail> = passo.then<Gerado | FalhaEmail>((p) => {
+    if (!("ok" in p)) return p;
+    if (emailAntes !== null) evento("landing_email_antes_ok", { via: p.via });
+    if (antes) { antes = null; salvar({ fase: "gerando", anteriores }); rolarAte(card, "start"); t0 = Date.now(); }
+    return criarPix(oferta, emailConhecido);
+  });
   // o código vai pra área de transferência AINDA no toque (a promessa resolve quando o QR chegar)
-  const copia = copiarNoToque(pedido.then((p) => ("erro" in p || "jaTem" in p ? Promise.reject(new Error("sem pix")) : p.qrCode)));
+  const copia = copiarNoToque(pedido.then((p) => ("qrCode" in p ? p.qrCode : Promise.reject(new Error("sem pix")))));
   const r = await pedido;
+  if ("existe" in r) {
+    // 29/10: o e-mail já tem conta → código do e-mail ANTES do Pix (nada pago: entrar na conta dela é seguro)
+    void copia.catch(() => null);
+    if (!emailAntes) { salvar({ fase: "oferta" }); return; }
+    const foi = await mandarCodigo(emailAntes);
+    evento("landing_email_antes_erro", { motivo: foi ? "tem_conta" : "codigo_nao_enviado" });
+    antes = { fase: "codigo", email: emailAntes, erro: foi ? null : "Não consegui mandar o código agora. Toque em “Mandar de novo”." };
+    codigoAntes = "";
+    salvar({ fase: "oferta" });
+    rolarAte(card, "start");
+    return;
+  }
+  if ("motivo" in r) {
+    void copia.catch(() => null);
+    evento("landing_email_antes_erro", { motivo: r.motivo });
+    if (antes) { antes = { ...antes, fase: "codigo", erro: r.erro }; render(); return; }
+    salvar({ fase: "oferta" });
+    mostrarErroAntes(r.erro);
+    return;
+  }
   // a animação "Gerando o seu Pix…" dura pelo menos 1,2 s (dá tempo de ler; o Pix rápido não pisca)
   const falta = 1200 - (Date.now() - t0);
   if (falta > 0) await espera(falta);
   if ("jaTem" in r) {
     // 29/10: o servidor diz que esta pessoa JÁ tem o CORE pra sempre — nada de Pix novo
     void copia.catch(() => null);
-    mostrarJaTem("servidor");
+    mostrarJaTem("servidor", emailAntes);
     return;
   }
   if ("erro" in r) {
@@ -379,11 +487,25 @@ async function gerar(): Promise<void> {
   }
   const c = await copia;
   copiado = c.ok;
-  salvar({ fase: "qr", pix: r });
-  evento("landing_pix_gerado", { oferta, valor: VALOR_OFERTA[oferta], order_id: r.orderId, simulado: SIMULADO });
+  salvar({ fase: "qr", pix: r, ...(emailAntes ? { emailPix: emailAntes } : {}) });
+  evento("landing_pix_gerado", { oferta, valor: VALOR_OFERTA[oferta], order_id: r.orderId, simulado: SIMULADO, email_antes: !!emailAntes });
   evento("landing_pix_copiado", { ok: c.ok, via: c.via, auto: true, order_id: r.orderId });
   pixel("InitiateCheckout", { value: VALOR_OFERTA[oferta], currency: "BRL", content_name: oferta }, `ic-${r.orderId}`);
   conferirEmLoop();
+}
+
+if (brCheckout === "email" && campoAntes) {
+  if (estado.emailPix && !campoAntes.value) campoAntes.value = estado.emailPix;
+  campoAntes.addEventListener("input", () => { mostrarErroAntes(null); if (sugestaoEl && !sugestaoEl.hidden) atualizarSugestao(); });
+  campoAntes.addEventListener("blur", atualizarSugestao);
+  campoAntes.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); void gerar(); } });
+  sugestaoEl?.addEventListener("click", () => {
+    const v = sugestaoEl.dataset.v;
+    if (!v) return;
+    campoAntes.value = v;
+    atualizarSugestao();
+    evento("landing_email_antes_sugestao", {});
+  });
 }
 
 /* confirmação: a cada 3 s + na volta da aba (o banco) — reveza com os QRs anteriores ainda vivos */
@@ -433,7 +555,12 @@ async function jaPaguei() {
   evento("landing_cta", { onde: "ja_paguei" });
   if (SIMULADO) { await espera(600); if (estado.pix) pago(estado.pix); return; }
   const ok = await conferirUmaVez();
-  if (!ok) { aviso = "Ainda não chegou. Confere no app do banco — quando cair, esta tela muda sozinha."; render(); }
+  if (!ok) {
+    aviso = estado.pix?.doEmail
+      ? "Se você já pagou, o acesso chega no seu e-mail em instantes."
+      : "Ainda não chegou. Confere no app do banco — quando cair, esta tela muda sozinha.";
+    render();
+  }
 }
 
 async function salvarEmailPix(email: string) {
@@ -543,9 +670,45 @@ function mostrarJaTem(via: "marcador" | "servidor" | "email_pix", email: string 
   if (estado.fase !== "oferta") salvar({ fase: "oferta", pix: null, anteriores: [] }); else render();
 }
 
+/** 29/10 (braço "email"): o e-mail já tem conta → o código, ANTES do Pix. */
+function renderCodigoAntes(a: NonNullable<typeof antes>) {
+  card.dataset.fase = "codigo"; // o CSS esconde a oferta (qualquer fase ≠ "oferta")
+  const entrando = a.fase === "entrando";
+  caixa.innerHTML = `
+      <div class="lp-pago" data-testid="landing-email-tem-conta">
+        <h3>Esse e-mail já tem conta</h3>
+        <p>Mandamos um código pra <b>${esc(a.email)}</b>. Digite aqui e o Pix sai na sua conta.</p>
+        <div class="lp-form">
+          <label for="lp-codigo-antes">Código de 6 números</label>
+          <input class="lp-campo grande" id="lp-codigo-antes" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" value="${esc(codigoAntes)}" />
+          <button type="button" class="lp-cta" id="lp-entrar-pagar" ${codigoAntes.trim().length >= 6 && !entrando ? "" : "disabled"}>${entrando ? '<i class="lp-gira"></i>Entrando…' : `Entrar e pagar ${reais(VALOR_OFERTA[ofertaAtual()])}`}</button>
+          ${a.erro ? `<p class="lp-erro" role="alert">${esc(a.erro)}</p>` : ""}
+        </div>
+        <div class="lp-links"><button type="button" class="lp-link" id="lp-outro-email">Usar outro e-mail</button><button type="button" class="lp-link" id="lp-reenviar">Mandar de novo</button></div>
+      </div>`;
+  const c = $<HTMLInputElement>("lp-codigo-antes"); const b = $<HTMLButtonElement>("lp-entrar-pagar");
+  c.addEventListener("input", () => { codigoAntes = c.value.replace(/\D/g, "").slice(0, 6); b.disabled = codigoAntes.length < 6 || antes?.fase === "entrando"; });
+  c.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !b.disabled) void gerar(codigoAntes); });
+  b.addEventListener("click", () => { void gerar(codigoAntes); });
+  $("lp-outro-email").addEventListener("click", () => {
+    evento("landing_cta", { onde: "outro_email" });
+    antes = null; codigoAntes = "";
+    render();
+    if (campoAntes) { campoAntes.value = ""; try { campoAntes.focus(); } catch { /* noop */ } }
+  });
+  $("lp-reenviar").addEventListener("click", async () => {
+    if (!antes) return;
+    evento("landing_cta", { onde: "reenviar_codigo" });
+    const foi = await mandarCodigo(antes.email);
+    if (antes) { antes = { ...antes, erro: foi ? null : "Não consegui mandar o código agora. Tenta de novo em alguns segundos." }; render(); }
+  });
+  atualizarFixo();
+}
+
 function render() {
   if (relogio) { window.clearInterval(relogio); relogio = null; }
   if (jaTem && (estado.fase === "oferta" || estado.fase === "erro")) { renderJaTem(jaTem); return; }
+  if (antes && estado.fase === "oferta") { renderCodigoAntes(antes); return; }
   card.dataset.fase = estado.fase === "erro" ? "oferta" : estado.fase;
   const f = estado.fase;
   if (f === "oferta") {
@@ -560,10 +723,14 @@ function render() {
       <div class="lp-qr-linha"><div class="lp-qr" id="lp-qr"></div><div class="lp-qr-dica">${copiado ? "Ou leia o <b>QR code</b> com a câmera do banco, em outro aparelho." : "<b>Copie o código</b> e cole no app do banco em Pix → Copia e Cola. Ou leia o QR code."}</div></div>
       <div class="lp-codigo" data-testid="landing-codigo">${esc(p.qrCode)}</div>
       <button type="button" class="lp-copiar${copiado ? "" : " cheio"}" id="lp-copiar">${ICO_COPIAR}<span>${copiado ? "Copiar de novo" : "Copiar código Pix"}</span></button>
-      <div class="lp-esperando"><i class="lp-ponto"></i><span><b>Esperando o pagamento</b>Esta tela confirma sozinha quando o pagamento entrar.</span></div>
+      <div class="lp-esperando"><i class="lp-ponto"></i><span><b>Esperando o pagamento</b>${p.doEmail ? "Quando o pagamento cair, o acesso chega no seu e-mail." : "Esta tela confirma sozinha quando o pagamento entrar."}</span></div>
       <div class="lp-validade" id="lp-validade">Este código vale por ${mmss(venceEm(p) - Date.now())}</div>
       ${aviso ? `<p class="lp-aviso" role="status">${esc(aviso)}</p>` : ""}
-      <div class="lp-email-opc">${estado.emailPix
+      <div class="lp-email-opc">${brCheckout === "email" || p.doEmail
+        ? (estado.emailPix
+          ? `<div class="lp-ok-linha" data-testid="landing-email-garantido">${ICO_CHECK}<span>Pagou e a página fechou? O acesso chega em <b>${esc(estado.emailPix)}</b>.</span></div>`
+          : `<div class="lp-ok-linha" data-testid="landing-email-garantido">${ICO_CHECK}<span>Pagou e a página fechou? O acesso chega no seu e-mail.</span></div>`)
+        : estado.emailPix
         ? `<div class="lp-ok-linha">${ICO_CHECK}<span>O acesso também vai pra <b>${esc(estado.emailPix)}</b>.</span></div>`
         : `<label for="lp-email-pix">Seu e-mail pra garantir o acesso <span style="font-weight:500">(opcional)</span></label>
            <div class="lp-linha"><input class="lp-campo" id="lp-email-pix" type="email" inputmode="email" autocomplete="email" autocapitalize="none" placeholder="voce@email.com" /><button type="button" class="lp-mini" id="lp-email-pix-ok" disabled>Salvar</button></div>
@@ -643,6 +810,23 @@ $("lp-pagar").addEventListener("click", () => { void gerar(); });
 
 /* 29/10: o aparelho já comprou (cookie/localStorage) e a página voltou na oferta → "Você já tem o CORE" */
 if (estado.fase === "oferta") { const m = lerCompra(); if (m) { jaTem = m; mostrarJaTem("marcador"); } }
+
+/* 29/10: chegou pelo e-mail de lembrete do Pix (?r=t12|t20h): o Pix ainda vivo reabre (mesmo nesta aba nova) */
+{
+  const volta = voltaDoLembrete(BUSCA);
+  if (volta) {
+    let restaurado = "nao";
+    if (estado.pix && volta.pedido && estado.pix.orderId === volta.pedido && estado.fase === "qr") restaurado = "aba";
+    else if (volta.pix && estado.fase === "oferta" && !jaTem) {
+      restaurado = "link";
+      estado = { ...estado, fase: "qr", pix: volta.pix, salvoEm: Date.now() };
+      estadoHeap = estado;
+      try { localStorage.setItem(CHAVE_ESTADO, JSON.stringify(estado)); } catch { /* fica no heap */ }
+    }
+    evento("landing_lembrete_volta", { toque: volta.toque, order_id: volta.pedido, restaurado });
+    if (restaurado === "nao" && estado.fase === "oferta") window.setTimeout(() => rolarAte($("oferta")), 300);
+  }
+}
 
 /* voltou com Pix aberto (o banco recarregou a aba) / já pago: a tela certa */
 if (estado.fase === "qr") { copiado = null; conferirEmLoop(); }

@@ -82,7 +82,7 @@ const Hiperfoco = () => {
             "Capture pensamentos rápidos na aba Dia",
             "Use a busca para encontrar ideias antigas",
             "Defina metas e estratégias para manter o foco",
-            "Registre sonhos no diário noturno",
+            "Registre seus sonhos na aba Sonhos", // 28/10: era "diário noturno" (a aba se chama Sonhos)
           ]}
         />
         {activeTab === "dia" && <ThoughtCapture />}

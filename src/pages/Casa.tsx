@@ -86,7 +86,8 @@ const Casa = () => {
           tips={[
             "Na Despensa, mude um produto para 'Acabou' e ele vai direto pra lista do Mercado",
             "Use o Cardápio para planejar as refeições da semana",
-            "Cadastre plantas e pets para nunca esquecer de regar ou dar remédio",
+            // 28/10 (auditoria das dicas): era "Cadastre plantas e pets…" — a Casa não tem planta nem pet (pet virou o módulo Pet)
+            "Em Cômodos, liste os afazeres de cada cômodo e marque conforme fizer",
           ]}
         />
 

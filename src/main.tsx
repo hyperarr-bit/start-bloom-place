@@ -21,6 +21,7 @@ import { guardarForcaConquistas2 } from "@/lib/conquistas2";
 import { guardarForcaDesafiosRodizio } from "@/lib/desafios-rodizio";
 import { guardarForcaMedicaoTotal, instalarMedicaoTotal } from "@/lib/medicao-total";
 import { precisaRestaurar, restaurarDaCopia } from "@/missao/seguranca";
+import { ehSwDoAvisoDeVenda } from "@/vendas/escopo";
 
 // Rede de segurança da classe core-shell (o index.html já tenta no boot):
 // se a injeção do Capacitor chegar depois do bloco inline por qualquer
@@ -127,10 +128,12 @@ window.addEventListener("vite:preloadError", () => { recarregarPorChunkNovo(); }
 // Always unregister any previously-installed service worker and wipe caches.
 // Past versions of this app may have registered a SW that is now serving
 // stale HTML/JS/assets to returning visitors. This self-heals them.
+// 29/10: a ÚNICA exceção é o SW do aviso de venda do dono (/vendas/sw.js, escopo /vendas) — ele não tem cache nem
+// fetch, só recebe o push; desregistrar mataria a inscrição. Nenhum cliente tem esse SW (a página é só do admin).
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker
     .getRegistrations()
-    .then((regs) => regs.forEach((r) => r.unregister()))
+    .then((regs) => regs.forEach((r) => { if (!ehSwDoAvisoDeVenda(r.scope)) r.unregister(); }))
     .catch(() => {});
   if (typeof caches !== "undefined") {
     caches

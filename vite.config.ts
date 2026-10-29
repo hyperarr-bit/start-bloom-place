@@ -46,6 +46,8 @@ const rotaDaMissao = () => {
     if (req.url === "/missao" || req.url?.startsWith("/missao?")) req.url = req.url.replace("/missao", "/missao.html");
     // 28/10: a LANDING NOVA (/organizar → landing.html; a demo /organizar/demo continua no SPA)
     else if (req.url === "/organizar" || req.url?.startsWith("/organizar?")) req.url = req.url.replace("/organizar", "/landing.html");
+    // 29/10: o painel do dono (/vendas → vendas.html, PWA própria com manifest e SW em /vendas/)
+    else if (req.url === "/vendas" || req.url === "/vendas/" || req.url?.startsWith("/vendas?")) req.url = "/vendas.html" + (req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "");
     next();
   };
   return {
@@ -124,6 +126,8 @@ export default defineConfig(({ mode }) => ({
         missao: path.resolve(__dirname, "missao.html"),
         // 28/10: a LANDING NOVA (/organizar, chave LANDING_NOVA "off" no próprio HTML) — HTML + CSS + src/landing/landing.ts
         landing: path.resolve(__dirname, "landing.html"),
+        // 29/10: /vendas — painel e aviso de venda do dono (PWA isolada: manifest e service worker só do /vendas)
+        vendas: path.resolve(__dirname, "vendas.html"),
       },
     },
   },

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>CORE Vendas</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <!--
+      /vendas (29/10) — painel e aviso de venda SÓ DO DONO. Página própria (não o index.html do app) de propósito:
+      o Safari do iPhone usa o <link rel="manifest"> da página na hora do "Adicionar à Tela de Início", e aqui ele é
+      o do /vendas (name "CORE Vendas", start_url/scope /vendas) — nunca o do app. O service worker é /vendas/sw.js,
+      escopo /vendas, sem cache e sem fetch (só push). A página não carrega o main.tsx do app, os pixels nem nada do
+      funil. O acesso é conferido no servidor (vendas-push / vendas-painel: user_roles admin).
+    -->
+    <link rel="manifest" href="/vendas/manifest.json" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="CORE Vendas" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)" />
+    <link rel="preload" href="/inter-latin.woff2" as="font" type="font/woff2" crossorigin />
+  </head>
+  <body>
+    <div id="raiz"></div>
+    <script type="module" src="/src/vendas/main.tsx"></script>
+  </body>
+</html>

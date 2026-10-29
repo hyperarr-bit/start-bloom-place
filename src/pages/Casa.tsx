@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
+import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
 import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
@@ -35,6 +37,7 @@ const Casa = () => {
   // seta ←: no app, o hub; na demo, o destino do botão de baixo dela (P5, 30/09 — antes, /auth)
   const voltarDoModulo = useVoltarDoModulo();
   const [activeTab, setActiveTab] = useState("comodos");
+  const abasDoModulo = useAbasOcultas("casa", tabs);
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
 
@@ -65,19 +68,8 @@ const Casa = () => {
             <ThemeToggle />
           </div>
         </div>
-        <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              data-spotlight={`tab-${tab.id}`}
-              onClick={() => handleTabChange(tab.id)}
-              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
-            >
-              <span>{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* 1.0.22: ocultar/organizar abas (components/ui/abas-ocultaveis) */}
+        <AbasOcultaveis abas={abasDoModulo} ativa={activeTab} onTrocar={handleTabChange} className="max-w-5xl mx-auto px-4 pb-2" />
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-5 space-y-5">

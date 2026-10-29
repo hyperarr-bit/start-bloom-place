@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
+import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
 import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 import { localDayKey, dataSegura } from "@/lib/utils";
 import { useTabReporter } from "@/hooks/use-module-tracker";
@@ -694,6 +696,16 @@ const WorkDay = () => (
 );
 
 // ============= MAIN =============
+/** As abas da Carreira (1.0.22: fora do componente — a fileira com "Organizar abas" memoiza em cima). */
+const CAREER_TABS = [
+  { id: "dia", label: "Meu Dia", icon: "🗓️" },
+  { id: "jobs", label: "Vagas", icon: "💼" },
+  { id: "portfolio", label: "Portfolio", icon: "🏆" },
+  { id: "network", label: "Rede", icon: "👥" },
+  { id: "skills", label: "Skills", icon: "⚡" },
+  { id: "interview", label: "Prep", icon: "📖" },
+];
+
 const Carreira = () => {
   // A seta ←: no app, o hub; na demo (/preview/carreira), o mesmo destino do
   // botão de baixo dela (P5, 30/09). Antes: /lp → /comecar.
@@ -711,14 +723,8 @@ const Carreira = () => {
     reportTab?.(tabId);
   };
 
-  const careerTabs = [
-    { id: "dia", label: "Meu Dia", icon: "🗓️" },
-    { id: "jobs", label: "Vagas", icon: "💼" },
-    { id: "portfolio", label: "Portfolio", icon: "🏆" },
-    { id: "network", label: "Rede", icon: "👥" },
-    { id: "skills", label: "Skills", icon: "⚡" },
-    { id: "interview", label: "Prep", icon: "📖" },
-  ];
+  // 1.0.22: fora do render (a fileira memoiza em cima) — ver CAREER_TABS lá em cima
+  const abasDoModulo = useAbasOcultas("carreira", CAREER_TABS);
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -742,19 +748,8 @@ const Carreira = () => {
             <ThemeToggle />
           </div>
         </div>
-        <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          {careerTabs.map((tab) => (
-            <button
-              key={tab.id}
-              data-spotlight={`tab-${tab.id}`}
-              onClick={() => handleTabChange(tab.id)}
-              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
-            >
-              <span>{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* 1.0.22: ocultar/organizar abas (components/ui/abas-ocultaveis) */}
+        <AbasOcultaveis abas={abasDoModulo} ativa={activeTab} onTrocar={handleTabChange} className="max-w-5xl mx-auto px-4 pb-2" />
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4 space-y-4">

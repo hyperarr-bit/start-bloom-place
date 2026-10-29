@@ -7,6 +7,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import { tutorialAntigoPodeMarcarVisto } from "@/lib/intro-modulo";
 import { tutorialNestaAbertura } from "@/lib/tutorial-abertura";
+import { segurarTodasAsAbas } from "@/lib/abas-ocultas";
 
 export interface SpotlightStep {
   selector: string;
@@ -110,6 +111,9 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
     }
   }, [moduleKey, get, set, isGuest, loaded]);
 
+
+  // 1.0.22 (ocultar abas): o holofote aponta pras abas pelo data-spotlight — aberto, todas as abas aparecem
+  useEffect(() => (active ? segurarTodasAsAbas() : undefined), [active]);
 
   // Track step views (drop-off analytics) + fire onEnter callback
   useEffect(() => {

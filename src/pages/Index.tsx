@@ -1,4 +1,6 @@
 import { lazy, Suspense, useState, useEffect, useMemo, useRef } from "react";
+import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
+import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
 import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 import { reais } from "@/lib/dinheiro";
 import { localDayKey } from "@/lib/utils";
@@ -466,19 +468,20 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
     if (d.alvo) window.setTimeout(() => document.querySelector(d.alvo!)?.scrollIntoView({ behavior: "smooth", block: "center" }), 250);
   };
 
-  const tabs = [
-    { id: "dashboard", label: "📊 DASHBOARD" },
-    ...(temKit ? [{ id: "kit", label: "📒 KIT 30 DIAS" }] : []),
-    { id: "financeiro", label: "💰 MEU FINANCEIRO" },
-    { id: "investimentos", label: "📈 INVESTIMENTOS" },
-    { id: "itens", label: "❤️ DESEJOS" },
-    { id: "viagem", label: "✈️ VIAGEM" },
-    { id: "simuladores", label: "🧮 SIMULADORES" },
-    
-    { id: "limites", label: "🎯 LIMITES" },
-    { id: "relatorios", label: "📋 RELATÓRIOS" },
-    { id: "saude", label: "💚 SAÚDE FINANCEIRA" },
-  ];
+  // 1.0.22 (ocultar abas): a fileira é a AbasOcultaveis de todos os módulos — "Organizar abas" no fim (lib/abas-ocultas)
+  const tabs = useMemo(() => [
+    { id: "dashboard", label: "DASHBOARD", icon: "📊" },
+    ...(temKit ? [{ id: "kit", label: "KIT 30 DIAS", icon: "📒" }] : []),
+    { id: "financeiro", label: "MEU FINANCEIRO", icon: "💰", spotlight: "financeiro" },
+    { id: "investimentos", label: "INVESTIMENTOS", icon: "📈" },
+    { id: "itens", label: "DESEJOS", icon: "❤️" },
+    { id: "viagem", label: "VIAGEM", icon: "✈️" },
+    { id: "simuladores", label: "SIMULADORES", icon: "🧮" },
+    { id: "limites", label: "LIMITES", icon: "🎯" },
+    { id: "relatorios", label: "RELATÓRIOS", icon: "📋" },
+    { id: "saude", label: "SAÚDE FINANCEIRA", icon: "💚" },
+  ], [temKit]);
+  const abasDeFinancas = useAbasOcultas("financas", tabs);
 
   // travado por MONTAR_FINANCAS_NO_MODULO (17/10, ver lá em cima): o módulo não abre o quiz sozinho
   if (MONTAR_FINANCAS_NO_MODULO && montar.estado === "decidindo") return <div className="min-h-screen bg-background" />;
@@ -558,19 +561,8 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
             <AcessoConhecerMais moduleId="financas" /><ThemeToggle />
           </div>
         </div>
-        {/* Tabs */}
-        <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto scrollbar-hide">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id} data-active={activeTab === tab.id}
-              data-spotlight={tab.id === "financeiro" ? "financeiro" : `tab-${tab.id}`}
-              onClick={() => setActiveTab(tab.id)}
-              className={`notion-tab whitespace-nowrap text-[11px] ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* Tabs (1.0.22: ocultar/organizar — components/ui/abas-ocultaveis) */}
+        <AbasOcultaveis abas={abasDeFinancas} ativa={activeTab} onTrocar={setActiveTab} corrigirAbaDesconhecida={false} className="max-w-7xl mx-auto px-4 pb-2" />
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-5 space-y-5">

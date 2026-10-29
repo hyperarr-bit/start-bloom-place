@@ -1,4 +1,6 @@
 import { CHAVE_ACOES_CONQUISTAS, registrarAcao } from "@/lib/conquistas-acoes";
+import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
+import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
 import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 /**
  * TREINO — redesenho de 26/09 (mockups p1–p4 e p7 aprovados pelo dono).
@@ -169,6 +171,7 @@ const Treino = () => {
   const voltarDoModulo = useVoltarDoModulo();
   const [abaPedida] = useState(abaDaUrl);
   const [activeTab, setActiveTab] = useState<Aba>(() => abaPedida ?? "hoje");
+  const abasDoModulo = useAbasOcultas("treino", ABAS);
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
   const today = localDayKey();
@@ -799,24 +802,7 @@ const Treino = () => {
             letra maior e mais espaçada, abas esticadas) e destoava dos outros módulos.
             Agora é a MESMA faixa do AbasOcultaveis: notion-tab 11 px, largura natural,
             rola pro lado quando não cabe (a aba ativa entra na tela sozinha). */}
-        <div className="relative max-w-5xl mx-auto px-4 pb-2">
-          <div className="flex gap-1 overflow-x-auto scrollbar-hide pt-2 -mt-2">
-            {ABAS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                data-spotlight={`tab-${tab.id}`}
-                data-active={activeTab === tab.id}
-                data-testid={`aba-${tab.id}`}
-                onClick={() => trocarAba(tab.id)}
-                className={`notion-tab shrink-0 whitespace-nowrap text-[11px] flex items-center gap-1 select-none ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
-              >
-                <span aria-hidden="true">{tab.icon}</span>
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <AbasOcultaveis abas={abasDoModulo} ativa={activeTab} onTrocar={(id) => trocarAba(id as Aba)} testIds className="max-w-5xl mx-auto px-4 pb-2" />
       </header>
 
       <main

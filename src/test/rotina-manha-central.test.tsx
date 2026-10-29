@@ -1,7 +1,7 @@
 /**
  * O LEMBRETE DE MANHÃ DA ROTINA no sistema e na central de notificações (1.0.16):
  *   · agendado pelo plugin de verdade (mockado): ids na faixa 1820000, allowWhileIdle, toque abre /rotina;
- *   · a central tem a linha "Rotina de manhã" (nasce desligada): liga, muda a hora e desliga — cada um
+ *   · a central tem a linha "Rotina de manhã" (nasce desligada, no grupo Rotina; a hora na folha): liga, muda a hora e desliga — cada um
  *     reagenda pelo MESMO caminho do resto (reagendarTudo) e desligar limpa a faixa.
  */
 process.env.TZ = "America/Sao_Paulo";
@@ -99,12 +99,25 @@ describe("na central de notificações", () => {
     render(<MemoryRouter initialEntries={["/notificacoes"]}><store.Provedor><Notificacoes /></store.Provedor></MemoryRouter>);
     return store;
   };
-  const linha = async () => (await screen.findByText("Rotina de manhã")).closest("div.rounded-2xl") as HTMLElement;
+  // 29/10 (A6): a linha mora no grupo Rotina (sanfona); o texto completo e a hora com minuto, na folha do lembrete
+  const linha = async () => {
+    const grupo = await screen.findByTestId("grupo-rotina");
+    if (!grupo.dataset.aberto) fireEvent.click(within(grupo).getByRole("button", { expanded: false }));
+    return screen.getByTestId("lembrete-rotina_manha");
+  };
+  const abrirFolha = async () => {
+    fireEvent.click(within(await linha()).getByRole("button", { name: "Detalhes: Rotina de manhã" }));
+    return screen.findByTestId("folha-lembrete");
+  };
 
   it("nasce desligada; ligar grava a chave própria e agenda pela régua de sempre", async () => {
     const store = abrir({ "rotina-habits": ["Beber água", "Treinar"] });
     const l = await linha();
-    expect(within(l).getByText(/Todo dia às 07:15/)).toBeTruthy();
+    expect(within(l).getByText("Rotina de manhã")).toBeTruthy();
+    expect(within(l).getByRole("button", { name: /Horário: Rotina de manhã, 07:15/ })).toBeTruthy();
+    const folha = await abrirFolha();
+    expect(within(folha).getByText(/Todo dia às 07:15/)).toBeTruthy();
+    fireEvent.click(within(folha).getByRole("button", { name: "Pronto" }));
     const chave = within(l).getByRole("switch", { name: "Rotina de manhã" });
     expect(chave.getAttribute("aria-checked")).toBe("false");
     fireEvent.click(chave);
@@ -112,10 +125,10 @@ describe("na central de notificações", () => {
     await waitFor(() => expect(daFaixa()).toHaveLength(11));
   });
 
-  it("a hora muda no próprio cartão (com minuto) e desligar limpa", async () => {
+  it("a hora muda na folha (com minuto) e desligar limpa", async () => {
     const store = abrir({ "rotina-habits": ["Ler"], [CHAVE_LEMBRETE_ROTINA_MANHA]: { ligado: true, hora: "07:15" } });
-    const l = await linha();
-    fireEvent.change(within(l).getByLabelText("Horário do lembrete de manhã"), { target: { value: "06:45" } });
+    const folha = await abrirFolha();
+    fireEvent.change(within(folha).getByLabelText("Horário do lembrete de manhã"), { target: { value: "06:45" } });
     await waitFor(() => expect(store.estado.dados[CHAVE_LEMBRETE_ROTINA_MANHA]).toEqual({ ligado: true, hora: "06:45" }));
     await waitFor(() => expect(daFaixa()[0]?.schedule.at).toEqual(new Date(2026, 9, 17, 6, 45)));
     fireEvent.click(within(await linha()).getByRole("switch", { name: "Rotina de manhã" }));

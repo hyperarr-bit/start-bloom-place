@@ -46,6 +46,19 @@ const AuthCallback = () => {
           return;
         }
 
+        /* TROCA DE E-MAIL (29/10, pages/conta): com o "Secure email change" ligado o 1º link confirmado volta só com
+         * `#message=Confirmation link accepted...` (sem sessão) — antes caía calado na Home. O 2º (ou o único) volta
+         * com `type=email_change` + sessão. */
+        const tipo = params.get("type") ?? query.get("type");
+        const mensagem = params.get("message");
+        if (mensagem && !access_token) {
+          trackEvent("conta_email_link", { etapa: "um_de_dois" });
+          toast({ title: "Falta um passo", description: "Confirme também o link que mandamos pro outro e-mail. Depois disso a troca vale." });
+        } else if (tipo === "email_change") {
+          trackEvent("conta_email_link", { etapa: "concluida" });
+          toast({ title: "E-mail trocado", description: "Agora você entra com o e-mail novo." });
+        }
+
         if (access_token && refresh_token) {
           const { error } = await supabase.auth.setSession({ access_token, refresh_token });
           if (error) {

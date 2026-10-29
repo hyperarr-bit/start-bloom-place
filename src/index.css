@@ -843,11 +843,6 @@ header.sticky.top-0::before {
     -webkit-backdrop-filter: blur(20px) saturate(1.6);
     backdrop-filter: blur(20px) saturate(1.6);
   }
-  /* com esse cabeçalho na tela, a faixa do relógio fica só com o desfoque: a cor dela (o fundo da página) por cima do
-     vidro do cabeçalho (a cor do cartão) desenhava uma emenda na altura do relógio — no escuro, bem visível */
-  html.core-shell:has(header.sticky.top-0:is(.bg-card, [class*="bg-card/"], [class*="bg-background"])) .app-safe-top-guard {
-    background: transparent;
-  }
 }
 
 /* ============================================================

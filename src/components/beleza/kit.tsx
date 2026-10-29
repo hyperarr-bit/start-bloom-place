@@ -18,6 +18,7 @@
  * Botão só-ícone leva classe `bg-*`: a regra global do alvo de toque (index.css)
  * infla botão "nu" com 8 px de cada lado.
  */
+import { ModuleTip } from "@/components/ModuleTip";
 import "./beleza.css";
 import { useState, type HTMLAttributes, type ReactNode } from "react";
 import { Check, Droplet, Moon, Sparkles, Sun, X } from "lucide-react";
@@ -247,34 +248,8 @@ export function Dica({
  * As dicas do módulo, no papel da Beleza (o ModuleTip cinza destoava no topo).
  * Mesma chave do ModuleTip (`core-tip-seen-beleza`): quem já fechou não vê de novo.
  */
-export function DicasDaBeleza({ dicas }: { dicas: string[] }) {
-  const { get, set, loaded } = useUserData();
-  const chave = "core-tip-seen-beleza";
-  // 28/10: a marca lida a cada render e só com a conta carregada (antes, lida 1x na montagem: reabrir direto na
-  // Beleza antes da conta chegar trazia as dicas fechadas de volta — o mesmo conserto do ModuleTip)
-  const [fechadaAgora, setFechadaAgora] = useState(false);
-  if (!loaded || fechadaAgora || get<string>(chave, "")) return null;
-  return (
-    <div className="relative rounded-2xl border border-dashed border-bz-dica-borda bg-bz-dica pl-4 pr-11 py-3.5" data-testid="dicas-beleza">
-      <button
-        type="button"
-        aria-label="Fechar dicas"
-        onClick={() => { set(chave, "true"); setFechadaAgora(true); }}
-        className="absolute top-1 right-1 w-10 h-10 grid place-items-center rounded-full bg-transparent text-bz-dica-tinta/70"
-      >
-        <X className="w-4 h-4" />
-      </button>
-      <p className="flex items-center gap-1.5 text-[11.5px] font-extrabold tracking-[.14em] uppercase text-bz-dica-tinta">
-        <Sparkles className="w-3.5 h-3.5 text-bz-acento" aria-hidden="true" /> Dicas pra começar
-      </p>
-      <ul className="mt-1.5 space-y-1">
-        {dicas.map((d) => (
-          <li key={d} className="flex gap-1.5 text-[12.5px] leading-snug text-bz-dica-tinta/90">
-            <span aria-hidden="true">·</span>
-            <span>{d}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
+/** "Dicas pra começar" da Beleza: o cartão de todos os módulos (ModuleTip, lib/dicas-do-modulo) na paleta da Beleza.
+ *  `dicas` só vale se a lista central não tiver a Beleza. A marca é a de sempre (`core-tip-seen-beleza`). */
+export function DicasDaBeleza({ dicas }: { dicas?: string[] }) {
+  return <ModuleTip moduleId="beleza" tips={dicas} tema="beleza" />;
 }

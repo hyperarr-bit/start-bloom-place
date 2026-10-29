@@ -234,7 +234,8 @@ describe("a porta única: chave off = ModuleTip de sempre; on = a folha dos cart
     n.montar(<BoasVindasDoModulo moduleId="rotina" tips={DICAS} />, "/preview/rotina");
     await respirar();
     expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
-    expect(screen.getByText("Dicas para começar")).toBeInTheDocument();
+    // 28/10: nem o "Dicas para começar" (demo de venda não mostra dicas — lib/dicas-do-modulo)
+    expect(screen.queryByText("Dicas para começar")).toBeNull();
     expect(eventos).toEqual([]);
   });
 

@@ -809,14 +809,7 @@ const Treino = () => {
         className="max-w-5xl mx-auto px-4 py-4"
         style={{ paddingBottom: mostraRodape ? `calc(${alturaRodape + 20}px + var(--teste-banner-h, 0px))` : "calc(2rem + var(--teste-banner-h, 0px))" }}
       >
-        <BoasVindasDoModulo
-          moduleId="treino"
-          tips={[
-            "No 📋 PLANO você monta a semana: modelo pronto, exercícios, séries e carga",
-            "Marque cada série no HOJE — o descanso começa sozinho",
-            "Recordes e a carga de cada exercício aparecem em 📈 EVOLUÇÃO",
-          ]}
-        />
+        <BoasVindasDoModulo moduleId="treino" />
 
         {activeTab === "hoje" && !treinoVazio && <PeDoEsqueceu hoje={today} log={log} onAbrir={setDiaEsquecido} />}
 

@@ -68,15 +68,7 @@ const Hiperfoco = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-5 pb-24 space-y-4">
-        <BoasVindasDoModulo
-          moduleId="hiperfoco"
-          tips={[
-            "Capture pensamentos rápidos na aba Dia",
-            "Use a busca para encontrar ideias antigas",
-            "Defina metas e estratégias para manter o foco",
-            "Registre seus sonhos na aba Sonhos", // 28/10: era "diário noturno" (a aba se chama Sonhos)
-          ]}
-        />
+        <BoasVindasDoModulo moduleId="hiperfoco" />
         {activeTab === "dia" && <ThoughtCapture />}
         {activeTab === "busca" && <ThoughtSearch />}
         {activeTab === "metas" && <GoalsPanel />}

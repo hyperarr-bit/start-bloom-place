@@ -71,15 +71,7 @@ const Saude = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-5 space-y-5">
-        <BoasVindasDoModulo
-          moduleId="saude"
-          tips={[
-            "Acompanhe sua hidratação diária e marque seus copos de água",
-            "Cadastre seus suplementos e marque conforme tomar cada um",
-            "Registre suas medidas corporais na aba ⚖️ Evolução",
-            "Use o Log Médico para salvar consultas e exames importantes",
-          ]}
-        />
+        <BoasVindasDoModulo moduleId="saude" />
 
         {activeTab === "hoje" && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">

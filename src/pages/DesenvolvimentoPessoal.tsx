@@ -540,16 +540,7 @@ const DesenvolvimentoPessoal = () => {
       </div>
 
       <main className="max-w-5xl mx-auto px-4 py-4">
-        <BoasVindasDoModulo
-          moduleId="desenvolvimento"
-          tips={[
-            // 28/10 (auditoria): a aba Metas não tem "bucket list"; o quadro de visão se chama Mural dos sonhos; a aba Sobre Mim não tem 🧠
-            "Defina suas metas (de 6 meses a 5 anos) e monte o mural dos sonhos na aba Metas",
-            "Escreva 3 coisas pelas quais é grato na aba Gratidão",
-            "Defina seus valores e forças pessoais na aba Sobre Mim",
-            "Crie afirmações positivas em Sobre Mim e leia-as todo dia"
-          ]}
-        />
+        <BoasVindasDoModulo moduleId="desenvolvimento" />
 
 
           {/* ========== SOBRE MIM ========== */}

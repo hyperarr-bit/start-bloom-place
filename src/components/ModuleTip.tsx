@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ChevronRight } from "lucide-react";
+import { X, ChevronRight, Lightbulb } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { useDemoDoFunil } from "@/lib/demo-do-funil";
 import { fileiraDeDemo } from "@/components/ui/abas-ocultaveis";
@@ -15,21 +15,28 @@ interface ModuleTipProps {
   tema?: "app" | "beleza";
 }
 
+/* 29/10 (dono: "quero o design antigo das dicas, o da lâmpada"): o cartão volta ao desenho da 1.0.12 — caixa tingida, a
+ * lâmpada num quadradinho à esquerda, título na cor do tema e as dicas em lista — e cada dica continua sendo um botão que
+ * leva ao lugar (modo "toque"). Beleza usa o mesmo desenho na paleta dela. */
 const TEMAS = {
   app: {
     caixa: "bg-primary/5 border border-primary/20 rounded-xl",
+    lampada: "bg-primary/10 text-primary",
     titulo: "text-xs font-bold text-primary",
-    linha: "text-[12px] leading-snug text-muted-foreground",
-    botao: "text-[12.5px] leading-snug text-foreground/85 hover:bg-primary/10 active:bg-primary/15",
-    seta: "text-primary/60",
+    linha: "text-[11.5px] leading-snug text-muted-foreground",
+    marca: "text-primary/60",
+    botao: "text-[12px] leading-snug text-muted-foreground hover:bg-primary/10 hover:text-foreground active:bg-primary/15",
+    seta: "text-primary/50",
     fechar: "bg-muted/80 hover:bg-muted text-foreground",
   },
   beleza: {
-    caixa: "border border-dashed border-bz-dica-borda bg-bz-dica rounded-2xl",
-    titulo: "text-[11.5px] font-extrabold tracking-[.14em] uppercase text-bz-dica-tinta",
-    linha: "text-[12.5px] leading-snug text-bz-dica-tinta/90",
-    botao: "text-[12.5px] leading-snug text-bz-dica-tinta hover:bg-black/5 active:bg-black/10",
-    seta: "text-bz-dica-tinta/60",
+    caixa: "border border-bz-dica-borda bg-bz-dica rounded-2xl",
+    lampada: "bg-bz-acento/15 text-bz-acento",
+    titulo: "text-xs font-bold text-bz-dica-tinta",
+    linha: "text-[11.5px] leading-snug text-bz-dica-tinta/85",
+    marca: "text-bz-acento/70",
+    botao: "text-[12px] leading-snug text-bz-dica-tinta/90 hover:bg-bz-acento/10 active:bg-bz-acento/15",
+    seta: "text-bz-dica-tinta/50",
     fechar: "bg-transparent text-bz-dica-tinta/70",
   },
 } as const;
@@ -72,7 +79,7 @@ export const ModuleTip = ({ moduleId, tips, tema = "app" }: ModuleTipProps) => {
           className="mb-4 overflow-hidden"
         >
           <div
-            className={`${t.caixa} relative ${modo === "toque" ? "pl-2 pr-2 pt-3 pb-1.5" : "pl-4 pr-11 py-3"}`}
+            className={`${t.caixa} relative p-4 pr-3`}
             data-testid={tema === "beleza" ? "dicas-beleza" : "dicas-modulo"}
             data-modo={modo}
             data-modulo={moduleId}
@@ -82,34 +89,45 @@ export const ModuleTip = ({ moduleId, tips, tema = "app" }: ModuleTipProps) => {
               aria-label="Fechar dicas"
               className={`absolute top-1.5 right-1.5 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${t.fechar}`}
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-3 h-3" />
             </button>
-            <p className={`${t.titulo} ${modo === "toque" ? "pl-2 pr-10 mb-1" : "pr-1 mb-1.5"}`}>
-              {tema === "beleza" ? "Dicas pra começar" : "Dicas para começar"}
-            </p>
-            {modo === "toque" ? (
-              <ul>
-                {dicas.map((d, i) => (
-                  <li key={i}>
-                    <button
-                      type="button"
-                      onClick={() => irParaDica(moduleId, d, i)}
-                      data-testid={`dica-${i + 1}`}
-                      className={`w-full min-h-[40px] flex items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors ${t.botao}`}
-                    >
-                      <span className="flex-1">{d.texto}</span>
-                      <ChevronRight className={`w-4 h-4 shrink-0 ${t.seta}`} aria-hidden />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <ul className="space-y-1">
-                {dicas.map((d, i) => (
-                  <li key={i} className={t.linha} data-testid={`dica-${i + 1}`}>{d.textoSemToque ?? d.texto}</li>
-                ))}
-              </ul>
-            )}
+            <div className="flex items-start gap-3">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${t.lampada}`} data-testid="dicas-lampada" aria-hidden>
+                <Lightbulb className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`${t.titulo} pr-8 mb-1.5`}>
+                  {tema === "beleza" ? "Dicas pra começar" : "Dicas para começar"}
+                </p>
+                {modo === "toque" ? (
+                  <ul className="-ml-2">
+                    {dicas.map((d, i) => (
+                      <li key={i}>
+                        <button
+                          type="button"
+                          onClick={() => irParaDica(moduleId, d, i)}
+                          data-testid={`dica-${i + 1}`}
+                          className={`w-full min-h-[36px] flex items-start gap-1.5 rounded-lg px-2 py-1.5 text-left transition-colors ${t.botao}`}
+                        >
+                          <span className={`mt-px ${t.marca}`} aria-hidden>•</span>
+                          <span className="flex-1">{d.texto}</span>
+                          <ChevronRight className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${t.seta}`} aria-hidden />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <ul className="space-y-1 pr-4">
+                    {dicas.map((d, i) => (
+                      <li key={i} className={`${t.linha} flex items-start gap-1.5`}>
+                        <span className={`mt-px ${t.marca}`} aria-hidden>•</span>
+                        <span data-testid={`dica-${i + 1}`}>{d.textoSemToque ?? d.texto}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
           </div>
         </motion.div>
       )}

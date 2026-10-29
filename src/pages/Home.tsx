@@ -5,7 +5,9 @@ import { useUserData } from "@/hooks/use-user-data";
 import { AnimatePresence, motion } from "framer-motion";
 import { Plus, LayoutGrid } from "lucide-react";
 import { LojasCard } from "@/components/LojasCard";
-import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
+import { DndContext, closestCenter, DragEndEvent } from "@dnd-kit/core";
+import { useSensoresDeReordenar } from "@/lib/arrastar-reordenar";
+import { vibrar } from "@/lib/acoes-rapidas";
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { QuickStartOnboarding, ModuleKey } from "@/components/onboarding/QuickStartOnboarding";
 import { DailyNudge } from "@/components/onboarding/DailyNudge";
@@ -35,7 +37,8 @@ import { useHomeNova } from "@/hooks/use-home-nova";
 import { tutorialNestaAbertura } from "@/lib/tutorial-abertura";
 import { useTheme, palettes, type ThemePalette } from "@/hooks/use-theme";
 import { CHAVE_COR_ANTES_HOME_NOVA, origemJaTentada } from "@/lib/home-nova";
-import { contaCarregadaDeVerdade, decidirOrigemDaConta } from "@/components/home-nova/OrigemDaConta";
+import { contaCarregadaDeVerdade, decidirOrigemDaConta, lerEscolhaDaConta } from "@/components/home-nova/OrigemDaConta";
+import { ConviteHomeNova } from "@/components/home-nova/EscolhaDaHome";
 import { contarUso } from "@/lib/medicao-total";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ATRIBUTO_RAIZ } from "@/lib/nav-abas";
@@ -142,6 +145,9 @@ const HomePage = () => {
   // 26/10 (home nova garantida): a ORIGEM da conta (nova × antiga) é decidida AQUI MESMO, no render, se ninguém decidiu
   // ainda com a conta desta pessoa carregada — a Home nunca depende da ordem da árvore (OrigemDaContaNaSessao grava)
   if (user?.id && !origemJaTentada(user.id) && contaCarregadaDeVerdade(loaded, contaCompleta)) decidirOrigemDaConta(user, get);
+  // 1.0.22 (28/10): a ESCOLHA da Home (Você › Home / o convite) gravada na conta vence a origem — lida aqui no render pelo
+  // mesmo motivo (a de outro aparelho chega com a conta; OrigemDaContaNaSessao espelha no aparelho)
+  lerEscolhaDaConta(user?.id, get, contaCarregadaDeVerdade(loaded, contaCompleta));
   // 1.0.19: a Home nova pra esta conta? (chave remota `home_nova`, no app o padrão é "novas+admin"; no modo "admin" a
   // checagem roda por trás e, sem resposta, vale "não"). `esperandoOrigem`: a origem desta conta ainda não foi decidida
   // — a tela de carregamento fica (nunca a Home antiga por um quadro pra conta nova)
@@ -281,14 +287,14 @@ const HomePage = () => {
     setData("gamification-lastCheckIn", today);
   }, [loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
-  );
+  // 28/10 (avaliação 5★ "a tela é muito sensível"): arrastar widget só no modo de editar e só com o dedo PARADO
+  // (lib/arrastar-reordenar — antes o PointerSensor pegava o toque com 5 px de movimento e rolar a tela arrastava)
+  const sensors = useSensoresDeReordenar();
 
+  // entrar no modo de editar: segurar PARADO (rolar/mexer o dedo cancela — use-long-press)
   const longPressHandlers = useLongPress(() => {
-    if (activeWidgets.length > 0) { setEditingWidgets(true); contarUso("widgets-editar-segurar", "widgets"); }
-  }, 600);
+    if (activeWidgets.length > 0) { vibrar(); setEditingWidgets(true); contarUso("widgets-editar-segurar", "widgets"); }
+  });
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -516,6 +522,9 @@ const HomePage = () => {
       {mostrarTour && (
         <TourDaHome lifeData={lifeData} widgetsAtivos={activeWidgets.map((w) => w.id)} adicionarWidget={addWidget} onFim={() => setDataTrigger((d) => d + 1)} variante={varianteDoTour() ?? "longo"} />
       )}
+
+      {/* 1.0.22 (dono 28/10): "Tem uma Home nova" — folha de baixo, 1x por conta, nunca card no topo (EscolhaDaHome) */}
+      <ConviteHomeNova bloqueado={mostrarTour || editingWidgets || showWidgetPicker} ligada={homeNova.ligada} />
 
       <WidgetPicker
         open={showWidgetPicker}

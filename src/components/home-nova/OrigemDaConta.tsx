@@ -5,7 +5,7 @@ import { isNativeShell } from "@/lib/native-shell";
 import { localDayKey } from "@/lib/utils";
 import { CHAVE_MISSAO_NA_CONTA, lerMissao, missaoDaConta, missaoDeAntesDa1019, missaoValida } from "@/lib/missao-doses";
 import {
-  CHAVE_ORIGEM_CONTA, anotarOrigemEmMemoria, classificarOrigem, definirContaHomeNova, lerMarcadorOrigem, marcadorDe, marcarOrigemTentada,
+  CHAVE_HOME_ESCOLHA, CHAVE_ORIGEM_CONTA, anotarEscolhaEmMemoria, anotarOrigemEmMemoria, lerEscolhaDaHome, registrarEscolhaDaHome, type EscolhaDaHome, classificarOrigem, definirContaHomeNova, lerMarcadorOrigem, marcadorDe, marcarOrigemTentada,
   origemConhecida, origemEmMemoria, registrarOrigem, type OrigemDaConta,
 } from "@/lib/home-nova";
 
@@ -58,6 +58,18 @@ export function decidirOrigemDaConta(user: Conta, get: Leitor): { origem: Origem
 }
 
 /**
+ * 1.0.22 (28/10) — A ESCOLHA DA HOME gravada na CONTA (`core-home-escolha`, lib/home-nova › ESCOLHA DA HOME), lida no
+ * RENDER (anota só na memória desta abertura, sem gravar nem avisar): quem decide a Home no mesmo passe já vê a escolha
+ * — inclusive a feita em OUTRO aparelho, que chega com a conta. Só com a conta DESTA pessoa carregada.
+ */
+export function lerEscolhaDaConta(userId: string | null | undefined, get: Leitor, contaPronta: boolean): EscolhaDaHome | null {
+  if (!userId || !contaPronta) return null;
+  const escolha = lerEscolhaDaHome(get<unknown>(CHAVE_HOME_ESCOLHA, null));
+  if (escolha) anotarEscolhaEmMemoria(userId, escolha);
+  return escolha;
+}
+
+/**
  * A ORIGEM DA CONTA NA SESSÃO (1.0.19, 26/10 — modo "novas"/"novas+admin" da chave `home_nova`, lib/home-nova).
  *
  * Montado no App ANTES das rotas (como o DonoDaMissaoNaSessao): define a conta da sessão pra quem decide sem React
@@ -86,6 +98,12 @@ export function OrigemDaContaNaSessao() {
   const { origem, faltaNaConta } = pronta
     ? decidirOrigemDaConta(user as Conta, get)
     : { origem: null as OrigemDaConta | null, faltaNaConta: false };
+
+  // 1.0.22: a escolha da Home que está na conta (memória no render; espelho + aviso no efeito)
+  const escolhaNaConta = lerEscolhaDaConta(uid, get, pronta);
+  useEffect(() => {
+    if (uid && escolhaNaConta) registrarEscolhaDaHome(uid, escolhaNaConta);
+  }, [uid, escolhaNaConta]);
 
   useEffect(() => {
     if (!uid || !origem) return;

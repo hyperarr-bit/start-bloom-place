@@ -1,6 +1,6 @@
 import { useState, useEffect, startTransition, type CSSProperties, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, ChevronRight, Mail, KeyRound, RotateCcw, Trash2, Bell, Sparkles, Monitor, Copy, LifeBuoy, Eraser, Star, Palette, Shield, FileText, NotebookPen, type LucideIcon } from "lucide-react";
+import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, ChevronRight, Mail, KeyRound, RotateCcw, Trash2, Bell, Sparkles, Monitor, Copy, LifeBuoy, Eraser, Star, Palette, Shield, FileText, NotebookPen, LayoutDashboard, type LucideIcon } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
@@ -25,6 +25,9 @@ import { PainelAparencia } from "@/components/account/PainelAparencia";
 import { useSequencia } from "@/components/conquistas/use-conquistas";
 import { Fogo } from "@/components/conquistas/Fogo";
 import { FaixaDoRelogioSobFundoEscuro } from "@/components/app/faixaDoRelogio";
+import { useEscolhaDaHome } from "@/hooks/use-escolha-da-home";
+import { PainelEscolhaDaHome } from "@/components/home-nova/EscolhaDaHome";
+import type { EscolhaDaHome } from "@/lib/home-nova";
 
 /* ───────────── 1.0.18: o MENU NOVO (lib/menu-novo) — 3 grupos, no desenho v1-menu ───────────── */
 
@@ -70,7 +73,7 @@ interface AccountDrawerProps {
 }
 
 /** As telas da folha: o menu e as sub-telas ("aparencia" e "legal" só existem com o menu novo da 1.0.18). */
-type Vista = "menu" | "account" | "computador" | "aparencia" | "legal";
+type Vista = "menu" | "account" | "computador" | "aparencia" | "legal" | "home";
 
 export const AccountDrawer = ({
   open,
@@ -89,6 +92,19 @@ export const AccountDrawer = ({
   const [view, setView] = useState<Vista>(inicial);
   // 1.0.18: a chave é lida a cada abertura da folha (a resposta do RevenueCat pode chegar com o app aberto)
   const novo = menuNovoLigado();
+  // 1.0.22 (dono 28/10): "Home: Nova / Clássica" — sempre à mão no menu (iPhone e site; Android não tem: disponivel=false)
+  const escolhaHome = useEscolhaDaHome();
+  const rotuloHome = escolhaHome.atual === "nova" ? "Nova" : "Clássica";
+  /** Fecha a folha PRIMEIRO e só depois troca a Home (nada muda por baixo de uma folha aberta); volta pro topo da Home. */
+  const trocarHome = (para: EscolhaDaHome) => {
+    onOpenChange(false);
+    window.setTimeout(() => {
+      escolhaHome.escolher(para, "voce");
+      startTransition(() => navigate("/home", { replace: true }));
+      try { window.scrollTo(0, 0); } catch { /* noop */ }
+      toast(para === "nova" ? "Pronto, Home nova. Dá pra voltar em Você." : "Pronto, Home clássica. Dá pra trocar em Você.");
+    }, 320);
+  };
 
   useEffect(() => {
     setView(inicial);
@@ -218,6 +234,7 @@ export const AccountDrawer = ({
         { icon: LifeBuoy, label: "Ajuda e suporte", onClick: () => go("/ajuda") },
         ...itemAvaliar,
         { icon: RotateCcw, label: "Ver tutorial", onClick: handleReplayTutorial },
+        ...(escolhaHome.disponivel ? [{ icon: LayoutDashboard, label: `Home: ${rotuloHome}`, onClick: () => setView("home") }] : []),
       ];
 
   return (
@@ -266,7 +283,9 @@ export const AccountDrawer = ({
                 avaliar: itemAvaliar.length ? itemAvaliar[0].onClick : undefined,
                 legal: () => setView("legal"),
                 sair: () => { void signOut(); },
+                home: escolhaHome.disponivel ? () => setView("home") : undefined,
               }}
+              rotuloHome={rotuloHome}
             />
           )}
 
@@ -275,6 +294,15 @@ export const AccountDrawer = ({
               <CabecalhoDaSubtela titulo="Aparência" onVoltar={voltarAoMenu} />
               <div className="px-4 pb-4" data-testid="menu-tela-aparencia">
                 <PainelAparencia origem="menu" />
+              </div>
+            </>
+          )}
+
+          {view === "home" && (
+            <>
+              <CabecalhoDaSubtela titulo="Home" onVoltar={voltarAoMenu} />
+              <div className="px-4 pb-6" data-testid="menu-tela-home">
+                <PainelEscolhaDaHome atual={escolhaHome.atual} onEscolher={trocarHome} />
               </div>
             </>
           )}
@@ -483,6 +511,8 @@ interface AcoesDoMenu {
   plano30?: () => void;
   legal: () => void;
   sair: () => void;
+  /** 1.0.22: "Home: Nova / Clássica" (só onde a escolha existe — iPhone e site) */
+  home?: () => void;
 }
 
 /**
@@ -491,7 +521,7 @@ interface AcoesDoMenu {
  * suporte, [Avaliar o CORE], Privacidade e termos; Sair separado. Componente próprio: só monta com a folha aberta
  * (a sequência e o tema não são lidos com a folha fechada). `menu_item_click {item, grupo, menu: "novo"}` em todo item.
  */
-function MenuNovo({ isGuest, nome, email, iniciais, acoes }: { isGuest: boolean; nome: string; email: string; iniciais: string; acoes: AcoesDoMenu }) {
+function MenuNovo({ isGuest, nome, email, iniciais, acoes, rotuloHome }: { isGuest: boolean; nome: string; email: string; iniciais: string; acoes: AcoesDoMenu; rotuloHome?: string }) {
   const auth = useAuth();
   const seq = useSequencia();
   const { mode, palette } = useTheme();
@@ -535,6 +565,7 @@ function MenuNovo({ isGuest, nome, email, iniciais, acoes }: { isGuest: boolean;
     ...(nativo && !isGuest ? [{ id: "lembretes", grupo: "app" as const, Icone: Bell, rotulo: "Lembretes", onClick: clicar("lembretes", "app", acoes.lembretes) }] : []),
     ...(nativo && !isGuest ? [{ id: "computador", grupo: "app" as const, Icone: Monitor, rotulo: "Usar no computador", onClick: clicar("computador", "app", acoes.computador) }] : []),
     ...(!isGuest ? [{ id: "tutorial", grupo: "app" as const, Icone: RotateCcw, rotulo: "Ver tutorial", onClick: clicar("tutorial", "app", acoes.tutorial) }] : []),
+    ...(!isGuest && acoes.home ? [{ id: "home", grupo: "app" as const, Icone: LayoutDashboard, rotulo: "Home", detalhe: <span data-testid="home-escolha-estado">{rotuloHome}</span>, onClick: clicar("home", "app", acoes.home) }] : []),
   ];
   const ajuda: ItemDoMenu[] = [
     { id: "ajuda", grupo: "ajuda", Icone: LifeBuoy, rotulo: "Ajuda e suporte", onClick: clicar("ajuda", "ajuda", acoes.ajuda) },

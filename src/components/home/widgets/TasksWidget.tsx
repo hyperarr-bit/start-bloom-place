@@ -7,8 +7,9 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { cn, localDayKey } from "@/lib/utils";
 import {
   CHAVE_TAREFAS_CARREIRA, CHAVE_TAREFAS_ROTINA, apareceHoje, avisoDaTarefa, avisoJaPassou, detalhesDaTarefa, diaDoAviso, ehPrioridade, estadoDoPrazo, horaDaTarefa,
-  horaDoAviso, ordenarPorHora, progressoDasSubtarefas, type TarefaDoDia,
+  horaDoAviso, ordenarPorHora, progressoDasSubtarefas, rotuloDoDia, type TarefaDoDia,
 } from "@/lib/tarefas";
+import { LinhaDoFeriado } from "@/components/feriados/LinhaDoFeriado";
 import { COR_DO_DIA, textoDoDia, tomDoDia } from "@/components/treino/planner";
 import { FicouDeOntem } from "@/components/tarefas/ficou-de-ontem";
 import {
@@ -165,8 +166,12 @@ export const TasksWidget = () => {
     const t = rotina.adicionar(c);
     const aviso = avisoDaTarefa(t);
     const hora = horaDaTarefa(t);
-    toast.success("Tarefa anotada", {
-      description: hora && aviso >= 0 && !avisoJaPassou(diaDoAviso(t), hora, aviso) ? `🔔 O aviso toca às ${horaDoAviso(hora, aviso)}${t.prazo && t.prazo !== t.dia ? ` em ${diaCurto(t.prazo)}` : ""}` : undefined,
+    // 28/10: tarefa pra outro dia — o toast diz pra quando (ela não aparece na lista de hoje)
+    const futura = t.dia > hoje;
+    toast.success(futura ? `Tarefa anotada pra ${rotuloDoDia(t.dia, hoje)}` : "Tarefa anotada", {
+      description: hora && aviso >= 0 && !avisoJaPassou(diaDoAviso(t), hora, aviso)
+        ? `🔔 O aviso toca às ${horaDoAviso(hora, aviso)}${t.prazo && t.prazo !== t.dia ? ` em ${diaCurto(t.prazo)}` : futura ? ` de ${rotuloDoDia(t.dia, hoje)}` : ""}`
+        : futura ? "Ela aparece na lista no dia dela." : undefined,
     });
   };
 
@@ -194,6 +199,9 @@ export const TasksWidget = () => {
           </div>
         )}
       </div>
+
+      {/* 28/10: hoje é feriado nacional — só informa */}
+      <LinhaDoFeriado dia={hoje} className="px-4 py-2 border-b border-border/50" />
 
       {/* 02/10: o que ficou sem fazer nos últimos 7 dias, no topo — a pessoa decide (trazer, concluir, apagar) */}
       <FicouDeOntem fontes={[{ chave: CHAVE_TAREFAS_ROTINA, tarefas: rotina }, { chave: CHAVE_TAREFAS_CARREIRA, tarefas: carreira }]} envolver />

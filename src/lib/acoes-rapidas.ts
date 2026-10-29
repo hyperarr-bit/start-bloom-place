@@ -8,7 +8,7 @@ import { lancarGasto } from "@/lib/finance-lancar";
 import { numeroBR } from "@/lib/data-normalizers";
 import { marcarCheckin } from "@/lib/detox";
 import { anotarAcaoRapida } from "@/lib/intro-modulo";
-import { avisoDaTarefa, avisoJaPassou, horaDaTarefa, horaDoAviso } from "@/lib/tarefas";
+import { avisoDaTarefa, avisoJaPassou, diaDoAviso, horaDaTarefa, horaDoAviso, rotuloDoDia } from "@/lib/tarefas";
 
 /**
  * AS GRAVAÇÕES DAS AÇÕES RÁPIDAS (26/10) — o que o QuickActions.tsx da Home de hoje fazia dentro de cada
@@ -233,8 +233,14 @@ export function gravarTarefa<C, T extends { dia: string }>(
   const hora = horaDaTarefa(t as unknown as Parameters<typeof horaDaTarefa>[0]);
   vibrar();
   aoGravar?.();
-  toast.success("Tarefa anotada", {
-    description: hora && aviso >= 0 && !avisoJaPassou(t.dia, hora, aviso) ? `🔔 O aviso toca às ${horaDoAviso(hora, aviso)}` : undefined,
+  // 28/10: tarefa pra outro dia — o toast diz pra quando (ela não aparece na lista de hoje)
+  const hoje = localDayKey();
+  const futura = t.dia > hoje;
+  const diaAviso = diaDoAviso(t as unknown as Parameters<typeof diaDoAviso>[0]) || t.dia;
+  toast.success(futura ? `Tarefa anotada pra ${rotuloDoDia(t.dia, hoje)}` : "Tarefa anotada", {
+    description: hora && aviso >= 0 && !avisoJaPassou(diaAviso, hora, aviso)
+      ? `🔔 O aviso toca às ${horaDoAviso(hora, aviso)}${diaAviso > hoje ? ` de ${rotuloDoDia(diaAviso, hoje)}` : ""}`
+      : futura ? "Ela aparece na lista no dia dela." : undefined,
     action: { label: "Ver na Rotina", onClick: () => ctx.navigate("/rotina") },
   });
   return t;

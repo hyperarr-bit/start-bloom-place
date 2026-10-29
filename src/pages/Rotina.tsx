@@ -14,6 +14,7 @@ import { BlocoDeFases, type Fase } from "@/components/fases/BlocoDeFases";
 import { TarefasDeHoje } from "@/components/tarefas/tarefas-do-dia";
 import { PedirLembreteRotina } from "@/components/rotina/PedirLembreteRotina";
 import { CompromissosDoDia, ProximosCompromissos } from "@/components/rotina/Compromissos";
+import { FeriadoETarefasDoDia, InterruptorFeriados, useMarcasDoMes } from "@/components/rotina/DiaDoMes";
 import { CHAVE_COMPROMISSOS, ocorrencias, type Compromisso } from "@/lib/compromissos";
 import { parseLocalDay } from "@/lib/utils";
 import { pedirAvaliacaoSePuder } from "@/lib/avaliacao";
@@ -771,6 +772,8 @@ const MonthlyPlanning = () => {
     () => new Set(ocorrencias(compromissos, new Date(currentYear, currentMonth, 1), totalDays).map((o) => o.dia)),
     [compromissos, currentYear, currentMonth, totalDays],
   );
+  // 28/10: feriados nacionais (se ligados) e dias com tarefa marcada — components/rotina/DiaDoMes
+  const { feriados, diasComTarefa } = useMarcasDoMes(currentYear, currentMonth);
   const abrirDia = (dia: string) => {
     const d = parseLocalDay(dia);
     setCurrentYear(d.getFullYear());
@@ -831,21 +834,28 @@ const MonthlyPlanning = () => {
               const hasNote = !!dayNotes[dayKey];
               const isToday = dayNum === now.getDate() && currentMonth === now.getMonth() && currentYear === now.getFullYear();
               const isSelected = selectedDay === dayKey;
+              const feriado = feriados.get(dayKey);
+              const temTarefa = diasComTarefa.has(dayKey);
               return (
                 <button
                   key={dayNum}
                   onClick={() => setSelectedDay(isSelected ? null : dayKey)}
+                  aria-label={feriado ? `${dayNum} — ${feriado.facultativo ? "ponto facultativo" : "feriado"}: ${feriado.nome}` : undefined}
+                  data-feriado={feriado ? "true" : undefined}
                   className={`aspect-square rounded-md text-xs font-medium flex items-center justify-center relative transition-all
                     ${isToday ? "bg-primary text-primary-foreground font-bold" : ""}
                     ${isSelected ? "ring-2 ring-primary" : ""}
                     ${!isToday && !isSelected ? "hover:bg-muted" : ""}
+                    ${feriado && !isToday ? "text-rose-600 dark:text-rose-400 font-bold" : ""}
                   `}
                 >
                   {dayNum}
-                  {(hasNote || diasComCompromisso.has(dayKey)) && (
+                  {(hasNote || diasComCompromisso.has(dayKey) || feriado || temTarefa) && (
                     <div className="absolute bottom-0.5 flex gap-0.5">
+                      {feriado && <div className="w-1 h-1 rounded-full bg-rose-500" data-testid="ponto-feriado" />}
                       {hasNote && <div className="w-1 h-1 rounded-full bg-teal-500" />}
                       {diasComCompromisso.has(dayKey) && <div className="w-1 h-1 rounded-full bg-sky-500" data-testid="ponto-compromisso" />}
+                      {temTarefa && <div className="w-1 h-1 rounded-full bg-amber-500" data-testid="ponto-tarefa" />}
                     </div>
                   )}
                 </button>
@@ -855,6 +865,7 @@ const MonthlyPlanning = () => {
 
           {selectedDay && (
             <div className="mt-3 p-3 bg-muted/30 rounded-md space-y-3">
+              <FeriadoETarefasDoDia dia={selectedDay} feriado={feriados.get(selectedDay)} />
               <CompromissosDoDia dia={selectedDay} lista={compromissos} onChange={setCompromissos} />
               <div className="space-y-2">
                 {/* dd/mm na tela (26/09, varredura) — a chave continua AAAA-MM-DD */}
@@ -868,6 +879,7 @@ const MonthlyPlanning = () => {
               </div>
             </div>
           )}
+          <InterruptorFeriados />
         </div>
       </div>
 

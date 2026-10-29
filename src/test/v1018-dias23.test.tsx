@@ -39,10 +39,16 @@ vi.mock("@/components/missao-doses/ConstruiuEm3Dias", async (orig) => {
   const real = await orig<typeof import("@/components/missao-doses/ConstruiuEm3Dias")>();
   return {
     ...real,
-    ConstruiuEm3Dias: function ConstruiuFalso({ aoContinuar, aoAbrir, aoVer }: { aoContinuar: () => void; aoAbrir?: boolean; aoVer?: () => void }) {
+    ConstruiuEm3Dias: function ConstruiuFalso({ aoContinuar, aoAbrir, aoVer, aoFazerDose, missao, braco }: { aoContinuar: () => void; aoAbrir?: boolean; aoVer?: () => void; aoFazerDose?: (p: { n: 1 | 2 | 3; modulo: string }) => void; missao: { feitos: Record<number, unknown>; modulos: string[] }; braco?: string }) {
       const { useEffect } = require("react") as typeof import("react");
       useEffect(() => { aoVer?.(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-      return <div data-testid="construiu" data-ao-abrir={aoAbrir ? "1" : "0"}><button type="button" data-testid="construiu-continuar" onClick={aoContinuar}>Continuar</button></div>;
+      const n = ([1, 2, 3] as const).find((k) => !missao.feitos[k]);
+      return (
+        <div data-testid="construiu" data-ao-abrir={aoAbrir ? "1" : "0"} data-braco={braco ?? ""}>
+          <button type="button" data-testid="construiu-continuar" onClick={aoContinuar}>Continuar</button>
+          {aoFazerDose && n && <button type="button" data-testid="construiu-dose" onClick={() => aoFazerDose({ n, modulo: missao.modulos[n - 1] })}>Dose</button>}
+        </div>
+      );
     },
   };
 });
@@ -417,22 +423,69 @@ describe("4. on, dia 3: 'Você construiu isso em 3 dias' AO ABRIR (sem a 3ª dos
     expect(screen.getByTestId("missao-doses-convite-titulo")).toHaveTextContent("Dia 3: Rotina");
   });
 
-  it("fechou o app com o resumo na tela, sem 'Continuar': volta 1 vez, depois nunca mais", () => {
+  it("29/10: fechou o app com o resumo na tela, sem 'Continuar': NÃO volta (vista = vista)", () => {
     ligar("on");
     const store = comFinancas();
     missaoA(DIA1);
     vi.setSystemTime(new Date(2026, 9, 5, 9, 0));
-    for (let vez = 1; vez <= 2; vez++) {
-      montar(store, "/home");
-      avancar(1500);
-      expect(screen.getByTestId("construiu"), `abertura ${vez}`).toBeInTheDocument();
-      cleanup();
-    }
+    montar(store, "/home");
+    avancar(1500);
+    expect(screen.getByTestId("construiu")).toBeInTheDocument();
+    avancar(3000); // a vista contada não tira a tela que está aberta
+    expect(screen.getByTestId("construiu")).toBeInTheDocument();
+    cleanup();
     montar(store, "/home");
     avancar(4000);
     expect(screen.queryByTestId("construiu")).toBeNull();
     expect(screen.queryByTestId("missao-doses-convite")).toBeNull(); // e o convite não entra no lugar dele no mesmo dia
-    expect(lerMissao()).toMatchObject({ fimAoAbrirVistas: 2, fimAoAbrir: "2026-10-05" });
+    expect(lerMissao()).toMatchObject({ fimAoAbrirVistas: 1, fimAoAbrir: "2026-10-05" });
+  });
+
+  it("29/10 (A/B): no dia 3 o botão É a dose de hoje — grava visto, leva direto pro módulo da dose 3, conta o toque com `botao` e o braço; reabrir não volta", () => {
+    ligar("on");
+    const store = comFinancas();
+    missaoA({ ...DIA1, 2: { dia: "2026-10-04", rotulo: "Beber água ao acordar" } });
+    vi.setSystemTime(new Date(2026, 9, 5, 8, 30));
+    montar(store, "/home");
+    avancar(1500);
+    const tela = screen.getByTestId("construiu");
+    expect(tela.getAttribute("data-braco")).toMatch(/^[ab]$/);
+    fireEvent.click(screen.getByTestId("construiu-dose"));
+    expect(screen.getByTestId("rota")).toHaveTextContent("/saude");
+    expect(lerMissao()).toMatchObject({ fimVisto: true, fimAoAbrir: "2026-10-05", convites: { "2026-10-05": "foi" } });
+    expect(eventos).toContainEqual(["missao_doses_fim_fechou", expect.objectContaining({ ao_abrir: true, botao: "dose", dose: 3, modulo: "saude", braco_construiu: tela.getAttribute("data-braco") })]);
+    cleanup();
+    montar(store, "/home");
+    avancar(4000);
+    expect(screen.queryByTestId("construiu")).toBeNull();
+  });
+
+  it("29/10: o resumo depois da 3ª dose (sem dias23) também não volta depois de visto — fechou o app sem 'Continuar' → vira visto", () => {
+    ligar("off");
+    const store = comFinancas();
+    missaoA({ ...DIA1, 2: { dia: "2026-10-04", rotulo: "Beber água ao acordar" }, 3: { dia: "2026-10-05", rotulo: "1 copo d'água · meta 8" } });
+    vi.setSystemTime(new Date(2026, 9, 5, 20, 0));
+    montar(store, "/home");
+    avancar(1500);
+    expect(screen.getByTestId("construiu")).toHaveAttribute("data-ao-abrir", "0");
+    avancar(3000);
+    expect(screen.getByTestId("construiu")).toBeInTheDocument(); // a vista contada não tira a tela aberta
+    expect(lerMissao()).toMatchObject({ fimVistas: 1 });
+    cleanup(); // fechou o app sem o "Continuar"
+    montar(store, "/home");
+    avancar(4000);
+    expect(screen.queryByTestId("construiu")).toBeNull();
+    expect(lerMissao()?.fimVisto).toBe(true);
+  });
+
+  it("29/10 (A/B): o 'Continuar' conta o toque com `botao: continuar` e o braço", () => {
+    ligar("on");
+    missaoA(DIA1);
+    vi.setSystemTime(new Date(2026, 9, 5, 8, 30));
+    montar(comFinancas(), "/home");
+    avancar(1500);
+    fireEvent.click(screen.getByTestId("construiu-continuar"));
+    expect(eventos).toContainEqual(["missao_doses_fim_fechou", expect.objectContaining({ ao_abrir: true, botao: "continuar", braco_construiu: expect.stringMatching(/^[ab]$/) })]);
   });
 
   it("faltou o dia 2 (só a dose 1): o resumo abre mesmo assim no dia 3; nunca no dia 2; nunca depois do 7º dia", () => {
@@ -455,15 +508,11 @@ describe("4. on, dia 3: 'Você construiu isso em 3 dias' AO ABRIR (sem a 3ª dos
     vi.setSystemTime(new Date(2026, 9, 5, 9, 0));
     const { ConstruiuEm3Dias: Real } = await vi.importActual<typeof import("@/components/missao-doses/ConstruiuEm3Dias")>("@/components/missao-doses/ConstruiuEm3Dias");
     render(<MemoryRouter><Provedor store={comFinancas()}><Real missao={lerMissao()!} aoAbrir aoContinuar={() => {}} /></Provedor></MemoryRouter>);
-    expect(screen.getByTestId("missao-doses-fim-titulo")).toHaveTextContent("Você construiu isso em 3 dias");
+    expect(screen.getByTestId("missao-doses-fim-titulo")).toHaveTextContent("Seu CORE começou.");
     expect(screen.getByTestId("missao-doses-fim-modulo-financas")).toHaveTextContent("R$ 61 por dia");
     expect(screen.getByTestId("missao-doses-fim-modulo-beleza")).toHaveTextContent("1º passo feito");
     expect(screen.queryByTestId("missao-doses-fim-modulo-rotina")).toBeNull();
-    expect(eventos).toContainEqual(["dia3_construiu_view", expect.objectContaining({ dia_do_teste: 3, doses: 2, dias23: "on" })]);
-    cleanup();
-    // depois da 3ª dose (o caminho de sempre, sem aoAbrir): a tela de hoje, sem a lista nova
-    render(<MemoryRouter><Provedor store={comFinancas()}><Real missao={lerMissao()!} aoContinuar={() => {}} /></Provedor></MemoryRouter>);
-    expect(screen.queryByTestId("missao-doses-fim-modulos")).toBeNull();
+    expect(eventos).toContainEqual(["dia3_construiu_view", expect.objectContaining({ dia_do_teste: 3, doses: 2, dias23: "on", braco_construiu: expect.stringMatching(/^[ab]$/) })]);
   });
 
   it("a linha de cada dose no resumo: Finanças mostra o número, a intro o rótulo neutro", () => {

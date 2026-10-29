@@ -344,6 +344,9 @@ export interface EstadoMissaoDoses {
   /** dia 3+: quantas vezes o resumo APARECEU sozinho (conta na hora em que entra): fechou o app sem o "Continuar" →
    *  volta 1 vez, depois nunca mais (MAX_VISTAS_SEM_DECISAO) */
   fimAoAbrirVistas?: number;
+  /** 29/10: quantas vezes o resumo depois da 3ª dose APARECEU (conta ao aparecer): fechou o app sem o "Continuar" →
+   *  não volta (a orquestra marca fimVisto na próxima abertura) */
+  fimVistas?: number;
 }
 
 /**
@@ -923,5 +926,6 @@ export function construiuAoAbrirDevido(m: EstadoMissaoDoses | null, hoje: string
   if (!dias23NaMissao(m) || !m!.boasVindas || m!.fimVisto) return false;
   const dia = diaDaMissao(m!, hoje);
   if (dia < 3 || dia > DIA_FIM_DA_MISSAO) return false;
-  return (m!.fimAoAbrirVistas ?? 0) - (naTela ? 1 : 0) < MAX_VISTAS_SEM_DECISAO;
+  // 29/10 (dono: "a tela não pode voltar depois de vista"): 1 vista e pronto — fechou o app com ele na tela, não volta
+  return (m!.fimAoAbrirVistas ?? 0) - (naTela ? 1 : 0) < 1;
 }

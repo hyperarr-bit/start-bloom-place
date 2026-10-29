@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { entrada, MOV, MOV_MS, saida, saidaCalmaDe, saidaCalmaDaTela } from "@/lib/movimento";
 import { EVENTO_INTRO_FIM, introNaTela, introVistaNaConta, introVistaNesteAparelho, marcarIntroVista, porQueNaoMostrar, type FimDaIntro } from "@/lib/intro-modulo";
 import { guardarForcaDias23 } from "@/lib/dias23";
+import { bracoConstruiu, guardarForcaConstruiu } from "@/lib/construiu-ab";
 import { porDiaDasFinancas } from "@/lib/lembrete-dia2";
 import { useAuth, useAuthOpcional } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
@@ -106,6 +107,7 @@ export function MissaoDosesNaWeb() {
   guardarForcaDaUrl(search);
   guardarForcaDia1Cheio(search);
   guardarForcaDias23(search);
+  guardarForcaConstruiu(search);
   const ligada = missaoDosesLigada();
   return ligada ? <><Ligada /><VeuDaMissao /></> : null;
 }
@@ -239,6 +241,15 @@ function Ligada() {
   // 1.0.16 (4.8): a missão do aparelho só vale pra conta DONA dela — outra conta no mesmo celular não herda
   const missao = missaoBruta && missaoDaConta(missaoBruta, user?.id) ? missaoBruta : null;
   const [verFim, setVerFim] = useState(false);
+  /* 29/10 (dono: a tela não volta depois de vista): o resumo depois da 3ª dose conta a vista quando APARECE
+     (`fimVistas`); fechou o app com ele na tela, sem o "Continuar" → na próxima abertura ele vira visto e não volta.
+     `fimNaTela` segura a tela aberta enquanto a vista sobe. */
+  const [fimNaTela, setFimNaTela] = useState(false);
+  useEffect(() => {
+    if (!missao || fimNaTela || missao.fimVisto || !missaoCumprida(missao) || (missao.fimVistas ?? 0) < 1) return;
+    gravarMissao({ ...missao, fimVisto: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [missao, fimNaTela]);
   const [passoAberto, setPassoAberto] = useState(0);
   /**
    * O passo EM CURSO fica montado até a comemoração ser dispensada (ou a pessoa
@@ -673,6 +684,19 @@ function Ligada() {
       <ConstruiuEm3Dias
         missao={missao}
         aoAbrir
+        braco={bracoConstruiu(user?.id)}
+        nome={(user?.user_metadata as Record<string, unknown> | undefined)?.full_name as string | undefined}
+        aoFazerDose={(p) => {
+          // 29/10: o botão É a dose de hoje — fecha o resumo (visto) e leva direto pro módulo, como o "Bora" do convite
+          saidaCalmaDe('[data-testid="missao-doses-fim"]', MOV_MS.base, 420);
+          const m = lerMissao() ?? missao;
+          setConstruiuNaTela(false);
+          const base = { ...m, fimVisto: true, fimAoAbrir: hoje, convites: { ...m.convites, [hoje]: "foi" as const } };
+          const novo = p.n === 2 && dias23NaMissao(m) && !m.escolha2 ? comEscolha2(base, p.modulo, "comecar", hoje) : base;
+          salvar(novo);
+          trackEvent("missao_doses_fim_fechou", eventoDaMissao({ ao_abrir: true, dia_do_teste: dia, botao: "dose", dose: p.n, modulo: p.modulo, braco_construiu: bracoConstruiu(user?.id) }));
+          navigate(MODULOS[p.modulo].rota);
+        }}
         aoVer={() => {
           // conta a vista quando APARECE (fechar o app sem o "Continuar": volta 1 vez, depois nunca mais)
           const m = lerMissao() ?? missao;
@@ -684,7 +708,7 @@ function Ligada() {
           const m = lerMissao() ?? missao;
           setConstruiuNaTela(false);
           salvar({ ...m, fimVisto: true, fimAoAbrir: hoje });
-          trackEvent("missao_doses_fim_fechou", eventoDaMissao({ ao_abrir: true, dia_do_teste: dia }));
+          trackEvent("missao_doses_fim_fechou", eventoDaMissao({ ao_abrir: true, dia_do_teste: dia, botao: "continuar", braco_construiu: bracoConstruiu(user?.id) }));
         }}
       />
     );
@@ -805,15 +829,23 @@ function Ligada() {
   }
 
   /* D8 — no braço B só a partir do dia 3 (as 3 doses foram no dia 1; "em 3 dias" só faz sentido no 3º) */
-  if (verFim || (missaoCumprida(missao) && !missao.fimVisto && noHome && (!B || dia >= 3))) {
+  if (verFim || fimNaTela || (missaoCumprida(missao) && !missao.fimVisto && (missao.fimVistas ?? 0) < 1 && noHome && (!B || dia >= 3))) {
     return (
       <ConstruiuEm3Dias
         missao={missao}
+        braco={bracoConstruiu(user?.id)}
+        nome={(user?.user_metadata as Record<string, unknown> | undefined)?.full_name as string | undefined}
+        aoVer={() => {
+          const m = lerMissao() ?? missao;
+          setFimNaTela(true);
+          salvar({ ...m, fimVistas: (m.fimVistas ?? 0) + 1 });
+        }}
         aoContinuar={() => {
           saidaCalmaDe('[data-testid="missao-doses-fim"]', MOV_MS.base, noHome ? 0 : 420);
-          salvar({ ...missao, fimVisto: true });
+          salvar({ ...(lerMissao() ?? missao), fimVisto: true });
           setVerFim(false);
-          trackEvent("missao_doses_fim_fechou", eventoDaMissao({}));
+          setFimNaTela(false);
+          trackEvent("missao_doses_fim_fechou", eventoDaMissao({ botao: "continuar", braco_construiu: bracoConstruiu(user?.id) }));
           if (!noHome) navigate("/home");
         }}
       />

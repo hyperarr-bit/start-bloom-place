@@ -26,7 +26,7 @@ import { destinoDePreview } from "../_shared/preview-seguro.ts";
 import { lerDestino } from "../_shared/destino-hoje.ts";
 import { OFERTAS_PLANO_LANDING } from "../_shared/ofertas-landing.ts";
 import {
-  JANELAS, JANELA_BUSCA_MS, linkDeVolta, mensagemDoLembrete, pixPagoNaAsaas, varrerLembretesLanding, type Mensagem,
+  JANELA_BUSCA_MS, pixPagoNaAsaas, previewDoLembrete, varrerLembretesLanding, type Mensagem,
 } from "../_shared/lembrete-pix-landing.ts";
 
 const log = (m: string, x?: unknown) => console.log(`[pix-pendente-email] ${m}`, x ? JSON.stringify(x) : "");
@@ -84,12 +84,8 @@ serve(async (req) => {
       const destino = destinoDePreview(body.preview);
       if (!destino) return Response.json({ error: "forbidden" }, { status: 403 });
       if (body.lembrete === "t12" || body.lembrete === "t20h") {
-        const toque = body.lembrete as "t12" | "t20h";
-        const criadoEm = Date.now() - JANELAS[toque].de;
-        const qr = "00020101021226870014br.gov.bcb.pix2565qrcode.exemplo.com/pix/v2/PREVIEW-SEM-COBRANCA-CORE5204000053039865405279005802BR5904CORE6009SAO PAULO62070503***6304ABCD";
-        const link = linkDeVolta({ toque, orderId: "previewpedido", offer: "LN_sempre279", qrCode: toque === "t12" ? qr : null, criadoEm, site });
-        const ok = await enviarLembrete(destino, mensagemDoLembrete({ toque, offer: "LN_sempre279", centavos: 2790, link, qrCode: toque === "t12" ? qr : null, minutosRestantes: 18 }), { lembrete: `preview_${toque}` });
-        return Response.json({ preview: true, lembrete: toque, ok });
+        const ok = await enviarLembrete(destino, previewDoLembrete(body.lembrete, site), { lembrete: `preview_${body.lembrete}` });
+        return Response.json({ preview: true, lembrete: body.lembrete, ok });
       }
       await enviar(destino, "João", "27,90", `${site}/planos?from=pix_pendente_preview`); return Response.json({ preview: true }); }
 

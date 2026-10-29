@@ -131,6 +131,15 @@ export function mensagemDoLembrete(args: {
   };
 }
 
+/** O e-mail de exemplo do preview (só sai pras caixas da equipe — quem confere é o pix-pendente-email). */
+export function previewDoLembrete(toque: Toque, site?: string, agora: number = Date.now()): Mensagem {
+  const qr = toque === "t12"
+    ? "00020101021226870014br.gov.bcb.pix2565qrcode.exemplo.com/pix/v2/PREVIEW-SEM-COBRANCA-CORE5204000053039865405279005802BR5904CORE6009SAO PAULO62070503***6304ABCD"
+    : null;
+  const link = linkDeVolta({ toque, orderId: "previewpedido", offer: "LN_sempre279", qrCode: qr, criadoEm: agora - JANELAS[toque].de, site });
+  return mensagemDoLembrete({ toque, offer: "LN_sempre279", centavos: 2790, link, qrCode: qr, minutosRestantes: 18 });
+}
+
 /* ───────────────────────── Asaas: o QR já foi pago? ───────────────────────── */
 
 type Buscar = (url: string, init?: { headers?: Record<string, string> }) => Promise<{ ok: boolean; json: () => Promise<unknown> }>;

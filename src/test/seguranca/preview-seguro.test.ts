@@ -30,8 +30,7 @@ describe("as duas funções conferem o destino ANTES de mandar", () => {
       const bloco = s.slice(i, i + 700);
       const confere = bloco.indexOf("destinoDePreview(body.preview)");
       const recusa = bloco.indexOf('"forbidden"');
-      // 29/10: o preview dos lembretes da landing manda pelo enviarLembrete (depois da MESMA conferência)
-      const manda = Math.max(bloco.indexOf("api.resend.com"), bloco.indexOf("await enviar("), bloco.indexOf("await enviarLembrete("));
+      const manda = Math.max(bloco.indexOf("api.resend.com"), bloco.indexOf("await enviar("));
       expect(confere).toBeGreaterThan(0);
       expect(recusa).toBeGreaterThan(confere);
       expect(manda).toBeGreaterThan(recusa);

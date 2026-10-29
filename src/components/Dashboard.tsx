@@ -15,7 +15,7 @@ import { AlertTriangle, Bell, CheckCircle, TrendingUp, TrendingDown, Calendar, D
 import { getCurrentYear } from "@/components/finance/storage-keys";
 import { totaisDoMes } from "@/components/finance/MonthComparison";
 import { perfilAtivoLocal } from "@/lib/finance-perfil";
-import { computeDailyBudget, computeLooseBillsOutflow, computeUnpaidOutsideOutflow } from "@/lib/finance-totals";
+import { computeDailyBudget, computeLooseBillsOutflow, computeUnpaidOutsideOutflow, statusDoPodeGastar } from "@/lib/finance-totals";
 import { useAuth } from "@/hooks/use-auth";
 import { useMesCorrente, useVersaoDaVirada } from "@/hooks/use-virada-do-mes";
 import { useFinanceCategories } from "@/lib/finance-categories";
@@ -449,15 +449,9 @@ export const Dashboard = ({
     // Cálculo compartilhado (lib/finance-totals) — o Pergunte ao CORE responde
     // com exatamente este número.
     const base = computeDailyBudget(totalIncome, totalExpenses, dueDays, fixedExpenses);
-    const now = new Date();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const fixedCostsRecorded = fixedExpenses.reduce((s, e) => s + e.value, 0);
-    const idealPerDay = totalIncome > 0 ? (totalIncome - fixedCostsRecorded) / daysInMonth : 0;
-    const status: "good" | "warning" | "danger" = base.cantSpend
-      ? "danger"
-      : base.perDay > idealPerDay * 0.8
-      ? "good"
-      : "warning";
+    // a cor mora em lib/finance-totals (1.0.22): a versão compacta do topo do MEU FINANCEIRO pinta igual
+    const status = statusDoPodeGastar(base, totalIncome, fixedExpenses);
     return { ...base, status, fixedCostsRecorded };
   }, [totalIncome, totalExpenses, fixedExpenses, dueDays]);
 
@@ -1036,9 +1030,10 @@ export const Dashboard = ({
       <LembreteDoLimite compacto />
     </div>
   );
-  /* Painel limpo, conta sem nada lançado (pulou o Montar): o card não pode abrir dizendo "Você não
-     pode gastar" pra quem ainda não contou quanto ganha — mostra o caminho. O de sempre não muda. */
-  const semNadaAinda = limpo && totalIncome <= 0 && totalExpenses <= 0;
+  /* Sem renda anotada, o card não pode abrir dizendo "Você não pode gastar" pra quem ainda não contou quanto
+     ganha — mostra o que falta pra calcular. Era só do painel limpo; 1.0.22 (28/10), com o card no TOPO do Dashboard
+     pra todo mundo, vale pros dois (a conta não muda: sem renda não existe número honesto). */
+  const semNadaAinda = totalIncome <= 0;
   const blocoPodeGastar = semNadaAinda ? (
     <div className="bg-card rounded-lg border border-border p-4" data-testid="pode-gastar-vazio">
       <h3 className="text-xs font-bold mb-2 flex items-center gap-2">
@@ -1046,7 +1041,9 @@ export const Dashboard = ({
         QUANTO POSSO GASTAR HOJE
       </h3>
       <p className="text-sm text-muted-foreground leading-snug">
-        Anota quanto entra no mês e suas contas fixas — aqui aparece quanto dá pra gastar por dia.
+        {totalExpenses > 0
+          ? <>Falta só quanto entra no mês: suas saídas (R$ {reais(Math.round(totalExpenses))}) já estão anotadas — com a renda, aqui aparece quanto dá pra gastar por dia.</>
+          : <>Anota quanto entra no mês e suas contas fixas — aqui aparece quanto dá pra gastar por dia.</>}
       </p>
       {onNavigate && (
         <button
@@ -1181,8 +1178,14 @@ export const Dashboard = ({
     );
   }
 
+  /* 1.0.22 (28/10, dono): QUANTO POSSO GASTAR HOJE vai pro TOPO do Dashboard de sempre — era o último card (70% dos
+     pagantes viam, 9% tocavam) e é a promessa dos anúncios e do lembrete do dia 2. O mesmo bloco, sem redesenho; a
+     PREVISÃO DO FIM DO MÊS fica onde estava. `?cards-simples=off` continua devolvendo o card antigo (agora no topo).
+     `depoisDoTopo` (o Desafio da semana, que o Index punha ACIMA do Dashboard) entra logo depois dele, como no painel limpo. */
   return (
     <div className="space-y-4">
+      {blocoPodeGastar}
+      {depoisDoTopo}
       {blocoNumeros}
       {blocoAlertas}
       <div className="grid lg:grid-cols-2 gap-4">
@@ -1195,11 +1198,7 @@ export const Dashboard = ({
       {blocoFixosVariaveis}
       {blocoTop5}
       {blocoUltimas}
-      {/* cards simples (desenho 17/10): QUANTO POSSO GASTAR HOJE sobe pra ANTES da previsão */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {simples ? blocoPodeGastar : blocoPrevisao}
-        {simples ? blocoPrevisao : blocoPodeGastar}
-      </div>
+      {blocoPrevisao}
     </div>
   );
 };

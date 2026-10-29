@@ -27,16 +27,17 @@ export const ABAS_ENXUTAS = true;
  */
 export const ABAS_POUCO_USO: Readonly<Record<string, readonly string[]>> = {
   // vivas: Meu financeiro 47,6% · Dashboard 28% | ocultas: Investimentos 4,3 · Saúde fin. 3 · Desejos 2,9 · Relatórios 2,8 ·
-  // Simuladores 1,4 · Limites 1,3 · Viagem 0,5 (morta; duplica Viagens›Budget)
-  financas: ["investimentos", "itens", "viagem", "simuladores", "limites", "relatorios", "saude"],
+  // Simuladores 1,4 · Limites 1,3 | Viagem 0,5 (duplicava Viagens›Budget) SAIU da fileira (sem repetição, 28/10)
+  financas: ["investimentos", "itens", "simuladores", "limites", "relatorios", "saude"],
   // vivas: Minha semana 43,5 · Meu mês 7,9 (abrir no dia 1 → 37% × 24% pagam) · Foco 5,4 | ocultas: Diário 2,2 · Revisão 0,3
   rotina: ["diario", "revisao"],
   // vivas: Hoje 36,2 · Log médico 9,1 | fraca Evolução 4,8 (quase viva, alvo do tutorial) fica
   saude: [],
   // vivas: Plano 19,5 · Hoje 15,4 | fracas Semana 4,2 · Evolução 2,5 ficam (módulo de 4 abas; gravar treino converte)
   treino: [],
-  // vivas: Cardápio 19,4 · Diário 6,9 | ocultas: Lista 1,6 · Jejum 0,8 · Receitas 0,6 (avaliação 5★: "ocultar jejum")
-  dieta: ["lista", "jejum", "receitas"],
+  // vivas: Cardápio 19,4 · Diário 6,9 | ocultas: Jejum 0,8 · Receitas 0,6 (avaliação 5★: "ocultar jejum") | Lista 1,6 SAIU
+  // (sem repetição, 28/10: virou "Gerar lista de compras" no Cardápio → Mercado da Casa)
+  dieta: ["jejum", "receitas"],
   // vivas: Skincare 23,4 · Cabelo 7,5 · Cuidados 6 | fraca Meus produtos 3,6 fica (4 abas, alvo de link)
   beleza: [],
   // vivas: Cômodos 8,6 · Mercado 6,4 | fraca Despensa 3,9 fica | ocultas: Utilidades 2,5 · Rotina 2,3 · Cardápio 0,7 ·

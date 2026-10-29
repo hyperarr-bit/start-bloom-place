@@ -94,14 +94,18 @@ describe("os destinos abrem telas que existem", () => {
     // não é destino do plano de 30 dias, então fica fora do ABAS_NA_URL
     expect(ler("src/pages/DesenvolvimentoPessoal.tsx")).toContain(`get("tab");\n      return t && ${JSON.stringify([...ABAS_NA_URL["/desenvolvimento"]]).replace(/,/g, ", ").replace(/\]$/, ", ABA_2027.id]")}.includes(t)`);
     const index = ler("src/pages/Index.tsx");
-    expect(index).toContain(`export const ABAS_DE_FINANCAS_NA_URL = ${JSON.stringify([...ABAS_NA_URL["/financas"]]).replace(/,/g, ", ")} as const;`);
+    // 28/10 (sem repetição): + "viagem" no fim — link antigo, abre o atalho pra Viagens › Budget (não é aba nem destino)
+    expect(index).toContain(`export const ABAS_DE_FINANCAS_NA_URL = ${JSON.stringify([...ABAS_NA_URL["/financas"], "viagem"]).replace(/,/g, ", ")} as const;`);
+    expect(index).toContain('{activeTab === "viagem" && (');
     for (const a of ABAS_NA_URL["/financas"]) expect(index).toContain(`{ id: "${a}", label:`);
     // Rotina/Saúde/Treino leem `aba`; Desenvolvimento lê `tab`; Dieta e Casa não leem nada (abrem na aba de entrada)
     expect(ler("src/pages/Rotina.tsx")).toContain('new URLSearchParams(window.location.search).get("aba")');
     expect(ler("src/pages/Saude.tsx")).toContain('new URLSearchParams(window.location.search).get("aba")');
     expect(ler("src/pages/Treino.tsx")).toContain('new URLSearchParams(window.location.search).get("aba")');
     expect(ler("src/pages/Dieta.tsx")).not.toMatch(/get\("aba"\)|get\("tab"\)/);
-    expect(ler("src/pages/Casa.tsx")).not.toMatch(/get\("aba"\)|get\("tab"\)/);
+    // 28/10 (sem repetição): a Casa passou a ler `?aba=` (o "Ver" da lista gerada na Dieta abre o Mercado); o plano de
+    // 30 dias continua abrindo a Casa na aba de entrada (PARAM_DA_ABA "/casa" = null)
+    expect(ler("src/pages/Casa.tsx")).toContain('new URLSearchParams(window.location.search).get("aba")');
   });
   it("toda tarefa de toda área: rota de módulo do App + aba válida pra ele; a URL sai certa", () => {
     const app = ler("src/App.tsx");

@@ -43,7 +43,13 @@ const tabs = [
 const Viagens = () => {
   // seta ←: no app, o hub; na demo, o destino do botão de baixo dela (P5, 30/09 — antes, /auth)
   const voltarDoModulo = useVoltarDoModulo();
-  const [activeTab, setActiveTab] = useState("destinos");
+  // `?aba=` (28/10, sem repetição): o atalho de Finanças › Viagem abre direto no Budget — o mesmo parâmetro dos outros módulos
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const a = new URLSearchParams(window.location.search).get("aba");
+      return a && tabs.some((t) => t.id === a) ? a : "destinos";
+    } catch { return "destinos"; }
+  });
   const abasDoModulo = useAbasOcultas("viagens", tabs);
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();

@@ -258,11 +258,12 @@ describe("Utilidades", () => {
 });
 
 describe("Cardápio da Casa e Cômodos", () => {
-  it("'Sugerir Cardápio' sem receita avisa e abre o banco de receitas", () => {
+  // 28/10 (sem repetição): o Cardápio da Casa é o MESMO da Dieta — o banco de receitas/"Sugerir" da Casa saiu
+  // (ver src/test/sem-repeticao.test.tsx); aqui fica só que a aba abre com os dias e o atalho pra Dieta.
+  it("Cardápio da Casa abre o cardápio da Dieta (dias + 'Abrir na Dieta')", () => {
     montar(<MealPlanner />, criarStore());
-    fireEvent.click(screen.getByRole("button", { name: /Sugerir Cardápio/ }));
-    expect(vi.mocked(toast)).toHaveBeenCalledWith(expect.stringMatching(/Cadastre pelo menos uma receita/));
-    expect(screen.getByText("📖 BANCO DE RECEITAS")).toBeInTheDocument();
+    expect(screen.getByTestId("cardapio-casa-SEGUNDA")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Abrir na Dieta/ })).toBeInTheDocument();
   });
 
   it("título certo e cômodo com tarefas pede 'apagar?' antes; desfazer devolve tudo", () => {
@@ -386,22 +387,23 @@ describe("Dieta", () => {
     expect(quadrado()).toHaveAttribute("data-status", "tudo");
   });
 
-  it("'Gerar do Cardápio' com o cardápio da demo: itens limpos, sem 'Refeição livre' nem capitalize", () => {
+  // 28/10 (sem repetição): a aba 🛒 LISTA saiu; "Gerar lista de compras" no Cardápio manda pro Mercado da Casa
+  it("'Gerar lista de compras' com o cardápio da demo: itens limpos no Mercado (categoria Dieta), sem 'Refeição livre'", () => {
     const seeds = getSeedsForModule("dieta");
     const store = criarStore({ "dieta-meals-config": seeds["dieta-meals-config"], "saude-meals": seeds["saude-meals"] });
     const { container } = montar(<Dieta />, store);
-    fireEvent.click(screen.getByRole("button", { name: /LISTA/ }));
-    fireEvent.click(screen.getByRole("button", { name: /Gerar do Cardápio/ }));
-    const textos = (store.dados["dieta-smart-list"] as { text: string }[]).map((i) => i.text);
+    expect(screen.queryByRole("button", { name: /^🛒\s*LISTA$/ })).toBeNull();
+    fireEvent.click(screen.getByTestId("gerar-lista-compras"));
+    const dieta = (store.dados["casa-grocery-categories"] as Cat[]).find((c) => c.name === "Dieta")!;
+    const textos = dieta.items.map((i) => i.text);
     expect(textos).toEqual(expect.arrayContaining(["Ovos mexidos", "Pão integral", "Frango grelhado", "Arroz", "Feijão", "Castanhas ou pasta de amendoim"]));
     // sem gramas, parênteses, "•", número de quantidade no começo nem a "Refeição livre"
-    // (o "3" de "Omelete de 3 ovos com queijo" é parte do nome do prato)
     expect(textos.some((t) => /livre|\(|•|^\d|\d\s*g\b/i.test(t))).toBe(false);
     expect(textos).toHaveLength(20);
     expect(new Set(textos.map((t) => t.toLowerCase())).size).toBe(textos.length);
-    expect(screen.getByText("Pão integral")).toBeInTheDocument();
+    expect(store.dados["dieta-smart-list"]).toBeUndefined();
     expect(container.querySelector(".capitalize")).toBeNull();
-    expect(vi.mocked(toast)).toHaveBeenCalledWith(`${textos.length} itens entraram na lista`);
+    expect(vi.mocked(toast.success).mock.calls.at(-1)?.[0]).toBe(`${textos.length} itens entraram na lista de compras da Casa`);
   });
 
   it("apagar receita oferece desfazer", () => {

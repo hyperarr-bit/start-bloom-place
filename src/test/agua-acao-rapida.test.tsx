@@ -44,7 +44,7 @@ describe("ação rápida de água usa o copo/garrafa configurado em Saúde", () 
     const hoje = localDayKey();
     expect((store.dados["core-saude-water"] as Record<string, number>)[hoje]).toBe(1);
     expect((store.dados["water-log"] as Record<string, number>)[hoje]).toBe(1);
-    expect(toast.success).toHaveBeenCalledWith(expect.stringContaining("1000ml"));
+    expect(toast.success).toHaveBeenCalledWith(expect.stringContaining("1000ml"), expect.objectContaining({ action: expect.objectContaining({ label: "Ver Saúde" }) }));
   });
 
   it("sem configurar nada: o botão diz o padrão real de Saúde (250ml), não 200", () => {

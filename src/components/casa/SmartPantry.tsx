@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { adicionarDaDespensa, devolverADespensa, retirarDaDespensa, type CategoriaMercado } from "@/lib/mercado";
+import { moverListaAntigaDaDespensa } from "@/lib/lista-e-cardapio-unicos";
 import { PantryItem, ShoppingItem, pantryCategoryEmoji, pantryCategoryLabel, statusEmoji } from "./types";
 
 const categories = ["geladeira", "armario", "limpeza", "banheiro"] as const;
@@ -22,7 +23,6 @@ const SmartPantry = ({ onAbrirMercado }: { onAbrirMercado?: () => void } = {}) =
   // "Acabou" vai pra lista do Mercado (a mesma da aba MERCADO e da Dieta)
   const [mercado, setMercado] = usePersistedState<CategoriaMercado[]>("casa-grocery-categories", []);
   const [newItems, setNewItems] = useState<Record<string, string>>({});
-  const [newShopItem, setNewShopItem] = useState("");
   const [view, setView] = useState<"pantry" | "shopping">("pantry");
 
   const addPantryItem = (cat: typeof categories[number]) => {
@@ -78,10 +78,16 @@ const SmartPantry = ({ onAbrirMercado }: { onAbrirMercado?: () => void } = {}) =
     }));
   };
 
-  const addShoppingItem = () => {
-    if (!newShopItem.trim()) return;
-    setShopping(prev => [...prev, { id: Date.now().toString(), name: newShopItem.trim(), checked: false, fromPantry: false }]);
-    setNewShopItem("");
+  // 1.0.22 (sem repetição): não se anota mais item novo aqui (vai pro Mercado). Os pendentes da lista antiga vão pro
+  // Mercado num toque — o do "Acabou" leva o canto de origem; os comprados ficam até "Limpar comprados".
+  const levarProMercado = () => {
+    const r = moverListaAntigaDaDespensa(mercado, shopping);
+    if (r.movidos === 0) return;
+    setMercado(r.lista);
+    setShopping(r.restante as ShoppingItem[]);
+    const ver = onAbrirMercado ? { action: { label: "Ver", onClick: onAbrirMercado } } : {};
+    toast.success(r.novos > 0 ? `${r.novos} ${r.novos === 1 ? "item foi" : "itens foram"} pro Mercado` : "Esses itens já estavam no Mercado", ver);
+    if (r.restante.length === 0) setView("pantry");
   };
 
   const clearChecked = () => setShopping(prev => prev.filter(s => !s.checked));
@@ -93,9 +99,16 @@ const SmartPantry = ({ onAbrirMercado }: { onAbrirMercado?: () => void } = {}) =
         <Button variant={view === "pantry" ? "default" : "outline"} size="sm" className="flex-1 h-9 text-xs" onClick={() => setView("pantry")}>
           🗄️ Despensa ({pantry.length})
         </Button>
-        <Button variant={view === "shopping" ? "default" : "outline"} size="sm" className="flex-1 h-9 text-xs gap-1" onClick={() => setView("shopping")}>
-          <ShoppingCart className="w-3 h-3" /> Compras ({shopping.filter(s => !s.checked).length})
-        </Button>
+        {/* 1.0.22 (sem repetição): a lista de compras é UMA — o Mercado. Sem lista antiga aqui, o botão leva pra lá. */}
+        {shopping.length > 0 || !onAbrirMercado ? (
+          <Button variant={view === "shopping" ? "default" : "outline"} size="sm" className="flex-1 h-9 text-xs gap-1" onClick={() => setView("shopping")} data-testid="despensa-lista-antiga">
+            <ShoppingCart className="w-3 h-3" /> Compras antigas ({shopping.filter(s => !s.checked).length})
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm" className="flex-1 h-9 text-xs gap-1" onClick={onAbrirMercado} data-testid="despensa-abrir-mercado">
+            <ShoppingCart className="w-3 h-3" /> Lista de compras →
+          </Button>
+        )}
       </div>
 
       {acabandoCount > 0 && view === "pantry" && (
@@ -152,14 +165,14 @@ const SmartPantry = ({ onAbrirMercado }: { onAbrirMercado?: () => void } = {}) =
       ) : (
         <div className="rounded-xl overflow-hidden border border-border">
           <div className="bg-emerald-200 dark:bg-emerald-900/60 px-3 py-2 flex items-center justify-between">
-            <h4 className="text-xs font-bold text-foreground">🛒 LISTA DE COMPRAS</h4>
+            <h4 className="text-xs font-bold text-foreground">🛒 DA LISTA ANTIGA DA DESPENSA</h4>
             {shopping.some(s => s.checked) && (
               <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={clearChecked}>Limpar comprados</Button>
             )}
           </div>
           <div className="bg-emerald-50 dark:bg-emerald-950/30 p-2 space-y-1.5">
             <p className="text-[10px] text-muted-foreground px-1">
-              O que acaba na despensa vai pra lista do Mercado.
+              A lista de compras agora é uma só: a do Mercado. O que você anotou aqui antes continua aqui até você levar ou limpar.
               {onAbrirMercado && <button type="button" onClick={onAbrirMercado} className="ml-1 font-bold text-primary underline underline-offset-2">Ver Mercado</button>}
             </p>
             {shopping.map(item => (
@@ -173,12 +186,12 @@ const SmartPantry = ({ onAbrirMercado }: { onAbrirMercado?: () => void } = {}) =
                 <button onClick={() => setShopping(prev => prev.filter(s => s.id !== item.id))}><X className="w-3 h-3 text-muted-foreground" /></button>
               </div>
             ))}
-            {shopping.length === 0 && <p className="text-[11px] text-muted-foreground italic py-4 text-center">Lista vazia! 🎉</p>}
-            <div className="flex gap-2 pt-1">
-              <Input value={newShopItem} onChange={e => setNewShopItem(e.target.value)} placeholder="Adicionar item..." className="text-xs h-7 flex-1 bg-background/70"
-                onKeyDown={e => e.key === "Enter" && addShoppingItem()} />
-              <Button size="sm" className="h-7 px-2" onClick={addShoppingItem}><Plus className="w-3 h-3" /></Button>
-            </div>
+            {shopping.length === 0 && <p className="text-[11px] text-muted-foreground italic py-4 text-center">Nada aqui — a lista de compras é a do Mercado. 🎉</p>}
+            {shopping.some(s => !s.checked) && (
+              <Button size="sm" variant="outline" className="h-8 w-full text-xs bg-background/70" onClick={levarProMercado} data-testid="levar-lista-antiga-despensa">
+                Levar pro Mercado
+              </Button>
+            )}
           </div>
         </div>
       )}

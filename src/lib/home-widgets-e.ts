@@ -7,6 +7,7 @@ import { somaParcelasDoMes, type Parcela } from "@/lib/finance-parcelas";
 import { computeDailyBudget, computeLooseBillsOutflow, computeMonthlyOutflow } from "@/lib/finance-totals";
 import { CHAVE_CUIDADOS, cuidadosValidos, faltaDoCuidado, ordenarCuidados } from "@/lib/beleza-cuidados";
 import { localDayKey } from "@/lib/utils";
+import { EMOJI_DO_HUMOR, humorDoDia } from "@/lib/humor-do-dia";
 
 /**
  * OS WIDGETS DA HOME NOVA (rodada 3, 26/10 — dono: "reformular no estilo Cal AI e tirar o excesso"). Um formato único
@@ -188,9 +189,11 @@ export function dadoDoWidgetE(id: IdDoWidgetE, d: LifeHubData, get: Get, hoje = 
     }
     case "humor": {
       // o check de humor de hoje (a ação do "+" grava em core-mood-log: { value, emoji }); tocar abre o formulário
+      // 1.0.22 (28/10): o humor do dia é um só (lib/humor-do-dia) — o da Rotina e o do Dev. Pessoal também aparecem
       const r = (get<Record<string, { value?: unknown; emoji?: unknown }>>("core-mood-log", {}) ?? {})[hoje];
-      const emoji = typeof r?.emoji === "string" && r.emoji ? r.emoji : null;
-      if (emoji) return { ...base, numero: emoji, detalhe: ROTULO_DO_HUMOR[Number(r?.value)] ?? "hoje", fracao: null, vazio: null, action: "mood" };
+      const h = humorDoDia(get, hoje);
+      const emoji = h ? (h.chave === "core-mood-log" && typeof r?.emoji === "string" && r.emoji ? r.emoji : EMOJI_DO_HUMOR[h.valor]) : null;
+      if (h && emoji) return { ...base, numero: emoji, detalhe: ROTULO_DO_HUMOR[h.valor] ?? "hoje", fracao: null, vazio: null, action: "mood" };
       if (d.registrosHoje?.humor) return { ...base, numero: "✓", detalhe: "registrado hoje", fracao: null, vazio: null, action: "mood" };
       return { ...base, numero: "—", fracao: null, vazio: { texto: "Como você está hoje?", cta: "Registrar humor", acao: "mood" }, action: "mood" };
     }

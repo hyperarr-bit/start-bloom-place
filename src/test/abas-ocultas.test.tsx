@@ -110,7 +110,8 @@ describe("regra pura", () => {
     for (const [m, lista] of Object.entries(ABAS_POUCO_USO)) {
       for (const id of lista) expect(ABAS_QUE_NUNCA_SAEM[m] ?? [], `${m}/${id}`).not.toContain(id);
     }
-    expect(padraoEnxuto("financas", IDS_FIN)).toEqual(["investimentos", "itens", "viagem", "simuladores", "limites", "relatorios", "saude"]);
+    // 28/10 (sem repetição): a aba Viagem saiu de Finanças (vive em Viagens › Budget) — some do padrão enxuto
+    expect(padraoEnxuto("financas", IDS_FIN)).toEqual(["investimentos", "itens", "simuladores", "limites", "relatorios", "saude"]);
     // todo id da lista existe na página do módulo (aba renomeada não pode virar lista morta sem ninguém ver)
     const PAGINA: Record<string, string> = { financas: "Index", rotina: "Rotina", saude: "Saude", treino: "Treino", dieta: "Dieta", beleza: "Beleza", casa: "Casa",
       biblioteca: "Biblioteca", desenvolvimento: "DesenvolvimentoPessoal", estudos: "Estudos", relacionamentos: "Relacionamentos", detox: "Detox",
@@ -223,11 +224,12 @@ describe("padrão enxuto (ABAS_ENXUTAS) — só conta nova", () => {
     localStorage.setItem(CHAVE_FORCA_ABAS_ENXUTAS, "on");
     const store = criarStore({ [CHAVE_ORIGEM_CONTA]: { tipo: "nova", em: "2026-10-28T10:00:00Z", versao: "1.0.19", regra: "x" } });
     render(<Com store={store}><Pagina /></Com>);
-    expect(naFileira()).toEqual(["tab-dashboard", "financeiro"]);
+    // "viagem" (só no fixture): saiu de Finanças em 28/10 e do padrão enxuto — id fora da lista continua visível
+    expect(naFileira()).toEqual(["tab-dashboard", "financeiro", "tab-viagem"]);
     expect(store.escritas).toEqual([]);
     fireEvent.click(screen.getByTestId("abas-mostrar-todas"));
     expect(store.dados["abas-ocultas:financas"]).toEqual([]);
-    expect(eventos).toContainEqual(["abas_mostrar_todas", { modulo: "financas", ocultas: 7 }]);
+    expect(eventos).toContainEqual(["abas_mostrar_todas", { modulo: "financas", ocultas: 6 }]);
     expect(naFileira()).toHaveLength(IDS_FIN.length);
     expect(screen.queryByTestId("abas-mostrar-todas")).not.toBeInTheDocument();
   });
@@ -243,7 +245,8 @@ describe("padrão enxuto (ABAS_ENXUTAS) — só conta nova", () => {
   it("conta nova SEM força (a chave ligada no código) já começa enxuta; ?abas-enxutas=off neste aparelho desliga (QA)", () => {
     const store = criarStore({ [CHAVE_ORIGEM_CONTA]: { tipo: "nova" } });
     render(<Com store={store}><Pagina /></Com>);
-    expect(naFileira()).toEqual(["tab-dashboard", "financeiro"]);
+    // "viagem" (só no fixture): saiu de Finanças em 28/10 e do padrão enxuto — id fora da lista continua visível
+    expect(naFileira()).toEqual(["tab-dashboard", "financeiro", "tab-viagem"]);
     expect(screen.getByTestId("abas-mostrar-todas")).toHaveTextContent("Ver todas");
     cleanup();
     localStorage.setItem(CHAVE_FORCA_ABAS_ENXUTAS, "off");

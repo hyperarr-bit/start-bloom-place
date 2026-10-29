@@ -105,8 +105,8 @@ describe("regra pura", () => {
     expect(ocultasEfetivas({ ids: ["a", "b"], gravada: ["b", "zzz"], enxuta: false, moduloId: "x" })).toEqual(["b"]);
   });
 
-  it("padrão enxuto: chave DESLIGADA no código; nenhuma lista esconde a aba de entrada ou alvo de missão", () => {
-    expect(ABAS_ENXUTAS).toBe(false);
+  it("padrão enxuto: chave LIGADA no código (dono 28/10); nenhuma lista esconde a aba de entrada ou alvo de missão", () => {
+    expect(ABAS_ENXUTAS).toBe(true);
     for (const [m, lista] of Object.entries(ABAS_POUCO_USO)) {
       for (const id of lista) expect(ABAS_QUE_NUNCA_SAEM[m] ?? [], `${m}/${id}`).not.toContain(id);
     }
@@ -240,10 +240,31 @@ describe("padrão enxuto (ABAS_ENXUTAS) — só conta nova", () => {
     expect(screen.queryByTestId("abas-mostrar-todas")).not.toBeInTheDocument();
   });
 
-  it("conta nova com a chave DESLIGADA (o padrão do código): nada muda", () => {
+  it("conta nova SEM força (a chave ligada no código) já começa enxuta; ?abas-enxutas=off neste aparelho desliga (QA)", () => {
     const store = criarStore({ [CHAVE_ORIGEM_CONTA]: { tipo: "nova" } });
     render(<Com store={store}><Pagina /></Com>);
+    expect(naFileira()).toEqual(["tab-dashboard", "financeiro"]);
+    expect(screen.getByTestId("abas-mostrar-todas")).toHaveTextContent("Ver todas");
+    cleanup();
+    localStorage.setItem(CHAVE_FORCA_ABAS_ENXUTAS, "off");
+    render(<Com store={store}><Pagina /></Com>);
     expect(naFileira()).toHaveLength(IDS_FIN.length);
+  });
+
+  it("DEMO de venda (/preview, iframe /organizar/demo): sem a porta e sem o 'Ver todas' — a fileira de antes", () => {
+    const store = criarStore({ "abas-ocultas:financas": ["viagem"] });
+    for (const rota of ["/preview/financas", "/organizar/demo"]) {
+      window.history.pushState({}, "", rota);
+      render(<Com store={store}><Pagina /></Com>);
+      expect(screen.queryByTestId("abas-organizar")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("abas-mostrar-todas")).not.toBeInTheDocument();
+      expect(naFileira()).toContain("tab-dashboard");
+      cleanup();
+    }
+    window.history.pushState({}, "", "/financas");
+    render(<Com store={store}><Pagina /></Com>);
+    expect(screen.getByTestId("abas-organizar")).toBeInTheDocument();
+    window.history.pushState({}, "", "/");
   });
 });
 

@@ -15,8 +15,9 @@
  * └───────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
  */
 
-/** A chave. Desligada = ninguém recebe o padrão enxuto (o "Organizar abas" funciona igual pra todos). */
-export const ABAS_ENXUTAS = false;
+/** A chave. LIGADA (dono 28/10: "concordo com tudo, liga") = conta nova começa enxuta; `?abas-enxutas=off` desliga neste
+ *  aparelho (QA). Desligada = ninguém recebe o padrão enxuto (o "Organizar abas" funciona igual pra todos). */
+export const ABAS_ENXUTAS = true;
 
 /**
  * Abas de pouco uso que a conta nova começa sem ver, por módulo. Fonte: briefing-codex-modulos/00-VISAO-GERAL.md (28/10;

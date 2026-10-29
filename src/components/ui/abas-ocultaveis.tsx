@@ -23,6 +23,7 @@ import { ChevronDown, ChevronUp, SlidersHorizontal, X } from "lucide-react";
 import type { AbaOcultavel, AbasOcultas } from "@/hooks/use-abas-ocultas";
 import { Switch } from "@/components/ui/switch";
 import { trackEvent } from "@/lib/analytics";
+import { emCaminhoDeDemo } from "@/lib/caminho-demo";
 import {
   Alca, CLASSE_FUNDO_FOLHA, FaixaDoRelogioSobFolha, propsDaFolha, propsDoFundo, useFolhaArrastavel,
 } from "@/components/home-nova/e/folha-arrasto";
@@ -45,6 +46,12 @@ interface AbasOcultaveisProps<T extends AbaOcultavel> {
 }
 
 const SEGURAR_MS = 500;
+
+/** Demo de venda (/preview, /experimente, /liberar, /hoje/demo e o iframe da landing /organizar/demo): a fileira fica como
+ *  antes, sem a porta "Organizar abas" nem o "Ver todas" (dono 28/10). */
+export const fileiraDeDemo = (): boolean => {
+  try { return emCaminhoDeDemo() || /^\/organizar\/demo(\/|$)/.test(window.location.pathname); } catch { return false; }
+};
 const rotuloDe = (t: AbaOcultavel) => `${t.icon ? `${t.icon} ` : ""}${t.label}`;
 
 export function AbasOcultaveis<T extends AbaOcultavel>({ abas, ativa, onTrocar, className = "", testIds = false, comoTab = false, corrigirAbaDesconhecida = true, rotuloDaFileira }: AbasOcultaveisProps<T>) {
@@ -121,6 +128,7 @@ export function AbasOcultaveis<T extends AbaOcultavel>({ abas, ativa, onTrocar, 
 
   // A fileira: as visíveis + a ativa se ela estiver oculta (link profundo), na ordem da pessoa.
   const visIds = new Set(visiveis.map((a) => a.id));
+  const demo = fileiraDeDemo();
   const naFileira = todas.filter((a) => visIds.has(a.id) || a.id === ativa);
 
   return (
@@ -172,7 +180,7 @@ export function AbasOcultaveis<T extends AbaOcultavel>({ abas, ativa, onTrocar, 
           );
         })}
 
-        {!editando && abas.enxuta && (
+        {!editando && !demo && abas.enxuta && (
           <button
             type="button"
             onClick={() => abas.mostrarTodas()}
@@ -180,12 +188,12 @@ export function AbasOcultaveis<T extends AbaOcultavel>({ abas, ativa, onTrocar, 
             data-testid="abas-mostrar-todas"
             className="notion-tab whitespace-nowrap text-[11px] font-semibold text-foreground/80 border-transparent hover:bg-muted shrink-0 px-2.5 underline decoration-dotted underline-offset-4"
           >
-            Mostrar todas as abas
+            Ver todas
           </button>
         )}
 
         {/* A porta da folha: fantasma, sem borda. Só o ícone quando nada está oculto. */}
-        {!editando && (
+        {!editando && !demo && (
           <button
             type="button"
             onClick={abrirFolha}

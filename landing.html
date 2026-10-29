@@ -37,7 +37,7 @@
         var AB_TITULO = "off";
         var BRACOS_TITULO = ["a", "b", "c"];
         var AB_OFERTA = "off";
-        var AB_CHECKOUT = "off"; // 29/10: e-mail antes do Pix (braço "email") × checkout de hoje ("livre") — ver o comentário acima
+        var AB_CHECKOUT = "on"; // 29/10 (dono, depois da compra real pelo braço email): LIGADO. e-mail antes do Pix (braço "email") × checkout de hoje ("livre") — ver o comentário acima
         var d = document.documentElement, q = null, mem = {};
         try { q = new URLSearchParams(location.search); } catch (e0) {}
         var pega = function (k) { try { return q ? q.get(k) : null; } catch (e) { return null; } };

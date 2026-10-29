@@ -21,7 +21,9 @@ const HTML = readFileSync(resolve(raiz, "landing.html"), "utf8");
 
 /* ───────── o script do <head>, rodado num ambiente falso (com cookie) ───────── */
 const scriptDaCabeca = HTML.match(/<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
-const ligado = scriptDaCabeca.replace('var AB_CHECKOUT = "off"', 'var AB_CHECKOUT = "on"');
+// 29/10: a chave foi LIGADA no código; o caminho "off" (rollback) segue testado trocando a linha
+const ligado = scriptDaCabeca.replace(/var AB_CHECKOUT = "(on|off)"/, 'var AB_CHECKOUT = "on"');
+const desligado = scriptDaCabeca.replace(/var AB_CHECKOUT = "(on|off)"/, 'var AB_CHECKOUT = "off"');
 
 function rodar(fonte: string, url: string, store: Record<string, string> = {}, cookie: { v: string; ultimo?: string } = { v: "" }) {
   const u = new URL(url, "https://www.coreaplicativo.com.br");
@@ -46,9 +48,9 @@ function rodar(fonte: string, url: string, store: Record<string, string> = {}, c
 }
 
 describe("o sorteio do checkout (head do landing.html)", () => {
-  it("a chave vem DESLIGADA no código: todo mundo no checkout de hoje (livre), sem criar id de aparelho", () => {
-    expect(HTML).toMatch(/var AB_CHECKOUT = "off";/);
-    const r = rodar(scriptDaCabeca, "/organizar");
+  it("com a chave em \"off\" (rollback): todo mundo no checkout de hoje (livre), sem criar id de aparelho", () => {
+    expect(HTML).toMatch(/var AB_CHECKOUT = "on";/);
+    const r = rodar(desligado, "/organizar");
     expect(r.attrs["data-checkout"]).toBe("livre");
     expect(r.store["landing-device-id"]).toBeUndefined();
     expect(r.cookie.v).toBe("");
@@ -61,7 +63,7 @@ describe("o sorteio do checkout (head do landing.html)", () => {
     expect(rodar(scriptDaCabeca, "/organizar", store).attrs["data-checkout"]).toBe("email"); // ficou
     expect(rodar(scriptDaCabeca, "/organizar", store).mem.checkout_forcado).toBe(true);
     expect(rodar(ligado, "/organizar?checkout=livre", store).attrs["data-checkout"]).toBe("livre");
-    expect(rodar(scriptDaCabeca, "/organizar?checkout=zzz", {}).attrs["data-checkout"]).toBe("livre");
+    expect(rodar(desligado, "/organizar?checkout=zzz", {}).attrs["data-checkout"]).toBe("livre");
   });
 
   it("ligada: estável por aparelho — o id fica no localStorage E no cookie do domínio; sem o localStorage, o cookie segura o braço", () => {

@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import { isNativeShell } from "@/lib/native-shell";
 import { estadoTeste } from "@/lib/teste-gratis";
 import { missaoWebConvidada } from "@/lib/missao-web";
+import SalveSeuAcesso from "@/components/account/SalveSeuAcesso";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -49,5 +50,6 @@ export const ProtectedRoute = ({ children, allowGuest = false }: ProtectedRouteP
     return <Navigate to="/auth" replace />;
   }
 
-  return <>{children}</>;
+  // 29/10: pagou numa conta anônima e ainda sem e-mail → "Salve seu acesso" por cima do app (só no site; ver o componente)
+  return <>{children}{user && !user.email && !isNativeShell() ? <SalveSeuAcesso /> : null}</>;
 };

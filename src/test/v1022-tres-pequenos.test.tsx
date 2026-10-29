@@ -238,7 +238,7 @@ describe("2b · o humor do dia é um só (3 chaves, cada uma no seu formato)", (
     delete store.dados["dp-mood-log"];
     store.reabrir();
     comStore(<MoodTracker />, store);
-    const meh = screen.getByRole("button", { name: /Meh/ });
+    const meh = screen.getByRole("button", { name: /Ruim/ }); // 1.0.22: o 2 se chama "Ruim" em todo lugar (era "Meh" na Rotina)
     expect(meh.getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByTestId("emocoes-do-dia")).toBeTruthy(); // emoções e nota liberadas: o dia tem humor
     // trocar na Rotina → as 3 chaves com o mesmo valor

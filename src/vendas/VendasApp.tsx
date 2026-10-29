@@ -93,14 +93,24 @@ function Entrar({ onEntrou }: { onEntrou: () => void }) {
     setIndo(true); setErro(null);
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: senha });
     setIndo(false);
-    if (error) { setErro("E-mail ou senha não conferem."); return; }
+    if (error) {
+      const m = String(error.message ?? "").toLowerCase();
+      const st = (error as { status?: number }).status;
+      setErro(
+        st === 429 || m.includes("rate limit") ? "Muitas tentativas seguidas. Espere uns 5 minutos e tente de novo."
+          : m.includes("not confirmed") ? "Este e-mail ainda não foi confirmado."
+          : m.includes("invalid login") ? "E-mail ou senha não conferem."
+          : `Não deu pra entrar agora (${st ?? "rede"}). Confira a internet e tente de novo.`,
+      );
+      return;
+    }
     onEntrou();
   };
   return (
     <div className="v-tela v-centro">
       <form className="v-entrar" onSubmit={enviar}>
         <Marca />
-        <input className="v-campo" type="email" autoComplete="username" placeholder="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <input className="v-campo" type="email" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} />
         <input className="v-campo" type="password" autoComplete="current-password" placeholder="Senha" value={senha} onChange={(e) => setSenha(e.target.value)} />
         {erro && <p className="v-erro">{erro}</p>}
         <button className="v-botao" disabled={indo || !email || !senha}>{indo ? "Entrando…" : "Entrar"}</button>

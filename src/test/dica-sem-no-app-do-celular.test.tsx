@@ -77,14 +77,14 @@ describe("Beleza: 'DICAS PRA COMEÇAR' (o print #86)", () => {
   it("no app: as dicas novas (a 1ª: as 3 perguntas do skincare), sem 'No app do celular'", () => {
     noApp();
     abrir(<Beleza />, "/beleza");
-    expect(screen.getByText("Responda 3 perguntas e sua rotina de skincare sai pronta")).toBeInTheDocument();
+    expect(screen.getByText("Responda 3 perguntas e ganhe sua rotina de pele")).toBeInTheDocument();
     expect(texto()).not.toMatch(/no app do celular/i);
   });
 
   it("no site: as mesmas dicas novas", () => {
     noSiteComDicas();
     abrir(<Beleza />, "/beleza");
-    expect(screen.getByText("Responda 3 perguntas e sua rotina de skincare sai pronta")).toBeInTheDocument();
+    expect(screen.getByText("Responda 3 perguntas e ganhe sua rotina de pele")).toBeInTheDocument();
   });
 });
 

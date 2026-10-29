@@ -70,7 +70,7 @@ export interface Dica {
 
 const ORGANIZAR: Dica = {
   texto: "Use só o que quiser: oculte as abas que não usa",
-  textoSemToque: "Não usa alguma aba? Oculte no ícone ao fim da fileira de abas",
+  textoSemToque: "Não usa uma aba? Oculte no ícone ao fim das abas",
   organizarAbas: true,
 };
 
@@ -83,7 +83,7 @@ export const DICAS_DO_MODULO: Readonly<Record<string, readonly Dica[]>> = {
     // RECEITAS 65% e CUSTOS FIXOS 65% usaram (257 e 287 em 2+ dias) — os cards mais usados de Finanças
     { texto: "Anote quanto entra no mês e suas contas fixas", aba: "financeiro", alvos: ['[data-spotlight="add-income"]'], acao: "focar" },
     // anotar gasto DE NOVO nos dias 2–3: 46,9% × 15,5% pagaram; 118 pagantes tocaram NOVO GASTO (1.138 toques em 9 dias)
-    { texto: "Anote o gasto na hora: o quanto posso gastar hoje se ajusta sozinho", aba: "financeiro", alvos: ['[data-cartao-alvo="novo-gasto"]', '[data-spotlight="add-expense"]'], acao: "focar" },
+    { texto: "Anote cada gasto e veja quanto pode gastar hoje", aba: "financeiro", alvos: ['[data-cartao-alvo="novo-gasto"]', '[data-spotlight="add-expense"]'], acao: "focar" },
     ORGANIZAR,
   ],
   rotina: [
@@ -95,14 +95,14 @@ export const DICAS_DO_MODULO: Readonly<Record<string, readonly Dica[]>> = {
   ],
   treino: [
     // MEU PLANO DA SEMANA 39,5% usaram (92 em 2+ dias); COMECE COM UM MODELO PRONTO 27,2%
-    { texto: "Monte sua semana no Plano, ou comece de um modelo pronto", aba: "plano", alvos: ['[data-testid="plano-semana"]'], acao: "mostrar" },
+    { texto: "Monte a semana no Plano ou use um modelo pronto", aba: "plano", alvos: ['[data-testid="plano-semana"]'], acao: "mostrar" },
     // gravar treino no dia 1: 30,7% × 21,6% pagaram (4+ módulos, significativo); CONCLUIR TREINO 21,3% de quem abriu
-    { texto: "Treinou? Marque as séries em Hoje e toque em Concluir treino", aba: "hoje", alvos: ['texto:Concluir treino', '[data-spotlight="add-exercise"]'], acao: "mostrar" },
+    { texto: "Treinou? Em Hoje, toque em Concluir treino", aba: "hoje", alvos: ['texto:Concluir treino', '[data-spotlight="add-exercise"]'], acao: "mostrar" },
     ORGANIZAR,
   ],
   dieta: [
     // CARDÁPIO: "Clique para adicionar" 37% de quem abriu; card do dia 37,9% usaram; saude-meals 19,6% dos ativos
-    { texto: "Toque numa refeição de hoje e escreva o que vai comer", aba: "cardapio", alvos: ['[data-spotlight="first-day"]'], acao: "mostrar" },
+    { texto: "Toque numa refeição de hoje e anote o que vai comer", aba: "cardapio", alvos: ['[data-spotlight="first-day"]'], acao: "mostrar" },
     // gravar de novo nos dias 2–3: 61,5% × 16,4% pagaram; abrir DIÁRIO no dia 1: 32,9% × 16,9%; dieta-diary-v2 21% em 4+ dias
     { texto: "No Diário, marque se seguiu cada refeição do dia", aba: "diario", acao: "mostrar" },
     ORGANIZAR,
@@ -111,12 +111,12 @@ export const DICAS_DO_MODULO: Readonly<Record<string, readonly Dica[]>> = {
     // HIDRATAÇÃO 55,9% usaram (142 em 2+ dias); water-log: 475 pagantes (41%), 28% em 4+ dias
     { texto: "Toque no copo para registrar a água do dia", aba: "hoje", alvos: ['[data-spotlight="add-water"]'], acao: "mostrar" },
     // VITAMINAS E REMÉDIOS 47,6% usaram, 143 em 2+ dias (o card que mais repete); gravar de novo nos dias 2–3: 43,8% × 15,9%
-    { texto: "Cadastre suas vitaminas e remédios e marque quando tomar", aba: "hoje", alvos: ['input[placeholder="Novo suplemento..."]'], acao: "focar" },
+    { texto: "Cadastre vitaminas e remédios e marque ao tomar", aba: "hoje", alvos: ['input[placeholder="Novo suplemento..."]'], acao: "focar" },
     ORGANIZAR,
   ],
   beleza: [
     // montar-rotina 52,7% usaram (o card mais usado da Beleza); 44% tocaram
-    { texto: "Responda 3 perguntas e sua rotina de skincare sai pronta", aba: "routine", alvos: ['[data-testid="montar-rotina"]', '[data-testid="skincare-de-hoje"]'], acao: "mostrar" },
+    { texto: "Responda 3 perguntas e ganhe sua rotina de pele", aba: "routine", alvos: ['[data-testid="montar-rotina"]', '[data-testid="skincare-de-hoje"]'], acao: "mostrar" },
     // abrir CABELO no dia 1: 34,3% × 17,6% pagaram; montar-cronograma 42,5% usaram
     { texto: "Em Cabelo, monte seu cronograma capilar", aba: "hair", alvos: ['[data-testid="montar-cronograma"]'], acao: "mostrar" },
     ORGANIZAR,
@@ -130,7 +130,7 @@ export const DICAS_DO_MODULO: Readonly<Record<string, readonly Dica[]>> = {
   ],
   biblioteca: [
     // LENDO AGORA 51,1% usaram (81 em 2+ dias); COMEÇAR UM LIVRO 29,7% de quem abriu; o link importa capa e dados
-    { texto: "Comece o livro que está lendo: cole o link e a capa vem sozinha", aba: "lendo", alvos: ['texto:Começar um Livro'], acao: "clicar", focoDepois: 'input[placeholder="Cole o link do livro aqui..."]' },
+    { texto: "Cole o link do livro e a capa vem sozinha", aba: "lendo", alvos: ['texto:Começar um Livro'], acao: "clicar", focoDepois: 'input[placeholder="Cole o link do livro aqui..."]' },
     // voltar à Biblioteca nos dias 2–3: 69,2% × 16,8% pagaram; ATUALIZAR PÁGINA 22,9% de quem abriu
     { texto: "Volte e anote a página em que parou", aba: "lendo", alvos: ['input[placeholder="Atualizar página..."]', 'texto:📖 LENDO AGORA'], acao: "focar" },
     ORGANIZAR,
@@ -153,7 +153,7 @@ export const DICAS_DO_MODULO: Readonly<Record<string, readonly Dica[]>> = {
     // COMEÇO PRONTO 38% usaram (dia/mês do aniversário 37–40% de quem abriu)
     { texto: "Comece pela família: salve os aniversários", aba: "pessoas", alvos: ['[data-testid="comeco-pronto"]', '[data-testid="lista-pessoas"]'], acao: "mostrar" },
     // MINHAS PESSOAS 24,4% usaram; ADICIONAR PESSOA 25,6% de quem abriu
-    { texto: "Adicione outras pessoas importantes e as datas delas", aba: "pessoas", alvos: ['texto:Adicionar pessoa', '[data-testid="comeco-pronto"]'], acao: "mostrar" },
+    { texto: "Adicione outras pessoas e as datas delas", aba: "pessoas", alvos: ['texto:Adicionar pessoa', '[data-testid="comeco-pronto"]'], acao: "mostrar" },
     ORGANIZAR,
   ],
   detox: [

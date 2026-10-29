@@ -67,7 +67,7 @@ describe("a lista", () => {
       const textos = dicas.map((d) => d.texto);
       expect(new Set(textos).size, m).toBe(textos.length);
       for (const d of dicas) for (const t of [d.texto, d.textoSemToque].filter(Boolean) as string[]) {
-        expect(t.length, `${m}: ${t}`).toBeLessThanOrEqual(70);
+        expect(t.length, `${m}: ${t}`).toBeLessThanOrEqual(52);
         expect(t, m).not.toMatch(/[!⚙]/);
         expect(EMOJI.test(t), `${m}: ${t}`).toBe(false);
       }
@@ -132,7 +132,7 @@ describe("o cartão nas duas apresentações", () => {
     expect(botoes.map((b) => b.getAttribute("aria-label"))).toEqual(["Fechar dicas"]); // só o X
     expect(container.querySelector("svg.lucide-chevron-right")).toBeNull();
     expect(screen.getByTestId("dica-1").textContent).toBe(DICAS_DO_MODULO.rotina[0].texto);
-    expect(screen.getByTestId("dica-3").textContent).toMatch(/ícone ao fim da fileira/);
+    expect(screen.getByTestId("dica-3").textContent).toMatch(/ícone ao fim das abas/);
   });
   it("Beleza usa o mesmo cartão (na paleta dela), nas duas apresentações", () => {
     render(<DicasDaBeleza />);

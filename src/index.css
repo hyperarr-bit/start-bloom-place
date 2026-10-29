@@ -742,7 +742,8 @@ body {
 .app-safe-top-guard {
   position: fixed;
   z-index: 2147483647;
-  top: 0;
+  /* --vv-topo: o deslocamento da área visível com o teclado (lib/topo-com-teclado); 0 fora disso */
+  top: var(--vv-topo, 0px);
   left: 0;
   right: 0;
   height: calc(var(--app-safe-top) + min(8px, var(--app-safe-top)));
@@ -800,7 +801,9 @@ html.faixa-relogio-transparente .cf-chegada[data-tipo="comum"] {
    ============================================================ */
 header.sticky.top-0 {
   position: sticky;
-  top: var(--app-safe-top);
+  /* + --vv-topo (1.0.22, dono 29/10): com campo focado e a página no fim, o iPhone desloca a área visível e o cabeçalho
+     ia parar embaixo do relógio (lib/topo-com-teclado) */
+  top: calc(var(--app-safe-top) + var(--vv-topo, 0px));
   z-index: 40;
 }
 /* 1.0.22: com a faixa do relógio em vidro que some pra baixo (acima), o conteúdo que rola por trás do cabeçalho
@@ -817,6 +820,35 @@ header.sticky.top-0::before {
   background: inherit;
   pointer-events: none;
 }
+/* 1.0.22 (dono 29/10 — "o borrão não funciona nos módulos"): no APP o cabeçalho fixo dos módulos (e Você, Conquistas,
+   Notificações…) vira VIDRO, como a barra do iOS e o topo da Home: a cor do cabeçalho a 80% + desfoque, do relógio até a
+   linha de baixo, e o conteúdo que rola passa por trás borrado. O vidro mora no ::before (z -1, atrás do conteúdo do
+   cabeçalho) cobrindo o cabeçalho E a área segura: um backdrop-filter no próprio header faria dele a raiz do fundo e o
+   pedaço de cima (área segura) não borraria nada. Só cabeçalhos de fundo do tema (bg-card/bg-background); cabeçalho de
+   outra cor fica liso. Site (sem core-shell) e WebView sem color-mix/backdrop-filter: igual a antes. */
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) and (color: color-mix(in srgb, red 50%, transparent)) {
+  html.core-shell header.sticky.top-0:is(.bg-card, [class*="bg-card/"]) { --cab-vidro: hsl(var(--card)); }
+  html.core-shell header.sticky.top-0[class*="bg-background"] { --cab-vidro: hsl(var(--background)); }
+  html.core-shell header.sticky.top-0:is(.bg-card, [class*="bg-card/"], [class*="bg-background"]) {
+    background: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  html.core-shell header.sticky.top-0:is(.bg-card, [class*="bg-card/"], [class*="bg-background"])::before {
+    top: calc(-1 * var(--app-safe-top));
+    bottom: 0;
+    height: auto;
+    z-index: -1;
+    background: color-mix(in srgb, var(--cab-vidro) 80%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    backdrop-filter: blur(20px) saturate(1.6);
+  }
+  /* com esse cabeçalho na tela, a faixa do relógio fica só com o desfoque: a cor dela (o fundo da página) por cima do
+     vidro do cabeçalho (a cor do cartão) desenhava uma emenda na altura do relógio — no escuro, bem visível */
+  html.core-shell:has(header.sticky.top-0:is(.bg-card, [class*="bg-card/"], [class*="bg-background"])) .app-safe-top-guard {
+    background: transparent;
+  }
+}
 
 /* ============================================================
    Barra do tour da demo (27/07)
@@ -827,12 +859,12 @@ header.sticky.top-0::before {
    ============================================================ */
 .demo-tour-nav {
   position: sticky;
-  top: var(--app-safe-top);
+  top: calc(var(--app-safe-top) + var(--vv-topo, 0px));
   z-index: 60;
 }
 
 .demo-com-tour header.sticky.top-0 {
-  top: calc(var(--app-safe-top) + var(--demo-nav-h, 49px));
+  top: calc(var(--app-safe-top) + var(--vv-topo, 0px) + var(--demo-nav-h, 49px));
 }
 
 

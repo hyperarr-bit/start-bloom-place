@@ -14,10 +14,20 @@
  * quem gerou Pix — senão eram dois e-mails em 1 hora.
  *
  * Marcador: analytics_events `pix_pendente_email_enviado {order_id, offer}`.
+ *
+ * 29/10 — A LANDING (/organizar) PEGA CARONA NESTE CRON: o Pix da landing grava `pix_order_created` (não
+ * `pix_generated`) e não entrava aqui. A passada própria (_shared/lembrete-pix-landing.ts) manda 2 toques por pedido —
+ * ~12 min (com o copia-e-cola, o Pix ainda vivo) e ~20 h — só pra quem tem e-mail, 1x cada, e para se pagou.
+ * Desligar sem deploy: secret LEMBRETE_PIX_LANDING=off. Preview (só caixas da equipe): {preview, lembrete: "t12"|"t20h"}.
  */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { destinoDePreview } from "../_shared/preview-seguro.ts";
+import { lerDestino } from "../_shared/destino-hoje.ts";
+import { OFERTAS_PLANO_LANDING } from "../_shared/ofertas-landing.ts";
+import {
+  JANELAS, JANELA_BUSCA_MS, linkDeVolta, mensagemDoLembrete, pixPagoNaAsaas, varrerLembretesLanding, type Mensagem,
+} from "../_shared/lembrete-pix-landing.ts";
 
 const log = (m: string, x?: unknown) => console.log(`[pix-pendente-email] ${m}`, x ? JSON.stringify(x) : "");
 const PRECOS: Record<string, string> = { w27: "27,90", downsell: "14,90", w25: "24,90", w47: "47,90", w97: "97,90", lifetime: "97,90" };
@@ -57,11 +67,30 @@ serve(async (req) => {
       });
       if (!r.ok) throw new Error(`Resend ${r.status}: ${(await r.text()).slice(0, 200)}`);
     };
+    /* 29/10: os lembretes da landing (remetente com resposta pra caixa de contato: o t20h diz "é só responder") */
+    const enviarLembrete = async (to: string, m: Mensagem, tags: Record<string, string>): Promise<boolean> => {
+      const r = await fetch("https://api.resend.com/emails", {
+        method: "POST", headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from, to: [to], reply_to: "contato@coreaplicativo.com.br", subject: m.assunto, html: m.html,
+          tags: Object.entries(tags).map(([name, value]) => ({ name, value: value.replace(/[^A-Za-z0-9_-]/g, "_") })),
+        }),
+      }).catch(() => null);
+      return !!r?.ok;
+    };
     // PREVIEW: manda pro e-mail informado, sem gravar nada
     if (body?.preview) {
       // segurança 21/10: o preview só sai pras caixas da equipe (a anon key pública basta pra chamar a função)
       const destino = destinoDePreview(body.preview);
       if (!destino) return Response.json({ error: "forbidden" }, { status: 403 });
+      if (body.lembrete === "t12" || body.lembrete === "t20h") {
+        const toque = body.lembrete as "t12" | "t20h";
+        const criadoEm = Date.now() - JANELAS[toque].de;
+        const qr = "00020101021226870014br.gov.bcb.pix2565qrcode.exemplo.com/pix/v2/PREVIEW-SEM-COBRANCA-CORE5204000053039865405279005802BR5904CORE6009SAO PAULO62070503***6304ABCD";
+        const link = linkDeVolta({ toque, orderId: "previewpedido", offer: "LN_sempre279", qrCode: toque === "t12" ? qr : null, criadoEm, site });
+        const ok = await enviarLembrete(destino, mensagemDoLembrete({ toque, offer: "LN_sempre279", centavos: 2790, link, qrCode: toque === "t12" ? qr : null, minutosRestantes: 18 }), { lembrete: `preview_${toque}` });
+        return Response.json({ preview: true, lembrete: toque, ok });
+      }
       await enviar(destino, "João", "27,90", `${site}/planos?from=pix_pendente_preview`); return Response.json({ preview: true }); }
 
     const agora = Date.now();
@@ -105,7 +134,36 @@ serve(async (req) => {
       } catch (e) { falhas++; log("falhou", { msg: String((e as Error)?.message ?? e).slice(0, 160) }); }
     }
     log("fim", { candidatos: porPessoa.size, enviados, pagos, jaAvisados, semEmail, testes, falhas });
-    return Response.json({ candidatos: porPessoa.size, enviados, pagos, jaAvisados, semEmail, testes, falhas });
+
+    /* 29/10: a passada da landing (/organizar) — 12 min e 20 h, só com e-mail, 1x cada, para se pagou. Contagens no
+     * log; nada de e-mail/id. Falha aqui nunca derruba a régua de cima. */
+    let landing: Record<string, number> | { erro: string } | "desligado" = "desligado";
+    if ((Deno.env.get("LEMBRETE_PIX_LANDING") ?? "on") !== "off") {
+      try {
+        const asaasKey = Deno.env.get("ASAAS_API_KEY") ?? "";
+        const { data: pedidosLn, error: eLn } = await supabase
+          .from("analytics_events").select("user_id, created_at, event_data")
+          .eq("event_name", "pix_order_created")
+          // sem teto de propósito: o pedido mais NOVO da conta (mesmo com < 12 min) cala o lembrete dos velhos
+          .gte("created_at", new Date(agora - JANELA_BUSCA_MS).toISOString())
+          .in("event_data->>offer", [...OFERTAS_PLANO_LANDING])
+          .not("user_id", "is", null)
+          .order("created_at", { ascending: false }).limit(500);
+        if (eLn) throw eLn;
+        landing = await varrerLembretesLanding(supabase, {
+          pedidos: pedidosLn ?? [], agora, site,
+          emailDaConta: async (uid) => { const { data } = await supabase.auth.admin.getUserById(uid); return data?.user?.email ?? null; },
+          destino: (uid) => lerDestino(supabase as never, uid).catch(() => null),
+          pagoNaAsaas: (oid) => (asaasKey ? pixPagoNaAsaas(fetch as never, asaasKey, oid) : Promise.resolve(null)),
+          enviar: enviarLembrete,
+        });
+        log("landing", landing);
+      } catch (e) {
+        landing = { erro: String((e as Error)?.message ?? e).slice(0, 120) };
+        log("landing falhou", landing);
+      }
+    }
+    return Response.json({ candidatos: porPessoa.size, enviados, pagos, jaAvisados, semEmail, testes, falhas, landing });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     log("ERROR", { msg });

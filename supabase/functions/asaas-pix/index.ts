@@ -17,6 +17,7 @@ import {
 import { MENSAGEM_DOWNSELL_INDISPONIVEL, ehDownsell, podePedirDownsell } from "../_shared/elegibilidade-downsell.ts";
 import { ehOfertaLanding } from "../_shared/ofertas-landing.ts";
 import { EMAIL_OK as EMAIL_LANDING_OK, jaTemOCore, temVitalicioAtivo } from "../_shared/landing-travas.ts";
+import { chaveQr } from "../_shared/lembrete-pix-landing.ts";
 
 /**
  * Pix in-app via ASAAS (21/07) — gateway principal, substitui a Pagar.me.
@@ -456,6 +457,12 @@ serve(async (req) => {
       if (pontErr) {
         logStep("Ponte pix_order_created FALHOU — abortando", { id: out.id, message: pontErr.message });
         return jsonResponse({ error: "bridge_failed" }, 503);
+      }
+      /* 29/10 (landing): o copia-e-cola fica guardado junto do pedido (webhook_events, só service_role) pro lembrete de
+       * ~12 min do pix-pendente-email mandar o MESMO código (_shared/lembrete-pix-landing.ts). Falhar aqui não trava o Pix. */
+      if (ehOfertaLanding(offer)) {
+        await supabaseAdmin.from("webhook_events").insert({ id: chaveQr(out.id), source: "landing", event: String(out.payload).slice(0, 1000) })
+          .then(() => {}, () => {});
       }
       const b64 = typeof out.encodedImage === "string" && out.encodedImage.length
         ? (out.encodedImage.startsWith("data:") ? out.encodedImage : `data:image/png;base64,${out.encodedImage}`)

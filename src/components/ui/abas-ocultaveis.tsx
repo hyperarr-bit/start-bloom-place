@@ -73,6 +73,13 @@ export function AbasOcultaveis<T extends AbaOcultavel>({ abas, ativa, onTrocar, 
     return ok;
   }, [ocultar, ativa, visiveis, onTrocar]);
 
+  // A fileira encolheu/cresceu (ocultar, religar, ordem): a aba aberta volta pra dentro da tela (print 28/10: ficava cortada)
+  const assinatura = visiveis.map((a) => a.id).join("|");
+  useEffect(() => {
+    const el = raiz.current?.querySelector<HTMLElement>('[data-active="true"]');
+    try { el?.scrollIntoView?.({ inline: "nearest", block: "nearest" }); } catch { /* sem suporte: fica onde está */ }
+  }, [assinatura]);
+
   // Um toque fora da fila sai do modo de editar.
   useEffect(() => {
     if (!editando) return;

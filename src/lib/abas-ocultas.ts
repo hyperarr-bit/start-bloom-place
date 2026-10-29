@@ -91,7 +91,10 @@ export function guardarForcaAbasEnxutas(busca?: string): void {
   } catch { /* sem storage: vale a chave */ }
 }
 
+let forcaLida = false;
 export function abasEnxutasLigada(): boolean {
+  // a força da URL vale a partir da 1ª leitura desta abertura (o link de QA pode cair em qualquer rota)
+  if (!forcaLida) { forcaLida = true; if (typeof window !== "undefined") guardarForcaAbasEnxutas(); }
   try {
     const f = localStorage.getItem(CHAVE_FORCA_ABAS_ENXUTAS);
     if (f === "on") return true;

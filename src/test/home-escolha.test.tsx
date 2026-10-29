@@ -102,7 +102,7 @@ beforeAll(() => {
   Object.defineProperty(navigator, "vibrate", { configurable: true, value: () => true });
 });
 beforeEach(() => {
-  localStorage.clear(); sessionStorage.clear(); eventos.length = 0; plat.p = "web";
+  localStorage.clear(); sessionStorage.clear(); eventos.length = 0; plat.p = "ios"; // 1.0.22: a escolha é só do app do iPhone
   auth.user = { ...auth.user, created_at: "2026-08-01T12:00:00Z" };
 });
 afterEach(() => { cleanup(); document.querySelectorAll("[data-teste-camada]").forEach((e) => e.remove()); });
@@ -146,9 +146,7 @@ describe("a regra (lib/home-nova)", () => {
     localStorage.clear(); plat.p = "android"; _zerarHomeNova();
     expect(homeNovaLigada(false, "antiga", "nova")).toBe(false); // Android: a Home de sempre
     plat.p = "web"; _zerarHomeNova();
-    expect(homeNovaLigada(null, null, "nova")).toBe(true); // site: o padrão "off" é só a Home de hoje, não um desligar
-    localStorage.setItem(CHAVE_FORCA_HOME_NOVA, "off");
-    expect(homeNovaLigada(null, null, "nova")).toBe(false);
+    expect(homeNovaLigada(null, null, "nova")).toBe(false); // 1.0.22: no site a escolha não vale (só iPhone nesta versão)
   });
   it("o formato gravado: objeto { home, em, via } (e a palavra solta); lixo = nada; o espelho é por conta", () => {
     expect(lerEscolhaDaHome({ home: "nova", em: "x", via: "voce" })).toBe("nova");

@@ -400,7 +400,9 @@ export const marcadorDaEscolha = (home: EscolhaDaHome, via: ViaDaEscolha, agora:
   ({ home, em: new Date(agora).toISOString(), via });
 
 /** A escolha existe NESTA plataforma? iPhone (app) e site sim; Android não. */
-export const escolhaDaHomeNaPlataforma = (): boolean => ESCOLHA_HOME === "on" && (!isNativeShell() || isIOS());
+// 1.0.22 (dono 28/10): SÓ no app do iPhone nesta versão — no site a Home nova no PC ainda não foi revisada e o desligar
+// lá só sai com deploy; volta pro site depois da revisão (era `!isNativeShell() || isIOS()`).
+export const escolhaDaHomeNaPlataforma = (): boolean => ESCOLHA_HOME === "on" && isNativeShell() && isIOS();
 
 /** A escolha da pessoa vale AGORA? (plataforma + o desligar de emergência do iPhone; "admin" = só o dono testando.) */
 export function escolhaDaHomeVale(modo: ModoHomeNova = modoHomeNova()): boolean {

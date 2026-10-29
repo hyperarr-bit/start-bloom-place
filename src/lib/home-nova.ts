@@ -311,9 +311,9 @@ export function homeNovaLigada(admin: boolean | null, origem: OrigemDaConta | nu
   const f = forcaHomeNova();
   if (f) return f === "on";
   const modo = modoHomeNova();
-  // 1.0.22 (dono 28/10): a ESCOLHA da pessoa (Você › Home, ou o convite) vence a regra da origem — SÓ pra conta ANTIGA.
-  // Conta NOVA é só a Home nova, sem nenhuma menção da antiga (nem convite, nem linha em Você): a escolha não vale pra ela.
-  if (escolha && origem !== "nova" && escolhaDaHomeVale(modo)) return escolha === "nova";
+  // 1.0.22 (dono 28/10): a ESCOLHA da pessoa (Você › Home, ou o convite) vence a regra da origem — SÓ pra conta ANTIGA
+  // CONFIRMADA. Conta NOVA é só a Home nova, sem nenhuma menção da antiga; origem ainda desconhecida também não (nunca na dúvida).
+  if (escolha && origem === "antiga" && escolhaDaHomeVale(modo)) return escolha === "nova";
   if (modo === "off") return false;
   if (modo === "on") return true;
   if (modo === "admin") return admin === true;
@@ -460,6 +460,8 @@ export function deveConvidarHomeNova(p: {
 }): boolean {
   if (!p.userId || !p.contaCarregada || p.convidado) return false;
   if (!escolhaDaHomeVale()) return false;
+  // 1.0.22 (dono 28/10): só conta ANTIGA confirmada — conta nova (já na Home nova) e origem desconhecida nunca veem o convite
+  if (origemConhecida(p.userId) !== "antiga") return false;
   if (p.ligada || p.escolha) return false;
   if (p.conviteNaConta || conviteVistoNoAparelho(p.userId)) return false;
   if (p.momentoRuim) return false;

@@ -24,8 +24,8 @@ export function useEscolhaDaHome(): { disponivel: boolean; atual: EscolhaDaHome;
   const homeNova = useHomeNova(user);
   const atual: EscolhaDaHome = homeNova.ligada ? "nova" : "classica";
   const uid = user?.id ?? null;
-  // 1.0.22 (dono 28/10): conta NOVA não vê a escolha (nem a linha em Você) — é só a Home nova
-  const disponivel = !!uid && !isGuest && origemConhecida(uid) !== "nova" && escolhaDaHomeVale(homeNova.modo);
+  // 1.0.22 (dono 28/10): só conta ANTIGA confirmada vê a escolha (a linha em Você); conta nova e origem desconhecida, nunca
+  const disponivel = !!uid && !isGuest && origemConhecida(uid) === "antiga" && escolhaDaHomeVale(homeNova.modo);
 
   const escolher = useCallback((para: EscolhaDaHome, via: ViaDaEscolha) => {
     if (!uid) return;

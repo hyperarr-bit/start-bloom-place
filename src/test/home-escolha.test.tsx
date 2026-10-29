@@ -58,7 +58,7 @@ import { _zerarConviteNestaAbertura } from "@/components/home-nova/EscolhaDaHome
 import { _zerarConsultaAdmin } from "@/hooks/use-home-nova";
 import {
   CHAVE_FORCA_HOME_NOVA, CHAVE_HOME_CONVITE, CHAVE_HOME_CONVITE_APARELHO, CHAVE_HOME_ESCOLHA, CHAVE_HOME_ESCOLHA_APARELHO, CHAVE_HOME_NOVA_APARELHO,
-  _zerarHomeNova, deveConvidarHomeNova, escolhaConhecida, homeNovaLigada, homeNovaLigadaSincrona, lerEscolhaDaHome, registrarEscolhaDaHome,
+  CHAVE_ORIGEM_APARELHO, _zerarHomeNova, deveConvidarHomeNova, escolhaConhecida, homeNovaLigada, homeNovaLigadaSincrona, lerEscolhaDaHome, registrarEscolhaDaHome,
 } from "@/lib/home-nova";
 import { registrarMomentoRuim } from "@/lib/momento-ruim";
 import { localDayKey } from "@/lib/utils";
@@ -111,6 +111,15 @@ afterEach(() => { cleanup(); document.querySelectorAll("[data-teste-camada]").fo
 
 describe("a regra (lib/home-nova)", () => {
   const base = { userId: "u1", contaCarregada: true, ligada: false, escolha: null, conviteNaConta: null, criadoEm: "2026-08-01T12:00:00Z" };
+  // 1.0.22 (dono 28/10): o convite/a escolha só existem pra conta ANTIGA confirmada
+  beforeEach(() => { localStorage.setItem(CHAVE_ORIGEM_APARELHO, "u1:antiga"); _zerarHomeNova(); });
+  it("conta NOVA (já na Home nova) e origem desconhecida nunca veem o convite", () => {
+    localStorage.setItem(CHAVE_ORIGEM_APARELHO, "u1:nova"); _zerarHomeNova();
+    expect(deveConvidarHomeNova(base)).toBe(false);
+    localStorage.removeItem(CHAVE_ORIGEM_APARELHO); _zerarHomeNova();
+    expect(deveConvidarHomeNova(base)).toBe(false);
+    expect(homeNovaLigada(false, null, "classica")).toBe(false); // desconhecida: a escolha não vale (a regra de origem decide)
+  });
   it("o convite: só conta logada, na clássica, sem escolha, sem convite visto, fora do 1º dia e sem aviso de cobrança recente", () => {
     expect(deveConvidarHomeNova(base)).toBe(true);
     expect(deveConvidarHomeNova({ ...base, convidado: true })).toBe(false);

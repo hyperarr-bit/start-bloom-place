@@ -63,7 +63,6 @@ import { type Parcela, viradaDeParcelas, mesesAnteriores, chaveArquivadaDeParcel
 import { variaveisDoMes } from "@/lib/finance-fatura";
 import { CHAVE_FATURAS_PAGAS, chaveDaFatura, ehEstimativaDaFatura, extrairFaturas, faturasAVencer, injetarFaturas, mesDeFechamento, parcelasDoMesPassado } from "@/lib/finance-faturas";
 import { TotalPorCartao } from "@/components/finance/TotalPorCartao";
-import { PodeGastarCompacto } from "@/components/finance/PodeGastarCompacto";
 import { usePainelLimpo } from "@/hooks/use-painel-limpo";
 import { useFinanceCards } from "@/lib/finance-cards";
 import { chaveArquivada } from "@/lib/virada-do-mes";
@@ -732,19 +731,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
               <MonthlySheet month={openMonth.month} year={openMonth.year} onClose={() => setOpenMonth(null)} />
             ) : (
               <>
-                {/* 1.0.22 (28/10): o número do QUANTO POSSO GASTAR HOJE no topo da aba mais usada, compacto; o toque
-                    leva ao card inteiro no topo do Dashboard (mesma conta, mesmos valores — components/finance/PodeGastarCompacto) */}
-                <TrackedCard cardKey="pode-gastar-topo" tab="financeiro">
-                  <PodeGastarCompacto
-                    totalIncome={totalIncome}
-                    totalExpenses={monthlyOutflow}
-                    dueDays={dueDaysComFaturas as unknown[]}
-                    fixedExpenses={fixedExpenses}
-                    gastoDeHoje={gastoDeHoje}
-                    onVerNoPainel={() => { setActiveTab("dashboard"); window.scrollTo({ top: 0 }); }}
-                    onAnotarRenda={() => document.getElementById("fin-receitas")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                  />
-                </TrackedCard>
+                {/* 29/10 (dono): sem o QUANTO POSSO GASTAR HOJE compacto aqui — ele fica só no Dashboard, logo abaixo dos 4 números */}
                 {getUserData<string>("spotlight-done-financas", "") !== "true" && (
                   <>
                     <QuizWelcome />

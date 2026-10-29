@@ -262,8 +262,8 @@ describe("pages/Index — cliente antigo fica com o painel de hoje", () => {
     const controle = montarIndex(MES_COM_DADO);
     await abrirDashboard();
     expect(secoesNaTela()).toEqual([
-      // 1.0.22 (28/10, dono): QUANTO POSSO GASTAR HOJE abre o Dashboard; o Desafio da semana vem logo depois
-      "QUANTO POSSO GASTAR HOJE", "DESAFIO DA SEMANA", "Saldo do Mês", "ALERTAS INTELIGENTES", "GASTOS POR CATEGORIA", "RECEITAS VS DESPESAS", "EVOLUÇÃO DO PATRIMÔNIO",
+      // 29/10 (dono): os 4 números no topo, logo abaixo o QUANTO POSSO GASTAR HOJE e então o Desafio da semana
+      "Saldo do Mês", "QUANTO POSSO GASTAR HOJE", "DESAFIO DA SEMANA", "ALERTAS INTELIGENTES", "GASTOS POR CATEGORIA", "RECEITAS VS DESPESAS", "EVOLUÇÃO DO PATRIMÔNIO",
       "PROGRESSO DO MÊS", "GASTO POR MÉTODO", "FIXOS VS VARIÁVEIS", "TOP 5 MAIORES GASTOS", "ÚLTIMAS TRANSAÇÕES",
       "PREVISÃO DO FIM DO MÊS", "COMPARAÇÃO MENSAL", "COMPARAÇÃO ANUAL",
     ]);

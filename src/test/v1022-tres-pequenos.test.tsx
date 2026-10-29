@@ -90,13 +90,15 @@ describe("1 · QUANTO POSSO GASTAR HOJE no topo", () => {
   };
   const fixos = [{ id: "a", description: "Aluguel", category: "moradia", value: 1000, paymentMethod: "boleto", day: 5 }];
 
-  it("Dashboard de sempre: o card é o 1º da tela (antes era o último), com a mesma conta", () => {
+  it("Dashboard de sempre: o card vem logo depois dos 4 números (29/10, dono; antes era o último), com a mesma conta", () => {
     const store = criarStore();
     const { container } = comStore(
       <Dashboard {...base} totalIncome={3000} totalExpenses={1500} fixedExpenses={fixos} dueDays={[]} gastoDeHoje={0} />, store,
     );
     const raiz = container.firstElementChild as HTMLElement;
-    expect(raiz.firstElementChild?.getAttribute("data-testid")).toBe("pode-gastar-simples");
+    const filhos = Array.from(raiz.children) as HTMLElement[];
+    expect(filhos[0].textContent).toMatch(/Saldo do Mês/); // os 4 números
+    expect(filhos[1].getAttribute("data-testid")).toBe("pode-gastar-simples");
     const b = computeDailyBudget(3000, 1500, [], fixos);
     expect(screen.getByTestId("pode-gastar-valor").textContent).toContain(String(Math.round(b.perDay)));
     // a previsão continua existindo (lá embaixo)

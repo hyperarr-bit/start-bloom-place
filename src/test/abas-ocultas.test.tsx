@@ -11,6 +11,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor, act } from "@testing-library/react";
 import { useState, type ReactNode } from "react";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 const eventos = vi.hoisted(() => [] as Array<[string, Record<string, unknown>]>);
 const ativacoes = vi.hoisted(() => [] as string[]);
@@ -109,6 +111,14 @@ describe("regra pura", () => {
       for (const id of lista) expect(ABAS_QUE_NUNCA_SAEM[m] ?? [], `${m}/${id}`).not.toContain(id);
     }
     expect(padraoEnxuto("financas", IDS_FIN)).toEqual(["investimentos", "itens", "viagem", "simuladores", "limites", "relatorios", "saude"]);
+    // todo id da lista existe na página do módulo (aba renomeada não pode virar lista morta sem ninguém ver)
+    const PAGINA: Record<string, string> = { financas: "Index", rotina: "Rotina", saude: "Saude", treino: "Treino", dieta: "Dieta", beleza: "Beleza", casa: "Casa",
+      biblioteca: "Biblioteca", desenvolvimento: "DesenvolvimentoPessoal", estudos: "Estudos", relacionamentos: "Relacionamentos", detox: "Detox",
+      hiperfoco: "Hiperfoco", carreira: "Carreira", pet: "Pet", viagens: "Viagens" };
+    for (const [m, lista] of Object.entries(ABAS_POUCO_USO)) {
+      const fonte = readFileSync(resolve(__dirname, `../pages/${PAGINA[m]}.tsx`), "utf8");
+      for (const id of lista) expect(new RegExp(`(id|v): "${id}"`).test(fonte), `${m}/${id}`).toBe(true);
+    }
     // gravado (mesmo vazio) vence o padrão
     expect(ocultasEfetivas({ ids: IDS_FIN, gravada: [], enxuta: true, moduloId: "financas" })).toEqual([]);
   });

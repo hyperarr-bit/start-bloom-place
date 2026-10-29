@@ -753,15 +753,7 @@ const Carreira = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4 space-y-4">
-        <BoasVindasDoModulo
-          moduleId="carreira"
-          tips={[
-            "Registre vagas de emprego e acompanhe o status de cada candidatura",
-            "Monte seu portfolio com projetos e conquistas",
-            "Gerencie contatos de networking importantes",
-            "Adicione habilidades e acompanhe seu aprendizado"
-          ]}
-        />
+        <BoasVindasDoModulo moduleId="carreira" />
 
         {activeTab === "dia" && <WorkDay />}
         {activeTab === "jobs" && <JobTracker />}

@@ -121,16 +121,7 @@ const Relacionamentos = () => {
         </header>
 
         <main className="max-w-5xl mx-auto px-4 py-5 pb-24 space-y-4">
-          <BoasVindasDoModulo
-            moduleId="relacionamentos"
-            tips={[
-              "Guarde suas pessoas com o dia do aniversário — o ano é opcional",
-              "Na ficha de cada pessoa: o que lembrar, ideias de presente e momentos",
-              "Peça pra lembrar de falar com alguém de tempos em tempos",
-              // 17/10 (revisão tela a tela #86): dentro do app "No app do celular" soa errado
-              isNativeShell() ? "Ligue os avisos: na véspera, no dia e o “faz tempo que…”" : "No app do celular, ligue os avisos: na véspera, no dia e o “faz tempo que…”",
-            ]}
-          />
+          <BoasVindasDoModulo moduleId="relacionamentos" />
           {aba === "pessoas" && <AbaPessoas avisos={avisos} />}
           {aba === "agenda" && <AbaDatas />}
           {aba === "presentes" && <AbaPresentes />}

@@ -842,6 +842,8 @@ const MonthlyPlanning = () => {
                   onClick={() => setSelectedDay(isSelected ? null : dayKey)}
                   aria-label={feriado ? `${dayNum} — ${feriado.facultativo ? "ponto facultativo" : "feriado"}: ${feriado.nome}` : undefined}
                   data-feriado={feriado ? "true" : undefined}
+                  data-dica={isToday ? "mes-hoje" : undefined}
+                  data-selecionado={isSelected ? "true" : undefined}
                   className={`aspect-square rounded-md text-xs font-medium flex items-center justify-center relative transition-all
                     ${isToday ? "bg-primary text-primary-foreground font-bold" : ""}
                     ${isSelected ? "ring-2 ring-primary" : ""}
@@ -1414,15 +1416,7 @@ const Rotina = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-5 space-y-5">
-        <BoasVindasDoModulo
-          moduleId="rotina"
-          tips={[
-            "Adicione seus hábitos diários e marque conforme concluir cada um",
-            "Monte sua rotina semanal hora a hora no card Rotina semanal, aqui em Minha Semana",
-            "Crie rituais matinais e noturnos para automatizar seu dia",
-            "Acompanhe seu humor diário e veja padrões ao longo do tempo"
-          ]}
-        />
+        <BoasVindasDoModulo moduleId="rotina" />
 
         {/* Convite pro lembrete de fechamento do dia — só com sequência viva.
             Fica na aba "Minha Semana" porque é onde os hábitos são marcados:

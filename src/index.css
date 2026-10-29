@@ -1230,3 +1230,16 @@ button:has(> svg:only-child):not(.md-botao):not([class*="bg-"]):not([style*="bac
     --mov-passo: 0px;
   }
 }
+
+/* "Dicas para começar" tocáveis (lib/dicas-do-modulo, 28/10): o alvo da dica acende por 2,4 s depois do toque. */
+@keyframes dica-alvo-pulso {
+  0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0); }
+  30%, 70% { box-shadow: 0 0 0 3px hsl(var(--primary) / 0.55), 0 0 0 7px hsl(var(--primary) / 0.15); }
+}
+[data-dica-aceso] {
+  border-radius: 0.75rem;
+  animation: dica-alvo-pulso 1.2s ease-in-out 2;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-dica-aceso] { animation: none; box-shadow: 0 0 0 3px hsl(var(--primary) / 0.55); }
+}

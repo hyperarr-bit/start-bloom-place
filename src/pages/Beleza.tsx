@@ -1,4 +1,3 @@
-import { fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
 import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
 import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
 import { useEffect, useState } from "react";
@@ -28,7 +27,6 @@ import { cartoesBeleza } from "@/components/cartoes-modulo/cartoes-beleza";
 import { cartoesLigados, guardarForcasDaUrl } from "@/lib/tour-home";
 import { guardarForcaDaIntro, introLigada } from "@/lib/intro-modulo";
 import { IntroDoModulo } from "@/components/intro-modulo/IntroDoModulo";
-import { isNativeShell } from "@/lib/native-shell";
 
 /*
  * AS ABAS DA BELEZA (28/09, dono). "ROTINA" virou SKINCARE ("rotina não tem a ver
@@ -128,18 +126,12 @@ const Beleza = () => {
       <main className="max-w-5xl mx-auto px-4 py-4 space-y-4">
         {comIntro && <IntroDoModulo moduleId="beleza" />}
         {comCartoes && <CartoesDoModulo config={cartoesBeleza({ irParaSkincare: () => handleTabChange("routine") })} />}
+        {/* 28/10: as dicas (lib/dicas-do-modulo) ficam em todas as abas até o X — a 2ª leva pra CABELO; com o fluxo
+            enxuto/modo 1.0.12 elas voltam (só elas; a intro continua fora) */}
+        {!comCartoes && !demo && <DicasDaBeleza />}
         {activeTab === "routine" && (
           <>
             {rotinaNoTopo && rotina}
-            {!comCartoes && !fluxoEnxutoLigado() && <DicasDaBeleza
-              dicas={[
-                "3 perguntas e a sua rotina sai pronta, de manhã e de noite",
-                "Toque num passo pra escolher o produto e os dias da semana",
-                // 17/10 (revisão tela a tela #86): dentro do app "No app do celular" soa errado — lá a dica é só o que fazer
-                isNativeShell() ? "Ligue o lembrete da manhã e da noite — ele diz o passo do dia" : "No app do celular, ligue o lembrete da manhã e da noite — ele diz o passo do dia",
-                "Cadastre seus produtos para rastrear validade e custo por dose",
-              ]}
-            />}
             <DailyMirror />
             {!rotinaNoTopo && rotina}
             <SkinDiary />

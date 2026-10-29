@@ -727,14 +727,7 @@ const Dieta = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4">
-        <BoasVindasDoModulo
-          moduleId="dieta"
-          tips={[
-            "Configure suas refeições clicando em ⚙️ no cardápio (adicione ou remova refeições)",
-            "No cardápio semanal, clique em cada refeição para adicionar o que vai comer",
-            "Use o 📊 DIÁRIO para registrar o que você comeu de verdade e compare com o plano"
-          ]}
-        />
+        <BoasVindasDoModulo moduleId="dieta" />
           {activeTab === "cardapio" && <div className="space-y-4">
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground">Cardápio semanal — clique para editar:</p>

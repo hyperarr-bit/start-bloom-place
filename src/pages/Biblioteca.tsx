@@ -581,7 +581,7 @@ const Biblioteca = () => {
 
       {/* 16/10: a intro do módulo fica dentro da calha da página (o "Dicas" antigo segue como era, colado na borda) */}
       <div className={introLigada() ? "px-4 pt-4 [&:empty]:hidden" : undefined}>
-      <BoasVindasDoModulo moduleId="biblioteca" tips={["📚 Adicione livros por link (Amazon, Goodreads) para importar capa e dados automaticamente!", "💡 Salve citações dos seus livros e filtre por tags depois!", "🏆 Defina sua meta anual de leitura na aba Desafio!"]} />
+      <BoasVindasDoModulo moduleId="biblioteca" />
       </div>
 
       {/* Stats */}

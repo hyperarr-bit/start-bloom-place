@@ -576,7 +576,10 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
             Finanças monta os dois à mão). */}
         {!isPreview && (guardarForcaDaIntro(), introLigada())
           ? <IntroDoModulo moduleId="financas" />
-          : !isPreview && (guardarForcasDaUrl(), cartoesLigados()) && <CartoesDoModulo config={cartoesFinancas({ irParaFinanceiro: () => setActiveTab("financeiro") })} />}
+          : !isPreview && (guardarForcasDaUrl(), cartoesLigados())
+            ? <CartoesDoModulo config={cartoesFinancas({ irParaFinanceiro: () => setActiveTab("financeiro") })} />
+            /* 28/10: Finanças ganha o "Dicas para começar" (lib/dicas-do-modulo) — inclusive no fluxo enxuto/modo 1.0.12 */
+            : !isPreview && <ModuleTip moduleId="financas" />}
         {/* Compact summary bar - all tabs except dashboard and financeiro */}
         {activeTab !== "dashboard" && activeTab !== "financeiro" && activeTab !== "kit" && (
           /* 2×2 EM VEZ DE FAIXA ROLÁVEL (29/07, foto do dono: "essa parte que

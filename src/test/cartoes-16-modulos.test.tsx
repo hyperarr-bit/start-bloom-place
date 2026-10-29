@@ -162,11 +162,12 @@ describe("os 16 módulos têm 4 a 6 cartões no mesmo molde", () => {
 describe("a porta única: chave off = ModuleTip de sempre; on = a folha dos cartões", () => {
   const DICAS = ["Dica um", "Dica dois"];
 
-  it("off: o 'Dicas para começar' com as mesmas dicas, nenhuma folha, nenhum evento; Pet sem dicas = nada", () => {
+  it("off: o 'Dicas para começar' (a lista do uso real vence o `tips`; o Pet ganhou dicas em 28/10), nenhuma folha, nenhum evento", () => {
     const n = criarNuvem({});
     n.montar(<><BoasVindasDoModulo moduleId="rotina" tips={DICAS} /><BoasVindasDoModulo moduleId="pet" /></>, "/rotina");
-    expect(screen.getByText("Dicas para começar")).toBeInTheDocument();
-    expect(screen.getByText("Dica um")).toBeInTheDocument();
+    expect(screen.getAllByText("Dicas para começar")).toHaveLength(2);
+    expect(screen.queryByText("Dica um")).toBeNull();
+    expect(screen.getByText("Crie seus hábitos e marque cada um quando fizer")).toBeInTheDocument();
     expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
     expect(eventos).toEqual([]);
     expect(document.querySelectorAll("[data-camada-guia]")).toHaveLength(0);
@@ -234,7 +235,8 @@ describe("a porta única: chave off = ModuleTip de sempre; on = a folha dos cart
     n.montar(<BoasVindasDoModulo moduleId="rotina" tips={DICAS} />, "/preview/rotina");
     await respirar();
     expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
-    expect(screen.getByText("Dicas para começar")).toBeInTheDocument();
+    // 28/10: nem o "Dicas para começar" (demo de venda não mostra dicas — lib/dicas-do-modulo)
+    expect(screen.queryByText("Dicas para começar")).toBeNull();
     expect(eventos).toEqual([]);
   });
 

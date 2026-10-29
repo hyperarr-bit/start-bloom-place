@@ -499,13 +499,7 @@ const Estudos = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4 space-y-4">
-        <BoasVindasDoModulo moduleId="estudos" tips={[
-          "Organize cursos em andamento e sua lista de desejos",
-          "Monte sua grade horária semanal editável",
-          "Registre provas e trabalhos com datas de entrega",
-          "Depois de cada aula, toque em \"Aprendi hoje\" no curso: o Caderno reúne tudo pra reler",
-          "Use o caderno para anotar resumos e dúvidas das aulas",
-        ]} />
+        <BoasVindasDoModulo moduleId="estudos" />
 
         {activeTab === "estudos" && <div className="space-y-4">
 

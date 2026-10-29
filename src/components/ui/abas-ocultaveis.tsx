@@ -24,6 +24,7 @@ import type { AbaOcultavel, AbasOcultas } from "@/hooks/use-abas-ocultas";
 import { Switch } from "@/components/ui/switch";
 import { trackEvent } from "@/lib/analytics";
 import { emCaminhoDeDemo } from "@/lib/caminho-demo";
+import { EVENTO_ABRIR_ABA, EVENTO_ORGANIZAR_ABAS, type DetalheAbrirAba, type DetalheOrganizar } from "@/lib/dicas-do-modulo";
 import {
   Alca, CLASSE_FUNDO_FOLHA, FaixaDoRelogioSobFolha, propsDaFolha, propsDoFundo, useFolhaArrastavel,
 } from "@/components/home-nova/e/folha-arrasto";
@@ -125,6 +126,23 @@ export function AbasOcultaveis<T extends AbaOcultavel>({ abas, ativa, onTrocar, 
     setFolha(true);
     trackEvent("abas_organizar_aberto", { modulo: modulo ?? "", ocultas: ocultas.length });
   };
+
+  // "Dicas para começar" tocáveis (lib/dicas-do-modulo, 28/10): a dica abre a aba (mesmo oculta — como um link) ou a folha.
+  const abrirFolhaRef = useRef(abrirFolha);
+  abrirFolhaRef.current = abrirFolha;
+  useEffect(() => {
+    if (!modulo) return;
+    const abrirAba = (e: Event) => {
+      const d = (e as CustomEvent<DetalheAbrirAba>).detail;
+      if (d?.modulo === modulo && todas.some((a) => a.id === d.aba)) onTrocar(d.aba);
+    };
+    const organizar = (e: Event) => {
+      if ((e as CustomEvent<DetalheOrganizar>).detail?.modulo === modulo) abrirFolhaRef.current();
+    };
+    window.addEventListener(EVENTO_ABRIR_ABA, abrirAba);
+    window.addEventListener(EVENTO_ORGANIZAR_ABAS, organizar);
+    return () => { window.removeEventListener(EVENTO_ABRIR_ABA, abrirAba); window.removeEventListener(EVENTO_ORGANIZAR_ABAS, organizar); };
+  }, [modulo, todas, onTrocar]);
 
   // A fileira: as visíveis + a ativa se ela estiver oculta (link profundo), na ordem da pessoa.
   const visIds = new Set(visiveis.map((a) => a.id));

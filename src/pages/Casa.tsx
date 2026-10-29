@@ -79,15 +79,7 @@ const Casa = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-5 space-y-5">
-        <BoasVindasDoModulo
-          moduleId="casa"
-          tips={[
-            "Na Despensa, mude um produto para 'Acabou' e ele vai direto pra lista do Mercado",
-            "Use o Cardápio para planejar as refeições da semana",
-            // 28/10 (auditoria das dicas): era "Cadastre plantas e pets…" — a Casa não tem planta nem pet (pet virou o módulo Pet)
-            "Em Cômodos, liste os afazeres de cada cômodo e marque conforme fizer",
-          ]}
-        />
+        <BoasVindasDoModulo moduleId="casa" />
 
         {activeTab === "comodos" && <RoomManager />}
         {activeTab === "mercado" && <GroceryList />}

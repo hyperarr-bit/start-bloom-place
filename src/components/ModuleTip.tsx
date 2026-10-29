@@ -13,13 +13,18 @@ interface ModuleTipProps {
 export const ModuleTip = ({ moduleId, tips, icon = "💡" }: ModuleTipProps) => {
   // funil-demo (/experimente, 14/10): sem cartão de chamada no topo — só no funil; app e /preview iguais
   const demoDoFunil = useDemoDoFunil();
-  const { get, set: setData } = useUserData();
+  const { get, set: setData, loaded } = useUserData();
   const storageKey = `core-tip-seen-${moduleId}`;
-  const [visible, setVisible] = useState(() => !get<string>(storageKey, ""));
+  /* 28/10 (auditoria das dicas): era `useState(() => !get(...))` — lido UMA vez, na montagem. Quem reabria o app
+   * direto no módulo (recarregar no site, app restaurado na rota) montava o cartão ANTES da conta chegar do servidor
+   * (`get` devolve o padrão até `loaded`), e o "Dicas para começar" fechado voltava a cada reabertura. Agora a marca
+   * é lida a cada render e o cartão só aparece com a conta carregada. */
+  const [fechadaAgora, setFechadaAgora] = useState(false);
+  const visible = loaded && !fechadaAgora && !get<string>(storageKey, "");
 
   const dismiss = () => {
     setData(storageKey, "true");
-    setVisible(false);
+    setFechadaAgora(true);
   };
 
   if (demoDoFunil) return null;

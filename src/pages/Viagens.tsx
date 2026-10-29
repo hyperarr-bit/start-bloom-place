@@ -86,8 +86,9 @@ const Viagens = () => {
             "Passeios: registre o rolê simples (cinema, jantar, parque) com data e custo",
             "Adicione destinos dos seus sonhos na bucket list",
             "Monte roteiros dia a dia com horários e custos",
-            "Divida contas com amigos no Rachar Conta",
-            "Salve lugares do Instagram no quadro de Lugares",
+            "Divida contas com amigos na aba Rachar", // 28/10: a aba se chama Rachar
+            // 28/10 (auditoria): era "Salve lugares do Instagram" — não há nada de Instagram, o quadro guarda nome, cidade e link do Maps
+            "Guarde lugares que quer conhecer, com o link do Maps, na aba Lugares",
             "Defina taxas de câmbio e converta offline"
           ]}
         />

@@ -1,120 +1,150 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowRight, Pencil } from "lucide-react";
+import { toast } from "sonner";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { Plus, X, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
-import { Recipe, MealPlan } from "./types";
+import {
+  DIAS_DO_CARDAPIO, cardapioAntigoDaCasa, levarCardapioAntigo,
+} from "@/lib/lista-e-cardapio-unicos";
 
-const weekDays = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
-const dayColors: Record<string, { header: string; body: string }> = {
-  Segunda: { header: "bg-blue-200 dark:bg-blue-900/60", body: "bg-blue-50 dark:bg-blue-950/30" },
-  Terça: { header: "bg-indigo-200 dark:bg-indigo-900/60", body: "bg-indigo-50 dark:bg-indigo-950/30" },
-  Quarta: { header: "bg-green-200 dark:bg-green-900/60", body: "bg-green-50 dark:bg-green-950/30" },
-  Quinta: { header: "bg-yellow-200 dark:bg-yellow-900/60", body: "bg-yellow-50 dark:bg-yellow-950/30" },
-  Sexta: { header: "bg-pink-200 dark:bg-pink-900/60", body: "bg-pink-50 dark:bg-pink-950/30" },
-  Sábado: { header: "bg-purple-200 dark:bg-purple-900/60", body: "bg-purple-50 dark:bg-purple-950/30" },
-  Domingo: { header: "bg-violet-200 dark:bg-violet-900/60", body: "bg-violet-50 dark:bg-violet-950/30" },
+/**
+ * CASA › CARDÁPIO (1.0.22, sem repetição — dono 28/10). Era um segundo cardápio (`casa-meal-plan`, almoço/janta por
+ * receita do `casa-recipes`, 0,7% de uso) ao lado do da Dieta (19,4%). Agora esta aba mostra e edita o MESMO cardápio
+ * da Dieta (`saude-meals`, no formato de sempre: { SEGUNDA: { "Almoço": "texto" } }) — escrever aqui aparece lá e
+ * vice-versa. O cardápio antigo da Casa não é apagado: aparece embaixo ("Do cardápio antigo da Casa") e dá pra levar
+ * pro cardápio, preenchendo só o que estiver vazio. O app antigo continua lendo as duas chaves como sempre.
+ */
+const PADRAO_REFEICOES = ["Café da Manhã", "Almoço", "Lanche", "Janta"];
+const EMOJI: Record<string, string> = { "Café da Manhã": "🌅", "Almoço": "🍽️", "Lanche": "🍎", "Janta": "🌙", "Pré-Treino": "⚡", "Pós-Treino": "💪", "Ceia": "🌙", "Café da Tarde": "☕" };
+const COR_DO_DIA: Record<string, { header: string; body: string }> = {
+  SEGUNDA: { header: "bg-blue-200 dark:bg-blue-900/60", body: "bg-blue-50 dark:bg-blue-950/30" },
+  TERÇA: { header: "bg-indigo-200 dark:bg-indigo-900/60", body: "bg-indigo-50 dark:bg-indigo-950/30" },
+  QUARTA: { header: "bg-green-200 dark:bg-green-900/60", body: "bg-green-50 dark:bg-green-950/30" },
+  QUINTA: { header: "bg-yellow-200 dark:bg-yellow-900/60", body: "bg-yellow-50 dark:bg-yellow-950/30" },
+  SEXTA: { header: "bg-pink-200 dark:bg-pink-900/60", body: "bg-pink-50 dark:bg-pink-950/30" },
+  SÁBADO: { header: "bg-purple-200 dark:bg-purple-900/60", body: "bg-purple-50 dark:bg-purple-950/30" },
+  DOMINGO: { header: "bg-violet-200 dark:bg-violet-900/60", body: "bg-violet-50 dark:bg-violet-950/30" },
 };
+const diaDeHoje = () => DIAS_DO_CARDAPIO[(new Date().getDay() + 6) % 7];
+const nomeDoDia = (d: string) => d.charAt(0) + d.slice(1).toLowerCase();
+
+type Cardapio = Record<string, Record<string, string>>;
 
 const MealPlanner = () => {
-  const [recipes, setRecipes] = usePersistedState<Recipe[]>("casa-recipes", []);
-  const [mealPlan, setMealPlan] = usePersistedState<MealPlan>("casa-meal-plan", {});
-  const [newRecipe, setNewRecipe] = useState("");
-  const [newEmoji, setNewEmoji] = useState("🍽️");
-  const [showRecipes, setShowRecipes] = useState(false);
+  const navigate = useNavigate();
+  const [refeicoesSalvas] = usePersistedState<string[]>("dieta-meals-config", PADRAO_REFEICOES);
+  const refeicoes = Array.isArray(refeicoesSalvas) && refeicoesSalvas.length ? refeicoesSalvas.filter((m) => typeof m === "string") : PADRAO_REFEICOES;
+  // o MESMO padrão da Dieta (todos os dias com as refeições vazias) — a 1ª escrita daqui sai no formato completo
+  const padrao = useMemo<Cardapio>(() => Object.fromEntries(DIAS_DO_CARDAPIO.map((d) => [d, Object.fromEntries(refeicoes.map((m) => [m, ""]))])), [refeicoes]);
+  const [cardapioBruto, setCardapio] = usePersistedState<Cardapio>("saude-meals", padrao);
+  const cardapio: Cardapio = cardapioBruto && typeof cardapioBruto === "object" && !Array.isArray(cardapioBruto) ? cardapioBruto : {};
+  // o cardápio antigo da Casa: só leitura (as chaves ficam como estão)
+  const [planoAntigo] = usePersistedState<unknown>("casa-meal-plan", {});
+  const [receitasAntigas] = usePersistedState<unknown>("casa-recipes", []);
+  const antigo = cardapioAntigoDaCasa(planoAntigo, receitasAntigas);
+  const levaria = levarCardapioAntigo(cardapio, antigo).preenchidas;
 
-  const setMeal = (day: string, slot: "almoco" | "janta", recipeId: string) => {
-    setMealPlan(prev => ({ ...prev, [day]: { ...prev[day], [slot]: recipeId } }));
-  };
+  const [editando, setEditando] = useState<{ dia: string; refeicao: string; texto: string } | null>(null);
+  const hoje = diaDeHoje();
 
-  const addRecipe = () => {
-    if (!newRecipe.trim()) return;
-    setRecipes(prev => [...prev, { id: Date.now().toString(), name: newRecipe.trim(), emoji: newEmoji, ingredients: [] }]);
-    setNewRecipe("");
-  };
-
-  const randomize = () => {
-    // antes o botão não fazia nada e não dizia por quê (26/09, varredura)
-    if (recipes.length === 0) {
-      setShowRecipes(true);
-      toast("Cadastre pelo menos uma receita no 📖 Banco de Receitas pra sugerir o cardápio.");
-      return;
-    }
-    const plan: MealPlan = {};
-    weekDays.forEach(day => {
-      plan[day] = {
-        almoco: recipes[Math.floor(Math.random() * recipes.length)].id,
-        janta: recipes[Math.floor(Math.random() * recipes.length)].id,
-      };
+  const salvar = () => {
+    if (!editando) return;
+    const { dia, refeicao, texto } = editando;
+    setCardapio((prev) => {
+      const base = prev && typeof prev === "object" && !Array.isArray(prev) ? prev : {};
+      return { ...base, [dia]: { ...(base[dia] && typeof base[dia] === "object" ? base[dia] : {}), [refeicao]: texto.trim() } };
     });
-    setMealPlan(plan);
+    setEditando(null);
+  };
+
+  const levar = () => {
+    const r = levarCardapioAntigo(cardapio, antigo);
+    if (r.preenchidas === 0) return;
+    setCardapio(r.cardapio);
+    toast.success(r.preenchidas === 1 ? "1 refeição entrou no cardápio" : `${r.preenchidas} refeições entraram no cardápio`);
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2">
-        <Button variant="outline" size="sm" className="text-xs gap-1 flex-1" onClick={() => setShowRecipes(!showRecipes)}>
-          📖 Receitas ({recipes.length})
-        </Button>
-        <Button variant="outline" size="sm" className="text-xs gap-1" onClick={randomize}>
-          <Shuffle className="w-3 h-3" /> Sugerir Cardápio
+    <div className="space-y-4" data-testid="cardapio-da-casa">
+      <div className="rounded-xl border border-border bg-card px-3 py-2.5 flex items-center gap-3">
+        <p className="text-[11.5px] text-muted-foreground flex-1 leading-snug">
+          É o <span className="font-semibold text-foreground">mesmo cardápio da Dieta</span> — o que você escreve aqui aparece lá.
+        </p>
+        <Button size="sm" variant="outline" className="text-xs h-8 gap-1 shrink-0" onClick={() => navigate("/dieta")}>
+          Abrir na Dieta <ArrowRight className="w-3 h-3" />
         </Button>
       </div>
 
-      {showRecipes && (
-        <div className="rounded-xl overflow-hidden border border-border">
-          <div className="bg-orange-200 dark:bg-orange-900/60 px-3 py-2">
-            <h4 className="text-xs font-bold text-foreground">📖 BANCO DE RECEITAS</h4>
-          </div>
-          <div className="bg-orange-50 dark:bg-orange-950/30 p-2 space-y-2">
-            <div className="flex flex-wrap gap-1">
-              {recipes.map(r => (
-                <div key={r.id} className="flex items-center gap-1 bg-background/60 rounded-full px-2 py-1 text-xs group">
-                  <span>{r.emoji}</span> {r.name}
-                  <button onClick={() => setRecipes(prev => prev.filter(x => x.id !== r.id))} className="opacity-0 group-hover:opacity-100">
-                    <X className="w-2.5 h-2.5 text-muted-foreground" />
-                  </button>
-                </div>
-              ))}
-              {recipes.length === 0 && <p className="text-[11px] text-muted-foreground italic py-2 w-full text-center">Nenhuma receita ainda</p>}
-            </div>
-            <div className="flex gap-2">
-              <Input value={newEmoji} onChange={e => setNewEmoji(e.target.value)} className="text-xs h-7 w-12 text-center bg-background/70" maxLength={2} />
-              <Input value={newRecipe} onChange={e => setNewRecipe(e.target.value)} placeholder="Nome da receita" className="text-xs h-7 flex-1 bg-background/70"
-                onKeyDown={e => e.key === "Enter" && addRecipe()} />
-              <Button size="sm" className="h-7 px-2" onClick={addRecipe}><Plus className="w-3 h-3" /></Button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="space-y-3">
-        {weekDays.map(day => {
-          const colors = dayColors[day];
+        {DIAS_DO_CARDAPIO.map((dia) => {
+          const cor = COR_DO_DIA[dia];
+          const doDia = cardapio[dia] && typeof cardapio[dia] === "object" ? cardapio[dia] : {};
+          const extras = Object.keys(doDia).filter((m) => !refeicoes.includes(m) && typeof doDia[m] === "string" && doDia[m].trim());
           return (
-            <div key={day} className="rounded-xl overflow-hidden border border-border">
-              <div className={`${colors.header} px-3 py-2`}>
-                <h4 className="text-xs font-bold text-foreground">{day.toUpperCase()}</h4>
+            <div key={dia} className="rounded-xl overflow-hidden border border-border" data-testid={`cardapio-casa-${dia}`}>
+              <div className={`${cor.header} px-3 py-2 flex items-center justify-between`}>
+                <h4 className="text-xs font-bold text-foreground">{dia}</h4>
+                {dia === hoje && <span className="text-[10px] font-bold text-foreground/70">HOJE</span>}
               </div>
-              <div className={`${colors.body} p-3`}>
-                <div className="grid grid-cols-2 gap-2">
-                  {(["almoco", "janta"] as const).map(slot => (
-                    <div key={slot}>
-                      <p className="text-[10px] text-muted-foreground mb-1">{slot === "almoco" ? "🌞 Almoço" : "🌙 Janta"}</p>
-                      <select value={mealPlan[day]?.[slot] || ""} onChange={e => setMeal(day, slot, e.target.value)}
-                        className="w-full text-xs bg-background/70 border border-border rounded px-2 py-1.5">
-                        <option value="">—</option>
-                        {recipes.map(r => <option key={r.id} value={r.id}>{r.emoji} {r.name}</option>)}
-                      </select>
+              <div className={`${cor.body} p-2.5 space-y-1.5`}>
+                {[...refeicoes, ...extras].map((m) => {
+                  const texto = typeof doDia[m] === "string" ? doDia[m] : "";
+                  const aberto = editando?.dia === dia && editando.refeicao === m;
+                  return (
+                    <div key={m} className="flex items-start gap-2">
+                      <span className="text-[10.5px] text-muted-foreground w-24 shrink-0 pt-1.5">{EMOJI[m] ?? "🍴"} {m}</span>
+                      {aberto ? (
+                        <Input
+                          autoFocus
+                          value={editando.texto}
+                          onChange={(e) => setEditando({ ...editando, texto: e.target.value })}
+                          onBlur={salvar}
+                          onKeyDown={(e) => { if (e.key === "Enter") salvar(); if (e.key === "Escape") setEditando(null); }}
+                          className="text-xs h-8 flex-1 bg-background/80"
+                          aria-label={`${m} de ${nomeDoDia(dia)}`}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setEditando({ dia, refeicao: m, texto })}
+                          className="flex-1 min-w-0 text-left text-xs rounded-md px-2 py-1.5 bg-background/60 hover:bg-background/90 flex items-center gap-1.5"
+                          aria-label={`Editar ${m} de ${nomeDoDia(dia)}`}
+                        >
+                          <span className={`flex-1 min-w-0 ${texto ? "" : "text-muted-foreground italic"}`}>{texto || "—"}</span>
+                          <Pencil className="w-3 h-3 text-muted-foreground shrink-0" aria-hidden="true" />
+                        </button>
+                      )}
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
             </div>
           );
         })}
       </div>
+
+      {antigo.length > 0 && (
+        <div className="rounded-xl border border-dashed border-border bg-card p-3 space-y-2" data-testid="cardapio-antigo-casa">
+          <p className="text-[10px] font-bold text-muted-foreground">DO CARDÁPIO ANTIGO DA CASA</p>
+          <ul className="space-y-1">
+            {antigo.map((d) => (
+              <li key={d.dia} className="text-xs">
+                <span className="font-semibold">{nomeDoDia(d.dia)}:</span>{" "}
+                {[d.almoco && `🌞 ${d.almoco}`, d.janta && `🌙 ${d.janta}`].filter(Boolean).join(" · ")}
+              </li>
+            ))}
+          </ul>
+          {levaria > 0 ? (
+            <Button size="sm" variant="outline" className="text-xs h-8 w-full" onClick={levar} data-testid="levar-cardapio-antigo">
+              Levar pro cardápio (só onde estiver vazio)
+            </Button>
+          ) : (
+            <p className="text-[10.5px] text-muted-foreground">Já está no cardápio (ou o dia já tinha outra refeição escrita).</p>
+          )}
+        </div>
+      )}
     </div>
   );
 };

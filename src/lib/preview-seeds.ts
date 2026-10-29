@@ -465,11 +465,17 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
       { id: "3", name: "Quarto", color: "bg-purple-200 dark:bg-purple-900/40", tasks: [{ id: "5", text: "Trocar os lençóis", done: false }] },
       { id: "4", name: "Banheiro", color: "bg-green-200 dark:bg-green-900/40", tasks: [{ id: "6", text: "Repor papel higiênico", done: false }] },
     ],
-    "casa-shopping-list": [
-      { id: "1", name: "Arroz 5 kg", checked: false, fromPantry: true },
-      { id: "2", name: "Ovos", checked: false, fromPantry: false },
-      { id: "3", name: "Detergente", checked: true, fromPantry: false },
-      { id: "4", name: "Frango", checked: false, fromPantry: false },
+    // 1.0.22 (sem repetição): a lista de compras da demo é a do Mercado (a "Compras" da Despensa virou o Mercado)
+    "casa-grocery-categories": [
+      { id: "1", name: "HortiFrutti", emoji: "🥬", color: "bg-green-500", items: [{ id: "s2", text: "Banana", done: false }] },
+      { id: "2", name: "Açougue e Peixaria", emoji: "🥩", color: "bg-red-500", items: [{ id: "s4", text: "Frango", done: false }] },
+      { id: "3", name: "Laticínios e Frios", emoji: "🧀", color: "bg-blue-600", items: [{ id: "s5", text: "Ovos", done: false }] },
+      { id: "4", name: "Mercearia", emoji: "🏪", color: "bg-purple-500", items: [{ id: "s1", text: "Arroz 5 kg", done: false, origem: "armario" }] },
+      { id: "5", name: "Padaria", emoji: "🥖", color: "bg-orange-500", items: [] },
+      { id: "6", name: "Congelados", emoji: "🍦", color: "bg-yellow-600", items: [] },
+      { id: "7", name: "Limpeza", emoji: "🧹", color: "bg-cyan-500", items: [{ id: "s3", text: "Detergente", done: true }] },
+      { id: "8", name: "Higiene Pessoal", emoji: "🛁", color: "bg-pink-500", items: [] },
+      { id: "9", name: "Bebidas", emoji: "🥤", color: "bg-indigo-600", items: [] },
     ],
     "casa-maint-tasks": [
       { id: "1", task: "Limpar o ar-condicionado", frequencyMonths: 6, lastDone: daysAgo(150), icon: "❄️" },

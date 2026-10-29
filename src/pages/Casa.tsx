@@ -36,7 +36,13 @@ const tabs = [
 const Casa = () => {
   // seta ←: no app, o hub; na demo, o destino do botão de baixo dela (P5, 30/09 — antes, /auth)
   const voltarDoModulo = useVoltarDoModulo();
-  const [activeTab, setActiveTab] = useState("comodos");
+  // `?aba=` (28/10, sem repetição): "Ver" da lista de compras gerada na Dieta abre direto no Mercado
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const a = new URLSearchParams(window.location.search).get("aba");
+      return a && tabs.some((t) => t.id === a) ? a : "comodos";
+    } catch { return "comodos"; }
+  });
   const abasDoModulo = useAbasOcultas("casa", tabs);
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();

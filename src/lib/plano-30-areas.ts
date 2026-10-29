@@ -42,7 +42,8 @@ const PARAM_DA_ABA: Record<DestinoDoPlano["modulo"], string | null> = {
 };
 /** As abas que cada módulo aceita na URL (o teste confere com o código dos módulos). */
 export const ABAS_NA_URL: Record<DestinoDoPlano["modulo"], readonly string[]> = {
-  "/financas": ["dashboard", "financeiro", "investimentos", "itens", "viagem", "simuladores", "limites", "relatorios", "saude"],
+  // 28/10 (sem repetição): "viagem" saiu da fileira de Finanças (mora em Viagens › Budget) — não é mais destino
+  "/financas": ["dashboard", "financeiro", "investimentos", "itens", "simuladores", "limites", "relatorios", "saude"],
   "/rotina": ["semana", "mes", "diario", "revisao", "foco"],
   "/saude": ["hoje", "evolucao", "log"],
   "/treino": ["hoje", "plano", "semana", "evolucao"],

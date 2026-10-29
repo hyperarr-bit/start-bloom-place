@@ -9,6 +9,9 @@ import {
   CHAVE_TAREFAS_CARREIRA, CHAVE_TAREFAS_ROTINA, apareceHoje, avisoDaTarefa, avisoJaPassou, detalhesDaTarefa, diaDoAviso, ehPrioridade, estadoDoPrazo, horaDaTarefa,
   horaDoAviso, ordenarPorHora, progressoDasSubtarefas, rotuloDoDia, type TarefaDoDia,
 } from "@/lib/tarefas";
+import {
+  CHAVE_TAREFAS_ESTUDOS, ROTULO_ORIGEM_CARREIRA, ROTULO_ORIGEM_ESTUDOS, alternarTarefaDosEstudos, tarefasDeHojeDosEstudos,
+} from "@/lib/tarefas-de-outros";
 import { LinhaDoFeriado } from "@/components/feriados/LinhaDoFeriado";
 import { COR_DO_DIA, textoDoDia, tomDoDia } from "@/components/treino/planner";
 import { FicouDeOntem } from "@/components/tarefas/ficou-de-ontem";
@@ -55,6 +58,7 @@ export const TasksWidget = () => {
   const [todos, setTodos] = usePersistedState<Todo[]>("todo-list", []);
   const rotina = useTarefasDoDia(CHAVE_TAREFAS_ROTINA);
   const carreira = useTarefasDoDia(CHAVE_TAREFAS_CARREIRA);
+  const [estudos, setEstudos] = usePersistedState<unknown>(CHAVE_TAREFAS_ESTUDOS, {});
   const [urgencias, setUrgencias] = usePersistedState<Urgencia[]>("rotina-urgencies", []);
   const [chores] = usePersistedState<Chore[]>("casa-chores", []);
   const [members] = usePersistedState<Member[]>("casa-members", []);
@@ -127,7 +131,18 @@ export const TasksWidget = () => {
       });
     });
   doDia(rotina, "rd", "Rotina");
-  doDia(carreira, "cd", "Carreira");
+  // 1.0.22 (sem repetição): a etiqueta é a mesma da lista do dia da Rotina — "Trabalho" e "Estudos"
+  doDia(carreira, "cd", ROTULO_ORIGEM_CARREIRA);
+
+  // Estudos › Tarefas (`estudos-week-tasks`): a coluna de hoje; o ✓ grava lá, na mesma linha (lib/tarefas-de-outros)
+  tarefasDeHojeDosEstudos(estudos).forEach((t) => {
+    const key = `es-${t.coluna}-${t.indice}`;
+    const alternar = () => setEstudos((prev) => alternarTarefaDosEstudos(prev, t.coluna, t.indice));
+    linhas.push({
+      key, origem: ROTULO_ORIGEM_ESTUDOS, texto: t.texto, feito: t.feito, onAlternar: alternar, onAbrir: () => setAberta(key),
+      ficha: { onde: ROTULO_ORIGEM_ESTUDOS, onAlternar: alternar, abrirModulo: { rotulo: "Abrir em Estudos", ir: () => navigate("/estudos?aba=tarefas") } },
+    });
+  });
 
   const membros = lista<Member>(members);
   lista<Chore>(chores).forEach((c) => {

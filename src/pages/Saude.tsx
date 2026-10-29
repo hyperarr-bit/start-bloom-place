@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
+import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
 import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 import { localDayKey } from "@/lib/utils";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
@@ -38,6 +40,7 @@ const Saude = () => {
       return tabs.some((t) => t.id === pedida) ? (pedida as string) : "hoje";
     } catch { return "hoje"; }
   });
+  const abasDoModulo = useAbasOcultas("saude", tabs);
   useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);
 
@@ -63,19 +66,8 @@ const Saude = () => {
             <AcessoConhecerMais moduleId="saude" /><ThemeToggle />
           </div>
         </div>
-        <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto scrollbar-hide">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id} data-active={activeTab === tab.id}
-              data-spotlight={`tab-${tab.id}`}
-              onClick={() => setActiveTab(tab.id)}
-              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
-            >
-              <span>{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* 1.0.22: ocultar/organizar abas (components/ui/abas-ocultaveis) */}
+        <AbasOcultaveis abas={abasDoModulo} ativa={activeTab} onTrocar={setActiveTab} className="max-w-7xl mx-auto px-4 pb-2" />
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-5 space-y-5">

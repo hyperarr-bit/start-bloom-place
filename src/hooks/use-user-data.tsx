@@ -77,6 +77,9 @@ const usoJaContado = new Set<string>();
 const checkActivation = (key: string, value: any) => {
   if (!isMeaningful(value)) return;
   if (key.startsWith("spotlight-") || key.startsWith("quickstart-") || key.startsWith("core-")) return;
+  // 1.0.22: `abas-ocultas:financas` / `abas-ordem:treino` são preferência da fileira de abas — sem isto o /financ|treino/
+  // das regras viraria "first_transaction"/"first_workout" (e avançaria missão/holofote) só por ocultar uma aba
+  if (key.startsWith("abas-")) return;
   for (const rule of ACTIVATION_RULES) {
     if (rule.match.test(key)) {
       if (rule.meaningful && !rule.meaningful(value)) return;

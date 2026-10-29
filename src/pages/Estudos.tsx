@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
+import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
 import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
@@ -144,6 +146,8 @@ const TABS = [
   { v: "tarefas", l: "Tarefas", icon: "✅" },
   { v: "caderno", l: "Caderno", icon: "📓" },
 ];
+/** 1.0.22: no formato da fileira com "Organizar abas" (components/ui/abas-ocultaveis). */
+const ABAS_ESTUDOS = TABS.map((t) => ({ id: t.v, label: t.l, icon: t.icon }));
 
 const Estudos = () => {
   // A seta ←: no app, o hub; na demo (/preview/estudos), o mesmo destino do
@@ -454,6 +458,7 @@ const Estudos = () => {
   };
 
   const [activeTab, setActiveTab] = useState("estudos");
+  const abasDoModulo = useAbasOcultas("estudos", ABAS_ESTUDOS);
   useScrollActiveTabIntoView(activeTab);
 
   const handleTabChange = (tabId: string) => {
@@ -483,19 +488,8 @@ const Estudos = () => {
             <ThemeToggle />
           </div>
         </div>
-        <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          {TABS.map((tab) => (
-            <button
-              key={tab.v}
-              data-spotlight={`tab-${tab.v}`}
-              onClick={() => handleTabChange(tab.v)}
-              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.v ? "notion-tab-active" : "hover:bg-muted"}`}
-            >
-              <span>{tab.icon}</span>
-              {tab.l}
-            </button>
-          ))}
-        </div>
+        {/* 1.0.22: ocultar/organizar abas (components/ui/abas-ocultaveis) */}
+        <AbasOcultaveis abas={abasDoModulo} ativa={activeTab} onTrocar={handleTabChange} className="max-w-5xl mx-auto px-4 pb-2" />
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4 space-y-4">

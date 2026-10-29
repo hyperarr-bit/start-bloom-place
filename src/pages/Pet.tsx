@@ -13,6 +13,8 @@
  * Sem pet nenhum, o HOJE e a SAÚDE mostram o começo pronto (3 perguntas).
  */
 import { useEffect, useMemo, useState } from "react";
+import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
+import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { mesAtualExtenso } from "@/lib/utils";
@@ -47,6 +49,9 @@ type Aba = (typeof ABAS)[number]["id"];
 // abas antigas que ainda chegam por link/notificação velha
 const ABA_ANTIGA: Record<string, Aba> = { pets: "hoje", rotina: "hoje" };
 
+/** 1.0.22: cópia mutável das ABAS pra fileira com "Organizar abas" (components/ui/abas-ocultaveis). */
+const ABAS_DA_FILEIRA = ABAS.map((a) => ({ id: a.id as string, label: a.label as string, icon: a.icon as string }));
+
 const Pet = () => {
   // P5 (30/09): na demo a seta vai pro destino do botão de baixo (o funil); no app, pra /home
   const voltarDoModulo = useVoltarDoModulo();
@@ -59,6 +64,7 @@ const Pet = () => {
       return (ABAS.some((a) => a.id === pedida) ? pedida : ABA_ANTIGA[pedida] ?? "hoje") as Aba;
     } catch { return "hoje"; }
   });
+  const abasDoModulo = useAbasOcultas("pet", ABAS_DA_FILEIRA);
   useScrollActiveTabIntoView(aba);
   useSetTrackedTab(aba);
 
@@ -110,26 +116,8 @@ const Pet = () => {
             <ThemeToggle />
           </div>
         </div>
-        <div className="relative max-w-5xl mx-auto px-4 pb-2">
-          <div className="flex gap-1 overflow-x-auto scrollbar-hide pt-2 -mt-2" role="tablist">
-            {ABAS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                role="tab"
-                aria-selected={aba === t.id}
-                data-spotlight={`tab-${t.id}`}
-                data-active={aba === t.id}
-                data-testid={`aba-${t.id}`}
-                onClick={() => trocarAba(t.id)}
-                className={`notion-tab shrink-0 whitespace-nowrap text-[11px] flex items-center gap-1 select-none ${aba === t.id ? "notion-tab-active" : "hover:bg-muted"}`}
-              >
-                <span aria-hidden="true">{t.icon}</span>
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* 1.0.22: ocultar/organizar abas (components/ui/abas-ocultaveis) */}
+        <AbasOcultaveis abas={abasDoModulo} ativa={aba} onTrocar={(id) => trocarAba(id as Aba)} comoTab testIds className="max-w-5xl mx-auto px-4 pb-2" />
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-4 pb-24 space-y-3">

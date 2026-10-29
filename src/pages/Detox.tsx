@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
+import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
 import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
@@ -29,6 +31,7 @@ const Detox = () => {
   // módulo sem nenhum registro → mostra o próximo passo no lugar do branco
   const vazio = (get<unknown[]>("detox-habits", []) ?? []).length === 0;
   const [activeTab, setActiveTab] = useState("rastreador");
+  const abasDoModulo = useAbasOcultas("detox", tabs);
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
 
@@ -59,19 +62,8 @@ const Detox = () => {
             <ThemeToggle />
           </div>
         </div>
-        <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              data-spotlight={`tab-${tab.id}`}
-              onClick={() => handleTabChange(tab.id)}
-              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
-            >
-              <span>{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* 1.0.22: ocultar/organizar abas (components/ui/abas-ocultaveis) */}
+        <AbasOcultaveis abas={abasDoModulo} ativa={activeTab} onTrocar={handleTabChange} className="max-w-5xl mx-auto px-4 pb-2" />
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-5 pb-24 space-y-4">

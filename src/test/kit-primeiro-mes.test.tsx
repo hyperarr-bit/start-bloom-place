@@ -211,7 +211,7 @@ describe("na tela de Finanças", () => {
     await act(async () => {});
     // linha no Painel (Finanças), não na Home
     expect(screen.getByTestId("kit-hoje-painel").textContent).toContain("DIA 3");
-    fireEvent.click(screen.getByText("📒 KIT 30 DIAS"));
+    fireEvent.click(document.querySelector("[data-spotlight=\"tab-kit\"]")!); // 1.0.22: emoji e nome em spans separados (fileira com "Organizar abas")
     await act(async () => {});
     expect(screen.getByText("Dia 3 de 30")).toBeTruthy();
     expect(screen.getByTestId("kit-dia-3").getAttribute("data-hoje")).toBe("true");
@@ -230,7 +230,7 @@ describe("na tela de Finanças", () => {
     quando(2026, 10, 20);
     const c = montarFinancas({ [CHAVE_KIT]: { comprado: true, em: "2026-10-18T15:00:00-03:00" } });
     await act(async () => {});
-    fireEvent.click(screen.getByText("📒 KIT 30 DIAS"));
+    fireEvent.click(document.querySelector("[data-spotlight=\"tab-kit\"]")!); // 1.0.22: emoji e nome em spans separados (fileira com "Organizar abas")
     await act(async () => {});
     const add = (nome: string, saldo: string, juros: string, parcela: string) => {
       fireEvent.click(screen.getByTestId("kit-dividas-adicionar"));

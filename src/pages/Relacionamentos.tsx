@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
+import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
 import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 import { useSearchParams } from "react-router-dom";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
@@ -46,6 +48,9 @@ const abaDoLink = (v: string | null): AbaRelacoes | null => {
   return ABAS.some((a) => a.id === v) ? (v as AbaRelacoes) : null;
 };
 
+/** 1.0.22: as ABAS no formato da fileira com "Organizar abas" (components/ui/abas-ocultaveis). */
+const ABAS_DA_FILEIRA = ABAS.map((a) => ({ id: a.id, label: a.rotulo, icon: a.emoji }));
+
 const Relacionamentos = () => {
   // P5 (30/09): na demo a seta vai pro destino do botão de baixo (o funil); no app, pra /home
   const voltarDoModulo = useVoltarDoModulo();
@@ -58,6 +63,7 @@ const Relacionamentos = () => {
   const [form, setForm] = useState<{ pessoaId?: string; sugestao?: SugestaoDeInicio } | null>(null);
   const [avisosAberto, setAvisosAberto] = useState(params.get("avisos") === "1");
   const [mensagem, setMensagem] = useState<{ pessoaId: string; tipo: "parabens" | "oi" } | null>(null);
+  const abasDoModulo = useAbasOcultas("relacionamentos", ABAS_DA_FILEIRA);
   useScrollActiveTabIntoView(aba);
   const reportTab = useTabReporter();
   const mes = mesAtualExtenso();
@@ -110,21 +116,8 @@ const Relacionamentos = () => {
               <ThemeToggle />
             </div>
           </div>
-          <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto" role="tablist" aria-label="Abas de Relações">
-            {ABAS.map((a) => (
-              <button
-                key={a.id}
-                role="tab"
-                aria-selected={aba === a.id}
-                data-spotlight={`tab-${a.id}`}
-                onClick={() => trocarAba(a.id)}
-                className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${aba === a.id ? "notion-tab-active" : "hover:bg-muted"}`}
-              >
-                <span aria-hidden="true">{a.emoji}</span>
-                {a.rotulo}
-              </button>
-            ))}
-          </div>
+          {/* 1.0.22: ocultar/organizar abas (components/ui/abas-ocultaveis) */}
+          <AbasOcultaveis abas={abasDoModulo} ativa={aba} onTrocar={(id) => trocarAba(id as AbaRelacoes)} comoTab rotuloDaFileira="Abas de Relações" className="max-w-5xl mx-auto px-4 pb-2" />
         </header>
 
         <main className="max-w-5xl mx-auto px-4 py-5 pb-24 space-y-4">

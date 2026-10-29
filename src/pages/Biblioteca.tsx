@@ -1,4 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
+import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
+import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
 import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
@@ -152,6 +154,8 @@ const TABS = [
   { v: "emprestados", l: "Emprestados", icon: "📤" },
   { v: "desafio", l: "Desafio", icon: "🏆" },
 ];
+/** 1.0.22: no formato da fileira com "Organizar abas" (components/ui/abas-ocultaveis). */
+const ABAS_BIBLIOTECA = TABS.map((t) => ({ id: t.v, label: t.l, icon: t.icon }));
 
 const bookGenres = ["Ficção", "Não-Ficção", "Fantasia", "Romance", "Sci-Fi", "Terror", "Autoajuda", "Negócios", "Biografia", "Técnico", "HQ/Mangá", "Outro"];
 
@@ -223,6 +227,7 @@ const Biblioteca = () => {
   const [yearGoal, setYearGoal] = usePersistedState<number>("lib-year-goal", 12);
   const [pagesHintDismissed, setPagesHintDismissed] = usePersistedState<boolean>("lib-pages-hint-dismissed", false);
   const [tab, setTab] = useState("lendo");
+  const abasDoModulo = useAbasOcultas("biblioteca", ABAS_BIBLIOTECA);
   useSetTrackedTab(tab);
 
   // ── Form State ──
@@ -570,19 +575,8 @@ const Biblioteca = () => {
             <ThemeToggle />
           </div>
         </div>
-        <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          {TABS.map((t) => (
-            <button
-              key={t.v}
-              data-spotlight={`tab-${t.v}`}
-              onClick={() => setTab(t.v)}
-              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${tab === t.v ? "notion-tab-active" : "hover:bg-muted"}`}
-            >
-              <span>{t.icon}</span>
-              {t.l}
-            </button>
-          ))}
-        </div>
+        {/* 1.0.22: ocultar/organizar abas (components/ui/abas-ocultaveis) */}
+        <AbasOcultaveis abas={abasDoModulo} ativa={tab} onTrocar={setTab} className="max-w-5xl mx-auto px-4 pb-2" />
       </header>
 
       {/* 16/10: a intro do módulo fica dentro da calha da página (o "Dicas" antigo segue como era, colado na borda) */}

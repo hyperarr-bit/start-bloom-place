@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
+import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
+import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
 import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 import { SerieHistorico } from "@/components/historico/SerieHistorico";
 import { useTabReporter } from "@/hooks/use-module-tracker";
@@ -326,12 +328,22 @@ const RecipeFields = ({ draft, setDraft, cats, onSave, onCancel, saveLabel, clas
   );
 };
 
+/** As abas da Dieta (1.0.22: fora do componente — a fileira com "Organizar abas" memoiza em cima). */
+const ABAS_DIETA = [
+  { id: "cardapio", label: "CARDÁPIO", icon: "🍽️" },
+  { id: "jejum", label: "JEJUM", icon: "⏱️" },
+  { id: "receitas", label: "RECEITAS", icon: "👩‍🍳" },
+  { id: "lista", label: "LISTA", icon: "🛒" },
+  { id: "diario", label: "DIÁRIO", icon: "📊" },
+];
+
 const Dieta = () => {
   const navigate = useNavigate();
   // seta ←: no app, o hub; na demo, o destino do botão de baixo dela (P5, 30/09 — antes, /auth)
   const voltarDoModulo = useVoltarDoModulo();
   const [activeTab, setActiveTab] = useState("cardapio");
   const { onModuleComplete: onDietaComplete, CompletionDialog: DietaCompletionDialog } = useModuleCompletionFlow("dieta");
+  const abasDoModulo = useAbasOcultas("dieta", ABAS_DIETA);
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
   // `today` é ESTADO (não const de render): o app fica vivo em memória no
@@ -504,6 +516,8 @@ const Dieta = () => {
     const aberta = refeicaoAberta();
     if (aberta && edicaoMudou(aberta.day, aberta.meal)) saveMeal(aberta.day, aberta.meal);
   };
+  /** O toque numa aba (1.0.22: vindo da fileira com "Organizar abas"): salva a edição aberta, fecha e mede, como antes. */
+  const trocarAbaDaDieta = (id: string) => { salvarEdicaoAberta(); setEditingMeal(null); setActiveTab(id); reportTab?.(id); };
 
   const startEditMeal = (day: string, meal: string) => {
     salvarEdicaoAberta();
@@ -762,25 +776,8 @@ const Dieta = () => {
             <ThemeToggle />
           </div>
         </div>
-        <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          {[
-            { id: "cardapio", label: "CARDÁPIO", icon: "🍽️" },
-            { id: "jejum", label: "JEJUM", icon: "⏱️" },
-            { id: "receitas", label: "RECEITAS", icon: "👩‍🍳" },
-            { id: "lista", label: "LISTA", icon: "🛒" },
-            { id: "diario", label: "DIÁRIO", icon: "📊" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => { salvarEdicaoAberta(); setEditingMeal(null); setActiveTab(tab.id); reportTab?.(tab.id); }}
-              data-track={`tab-${tab.id}`}
-              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
-            >
-              <span>{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* 1.0.22: ocultar/organizar abas (components/ui/abas-ocultaveis) — o toque salva a edição aberta, como antes */}
+        <AbasOcultaveis abas={abasDoModulo} ativa={activeTab} onTrocar={trocarAbaDaDieta} className="max-w-5xl mx-auto px-4 pb-2" />
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4">

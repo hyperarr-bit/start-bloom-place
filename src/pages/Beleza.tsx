@@ -1,4 +1,6 @@
 import { fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
+import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
+import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
 import { useEffect, useState } from "react";
 import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 import { useSearchParams } from "react-router-dom";
@@ -60,6 +62,7 @@ const Beleza = () => {
   const [params] = useSearchParams();
   const pedida = ABA_DO_LINK[(params.get("aba") ?? "").toLowerCase()];
   const [activeTab, setActiveTab] = useState<Aba>(pedida && pedida !== "fotos" ? pedida : "routine");
+  const abasDoModulo = useAbasOcultas("beleza", tabs);
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
   /* ROTINA VAZIA VAI PRO TOPO (28/09, protótipo): quem ainda não tem rotina vê as
@@ -118,20 +121,8 @@ const Beleza = () => {
             <ThemeToggle />
           </div>
         </div>
-        <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              data-spotlight={`tab-${tab.id}`}
-              data-active={activeTab === tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
-            >
-              <span>{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* 1.0.22: ocultar/organizar abas (components/ui/abas-ocultaveis) */}
+        <AbasOcultaveis abas={abasDoModulo} ativa={activeTab} onTrocar={(id) => handleTabChange(id as Aba)} className="max-w-5xl mx-auto px-4 pb-2" />
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4 space-y-4">

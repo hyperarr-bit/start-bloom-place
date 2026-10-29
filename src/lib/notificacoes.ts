@@ -1912,7 +1912,9 @@ export async function sincronizarLembreteDia2(
   // 1.0.16 (desenho 8, 4.6): o aviso do teste (920001) é refeito a cada abertura (texto com a dose do dia e o
   // número dela) e, no dia em que ele sai, o lembrete diário CEDE — 1 notificação de teste por dia
   try { await armarLembreteDoTesteSePuder(get); } catch { /* nunca segura o dia 2 */ }
-  if (plano.ok === true && avisoDoTesteNoDia(localDayKey(plano.quando), agora.getTime(), get)) {
+  // 29/10 (dono): no modo 1.0.12 o lembrete da missão NÃO cede pro aviso do teste — na 1.0.12 os dois saíam
+  // (a regra "cede" é da 1.0.16 e tirava o lembrete do dia 2 de ~43% dos testes, os que começam antes do meio-dia)
+  if (!modo1012() && plano.ok === true && avisoDoTesteNoDia(localDayKey(plano.quando), agora.getTime(), get)) {
     const assinatura920 = `motivo:pulado_por_920:${localDayKey(plano.quando)}`;
     if (e.ultimo?.assinatura !== assinatura920) {
       await limparFaixa(BASE_DIA2);

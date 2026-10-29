@@ -73,22 +73,23 @@ const abrir = (ui: ReactNode, rota: string, inicial: Record<string, unknown> = {
 const texto = () => document.body.textContent ?? "";
 
 describe("Beleza: 'DICAS PRA COMEÇAR' (o print #86)", () => {
-  it("no app: 'Ligue o lembrete da manhã e da noite — ele diz o passo do dia', sem 'No app do celular'", () => {
+  // 28/10: as dicas foram reescritas pelo uso real (lib/dicas-do-modulo) — nenhuma fala em "no app do celular", nem no site
+  it("no app: as dicas novas (a 1ª: as 3 perguntas do skincare), sem 'No app do celular'", () => {
     noApp();
     abrir(<Beleza />, "/beleza");
-    expect(screen.getByText("Ligue o lembrete da manhã e da noite — ele diz o passo do dia")).toBeInTheDocument();
+    expect(screen.getByText("Responda 3 perguntas e sua rotina de skincare sai pronta")).toBeInTheDocument();
     expect(texto()).not.toMatch(/no app do celular/i);
   });
 
-  it("no site continua como está: 'No app do celular, ligue o lembrete…'", () => {
+  it("no site: as mesmas dicas novas", () => {
     noSiteComDicas();
     abrir(<Beleza />, "/beleza");
-    expect(screen.getByText("No app do celular, ligue o lembrete da manhã e da noite — ele diz o passo do dia")).toBeInTheDocument();
+    expect(screen.getByText("Responda 3 perguntas e sua rotina de skincare sai pronta")).toBeInTheDocument();
   });
 });
 
 describe("as outras dicas com a frase", () => {
-  it("Relações: no app (intro ligada, 17/10) a 1ª abertura mostra a INTRO, não as dicas — e nada diz 'no app do celular'; no site 'No app do celular, ligue os avisos: …'", () => {
+  it("Relações: no app (intro ligada, 17/10) a 1ª abertura mostra a INTRO, não as dicas — e nada diz 'no app do celular'; no site (intro desligada) as dicas novas, sem a frase", () => {
     noApp();
     abrir(<Relacionamentos />, "/relacionamentos");
     expect(document.querySelector("[data-testid=intro-modulo-faixa]")?.textContent).toContain("anote 1 pessoa");
@@ -103,7 +104,9 @@ describe("as outras dicas com a frase", () => {
     expect(texto()).not.toMatch(/no app do celular/i);
     cleanup(); document.body.innerHTML = ""; localStorage.clear();
     abrir(<Relacionamentos />, "/relacionamentos");
-    expect(screen.getByText("No app do celular, ligue os avisos: na véspera, no dia e o “faz tempo que…”")).toBeInTheDocument();
+    // 28/10: as dicas novas (lib/dicas-do-modulo) — sem a frase
+    expect(screen.getByText("Comece pela família: salve os aniversários")).toBeInTheDocument();
+    expect(texto()).not.toMatch(/no app do celular/i);
   });
 
   it("Pet ('O que vem pronto' da 1ª vez): no app o aviso começa por 'Da vacina…'; no site, 'No app do celular: da vacina…'", () => {

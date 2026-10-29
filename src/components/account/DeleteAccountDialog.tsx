@@ -10,6 +10,7 @@ import { trackEvent } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
 import { lojaParaCancelar } from "@/lib/loja";
 import { toast } from "sonner";
+import { esquecerCompra } from "@/landing/marcador";
 
 /**
  * EXCLUIR CONTA (24/07) — exigência do Google Play: app com login precisa de
@@ -44,6 +45,10 @@ export function DeleteAccountDialog({ open, onOpenChange }: {
     // Sessão morre junto com o usuário: limpa o local e recomeça do zero.
     try { await supabase.auth.signOut(); } catch { /* usuário já não existe */ }
     try { localStorage.clear(); } catch { /* noop */ }
+    // 29/10: o "já comprou" da landing (cookie, sobrevive ao clear) também sai — a conta que comprou não existe mais
+    esquecerCompra();
+    // dentro de um iframe da mesma origem (a demo da landing), quem recomeça é a página inteira, não o iframe
+    try { if (window.top && window.top !== window && window.top.location.origin === window.location.origin) { window.top.location.href = "/"; return; } } catch { /* outra origem */ }
     window.location.href = "/";
   };
 

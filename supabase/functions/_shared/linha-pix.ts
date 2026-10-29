@@ -73,7 +73,7 @@ export const pedidoJaCreditado = (linhas: LinhaAssinatura[], orderId: string | n
   !!orderId && linhasProprias(linhas).some((l) => l.abacatepay_billing_id === orderId);
 
 export type DecisaoGrant =
-  | { acao: "preservar"; motivo: "vitalicio_pagou_mes"; jaLiberado: true }
+  | { acao: "preservar"; motivo: "vitalicio_pagou_mes" | "vitalicio_pagou_de_novo"; jaLiberado: true; pedidoAnterior?: string | null }
   | { acao: "ja_creditado"; jaLiberado: true }
   | { acao: "atualizar"; linhaId: string; jaLiberado: boolean; fim: string }
   | { acao: "inserir"; jaLiberado: false; fim: string };
@@ -99,11 +99,18 @@ export function decidirGrantPix(
   concessao: Concessao,
   agora: Date = new Date(),
   orderId?: string | null,
+  /** 29/10 (landing /organizar): vitalício que paga o vitalício DE NOVO (outro pedido) → preservar. Antes a linha era
+   *  reescrita com o pedido novo: o pedido que valia sumia do banco e o pagamento em dobro ficava invisível. */
+  opts: { protegerVitalicio?: boolean } = {},
 ): DecisaoGrant {
   const jaLiberado = temVitalicioProprio(linhas);
   const vitalicio = concessao.dias === null;
   if (jaLiberado && !vitalicio) return { acao: "preservar", motivo: "vitalicio_pagou_mes", jaLiberado: true };
   if (pedidoJaCreditado(linhas, orderId)) return { acao: "ja_creditado", jaLiberado: true };
+  if (opts.protegerVitalicio && jaLiberado && vitalicio && orderId) {
+    const vit = linhasProprias(linhas).filter((l) => viva(l) && vitalicia(l)).sort((a, b) => fimMs(b) - fimMs(a))[0];
+    return { acao: "preservar", motivo: "vitalicio_pagou_de_novo", jaLiberado: true, pedidoAnterior: vit?.abacatepay_billing_id ?? null };
+  }
 
   const fim = new Date(agora);
   if (vitalicio) fim.setFullYear(fim.getFullYear() + 100);

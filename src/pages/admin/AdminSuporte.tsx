@@ -62,6 +62,9 @@ const ROTULO: Record<string, { txt: string; cor: string }> = {
   app_duvida: { txt: "Dúvida", cor: "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400" },
   app_sugestao: { txt: "Sugestão", cor: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400" },
   cancel_flow: { txt: "Cancelamento", cor: "bg-muted text-muted-foreground" },
+  // 29/10: abertos pelo servidor (landing /organizar — _shared/landing-travas.ts)
+  pix_sem_email: { txt: "Pix pago sem e-mail", cor: "bg-destructive/10 text-destructive" },
+  pix_em_dobro: { txt: "Pix pago em dobro", cor: "bg-destructive/10 text-destructive" },
 };
 const rotulo = (s: string) => ROTULO[s] ?? { txt: s, cor: "bg-muted text-muted-foreground" };
 

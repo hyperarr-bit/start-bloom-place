@@ -15,6 +15,8 @@ import {
   areaPlano30, liberarKitDoBump, liberarPlano30, mandarLinkPorEmail, reservar, temPraSempre,
 } from "../_shared/presente.ts";
 import { MENSAGEM_DOWNSELL_INDISPONIVEL, ehDownsell, podePedirDownsell } from "../_shared/elegibilidade-downsell.ts";
+import { ehOfertaLanding } from "../_shared/ofertas-landing.ts";
+import { EMAIL_OK as EMAIL_LANDING_OK, jaTemOCore, temVitalicioAtivo } from "../_shared/landing-travas.ts";
 
 /**
  * Pix in-app via ASAAS (21/07) — gateway principal, substitui a Pagar.me.
@@ -372,6 +374,27 @@ serve(async (req) => {
         if (!praSempre) return jsonResponse({ error: "O presente é pra quem já tem o CORE pra sempre." }, 403);
       }
 
+      /* 29/10 (landing /organizar): quem JÁ tem o CORE pra sempre não ganha Pix novo. Caso real: pagou, a conta sumiu do
+       * aparelho, a página voltou na oferta e ela pagou de novo. Confere a conta da sessão (anônima ou logada), o e-mail
+       * dela, o e-mail que a página mandou (o da compra anterior, se a página lembra) e o destino da tela do Pix. A página
+       * trata `ja_tem` mostrando "Você já tem o CORE" (200: o invoke não vira erro). Falha de leitura = deixa gerar. */
+      if (ehOfertaLanding(offer)) {
+        const emailPagina = String(body.email ?? "").trim().toLowerCase();
+        const destino = await lerDestino(supabaseAdmin as never, user.id).catch(() => null);
+        const jt = await jaTemOCore(supabaseAdmin, {
+          userId: user.id,
+          emails: [user.email ?? null, EMAIL_LANDING_OK.test(emailPagina) ? emailPagina : null, destino],
+          acharConta: (e) => acharConta(supabaseAdmin as never, e),
+        }).catch(() => ({ jaTem: false as const }));
+        if (jt.jaTem) {
+          logStep("Landing: já tem o CORE pra sempre — Pix não gerado", { via: jt.via });
+          await supabaseAdmin.from("analytics_events").insert({
+            user_id: user.id, event_name: "landing_pix_recusado_ja_tem", event_data: { offer, via: jt.via },
+          }).then(() => {}, () => {});
+          return jsonResponse({ ja_tem: true, error: "ja_tem", via: jt.via });
+        }
+      }
+
       const chave = await obterChavePix(apiKey);
       if (!chave) {
         logStep("Conta Asaas SEM chave Pix cadastrada");
@@ -584,6 +607,7 @@ serve(async (req) => {
       const vitalicio = concessao.dias === null;
       const g = await creditarPedido(supabaseAdmin, {
         userId: user.id, orderId: id, gateway: "asaas", concessao, agora: now, linhaNova: concessao.linhaNova === true,
+        protegerVitalicio: ehOfertaLanding(offer), offer, // 29/10: 2º vitalício da landing não reescreve a linha (vira chamado)
         montarPayload: (fim) => ({
           user_id: user.id, status: "active",
           plan: vitalicio ? "lifetime" : concessao.plano,
@@ -602,7 +626,7 @@ serve(async (req) => {
       if (g.r === "preservado") {
         // vitalício pagou o mês: a linha não se toca (sobrescrever gravaria 2490 numa
         // venda de 97,90 e o acesso venceria em 30 dias). Caso de reembolso.
-        logStep("Vitalício pagou o mês — linha preservada", { userId: user.id, offer, id });
+        logStep(g.motivo === "vitalicio_pagou_de_novo" ? "Vitalício pagou o vitalício de novo — linha preservada, chamado aberto" : "Vitalício pagou o mês — linha preservada", { userId: user.id, offer, id });
         return jsonResponse({ paid: true, status: "CONFIRMED", jaVitalicio: true });
       }
       if (g.r === "ja_creditado") {
@@ -727,6 +751,19 @@ serve(async (req) => {
       const email = String(body.email ?? "").trim().toLowerCase();
       if (!EMAIL_DESTINO_OK.test(email)) return jsonResponse({ ok: false, motivo: "email_invalido" });
       if (user.email) return jsonResponse({ ok: false, motivo: "conta_tem_email" });
+      /* 29/10 (landing): o e-mail é de quem JÁ tem o CORE pra sempre → não guarda o destino; a página troca o QR por
+       * "Você já tem o CORE" (antes: a 2ª compra ia pra conta dela e virava pagamento em dobro). */
+      if (id) {
+        const regLn = await registroDoPedido(supabaseAdmin, id, logStep);
+        const offerLn = String((regLn?.[0]?.event_data as Record<string, string> | undefined)?.offer ?? "");
+        if (regLn?.[0]?.user_id === user.id && ehOfertaLanding(offerLn)) {
+          const conta = await acharConta(supabaseAdmin as never, email).catch(() => null);
+          if (conta && temVitalicioAtivo(await linhasDaConta(supabaseAdmin, conta) as never)) {
+            logStep("Landing: e-mail de quem já tem o CORE pra sempre — destino não salvo");
+            return jsonResponse({ ok: false, motivo: "ja_tem", ja_tem: true });
+          }
+        }
+      }
       if (!(await salvarDestino(supabaseAdmin as never, user.id, email))) return jsonResponse({ ok: false, motivo: "gravar" });
       let encaminhado = false;
       if (id) {

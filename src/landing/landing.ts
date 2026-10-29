@@ -26,6 +26,12 @@
  *   landing_pix_copiado {ok, via}                         · landing_pix_pago {oferta, valor, order_id}
  *   landing_email_pix {ok, via}                           · landing_email {via}   · landing_abrir_core {}
  *   landing_loja {loja, onde}                             · landing_erro {onde, msg}
+ *   (29/10) landing_duvida_aberta {pergunta}              · landing_voltou {fase, ausente_s, com_pix}  (aba visível de novo, ≥5 s fora)
+ *   (29/10) landing_ja_tem {via: marcador|servidor|email_pix} · landing_ja_tem_nao_fui_eu {}
+ *   (29/10) todo evento leva landing_device_id (id aleatório estável do aparelho, cookie + localStorage — ./marcador.ts)
+ * "Já comprou" (29/10, ./marcador.ts): ao confirmar o pagamento grava um marcador (cookie de 400 dias no domínio + localStorage);
+ * com ele a página abre com "Você já tem o CORE" + Abrir meu CORE + lojas no lugar da oferta. O servidor também recusa o
+ * Pix (`ja_tem`) de quem já tem o CORE pra sempre. Quem nunca comprou vê a página IGUAL (nada muda no HTML nem no 1º render).
  * Pixel: PageView (no HTML) · ViewContent 1x na oferta · InitiateCheckout no Pix gerado · Purchase pelo pagamento.ts
  * (firePixPurchaseOnce, mesmo id da CAPI do servidor).
  */
@@ -35,6 +41,7 @@ import {
   bracoOfertaDoHtml, bracoTituloDoHtml, ehArea, ehModuloLanding, estadoQueVolta, mmss, ofertaEscolhida, reais, urlPlay, venceEm,
   type Area, type EstadoLanding, type MensagemDaDemo, type ModuloLanding, type OfertaLanding, type PixLanding,
 } from "./regras";
+import { esquecerCompra, idDoAparelho, lerCompra, marcarCompra, type MarcaCompra } from "./marcador";
 
 // o Pix de verdade carrega sob demanda — declarado antes do observador dos blocos, que pode pré-aquecê-lo (com PIX_REAL)
 type Pagamento = typeof import("./pagamento");
@@ -50,6 +57,7 @@ const SIMULADO = !PRODUCAO;
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const agora = () => Math.round(performance.now());
 type Janela = Window & {
+  __landingSimularJaTem?: boolean;
   __landing?: { t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; divisao?: string | null };
   __eventosLanding?: Record<string, unknown>[];
   __landingSimular?: { pagar: () => void };
@@ -73,6 +81,7 @@ const ss = (k: string, v?: string): string | null => {
 };
 const sessao = ss("landing-sessao-v1") || ss("landing-sessao-v1", novoId())!;
 const coreSid = ss("core_session_id") || ss("core_session_id", novoId())!;
+const aparelho = idDoAparelho(); // 29/10: estável entre visitas (o landing_session_id morre com a aba)
 const URL_EV = "https://itoylenzvahbscgjgtqf.supabase.co/rest/v1/analytics_events";
 const KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0b3lsZW56dmFoYnNjZ2pndHFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMTc4NzUsImV4cCI6MjA4OTg5Mzg3NX0.G3bJEdD5B5lmc1cic6UYGeu2xv4XrbmZ9MA_afoYnLg";
 const ua = navigator.userAgent || "";
@@ -85,7 +94,7 @@ for (const k of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm
 if (BUSCA.get("fbclid")) atrib.tem_fbclid = "1";
 
 export function evento(nome: string, dados: Record<string, unknown> = {}): void {
-  const corpo = { ...dados, landing_session_id: sessao, braco_titulo: brTitulo, braco_oferta: brOferta, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
+  const corpo = { ...dados, landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
   w.__eventosLanding!.push({ nome, ...corpo });
   if (!PRODUCAO) return;
   try {
@@ -234,13 +243,17 @@ const lerEstado = (): EstadoLanding => {
   return estadoQueVolta(bruto);
 };
 let estado: EstadoLanding = lerEstado();
+/* 29/10: "Você já tem o CORE" no lugar da oferta (marcador do aparelho, ou o servidor disse `ja_tem`) */
+let jaTem: MarcaCompra | null = null;
+// comprou antes do marcador existir (o estado do Pix ainda guarda a compra): marca agora
+if (estado.pago) { try { if (!lerCompra()) marcarCompra({ oferta: estado.pago.oferta, email: estado.email ?? estado.emailPix }); } catch { /* noop */ } }
 
 /* ───────────────────────── blocos vistos + botão fixo ───────────────────────── */
 const fixo = $("lp-fixo");
 let passouDaDemo = false;
 const naTela = new Set<string>();
 const atualizarFixo = () => {
-  const mostrar = passouDaDemo && !naTela.has("oferta") && !naTela.has("fim") && estado.fase !== "conta";
+  const mostrar = passouDaDemo && !naTela.has("oferta") && !naTela.has("fim") && estado.fase !== "conta" && !jaTem;
   if (mostrar) { fixo.setAttribute("data-on", ""); fixo.removeAttribute("aria-hidden"); (fixo.querySelector("button") as HTMLButtonElement).tabIndex = 0; }
   else { fixo.removeAttribute("data-on"); fixo.setAttribute("aria-hidden", "true"); (fixo.querySelector("button") as HTMLButtonElement).tabIndex = -1; }
 };
@@ -342,15 +355,22 @@ async function gerar(): Promise<void> {
   rolarAte(card, "start");
   evento("landing_cta", { onde: "pagar", oferta });
   const t0 = Date.now();
-  const pedido: Promise<PixLanding | { erro: string; onde: string }> = SIMULADO
-    ? espera(700).then(() => ({ orderId: `simulado-${Date.now().toString(36)}`, qrCode: CODIGO_SIMULADO, qrCodeBase64: null, expiresAt: null, criadoEm: Date.now(), oferta }))
-    : pg().then((m) => m.gerarPix(oferta, URL_DE_CHEGADA)).catch((e) => ({ erro: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.", onde: String(e).slice(0, 120) }));
+  const emailConhecido = estado.email ?? estado.emailPix ?? lerCompra()?.email ?? null;
+  const pedido: Promise<PixLanding | { jaTem: true; via: string } | { erro: string; onde: string }> = SIMULADO
+    ? espera(700).then(() => (w.__landingSimularJaTem ? { jaTem: true as const, via: "servidor" } : { orderId: `simulado-${Date.now().toString(36)}`, qrCode: CODIGO_SIMULADO, qrCodeBase64: null, expiresAt: null, criadoEm: Date.now(), oferta }))
+    : pg().then((m) => m.gerarPix(oferta, URL_DE_CHEGADA, emailConhecido)).catch((e) => ({ erro: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.", onde: String(e).slice(0, 120) }));
   // o código vai pra área de transferência AINDA no toque (a promessa resolve quando o QR chegar)
-  const copia = copiarNoToque(pedido.then((p) => ("erro" in p ? Promise.reject(new Error("sem pix")) : p.qrCode)));
+  const copia = copiarNoToque(pedido.then((p) => ("erro" in p || "jaTem" in p ? Promise.reject(new Error("sem pix")) : p.qrCode)));
   const r = await pedido;
   // a animação "Gerando o seu Pix…" dura pelo menos 1,2 s (dá tempo de ler; o Pix rápido não pisca)
   const falta = 1200 - (Date.now() - t0);
   if (falta > 0) await espera(falta);
+  if ("jaTem" in r) {
+    // 29/10: o servidor diz que esta pessoa JÁ tem o CORE pra sempre — nada de Pix novo
+    void copia.catch(() => null);
+    mostrarJaTem("servidor");
+    return;
+  }
   if ("erro" in r) {
     erroPix = r.erro;
     evento("landing_erro", { onde: "pix_create", msg: r.onde });
@@ -400,6 +420,7 @@ function pago(p: PixLanding) {
   if (estado.fase === "pago" || estado.fase === "conta") return;
   if (loop) window.clearTimeout(loop);
   evento("landing_pix_pago", { oferta: p.oferta, valor: VALOR_OFERTA[p.oferta], order_id: p.orderId, simulado: SIMULADO });
+  marcarCompra({ oferta: p.oferta, email: estado.emailPix }); // 29/10: sobrevive ao localStorage zerado (cookie)
   salvar({ fase: "pago", pago: p, anteriores: [] });
   rolarAte(card, "start");
   // deu o e-mail na tela do QR (ou pagou logada): segue sozinho pra conta
@@ -420,9 +441,13 @@ async function salvarEmailPix(email: string) {
   if (!EMAIL_OK.test(limpo) || !estado.pix) return;
   let via: string | null = null;
   erroEmail = null;
-  if (SIMULADO) { await espera(400); via = limpo.includes("+existe") ? "destino" : "conta"; }
-  else {
+  if (SIMULADO) {
+    await espera(400);
+    if (limpo.includes("+jatem")) { evento("landing_email_pix", { ok: false, via: "ja_tem" }); mostrarJaTem("email_pix", limpo); return; }
+    via = limpo.includes("+existe") ? "destino" : "conta";
+  } else {
     const r = await pg().then((m) => m.salvarEmailDoPix(estado.pix!, limpo)).catch(() => ({ erro: "Não consegui salvar agora." }));
+    if ("jaTem" in r) { evento("landing_email_pix", { ok: false, via: "ja_tem" }); mostrarJaTem("email_pix", limpo); return; }
     if ("via" in r) via = r.via; else erroEmail = r.erro;
   }
   evento("landing_email_pix", { ok: !!via, via });
@@ -436,6 +461,7 @@ async function prontoComEmail(email: string, via: string) {
     try { await (await pg()).finalizarConta(p.orderId, { attr: atrib, braco_titulo: brTitulo, braco_oferta: brOferta, oferta: p.oferta, landing_session_id: sessao }); } catch { /* o e-mail é extra */ }
   }
   evento("landing_email", { via });
+  marcarCompra({ oferta: p.oferta, email });
   salvar({ fase: "conta", email });
 }
 
@@ -485,10 +511,43 @@ async function desenharQr(alvo: HTMLElement, p: PixLanding) {
 }
 
 let relogio: number | null = null;
+/** 29/10: o cartão "Você já tem o CORE" (a mesma cara da "Sua conta está pronta") no lugar da oferta. */
+function renderJaTem(m: MarcaCompra) {
+  card.dataset.fase = "conta";
+  const email = m.email ?? "";
+  caixa.innerHTML = `
+      <div class="lp-pago" data-testid="landing-ja-tem">
+        <div class="lp-pago-check">${ICO_CHECK}</div>
+        <h3>Você já tem o CORE</h3>
+        <p>${email ? `Seu CORE já está liberado. Entre com <b>${esc(email)}</b>.` : "Seu CORE já está liberado. Entre com o e-mail que você usou na compra."}</p>
+        <div class="lp-form"><button type="button" class="lp-cta" id="lp-abrir">Abrir meu CORE ${ICO_SETA}</button></div>
+        <div class="lp-loja-bloco">
+          <b>Seu CORE também no celular</b>
+          <p>Baixe na App Store ou Google Play e entre com ${email ? `este e-mail: <strong>${esc(email)}</strong>` : "o mesmo e-mail"}</p>
+          <div class="lp-selos"><a href="${URL_APP_STORE}" target="_blank" rel="noopener" data-loja="ios"><img src="/selos/app-store.svg" alt="Baixar na App Store" width="120" height="40" /></a><a href="${esc(urlPlay("landing"))}" target="_blank" rel="noopener" data-loja="android"><img src="/selos/google-play.png" alt="Disponível no Google Play" width="103" height="40" /></a></div>
+        </div>
+        <div class="lp-links"><button type="button" class="lp-link" id="lp-nao-fui-eu">Não fui eu que comprei</button></div>
+      </div>`;
+  $("lp-abrir").addEventListener("click", () => { evento("landing_abrir_core", { via: "ja_tem" }); location.href = "/home"; });
+  caixa.querySelectorAll<HTMLAnchorElement>("a[data-loja]").forEach((a) => a.addEventListener("click", () => evento("landing_loja", { loja: a.dataset.loja, onde: "ja_tem" })));
+  $("lp-nao-fui-eu").addEventListener("click", () => { evento("landing_ja_tem_nao_fui_eu", {}); esquecerCompra(); jaTem = null; render(); });
+  atualizarFixo();
+}
+
+function mostrarJaTem(via: "marcador" | "servidor" | "email_pix", email: string | null = null) {
+  if (loop) window.clearTimeout(loop);
+  if (via !== "marcador") marcarCompra({ email });
+  jaTem = lerCompra() ?? { em: Date.now(), oferta: null, email };
+  if (email && !jaTem.email) jaTem = { ...jaTem, email };
+  evento("landing_ja_tem", { via });
+  if (estado.fase !== "oferta") salvar({ fase: "oferta", pix: null, anteriores: [] }); else render();
+}
+
 function render() {
+  if (relogio) { window.clearInterval(relogio); relogio = null; }
+  if (jaTem && (estado.fase === "oferta" || estado.fase === "erro")) { renderJaTem(jaTem); return; }
   card.dataset.fase = estado.fase === "erro" ? "oferta" : estado.fase;
   const f = estado.fase;
-  if (relogio) { window.clearInterval(relogio); relogio = null; }
   if (f === "oferta") {
     caixa.innerHTML = erroPix ? `<p class="lp-erro" role="alert">${esc(erroPix)}</p>` : "";
   } else if (f === "gerando") {
@@ -581,9 +640,38 @@ const ehPraSempreTxt = () => (estado.pago && estado.pago.oferta !== "LN_ano279" 
 
 $("lp-pagar").addEventListener("click", () => { void gerar(); });
 
+/* 29/10: o aparelho já comprou (cookie/localStorage) e a página voltou na oferta → "Você já tem o CORE" */
+if (estado.fase === "oferta") { const m = lerCompra(); if (m) { jaTem = m; mostrarJaTem("marcador"); } }
+
 /* voltou com Pix aberto (o banco recarregou a aba) / já pago: a tela certa */
 if (estado.fase === "qr") { copiado = null; conferirEmLoop(); }
 if (estado.fase !== "oferta") {
   render();
   if (estado.fase === "pago" || estado.fase === "conta") window.setTimeout(() => rolarAte(card, "start"), 50);
 }
+
+/* ───────────────────────── medição invisível (29/10) ───────────────────────── */
+/* qual dúvida abre: 1x por pergunta por visita */
+const duvidasAbertas = new Set<string>();
+document.querySelectorAll<HTMLDetailsElement>("details").forEach((d) => d.addEventListener("toggle", () => {
+  if (!d.open) return;
+  const pergunta = (d.querySelector("summary")?.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
+  if (!pergunta || duvidasAbertas.has(pergunta)) return;
+  duvidasAbertas.add(pergunta);
+  evento("landing_duvida_aberta", { pergunta });
+}));
+
+/* a volta pra aba (foi ao banco, ao Instagram…): ≥5 s fora */
+let saiuEm: number | null = document.visibilityState === "hidden" ? Date.now() : null;
+const faseAgora = () => (jaTem && estado.fase === "oferta" ? "ja_tem" : estado.fase);
+const voltou = () => {
+  if (saiuEm === null) return;
+  const fora = Date.now() - saiuEm;
+  saiuEm = null;
+  if (fora >= 5000) evento("landing_voltou", { fase: faseAgora(), ausente_s: Math.round(fora / 1000), com_pix: estado.fase === "qr", order_id: estado.fase === "qr" ? estado.pix?.orderId ?? null : null });
+};
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") saiuEm = Date.now(); else voltou();
+});
+window.addEventListener("pagehide", () => { saiuEm = Date.now(); });
+window.addEventListener("pageshow", (e) => { if ((e as PageTransitionEvent).persisted) voltou(); });

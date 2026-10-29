@@ -18,6 +18,7 @@
  */
 import { COLUNAS_DECISAO, decidirGrantPix, pedidoJaCreditado, type Concessao, type LinhaAssinatura } from "./linha-pix.ts";
 import { pegarTrava, soltarTrava } from "./trava-grant.ts";
+import { registrarPagoEmDobro } from "./landing-travas.ts";
 
 // deno-lint-ignore no-explicit-any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -25,7 +26,7 @@ type ClienteMin = { from: (t: string) => any };
 
 export type ResultadoGrant =
   | { r: "creditado"; acao: "atualizar" | "inserir"; jaLiberado: boolean; fim: string }
-  | { r: "preservado" }
+  | { r: "preservado"; motivo?: "vitalicio_pagou_mes" | "vitalicio_pagou_de_novo" }
   | { r: "ja_creditado" }
   | { r: "em_andamento" }
   | { r: "erro"; msg: string };
@@ -44,6 +45,11 @@ export async function creditarPedido(admin: ClienteMin, args: {
    *  (a receita do dia ficava menor) e um webhook atrasado do plano creditava de novo (o pedido não estava mais em
    *  linha nenhuma). O fim continua o decidido (vitalício +100 anos; prazo empilha sobre o vigente). */
   linhaNova?: boolean;
+  /** 29/10 (landing): quem já tem o vitalício e paga o vitalício de novo NÃO tem a linha reescrita — o pedido vira
+   *  `pix_pago_em_dobro` + chamado no /admin → Suporte (1x por pedido), pro suporte devolver. */
+  protegerVitalicio?: boolean;
+  /** a oferta (só pro registro do pagamento em dobro) */
+  offer?: string | null;
 }): Promise<ResultadoGrant> {
   const ler = async (): Promise<LinhaAssinatura[]> => {
     const { data } = await admin.from("subscriptions").select(COLUNAS_DECISAO).eq("user_id", args.userId);
@@ -56,8 +62,15 @@ export async function creditarPedido(admin: ClienteMin, args: {
     const { data: emOutra } = await admin.from("subscriptions").select("id, user_id").eq("abacatepay_billing_id", args.orderId);
     if (Array.isArray(emOutra) && emOutra.some((l: { user_id?: string }) => l.user_id && l.user_id !== args.userId)) return { r: "ja_creditado" };
   } catch { /* sem a consulta, segue a regra de sempre */ }
-  const decisao = decidirGrantPix(await ler(), args.concessao, args.agora, args.orderId);
-  if (decisao.acao === "preservar") return { r: "preservado" };
+  const decisao = decidirGrantPix(await ler(), args.concessao, args.agora, args.orderId, { protegerVitalicio: args.protegerVitalicio });
+  if (decisao.acao === "preservar") {
+    if (decisao.motivo === "vitalicio_pagou_de_novo") {
+      let amount: number | null = null;
+      try { amount = Number(args.montarPayload(new Date(args.agora).toISOString()).amount_cents) || null; } catch { /* noop */ }
+      await registrarPagoEmDobro(admin, { userId: args.userId, orderId: args.orderId, amountCents: amount, pedidoAnterior: decisao.pedidoAnterior ?? null, offer: args.offer ?? null, agora: args.agora }).catch(() => false);
+    }
+    return { r: "preservado", motivo: decisao.motivo };
+  }
   if (decisao.acao === "ja_creditado") return { r: "ja_creditado" };
 
   const trava = await pegarTrava(admin, args.gateway, args.orderId);

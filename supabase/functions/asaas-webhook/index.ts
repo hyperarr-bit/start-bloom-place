@@ -9,6 +9,8 @@ import { reservarBoasVindas, soltarBoasVindas } from "../_shared/boas-vindas-hoj
 import { CONCESSAO_HOJE, PRECOS_HOJE, chaveCapiCasal, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
 import { encaminharParaDestino } from "../_shared/destino-hoje.ts";
 import { fetchNosPixels } from "../_shared/meta-pixels.ts";
+import { ehOfertaLanding } from "../_shared/ofertas-landing.ts";
+import { guardarNomeDoPagador, nomeDoPagadorAsaas } from "../_shared/landing-travas.ts";
 import {
   PRECOS_PLANO30, PRECOS_PRESENTE, chaveCapiPlano30, chaveCapiPresente, ehOfertaPlano30, ehOfertaPresente, garantirPresente, liberarKitDoBump, liberarPlano30, mandarLinkPorEmail, reservar,
 } from "../_shared/presente.ts";
@@ -344,6 +346,7 @@ serve(async (req) => {
     /* 15/10: decisão + trava "1 pedido = 1 crédito" em _shared/grant-pix.ts (o mesmo do check da página e do reconcile). */
     const g = await creditarPedido(admin, {
       userId, orderId: qrCodeId, gateway: "asaas", concessao, agora: now, linhaNova: concessao.linhaNova === true,
+      protegerVitalicio: ehOfertaLanding(offer), offer, // 29/10: 2º vitalício da landing não reescreve a linha (vira chamado)
       montarPayload: (fim) => ({
         user_id: userId, status: "active",
         plan: vitalicio ? "lifetime" : concessao.plano,
@@ -357,8 +360,16 @@ serve(async (req) => {
       const kit = await liberarKitDoBump(admin, { userId, orderId: qrCodeId, offer });
       if (kit === "falhou") logStep("Kit do bump não gravou (o reconcile tenta de novo)", { offer, qrCodeId: qrCodeId.slice(0, 20) });
     }
+    /* 29/10 (landing /organizar): Pix pago e a conta SEM e-mail → guarda o nome do pagador que a Asaas devolve junto do
+     * pedido (webhook_events, só service_role; nada de nome no log). Se em 10 min a pessoa não der o e-mail, o
+     * pix-reconcile abre o chamado "Pix pago sem e-mail" com esse nome (1x por pedido). */
+    if (ehOfertaLanding(offer) && !email && g.r !== "erro") {
+      const nome = await nomeDoPagadorAsaas(fetch as never, apiKey, { customerId: typeof pago.customer === "string" ? pago.customer : null, qrCodeId });
+      const guardou = await guardarNomeDoPagador(admin, qrCodeId, nome).catch(() => false);
+      logStep("Landing pago sem e-mail — nome do pagador", { tem_nome: !!nome, guardou, qrCodeId: qrCodeId.slice(0, 20) });
+    }
     if (g.r === "preservado") {
-      logStep("Vitalício pagou o mês — linha preservada, caso de reembolso", { userId, offer, qrCodeId: qrCodeId.slice(0, 20) });
+      logStep(g.motivo === "vitalicio_pagou_de_novo" ? "Vitalício pagou o vitalício de novo — linha preservada, chamado aberto" : "Vitalício pagou o mês — linha preservada, caso de reembolso", { userId, offer, qrCodeId: qrCodeId.slice(0, 20) });
       return jsonResponse({ received: true, granted: true, jaVitalicio: true });
     }
     if (g.r === "ja_creditado" || g.r === "em_andamento") {

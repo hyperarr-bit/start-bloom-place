@@ -149,6 +149,19 @@ const SoNaWeb = ({ children }: { children: ReactNode }) =>
  * /preview que não seja pro próprio funil (/app) volta pra continuação do
  * funil, e a flag morre no primeiro pouso legítimo.
  */
+/** 29/10: dentro do iframe da landing (/organizar), o app nunca sai da demo — ver src/landing/guarda-demo.ts. */
+function GuardaDemoDaLanding() {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    try {
+      const volta = voltaDaDemoDaLanding(pathname, caminhoDeCima());
+      if (volta) navigate(`${volta}?m=financas`, { replace: true });
+    } catch { /* cerca nunca derruba navegação */ }
+  }, [pathname, navigate]);
+  return null;
+}
+
 function GuardaDemoShell() {
   const { pathname, search } = useLocation();
   const navigate = useNavigate();
@@ -384,6 +397,7 @@ const DevHomeNova = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevHome
 // MOCKUP do registro rápido (26/10): dev E QA (VITE_PORTA_QA) — o vídeo do fluxo é no Simulador
 const DevRegistroRapido = import.meta.env.DEV || import.meta.env.VITE_PORTA_QA === "1" ? lazy(() => import("./pages/dev/DevRegistroRapido")) : null;
 import NotFound from "./pages/NotFound";
+import { caminhoDeCima, voltaDaDemoDaLanding } from "@/landing/guarda-demo";
 
 // Code-splitting: rotas pesadas (módulos do app, checkout, admin) saem do
 // bundle inicial e carregam sob demanda — a LP/anônimo carrega leve.
@@ -932,6 +946,7 @@ const App = () => {
                 <ScrollToTop />
                 <DeepLinks />
                 <GuardaDemoShell />
+                <GuardaDemoDaLanding />
                 <TelemetriaWebView />
                 <MedicaoDeTelas />
                 <GracePeriodBanner />

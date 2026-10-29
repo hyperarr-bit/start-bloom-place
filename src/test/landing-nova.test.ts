@@ -202,6 +202,8 @@ describe("o Pix na página (simulado, fora do domínio de produção)", () => {
   beforeEach(async () => {
     vi.resetModules();
     localStorage.clear();
+    // 29/10: o "já comprou" e o id do aparelho também moram em cookie (src/landing/marcador.ts) — cada teste é um aparelho novo
+    for (const c of document.cookie.split(";")) { const n = c.split("=")[0].trim(); if (n) document.cookie = `${n}=; Max-Age=0; Path=/`; }
     document.documentElement.setAttribute("data-t", "a");
     document.documentElement.setAttribute("data-oferta", "ano");
     document.body.innerHTML = corpo;

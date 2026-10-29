@@ -7,8 +7,10 @@ import { PRECO_2027_CENTAVOS, confirmarPacote2027, eh2027 } from "../_shared/pac
 import { valorCobre } from "../_shared/trava-grant.ts";
 import { nomeDoProduto } from "../_shared/email-venda.ts";
 import { CONCESSAO_HOJE, PRECOS_HOJE, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
-import { encaminharParaDestino } from "../_shared/destino-hoje.ts";
+import { encaminharParaDestino, lerDestino } from "../_shared/destino-hoje.ts";
 import { fetchNosPixels } from "../_shared/meta-pixels.ts";
+import { ehOfertaLanding } from "../_shared/ofertas-landing.ts";
+import { nomeDoPagadorAsaas, varrerPagosSemEmail } from "../_shared/landing-travas.ts";
 import {
   CHAVE_KIT_CONTA, PRECOS_PLANO30, PRECOS_PRESENTE, chaveCapiPlano30, chaveCapiPresente, ehOfertaPlano30, ehOfertaPresente, garantirPresente, liberarKitDoBump, liberarPlano30,
   mandarLinkPorEmail, reservar,
@@ -514,6 +516,7 @@ serve(async (req) => {
         const linhaNova = CONCESSAO_HOJE[o.offer]?.linhaNova === true;
         const g = await creditarPedido(admin, {
           userId: uid, orderId: o.orderId, gateway: gw, concessao: { dias }, agora: inicio, linhaNova,
+          protegerVitalicio: ehOfertaLanding(o.offer), offer: o.offer, // 29/10: 2º vitalício da landing vira chamado
           montarPayload: (fimDecidido) => (linhaNova ? { ...payload, current_period_end: fimDecidido } : payload),
         });
         // 21/10 (segurança): o kit do order bump (h279k/h149k) nasce no servidor — idempotente
@@ -658,7 +661,23 @@ serve(async (req) => {
     }
 
     logStep("Fim", { janelaHoras: hours, usuarios: porUser.size, sondadas, adiantadosFora, ofertasDesconhecidas, creditados: creditados.length, presentes: presentes.length, planos30: planos30.length, falhas: falhas.length });
-    return jsonResponse({ ok: true, dryRun, janelaHoras: hours, sondadas, adiantadosFora, ofertasDesconhecidas, creditados, presentes, planos30, falhas });
+    /* 29/10 (landing /organizar): Pix da landing PAGO e a conta ainda sem e-mail 10 min depois → chamado "Pix pago sem
+     * e-mail · R$ X · horário · nome do pagador" no /admin → Suporte (1x por pedido; o nome vem do que o asaas-webhook
+     * guardou, ou da Asaas agora). Nada de nome/e-mail no log. */
+    let alertasSemEmail = 0;
+    if (!dryRun) {
+      try {
+        alertasSemEmail = await varrerPagosSemEmail(admin, {
+          pedidos: (qrs ?? []) as never,
+          emailDaConta: async (uid) => { const { data } = await admin.auth.admin.getUserById(uid); return data?.user?.email ?? null; },
+          temDestino: async (uid) => !!(await lerDestino(admin as never, uid).catch(() => null)),
+          nomeNaAsaas: (oid) => (asaasKey ? nomeDoPagadorAsaas(fetch as never, asaasKey, { qrCodeId: oid }) : Promise.resolve(null)),
+        });
+        if (alertasSemEmail) logStep("Landing: chamados de Pix pago sem e-mail abertos", { n: alertasSemEmail });
+      } catch (e) { logStep("Landing: varredura de pago sem e-mail falhou", { e: String(e).slice(0, 120) }); }
+    }
+
+    return jsonResponse({ ok: true, dryRun, janelaHoras: hours, sondadas, adiantadosFora, ofertasDesconhecidas, creditados, presentes, planos30, falhas, alertasSemEmail });
   } catch (e) {
     logStep("ERRO", { e: String(e).slice(0, 200) });
     return jsonResponse({ error: String(e).slice(0, 200) }, 500);

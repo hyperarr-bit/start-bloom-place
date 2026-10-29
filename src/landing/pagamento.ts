@@ -21,13 +21,17 @@ import { cookiesDaMeta } from "@/pages/venda/rastreio";
 import { abrirSessaoParaPagar, emailAtual, gravarAtribuicao, pedirBoasVindas, salvarEmailDaCompra, sessaoViva, trazerCompraParaConta } from "@/pages/hoje/conta";
 import type { OfertaLanding, PixLanding } from "./regras";
 
-export async function gerarPix(oferta: OfertaLanding, sourceUrl: string): Promise<PixLanding | { erro: string; onde: string }> {
+/** 29/10: o servidor recusou o Pix porque esta pessoa JÁ tem o CORE pra sempre (a página mostra "Você já tem o CORE"). */
+export type JaTem = { jaTem: true; via: string };
+
+export async function gerarPix(oferta: OfertaLanding, sourceUrl: string, emailConhecido: string | null = null): Promise<PixLanding | JaTem | { erro: string; onde: string }> {
   const s = await abrirSessaoParaPagar();
   if (s === "indisponivel") return { erro: "Não consegui abrir o pagamento agora. Tenta de novo em alguns segundos.", onde: "sessao" };
   const c = cookiesDaMeta();
   const { data, error } = await supabase.functions.invoke("asaas-pix", {
-    body: { action: "create", offer: oferta, fbp: c.fbp, fbc: c.fbc, sourceUrl: sourceUrl.slice(0, 300) },
+    body: { action: "create", offer: oferta, fbp: c.fbp, fbc: c.fbc, sourceUrl: sourceUrl.slice(0, 300), ...(emailConhecido ? { email: emailConhecido } : {}) },
   });
+  if ((data as { ja_tem?: boolean } | null)?.ja_tem) return { jaTem: true, via: String((data as { via?: string }).via ?? "servidor") };
   const d = data as { orderId?: string; qrCode?: string; qrCodeBase64?: string | null; expiresAt?: string | null } | null;
   if (error || !d?.orderId || !d?.qrCode) {
     return { erro: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.", onde: String(error?.message || (data as { error?: string } | null)?.error || "sem_qr").slice(0, 160) };
@@ -52,7 +56,7 @@ export async function conferirPix(pix: PixLanding, sourceUrl: string): Promise<b
 }
 
 /** O e-mail OPCIONAL da tela do QR. "conta" = gravado na própria compra; "destino" = e-mail que já tinha conta. */
-export async function salvarEmailDoPix(pix: PixLanding, email: string): Promise<{ via: "conta" | "destino" } | { erro: string }> {
+export async function salvarEmailDoPix(pix: PixLanding, email: string): Promise<{ via: "conta" | "destino" } | JaTem | { erro: string }> {
   const limpo = email.trim().toLowerCase();
   try {
     const r = await salvarEmailDaCompra(limpo);
@@ -61,6 +65,7 @@ export async function salvarEmailDoPix(pix: PixLanding, email: string): Promise<
       await sessaoViva();
       const { data } = await supabase.functions.invoke("asaas-pix", { body: { action: "email_pedido", id: pix.orderId, email: limpo } });
       if ((data as { ok?: boolean } | null)?.ok) return { via: "destino" };
+      if ((data as { ja_tem?: boolean } | null)?.ja_tem) return { jaTem: true, via: "email_pix" };
       return { erro: "Não consegui salvar agora. Pode seguir — o e-mail também pode ir depois do pagamento." };
     }
     return { erro: r.erro };

@@ -14,8 +14,8 @@ import { TotalPorCartao } from "@/components/finance/TotalPorCartao";
 import { useFinanceCards } from "@/lib/finance-cards";
 import { useFinanceCategories } from "@/lib/finance-categories";
 import {
-  type Parcela, carimbar, carimbarLista, marcarParcelaDoMes, parcelaDoMes, parcelaPagaNoMes, parcelaQuitada,
-  somaParcelasDoMes,
+  type Parcela, carimbar, carimbarLista, marcarParcelaDoMes, nomeDoMes, parcelaDoMes, parcelaPagaNoMes, parcelaQuitada,
+  somaParcelasDoMes, somarMeses,
 } from "@/lib/finance-parcelas";
 import { mesCorrenteId } from "@/lib/virada-contas";
 
@@ -137,6 +137,22 @@ export const InstallmentTracker = ({
     setNewItem({ description: "", totalValue: "", totalInstallments: "", paidInstallments: "", cardName: "", category: "", date: "" });
     setShowForm(false);
   };
+
+  /* A prévia do cadastro (1.0.22): "Este mês: parcela 3 de 5 · faltam 3, a última em dez" — a mesma conta que a lista e a
+     virada usam (parcela do mês = pagas + 1; uma por mês até a última). */
+  const previaNova = (() => {
+    const total = Number(newItem.totalInstallments);
+    if (!Number.isInteger(total) || total < 1 || total > 99) return null;
+    const p = parseInt(newItem.paidInstallments, 10);
+    const pagas = Math.max(0, Math.min(Number.isInteger(p) ? p : 0, total));
+    if (pagas >= total) return "Todas já pagas — entra como quitado.";
+    const faltam = total - pagas;
+    const valor = numeroBR(newItem.totalValue);
+    const daParcela = Number.isFinite(valor) && valor > 0 ? ` (R$ ${brl(valor / total)})` : "";
+    const ultima = nomeDoMes(somarMeses(mesDaChave, faltam - 1), true);
+    const quando = mes && mes !== mesCorrenteId() ? `Em ${nomeDoMes(mes)}` : "Este mês";
+    return `${quando}: parcela ${pagas + 1} de ${total}${daParcela} · ${faltam === 1 ? "é a última" : `faltam ${faltam}, a última em ${ultima}`}`;
+  })();
 
   // Desfazer (26/09): um toque apagava o parcelamento inteiro, sem volta.
   const deleteInstallment = (id: string) => {
@@ -341,7 +357,7 @@ export const InstallmentTracker = ({
                       )}
                       {/* só no celular: o que as colunas escondidas diziam */}
                       <span className={`sm:hidden block text-[10px] font-normal ${isDone ? "text-green-500" : "text-muted-foreground"}`}>
-                        {`${isDone ? "quitado" : `${k} de ${inst.totalInstallments}`} · ${getCardLabel(inst.cardName)}`}
+                        {`${isDone ? "quitado" : `parcela ${k} de ${inst.totalInstallments}`} · ${getCardLabel(inst.cardName)}`}
                       </span>
                     </td>
                     <td className="hidden sm:table-cell px-3 py-2 text-center">
@@ -416,13 +432,30 @@ export const InstallmentTracker = ({
                 <Input placeholder="Nome do item" value={newItem.description} onChange={(e) => setNewItem({ ...newItem, description: e.target.value })} className="text-xs" />
                 <Input type="number" placeholder="Valor total" value={newItem.totalValue} onChange={(e) => setNewItem({ ...newItem, totalValue: e.target.value })} className="text-xs" />
               </div>
+              {/* "JÁ PAGUEI" COM NOME (1.0.22, 28/10). Chamado de 24/10: "já estou na 2/5 parcela do meu cartão, porém no
+                  app quando cadastra, ele gera automaticamente como se ainda tivesse 5 parcelas"; avaliação 3★: "a parte
+                  de inclusão de compras parceladas no cartão de crédito é muito confusa". O campo JÁ EXISTIA
+                  (`paidInstallments`, o mesmo que a edição chama de "Já paguei"), mas era uma caixa com o placeholder
+                  "Pagas" que some ao digitar — ninguém achava. Agora tem rótulo fixo, padrão 0, e a prévia diz qual
+                  parcela é a deste mês e até quando vai. Nenhum campo novo no formato salvo: o app antigo já lê
+                  `paidInstallments` (parcela do mês = pagas + 1, lib/finance-parcelas). */}
               <div className="grid grid-cols-3 gap-2">
-                <Input type="number" placeholder="Total parcelas" value={newItem.totalInstallments} onChange={(e) => setNewItem({ ...newItem, totalInstallments: e.target.value })} className="text-xs" />
-                <Input type="number" placeholder="Pagas" value={newItem.paidInstallments} onChange={(e) => setNewItem({ ...newItem, paidInstallments: e.target.value })} className="text-xs" />
-                <div className="relative">
-                  <Input type="date" value={newItem.date} onChange={(e) => setNewItem({ ...newItem, date: e.target.value })} className="text-xs" />
-                </div>
+                <label className="text-[10px] text-muted-foreground min-w-0">
+                  Total de parcelas
+                  <Input type="number" inputMode="numeric" placeholder="Ex.: 5" value={newItem.totalInstallments} onChange={(e) => setNewItem({ ...newItem, totalInstallments: e.target.value })} className="text-xs mt-0.5" />
+                </label>
+                <label className="text-[10px] text-muted-foreground min-w-0">
+                  Já paguei
+                  <Input type="number" inputMode="numeric" min={0} placeholder="0" value={newItem.paidInstallments} onChange={(e) => setNewItem({ ...newItem, paidInstallments: e.target.value })} className="text-xs mt-0.5" />
+                </label>
+                <label className="text-[10px] text-muted-foreground min-w-0">
+                  Data
+                  <Input type="date" value={newItem.date} onChange={(e) => setNewItem({ ...newItem, date: e.target.value })} className="text-xs mt-0.5" />
+                </label>
               </div>
+              {previaNova && (
+                <p className="text-[11px] leading-snug text-muted-foreground" data-testid="previa-parcelamento">{previaNova}</p>
+              )}
               {/* Mesmos seletores do resto do financeiro: o cartão aceita os
                   personalizados (Renner, Will…) e a categoria é a lista comum,
                   com as que o usuário criou. */}

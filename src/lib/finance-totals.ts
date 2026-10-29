@@ -127,3 +127,18 @@ export const computeDailyBudget = (
   const perDay = availableReal / remainingDays;
   return { availableReal, perDay, remainingDays, unpaidBillsEstimate, currentBalance, cantSpend: availableReal <= 0 };
 };
+
+/** 1.0.22 (28/10): a COR do "quanto posso gastar hoje" (verde/laranja/vermelho), tirada de dentro do Dashboard pra
+ *  a versão compacta do topo do MEU FINANCEIRO (components/finance/PodeGastarCompacto) pintar igual. A conta é a de
+ *  sempre: "bom" quando o por-dia passa de 80% do ideal (renda − fixos ÷ dias do mês). Não muda número nenhum. */
+export const statusDoPodeGastar = (
+  base: { cantSpend: boolean; perDay: number },
+  totalIncome: number,
+  fixedExpenses: any[],
+  now: Date = new Date(),
+): "good" | "warning" | "danger" => {
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const fixedCostsRecorded = (fixedExpenses ?? []).reduce((s: number, e: any) => s + (e?.value || 0), 0);
+  const idealPerDay = totalIncome > 0 ? (totalIncome - fixedCostsRecorded) / daysInMonth : 0;
+  return base.cantSpend ? "danger" : base.perDay > idealPerDay * 0.8 ? "good" : "warning";
+};

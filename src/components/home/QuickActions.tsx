@@ -4,6 +4,7 @@ import { localDayKey } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Droplets, DollarSign, Banknote, Scale, Lightbulb, ListTodo, Heart, SmilePlus, X, Check, Dumbbell, Moon, Utensils, Shield } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
+import { humorDoDia } from "@/lib/humor-do-dia";
 import { CHAVE_COPO_ML, COPO_ML_PADRAO, normalizarCopoMl, rotuloAcaoAgua } from "@/lib/saude-copo";
 import { CHAVE_MACROS, type MacrosPlano, formatarMacros, temMacros } from "@/lib/dieta-macros";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
@@ -472,21 +473,31 @@ export const QuickActions = ({ apenasFormularios = false, onAtivaChange, onFeito
               )}
 
               {/* Mood selector */}
-              {activeAction === "mood" && (
-                <div className="flex justify-between px-2">
-                  {moods.map(m => (
-                    <motion.button
-                      key={m.value}
-                      onClick={() => submitMood(m.value, m.emoji)}
-                      className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-muted/50 transition-colors"
-                      whileTap={{ scale: 1.3 }}
-                    >
-                      <span className="text-2xl">{m.emoji}</span>
-                      <span className="text-[9px] text-muted-foreground font-medium">{m.label}</span>
-                    </motion.button>
-                  ))}
-                </div>
-              )}
+              {/* 1.0.22: o humor de HOJE (de qualquer um dos 3 lugares — lib/humor-do-dia) vem marcado; trocar grava nos 3 */}
+              {activeAction === "mood" && (() => {
+                const humorHoje = humorDoDia(get, localDayKey())?.valor ?? null;
+                return (
+                  <div>
+                    <div className="flex justify-between px-2">
+                      {moods.map(m => (
+                        <motion.button
+                          key={m.value}
+                          onClick={() => submitMood(m.value, m.emoji)}
+                          aria-pressed={humorHoje === m.value}
+                          className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-colors ${humorHoje === m.value ? "bg-primary/10 ring-2 ring-primary" : "hover:bg-muted/50"}`}
+                          whileTap={{ scale: 1.3 }}
+                        >
+                          <span className="text-2xl">{m.emoji}</span>
+                          <span className="text-[9px] text-muted-foreground font-medium">{m.label}</span>
+                        </motion.button>
+                      ))}
+                    </div>
+                    {humorHoje !== null && (
+                      <p className="text-[10px] text-center text-muted-foreground mt-1.5" data-testid="humor-hoje-home">Hoje já está anotado — aparece na Rotina e no Dev. Pessoal</p>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Sleep form */}
               {activeAction === "sleep" && (

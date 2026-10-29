@@ -7,6 +7,7 @@ import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { semanaAtualId, localDayKey, dataSegura } from "@/lib/utils";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useHumorDoDia } from "@/hooks/use-humor-do-dia";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { SerieHistorico } from "@/components/historico/SerieHistorico";
@@ -205,28 +206,30 @@ const useFasesEmUso = () => {
    continua lendo só o `mood` e não muda nada. */
 const EMOCOES = ["Calmo", "Ansioso", "Grato", "Cansado", "Animado", "Triste", "Irritado", "Focado", "Estressado", "Feliz", "Entediado", "Esperançoso"];
 
-const MoodTracker = () => {
-  const [moodLog, setMoodLog] = usePersistedState<Record<string, { mood: number; note: string; emocoes?: string[] }>>("mood-log", {});
+/* 1.0.22 (28/10): O HUMOR DO DIA É UM SÓ (lib/humor-do-dia). Este card lê o humor de hoje das 3 chaves (`mood-log`
+   desta tela, `core-mood-log` do "+" da Home, `dp-mood-log` do Dev. Pessoal) e grava nas 3 — o humor registrado
+   pelo "+" da Home aparece aqui, já marcado, e no histórico. A nota e as emoções continuam só no `mood-log`. */
+export const MoodTracker = () => {
   const today = getDateKey();
+  const { hoje: humorHoje, historico, registrar, mapaRotina: moodLog, setMapaRotina: setMoodLog } = useHumorDoDia(today);
   const todayMood = moodLog[today];
+  const valorHoje = humorHoje?.valor ?? null;
   const [note, setNote] = useState(todayMood?.note || "");
   const emocoesHoje = Array.isArray(todayMood?.emocoes) ? todayMood!.emocoes! : [];
 
-  const logMood = (value: number) => {
-    setMoodLog(prev => ({ ...prev, [today]: { ...prev[today], mood: value, note: prev[today]?.note || "" } }));
-  };
+  const logMood = (value: number) => registrar(value);
 
   const toggleEmocao = (e: string) => {
     setMoodLog(prev => {
       const atual = Array.isArray(prev[today]?.emocoes) ? prev[today]!.emocoes! : [];
       const emocoes = atual.includes(e) ? atual.filter(x => x !== e) : [...atual, e];
-      return { ...prev, [today]: { ...prev[today], mood: prev[today]?.mood ?? 0, note: prev[today]?.note || "", emocoes } };
+      return { ...prev, [today]: { ...prev[today], mood: prev[today]?.mood || valorHoje || 0, note: prev[today]?.note || "", emocoes } };
     });
   };
 
   const saveNote = () => {
-    if (todayMood) {
-      setMoodLog(prev => ({ ...prev, [today]: { ...prev[today], note } }));
+    if (valorHoje) {
+      setMoodLog(prev => ({ ...prev, [today]: { ...prev[today], mood: prev[today]?.mood || valorHoje, note } }));
     }
   };
 
@@ -242,14 +245,8 @@ const MoodTracker = () => {
    * continua sendo { mood, note } por dia; a série lê o `mood` e ignora o
    * resto. Sem `mood` (dia só com nota) o valor é 0 e o SerieHistorico já
    * trata 0 como "dia sem registro". */
-  const serieHumor = useMemo(() => {
-    const fora: Record<string, number> = {};
-    for (const [dia, reg] of Object.entries(moodLog)) {
-      const v = Number(reg?.mood);
-      if (Number.isFinite(v) && v > 0) fora[dia] = v;
-    }
-    return fora;
-  }, [moodLog]);
+  // 1.0.22: a série lê o histórico UNIFICADO (os dias do "+" da Home e do Dev. Pessoal entram) — lib/humor-do-dia
+  const serieHumor = historico;
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
@@ -263,7 +260,8 @@ const MoodTracker = () => {
             <button
               key={m.value}
               onClick={() => logMood(m.value)}
-              className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-all ${todayMood?.mood === m.value ? "bg-primary/10 ring-2 ring-primary scale-110" : "hover:bg-muted"}`}
+              aria-pressed={valorHoje === m.value}
+              className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-all ${valorHoje === m.value ? "bg-primary/10 ring-2 ring-primary scale-110" : "hover:bg-muted"}`}
             >
               <span className="text-2xl">{m.emoji}</span>
               <span className="text-[10px] text-muted-foreground">{m.label}</span>
@@ -271,7 +269,7 @@ const MoodTracker = () => {
           ))}
         </div>
 
-        {todayMood && (
+        {valorHoje !== null && (
           <div className="flex flex-wrap gap-1.5" data-testid="emocoes-do-dia">
             {EMOCOES.map(e => {
               const on = emocoesHoje.includes(e);
@@ -290,7 +288,7 @@ const MoodTracker = () => {
           </div>
         )}
 
-        {todayMood && (
+        {valorHoje !== null && (
           <div className="flex gap-2">
             <Input
               placeholder="O que aconteceu hoje? (opcional)"

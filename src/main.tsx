@@ -6,6 +6,7 @@ import { trackEvent, captureLandingMeta, iniciarMedicaoDoAparelho } from "@/lib/
 import { initPwaInstall } from "@/lib/pwa-install";
 import { isNativeShell } from "@/lib/native-shell";
 import { instalarTrocaDeRotaSemBranco } from "@/lib/troca-de-rota";
+import { instalarTopoComTeclado } from "@/lib/topo-com-teclado";
 import { instalarResizeObserverSePreciso } from "@/lib/resize-observer-fallback";
 import { instalarArrastarComMouse } from "@/lib/arrastar-com-mouse";
 import { ehErroDeChunk, recarregarPorChunkNovo } from "@/lib/chunk-novo";
@@ -29,6 +30,9 @@ import { precisaRestaurar, restaurarDaCopia } from "@/missao/seguranca";
 if (isNativeShell()) document.documentElement.classList.add("core-shell");
 // 1.0.17 QA: troca de rota sem quadro em branco (foto da tela de antes por cima, cross-fade de 200 ms) — só no app
 if (isNativeShell()) instalarTrocaDeRotaSemBranco();
+// 1.0.22 (dono 29/10): com campo focado o iPhone desloca a área visível e o topo fixo (cabeçalho do módulo, faixa do
+// relógio) subia pra baixo do relógio — o deslocamento vira --vv-topo e o CSS compensa (lib/topo-com-teclado)
+instalarTopoComTeclado();
 
 // 10/10 (1.0.14): device_id, turma e versão em TODO evento + app_primeira_abertura
 // (1× por aparelho, só no app das lojas). Antes do React: os primeiros eventos

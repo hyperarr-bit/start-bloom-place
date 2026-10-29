@@ -1,4 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
+import { toast } from "sonner";
+import {
+  concluirPomodoro, estadoDoPomodoro, iniciarPomodoro, irParaModo, ouvirPomodoro, pausarPomodoro, recomecarPomodoro, tempoRestante,
+} from "@/lib/pomodoro-agora";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Brain, Play, Pause, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,17 +43,21 @@ export const somarFocoDoDia = (log: unknown, dia: string, minutos: number): Reco
   return out;
 };
 
-/** Timer compartilhado. Nasceu na aba FOCO da Rotina e agora também serve a
- *  aba MEU DIA da Carreira — as chaves persistidas são as mesmas de sempre,
- *  então quem já usava não perde as sessões nem o histórico. */
-export const PomodoroTimer = () => {
+/**
+ * O TIMER ÚNICO (1.0.22, sem repetição): o estado mora em lib/pomodoro-agora (um só por aparelho) e TODA tela com
+ * pomodoro usa este hook — Rotina › Foco, Carreira › Meu dia e o widget da Home mostram o mesmo relógio. Quem vê o
+ * período acabar primeiro grava as chaves de sempre (`pomodoro-*`, mesmo formato) uma vez só.
+ */
+export function usePomodoro() {
   const [salvos, setSalvos] = usePersistedState<Minutos>("pomodoro-duracoes", PADRAO);
   const minutos = minutosValidos(salvos);
   const durations: Minutos = { focus: minutos.focus * 60, break: minutos.break * 60, longBreak: minutos.longBreak * 60 };
+  const estado = useSyncExternalStore(ouvirPomodoro, estadoDoPomodoro, estadoDoPomodoro);
+  const mode = estado.modo;
+  const isRunning = estado.rodando;
+  const [agora, setAgora] = useState(() => Date.now());
+  const timeLeft = tempoRestante(estado, durations[mode], agora);
 
-  const [mode, setMode] = useState<Modo>("focus");
-  const [timeLeft, setTimeLeft] = useState(durations.focus);
-  const [isRunning, setIsRunning] = useState(false);
   const [sessions, setSessions] = usePersistedState<number>("pomodoro-sessions-today", 0);
   // "sessões HOJE" nunca zerava (26/09): a chave guardava só o número e somava
   // pra sempre. Agora anda junto do dia em que foi contada.
@@ -59,71 +67,54 @@ export const PomodoroTimer = () => {
   // Foco por DIA (27/09): `pomodoro-log` { "AAAA-MM-DD": minutos } — é o que
   // deixa a insígnia "Horas de foco no mês" existir; o acumulado de sempre
   // (`pomodoro-total-focus`) continua sendo gravado do mesmo jeito.
-  const [focoPorDia, setFocoPorDia] = usePersistedState<Record<string, number>>("pomodoro-log", {});
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  // Fim da contagem no RELÓGIO DE PAREDE (20/08, review ★4: "o Pomodoro
-  // pausa quando a tela é bloqueada"). Com a tela travada o WebView congela
-  // os setInterval — contar por tick fazia o timer parar junto. O restante
-  // agora deriva SEMPRE de fimEm - agora; o tick só re-renderiza, e ao
-  // voltar do bloqueio o visibilitychange recalcula e o timer "alcança" o
-  // tempo real (inclusive completando a sessão se o prazo venceu no escuro).
-  const fimEm = useRef(0);
+  const [, setFocoPorDia] = usePersistedState<Record<string, number>>("pomodoro-log", {});
 
-  // Tempo trocado (ou carregado do servidor depois do 1º desenho): com o timer
-  // parado e cheio, o mostrador acompanha. Pausado no meio, não mexe.
-  const cheioAntes = useRef(durations[mode]);
+  // Fim da contagem no RELÓGIO DE PAREDE (20/08, review ★4: "o Pomodoro pausa quando a tela é bloqueada"): o
+  // restante deriva SEMPRE de fimEm - agora; o tick só re-renderiza, e ao voltar do bloqueio o visibilitychange
+  // recalcula e o timer "alcança" o tempo real (inclusive completando a sessão se o prazo venceu no escuro).
   useEffect(() => {
-    const cheio = durations[mode];
-    if (!isRunning && timeLeft === cheioAntes.current && cheio !== timeLeft) setTimeLeft(cheio);
-    cheioAntes.current = cheio;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [durations.focus, durations.break, durations.longBreak, mode]);
+    if (!isRunning) return;
+    const tick = () => setAgora(Date.now());
+    tick();
+    const id = window.setInterval(tick, 1000);
+    const aoVoltar = () => { if (document.visibilityState === "visible") tick(); };
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => { window.clearInterval(id); document.removeEventListener("visibilitychange", aoVoltar); };
+  }, [isRunning, estado.fimEm]);
 
   useEffect(() => {
-    if (!isRunning) fimEm.current = 0; // pausa/troca: a retomada re-ancora
-    if (isRunning && timeLeft > 0) {
-      if (!fimEm.current) fimEm.current = Date.now() + timeLeft * 1000;
-      const tick = () => setTimeLeft(Math.max(0, Math.round((fimEm.current - Date.now()) / 1000)));
-      intervalRef.current = setInterval(tick, 1000);
-      const aoVoltar = () => { if (document.visibilityState === "visible") tick(); };
-      document.addEventListener("visibilitychange", aoVoltar);
-      return () => {
-        if (intervalRef.current) clearInterval(intervalRef.current);
-        document.removeEventListener("visibilitychange", aoVoltar);
-      };
-    } else if (timeLeft === 0) {
-      fimEm.current = 0;
-      setIsRunning(false);
-      if (mode === "focus") {
-        const hoje = diaLocal();
-        const feitasHoje = diaSessoes === hoje ? sessions + 1 : 1;
-        setSessions(feitasHoje);
-        setDiaSessoes(hoje);
-        setTotalFocusMin(t => t + minutos.focus);
-        setFocoPorDia(l => somarFocoDoDia(l, hoje, minutos.focus));
-        // Auto switch to break
-        const nextMode = feitasHoje % 4 === 0 ? "longBreak" : "break";
-        setMode(nextMode);
-        setTimeLeft(durations[nextMode]);
-      } else {
-        setMode("focus");
-        setTimeLeft(durations.focus);
-      }
+    if (!isRunning || timeLeft > 0) return;
+    const terminou = concluirPomodoro(estado.fimEm, Math.max(Date.now(), agora));
+    if (!terminou) return; // outra tela já levou esta sessão
+    if (terminou === "focus") {
+      const hoje = diaLocal();
+      const feitasHoje = diaSessoes === hoje ? sessions + 1 : 1;
+      setSessions(feitasHoje);
+      setDiaSessoes(hoje);
+      setTotalFocusMin(t => t + minutos.focus);
+      setFocoPorDia(l => somarFocoDoDia(l, hoje, minutos.focus));
+      toast.success(`Foco de ${minutos.focus} min concluído`);
+      // Auto switch to break
+      irParaModo(feitasHoje % 4 === 0 ? "longBreak" : "break");
+    } else {
+      irParaModo("focus");
     }
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [isRunning, timeLeft]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRunning, timeLeft, estado.fimEm]);
 
-  const switchMode = (m: Modo) => {
-    setIsRunning(false);
-    setMode(m);
-    setTimeLeft(durations[m]);
+  return {
+    minutos, durations, mode, isRunning, timeLeft, sessoesHoje, totalFocusMin,
+    alternar: () => (isRunning ? pausarPomodoro() : iniciarPomodoro(timeLeft)),
+    recomecar: () => recomecarPomodoro(),
+    switchMode: (m: Modo) => irParaModo(m),
+    escolherMinutos: (m: number) => { setSalvos({ ...minutos, [mode]: m }); recomecarPomodoro(); },
   };
+}
 
-  const escolherMinutos = (m: number) => {
-    setSalvos({ ...minutos, [mode]: m });
-    setIsRunning(false);
-    setTimeLeft(m * 60);
-  };
+/** Timer compartilhado (Rotina › Foco e Carreira › Meu dia) — o mesmo estado do widget da Home (usePomodoro). As
+ *  chaves persistidas são as mesmas de sempre, então quem já usava não perde as sessões nem o histórico. */
+export const PomodoroTimer = () => {
+  const { minutos, durations, mode, isRunning, timeLeft, sessoesHoje, totalFocusMin, alternar, recomecar, switchMode, escolherMinutos } = usePomodoro();
 
   const mins = Math.floor(timeLeft / 60);
   const secs = timeLeft % 60;
@@ -164,11 +155,11 @@ export const PomodoroTimer = () => {
         </div>
 
         <div className="flex gap-3">
-          <Button size="sm" onClick={() => setIsRunning(!isRunning)} className="gap-2">
+          <Button size="sm" onClick={alternar} className="gap-2">
             {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
             {isRunning ? "Pausar" : "Iniciar"}
           </Button>
-          <Button size="sm" variant="outline" onClick={() => { setIsRunning(false); setTimeLeft(durations[mode]); }} aria-label="Recomeçar">
+          <Button size="sm" variant="outline" onClick={recomecar} aria-label="Recomeçar">
             <RotateCcw className="w-4 h-4" />
           </Button>
         </div>

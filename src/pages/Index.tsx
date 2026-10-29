@@ -44,7 +44,7 @@ import { MonthlyBudget } from "@/components/MonthlyBudget";
 import { WishlistItems } from "@/components/WishlistItems";
 import { InvestmentsTracker } from "@/components/InvestmentsTracker";
 import { FinancialHealth } from "@/components/FinancialHealth";
-import { TravelBudget } from "@/components/travel/TravelBudget";
+import { AtalhoParaOutroModulo } from "@/components/sem-repeticao/AtalhoParaOutroModulo";
 import { PedirLembretes } from "@/components/finance/PedirLembretes";
 import { Dashboard } from "@/components/Dashboard";
 import { Simulators } from "@/components/Simulators";
@@ -98,7 +98,8 @@ interface PropsDoConteudo {
 
 /** 21/10 (plano de 30 dias por área, src/lib/plano-30-areas): `/financas?aba=<aba>` abre direto nessa aba — o mesmo
  *  `?aba=` que Rotina, Saúde e Treino já leem. Sem o parâmetro (ou com aba desconhecida), nada muda. */
-export const ABAS_DE_FINANCAS_NA_URL = ["dashboard", "financeiro", "investimentos", "itens", "viagem", "simuladores", "limites", "relatorios", "saude"] as const;
+// 28/10 (sem repetição): "viagem" fica no fim só pro link ANTIGO — abre o atalho "Abrir em Viagens" (a aba saiu da fileira)
+export const ABAS_DE_FINANCAS_NA_URL = ["dashboard", "financeiro", "investimentos", "itens", "simuladores", "limites", "relatorios", "saude", "viagem"] as const;
 const abaDaUrlDeFinancas = (): string | null => {
   try {
     const a = new URLSearchParams(window.location.search).get("aba");
@@ -476,7 +477,8 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
     { id: "financeiro", label: "MEU FINANCEIRO", icon: "💰", spotlight: "financeiro" },
     { id: "investimentos", label: "INVESTIMENTOS", icon: "📈" },
     { id: "itens", label: "DESEJOS", icon: "❤️" },
-    { id: "viagem", label: "VIAGEM", icon: "✈️" },
+    // SEM REPETIÇÃO (28/10): a aba ✈️ VIAGEM era o MESMO componente/chave (`travel-trips-v2`) de Viagens › Budget e
+    // tinha 0,4% de uso real — saiu da fileira. Quem chega nela (`?aba=viagem`, aba que estava aberta) vê o atalho.
     { id: "simuladores", label: "SIMULADORES", icon: "🧮" },
     { id: "limites", label: "LIMITES", icon: "🎯" },
     { id: "relatorios", label: "RELATÓRIOS", icon: "📋" },
@@ -910,9 +912,13 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
         )}
 
         {activeTab === "viagem" && (
-          <TrackedCard cardKey="travel-budget" tab="viagem">
-            <TravelBudget />
-          </TrackedCard>
+          <AtalhoParaOutroModulo
+            emoji="✈️"
+            titulo="O orçamento de viagem mora em Viagens"
+            texto="É o mesmo orçamento de antes, com as mesmas viagens e gastos — só ficou num lugar só: Viagens › Budget."
+            rotulo="Abrir em Viagens"
+            para="/viagens?aba=budget"
+          />
         )}
 
         {activeTab === "simuladores" && (

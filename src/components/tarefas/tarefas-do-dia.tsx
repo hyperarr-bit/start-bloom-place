@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AlarmClock, ArrowDown, ArrowUp, Bell, BellOff, CalendarClock, CalendarDays, Check, ChevronRight, Flag, ListChecks, NotebookText, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -34,7 +35,11 @@ import {
   AVISO_PADRAO_TAREFA, AVISOS_TAREFA, apareceHoje, avisoDaTarefa, avisoJaPassou, dataDeCriacao, detalhesDaTarefa, diaDoAviso, ehPrioridade, estadoDoPrazo,
   diaSeguinte, horaDaTarefa, horaDoAviso, montarSubtarefas, moverTarefaNoDia, normalizarHora, ordenarPorHora, posicaoNoDia, prazoDaTarefa, progressoDasSubtarefas,
   resumoDosDetalhes, rotuloCurtoDoDia, rotuloDoDia, subtarefasDaTarefa, tarefasFuturas, textoDoAviso, type EstadoDoPrazo, type Subtarefa, type TarefaDoDia,
+  CHAVE_TAREFAS_CARREIRA, CHAVE_TAREFAS_ROTINA,
 } from "@/lib/tarefas";
+import {
+  CHAVE_TAREFAS_ESTUDOS, ROTULO_ORIGEM_CARREIRA, ROTULO_ORIGEM_ESTUDOS, alternarTarefaDosEstudos, tarefasDeHojeDosEstudos,
+} from "@/lib/tarefas-de-outros";
 import { LinhaDoFeriado } from "@/components/feriados/LinhaDoFeriado";
 import { COR_DO_DIA, DIAS_DA_SEMANA, Pautado, Quadradinho, textoDoDia } from "@/components/treino/planner";
 
@@ -885,10 +890,62 @@ export const TOM_CEU: TomDaTabela = { claro: "bg-sky-50", linha: "border-sky-100
  * BlocoDeFases também usa as mesmas tarefas nos fechamentos da semana e do mês
  * (dois hooks na mesma chave não se enxergam na hora).
  */
-export function ListaTarefasDeHoje({ tarefas, placeholder = "Nova tarefa...", onde }: {
+export function ListaTarefasDeHoje(props: {
   tarefas: ReturnType<typeof useTarefasDoDia>;
   placeholder?: string;
   onde: string;
+}) {
+  // 1.0.22 (sem repetição): a lista da ROTINA junta as de hoje da Carreira e dos Estudos (com etiqueta e ✓ na origem)
+  return props.tarefas.chave === CHAVE_TAREFAS_ROTINA ? <ListaComOutrosModulos {...props} /> : <ListaDoDia {...props} extras={[]} />;
+}
+
+/** Uma linha de OUTRO módulo na lista do dia: a linha pronta + a ficha (o ✓ dela grava na chave de origem). */
+export type LinhaDeOutroModulo = LinhaVisivel & { ficha: Omit<FichaAberta, "texto" | "feito"> };
+
+/**
+ * As de HOJE da Carreira (`career-day-tasks`, etiqueta "Trabalho") e dos Estudos (`estudos-week-tasks`, "Estudos")
+ * como linhas da lista da Rotina. Lê as chaves de origem e escreve nelas; nada muda de lugar nem de formato.
+ */
+export function useLinhasDeOutrosModulos(prefixo = ""): LinhaDeOutroModulo[] {
+  const navigate = useNavigate();
+  const carreira = useTarefasDoDia(CHAVE_TAREFAS_CARREIRA);
+  const [estudos, setEstudos] = usePersistedState<unknown>(CHAVE_TAREFAS_ESTUDOS, {});
+  const hoje = localDayKey();
+  const linhas: LinhaDeOutroModulo[] = [];
+  carreira.lista.filter((t): t is TarefaDoDia => !!t && typeof t.texto === "string" && apareceHoje(t, hoje)).forEach((t) => {
+    linhas.push({
+      key: `${prefixo}cd-${t.id}`, origem: ROTULO_ORIGEM_CARREIRA, texto: t.texto, feito: !!t.feito,
+      detalhe: t.veioDe ? `veio de ${diaCurto(t.veioDe)}` : undefined,
+      hora: horaDaTarefa(t) ?? undefined, aviso: avisoDaTarefa(t), detalhes: detalhesDaTarefa(t),
+      prioridade: ehPrioridade(t), checklist: progressoDasSubtarefas(t), prazo: estadoDoPrazo(t, hoje),
+      onAlternar: () => carreira.alternar(t.id), onAbrir: () => {},
+      ficha: {
+        onde: ROTULO_ORIGEM_CARREIRA, tarefa: t, onAlternar: () => carreira.alternar(t.id), onSalvar: (c) => carreira.salvar(t.id, c),
+        onApagar: () => carreira.apagar(t.id), onAlternarSubtarefa: (subId) => carreira.alternarSubtarefa(t.id, subId),
+      },
+    });
+  });
+  tarefasDeHojeDosEstudos(estudos).forEach((t) => {
+    const alternar = () => setEstudos((prev) => alternarTarefaDosEstudos(prev, t.coluna, t.indice));
+    linhas.push({
+      key: `${prefixo}es-${t.coluna}-${t.indice}`, origem: ROTULO_ORIGEM_ESTUDOS, texto: t.texto, feito: t.feito,
+      onAlternar: alternar, onAbrir: () => {},
+      ficha: { onde: ROTULO_ORIGEM_ESTUDOS, onAlternar: alternar, abrirModulo: { rotulo: "Abrir em Estudos", ir: () => navigate("/estudos?aba=tarefas") } },
+    });
+  });
+  return linhas;
+}
+
+function ListaComOutrosModulos(props: { tarefas: ReturnType<typeof useTarefasDoDia>; placeholder?: string; onde: string }) {
+  const extras = useLinhasDeOutrosModulos();
+  return <ListaDoDia {...props} extras={extras} />;
+}
+
+function ListaDoDia({ tarefas, placeholder = "Nova tarefa...", onde, extras }: {
+  tarefas: ReturnType<typeof useTarefasDoDia>;
+  placeholder?: string;
+  onde: string;
+  extras: LinhaDeOutroModulo[];
 }) {
   const [novaTarefa, setNovaTarefa] = useState("");
   const [criando, setCriando] = useState(false);
@@ -896,7 +953,8 @@ export function ListaTarefasDeHoje({ tarefas, placeholder = "Nova tarefa...", on
   const hoje = localDayKey();
   // 09/10: as de hoje + as com PRAZO ainda pendentes (ficam na lista todo dia até serem feitas)
   const tarefasHoje = tarefas.lista.filter((t) => apareceHoje(t, hoje));
-  const feitasHoje = tarefasHoje.filter((t) => t.feito).length;
+  const feitasHoje = tarefasHoje.filter((t) => t.feito).length + extras.filter((l) => l.feito).length;
+  const totalHoje = tarefasHoje.length + extras.length;
   const addTarefa = () => {
     if (!novaTarefa.trim()) return;
     tarefas.adicionar({ texto: novaTarefa });
@@ -906,7 +964,8 @@ export function ListaTarefasDeHoje({ tarefas, placeholder = "Nova tarefa...", on
   const futuras = tarefasFuturas(tarefas.lista, hoje);
   const [verFuturas, setVerFuturas] = useState(false);
   const tarefaAberta = aberta ? (tarefasHoje.find((t) => t.id === aberta) ?? futuras.find((t) => t.id === aberta)) : undefined;
-  const ficha: FichaAberta | null = tarefaAberta ? {
+  const extraAberta = aberta ? extras.find((l) => l.key === aberta) : undefined;
+  const ficha: FichaAberta | null = extraAberta ? { texto: extraAberta.texto, feito: extraAberta.feito, ...extraAberta.ficha } : tarefaAberta ? {
     texto: tarefaAberta.texto, feito: !!tarefaAberta.feito, onde, tarefa: tarefaAberta,
     onAlternar: () => tarefas.alternar(tarefaAberta.id),
     onSalvar: (c) => tarefas.salvar(tarefaAberta.id, c),
@@ -926,30 +985,27 @@ export function ListaTarefasDeHoje({ tarefas, placeholder = "Nova tarefa...", on
       <div className="rounded-xl border border-border overflow-hidden" data-testid="tarefas-de-hoje">
         <div className="bg-sky-200 dark:bg-sky-800/50 px-4 py-2 flex items-center justify-between">
           <span className="text-[10px] font-bold uppercase tracking-wider">✅ TAREFAS DE HOJE</span>
-          <span className="text-[9px] text-muted-foreground">{feitasHoje}/{tarefasHoje.length}</span>
+          <span className="text-[9px] text-muted-foreground">{feitasHoje}/{totalHoje}</span>
         </div>
         {/* 28/10: hoje é feriado nacional — só informa (não é tarefa, não conta, não avisa) */}
         <LinhaDoFeriado dia={hoje} className="px-4 py-1.5 border-b border-sky-100 bg-card" />
         <div className="bg-card">
-          {tarefasHoje.length === 0 ? (
+          {totalHoje === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-3">Nenhuma tarefa hoje ainda.</p>
           ) : (
             <>
               <CabecalhoDaTabela tom={TOM_CEU} />
-              {[false, true].flatMap((feita) => ordenarPorHora(tarefasHoje.filter((t) => !!t.feito === feita).map((t) => ({ ...t, hora: horaDaTarefa(t) ?? undefined }))))
-                .map((t, i) => (
-                  <LinhaDeTarefa
-                    key={t.id}
-                    tom={TOM_CEU}
-                    primeira={i === 0}
-                    l={{
-                      key: t.id, texto: t.texto, feito: !!t.feito, hora: t.hora, aviso: avisoDaTarefa(t), detalhes: detalhesDaTarefa(t),
-                      detalhe: t.veioDe ? `veio de ${diaCurto(t.veioDe)}` : undefined,
-                      prioridade: ehPrioridade(t), checklist: progressoDasSubtarefas(t), prazo: estadoDoPrazo(t, hoje),
-                      onAlternar: () => tarefas.alternar(t.id), onAbrir: () => setAberta(t.id),
-                    }}
-                  />
-                ))}
+              {[false, true].flatMap((feita) => ordenarPorHora<LinhaVisivel>([
+                ...tarefasHoje.filter((t) => !!t.feito === feita).map((t): LinhaVisivel => ({
+                  key: t.id, texto: t.texto, feito: !!t.feito, hora: horaDaTarefa(t) ?? undefined, aviso: avisoDaTarefa(t), detalhes: detalhesDaTarefa(t),
+                  detalhe: t.veioDe ? `veio de ${diaCurto(t.veioDe)}` : undefined,
+                  prioridade: ehPrioridade(t), checklist: progressoDasSubtarefas(t), prazo: estadoDoPrazo(t, hoje),
+                  onAlternar: () => tarefas.alternar(t.id), onAbrir: () => setAberta(t.id),
+                })),
+                // 1.0.22: as de hoje do Trabalho e dos Estudos, com a etiqueta — o ✓ grava na chave de origem
+                ...extras.filter((l) => l.feito === feita).map(({ ficha: _f, ...l }): LinhaVisivel => ({ ...l, onAbrir: () => setAberta(l.key) })),
+              ]))
+                .map((l, i) => <LinhaDeTarefa key={l.key} tom={TOM_CEU} primeira={i === 0} l={l} />)}
             </>
           )}
           <div className="flex gap-2 p-2.5 border-t border-sky-100 bg-sky-50">

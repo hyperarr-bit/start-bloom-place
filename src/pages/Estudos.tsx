@@ -457,7 +457,13 @@ const Estudos = () => {
     }, ...notebooks]);
   };
 
-  const [activeTab, setActiveTab] = useState("estudos");
+  // `?aba=` (28/10, sem repetição): a tarefa dos Estudos aberta na lista do dia da Rotina leva direto pra aba Tarefas
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const a = new URLSearchParams(window.location.search).get("aba");
+      return a && ABAS_ESTUDOS.some((t) => t.id === a) ? a : "estudos";
+    } catch { return "estudos"; }
+  });
   const abasDoModulo = useAbasOcultas("estudos", ABAS_ESTUDOS);
   useScrollActiveTabIntoView(activeTab);
 

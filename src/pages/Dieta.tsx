@@ -10,18 +10,19 @@ import { adicionarSubstituto, comoSubstitutos, notaDeSubstituto, removerSubstitu
 import { CHAVE_MACROS, type Macros, type MacrosPlano, type EntradaLog, comoMacros, entradaDoPlano, formatarMacros, lerGramas, macrosDoPlano, macrosRegistradas, sincronizarLogDoDiario, temMacros } from "@/lib/dieta-macros";
 import { CHAVE_KCAL, CHAVE_META_KCAL_ANTIGA, CHAVE_META_KCAL_MODO, META_KCAL_PADRAO, kcalDoPlano, metaDoDia, normalizarModoMeta, type ModoMetaKcal } from "@/lib/dieta-consumo";
 import { localDayKey, parseLocalDay } from "@/lib/utils";
-import { enviarParaMercado } from "@/lib/mercado";
+import { descricoesDoCardapio } from "@/lib/lista-e-cardapio-unicos";
+import { ListaDeComprasDoCardapio } from "@/components/dieta/ListaDeComprasDoCardapio";
 import { avisarApagado } from "@/lib/desfazer";
-import { fotografarDias, itensDoCardapio, primeiraMaiuscula, restaurarDias, statusAderencia } from "@/components/dieta/cardapio";
+import { fotografarDias, restaurarDias, statusAderencia } from "@/components/dieta/cardapio";
 import { useNavigate } from "react-router-dom";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { useAuth } from "@/hooks/use-auth";
 import { useHomeNova } from "@/hooks/use-home-nova";
 import {
   ArrowLeft, Plus, X, Trash2, Check, Utensils, Clock,
-  Apple, ChefHat, Calendar, Heart, Settings,
+  Apple, ChefHat, Heart, Settings,
   ArrowUp, ArrowDown, Copy, Search, BookOpen,
-  ShoppingCart, Send, UtensilsCrossed, Pencil, Link2, ExternalLink, Tag, ChevronDown
+  UtensilsCrossed, Pencil, Link2, ExternalLink, Tag, ChevronDown
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -333,7 +334,8 @@ const ABAS_DIETA = [
   { id: "cardapio", label: "CARDÁPIO", icon: "🍽️" },
   { id: "jejum", label: "JEJUM", icon: "⏱️" },
   { id: "receitas", label: "RECEITAS", icon: "👩‍🍳" },
-  { id: "lista", label: "LISTA", icon: "🛒" },
+  // SEM REPETIÇÃO (28/10): a 🛒 LISTA (1,6% de uso) saiu — a lista de compras é UMA, o Mercado da Casa; o Cardápio
+  // ganhou "Gerar lista de compras" (components/dieta/ListaDeComprasDoCardapio), que também mostra a lista antiga.
   { id: "diario", label: "DIÁRIO", icon: "📊" },
 ];
 
@@ -483,13 +485,6 @@ const Dieta = () => {
     return fora;
   }, [diaryData]);
 
-  // LISTA INTELIGENTE
-  const [smartList, setSmartList] = usePersistedState<{ id: string; text: string; done: boolean }[]>("dieta-smart-list", []);
-  const [newSmartItem, setNewSmartItem] = useState("");
-
-  // Casa grocery sync
-  const [casaGrocery, setCasaGrocery] = usePersistedState<any[]>("casa-grocery-categories", []);
-
   useEffect(() => {
     if (!fastingStart) { setFastingElapsed(0); return; }
     const interval = setInterval(() => {
@@ -609,55 +604,6 @@ const Dieta = () => {
     const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
     if (dateStr === localDayKey(yesterday)) return "Ontem";
     return d.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" });
-  };
-
-  /* LISTA INTELIGENTE (26/09, varredura): cada refeição INTEIRA virava um item
-     ("2 ovos mexidos (100g) • 1 fatia de pão…"), com as gramas e até a
-     "Refeição livre 😌". Agora separa por "•", ",", quebra de linha etc., tira
-     quantidades e não repete — ver src/components/dieta/cardapio.ts. */
-  const juntarNaLista = (novos: string[]) => {
-    if (novos.length > 0) {
-      const t = Date.now();
-      setSmartList(prev => [...prev, ...novos.map((text, n) => ({ id: `${t}-${n}`, text, done: false }))]);
-    }
-    toast(novos.length ? `${novos.length} ${novos.length === 1 ? "item entrou" : "itens entraram"} na lista` : "A lista já tem tudo isso");
-  };
-
-  // Smart list: generate from meal plan (na ordem das refeições do cardápio)
-  const generateFromMealPlan = () => {
-    const descricoes: string[] = [];
-    weekDays.forEach(day => {
-      const dayMeals = mealPlan[day];
-      if (!dayMeals) return;
-      [...meals, ...Object.keys(dayMeals).filter(m => !meals.includes(m))].forEach(m => {
-        const desc = dayMeals[m];
-        if (typeof desc === "string" && desc.trim()) descricoes.push(desc);
-      });
-    });
-    if (descricoes.length === 0) { toast("O cardápio está vazio — preencha as refeições na aba Cardápio."); return; }
-    juntarNaLista(itensDoCardapio(descricoes, smartList.map(i => i.text)));
-  };
-
-  const generateFromRecipes = () => {
-    const favoritas = recipes.filter(r => r.favorite && r.ingredients);
-    if (favoritas.length === 0) { toast("Favorite uma receita (❤️) com ingredientes pra gerar a lista."); return; }
-    juntarNaLista(itensDoCardapio(favoritas.map(r => r.ingredients), smartList.map(i => i.text)));
-  };
-
-  const sendToCasa = () => {
-    const pendingItems = smartList.filter(i => !i.done);
-    if (pendingItems.length === 0) return;
-    // Parte das 9 categorias do Mercado quando ele nunca foi aberto (antes a
-    // "Dieta" entrava numa lista vazia e as outras sumiam) e avisa o que foi.
-    const { lista, novos } = enviarParaMercado(casaGrocery, pendingItems.map(i => primeiraMaiuscula(i.text)));
-    if (novos === 0) {
-      toast("Esses itens já estão no Mercado da Casa.");
-      return;
-    }
-    setCasaGrocery(lista);
-    toast.success(novos === 1 ? "1 item enviado pro Mercado da Casa" : `${novos} itens enviados pro Mercado da Casa`, {
-      action: { label: "Ver", onClick: () => navigate("/casa") },
-    });
   };
 
   // ---------------------- RECEITAS: categorias e edição ----------------------
@@ -1201,6 +1147,9 @@ const Dieta = () => {
                 </div>
               ))}
             </div>
+
+            {/* 1.0.22 (sem repetição): a lista de compras é a do Mercado da Casa — o botão manda os ingredientes pra lá */}
+            <ListaDeComprasDoCardapio descricoes={descricoesDoCardapio(mealPlan, weekDays, meals)} />
           </div>}
 
           {/* ========== JEJUM ========== */}
@@ -1464,105 +1413,6 @@ const Dieta = () => {
           </div>}
 
           {/* ========== LISTA INTELIGENTE ========== */}
-          {activeTab === "lista" && <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-xs font-bold flex items-center gap-2"><ShoppingCart className="w-4 h-4" /> LISTA INTELIGENTE</h3>
-                <p className="text-[10px] text-muted-foreground">
-                  {smartList.length > 0 ? `${smartList.filter(i => !i.done).length} itens pendentes` : "Gere a lista a partir do cardápio"}
-                </p>
-              </div>
-            </div>
-
-            {/* Action buttons */}
-            <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" size="sm" className="text-xs h-9 gap-1" onClick={generateFromMealPlan}>
-                <Calendar className="w-3 h-3" /> Gerar do Cardápio
-              </Button>
-              <Button variant="outline" size="sm" className="text-xs h-9 gap-1" onClick={generateFromRecipes}>
-                <Heart className="w-3 h-3" /> Gerar das Favoritas
-              </Button>
-            </div>
-
-            {/* Manual add */}
-            <div className="flex gap-2">
-              <Input
-                value={newSmartItem}
-                onChange={e => setNewSmartItem(e.target.value)}
-                placeholder="Adicionar item manualmente..."
-                className="text-xs h-9 flex-1"
-                onKeyDown={e => {
-                  if (e.key === "Enter" && newSmartItem.trim()) {
-                    setSmartList(prev => [...prev, { id: Date.now().toString(), text: newSmartItem.trim(), done: false }]);
-                    setNewSmartItem("");
-                  }
-                }}
-              />
-              <Button size="sm" className="h-9" onClick={() => {
-                if (newSmartItem.trim()) {
-                  setSmartList(prev => [...prev, { id: Date.now().toString(), text: newSmartItem.trim(), done: false }]);
-                  setNewSmartItem("");
-                }
-              }}>
-                <Plus className="w-4 h-4" />
-              </Button>
-            </div>
-
-            {/* Items list */}
-            {smartList.length > 0 ? (
-              <div className="bg-card rounded-xl border border-border p-3 space-y-1.5">
-                {smartList.filter(i => !i.done).map(item => (
-                  <div key={item.id} className="flex items-center gap-2 py-1 group">
-                    <Checkbox
-                      checked={false}
-                      onCheckedChange={() => setSmartList(prev => prev.map(i => i.id === item.id ? { ...i, done: true } : i))}
-                    />
-                    <span className="text-xs flex-1">{primeiraMaiuscula(item.text)}</span>
-                    <button onClick={() => setSmartList(prev => prev.filter(i => i.id !== item.id))} className="opacity-0 group-hover:opacity-100">
-                      <X className="w-3 h-3 text-muted-foreground" />
-                    </button>
-                  </div>
-                ))}
-                {smartList.some(i => i.done) && (
-                  <>
-                    <div className="border-t border-border my-2" />
-                    <p className="text-[10px] font-bold text-muted-foreground">COMPRADOS</p>
-                    {smartList.filter(i => i.done).map(item => (
-                      <div key={item.id} className="flex items-center gap-2 py-1 group">
-                        <Checkbox
-                          checked={true}
-                          onCheckedChange={() => setSmartList(prev => prev.map(i => i.id === item.id ? { ...i, done: false } : i))}
-                        />
-                        <span className="text-xs flex-1 line-through text-muted-foreground">{primeiraMaiuscula(item.text)}</span>
-                        <button onClick={() => setSmartList(prev => prev.filter(i => i.id !== item.id))} className="opacity-0 group-hover:opacity-100">
-                          <X className="w-3 h-3 text-muted-foreground" />
-                        </button>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <ShoppingCart className="w-8 h-8 mx-auto text-muted-foreground/30 mb-2" />
-                <p className="text-xs text-muted-foreground">Lista vazia</p>
-                <p className="text-[10px] text-muted-foreground mt-1">Use os botões acima para gerar automaticamente</p>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="text-xs h-9 flex-1 gap-1" onClick={sendToCasa} disabled={smartList.filter(i => !i.done).length === 0}>
-                <Send className="w-3 h-3" /> Enviar para Casa (Mercado)
-              </Button>
-              {smartList.length > 0 && (
-                <Button variant="outline" size="sm" className="text-xs h-9 gap-1" onClick={() => setSmartList(prev => prev.filter(i => !i.done))}>
-                  <Trash2 className="w-3 h-3" /> Limpar ✓
-                </Button>
-              )}
-            </div>
-          </div>}
-
           {/* ========== DIÁRIO v2 ========== */}
           {activeTab === "diario" && <div className="space-y-4">
             {/* Date navigation */}

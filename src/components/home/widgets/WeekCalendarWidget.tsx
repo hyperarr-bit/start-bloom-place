@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
 import { localDayKey } from "@/lib/utils";
 import { useUserData } from "@/hooks/use-user-data";
+import { useMostrarFeriados } from "@/hooks/use-feriados";
+import { feriadoDoDia, textoDoFeriado } from "@/lib/feriados";
 
 export const WeekCalendarWidget = ({ size = "large" }: { size?: "small" | "large" }) => {
   const { get } = useUserData();
@@ -19,6 +21,11 @@ export const WeekCalendarWidget = ({ size = "large" }: { size?: "small" | "large
     const dateStr = localDayKey(d);
     weekDays.push({ date: dateStr, label: dayNames[d.getDay()], labelFull: dayNamesFull[d.getDay()], dayNum: d.getDate(), isToday: dateStr === todayStr });
   }
+
+  // 28/10: feriados nacionais da semana (se ligados) — ponto no dia + o nome embaixo
+  const [mostrarFeriados] = useMostrarFeriados();
+  const feriadosDaSemana = mostrarFeriados ? weekDays.map((d) => feriadoDoDia(d.date)).filter((f): f is NonNullable<typeof f> => !!f) : [];
+  const ehFeriado = (date: string) => feriadosDaSemana.some((f) => f.dia === date);
 
   const workoutLog = get<string[]>("saude-workout-log", []);
   const habitLog = get<any>("core-rotina-habit-log", {});
@@ -62,15 +69,21 @@ export const WeekCalendarWidget = ({ size = "large" }: { size?: "small" | "large
               {isSmall ? day.label : day.labelFull}
             </span>
             <div
-              className={`${isSmall ? "w-5 h-5 text-[8px]" : "w-7 h-7 text-[10px]"} rounded-md flex items-center justify-center font-bold ${
+              className={`relative ${isSmall ? "w-5 h-5 text-[8px]" : "w-7 h-7 text-[10px]"} rounded-md flex items-center justify-center font-bold ${
                 day.isToday ? "ring-1.5 ring-primary ring-offset-1 ring-offset-background " : ""
               }${statusColors[getDayStatus(day.date)]}`}
             >
               {day.dayNum}
+              {ehFeriado(day.date) && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-rose-500" data-testid="ponto-feriado" aria-label="feriado" />}
             </div>
           </motion.div>
         ))}
       </div>
+      {!isSmall && feriadosDaSemana.length > 0 && (
+        <p className="mt-2 text-[9.5px] font-semibold text-rose-700 dark:text-rose-300 text-center truncate" data-testid="feriados-da-semana">
+          {feriadosDaSemana.map((f) => `${f.dia.slice(8, 10)}/${f.dia.slice(5, 7)} ${textoDoFeriado(f)}`).join(" · ")}
+        </p>
+      )}
       {!isSmall && (
         <div className="flex items-center gap-3 mt-2 justify-center">
           <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-500" /><span className="text-[8px] text-muted-foreground">Completo</span></div>

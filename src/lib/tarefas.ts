@@ -197,6 +197,47 @@ export const apareceHoje = (t: Parcial, hoje: string): boolean => {
   return !t.feito || t.feitoEm === hoje;
 };
 
+/* ---------------------------------------------- 28/10: tarefa pra OUTRO dia */
+
+/*
+ * Chamado de 18/10: "só tem tarefas do dia! A não ser que eu coloque tarefa com prazo mais pra
+ * frente, mas tem prazo, e não uma tarefa para fazer daqui a dois dias." O campo `dia` (que já
+ * existe, mesmo formato) passa a poder ser um dia FUTURO, escolhido no formulário (Hoje · Amanhã ·
+ * Escolher dia). `apareceHoje` já deixava a de dia futuro fora da lista de hoje; o aviso já é do
+ * `dia` (ou do prazo, quando tem); o "Ficou de ontem" só olha pra trás. Com dia futuro E prazo,
+ * ela aparece a partir do dia dela até ser feita.
+ */
+
+const NOME_DO_DIA_CURTO = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+
+/** "hoje", "amanhã", "quinta, 30/10" (o dia da tarefa em palavras). Dia torto = "". */
+export const rotuloDoDia = (dia: string, hoje: string): string => {
+  if (!ehDia(dia) || !ehDia(hoje)) return "";
+  const n = diasEntreDias(hoje, dia);
+  if (n === 0) return "hoje";
+  if (n === 1) return "amanhã";
+  if (n === -1) return "ontem";
+  return `${DIA_DA_SEMANA_MIUDO[dataLocal(dia).getDay()]}, ${ddmm(dia)}`;
+};
+
+/** "qui, 30/10" — o chip do "Escolher dia". */
+export const rotuloCurtoDoDia = (dia: string): string => (ehDia(dia) ? `${NOME_DO_DIA_CURTO[dataLocal(dia).getDay()]}, ${ddmm(dia)}` : "");
+
+/** O dia seguinte a `dia` ("YYYY-MM-DD"). */
+export const diaSeguinte = (dia: string): string => {
+  const d = dataLocal(dia);
+  d.setDate(d.getDate() + 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+/** As pendentes marcadas pra DEPOIS de hoje, por dia (e hora) — o "Nos próximos dias" sob a lista. */
+export const tarefasFuturas = (lista: unknown, hoje: string): TarefaDoDia[] =>
+  ordenarPorHora(tarefasValidas(lista).filter((t) => !t.feito && t.dia > hoje)).sort((a, b) => a.dia.localeCompare(b.dia));
+
+/** As tarefas cujo dia é `dia` (feitas ou não) — o dia aberto do calendário. */
+export const tarefasDoDiaMarcado = (lista: unknown, dia: string): TarefaDoDia[] =>
+  ordenarPorHora(tarefasValidas(lista).filter((t) => t.dia === dia));
+
 /** Texto limpo e id novo pra cada linha digitada no formulário; linha vazia não vira subtarefa. */
 export const montarSubtarefas = (linhas: Array<Partial<Subtarefa> | string>): Subtarefa[] =>
   linhas

@@ -261,8 +261,11 @@ window.addEventListener("message", (e: MessageEvent) => {
  *          Visualmente igual: a imagem leve do módulo ocupa a MESMA caixa até o iframe chegar, como hoje.
  *   v2:    SÓ no toque ("Testar o app", pílula ou grade). 61% nunca chegavam à demo e baixavam tudo mesmo assim.
  */
+// (a) depois do pixel E do load: o iframe antes do `load` segurava o evento load da página em ~5 s na medição (a barra de
+// progresso do navegador do Instagram ficaria girando) — no main de hoje a demo também só entra depois do load
+const depoisDoLoad = (f: () => void) => { if (document.readyState === "complete") f(); else window.addEventListener("load", f, { once: true }); };
 if (!V2) {
-  depoisDoPixel(() => ocioso(() => iniciarDemo("fundo"), 1500));
+  depoisDoPixel(() => depoisDoLoad(() => ocioso(() => iniciarDemo("fundo"), 1500)));
   if ("IntersectionObserver" in window) {
     const perto = new IntersectionObserver((ens) => { if (ens.some((e) => e.isIntersecting)) { iniciarDemo("perto"); perto.disconnect(); } }, { threshold: 0.25 });
     perto.observe($("demo"));
@@ -790,7 +793,7 @@ function render() {
          <p class="lp2-garantia-mini">${ICO_CHECK}<span>7 dias de garantia · não gostou, devolvemos 100%</span></p>`
       : `<div class="lp-esperando"><i class="lp-ponto"></i><span><b>Esperando o pagamento</b>${p.doEmail ? "Quando o pagamento cair, o acesso chega no seu e-mail." : "Esta tela confirma sozinha quando o pagamento entrar."}</span></div>`;
     caixa.innerHTML = `
-      <div class="lp-pix-valor"><b>${reais(VALOR_OFERTA[p.oferta])}</b><span>${esc(ROTULO_OFERTA[p.oferta])}</span></div>
+      <div class="lp-pix-valor"><b>${reais(VALOR_OFERTA[p.oferta])}</b><span>${esc(V2 && p.oferta === "LN_sempre279" ? "Vitalício · pagamento único" : ROTULO_OFERTA[p.oferta])}</span></div>
       ${copiado && !V2 ? `<div class="lp-copiado" data-testid="landing-copiado">${ICO_CHECK}<span><b>Código Pix copiado</b>Agora abra o app do seu banco: Pix → Copia e Cola.</span></div>` : ""}
       ${passosV2}
       <div class="lp-qr-linha"><div class="lp-qr" id="lp-qr"></div><div class="lp-qr-dica">${copiado ? "Ou leia o <b>QR code</b> com a câmera do banco, em outro aparelho." : "<b>Copie o código</b> e cole no app do banco em Pix → Copia e Cola. Ou leia o QR code."}</div></div>

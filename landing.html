@@ -426,7 +426,8 @@
       .lp2-confianca svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--verde); }
       html[data-lp="v2"] .lp-ancora { color: var(--suave); font-weight: 600; }
       html[data-lp="v2"] .lp-ancora b { color: var(--tx); }
-      /* 3. a tela do Pix (preenchida pelo landing.ts no braço v2): 3 passos curtos */
+      /* 3. a tela do Pix (preenchida pelo landing.ts no braço v2): 3 passos curtos; o valor numa linha só */
+      html[data-lp="v2"] .lp-pix-valor b { white-space: nowrap; }
       .lp2-passos { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; counter-reset: p; }
       .lp2-passos li { display: flex; align-items: center; gap: 10px; font-size: 14.5px; line-height: 1.35; color: #3d3a40; }
       .lp2-passos li::before { counter-increment: p; content: counter(p); width: 24px; height: 24px; border-radius: 50%; background: var(--grafite); color: #fff; font-size: 12.5px; font-weight: 800; display: grid; place-items: center; flex-shrink: 0; }
@@ -503,9 +504,12 @@
         <h1 class="lp-h1">Sua vida organizada num app só.</h1>
         <p class="lp-sub">Dinheiro, contas, rotina, treino e mais 12 áreas, no mesmo lugar.</p>
         <p class="lp2-onde" aria-label="Onde o CORE funciona"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"></rect><path d="M12 18h.01"></path></svg>App Store</span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"></rect><path d="M12 18h.01"></path></svg>Google Play</span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"></rect><line x1="8" x2="16" y1="21" y2="21"></line><line x1="12" x2="12" y1="17" y2="21"></line></svg>Computador</span></p>
+        <!-- 4 prints reais: os 16 módulos primeiro (é o que o carrossel "16 módulos" do anúncio mostra — 77% da verba), depois o
+             número de Finanças, a Home e as contas do mês. Só os 2 primeiros aparecem sem rolar; os outros baixam preguiçosos. -->
         <div class="lp2-fita" id="lp-fita" aria-label="Telas do CORE">
-          <figure class="lp2-tel"><figcaption>Seu dia</figcaption><div class="lp2-cel"><img src="/landing/v2-home.webp" alt="A Home do CORE: score do dia, hábitos, água, refeições e os módulos" width="480" height="970" decoding="async" fetchpriority="high" /></div></figure>
-          <figure class="lp2-tel"><figcaption>Quanto posso gastar hoje</figcaption><div class="lp2-cel"><img src="/landing/v2-financas.webp" alt="Finanças do CORE: quanto posso gastar hoje, receitas, despesas e contas que vencem" width="480" height="970" decoding="async" /></div></figure>
+          <figure class="lp2-tel"><figcaption>As 16 áreas</figcaption><div class="lp2-cel"><img src="/landing/v2-modulos.webp" alt="A Home do CORE rolada até os 16 módulos: Finanças, Rotina, Saúde, Treino, Dieta, Beleza, Dev. Pessoal, Casa, Biblioteca, Estudos, Mente, Carreira, Relações, Detox, Pet e Viagens" width="480" height="922" decoding="async" fetchpriority="high" /></div></figure>
+          <figure class="lp2-tel"><figcaption>Quanto posso gastar</figcaption><div class="lp2-cel"><img src="/landing/v2-financas.webp" alt="Finanças do CORE: quanto posso gastar hoje, receitas, despesas e contas que vencem" width="480" height="970" decoding="async" /></div></figure>
+          <figure class="lp2-tel"><figcaption>Seu dia</figcaption><div class="lp2-cel"><img src="/landing/v2-home.webp" alt="A Home do CORE: score do dia, hábitos, água e refeições" width="480" height="970" loading="lazy" decoding="async" /></div></figure>
           <figure class="lp2-tel"><figcaption>Contas do mês</figcaption><div class="lp2-cel"><img src="/landing/v2-meu-mes.webp" alt="Meu mês no CORE: o calendário com as contas, o que entrou e o que saiu" width="480" height="1039" loading="lazy" decoding="async" /></div></figure>
           <span class="lp2-fita-fim" aria-hidden="true"></span>
         </div>

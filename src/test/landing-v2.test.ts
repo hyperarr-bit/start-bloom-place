@@ -17,7 +17,7 @@
  * A página roda de verdade (landing.html + landing.ts) no jsdom, com o Pix SIMULADO (fora do domínio de produção).
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { bracoCheckoutDoAparelho, bracoLpDoAparelho, bracoLpDoHtml } from "@/landing/regras";
@@ -168,7 +168,8 @@ describe("braço v2: a vitrine, a ordem e o cartão", () => {
     expect(topo.querySelector("h1")!.textContent).toBe("Sua vida organizada num app só.");
     expect(topo.querySelector(".lp2-onde")!.textContent).toMatch(/App Store.*Google Play.*Computador/);
     const imgs = [...topo.querySelectorAll(".lp2-cel img")].map((i) => i.getAttribute("src"));
-    expect(imgs).toEqual(["/landing/v2-home.webp", "/landing/v2-financas.webp", "/landing/v2-meu-mes.webp"]);
+    expect(imgs).toEqual(["/landing/v2-modulos.webp", "/landing/v2-financas.webp", "/landing/v2-home.webp", "/landing/v2-meu-mes.webp"]);
+    for (const i of imgs) expect(existsSync(resolve(raiz, `public${i}`))).toBe(true);
     expect(HTML).toMatch(/\.lp2-cel \{[^}]*aspect-ratio: 390 \/ 844/);
     expect(HTML).toMatch(/\.lp2-cel img \{[^}]*width: 100%; height: auto/); // nunca esticado
     expect(topo.querySelector(".lp2-preco")!.textContent!.replace(/\s+/g, " ")).toMatch(/R\$ 27,90.*Vitalício · pagamento único no Pix.*Na App Store: R\$ 97,90 por ano/);
@@ -283,8 +284,8 @@ describe("nos DOIS braços: braco_lp em todo evento, pixel cedo, demo preguiços
 
   it("o pixel entra no 1º quadro + ocioso (≤ 1,5 s), sem esperar o load (+800 ms) de antes; reserva aos 2,5 s", async () => {
     const src = readFileSync(resolve(raiz, "src/landing/landing.ts"), "utf8");
-    expect(src).not.toMatch(/addEventListener\("load"/);
     expect(src).toMatch(/requestAnimationFrame\(\(\) => ocioso\(carregarTerceiros, 1500\)\)/);
+    expect(src).not.toMatch(/depoisDoLoad\(carregarTerceiros/); // o pixel não espera mais o load (só a demo do atual espera)
     expect(src).toMatch(/window\.setTimeout\(carregarTerceiros, 2500\)/);
     expect(src).not.toMatch(/setTimeout\(carregarTerceiros, 6000\)/);
     await abrirPagina("atual");

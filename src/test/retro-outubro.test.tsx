@@ -9,14 +9,15 @@
  */
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, cleanup, screen, fireEvent } from "@testing-library/react";
-import { montarRetroOutubro, comEscolhas, CRITERIO_AZUL, MINIMOS_RETRO } from "@/components/compartilhar/retro-outubro-dados";
-import { CardDeCompartilhar } from "@/components/compartilhar/cards";
+import { montarRetroOutubro, comEscolhas, escolherDestaques, CRITERIO_AZUL, MINIMOS_RETRO, MAX_DESTAQUES } from "@/components/compartilhar/retro-outubro-dados";
+import { CardDeCompartilhar, MODULOS_DA_RETRO, pecasDaAbertura } from "@/components/compartilhar/cards";
+import type { DadosRetroAbertura, DadosRetroResumo, ItemDoResumo, ModuloDaRetro } from "@/components/compartilhar/tipos";
 import { TEMAS, contraste } from "@/components/compartilhar/temas";
 import {
   RETRO_OUTUBRO_APP, RETRO_OUTUBRO_WEB, CHAVE_FORCA_RETRO_OUTUBRO, retroOutubroAtiva, retroOutubroLigada, outubroJaAcabou,
   registrarRetroOutubroRemoto, _zerarRetroOutubroRemoto, guardarForcaRetroOutubro, lerChaveRemotaRetroOutubro,
 } from "@/lib/retro-outubro";
-import { SEMENTE_COMPLETA, SEMENTE_FIN_INCOMPLETA, SEMENTE_POUCA, AGORA_EXEMPLO, leitorDe } from "@/pages/dev/retro-outubro-exemplo";
+import { SEMENTE_COMPLETA, SEMENTE_DUAS_AREAS, SEMENTE_FIN_INCOMPLETA, SEMENTE_POUCA, SEMENTE_SO_DIAS, SEMENTE_UMA_AREA, AGORA_EXEMPLO, leitorDe } from "@/pages/dev/retro-outubro-exemplo";
 
 const nativo = vi.hoisted(() => ({ v: false }));
 vi.mock("@/lib/native-shell", async (orig) => ({ ...(await orig<typeof import("@/lib/native-shell")>()), isNativeShell: () => nativo.v }));
@@ -241,5 +242,90 @@ describe("8. a tela", () => {
     const sw = screen.getByTestId("retro-valores");
     expect(sw.getAttribute("aria-checked")).toBe("false");
     expect(eventos.filter((e) => e.nome === "wrapped_tela").map((e) => [e.dados.mes, e.dados.id])).toEqual([["outubro", "abertura"], ["outubro", "financas"]]);
+  });
+});
+
+describe("9. a abertura nova (30/10, versão do Codex): mini-cards com os dados de verdade", () => {
+  const abertura = (semente: Record<string, unknown>) => {
+    const r = montar(semente)!;
+    const a = r.cards[0].dados as DadosRetroAbertura;
+    const resumo = r.cards.at(-1)!.dados as DadosRetroResumo;
+    expect(a.tipo).toBe("retro-abertura");
+    return { r, a, resumo };
+  };
+  const desenhar = (a: DadosRetroAbertura, formato: "stories" | "feed" = "stories") => render(<CardDeCompartilhar dados={a} formato={formato} />).container;
+
+  it("conta completa: 3 mini-cards = os 3 destaques mais fortes, na ordem da sequência, com o MESMO número, rótulo e cor do card", () => {
+    const { a, resumo } = abertura(SEMENTE_COMPLETA);
+    // treino 18/(31/2) e leitura 4 livros cobrem o mês inteiro (força 1); rotina 24/31 vence água 23/31, metas 3/4 e finanças (15 dias)
+    expect(a.destaques!.map((d) => d.modulo)).toEqual(["treino", "rotina", "leitura"]);
+    for (const d of a.destaques!) expect(resumo.itens.find((i) => i.modulo === d.modulo)).toEqual(d);
+    expect(pecasDaAbertura(a).map((p) => p.cor)).toEqual(["treino", "rotina", "leitura"].map((m) => MODULOS_DA_RETRO[m as ModuloDaRetro].cor));
+    for (const f of ["stories", "feed"] as const) {
+      const c = desenhar(a, f);
+      const minis = [...c.querySelectorAll("[data-mini-card]")].map((el) => el.textContent);
+      expect(minis).toEqual(["18dias de treino", "24dias de meditar", "4livros lidos"]);
+      expect(c.textContent).toMatch(/Seu outubro,/);
+      expect(c.textContent).toMatch(/do seu jeito\./);
+      expect(c.textContent).toMatch(/Os detalhes que fizeram o seu mês\./);
+      expect(c.textContent).toMatch(/OUT \/ 26/);
+      cleanup();
+    }
+  });
+  it("nunca R$ — nem com os valores ligados, nem com Finanças entre os destaques", () => {
+    const { a } = abertura(SEMENTE_COMPLETA);
+    expect(desenhar(comEscolhas(a, { valores: true, textosDasMetas: true }) as DadosRetroAbertura).textContent).not.toMatch(/R\$/);
+    cleanup();
+    // Finanças no azul como o destaque mais forte: vai a %, nunca o saldo
+    const comFinancas = { ...a, destaques: [{ modulo: "financas", numero: "21%", rotulo: "sobrou, no azul" }] as ItemDoResumo[] };
+    const c = desenhar(comFinancas);
+    expect(c.textContent).toMatch(/21%/);
+    expect(c.textContent).not.toMatch(/R\$/);
+  });
+  it("2 áreas → 2 mini-cards; 1 área → 1 mini-card (sem completar com nada)", () => {
+    const duas = abertura(SEMENTE_DUAS_AREAS).a;
+    expect(duas.destaques!.map((d) => [d.modulo, d.numero])).toEqual([["treino", "9"], ["rotina", "14"]]);
+    expect(desenhar(duas).querySelectorAll("[data-mini-card]").length).toBe(2);
+    cleanup();
+    const uma = abertura(SEMENTE_UMA_AREA).a;
+    expect(uma.destaques!.map((d) => d.modulo)).toEqual(["agua"]);
+    const c = desenhar(uma);
+    expect(c.querySelectorAll("[data-mini-card]").length).toBe(1);
+    expect(c.querySelector("[data-mini-card]")!.textContent).toBe(`${uma.destaques![0].numero}dias na meta de água`);
+  });
+  it("pouco dado: a abertura continua fazendo sentido — o destaque que existe e a frase 'O que você registrou também conta.'", () => {
+    const { a, r } = abertura(SEMENTE_POUCA);
+    expect(r.poucoDado).toBe(true);
+    expect(a.pouco).toBe(true);
+    expect(a.destaques!.map((d) => [d.modulo, d.numero, d.rotulo])).toEqual([["treino", "2", "dias de treino"]]);
+    const c = desenhar(a);
+    expect(c.textContent).toMatch(/O que você registrou também conta\./);
+    expect(c.textContent).not.toMatch(/Os detalhes que fizeram/);
+    expect(c.querySelectorAll("[data-mini-card]").length).toBe(1);
+  });
+  it("0 destaques (nenhum módulo com o mínimo): 1 mini-card só, com os dias com registro — nada inventado", () => {
+    const { a } = abertura(SEMENTE_SO_DIAS);
+    expect(a.destaques).toEqual([]);
+    expect(a.pouco).toBe(true);
+    const c = desenhar(a);
+    const minis = [...c.querySelectorAll("[data-mini-card]")].map((el) => el.textContent);
+    expect(minis).toEqual(["3dias com registro"]);
+    // 1 dia só: singular
+    const um = abertura({ "saude-workout-log": [out(18)] }).a;
+    expect(pecasDaAbertura(um)).toEqual([expect.objectContaining({ numero: "1", rotulo: "dia com registro" })]);
+  });
+  it("escolherDestaques: no máximo 3, os mais fortes, empate pela ordem da sequência, devolvidos na ordem da sequência", () => {
+    const item = (modulo: ModuloDaRetro): ItemDoResumo => ({ modulo, numero: "1", rotulo: modulo });
+    const resumo = (["financas", "treino", "rotina", "agua", "leitura", "metas"] as ModuloDaRetro[]).map(item);
+    const forca = new Map<ModuloDaRetro, number>([["financas", 0.2], ["treino", 0.5], ["rotina", 0.9], ["agua", 0.5], ["leitura", 0.5], ["metas", 1]]);
+    expect(MAX_DESTAQUES).toBe(3);
+    expect(escolherDestaques(resumo, forca).map((d) => d.modulo)).toEqual(["treino", "rotina", "metas"]);
+    expect(escolherDestaques(resumo.slice(0, 2), forca).map((d) => d.modulo)).toEqual(["financas", "treino"]);
+    expect(escolherDestaques([], forca)).toEqual([]);
+  });
+  it("o 'no azul' continua só com CRITERIO_AZUL: o mês anotado pela metade entra como lançamentos (nunca 'azul') na abertura", () => {
+    const { a } = abertura(SEMENTE_FIN_INCOMPLETA);
+    expect(a.destaques!.map((d) => [d.modulo, d.rotulo])).toEqual([["financas", "lançamentos anotados"]]);
+    expect(desenhar(a).textContent).not.toMatch(/azul/i);
   });
 });

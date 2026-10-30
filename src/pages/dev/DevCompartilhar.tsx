@@ -8,7 +8,7 @@ import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data
 import { FORMATOS, type DadosCard, type Formato } from "@/components/compartilhar/tipos";
 import { DIRECOES } from "./compartilhar-direcoes";
 import { RetroOutubro } from "@/components/compartilhar/RetroOutubro";
-import { AGORA_EXEMPLO, RETRO_EXEMPLO, RETRO_FIN_INCOMPLETA, RETRO_POUCA, SEMENTE_COMPLETA, SEMENTE_FIN_INCOMPLETA, SEMENTE_POUCA, leitorDe } from "./retro-outubro-exemplo";
+import { AGORA_EXEMPLO, RETRO_DUAS_AREAS, RETRO_EXEMPLO, RETRO_FIN_INCOMPLETA, RETRO_POUCA, RETRO_SO_DIAS, RETRO_UMA_AREA, SEMENTE_COMPLETA, SEMENTE_DUAS_AREAS, SEMENTE_FIN_INCOMPLETA, SEMENTE_POUCA, SEMENTE_SO_DIAS, SEMENTE_UMA_AREA, leitorDe } from "./retro-outubro-exemplo";
 import { AGUA, AZUL_1, AZUL_3, FIGURINHA_LENDARIA, HABITOS, INSIGNIA_OURO, LIVROS_MES, LIVROS_5, METAS, POUPANCA, SEQUENCIA, SONO, TREINOS_MES, TREINOS_TOTAL } from "./compartilhar-exemplos";
 
 /**
@@ -50,9 +50,11 @@ const EXEMPLOS: { id: string; nome: string; dados: DadosCard }[] = [
   ...RETRO_EXEMPLO.cards.map((c) => ({ id: `retro-${c.id}`, nome: `Retro outubro · ${c.id}`, dados: c.dados })),
   ...(RETRO_FIN_INCOMPLETA?.cards.filter((c) => c.id === "financas").map((c) => ({ id: "retro-financas-neutro", nome: "Retro outubro · finanças incompletas (neutro)", dados: c.dados })) ?? []),
   ...(RETRO_POUCA?.cards.map((c) => ({ id: `retro-pouca-${c.id}`, nome: `Retro outubro (pouco dado) · ${c.id}`, dados: c.dados })) ?? []),
+  // 30/10: a abertura nova (Codex) com 1 e 2 mini-cards e sem nenhum módulo
+  ...([["uma-area", RETRO_UMA_AREA, "1 área"], ["duas-areas", RETRO_DUAS_AREAS, "2 áreas"], ["so-dias", RETRO_SO_DIAS, "só dias"]] as const).flatMap(([id, r, nome]) => (r ? [{ id: `retro-${id}-abertura`, nome: `Retro outubro (${nome}) · abertura`, dados: r.cards[0].dados }] : [])),
 ];
 
-const SEMENTES_RETRO: Record<string, Record<string, unknown>> = { "1": SEMENTE_COMPLETA, pouca: SEMENTE_POUCA, incompleta: SEMENTE_FIN_INCOMPLETA };
+const SEMENTES_RETRO: Record<string, Record<string, unknown>> = { "1": SEMENTE_COMPLETA, pouca: SEMENTE_POUCA, incompleta: SEMENTE_FIN_INCOMPLETA, "uma-area": SEMENTE_UMA_AREA, "duas-areas": SEMENTE_DUAS_AREAS, "so-dias": SEMENTE_SO_DIAS };
 
 export const dadosDaChave = (chave: string): { dados: DadosCard; formato: Formato } | null => {
   const m = /^card-(.+)-(stories|feed|adesivo)$/.exec(chave);

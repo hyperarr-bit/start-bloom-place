@@ -79,8 +79,29 @@ export const SEMENTE_FIN_INCOMPLETA: Record<string, unknown> = {
   "finance-expenses": [1, 2, 4, 6, 8, 10, 12, 14, 15].map((d, i) => gasto(d, 50, "mercado", i)),
 };
 
+/** 30/10 (a abertura com 1 mini-card): só água, 20 dias na meta — um destaque só, sem ser "pouco dado". */
+export const SEMENTE_UMA_AREA: Record<string, unknown> = {
+  "core-saude-water-goal": 8,
+  "water-log": Object.fromEntries(Array.from({ length: 31 }, (_, i) => [out(i + 1), i % 3 === 2 ? 3 : 8])),
+};
+
+/** 30/10 (a abertura com 2 mini-cards): treino em 9 dias e "Ler" em 14. */
+export const SEMENTE_DUAS_AREAS: Record<string, unknown> = {
+  "saude-workout-log": dias([2, 5, 8, 11, 14, 17, 20, 23, 27]),
+  "rotina-habit-log": Object.fromEntries(dias([1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26]).map((d) => [d, ["Ler"]])),
+};
+
+/** 30/10 (pouco dado, NENHUM módulo com o mínimo): 1 treino e 2 gastos soltos → a abertura mostra só os dias com registro. */
+export const SEMENTE_SO_DIAS: Record<string, unknown> = {
+  "saude-workout-log": dias([18]),
+  "finance-expenses": [gasto(3, 40, "mercado", 1), gasto(25, 60, "restaurante", 1)],
+};
+
 export const leitorDe = (semente: Record<string, unknown>): Leitor => (k) => semente[k];
 
 export const RETRO_EXEMPLO: RetroOutubro = montarRetroOutubro(leitorDe(SEMENTE_COMPLETA), { agora: AGORA_EXEMPLO })!;
 export const RETRO_POUCA: RetroOutubro | null = montarRetroOutubro(leitorDe(SEMENTE_POUCA), { agora: AGORA_EXEMPLO });
 export const RETRO_FIN_INCOMPLETA: RetroOutubro | null = montarRetroOutubro(leitorDe(SEMENTE_FIN_INCOMPLETA), { agora: AGORA_EXEMPLO });
+export const RETRO_UMA_AREA: RetroOutubro | null = montarRetroOutubro(leitorDe(SEMENTE_UMA_AREA), { agora: AGORA_EXEMPLO });
+export const RETRO_DUAS_AREAS: RetroOutubro | null = montarRetroOutubro(leitorDe(SEMENTE_DUAS_AREAS), { agora: AGORA_EXEMPLO });
+export const RETRO_SO_DIAS: RetroOutubro | null = montarRetroOutubro(leitorDe(SEMENTE_SO_DIAS), { agora: AGORA_EXEMPLO });

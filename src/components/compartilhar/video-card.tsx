@@ -3,7 +3,7 @@ import { gerarCanvasEMedir } from "@/components/conquistas/gerar-imagem";
 import type { Roteiro } from "@/components/conquistas/video/camadas";
 import { codificarRoteiro, type EtapaVideo, type VideoGerado } from "@/components/conquistas/video/gerar-video";
 import { suporteVideo } from "@/components/conquistas/video/suporte";
-import { AGUA_FINAL, CORES_AGUA, CardDeCompartilhar, ONDA, type Camada } from "./cards";
+import { AGUA_FINAL, CORES_AGUA, CardDeCompartilhar, ONDA, pecasDaAbertura, type Camada, type CamadaDaPeca } from "./cards";
 import { caminhoDaOnda } from "./onda";
 import { numeroBR } from "./textos";
 import { FORMATOS, type DadosCard } from "./tipos";
@@ -73,26 +73,42 @@ export interface CamadasDoCard {
   apagado: HTMLCanvasElement;
   aceso: HTMLCanvasElement;
   textos: HTMLCanvasElement;
+  /** 30/10: os mini-cards da abertura da retrospectiva, um por camada (eles se sobrepõem). */
+  pecas?: HTMLCanvasElement[];
   medidas: MedidasDoCard;
 }
 
 type Formato916 = "stories" | "feed";
 
-/** Fotografa as 4 camadas (e mede na 1ª). */
+/** Fotografa as camadas (e mede na 1ª). A abertura da retrospectiva: fundo, textos e um mini-card por camada. */
 export async function prepararCamadasDoCard(dados: DadosCard, formato: Formato916, moeda?: ReactNode, onPasso?: (feitas: number, de: number) => void): Promise<CamadasDoCard | null> {
   const { w, h } = FORMATOS[formato];
   const foto = (camada: Camada) => <CardDeCompartilhar dados={dados} formato={formato} camada={camada} moeda={moeda} />;
+  const nPecas = dados.tipo === "retro-abertura" ? pecasDaAbertura(dados).length : 0;
+  const lista: Camada[] = dados.tipo === "retro-abertura"
+    ? ["textos", ...Array.from({ length: nPecas }, (_, i) => `peca${i}` as CamadaDaPeca)]
+    : ["apagado", "aceso", "textos"];
+  const total = lista.length + 1;
   const primeira = await gerarCanvasEMedir(foto("fundo"), { largura: w, altura: h }, medirCard);
-  onPasso?.(1, 4);
+  onPasso?.(1, total);
   if (!primeira) return null;
-  const outras: HTMLCanvasElement[] = [];
-  for (const [i, c] of (["apagado", "aceso", "textos"] as Camada[]).entries()) {
+  const fotos = new Map<Camada, HTMLCanvasElement>();
+  for (const [i, c] of lista.entries()) {
     const r = await gerarCanvasEMedir(foto(c), { largura: w, altura: h }, () => null);
-    onPasso?.(i + 2, 4);
+    onPasso?.(i + 2, total);
     if (!r) return null;
-    outras.push(r.canvas);
+    fotos.set(c, r.canvas);
   }
-  return { fundo: primeira.canvas, apagado: outras[0], aceso: outras[1], textos: outras[2], medidas: primeira.medida };
+  const textos = fotos.get("textos")!;
+  return {
+    fundo: primeira.canvas,
+    // a abertura não tem "apagado"/"aceso" (o roteiro dela não usa): fica o fundo, sem fotografar à toa
+    apagado: fotos.get("apagado") ?? primeira.canvas,
+    aceso: fotos.get("aceso") ?? primeira.canvas,
+    textos,
+    ...(nPecas ? { pecas: Array.from({ length: nPecas }, (_, i) => fotos.get(`peca${i}` as CamadaDaPeca)!) } : {}),
+    medidas: primeira.medida,
+  };
 }
 
 /* ------------------------------------------------------------------------- *
@@ -392,11 +408,68 @@ export function roteiroDaAgua(cam: CamadasDoCard, largura: number, altura: numbe
   return { duracao, desenhar };
 }
 
+/**
+ * O roteiro da ABERTURA da retrospectiva (30/10, a entrada do protótipo do
+ * Codex): o cabeçalho já está lá; "Seu outubro," e "do seu jeito." sobem por
+ * trás de uma máscara (uma linha depois da outra), a frase aparece, os
+ * mini-cards entram um por um vindo de baixo e a assinatura chega por último.
+ * O último quadro é igual à imagem.
+ */
+export const TEMPOS_DA_ABERTURA = {
+  linhas: [[0.05, 0.75], [0.22, 0.92]] as [number, number][],
+  sub: [0.65, 1.25] as [number, number],
+  /** início do 1º mini-card, o intervalo entre eles e quanto cada um leva */
+  pecas: { inicio: 0.55, passo: 0.16, dura: 0.6, sobe: 100 },
+  assinatura: [1.8, 2.4] as [number, number],
+  duracao: 4.5,
+};
+
+export function roteiroDaAbertura(cam: CamadasDoCard, largura: number, altura: number): Roteiro {
+  const m = cam.medidas;
+  const T = TEMPOS_DA_ABERTURA;
+  const desenhar = (ctx: CanvasRenderingContext2D, t: number, escala: number) => {
+    ctx.save();
+    ctx.setTransform(escala, 0, 0, escala, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.globalAlpha = 1;
+    ctx.drawImage(cam.fundo, 0, 0, largura, altura);
+    // as duas linhas do título: sobem de dentro da própria caixa (a máscara)
+    (["titulo1", "titulo2"] as const).forEach((nome, i) => {
+      const c = m.blocos[nome];
+      if (!c) return;
+      const p = saiCubico(prog(t, T.linhas[i][0], T.linhas[i][1]));
+      if (p <= 0) return;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(c.x - 20, c.y, c.w + 40, c.h);
+      ctx.clip();
+      pedaco(ctx, cam.textos, c, { dy: (c.h + 8) * (1 - p), folga: 0 });
+      ctx.restore();
+    });
+    const aparece = (img: HTMLCanvasElement, c: Caixa | undefined, [a, b]: [number, number], sobe: number, folga = 16) => {
+      if (!c) return;
+      const p = saiCubico(prog(t, a, b));
+      pedaco(ctx, img, c, { alfa: p, dy: sobe * (1 - p), folga });
+    };
+    aparece(cam.textos, m.blocos.sub, T.sub, 25);
+    (cam.pecas ?? []).forEach((img, i) => {
+      const a = T.pecas.inicio + i * T.pecas.passo;
+      // a sombra do mini-card passa da caixa: folga larga (a camada só tem ele)
+      aparece(img, m.blocos[`peca${i}`], [a, a + T.pecas.dura], T.pecas.sobe, 60);
+    });
+    aparece(cam.textos, m.blocos.assinatura, T.assinatura, 8);
+    ctx.restore();
+  };
+  return { duracao: T.duracao, desenhar };
+}
+
 /** O roteiro de cada tipo de card. */
 export function roteiroDoCard(dados: DadosCard, cam: CamadasDoCard, formato: Formato916): Roteiro {
   const { w, h } = FORMATOS[formato];
   if (dados.tipo === "azul") return roteiroDaAgua(cam, w, h, formato, true);
   if (dados.tipo === "poupanca") return roteiroDaAgua(cam, w, h, formato, false);
+  if (dados.tipo === "retro-abertura") return roteiroDaAbertura(cam, w, h);
   return roteiroQueAcende(cam, w, h);
 }
 

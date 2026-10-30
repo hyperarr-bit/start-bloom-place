@@ -133,6 +133,9 @@ export function montarRetroOutubro(ler: Leitor, opts: { agora?: Date; valoresLig
 
   const modulos: CardDaRetro[] = [];
   const resumo: ItemDoResumo[] = [];
+  /** A força de cada destaque (0–1), pra escolher os mini-cards da abertura. */
+  const forca = new Map<ModuloDaRetro, number>();
+  const diasAteHoje = Number(hoje.slice(8, 10));
 
   // FINANÇAS
   let financas: RetroOutubro["financas"] = null;
@@ -149,11 +152,13 @@ export function montarRetroOutubro(ler: Leitor, opts: { agora?: Date; valoresLig
     const azul: DadosAzul = { tipo: "azul", meses: [...antes.reverse(), { mes: prefixo.slice(0, 7), pct, saldo: av.saldo }], valoresLigados };
     modulos.push({ id: "financas", dados: azul });
     resumo.push({ modulo: "financas", numero: porcento(pct), rotulo: "sobrou, no azul" });
+    forca.set("financas", forcaDoDestaque.financas(av.dias.length, diasAteHoje));
     financas = "azul";
   } else if (av.lancamentos >= MINIMOS_RETRO.lancamentos) {
     const neutro: DadosLancamentos = { tipo: "lancamentos", ano, mesIdx, hoje, lancamentos: av.lancamentos, dias: av.dias };
     modulos.push({ id: "financas", dados: neutro });
     resumo.push({ modulo: "financas", numero: numeroBR(av.lancamentos), rotulo: "lançamentos anotados" });
+    forca.set("financas", forcaDoDestaque.financas(av.dias.length, diasAteHoje));
     financas = "neutro";
   }
 
@@ -163,6 +168,7 @@ export function montarRetroOutubro(ler: Leitor, opts: { agora?: Date; valoresLig
     const treino: DadosTreinos = { tipo: "treinos", periodo: "mes", ano, mesIdx, hoje, dias: diasTreino, melhorSequencia: maiorCorrida(diasTreino.map((d) => Number(d.slice(8, 10)))) };
     modulos.push({ id: "treino", dados: treino });
     resumo.push({ modulo: "treino", numero: String(diasTreino.length), rotulo: diasTreino.length === 1 ? "dia de treino" : "dias de treino" });
+    forca.set("treino", forcaDoDestaque.treino(diasTreino.length, diasAteHoje));
   }
 
   // ROTINA (o hábito campeão)
@@ -176,19 +182,20 @@ export function montarRetroOutubro(ler: Leitor, opts: { agora?: Date; valoresLig
       const hab: DadosHabitos = { tipo: "habitos", ano, mesIdx, hoje, habito: campeao.nome, dias: [...dias].sort() };
       modulos.push({ id: "rotina", dados: hab });
       resumo.push({ modulo: "rotina", numero: String(dias.size), rotulo: `dias de ${campeao.nome.toLowerCase()}` });
+      forca.set("rotina", forcaDoDestaque.rotina(dias.size, diasAteHoje));
     }
   }
 
   // ÁGUA (a maior do dia entre water-log e core-saude-water; a meta da pessoa, padrão 8 copos)
   const meta = dados.metaAgua && dados.metaAgua > 0 ? dados.metaAgua : 8;
   const agua = aguaDoMes(ano, mesIdx, dados);
-  const diasAteHoje = Number(hoje.slice(8, 10));
   const porDia = Array.from({ length: diasAteHoje }, (_, i) => (agua.porDia.get(i + 1) ?? 0) / meta);
   const naMeta = porDia.filter((f) => f >= 1).length;
   if (naMeta >= MINIMOS_RETRO.agua) {
     const a: DadosAgua = { tipo: "agua", ano, mesIdx, hoje, porDia };
     modulos.push({ id: "agua", dados: a });
     resumo.push({ modulo: "agua", numero: String(naMeta), rotulo: "dias na meta de água" });
+    forca.set("agua", forcaDoDestaque.agua(naMeta, diasAteHoje));
   }
 
   // LEITURA (lib-books "lido" com fim no mês; a capa = `cover`)
@@ -203,6 +210,7 @@ export function montarRetroOutubro(ler: Leitor, opts: { agora?: Date; valoresLig
     const l: DadosLivros = { tipo: "livros", periodo: "mes", ano, mesIdx, livros: lidos.map(paraCard), ...(metaDoAno ? { metaDoAno, noAno } : {}) };
     modulos.push({ id: "leitura", dados: l });
     resumo.push({ modulo: "leitura", numero: String(lidos.length), rotulo: lidos.length === 1 ? "livro lido" : "livros lidos" });
+    forca.set("leitura", forcaDoDestaque.leitura(lidos.length));
   }
 
   // METAS (month-goals["2026-10"]; os textos só com a escolha da pessoa)
@@ -213,19 +221,54 @@ export function montarRetroOutubro(ler: Leitor, opts: { agora?: Date; valoresLig
     const m: DadosMetas = { tipo: "metas", ano, mesIdx, feitas: feitas.length, total: metas.length, textos: [...feitas, ...metas.filter((x) => !x.done)].map((x) => texto(x.text)), mostrarTextos: !!opts.mostrarTextosDasMetas };
     modulos.push({ id: "metas", dados: m });
     resumo.push({ modulo: "metas", numero: `${feitas.length}/${metas.length}`, rotulo: feitas.length === 1 ? "meta batida" : "metas batidas" });
+    forca.set("metas", forcaDoDestaque.metas(feitas.length, metas.length));
   }
 
   if (!modulos.length && !diasAtivos.length) return null;
 
-  const abertura: DadosRetroAbertura = { tipo: "retro-abertura", ano, mesIdx, hoje, dias: diasAtivos, modulos: modulos.map((c) => c.id as ModuloDaRetro) };
+  const poucoDado = ehRetroCurta(atividade);
+  const abertura: DadosRetroAbertura = { tipo: "retro-abertura", ano, mesIdx, hoje, dias: diasAtivos, modulos: modulos.map((c) => c.id as ModuloDaRetro), destaques: escolherDestaques(resumo, forca), pouco: poucoDado };
   const fim: DadosRetroResumo = { tipo: "retro-resumo", ano, mesIdx, itens: resumo, diasComRegistro: diasAtivos.length };
   return {
     ano,
     mesIdx,
     cards: [{ id: "abertura", dados: abertura }, ...modulos, { id: "resumo", dados: fim }],
-    poucoDado: ehRetroCurta(atividade),
+    poucoDado,
     financas,
   };
+}
+
+/**
+ * A FORÇA de cada destaque (30/10, os mini-cards da abertura): quanto do mês
+ * aquele card cobre, de 0 a 1. Régua simples e explicável:
+ *  · Finanças (azul ou neutro), Rotina, Água: dias com registro ÷ dias do mês até hoje;
+ *  · Treino: dias de treino ÷ METADE dos dias (treinar dia sim, dia não já é o máximo);
+ *  · Leitura: livros ÷ 2 (2 livros no mês já é o máximo);
+ *  · Metas: feitas ÷ total do mês.
+ */
+export const forcaDoDestaque = {
+  financas: (diasComLancamento: number, diasDoMes: number) => Math.min(1, diasComLancamento / Math.max(1, diasDoMes)),
+  treino: (dias: number, diasDoMes: number) => Math.min(1, dias / Math.max(1, diasDoMes / 2)),
+  rotina: (dias: number, diasDoMes: number) => Math.min(1, dias / Math.max(1, diasDoMes)),
+  agua: (dias: number, diasDoMes: number) => Math.min(1, dias / Math.max(1, diasDoMes)),
+  leitura: (livros: number) => Math.min(1, livros / 2),
+  metas: (feitas: number, total: number) => Math.min(1, feitas / Math.max(1, total)),
+};
+
+/** Quantos mini-cards a abertura tem, no máximo. */
+export const MAX_DESTAQUES = 3;
+
+/**
+ * Os mini-cards da abertura: os até 3 itens do resumo com mais força (empate:
+ * o que vem antes na sequência), de volta na ORDEM DA SEQUÊNCIA (a abertura
+ * antecipa os cards na ordem em que eles vêm).
+ */
+export function escolherDestaques(resumo: ItemDoResumo[], forca: Map<ModuloDaRetro, number>): ItemDoResumo[] {
+  const fortes = resumo
+    .map((item, i) => ({ item, i, f: forca.get(item.modulo) ?? 0 }))
+    .sort((a, b) => b.f - a.f || a.i - b.i)
+    .slice(0, MAX_DESTAQUES);
+  return fortes.sort((a, b) => a.i - b.i).map((x) => x.item);
 }
 
 /** Liga/desliga o R$ e os textos das metas num card (os interruptores da tela). */

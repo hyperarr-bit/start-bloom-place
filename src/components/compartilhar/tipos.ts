@@ -215,7 +215,11 @@ export interface DadosLancamentos {
 /** Um módulo que entrou na retrospectiva (o chip da abertura e o bloco do resumo). */
 export type ModuloDaRetro = "financas" | "treino" | "rotina" | "agua" | "leitura" | "metas";
 
-/** A ABERTURA da retrospectiva (23/10): "Seu outubro" + o calendário dos dias com registro acendendo. */
+/**
+ * A ABERTURA da retrospectiva (30/10, a versão do Codex que o dono escolheu):
+ * "Seu outubro, do seu jeito." + até 3 mini-cards inclinados, cada um na cor
+ * do card do módulo, com o MESMO número e rótulo do resumo.
+ */
 export interface DadosRetroAbertura {
   tipo: "retro-abertura";
   ano: number;
@@ -225,6 +229,15 @@ export interface DadosRetroAbertura {
   dias: string[];
   /** Os módulos que têm card, na ordem da sequência. */
   modulos: ModuloDaRetro[];
+  /**
+   * Os mini-cards: os até 3 destaques MAIS FORTES entre os cards da sequência
+   * (retro-outubro-dados.ts › forcaDoDestaque), na ordem da sequência. Os
+   * itens são os do resumo (nunca R$). Vazio = nenhum módulo com card: a
+   * abertura mostra um mini-card só com os dias com registro.
+   */
+  destaques?: ItemDoResumo[];
+  /** Retrospectiva curta (pouco dado): a frase de baixo muda, nada é inventado. */
+  pouco?: boolean;
 }
 
 export interface ItemDoResumo {

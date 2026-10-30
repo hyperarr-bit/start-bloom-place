@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { COLUNAS_DECISAO, decidirGrantPix, linhasProprias, type LinhaAssinatura } from "../_shared/linha-pix.ts";
+import { liberarPix, trocarEmailAdmin } from "../_shared/admin-acoes-suporte.ts";
+import { COLUNAS_DECISAO, decidirGrantPix, type LinhaAssinatura } from "../_shared/linha-pix.ts";
 
 /**
  * Operações de SUPORTE do dono (17/07). Primeira: trocar o e-mail de login de
@@ -8,7 +9,11 @@ import { COLUNAS_DECISAO, decidirGrantPix, linhasProprias, type LinhaAssinatura 
  * (updateUserById) — mantém auth.users + identities coerentes, coisa que
  * UPDATE na mão não faz. Só a conta interna do dono pode chamar.
  *
- * POST { action: "trocar_email", de, para }  → troca de→para (email_confirm)
+ * POST { action: "trocar_email", de, para }  → de = e-mail atual OU id da conta;
+ *   para = e-mail novo. Auth (users + identity) + perfil + assinatura. Sem e-mail ao cliente.
+ * POST { action: "transferir_pix", deUid, paraUid }
+ *   ou { pedido | orderId | paymentId, email } ou { deUid, email, pedido? }
+ *   → move o Pix já pago (transferirCompraPix). Não cria acesso. Sem e-mail ao cliente.
  * POST { action: "status", email }           → uid/e-mail/assinatura (conferência)
  */
 
@@ -17,44 +22,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 const ADMIN_EMAILS = ["jv20101958@gmail.com", "hyperarr@gmail.com"];
-
-/** Move a assinatura Pix de uma conta anônima pra conta que a pessoa usa.
- *  Regras: origem sem e-mail (ou is_anonymous), com assinatura pix ativa;
- *  destino existe e NÃO tem assinatura ativa (uma casca expirada/cancelada
- *  no destino dá lugar à linha paga). A linha paga nunca é apagada. */
-export async function transferirCompraPix(
-  admin: ReturnType<typeof createClient>, deUid: string, paraUid: string,
-): Promise<{ erro: string | null; status?: number; detalhe?: Record<string, unknown> }> {
-  const { data: de } = await admin.auth.admin.getUserById(deUid);
-  if (!de?.user) return { erro: "origem_nao_encontrada", status: 404 };
-  const origemAnonima = de.user.is_anonymous === true || !de.user.email;
-  if (!origemAnonima) return { erro: "origem_tem_email", detalhe: { dica: "não é uma conta anônima — usar absorver/trocar_email" } };
-  const { data: para } = await admin.auth.admin.getUserById(paraUid);
-  if (!para?.user) return { erro: "destino_nao_encontrado", status: 404 };
-
-  const { data: subDe } = await admin.from("subscriptions")
-    .select("id, plan, billing_period, amount_cents, status, payment_method, created_at")
-    .eq("user_id", deUid).eq("payment_method", "pix").eq("status", "active")
-    .order("current_period_end", { ascending: false }).limit(1).maybeSingle();
-  if (!subDe || subDe.status !== "active") return { erro: "origem_sem_pix_ativo" };
-  /* 01/10: no destino só as linhas PRÓPRIAS contam — a da App Store/Play é do
-   * RevenueCat: nem barra a transferência (quem está na carência da Apple e
-   * pagou o Pix anônimo PRECISA receber a linha) nem pode ser apagada. */
-  const { data: todasPara } = await admin.from("subscriptions").select(COLUNAS_DECISAO).eq("user_id", paraUid);
-  const propriasPara = linhasProprias((todasPara ?? []) as LinhaAssinatura[]);
-  if (propriasPara.some((l) => l.status === "active")) return { erro: "destino_ja_tem_assinatura" };
-  for (const casca of propriasPara) await admin.from("subscriptions").delete().eq("id", casca.id); // casca inativa (expirada/cancelada) dá lugar à paga
-
-  const emailPara = para.user.email ?? null;
-  const { error } = await admin.from("subscriptions")
-    .update({ user_id: paraUid, customer_email: emailPara }).eq("id", subDe.id);
-  if (error) return { erro: `update: ${error.message}`, status: 500 };
-  await admin.from("analytics_events").insert({
-    user_id: paraUid, event_name: "compra_vinculada",
-    event_data: { de: deUid, plan: subDe.plan, amount_cents: subDe.amount_cents, pago_em: subDe.created_at },
-  }).then(() => {}, () => {});
-  return { erro: null, detalhe: { uid: paraUid, plan: subDe.plan, billing_period: subDe.billing_period, amount_cents: subDe.amount_cents, pago_em: subDe.created_at, email: emailPara ? "ok" : "sem_email" } };
-}
 
 const json = (body: Record<string, unknown>, status = 200) =>
   new Response(JSON.stringify(body), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status });
@@ -250,43 +217,33 @@ serve(async (req) => {
       return json({ ok: true, uid: uidPago, email: upd.user?.email, cascaParqueadaEm: alias });
     }
 
-    /* TRANSFERIR COMPRA ÓRFÃ (17/09). O funil da web vende ANTES do cadastro:
-     * o Pix nasce numa conta anônima. Se depois de pagar a pessoa entra em
-     * OUTRA conta (Google cria uma nova; "já tenho conta" troca de sessão), a
-     * compra fica presa na anônima e a conta de verdade cai no paywall. Dois
-     * casos reais em 55 Pix (05/09 e 17/09). Isto move a LINHA da assinatura —
-     * não cria venda nova, não duplica receita, mantém data e valor do Pix.
-     * Só aceita origem anônima/sem e-mail e destino sem assinatura.
-     * POST { action: "transferir_pix", deUid, paraUid } */
+    /* TRANSFERIR COMPRA ÓRFÃ (17/09) + botão "Liberar Pix" do /admin (30/10).
+     * Move a LINHA do Pix já pago (conta anônima → conta com e-mail). Não cria
+     * venda, não manda e-mail. O painel manda { pedido, email } ou, no chamado
+     * "Pix pago sem e-mail", { deUid, pedido, email }. deUid+paraUid continua
+     * valendo. A regra mora em _shared/admin-acoes-suporte.ts (transferirCompraPix). */
     if (action === "transferir_pix") {
-      const deUid = String(body.deUid ?? "");
-      const paraUid = String(body.paraUid ?? "");
-      if (!deUid || !paraUid || deUid === paraUid) return json({ error: "deUid/paraUid inválidos" }, 400);
-      const r = await transferirCompraPix(admin, deUid, paraUid);
-      if (r.erro) return json({ error: r.erro, ...r.detalhe }, r.status ?? 409);
-      console.log(`[ADMIN-SUPORTE] transferir_pix ${deUid} -> ${paraUid} (${r.detalhe?.plan}, ${r.detalhe?.amount_cents}) por ${caller}`);
+      const r = await liberarPix(admin, {
+        deUid: String(body.deUid ?? ""),
+        paraUid: String(body.paraUid ?? ""),
+        pedido: String(body.pedido ?? body.orderId ?? body.paymentId ?? ""),
+        email: String(body.email ?? ""),
+        caller,
+      });
+      if (!r.ok) return json({ error: r.erro, ...(r.detalhe ?? {}) }, r.status);
       return json({ ok: true, ...r.detalhe });
     }
 
+    /* TROCAR E-MAIL (17/07, painel 30/10). de = e-mail atual OU id da conta.
+     * para = e-mail novo. Auth + perfil + assinaturas. Sem e-mail ao cliente. */
     if (action === "trocar_email") {
-      const de = String(body.de ?? "").trim().toLowerCase();
-      const para = String(body.para ?? "").trim().toLowerCase();
-      if (!de || !para || !para.includes("@")) return json({ error: "de/para inválidos" }, 400);
-
-      const jaExiste = await acharUid(para);
-      if (jaExiste) return json({ error: "destino_ja_existe", uidDestino: jaExiste }, 409);
-
-      const uid = await acharUid(de);
-      if (!uid) return json({ error: "origem_nao_encontrada" }, 404);
-
-      const { data: upd, error } = await admin.auth.admin.updateUserById(uid, { email: para, email_confirm: true });
-      if (error) return json({ error: error.message }, 500);
-
-      // consistência nas tabelas nossas que guardam o e-mail
-      await admin.from("subscriptions").update({ customer_email: para }).eq("user_id", uid);
-
-      console.log(`[ADMIN-SUPORTE] email trocado uid=${uid} ${de} -> ${para} (por ${caller})`);
-      return json({ ok: true, uid, email: upd.user?.email });
+      const r = await trocarEmailAdmin(admin, {
+        de: String(body.de ?? body.uid ?? ""),
+        para: String(body.para ?? ""),
+        caller,
+      });
+      if (!r.ok) return json({ error: r.erro, ...(r.detalhe ?? {}) }, r.status);
+      return json({ ok: true, ...r.detalhe });
     }
 
     // Backfill contábil (19/07): downsells de 14,90 gravados como 27,90

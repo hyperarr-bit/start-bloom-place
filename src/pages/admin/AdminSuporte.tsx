@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, Loader2, Paperclip, Mail, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Panel, StatTile, EmptyState } from "./components";
+import { AcoesSuporte, LiberarPixChamado } from "./acoes-suporte";
+import { pedidoDoChamado } from "./acoes-suporte-api";
 
 /**
  * CAIXA DE ENTRADA DO SUPORTE (07/09, refeita 17/09).
@@ -55,7 +57,7 @@ interface ErroAgrupado {
 }
 
 type Aba = "chamados" | "cancelamentos" | "erros";
-type FiltroTipo = "todos" | "app_erro" | "app_duvida" | "app_sugestao";
+type FiltroTipo = "todos" | "app_erro" | "app_duvida" | "app_sugestao" | "pix_sem_email";
 
 const ROTULO: Record<string, { txt: string; cor: string }> = {
   app_erro: { txt: "Erro", cor: "bg-destructive/10 text-destructive" },
@@ -283,6 +285,8 @@ export default function AdminSuporte() {
         </div>
       )}
 
+      <AcoesSuporte />
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatTile label="Chamados em aberto" value={String(abertos.length)} sub={`${contagem.app_erro} erro · ${contagem.app_duvida} dúvida · ${contagem.app_sugestao} sugestão`} />
         <StatTile label="Sugestões" value={String(chamados.filter((t) => t.source === "app_sugestao").length)} sub="no total, abertas e resolvidas" />
@@ -309,7 +313,7 @@ export default function AdminSuporte() {
             <Seletor
               valor={tipo}
               onChange={(v) => setTipo(v as FiltroTipo)}
-              opcoes={[{ id: "todos", l: "Tudo" }, { id: "app_erro", l: "Erros" }, { id: "app_duvida", l: "Dúvidas" }, { id: "app_sugestao", l: "Sugestões" }]}
+              opcoes={[{ id: "todos", l: "Tudo" }, { id: "app_erro", l: "Erros" }, { id: "app_duvida", l: "Dúvidas" }, { id: "app_sugestao", l: "Sugestões" }, { id: "pix_sem_email", l: "Pix sem e-mail" }]}
             />
           </div>
           {visiveis.length === 0 ? (
@@ -369,6 +373,10 @@ export default function AdminSuporte() {
                     </div>
 
                     <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap">{texto}</p>
+
+                    {t.source === "pix_sem_email" && (
+                      <LiberarPixChamado deUid={t.user_id} pedido={pedidoDoChamado(t.message)} />
+                    )}
 
                     {t.resposta && (
                       <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.06] p-3">

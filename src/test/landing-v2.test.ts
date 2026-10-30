@@ -244,6 +244,8 @@ describe("braço v2: a vitrine, a ordem e o cartão", () => {
     const atual = (sel: string) => [...d.querySelectorAll(sel)].find((b) => b.getAttribute("data-so-lp") === "atual")!.textContent!.replace(/\s+/g, " ").trim();
     expect(v2("#lp-fixo button")).toBe("Quero organizar minha vida · R$ 27,90");
     expect(v2("#fim button")).toBe("Quero organizar minha vida");
+    expect(d.querySelector("#lp-cta-topo")!.textContent).toBe("Quero organizar minha vida"); // r2 2.1: sem o preço no botão (está 10 px acima); numa linha só com fonte +30%
+    expect(HTML).toMatch(/\.lp2-topo \.lp-cta \{[^}]*white-space: nowrap/);
     expect(atual("#lp-fixo button")).toBe("Quero organizar tudo · R$ 27,90");
     expect(atual("#fim button")).toBe("Quero organizar tudo");
   });
@@ -383,7 +385,7 @@ describe("nos DOIS braços: braco_lp em todo evento, pixel cedo, demo preguiços
     expect(fixo.hasAttribute("data-on")).toBe(true);
     // com a oferta na tela, o fixo some (como hoje) — mas no v2 "viu a oferta" NÃO vem do bloco (crítica 8.1)…
     const oferta = document.getElementById("oferta")!;
-    dispara((o) => o.alvos.includes(oferta), [{ isIntersecting: true, target: oferta, boundingClientRect: { top: 200 } }]);
+    dispara((o) => o.alvos.includes(oferta) && o.opts.threshold === 0.15, [{ isIntersecting: true, target: oferta, boundingClientRect: { top: 200 } }]);
     expect(fixo.hasAttribute("data-on")).toBe(false);
     expect(nomes()).not.toContain("landing_oferta_vista");
     // …vem do BOTÃO DE PAGAR ≥ 50% visível
@@ -557,16 +559,13 @@ describe("crítica r1 · 4.1: o QR não pode sair da tela quando aparece (v2)", 
 });
 
 describe("crítica r1 · 7.1 / 8.1 / 8.2: rede e medição", () => {
-  it("7.1: toda imagem do v2 é loading=lazy sem fetchpriority no HTML (fora do v2 fica display:none e não baixa); o preload da 1ª tela sai do <head> SÓ no v2", () => {
+  it("7.1 / r2 2.3: toda imagem do v2 é loading=lazy sem fetchpriority (fora do v2 fica display:none e não baixa); e o <head> não injeta preload nenhum (Safari avisava 'preloaded but not used')", () => {
     const d = document.createElement("div"); d.innerHTML = corpoDe(HTML);
     const imgs = [...d.querySelectorAll('[data-so-lp="v2"] img')];
     expect(imgs.length).toBeGreaterThanOrEqual(5);
     for (const i of imgs) { expect(i.getAttribute("loading")).toBe("lazy"); expect(i.hasAttribute("fetchpriority")).toBe(false); }
-    expect(rodar(comChaves("off", "off"), "/organizar").preloads).toEqual([]);
-    expect(rodar(comChaves("off", "off"), "/organizar?lp=atual").preloads).toEqual([]);
-    const v2 = rodar(comChaves("off", "off"), "/organizar?lp=v2").preloads;
-    expect(v2).toHaveLength(1);
-    expect(v2[0]).toMatchObject({ rel: "preload", as: "image", href: "/landing/v2-posso-gastar.webp", fetchpriority: "high" });
+    expect(HTML).not.toMatch(/rel="preload" as="image"|pl\.rel = "preload"/);
+    for (const u of ["/organizar", "/organizar?lp=atual", "/organizar?lp=v2"]) expect(rodar(comChaves("off", "off"), u).preloads).toEqual([]);
   });
   it("8.1: no braço atual 'viu a oferta' continua sendo 15% do bloco (como hoje); no v2 só o botão ≥ 50% — o bloco #oferta na tela não dispara nada", async () => {
     await abrirPagina("atual");
@@ -576,8 +575,14 @@ describe("crítica r1 · 7.1 / 8.1 / 8.2: rede e medição", () => {
     expect(IOFake.inst.find((o) => o.opts.threshold === 0.5)).toBeUndefined();
     await abrirPagina("v2");
     const oferta2 = document.getElementById("oferta")!;
-    dispara((o) => o.alvos.includes(oferta2), [{ isIntersecting: true, target: oferta2, boundingClientRect: { top: 200 } }]);
+    dispara((o) => o.alvos.includes(oferta2) && o.opts.threshold === 0.15, [{ isIntersecting: true, target: oferta2, boundingClientRect: { top: 200 } }]);
     expect(nomes()).not.toContain("landing_oferta_vista");
+    // r2 2.5: nem o landing_bloco "oferta" sai com 15% no v2 — só com ≥ 50% do bloco
+    expect(eventos().find((e) => e.nome === "landing_bloco" && e.bloco === "oferta")).toBeUndefined();
+    const obs50 = IOFake.inst.find((o) => o.alvos.includes(oferta2) && o.opts.threshold === 0.5)!;
+    obs50.cb([{ isIntersecting: true, target: oferta2, boundingClientRect: { top: 100 } }], obs50);
+    obs50.cb([{ isIntersecting: true, target: oferta2, boundingClientRect: { top: 100 } }], obs50);
+    expect(eventos().filter((e) => e.nome === "landing_bloco" && e.bloco === "oferta")).toEqual([expect.objectContaining({ via: "50" })]);
   });
   it("8.2: landing_fita {indice, legenda} 1x por celular do 'Por dentro' (≥ 60% na tela), só no v2", async () => {
     await abrirPagina("v2");
@@ -586,8 +591,20 @@ describe("crítica r1 · 7.1 / 8.1 / 8.2: rede e medição", () => {
     expect(obs.opts.threshold).toBe(0.6);
     obs.cb([{ isIntersecting: true, target: telas[1], boundingClientRect: { top: 100 } }], obs);
     obs.cb([{ isIntersecting: true, target: telas[1], boundingClientRect: { top: 100 } }], obs);
-    expect(eventos().filter((e) => e.nome === "landing_fita")).toEqual([expect.objectContaining({ indice: 1, legenda: "Quanto posso gastar", braco_lp: "v2" })]);
+    expect(eventos().filter((e) => e.nome === "landing_fita")).toEqual([expect.objectContaining({ indice: 1, legenda: "Finanças", braco_lp: "v2" })]);
     await abrirPagina("atual");
     expect(IOFake.inst.find((o) => o.opts.threshold === 0.6)).toBeUndefined();
+  });
+});
+
+describe("crítica r2 · 2.4: uma página velha (de outro teste) não escreve na lista de eventos da nova", () => {
+  it("os timers da página anterior (pixel → demo 'fundo') só escrevem na lista em que ela nasceu", async () => {
+    await abrirPagina("atual");
+    const listaVelha = eventos();
+    await abrirPagina("v2"); // antes de os timers da anterior (≈ 400 ms) dispararem
+    await dormir(900);
+    expect(listaVelha.map((e) => e.nome)).toContain("landing_demo_aberta"); // a velha recebeu o seu "fundo"
+    expect(nomes()).not.toContain("landing_demo_aberta"); // a nova (v2) ficou limpa
+    expect(frame().getAttribute("src")).toBeNull();
   });
 });

@@ -97,7 +97,7 @@ type Janela = Window & {
   requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
 };
 const w = window as Janela;
-w.__eventosLanding = w.__eventosLanding || [];
+const listaDeEventos = (w.__eventosLanding = w.__eventosLanding || []); // a lista desta página (o teste cria outra a cada página)
 const diag = { terceirosEm: null as number | null, demoEm: null as number | null, demoVia: null as string | null };
 w.__landingDiag = diag;
 
@@ -132,7 +132,7 @@ if (BUSCA.get("fbclid")) atrib.tem_fbclid = "1";
 
 export function evento(nome: string, dados: Record<string, unknown> = {}): void {
   const corpo = { ...dados, landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
-  w.__eventosLanding!.push({ nome, ...corpo });
+  listaDeEventos.push({ nome, ...corpo });
   if (!PRODUCAO) return;
   try {
     fetch(URL_EV, {
@@ -341,6 +341,8 @@ if ("IntersectionObserver" in window) {
   if (V2) {
     const botaoPagar = $("lp-pagar");
     new IntersectionObserver((ens) => { if (ens.some((e) => e.isIntersecting)) viuAOferta(); }, { threshold: 0.5 }).observe(botaoPagar);
+    // crítica r2 2.5: o landing_bloco "oferta" do v2 também só com metade do bloco na tela (em 844+ os 15% apareciam sem rolar)
+    new IntersectionObserver((ens, o) => { if (ens.some((e) => e.isIntersecting) && !vistos.has("oferta")) { vistos.add("oferta"); evento("landing_bloco", { bloco: "oferta", via: "50" }); o.disconnect(); } }, { threshold: 0.5 }).observe($("oferta"));
     // crítica r1 8.2: a fita "Por dentro" — qual celular foi visto (1x por celular, ≥ 60% na tela)
     const telas = [...document.querySelectorAll<HTMLElement>("#dentro-v2 .lp2-tel")];
     const vistas = new Set<number>();
@@ -358,7 +360,7 @@ if ("IntersectionObserver" in window) {
       const bloco = (en.target as HTMLElement).dataset.bloco!;
       if (en.isIntersecting) {
         naTela.add(bloco);
-        if (!vistos.has(bloco)) { vistos.add(bloco); evento("landing_bloco", { bloco }); }
+        if (!vistos.has(bloco) && !(V2 && bloco === "oferta")) { vistos.add(bloco); evento("landing_bloco", { bloco }); } // v2: a oferta conta com ≥ 50% (abaixo)
         if (bloco === "oferta" && !V2) viuAOferta(); // no v2 é o botão de pagar ≥ 50% visível (abaixo)
       } else naTela.delete(bloco);
       // passou da demo = o fim da demo já subiu acima do meio da tela

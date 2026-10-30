@@ -388,88 +388,127 @@
         .lp-topo, .lp-sec { padding-left: 24px; padding-right: 24px; }
       }
 
-      /* ═════════ BRAÇO v2 (30/10, AB_LP) — TUDO escopado em html[data-lp="v2"] / .lp2-* / [data-so-lp]; o braço "atual" não vê nada daqui ═════════ */
-      /* a ordem dos blocos (vitrine → oferta → prova → os 16 → como → demo opcional → dúvidas) sai só de CSS: nada é duplicado */
+      /* ═════════ BRAÇO v2 = v3 "produto em uso" (30/10, AB_LP) — TUDO escopado em html[data-lp="v2"] / .lp2-* / [data-so-lp]; o braço "atual" não vê nada daqui ═════════ */
+      /* a ordem dos blocos (1ª tela → por dentro → oferta → avaliações → como → dúvidas → demo opcional) sai só de CSS: o DOM é o de hoje */
       html[data-lp="v2"] main.lp { display: flex; flex-direction: column; }
-      /* CRÍTICA r1 4.1: com a ordem por `order`, o scroll anchoring do navegador escolhia #antes (abaixo do cartão na tela, antes no
-         DOM) como âncora e, quando o QR crescia o cartão em ~580 px, empurrava a página — a pessoa via só "Já paguei". Sem âncora
-         automática no v2; o landing.ts rola até o cartão a cada troca de fase. */
+      /* com a ordem por `order`, o scroll anchoring do navegador tomava um bloco abaixo na tela (antes no DOM) como âncora e, quando o QR
+         crescia o cartão, empurrava a página (a pessoa via só "Já paguei"). Sem âncora automática; o landing.ts rola até o cartão a cada troca de fase. */
       html[data-lp="v2"], html[data-lp="v2"] body, html[data-lp="v2"] main.lp { overflow-anchor: none; }
-      html[data-lp="v2"] .lp-promo { order: -2; }
-      html[data-lp="v2"] .lp-barra { order: -1; height: 46px; padding-top: 12px; }
+      html[data-lp="v2"] .lp-promo { order: -2; display: block; white-space: normal; height: auto; min-height: 34px; padding: 8px 12px 7px; line-height: 1.3; } /* fonte do sistema +15%: quebra como texto corrido (2 linhas), não por pedaços */
+      html[data-lp="v2"] .lp-barra { display: none; } /* a faixa já carrega "CORE": sem barra de marca (46 px a mais pro celular da 1ª tela) */
       html[data-lp="v2"] #topo-v2 { order: 1; }
-      html[data-lp="v2"] #oferta { order: 2; padding-top: 44px; }
-      html[data-lp="v2"] #dentro-v2 { order: 3; }
-      html[data-lp="v2"] #avaliacoes { order: 4; }
-      html[data-lp="v2"] #modulos { order: 5; }
-      html[data-lp="v2"] #como { order: 6; }
+      html[data-lp="v2"] #dentro-v2 { order: 2; }
+      html[data-lp="v2"] #oferta { order: 3; padding-top: 40px; }
+      html[data-lp="v2"] #avaliacoes-v2 { order: 4; }
+      html[data-lp="v2"] #como-v2 { order: 5; }
+      html[data-lp="v2"] #duvidas-v2 { order: 6; }
       html[data-lp="v2"] #demo { order: 7; }
-      html[data-lp="v2"] #duvidas { order: 8; }
-      /* 1. a vitrine: promessa + onde roda + grade dos 16 (HTML) + card real + preço + botão — em 390×690 com ≥ 40 px de folga (crítica r1 1.2) */
-      .lp2-topo { padding: 10px 20px 0; }
-      .lp2-topo .lp-h1 { font-size: 31px; }
-      .lp2-topo .lp-sub { font-size: 15px; margin-top: 6px; }
-      .lp2-onde { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; padding: 0; }
-      .lp2-onde li { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 99px; background: #f4f4f5; font-size: 12px; font-weight: 700; color: var(--suave); white-space: nowrap; }
-      .lp2-onde svg { width: 13px; height: 13px; flex-shrink: 0; }
-      .lp2-grade { list-style: none; margin: 12px 0 0; padding: 0; display: grid; grid-template-columns: repeat(8, 1fr); gap: 7px 3px; }
-      .lp2-grade li { display: block; text-align: center; font-size: 10px; font-weight: 650; letter-spacing: -.01em; color: var(--tx); white-space: nowrap; line-height: 1.1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-      /* fonte do sistema +30%: a faixa quebra em 2 linhas em vez de cortar (só no v2) */
-      html[data-lp="v2"] .lp-promo { white-space: normal; height: auto; min-height: 34px; padding: 7px 12px; line-height: 1.3; }
-      .lp2-g-ico { width: 36px; height: 36px; margin: 0 auto 4px; border-radius: 11px; display: grid; place-items: center; }
-      .lp2-g-ico svg { width: 18px; height: 18px; }
-      .lp2-card { margin: 12px 0 0; }
-      .lp2-card img { display: block; width: 100%; height: auto; border-radius: 10px; box-shadow: 0 12px 26px -14px rgba(22,18,28,.4), 0 0 0 1px rgba(0,0,0,.05); background: #f0fdf4; }
-      .lp2-preco { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
-      .lp2-preco-v { font-size: 31px; font-weight: 850; letter-spacing: -.035em; line-height: 1; white-space: nowrap; }
-      .lp2-preco-v small { font-size: 62%; font-weight: 800; }
-      .lp2-preco-txt { display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; line-height: 1.25; }
-      .lp2-preco-txt b { font-weight: 750; font-size: 14.5px; }
-      .lp2-preco-txt span { color: var(--suave); font-weight: 600; font-size: 12.5px; }
-      .lp2-topo .lp-cta { margin-top: 10px; min-height: 54px; white-space: nowrap; padding: 0 12px; }
-      .lp2-miuda { margin: 7px 0 0; text-align: center; font-size: 12px; color: var(--suave); font-weight: 600; line-height: 1.3; }
-      /* 1b. "Por dentro": os celulares inteiros (proporção REAL do iPhone, tela 390×844; o print não é esticado — só sai da tela por baixo) */
-      .lp2-fita { display: flex; gap: 14px; margin: 16px -20px 0; padding: 0 20px; height: 340px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; -webkit-mask-image: linear-gradient(to bottom, #000 84%, transparent); mask-image: linear-gradient(to bottom, #000 84%, transparent); }
-      .lp2-fita::-webkit-scrollbar { display: none; }
-      .lp2-tel { flex: 0 0 auto; width: 270px; margin: 0; scroll-snap-align: start; scroll-margin-left: 20px; }
-      .lp2-tel figcaption { font-size: 12.5px; font-weight: 750; color: var(--suave); margin: 0 0 7px 4px; letter-spacing: -.005em; }
-      .lp2-cel { aspect-ratio: 390 / 844; border-radius: 34px; border: 5px solid #16121c; background: #fff; overflow: hidden; box-shadow: 0 16px 34px -18px rgba(22,18,28,.45), 0 1px 0 rgba(0,0,0,.04); }
-      .lp2-cel img { display: block; width: 100%; height: auto; }
-      .lp2-fita-fim { flex: 0 0 8px; }
-      /* 2. o cartão da oferta: só texto muda (data-so-lp); a linha de confiança embaixo do botão */
-      .lp2-confianca { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 10px 0 0; font-size: 13px; font-weight: 650; color: #3d3a40; text-align: center; line-height: 1.35; }
-      .lp2-confianca svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--verde); }
-      html[data-lp="v2"] .lp-ancora { color: var(--suave); font-weight: 600; }
-      html[data-lp="v2"] .lp-ancora b { color: var(--tx); }
+      /* ── 1. a 1ª tela: painel pastel (= foto 01 da loja; --lp2-painel troca pra âmbar #f9e5bd = foto 02 — decisão do dono) ── */
+      .lp2-topo { --lp2-painel: #fbe4ee; padding: 0; }
+      .lp2-hero { background: var(--lp2-painel); padding: 12px 20px 0; overflow: hidden; }
+      .lp2-topo .lp-h1 { font-size: 30px; line-height: 1.06; letter-spacing: -.025em; }
+      html[data-lp="v2"][data-t="b"] .lp2-h1-a, html[data-lp="v2"]:not([data-t="b"]) .lp2-h1-b { display: none; }
+      /* 350 px = o que cabe da Home (de "Bom dia, Ana" até 8 px abaixo dos rótulos da 1ª fileira) num celular de 232 px */
+      .lp2-hero-cel { height: 350px; margin-top: 8px; display: flex; justify-content: center; overflow: hidden; }
+      .lp2-hero-cel .lp2-fone { --w: 232px; }
+      /* o celular: proporção REAL (só a largura é fixa; a altura segue o print — nunca esticado); moldura, ilha e barra como um iPhone */
+      .lp2-fone { --w: 300px; width: var(--w); flex: none; background: #1b1a1d; border-radius: calc(var(--w) * .14); padding: calc(var(--w) * .028); box-shadow: 0 18px 40px -16px rgba(28,26,31,.45), 0 0 0 1px rgba(0,0,0,.06); position: relative; }
+      .lp2-fone-tela { background: #fff; border-radius: calc(var(--w) * .114); overflow: hidden; position: relative; }
+      .lp2-fone-barra { height: calc(var(--w) * .1); display: flex; align-items: center; justify-content: space-between; padding: 0 calc(var(--w) * .085) 0 calc(var(--w) * .09); font-size: calc(var(--w) * .046); font-weight: 700; color: #111; }
+      .lp2-fone-barra svg { height: calc(var(--w) * .036); width: auto; }
+      .lp2-fone-ilha { position: absolute; top: calc(var(--w) * .028); left: 50%; transform: translateX(-50%); width: calc(var(--w) * .27); height: calc(var(--w) * .074); background: #0b0b0c; border-radius: 99px; }
+      .lp2-fone img { display: block; width: 100%; height: auto; }
+      .lp2-abaixo { padding: 6px 20px 0; }
+      .lp2-onde { display: flex; justify-content: center; align-items: center; gap: 5px; flex-wrap: wrap; margin: 0; padding: 0; list-style: none; font-size: 12.5px; font-weight: 600; color: var(--suave); }
+      .lp2-onde li { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+      .lp2-onde li + li::before { content: "·"; color: var(--fraco); font-weight: 400; margin-right: 3px; }
+      .lp2-onde svg { width: 13px; height: 13px; fill: currentColor; flex-shrink: 0; }
+      .lp2-preco { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 6px; }
+      .lp2-preco-v { font-size: 38px; font-weight: 850; letter-spacing: -.03em; line-height: 1; white-space: nowrap; }
+      .lp2-preco-v small { font-size: .55em; font-weight: 800; letter-spacing: 0; }
+      .lp2-preco-txt { display: flex; flex-direction: column; text-align: right; line-height: 1.2; }
+      .lp2-preco-txt b { font-size: 15px; font-weight: 800; }
+      .lp2-preco-txt span { font-size: 13px; color: var(--suave); font-weight: 500; margin-top: 2px; }
+      .lp2-topo .lp-cta { margin-top: 8px; min-height: 54px; white-space: nowrap; padding: 0 12px; font-size: 17.5px; font-weight: 800; border-radius: 14px; }
+      .lp2-topo .lp-cta svg, html[data-lp="v2"] .lp-fim .lp-cta svg { width: 18px; height: 18px; }
+      .lp2-miuda { margin: 6px 0 0; text-align: center; font-size: 12px; color: var(--suave); font-weight: 500; line-height: 1.3; }
+      /* ── 2. "Por dentro": painéis no estilo das fotos de loja (fundo do módulo, título falado, celular ≥ 70% cortado pela borda) ── */
+      .lp2-dentro { padding-top: 36px; }
+      .lp2-foto { position: relative; border-radius: 24px; padding: 22px 20px 0; margin: 16px 0 0; overflow: hidden; height: 440px; color: var(--tx); }
+      .lp2-foto figcaption { margin: 0; }
+      .lp2-foto h3 { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -.025em; line-height: 1.1; }
+      .lp2-foto h3 em { font-style: normal; }
+      .lp2-foto figcaption p { margin: 6px 0 0; font-size: 13.5px; line-height: 1.35; color: rgba(0,0,0,.62); font-weight: 500; text-wrap: pretty; }
+      .lp2-foto .lp2-fone { margin: 14px auto 0; }
+      .lp2-foto.magenta { background: var(--magenta-escuro); color: #fff; height: 482px; } /* a 4ª fileira (Relações, Detox, Pet, Viagens) inteira + 8 px; a borda do painel corta o celular antes do bezel de baixo */ .lp2-foto.magenta em { color: #ffd9a8; } .lp2-foto.magenta figcaption p { color: rgba(255,255,255,.8); }
+      .lp2-foto.ambar { background: #f9e5bd; } .lp2-foto.ambar em { color: #9a5b00; }
+      .lp2-foto.verde { background: #dcf2e4; } .lp2-foto.verde em { color: #1d7a45; }
+      /* o card real recortado @3x e ~1,3× maior por cima do próprio card (regra do dono 22/10: zoom = card real nítido, flutuando) */
+      .lp2-zoom { position: absolute; top: 268px; left: 50%; transform: translateX(-50%); width: 350px; max-width: calc(100% - 8px); border-radius: 12px; overflow: hidden; background: #f0fdf4; box-shadow: 0 16px 36px -10px rgba(60,40,0,.45), 0 0 0 1px rgba(0,0,0,.05); }
+      .lp2-zoom img { display: block; width: 100%; height: auto; }
+      /* ── 3. o cartão: 8 linhas, 1 fato por linha (só texto muda, por data-so-lp) ── */
       html[data-lp="v2"] .lp-preco-tit b small { font-size: 60%; font-weight: 850; }
-      html[data-lp="v2"] .lp-seguro { color: var(--suave); }
-      /* 3. a tela do Pix (preenchida pelo landing.ts no braço v2): 3 passos curtos; o valor numa linha só */
+      html[data-lp="v2"] .lp-seguro { color: var(--suave); font-size: 11px; }
+      .lp2-disp span { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 4px 8px; }
+      .lp2-disp svg { width: 13px; height: 13px; fill: currentColor; }
+      /* ── 4. a tela do Pix (preenchida pelo landing.ts no v2): 3 passos, QR e código lado a lado, "Pagou? Volte aqui", tudo em 690 ── */
       html[data-lp="v2"] .lp-pix-valor b { white-space: nowrap; }
       html[data-lp="v2"] button.lp-link { min-height: 44px; padding: 10px 8px; }
       .lp2-vale { display: block; margin-top: 4px; color: var(--suave); font-weight: 600; font-size: 12.5px; }
-      .lp2-passos { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; counter-reset: p; }
-      .lp2-passos li { display: flex; align-items: center; gap: 10px; font-size: 14.5px; line-height: 1.35; color: #3d3a40; }
-      .lp2-passos li::before { counter-increment: p; content: counter(p); width: 24px; height: 24px; border-radius: 50%; background: var(--grafite); color: #fff; font-size: 12.5px; font-weight: 800; display: grid; place-items: center; flex-shrink: 0; }
-      .lp2-passos li.feito::before { content: "✓"; background: var(--verde); }
+      .lp2-passos { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; counter-reset: p; }
+      .lp2-passos li { display: flex; align-items: center; gap: 10px; font-size: 14.5px; line-height: 1.3; color: #3d3a40; }
+      .lp2-passos li::before { counter-increment: p; content: counter(p); width: 22px; height: 22px; border-radius: 7px; background: var(--papel); color: var(--tx); font-size: 12px; font-weight: 800; display: grid; place-items: center; flex-shrink: 0; }
+      .lp2-passos li.feito::before { content: "✓"; background: #dcf2e4; color: #1d7a45; }
       .lp2-passos b { color: var(--tx); }
+      .lp2-qr-linha { display: flex; gap: 12px; align-items: stretch; margin-top: 14px; }
+      .lp2-qr-linha .lp-qr { width: 118px; height: 118px; padding: 6px; }
+      .lp2-qr-lado { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 6px; }
+      .lp2-qr-dica { margin: 0; font-size: 12px; line-height: 1.35; color: var(--suave); }
+      .lp2-codigo { margin: 0; padding: 7px 10px; max-height: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-radius: 8px; }
+      html[data-lp="v2"] button.lp-copiar { margin-top: 0; min-height: 44px; font-size: 14.5px; border-radius: 11px; }
       .lp2-volte { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; padding: 12px 14px; border-radius: 14px; background: var(--magenta-suave); border: 1px solid #f3cfe2; font-size: 13.5px; line-height: 1.4; color: #3d3a40; }
       .lp2-volte b { color: var(--tx); display: block; font-size: 14.5px; }
-      .lp2-garantia-mini { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 10px; font-size: 12.5px; font-weight: 650; color: #14532d; }
+      .lp2-volte .lp-ponto { background: var(--magenta); box-shadow: 0 0 0 4px rgba(214,51,138,.18); animation: none; }
+      .lp2-garantia-mini { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 10px 0 0; font-size: 12.5px; font-weight: 650; color: #14532d; }
       .lp2-garantia-mini svg { width: 14px; height: 14px; color: var(--verde); }
-      /* 4. a demo vira opcional: só o toque em "Testar o app" baixa o iframe */
+      html[data-lp="v2"] .lp-email-opc { margin-top: 12px; padding-top: 12px; }
+      html[data-lp="v2"] .lp-links { margin-top: 6px; }
+      /* ── 5. pós-compra: e-mail numa caixa, selos primeiro e grandes (D1: loja 43% × site 15%), site secundário, caixa do 1º passo ── */
+      .lp2-email-caixa { margin: 12px 0 0; padding: 12px 14px; border-radius: 14px; background: var(--papel); font-size: 15px; font-weight: 700; line-height: 1.4; text-align: center; word-break: break-all; }
+      .lp2-selos { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+      .lp2-selos a { display: inline-flex; }
+      .lp2-selos img { height: 48px; width: auto; display: block; }
+      html[data-lp="v2"] .lp-pago .lp2-selos + .lp-form { margin-top: 12px; }
+      button.lp2-btn2 { width: 100%; min-height: 48px; border-radius: 12px; border: 1.5px solid var(--grafite); background: #fff; color: var(--grafite); font-size: 15px; font-weight: 750; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+      .lp2-passo1 { margin: 14px 0 0; padding: 12px 14px; border-radius: 14px; background: #fff4dc; color: #6b4300; font-size: 13.5px; line-height: 1.4; text-align: left; }
+      .lp2-passo1 b { color: #4a2f00; }
+      .lp2-duvida-contato { margin: 12px 0 0; font-size: 12.5px; color: var(--suave); }
+      /* ── 6. a demo vira opcional e compacta: print + "Testar o app"; o celular só cresce quando abre (iframe só no toque) ── */
       html[data-lp="v2"] .lp-celular { height: clamp(420px, 56svh, 520px); }
+      html[data-lp="v2"] .lp-celular:not([data-abrindo]):not([data-pronta]) { height: 220px; }
+      html[data-lp="v2"] #demo:not(:has(.lp-celular[data-abrindo], .lp-celular[data-pronta])) .lp-pilulas { display: none; }
+      html[data-lp="v2"] .lp-pilula-16 { display: none; } /* os 16 em HTML não existem no v3 (estão dentro do celular, no "Por dentro") */
       html[data-lp="v2"] .lp-celular:not([data-abrindo]) .lp-demo-carregando { display: none; }
       html[data-lp="v2"] .lp-celular[data-abrindo] .lp2-demo-abrir, html[data-lp="v2"] .lp-celular[data-pronta] .lp2-demo-abrir { display: none; }
       .lp2-demo-abrir { position: absolute; z-index: 3; left: 50%; top: 50%; transform: translate(-50%, -50%); min-height: 54px; padding: 0 24px; border-radius: 99px; border: 0; background: var(--grafite); color: #fff; font-size: 16px; font-weight: 750; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 10px 24px -8px rgba(0,0,0,.45); white-space: nowrap; }
       .lp2-demo-abrir svg { width: 18px; height: 18px; }
       .lp2-demo-veu { position: absolute; z-index: 2; inset: 0; background: linear-gradient(to bottom, rgba(255,255,255,0) 30%, rgba(255,255,255,.75)); pointer-events: none; }
       html[data-lp="v2"] .lp-celular[data-abrindo] .lp2-demo-veu, html[data-lp="v2"] .lp-celular[data-pronta] .lp2-demo-veu { display: none; }
+      /* ── 7. fim + barra fixa (preço à esquerda, botão numa linha) ── */
+      html[data-lp="v2"] .lp-fim { background: #fbe4ee; color: var(--tx); margin-top: 48px; padding: 32px 20px 28px; }
+      html[data-lp="v2"] .lp-fim p { color: var(--suave); font-weight: 600; }
+      html[data-lp="v2"] .lp-fim button.lp-cta { background: var(--grafite); color: #fff; }
+      html[data-lp="v2"] .lp-rodape { background: #fff; color: var(--fraco); border-top: 0; padding-top: 18px; }
+      html[data-lp="v2"] .lp-rodape a { color: var(--suave); }
+      html[data-lp="v2"] .lp-fixo { display: flex; align-items: center; gap: 12px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: rgba(255,255,255,.94); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border-top: 1px solid var(--borda); }
+      .lp2-fixo-p { flex: none; line-height: 1.15; }
+      .lp2-fixo-p b { display: block; font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
+      .lp2-fixo-p span { display: block; font-size: 11.5px; color: var(--suave); font-weight: 600; }
+      html[data-lp="v2"] .lp-fixo .lp-cta { margin: 0; flex: 1; min-height: 48px; font-size: 15.5px; white-space: nowrap; padding: 0 10px; max-width: none; }
+      @media (max-width: 374px) { .lp2-topo .lp-h1 { font-size: 27px; } .lp2-fixo-p span { display: none; } html[data-lp="v2"] .lp-fixo .lp-cta { font-size: 14.5px; } } /* 360 com fonte +15%: o título fica em 2 linhas */
       @media (min-width: 720px) {
-        .lp2-topo .lp-h1 { font-size: 40px; }
-        .lp2-grade li { font-size: 11.5px; }
-        .lp2-g-ico { width: 42px; height: 42px; }
-        .lp2-tel { width: 290px; }
-        .lp2-fita { height: 380px; }
+        .lp2-topo .lp-h1 { font-size: 36px; }
+        .lp2-foto .lp2-fone { --w: 316px; } /* tela 298 px: 3× = 894 ≤ 900 do print (0 upscale) */
       }
     </style>
     <!-- Meta Pixel (só a fila aqui; o fbevents.js entra no carregador adiado do landing.ts, depois da 1ª pintura) -->
@@ -491,7 +530,7 @@
       <!-- ═════════ 1. TOPO ═════════ -->
       <div class="lp-promo" role="note" data-so-lp="atual"><b data-so-oferta="sempre">🔥 ACESSO VITALÍCIO</b><b data-so-oferta="ano">🔥 OFERTA ESPECIAL</b> <span>· só hoje<b id="lp-promo-data"></b></span></div>
       <!-- 30/10 (v2): a faixa sem "só hoje, DD/MM" (a data mudava sozinha todo dia = promoção eterna; risco CDC art. 37 e política da Meta). Só o que é verdade. -->
-      <div class="lp-promo" role="note" data-so-lp="v2"><b>🔥 ACESSO VITALÍCIO</b> <span>· R$ 27,90 no Pix</span></div>
+      <div class="lp-promo" role="note" data-so-lp="v2"><b>CORE · ACESSO VITALÍCIO</b> <span>· R$ 27,90 no Pix</span></div>
       <script>
         // a data de hoje no fuso de Brasília ("· válida hoje, 28/10") — sem ela, fica só "válida hoje"
         try { var dd = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" }).format(new Date()); document.getElementById("lp-promo-data").textContent = ", " + dd; } catch (e) {}
@@ -516,43 +555,30 @@
         <p class="lp-onde"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"></rect><path d="M12 18h.01"></path></svg>iPhone e Android</span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"></rect><line x1="8" x2="16" y1="21" y2="21"></line><line x1="12" x2="12" y1="17" y2="21"></line></svg>Computador</span><span>Mesma conta</span></p>
       </section>
 
-      <!-- ═════════ 1v2. A VITRINE (30/10, só no braço v2 — AB_LP) ═════════
-           O que os dados pediram (lp-web/funil 30/10 + lp-analise/topo 29/10): 61% não rolam e 75% desses somem em < 3 s; a
-           pergunta de área era tocada por 1%; a oferta ficava 4,7 telas abaixo; "É um app de verdade?" é a dúvida nº 1.
-           Aqui: promessa + onde roda + PRINTS REAIS do app (celular na proporção do iPhone, sem esticar) + preço + botão,
-           tudo dentro de 390×690 (o navegador do Instagram). Sem vídeo automático, sem pergunta, sem "só hoje". -->
+      <!-- ═════════ 1v2. A 1ª TELA DO v3 "produto em uso" (30/10, só no braço v2 — AB_LP) ═════════
+           Uma frase, um visual, um preço, um botão (BRIEF §4 e SINTESE.md). O visual é UM celular real, em proporção real
+           (402×874 pt do iPhone; só a largura é fixa, a altura segue o print), com a Home do dia (print real da conta demo,
+           página 3: Próxima conta · Orçamento · Treino · Sono + a 1ª fileira dos módulos) cortado pela borda do painel
+           pastel — a gramática das fotos de loja aprovadas (refino-29-10). A faixa carrega o nome "CORE": sem barra de marca.
+           Título: "a" = dor nº 1; "b" = a legenda do anúncio dos 16 (A/B pela chave AB_TITULO / ?t=b). Sem sub, sem pílulas,
+           sem âncora de preço, sem vídeo, sem pergunta. Nada aqui é pedido pelo braço atual (display:none + loading=lazy). -->
       <section class="lp2-topo" id="topo-v2" data-bloco="topo" data-so-lp="v2">
-        <h1 class="lp-h1">Sua vida organizada num app só.</h1>
-        <p class="lp-sub">Dinheiro, contas, rotina, treino e mais 12 áreas, no mesmo lugar.</p>
-        <ul class="lp2-onde" role="list" aria-label="Onde o CORE funciona"><li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9s-2-.9-3.4-.9c-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.4.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.7-1-2.7-4.1zM13.9 5c.7-.9 1.2-2 1-3.2-1 .1-2.2.7-3 1.6-.6.7-1.2 1.9-1 3.1 1.1.1 2.3-.6 3-1.5z"/></svg>App Store</li><li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 2.5v19l10-9.5z"/><path d="M14.5 13.9 4.7 22.2 17.4 15z" opacity=".75"/><path d="M14.5 11.1 4.7 1.8 17.4 9z" opacity=".75"/><path d="M18.6 9.7 21 11c.9.5.9 1.5 0 2l-2.4 1.3-2.7-2.3z"/></svg>Google Play</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"></rect><line x1="8" x2="16" y1="21" y2="21"></line><line x1="12" x2="12" y1="17" y2="21"></line></svg>Computador</li></ul>
-        <!-- CRÍTICA r1 2.1/2.2: a grade dos 16 em HTML (nítida em qualquer tela, 0 bytes; os mesmos ícones e cores do bloco "os 16" e
-             do carrossel do anúncio) + o card REAL "Quanto posso gastar hoje" recortado do print em @3x (regra do dono 22/10: zoom =
-             card real nítido). Os celulares inteiros ficaram no bloco "Por dentro", logo depois da oferta. -->
-        <ul class="lp2-grade" role="list" aria-label="As 16 áreas do CORE">
-          <li><span class="lp2-g-ico" style="background:rgba(251,191,36,.2);color:#d97706"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" x2="12" y1="2" y2="22"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></span>Finanças</li>
-          <li><span class="lp2-g-ico" style="background:rgba(52,211,153,.2);color:#059669"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"></path><path d="M16 2v4"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><path d="M3 10h18"></path><path d="m9 16 2 2 4-4"></path></svg></span>Rotina</li>
-          <li><span class="lp2-g-ico" style="background:rgba(96,165,250,.2);color:#2563eb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.4 14.4 9.6 9.6"></path><path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z"></path><path d="m21.5 21.5-1.4-1.4"></path><path d="M3.9 3.9 2.5 2.5"></path><path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"></path></svg></span>Treino</li>
-          <li><span class="lp2-g-ico" style="background:rgba(74,222,128,.2);color:#16a34a"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z"></path><path d="M10 2c1 .5 2 2 2 5"></path></svg></span>Dieta</li>
-          <li><span class="lp2-g-ico" style="background:rgba(248,113,113,.2);color:#dc2626"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path></svg></span>Saúde</li>
-          <li><span class="lp2-g-ico" style="background:rgba(192,132,252,.2);color:#9333ea"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"></path><path d="M20 3v4"></path><path d="M22 5h-4"></path><path d="M4 17v2"></path><path d="M5 18H3"></path></svg></span>Metas</li>
-          <li><span class="lp2-g-ico" style="background:rgba(34,211,238,.2);color:#0891b2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"></path><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></span>Casa</li>
-          <li><span class="lp2-g-ico" style="background:rgba(129,140,248,.2);color:#4f46e5"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"></path><path d="M22 10v6"></path><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"></path></svg></span>Estudos</li>
-          <li><span class="lp2-g-ico" style="background:rgba(148,163,184,.2);color:#475569"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path><rect width="20" height="14" x="2" y="6" rx="2"></rect></svg></span>Carreira</li>
-          <li><span class="lp2-g-ico" style="background:rgba(251,146,60,.2);color:#ea580c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"></path><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path></svg></span>Leitura</li>
-          <li><span class="lp2-g-ico" style="background:rgba(244,114,182,.2);color:#db2777"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"></path><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"></path></svg></span>Beleza</li>
-          <li><span class="lp2-g-ico" style="background:rgba(45,212,191,.2);color:#0d9488"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"></path></svg></span>Viagens</li>
-          <li><span class="lp2-g-ico" style="background:rgba(167,139,250,.2);color:#7c3aed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"></path><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"></path><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"></path><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"></path><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"></path><path d="M3.477 10.896a4 4 0 0 1 .585-.396"></path><path d="M19.938 10.5a4 4 0 0 1 .585.396"></path><path d="M6 18a4 4 0 0 1-1.967-.516"></path><path d="M19.967 17.484A4 4 0 0 1 18 18"></path></svg></span>Mente</li>
-          <li><span class="lp2-g-ico" style="background:rgba(251,113,133,.2);color:#e11d48"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span>Relações</li>
-          <li><span class="lp2-g-ico" style="background:rgba(251,191,36,.2);color:#f59e0b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="4" r="2"></circle><circle cx="18" cy="8" r="2"></circle><circle cx="20" cy="16" r="2"></circle><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"></path></svg></span>Pet</li>
-          <li><span class="lp2-g-ico" style="background:rgba(163,230,53,.2);color:#65a30d"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"></path><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"></path></svg></span>Detox</li>
-        </ul>
-        <figure class="lp2-card"><img src="/landing/v2-posso-gastar.webp" alt="O card de Finanças do CORE: quanto posso gastar hoje, R$ 146 por dia, 17 dias até o fim do mês" width="1050" height="361" loading="lazy" decoding="async" /></figure>
-        <div class="lp2-preco">
-          <span class="lp2-preco-v">R$ 27<small>,90</small></span>
-          <span class="lp2-preco-txt"><b>Vitalício · pagamento único</b><span>Anual na App Store: R$ 97,90</span></span>
+        <div class="lp2-hero">
+          <h1 class="lp-h1 lp2-h1-a">Sua vida organizada<br /><em>num app só.</em></h1>
+          <h1 class="lp-h1 lp2-h1-b">16 áreas da vida.<br /><em>Em um só app.</em></h1>
+          <div class="lp2-hero-cel">
+            <div class="lp2-fone" id="lp2-fone-home"><div class="lp2-fone-tela"><div class="lp2-fone-barra" aria-hidden="true"><span>9:41</span><svg viewBox="0 0 54 12"><g fill="#111"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="4.5" y="5" width="3" height="7" rx="1"/><rect x="9" y="3" width="3" height="9" rx="1"/><rect x="13.5" y="1" width="3" height="11" rx="1"/></g><path d="M26 4.2a7 7 0 0 1 8 0l-1 1.3a5.3 5.3 0 0 0-6 0zM27.6 6.6a4.4 4.4 0 0 1 4.8 0l-1 1.3a2.7 2.7 0 0 0-2.8 0zM30 9l1.2 1.6L30 12l-1.2-1.4z" fill="#111"/><rect x="37" y="1.5" width="14" height="9" rx="2.5" fill="none" stroke="#111" stroke-width="1.2"/><rect x="38.5" y="3" width="10" height="6" rx="1.2" fill="#111"/><rect x="52" y="4.5" width="1.5" height="3" rx=".6" fill="#111"/></svg></div><div class="lp2-fone-ilha" aria-hidden="true"></div><img src="/landing/v3-home.webp" alt="A Home do CORE num iPhone: Bom dia, Ana; próxima conta: Internet vence em 2 dias; orçamento: 40% sobra pra 17 dias; treino de hoje feito; sono 8 h; e os módulos Finanças, Rotina, Saúde e Treino" width="720" height="1070" loading="lazy" decoding="async" /></div></div>
+          </div>
         </div>
-        <button type="button" class="lp-cta" id="lp-cta-topo" data-ir="oferta">Quero organizar minha vida</button>
-        <p class="lp2-miuda">Paga 1 vez · nada é cobrado depois · 7 dias de garantia</p>
+        <div class="lp2-abaixo">
+          <ul class="lp2-onde" role="list" aria-label="Onde o CORE funciona"><li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.7c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9s-2-.9-3.3-.8C6.1 7 4.6 8 3.7 9.5c-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.3.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.8-1.1-2.9-4.2zM13.9 5.3c.7-.8 1.2-2 1-3.2-1 0-2.3.7-3 1.5-.6.7-1.2 1.9-1.1 3.1 1.2.1 2.3-.6 3.1-1.4z"/></svg>App Store</li><li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 2.2 13.8 12 3.6 21.8c-.4-.2-.6-.6-.6-1.1V3.3c0-.5.2-.9.6-1.1zm11.7 11.3 2.8 2.8-10.4 6c-.6.3-1.2.3-1.7 0zM18.1 8.6l3.1 1.8c1 .6 1 1.6 0 2.2l-3.1 1.8L15.3 12zM5.8 1.9l10.3 6-2.8 2.8L5.8 2c.5-.3 1.2-.3 1.7 0z"/></svg>Google Play</li><li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-7v2h3v2H7v-2h3v-2H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm1 2v9h16V6z"/></svg>Computador</li></ul>
+          <div class="lp2-preco">
+            <span class="lp2-preco-v">R$ 27<small>,90</small></span>
+            <span class="lp2-preco-txt"><b>Vitalício</b><span>Pagamento único no Pix</span></span>
+          </div>
+          <button type="button" class="lp-cta" id="lp-cta-topo" data-ir="oferta">Quero organizar minha vida <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          <p class="lp2-miuda">Paga 1 vez · nada é cobrado depois · 7 dias de garantia</p>
+        </div>
       </section>
 
       <!-- ═════════ 2. DEMO (o app de verdade) ═════════ -->
@@ -560,8 +586,8 @@
         <div class="lp-kicker" id="lp-demo-kicker">Seu CORE · Finanças</div>
         <h2 class="lp-h2" data-so-lp="atual">Isso é o app de verdade, não um vídeo.</h2>
         <p class="lp-p" data-so-lp="atual">Toque, anote, mexa à vontade. São dados de exemplo.</p>
-        <h2 class="lp-h2" data-so-lp="v2">Quer mexer antes de comprar?</h2>
-        <p class="lp-p" data-so-lp="v2">É o app de verdade, com dados de exemplo. Toque pra abrir.</p>
+        <h2 class="lp-h2" data-so-lp="v2">Quer mexer antes de pagar?</h2>
+        <p class="lp-p" data-so-lp="v2">Abre aqui mesmo, com dados de exemplo.</p>
         <div class="lp-pilulas" role="tablist" aria-label="Módulos da demonstração">
           <button type="button" class="lp-pilula" data-m="financas" aria-pressed="true">💰 Finanças</button>
           <button type="button" class="lp-pilula" data-m="rotina" aria-pressed="false">📅 Rotina</button>
@@ -581,7 +607,7 @@
       </section>
 
       <!-- ═════════ 3. OS 16 ═════════ -->
-      <section class="lp-sec" id="modulos" data-bloco="modulos">
+      <section class="lp-sec" id="modulos" data-bloco="modulos" data-so-lp="atual">
         <div class="lp-kicker">16 áreas, 1 app</div>
         <h2 class="lp-h2">Use as que quiser e esconda o resto.</h2>
         <p class="lp-p" data-so-lp="atual">Toque numa área pra ver ela funcionando aqui em cima.</p>
@@ -608,18 +634,29 @@
       </section>
 
       <!-- ═════════ 4. ANTES E DEPOIS + AVALIAÇÕES ═════════ -->
-      <!-- ═════════ 2v2. POR DENTRO (30/10, só no v2): os celulares inteiros na proporção do iPhone, prints reais em 810 px (3× dos 270 px CSS) ═════════ -->
+      <!-- ═════════ 2v2. POR DENTRO (v3, só no v2): a dúvida nº 1 ("É um app de verdade?", 82% de quem abre dúvida) respondida com
+           imagem, na gramática das fotos de loja aprovadas: painel pastel + título falado em 2 linhas (2ª na cor do módulo) + 1 celular
+           real ≥ 70% da largura, cortado pela borda do painel. Painéis EMPILHADOS (nunca fita: no iPhone dentro do Instagram arrastar da
+           borda é "voltar"). 1º = a grade dos 16 dentro do celular (a imagem do carrossel que leva 77% da verba, a 1 rolagem da dobra);
+           2º = Finanças com o card REAL "Quanto posso gastar hoje" recortado @3x e ampliado por cima do próprio card (Cal AI / foto 02 da
+           loja), com a legenda que explica o número ANTES de mostrá-lo; 3º = Rotina. Prints ≤ 33 KB, todos preguiçosos, 0 upscale. ═════════ -->
       <section class="lp-sec lp2-dentro" id="dentro-v2" data-bloco="dentro" data-so-lp="v2">
         <div class="lp-kicker">Por dentro</div>
         <h2 class="lp-h2">Sim, é um app de verdade.</h2>
-        <p class="lp-p">Cada área tem a sua tela. Arraste pra ver.</p>
-        <div class="lp2-fita" id="lp-fita" role="group" aria-label="Telas do CORE">
-          <figure class="lp2-tel"><figcaption>As 16 áreas</figcaption><div class="lp2-cel"><img src="/landing/v2-modulos.webp" alt="A Home do CORE rolada até os 16 módulos: Finanças, Rotina, Saúde, Treino, Dieta, Beleza, Dev. Pessoal, Casa, Biblioteca, Estudos, Mente, Carreira, Relações, Detox, Pet e Viagens" width="810" height="1556" loading="lazy" decoding="async" /></div></figure>
-          <figure class="lp2-tel"><figcaption>Finanças</figcaption><div class="lp2-cel"><img src="/landing/v2-financas.webp" alt="Finanças do CORE: quanto posso gastar hoje, receitas, despesas e contas que vencem" width="810" height="1636" loading="lazy" decoding="async" /></div></figure>
-          <figure class="lp2-tel"><figcaption>Seu dia</figcaption><div class="lp2-cel"><img src="/landing/v2-home.webp" alt="A Home do CORE: score do dia, hábitos, água e refeições" width="810" height="1636" loading="lazy" decoding="async" /></div></figure>
-          <figure class="lp2-tel"><figcaption>Meu mês</figcaption><div class="lp2-cel"><img src="/landing/v2-meu-mes.webp" alt="Meu mês no CORE: o calendário com as contas, o que entrou e o que saiu" width="810" height="1753" loading="lazy" decoding="async" /></div></figure>
-          <span class="lp2-fita-fim" aria-hidden="true"></span>
-        </div>
+        <p class="lp-p">Telas reais do app, com dados de exemplo.</p>
+        <figure class="lp2-foto magenta">
+          <figcaption><h3>16 áreas da vida<br /><em>em um só app.</em></h3><p>Use as que quiser e esconda o resto.</p></figcaption>
+          <div class="lp2-fone"><div class="lp2-fone-tela"><div class="lp2-fone-barra" aria-hidden="true"><span>9:41</span><svg viewBox="0 0 54 12"><g fill="#111"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="4.5" y="5" width="3" height="7" rx="1"/><rect x="9" y="3" width="3" height="9" rx="1"/><rect x="13.5" y="1" width="3" height="11" rx="1"/></g><path d="M26 4.2a7 7 0 0 1 8 0l-1 1.3a5.3 5.3 0 0 0-6 0zM27.6 6.6a4.4 4.4 0 0 1 4.8 0l-1 1.3a2.7 2.7 0 0 0-2.8 0zM30 9l1.2 1.6L30 12l-1.2-1.4z" fill="#111"/><rect x="37" y="1.5" width="14" height="9" rx="2.5" fill="none" stroke="#111" stroke-width="1.2"/><rect x="38.5" y="3" width="10" height="6" rx="1.2" fill="#111"/><rect x="52" y="4.5" width="1.5" height="3" rx=".6" fill="#111"/></svg></div><div class="lp2-fone-ilha" aria-hidden="true"></div><img src="/landing/v3-modulos.webp" alt="A Home do CORE rolada até os 16 módulos: Finanças, Rotina, Saúde, Treino, Dieta, Beleza, Dev. Pessoal, Casa, Biblioteca, Estudos, Mente, Carreira, Relações, Detox, Pet e Viagens" width="900" height="1045" loading="lazy" decoding="async" /></div></div>
+        </figure>
+        <figure class="lp2-foto ambar">
+          <figcaption><h3>Saiba quanto<br /><em>pode gastar hoje.</em></h3><p>Anote o que entra e o que sai. O CORE diz quanto você pode gastar hoje.</p></figcaption>
+          <div class="lp2-fone"><div class="lp2-fone-tela"><div class="lp2-fone-barra" aria-hidden="true"><span>9:41</span><svg viewBox="0 0 54 12"><g fill="#111"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="4.5" y="5" width="3" height="7" rx="1"/><rect x="9" y="3" width="3" height="9" rx="1"/><rect x="13.5" y="1" width="3" height="11" rx="1"/></g><path d="M26 4.2a7 7 0 0 1 8 0l-1 1.3a5.3 5.3 0 0 0-6 0zM27.6 6.6a4.4 4.4 0 0 1 4.8 0l-1 1.3a2.7 2.7 0 0 0-2.8 0zM30 9l1.2 1.6L30 12l-1.2-1.4z" fill="#111"/><rect x="37" y="1.5" width="14" height="9" rx="2.5" fill="none" stroke="#111" stroke-width="1.2"/><rect x="38.5" y="3" width="10" height="6" rx="1.2" fill="#111"/><rect x="52" y="4.5" width="1.5" height="3" rx=".6" fill="#111"/></svg></div><div class="lp2-fone-ilha" aria-hidden="true"></div><img src="/landing/v3-financas.webp" alt="Finanças do CORE: quanto posso gastar hoje, R$ 146 por dia; receitas R$ 6.200, despesas R$ 3.718, saldo do mês +R$ 2.482, investimentos R$ 23.930" width="900" height="993" loading="lazy" decoding="async" /></div></div>
+          <div class="lp2-zoom"><img src="/landing/v3-posso-gastar.webp" alt="O card de Finanças ampliado: Quanto posso gastar hoje, R$ 146 por dia" width="1110" height="290" loading="lazy" decoding="async" /></div>
+        </figure>
+        <figure class="lp2-foto verde">
+          <figcaption><h3>Seus hábitos,<br /><em>dia após dia.</em></h3><p>Marque o que fez e veja a sequência crescer.</p></figcaption>
+          <div class="lp2-fone"><div class="lp2-fone-tela"><div class="lp2-fone-barra" aria-hidden="true"><span>9:41</span><svg viewBox="0 0 54 12"><g fill="#111"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="4.5" y="5" width="3" height="7" rx="1"/><rect x="9" y="3" width="3" height="9" rx="1"/><rect x="13.5" y="1" width="3" height="11" rx="1"/></g><path d="M26 4.2a7 7 0 0 1 8 0l-1 1.3a5.3 5.3 0 0 0-6 0zM27.6 6.6a4.4 4.4 0 0 1 4.8 0l-1 1.3a2.7 2.7 0 0 0-2.8 0zM30 9l1.2 1.6L30 12l-1.2-1.4z" fill="#111"/><rect x="37" y="1.5" width="14" height="9" rx="2.5" fill="none" stroke="#111" stroke-width="1.2"/><rect x="38.5" y="3" width="10" height="6" rx="1.2" fill="#111"/><rect x="52" y="4.5" width="1.5" height="3" rx=".6" fill="#111"/></svg></div><div class="lp2-fone-ilha" aria-hidden="true"></div><img src="/landing/v3-rotina.webp" alt="Rotina do CORE: a tabela de hábitos da semana (beber 2L de água, treinar, ler 30 min) com os dias marcados e a faixa de consistência: 41 dias seguidos" width="900" height="1269" loading="lazy" decoding="async" /></div></div>
+        </figure>
       </section>
       <section class="lp-sec" id="antes" data-bloco="antes" data-so-lp="atual">
         <div class="lp-kicker">Antes e depois</div>
@@ -642,7 +679,7 @@
           </ul>
         </div>
       </section>
-      <section class="lp-sec" id="avaliacoes" data-bloco="avaliacoes" style="padding-top:44px">
+      <section class="lp-sec" id="avaliacoes" data-bloco="avaliacoes" style="padding-top:44px" data-so-lp="atual">
         <div class="lp-kicker">Quem usa conta</div>
         <h2 class="lp-h2">Avaliações de verdade, das lojas.</h2>
         <div class="lp-avals">
@@ -655,7 +692,7 @@
       </section>
 
       <!-- ═════════ 5. COMO FUNCIONA ═════════ -->
-      <section class="lp-sec" id="como" data-bloco="como">
+      <section class="lp-sec" id="como" data-bloco="como" data-so-lp="atual">
         <div class="lp-kicker">Como funciona</div>
         <h2 class="lp-h2">Em 3 passos, hoje mesmo.</h2>
         <ol class="lp-passos">
@@ -667,6 +704,33 @@
         </ol>
       </section>
 
+      <!-- ═════════ 4v2. QUEM USA, CONTA (v3): 4 avaliações reais das lojas em texto (as mesmas do lp-copy.json), a 1ª respondendo o
+           reembolso nº 1 ("confuso/bagunçado"). Sem nome, nota ou quantidade (regra do dono).
+           DECISÃO DO DONO (hoje proibida, não renderizada): 1 linha abaixo das 4 — "4,6 na App Store · 4,8 no Google Play". ═════════ -->
+      <section class="lp-sec" id="avaliacoes-v2" data-bloco="avaliacoes" style="padding-top:44px" data-so-lp="v2">
+        <div class="lp-kicker">Quem usa, conta</div>
+        <h2 class="lp-h2">Avaliações de verdade, das lojas.</h2>
+        <div class="lp-avals">
+          <figure class="lp-aval"><blockquote>“Design ótimo, interfaces completas sem ser complexas. Agradável de usar.”</blockquote><figcaption><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 2.2 13.8 12 3.6 21.8c-.4-.2-.6-.6-.6-1.1V3.3c0-.5.2-.9.6-1.1zm11.7 11.3 2.8 2.8-10.4 6c-.6.3-1.2.3-1.7 0zM18.1 8.6l3.1 1.8c1 .6 1 1.6 0 2.2l-3.1 1.8L15.3 12zM5.8 1.9l10.3 6-2.8 2.8L5.8 2c.5-.3 1.2-.3 1.7 0z"/></svg>Avaliação no Google Play</figcaption></figure>
+          <figure class="lp-aval"><blockquote>“Tudo que eu sempre quis num planner online.”</blockquote><figcaption><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 2.2 13.8 12 3.6 21.8c-.4-.2-.6-.6-.6-1.1V3.3c0-.5.2-.9.6-1.1zm11.7 11.3 2.8 2.8-10.4 6c-.6.3-1.2.3-1.7 0zM18.1 8.6l3.1 1.8c1 .6 1 1.6 0 2.2l-3.1 1.8L15.3 12zM5.8 1.9l10.3 6-2.8 2.8L5.8 2c.5-.3 1.2-.3 1.7 0z"/></svg>Avaliação no Google Play</figcaption></figure>
+          <figure class="lp-aval"><blockquote>“Muito bom pra quem quer se organizar em todas as áreas da vida.”</blockquote><figcaption><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.7c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9s-2-.9-3.3-.8C6.1 7 4.6 8 3.7 9.5c-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.3.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.8-1.1-2.9-4.2zM13.9 5.3c.7-.8 1.2-2 1-3.2-1 0-2.3.7-3 1.5-.6.7-1.2 1.9-1.1 3.1 1.2.1 2.3-.6 3.1-1.4z"/></svg>Avaliação na App Store</figcaption></figure>
+          <figure class="lp-aval"><blockquote>“Sem dúvidas, o mais completo que já usei até hoje.”</blockquote><figcaption><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.7c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9s-2-.9-3.3-.8C6.1 7 4.6 8 3.7 9.5c-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.3.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.8-1.1-2.9-4.2zM13.9 5.3c.7-.8 1.2-2 1-3.2-1 0-2.3.7-3 1.5-.6.7-1.2 1.9-1.1 3.1 1.2.1 2.3-.6 3.1-1.4z"/></svg>Avaliação na App Store</figcaption></figure>
+        </div>
+      </section>
+
+      <!-- ═════════ 5v2. COMO FUNCIONA (v3): mata o "e depois?" e prepara o 1º passo (Finanças: 84% dos pagantes; ação no dia 0 → D1 49%) ═════════ -->
+      <section class="lp-sec" id="como-v2" data-bloco="como" data-so-lp="v2">
+        <div class="lp-kicker">Como funciona</div>
+        <h2 class="lp-h2">Em 3 passos, hoje mesmo.</h2>
+        <ol class="lp-passos">
+          <li><span class="lp-num">1</span><div class="lp-passo"><b>Pague R$ 27,90 no Pix, aqui na página.</b><span>Leva 1 minuto. A tela confirma sozinha.</span></div></li>
+          <li><span class="lp-num">2</span><div class="lp-passo"><b>Entre no CORE com o mesmo e-mail.</b><span>Os links aparecem logo depois do pagamento.</span>
+            <!-- sem selo/link de loja antes do preço (dono 28/10): os selos ficam só no pós-compra -->
+            <div class="lp-disp lp2-disp"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.7c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9s-2-.9-3.3-.8C6.1 7 4.6 8 3.7 9.5c-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.3.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.8-1.1-2.9-4.2zM13.9 5.3c.7-.8 1.2-2 1-3.2-1 0-2.3.7-3 1.5-.6.7-1.2 1.9-1.1 3.1 1.2.1 2.3-.6 3.1-1.4z"/></svg>App Store</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 2.2 13.8 12 3.6 21.8c-.4-.2-.6-.6-.6-1.1V3.3c0-.5.2-.9.6-1.1zm11.7 11.3 2.8 2.8-10.4 6c-.6.3-1.2.3-1.7 0zM18.1 8.6l3.1 1.8c1 .6 1 1.6 0 2.2l-3.1 1.8L15.3 12zM5.8 1.9l10.3 6-2.8 2.8L5.8 2c.5-.3 1.2-.3 1.7 0z"/></svg>Google Play</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-7v2h3v2H7v-2h3v-2H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm1 2v9h16V6z"/></svg>Computador</span></div></div></li>
+          <li><span class="lp-num">3</span><div class="lp-passo"><b>Comece pelo dinheiro.</b><span>Anote o que entra e o que sai. Em 5 minutos você já vê quanto pode gastar hoje.</span></div></li>
+        </ol>
+      </section>
+
       <!-- ═════════ 6–8. OFERTA + PIX + DEPOIS DE PAGAR ═════════ -->
       <section class="lp-oferta" id="oferta" data-bloco="oferta">
         <div class="lp-card" id="lp-card" data-fase="oferta">
@@ -674,17 +738,18 @@
           <div class="lp-card-corpo">
             <div class="lp-so-oferta">
               <p class="lp-ancora" data-so-lp="atual"><s>De R$ 97,90 por ano</s> Só hoje</p>
-              <!-- 30/10 (v2): âncora honesta (o anual nas lojas custa isso mesmo) e "Vitalício" escrito no cartão (dono 30/10) -->
-              <p class="lp-ancora" data-so-lp="v2">Anual na App Store: <b>R$ 97,90</b></p>
+              <!-- v3 (30/10): SEM âncora de preço no v2 — 2º número competindo com o 27,90, "é outro app?", e vira falsa se o teste
+                   97,90 × 119,90 da 1.0.18 ligar (SINTESE.md §3). DECISÃO DO DONO: se quiser, 1 linha removível aqui, um
+                   p.lp-ancora com data-so-lp="v2" e o texto "Anual na App Store: R$ 97,90". -->
               <h2 class="lp-preco-tit" data-so-oferta="ano">1 ano inteiro por <b>R$ 27,90</b></h2>
               <h2 class="lp-preco-tit" data-so-oferta="sempre" data-so-lp="atual">Pra sempre por <b>R$ 27,90</b></h2>
               <h2 class="lp-preco-tit" data-so-oferta="sempre" data-so-lp="v2">Vitalício por <b>R$ 27<small>,90</small></b></h2>
               <p class="lp-preco-sub" data-so-oferta="ano">Pagamento único no Pix · menos de R$ 0,08 por dia</p>
               <p class="lp-preco-sub" data-so-oferta="sempre" data-so-lp="atual">Pagamento único no Pix · nunca mais paga</p>
-              <p class="lp-preco-sub" data-so-oferta="sempre" data-so-lp="v2">Pagamento único no Pix</p>
+              <p class="lp-preco-sub" data-so-oferta="sempre" data-so-lp="v2">Pagamento único no Pix. Nada é cobrado depois.</p>
               <ul class="lp-checks">
                 <li data-so-lp="atual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span>As <b>16 áreas</b> no celular e no computador</span></li>
-                <li data-so-lp="v2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span>📱 <b>App de verdade:</b> App Store, Google Play e computador.</span></li>
+                <li data-so-lp="v2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span>📱 <b>App de verdade:</b> App Store, Google Play e computador, com a mesma conta.</span></li>
                 <li data-so-oferta="ano"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span><b>Sem renovação automática.</b> Daqui a 1 ano, você decide.</span></li>
                 <li data-so-oferta="sempre" data-so-lp="atual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span><b>Pague uma vez e é seu pra sempre.</b> Nada é cobrado depois.</span></li>
                 <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span><b>7 dias de garantia.</b> Não gostou? Devolvemos 100%.</span></li>
@@ -701,8 +766,6 @@
                   <p class="lp-erro" id="lp-email-antes-erro" role="alert" hidden></p>
                 </div>
                 <button type="button" class="lp-cta" id="lp-pagar"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.2" y="5.2" width="13.6" height="13.6" rx="3.2" transform="rotate(45 12 12)" fill="none" stroke="currentColor" stroke-width="2.2"/><rect x="9.6" y="9.6" width="4.8" height="4.8" rx="1" transform="rotate(45 12 12)" fill="currentColor"/></svg><span id="lp-pagar-txt">Pagar R$ 27,90 no Pix</span></button>
-                <!-- 30/10 (v2): as duas dúvidas mais abertas ("Renova sozinho?", "Tem versão grátis?") respondidas onde a pessoa decide -->
-                <p class="lp2-confianca" data-so-lp="v2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Paga 1 vez. Nada é cobrado depois.</p>
                 <p class="lp-seguro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>O Pix sai aqui mesmo · CORE · CNPJ 55.041.112/0001-82</p>
               </div>
             </div>
@@ -713,7 +776,19 @@
       </section>
 
       <!-- ═════════ 9. DÚVIDAS + CHAMADA FINAL ═════════ -->
-      <section class="lp-sec" id="duvidas" data-bloco="duvidas" style="padding-top:48px">
+      <!-- ═════════ 9v2. DÚVIDAS (v3): as 5 reais, na ordem da dor (lp-web/funil 30/10: app de verdade 104 · renova 88 · grátis 86) ═════════ -->
+      <section class="lp-sec" id="duvidas-v2" data-bloco="duvidas" style="padding-top:48px" data-so-lp="v2">
+        <h2 class="lp-h2">Dúvidas</h2>
+        <p class="lp-p">O que mais perguntam.</p>
+        <div class="lp-duvidas">
+          <details><summary>É um app de verdade?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Sim. O CORE está na App Store e no Google Play, e também abre no computador. É a mesma conta em todos.</p></details>
+          <details><summary>Renova sozinho? Tem mensalidade?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Não. Você paga R$ 27,90 uma vez no Pix e o CORE é seu. Nada é cobrado depois.</p></details>
+          <details><summary>Tem versão grátis?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Não, mas você tem 7 dias de garantia: se não gostar, devolvemos 100% no Pix. É só mandar um e-mail.</p></details>
+          <details><summary>Funciona no computador?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Sim. Entre no site com o mesmo e-mail e está tudo lá, igual ao celular.</p></details>
+          <details><summary>Como falo com vocês?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Pelo e-mail <a href="mailto:contato@coreaplicativo.com.br">contato@coreaplicativo.com.br</a>. A gente responde rápido.</p></details>
+        </div>
+      </section>
+      <section class="lp-sec" id="duvidas" data-bloco="duvidas" style="padding-top:48px" data-so-lp="atual">
         <h2 class="lp-h2">Dúvidas</h2>
         <div class="lp-duvidas">
           <details><summary>É um app de verdade?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Sim. O CORE está na App Store e na Google Play, e também abre no computador. É a mesma conta em todos.</p></details>
@@ -729,10 +804,11 @@
     <section class="lp-fim" id="fim" data-bloco="fim">
       <h2 data-so-oferta="ano">Sua vida inteira num app só, por R$ 27,90 o ano.</h2>
       <h2 data-so-oferta="sempre" data-so-lp="atual">Sua vida inteira num app só, por R$ 27,90. Pra sempre.</h2>
-      <h2 data-so-oferta="sempre" data-so-lp="v2">Sua vida organizada num app só. Vitalício por R$ 27,90.</h2>
-      <p>Pix na hora · 7 dias de garantia</p>
+      <h2 data-so-oferta="sempre" data-so-lp="v2">Sua vida organizada num app só.</h2>
+      <p data-so-lp="atual">Pix na hora · 7 dias de garantia</p>
+      <p data-so-lp="v2">Vitalício por R$ 27,90 · Pix na hora</p>
       <button type="button" class="lp-cta" data-ir="oferta" data-so-lp="atual">Quero organizar tudo</button>
-      <button type="button" class="lp-cta" data-ir="oferta" data-so-lp="v2">Quero organizar minha vida</button>
+      <button type="button" class="lp-cta" data-ir="oferta" data-so-lp="v2">Quero organizar minha vida <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
     </section>
     <footer class="lp-rodape">
       CORE · CNPJ 55.041.112/0001-82<br />
@@ -740,7 +816,9 @@
     </footer>
     <div class="lp-fixo" id="lp-fixo" aria-hidden="true">
       <button type="button" class="lp-cta" data-ir="oferta" tabindex="-1" data-so-lp="atual">Quero organizar tudo <small>· R$ 27,90</small></button>
-      <button type="button" class="lp-cta" data-ir="oferta" tabindex="-1" data-so-lp="v2">Quero organizar minha vida <small>· R$ 27,90</small></button>
+      <!-- v3: preço à esquerda + botão numa linha só (o fixo deu 136 de 220 toques de CTA na página atual) -->
+      <span class="lp2-fixo-p" data-so-lp="v2"><b>R$ 27,90</b><span>Vitalício · Pix</span></span>
+      <button type="button" class="lp-cta" data-ir="oferta" tabindex="-1" data-so-lp="v2">Quero organizar minha vida</button>
     </div>
     <script type="module" src="/src/landing/landing.ts"></script>
   </body>

@@ -8,9 +8,11 @@
  *      id do AB_CHECKOUT com outra conta (independentes); forçável por ?lp=v2|atual, ?lp=auto desfaz;
  *   2. o braço "atual" é a página de hoje BYTE A BYTE: o HTML e o CSS, tirando o que é só do v2, batem com o
  *      landing.html do origin/main de 30/10 (src/test/fixtures/landing-atual-30-10.html);
- *   3. o braço v2: a vitrine (prints reais, preço e botão no topo), a ordem dos blocos por CSS (oferta logo depois do
- *      topo), o cartão com "Vitalício", a faixa sem "só hoje", a tela do Pix com 3 passos + "Pagou? Volte aqui",
- *      a demo só no toque, o botão fixo quando o botão do topo sai da tela;
+ *   3. o braço v2 = v3 "produto em uso" (novidades-guardadas/2026-10-30/lp-v3/SINTESE.md): a 1ª tela com UM celular real
+ *      (a Home do dia) + preço + botão; "Sim, é um app de verdade" com 3 painéis (os 16 no celular, Finanças com o card
+ *      R$ 146, Rotina); a ordem dos blocos por CSS; o cartão de 8 linhas com "Vitalício"; a faixa sem "só hoje"; a tela do
+ *      Pix com 3 passos + QR e código lado a lado + "Pagou? Volte aqui"; o pós-compra com os selos das lojas primeiro; a demo
+ *      só no toque; o botão fixo quando o botão do topo sai da tela;
  *   4. nos DOIS braços (técnico, sem mudança visual): braco_lp em todo evento; o pixel no 1º quadro (≤ 1,5 s, sem esperar
  *      o load); a demo do atual só depois do pixel / perto da tela / no toque; a 2ª chance do chunk do Pix;
  *   5. o AB_CHECKOUT continua nos dois braços; o fluxo inteiro no v2: oferta → e-mail → Pix → pago → conta com as lojas.
@@ -162,90 +164,158 @@ describe("braço atual = a página de hoje (origin/main 30/10), sem tirar nem p�
   });
 });
 
-/* ───────── 3. o que o v2 tem ───────── */
-describe("braço v2: a vitrine, a ordem e o cartão", () => {
+/* ───────── 3. o que o v2 (= v3 "produto em uso", SINTESE.md) tem ───────── */
+const txt = (el: Element | null) => (el?.innerHTML ?? "").replace(/<br\s*\/?>/g, " ").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+describe("braço v2 · a 1ª tela: uma frase, UM celular real, um preço, um botão", () => {
   const html = () => { const d = document.createElement("div"); d.innerHTML = corpoDe(HTML); return d; };
-  it("a vitrine (#topo-v2): promessa, onde roda (ícones distintos), a GRADE dos 16 em HTML (mesmos ícones dos 16), o card real de Finanças em @3x, preço vitalício e o botão — sem vídeo, sem pergunta", () => {
+  it("#topo-v2: faixa com CORE, título (a = dor nº 1; b = a legenda do anúncio, por ?t=b), 1 celular com a Home, lojas em texto, preço vitalício, botão, miúda — 7 elementos", () => {
     const d = html();
     const topo = d.querySelector("#topo-v2")!;
     expect(topo.getAttribute("data-so-lp")).toBe("v2");
-    expect(topo.querySelector("h1")!.textContent).toBe("Sua vida organizada num app só.");
+    expect(txt(topo.querySelector("h1.lp2-h1-a"))).toBe("Sua vida organizada num app só.");
+    expect(txt(topo.querySelector("h1.lp2-h1-b"))).toBe("16 áreas da vida. Em um só app.");
+    expect(HTML).toContain('html[data-lp="v2"][data-t="b"] .lp2-h1-a, html[data-lp="v2"]:not([data-t="b"]) .lp2-h1-b { display: none; }');
+    // UM celular, em proporção real (só a largura é fixa; o print nunca é esticado), com a Home do dia em @3x (≥ 3× dos 219 px CSS de tela)
+    const fones = topo.querySelectorAll(".lp2-fone");
+    expect(fones).toHaveLength(1);
+    const img = fones[0].querySelector("img")!;
+    expect(img.getAttribute("src")).toBe("/landing/v3-home.webp");
+    expect(Number(img.getAttribute("width"))).toBeGreaterThanOrEqual(657);
+    expect(img.getAttribute("alt")).toMatch(/Home do CORE/);
+    expect(existsSync(resolve(raiz, "public/landing/v3-home.webp"))).toBe(true);
+    expect(HTML).toMatch(/\.lp2-hero-cel \.lp2-fone \{ --w: 232px; \}/);
+    expect(HTML).toMatch(/\.lp2-fone img \{ display: block; width: 100%; height: auto; \}/);
+    expect(HTML).toMatch(/\.lp2-fone \{[^}]*border-radius: calc\(var\(--w\) \* \.14\)/); // moldura proporcional à largura
+    // sem grade solta, sem card solto, sem sub, sem pílulas, sem vídeo, sem pergunta, sem âncora de preço (o "sem sentido" da v2)
+    expect(topo.querySelector(".lp2-grade, .lp2-card, .lp-sub, .lp-pergunta, .lp-area, video, iframe")).toBeNull();
+    expect(topo.textContent).not.toMatch(/97,90|App Store: R\$/);
     const onde = [...topo.querySelectorAll(".lp2-onde li")];
     expect(onde.map((l) => l.textContent)).toEqual(["App Store", "Google Play", "Computador"]);
-    expect(new Set(onde.map((l) => l.querySelector("svg")!.innerHTML)).size).toBe(3); // crítica 1.3: 3 ícones diferentes
-    // a grade dos 16: os MESMOS nomes, ícones e cores do bloco "os 16" (crítica 2.1: nítida, 0 bytes)
-    const grade = [...topo.querySelectorAll(".lp2-grade li")];
-    const dos16 = [...d.querySelectorAll("#modulos .lp-mod")];
-    expect(grade).toHaveLength(16);
-    expect(grade.map((l) => l.textContent!.trim())).toEqual(dos16.map((b) => b.querySelector(".lp-mod-nome")!.textContent));
-    expect(grade.map((l) => l.querySelector("svg")!.innerHTML)).toEqual(dos16.map((b) => b.querySelector("svg")!.innerHTML));
-    expect(grade.map((l) => l.querySelector(".lp2-g-ico")!.getAttribute("style"))).toEqual(dos16.map((b) => b.querySelector(".lp-mod-ico")!.getAttribute("style")));
-    // o card real (recorte @3x: 1050 px pros 350 px CSS) e os celulares (810 px pros 270 px CSS) — crítica 2.2: nada esticado em @3x
-    const card = topo.querySelector(".lp2-card img")!;
-    expect(card.getAttribute("src")).toBe("/landing/v2-posso-gastar.webp");
-    expect(Number(card.getAttribute("width"))).toBeGreaterThanOrEqual(1050);
-    const imgs = [...d.querySelectorAll("#dentro-v2 .lp2-cel img")];
-    expect(imgs.map((i) => i.getAttribute("src"))).toEqual(["/landing/v2-modulos.webp", "/landing/v2-financas.webp", "/landing/v2-home.webp", "/landing/v2-meu-mes.webp"]);
-    for (const i of imgs) { expect(Number(i.getAttribute("width"))).toBeGreaterThanOrEqual(810); expect(existsSync(resolve(raiz, `public${i.getAttribute("src")}`))).toBe(true); }
-    expect(existsSync(resolve(raiz, "public/landing/v2-posso-gastar.webp"))).toBe(true);
-    expect(HTML).toMatch(/\.lp2-tel \{[^}]*width: 270px/);
-    expect(HTML).toMatch(/\.lp2-cel \{[^}]*aspect-ratio: 390 \/ 844/);
-    expect(HTML).toMatch(/\.lp2-cel img \{[^}]*width: 100%; height: auto/); // nunca esticado
-    expect(topo.querySelector(".lp2-preco")!.textContent!.replace(/\s+/g, " ")).toMatch(/R\$ 27,90.*Vitalício · pagamento único.*Anual na App Store: R\$ 97,90/);
-    expect(topo.querySelector("#lp-cta-topo")!.getAttribute("data-ir")).toBe("oferta");
+    expect(new Set(onde.map((l) => l.querySelector("svg")!.innerHTML)).size).toBe(3);
+    expect(topo.querySelector("a")).toBeNull(); // nenhum link pra fora antes do preço
+    expect(txt(topo.querySelector(".lp2-preco"))).toMatch(/^R\$ 27,90 ?Vitalício ?Pagamento único no Pix$/);
+    const cta = topo.querySelector("#lp-cta-topo")!;
+    expect(cta.getAttribute("data-ir")).toBe("oferta");
+    expect(txt(cta)).toBe("Quero organizar minha vida");
+    expect(HTML).toMatch(/\.lp2-topo \.lp-cta \{[^}]*white-space: nowrap/);
     expect(topo.querySelector(".lp2-miuda")!.textContent).toBe("Paga 1 vez · nada é cobrado depois · 7 dias de garantia");
-    expect(topo.querySelector("video")).toBeNull();
-    expect(topo.querySelector(".lp-area, .lp-pergunta")).toBeNull(); // sem a pergunta de área
-    expect(d.querySelector("#antes")!.getAttribute("data-so-lp")).toBe("atual"); // o antes/depois sai no v2 (o "Por dentro" entra no lugar)
+    const elementos = [topo.querySelector("h1.lp2-h1-a"), topo.querySelector(".lp2-fone"), topo.querySelector(".lp2-onde"), topo.querySelector(".lp2-preco"), cta, topo.querySelector(".lp2-miuda")];
+    expect(elementos.every(Boolean)).toBe(true); // + a faixa = 7
   });
-  it("a ordem dos blocos por CSS: vitrine → oferta → por dentro → avaliações → os 16 → como → demo (opcional) → dúvidas", () => {
-    const ordem = (id: string) => Number(HTML.match(new RegExp(`html\\[data-lp="v2"\\] #${id} \\{ order: (-?\\d+)`))![1]);
-    const seq = ["topo-v2", "oferta", "dentro-v2", "avaliacoes", "modulos", "como", "demo", "duvidas"].map(ordem);
-    expect([...seq].sort((a, b) => a - b)).toEqual(seq);
-    expect(HTML).toMatch(/html\[data-lp="v2"\] main\.lp \{ display: flex; flex-direction: column; \}/);
-    expect(ordem("oferta")).toBe(ordem("topo-v2") + 1);
-  });
-  it("a faixa do v2 não tem 'só hoje' nem data; a do atual continua com a data", () => {
+  it("a faixa do v2 carrega o nome (CORE · ACESSO VITALÍCIO · R$ 27,90 no Pix), sem 'só hoje' nem data; a barra de marca some no v2; a do atual continua com a data", () => {
     const d = html();
     const faixas = [...d.querySelectorAll(".lp-promo")];
     const v2 = faixas.find((f) => f.getAttribute("data-so-lp") === "v2")!;
     const atual = faixas.find((f) => f.getAttribute("data-so-lp") === "atual")!;
-    expect(v2.textContent).toMatch(/ACESSO VITALÍCIO · R\$ 27,90 no Pix/); // crítica 1.1: curta (cabia 400 px em 390)
+    expect(v2.textContent!.replace(/\s+/g, " ").trim()).toBe("CORE · ACESSO VITALÍCIO · R$ 27,90 no Pix");
     expect(v2.textContent).not.toMatch(/hoje|\d\d\/\d\d|garantia/);
     expect(atual.querySelector("#lp-promo-data")).not.toBeNull();
+    expect(HTML).toContain('html[data-lp="v2"] .lp-barra { display: none; }');
   });
-  it("o cartão v2: 'Vitalício por R$ 27,90', âncora honesta, 'App de verdade: App Store, Google Play e computador' e a linha de confiança embaixo do botão", () => {
+});
+
+describe("braço v2 · 'Sim, é um app de verdade': 3 painéis empilhados no estilo das fotos de loja", () => {
+  const html = () => { const d = document.createElement("div"); d.innerHTML = corpoDe(HTML); return d; };
+  it("os 16 DENTRO do celular em 1º (a imagem do anúncio, a 1 rolagem da dobra), depois Finanças com o card R$ 146 ampliado e a legenda que explica o número, depois Rotina; nunca fita", () => {
+    const d = html();
+    const sec = d.querySelector("#dentro-v2")!;
+    expect(sec.getAttribute("data-so-lp")).toBe("v2");
+    expect(sec.querySelector("h2")!.textContent).toBe("Sim, é um app de verdade.");
+    expect(sec.querySelector(".lp-p")!.textContent).toBe("Telas reais do app, com dados de exemplo.");
+    const fotos = [...sec.querySelectorAll(".lp2-foto")];
+    expect(fotos.map((f) => f.className)).toEqual(["lp2-foto magenta", "lp2-foto ambar", "lp2-foto verde"]);
+    expect(fotos.map((f) => txt(f.querySelector("h3")))).toEqual(["16 áreas da vida em um só app.", "Saiba quanto pode gastar hoje.", "Seus hábitos, dia após dia."]);
+    expect(fotos.map((f) => f.querySelector("figcaption p")!.textContent)).toEqual([
+      "Use as que quiser e esconda o resto.",
+      "Anote o que entra e o que sai. O CORE diz quanto você pode gastar hoje.",
+      "Marque o que fez e veja a sequência crescer.",
+    ]);
+    const imgs = fotos.map((f) => f.querySelector(".lp2-fone img")!);
+    expect(imgs.map((i) => i.getAttribute("src"))).toEqual(["/landing/v3-modulos.webp", "/landing/v3-financas.webp", "/landing/v3-rotina.webp"]);
+    for (const i of imgs) { expect(Number(i.getAttribute("width"))).toBeGreaterThanOrEqual(850); expect(i.getAttribute("alt")).toBeTruthy(); } // 3× dos 283 px CSS de tela
+    const zoom = fotos[1].querySelector(".lp2-zoom img")!;
+    expect(zoom.getAttribute("src")).toBe("/landing/v3-posso-gastar.webp");
+    expect(Number(zoom.getAttribute("width"))).toBeGreaterThanOrEqual(1050); // 3× dos 350 px CSS
+    expect(zoom.getAttribute("alt")).toMatch(/R\$ 146/);
+    for (const f of ["v3-modulos", "v3-financas", "v3-rotina", "v3-posso-gastar"]) expect(existsSync(resolve(raiz, `public/landing/${f}.webp`))).toBe(true);
+    expect(sec.querySelector(".lp2-fita, .lp2-tel")).toBeNull();
+    expect(HTML).not.toMatch(/overflow-x: auto;[^}]*scroll-snap-type: x/);
+    expect(HTML).toMatch(/\.lp2-fone \{ --w: 300px/); // ≥ 70% dos 390
+  });
+  it("a ordem dos blocos por CSS: 1ª tela → por dentro → oferta → avaliações → como → dúvidas → demo; os blocos de hoje (os 16 em HTML, antes/depois, avaliações, como, dúvidas) ficam só no atual", () => {
+    const ordem = (id: string) => Number(HTML.match(new RegExp(`html\\[data-lp="v2"\\] #${id} \\{ order: (-?\\d+)`))![1]);
+    const seq = ["topo-v2", "dentro-v2", "oferta", "avaliacoes-v2", "como-v2", "duvidas-v2", "demo"].map(ordem);
+    expect([...seq].sort((a, b) => a - b)).toEqual(seq);
+    expect(HTML).toMatch(/html\[data-lp="v2"\] main\.lp \{ display: flex; flex-direction: column; \}/);
+    const d = html();
+    for (const id of ["modulos", "antes", "avaliacoes", "como", "duvidas"]) expect(d.querySelector(`#${id}`)!.getAttribute("data-so-lp")).toBe("atual");
+    for (const id of ["avaliacoes-v2", "como-v2", "duvidas-v2"]) expect(d.querySelector(`#${id}`)!.getAttribute("data-so-lp")).toBe("v2");
+  });
+});
+
+describe("braço v2 · cartão, avaliações, como funciona, dúvidas, demo, fim e barra fixa", () => {
+  const html = () => { const d = document.createElement("div"); d.innerHTML = corpoDe(HTML); return d; };
+  it("o cartão: 8 linhas, 1 fato por linha — 'Vitalício por R$ 27,90', 'Pagamento único no Pix. Nada é cobrado depois.' 1x, 2 checks (app de verdade com a mesma conta · 7 dias), e-mail do AB_CHECKOUT, botão, CNPJ; sem âncora, sem linha repetida embaixo do botão", () => {
     const card = html().querySelector("#lp-card")!;
     card.querySelectorAll('[data-so-lp="atual"], [data-so-oferta="ano"]').forEach((el) => el.remove());
     const t = card.textContent!.replace(/\s+/g, " ");
     expect(t).toContain("Acesso vitalício");
     expect(t).toContain("sem renovação");
-    expect(t).toContain("Anual na App Store: R$ 97,90");
     expect(t).toContain("Vitalício por R$ 27,90");
-    expect(t).toContain("Pagamento único no Pix");
-    // crítica 3.1: 2 checks só (app de verdade + garantia) e 1 linha embaixo do botão; sem o check "pra sempre" nem a caixa verde
+    expect(t).toContain("Pagamento único no Pix. Nada é cobrado depois.");
     const checks = [...card.querySelectorAll(".lp-checks li")].map((l) => l.textContent!.replace(/\s+/g, " ").trim());
-    expect(checks).toEqual(["📱 App de verdade: App Store, Google Play e computador.", "7 dias de garantia. Não gostou? Devolvemos 100%."]);
-    expect(t).not.toMatch(/só hoje|De R\$ 97,90|Aqui:/i);
-    expect(card.querySelector("#lp-pagar + .lp2-confianca")!.textContent).toContain("Paga 1 vez. Nada é cobrado depois.");
+    expect(checks).toEqual(["📱 App de verdade: App Store, Google Play e computador, com a mesma conta.", "7 dias de garantia. Não gostou? Devolvemos 100%."]);
+    expect(t).not.toMatch(/97,90|só hoje|De R\$|Aqui:|Paga 1 vez/i);
+    expect(card.querySelector(".lp-ancora, .lp2-confianca")).toBeNull();
     expect((t.match(/pagamento único/gi) ?? []).length).toBe(1);
     expect((t.match(/7 dias/gi) ?? []).length).toBe(1);
+    expect((t.match(/cobrado depois/gi) ?? []).length).toBe(1);
+    expect(card.querySelector(".lp-email-antes")!.getAttribute("data-so-checkout")).toBe("email");
+    expect(card.querySelector("#lp-pagar-txt")!.textContent).toBe("Pagar R$ 27,90 no Pix");
     expect(html().querySelector("#oferta .lp-garantia")!.getAttribute("data-so-lp")).toBe("atual");
-    expect(card.querySelector(".lp-email-antes")!.getAttribute("data-so-checkout")).toBe("email"); // o A/B do e-mail continua no mesmo cartão
   });
-  it("a demo no v2 é opcional: botão 'Testar o app' em cima do print; o iframe só tem src no toque (ver o teste de comportamento)", () => {
+  it("avaliações do v2: 4 textos reais das lojas (os mesmos da página de hoje), 'Design ótimo… sem ser complexas' em 1º, 'no Google Play'; sem nota nem quantidade", () => {
+    const d = html();
+    const deHoje = [...d.querySelectorAll("#avaliacoes blockquote")].map((b) => b.textContent);
+    const doV2 = [...d.querySelectorAll("#avaliacoes-v2 .lp-aval")];
+    expect(doV2).toHaveLength(4);
+    expect(doV2[0].querySelector("blockquote")!.textContent).toBe("“Design ótimo, interfaces completas sem ser complexas. Agradável de usar.”");
+    for (const a of doV2) { expect(deHoje).toContain(a.querySelector("blockquote")!.textContent); expect(a.querySelector("figcaption")!.textContent).toMatch(/^Avaliação (no Google Play|na App Store)$/); }
+    expect(d.querySelector("#avaliacoes-v2")!.textContent).not.toMatch(/\d[,.]\d|avaliações|★/);
+  });
+  it("como funciona (v2): 3 passos — Pix aqui na página · entre com o mesmo e-mail (lojas em texto, sem link) · comece pelo dinheiro", () => {
+    const d = html();
+    const passos = [...d.querySelectorAll("#como-v2 .lp-passo > b")].map((b) => b.textContent);
+    expect(passos).toEqual(["Pague R$ 27,90 no Pix, aqui na página.", "Entre no CORE com o mesmo e-mail.", "Comece pelo dinheiro."]);
+    expect(d.querySelector("#como-v2")!.textContent).toContain("Em 5 minutos você já vê quanto pode gastar hoje.");
+    expect(d.querySelector("#como-v2 a")).toBeNull();
+    expect([...d.querySelectorAll("#como-v2 .lp2-disp span")].map((s) => s.textContent)).toEqual(["App Store", "Google Play", "Computador"]);
+  });
+  it("dúvidas (v2): as 5 reais na ordem da dor; 'Renova sozinho? Tem mensalidade?'; computador 'igual ao celular'; contato@ (nunca suporte@)", () => {
+    const d = html();
+    expect([...d.querySelectorAll("#duvidas-v2 summary")].map((s) => s.textContent)).toEqual(["É um app de verdade?", "Renova sozinho? Tem mensalidade?", "Tem versão grátis?", "Funciona no computador?", "Como falo com vocês?"]);
+    const t = d.querySelector("#duvidas-v2")!.textContent!;
+    expect(t).toContain("igual ao celular");
+    expect(t).toContain("contato@coreaplicativo.com.br");
+    expect(t).not.toMatch(/suporte@|conecta (no|com o) banco/);
+  });
+  it("a demo no v2 é opcional e compacta: 'Testar o app' em cima do print, o iframe só tem src no toque, o celular só cresce quando abre", () => {
     const d = html();
     expect(d.querySelector("#lp-demo-abrir")!.getAttribute("data-so-lp")).toBe("v2");
     expect(d.querySelector("#lp-demo-frame")!.getAttribute("src")).toBeNull();
+    expect(HTML).toContain('html[data-lp="v2"] .lp-celular:not([data-abrindo]):not([data-pronta]) { height: 220px; }');
+    expect([...d.querySelectorAll('#demo [data-so-lp="v2"]')].map((e) => e.textContent)).toContain("Quer mexer antes de pagar?");
   });
-  it("crítica 3.2: um verbo só no v2 — o botão do topo, o fixo e o do fim dizem 'Quero organizar minha vida'; o atual segue 'Quero organizar tudo'", () => {
+  it("um verbo só no v2 — topo, fixo (com o preço ao lado, numa linha) e fim dizem 'Quero organizar minha vida'; o atual segue 'Quero organizar tudo'", () => {
     const d = html();
-    const v2 = (sel: string) => [...d.querySelectorAll(sel)].find((b) => b.getAttribute("data-so-lp") === "v2")!.textContent!.replace(/\s+/g, " ").trim();
+    const v2 = (sel: string) => [...d.querySelectorAll(sel)].find((b) => b.getAttribute("data-so-lp") === "v2")!;
     const atual = (sel: string) => [...d.querySelectorAll(sel)].find((b) => b.getAttribute("data-so-lp") === "atual")!.textContent!.replace(/\s+/g, " ").trim();
-    expect(v2("#lp-fixo button")).toBe("Quero organizar minha vida · R$ 27,90");
-    expect(v2("#fim button")).toBe("Quero organizar minha vida");
-    expect(d.querySelector("#lp-cta-topo")!.textContent).toBe("Quero organizar minha vida"); // r2 2.1: sem o preço no botão (está 10 px acima); numa linha só com fonte +30%
-    expect(HTML).toMatch(/\.lp2-topo \.lp-cta \{[^}]*white-space: nowrap/);
+    expect(txt(v2("#lp-fixo button"))).toBe("Quero organizar minha vida");
+    expect(txt(v2("#lp-fixo .lp2-fixo-p"))).toMatch(/^R\$ 27,90 ?Vitalício · Pix$/);
+    expect(txt(v2("#fim button"))).toBe("Quero organizar minha vida");
+    expect(txt(v2("#fim h2"))).toBe("Sua vida organizada num app só.");
+    expect(txt(v2("#fim p"))).toBe("Vitalício por R$ 27,90 · Pix na hora");
+    expect(HTML).toMatch(/html\[data-lp="v2"\] \.lp-fixo \.lp-cta \{[^}]*white-space: nowrap/);
     expect(atual("#lp-fixo button")).toBe("Quero organizar tudo · R$ 27,90");
     expect(atual("#fim button")).toBe("Quero organizar tudo");
   });
@@ -253,6 +323,13 @@ describe("braço v2: a vitrine, a ordem e o cartão", () => {
     const d = html();
     d.querySelectorAll("#lp-pix").forEach((el) => el.remove());
     expect(d.querySelectorAll('a[href*="apps.apple.com"], a[href*="play.google.com"]')).toHaveLength(0);
+  });
+  it("toda imagem do v3 mora dentro de [data-so-lp=v2] (o atual nunca a pede) e é lazy, sem fetchpriority", () => {
+    const d = html();
+    const imgs = [...d.querySelectorAll('img[src*="/landing/v3-"]')];
+    expect(imgs).toHaveLength(5);
+    for (const i of imgs) { expect(i.closest('[data-so-lp="v2"]')).not.toBeNull(); expect(i.getAttribute("loading")).toBe("lazy"); expect(i.hasAttribute("fetchpriority")).toBe(false); }
+    expect(d.querySelector('img[src*="/landing/v2-"]')).toBeNull();
   });
 });
 
@@ -439,7 +516,7 @@ describe("a 2ª chance do chunk do Pix (src/landing/carregar.ts)", () => {
 });
 
 describe("braço v2 + AB_CHECKOUT: o fluxo inteiro, nos dois braços do e-mail", () => {
-  it("v2 · livre: oferta → Pix com os 3 passos e 'Pagou? Volte aqui' (e-mail opcional continua) → pago → e-mail → conta pronta com Abrir meu CORE + lojas; sem 'Mudar o plano'", async () => {
+  it("v2 · livre: oferta → Pix (3 passos, QR e código lado a lado, 'Pagou? Volte aqui', e-mail sem '(opcional)') → 'Pronto! Falta o seu e-mail' → conta pronta: e-mail em caixa, selos das lojas de 48 px, site, 1º passo; sem 'Mudar o plano'", async () => {
     await abrirPagina("v2", "livre");
     pagar();
     expect(document.querySelector('[data-testid="landing-gerando"]')!.textContent).toContain("Gerando o seu Pix");
@@ -451,6 +528,11 @@ describe("braço v2 + AB_CHECKOUT: o fluxo inteiro, nos dois braços do e-mail",
     expect(passos[2]).toMatch(/Pix Copia e Cola/);
     expect(pix.querySelector('[data-testid="landing-volte"]')!.textContent).toMatch(/Pagou\? Volte aqui\. O acesso abre na hora/);
     expect(pix.querySelector(".lp2-garantia-mini")!.textContent).toContain("7 dias de garantia");
+    expect(pix.querySelector(".lp2-qr-linha #lp-qr")).not.toBeNull(); // QR à esquerda…
+    expect(pix.querySelector(".lp2-qr-linha .lp2-qr-lado .lp-codigo")).not.toBeNull(); // …código + Copiar à direita
+    expect(pix.querySelector(".lp2-qr-linha .lp2-qr-lado #lp-copiar")).not.toBeNull();
+    expect(pix.querySelector(".lp2-qr-dica")!.textContent).toMatch(/QR code|cole no app do banco/);
+    expect(pix.querySelector('label[for="lp-email-pix"]')!.textContent).toBe("Seu e-mail · pra entrar no app depois");
     expect(pix.querySelector('[data-testid="landing-volte"] #lp-validade')!.textContent).toMatch(/Este código vale por \d\d:\d\d/); // crítica 4.3
     expect(pix.querySelectorAll("#lp-validade")).toHaveLength(1);
     expect(document.getElementById("lp-ja-paguei")!.textContent).toBe("Já paguei e não mudou?"); // crítica 4.2
@@ -461,15 +543,25 @@ describe("braço v2 + AB_CHECKOUT: o fluxo inteiro, nos dois braços do e-mail",
     expect(document.getElementById("lp-email-pix")).not.toBeNull(); // braço livre: o opcional segue
     expect(pix.querySelector(".lp-codigo")!.textContent).toMatch(/^000201/);
     simular().pagar();
-    await espera('[data-testid="landing-pago"]');
+    const pago = await espera('[data-testid="landing-pago"]');
+    expect(pago.querySelector("h3")!.textContent).toBe("Pronto! Falta o seu e‑mail.");
+    expect(document.getElementById("lp-criar")!.textContent).toContain("Liberar meu acesso");
     digitar("lp-email", "maria@email.com");
     (document.getElementById("lp-criar") as HTMLButtonElement).click();
     const conta = await espera('[data-testid="landing-conta"]');
-    expect(conta.textContent).toContain("Seu CORE é seu pra sempre.");
-    expect(conta.textContent).toContain("Abrir meu CORE");
-    expect(conta.textContent).toContain("entre com este e-mail: maria@email.com");
+    expect(conta.querySelector("h3")!.textContent).toBe("Sua conta está pronta.");
+    expect(conta.textContent).toContain("O CORE é seu pra sempre.");
+    expect(conta.textContent).toMatch(/entre com este e-mail/i);
+    expect(conta.querySelector(".lp2-email-caixa")!.textContent).toBe("maria@email.com");
+    const selos = [...conta.querySelectorAll(".lp2-selos a[data-loja] img")];
+    expect(selos.map((i) => i.getAttribute("height"))).toEqual(["48", "48"]);
     expect(conta.querySelector('a[href*="apps.apple.com"]')).not.toBeNull();
     expect(conta.querySelector('a[href*="play.google.com"]')).not.toBeNull();
+    expect(conta.querySelector("#lp-abrir")).not.toBeNull(); // o site (no computador, principal; no celular, "Ou abrir no site agora")
+    expect(conta.querySelector(".lp2-passo1")!.textContent).toContain("1º passo: anote o que entra e o que sai.");
+    expect(conta.textContent).toContain("contato@coreaplicativo.com.br");
+    expect(conta.textContent).not.toMatch(/comprovante/i);
+    expect(document.getElementById("lp-fixo")!.hasAttribute("data-on")).toBe(false);
     expect(nomes()).toEqual(expect.arrayContaining(["landing_pix_gerado", "landing_pix_copiado", "landing_pix_pago", "landing_email"]));
     for (const e of eventos()) expect(e).toMatchObject({ braco_lp: "v2", braco_checkout: "livre" });
   });
@@ -562,7 +654,7 @@ describe("crítica r1 · 7.1 / 8.1 / 8.2: rede e medição", () => {
   it("7.1 / r2 2.3: toda imagem do v2 é loading=lazy sem fetchpriority (fora do v2 fica display:none e não baixa); e o <head> não injeta preload nenhum (Safari avisava 'preloaded but not used')", () => {
     const d = document.createElement("div"); d.innerHTML = corpoDe(HTML);
     const imgs = [...d.querySelectorAll('[data-so-lp="v2"] img')];
-    expect(imgs.length).toBeGreaterThanOrEqual(5);
+    expect(imgs.length).toBe(5);
     for (const i of imgs) { expect(i.getAttribute("loading")).toBe("lazy"); expect(i.hasAttribute("fetchpriority")).toBe(false); }
     expect(HTML).not.toMatch(/rel="preload" as="image"|pl\.rel = "preload"/);
     for (const u of ["/organizar", "/organizar?lp=atual", "/organizar?lp=v2"]) expect(rodar(comChaves("off", "off"), u).preloads).toEqual([]);
@@ -584,14 +676,15 @@ describe("crítica r1 · 7.1 / 8.1 / 8.2: rede e medição", () => {
     obs50.cb([{ isIntersecting: true, target: oferta2, boundingClientRect: { top: 100 } }], obs50);
     expect(eventos().filter((e) => e.nome === "landing_bloco" && e.bloco === "oferta")).toEqual([expect.objectContaining({ via: "50" })]);
   });
-  it("8.2: landing_fita {indice, legenda} 1x por celular do 'Por dentro' (≥ 60% na tela), só no v2", async () => {
+  it("8.2: landing_fita {indice, legenda} 1x por painel do 'Por dentro' (≥ 60% na tela; a legenda é o título do painel), só no v2", async () => {
     await abrirPagina("v2");
-    const telas = [...document.querySelectorAll("#dentro-v2 .lp2-tel")];
+    const telas = [...document.querySelectorAll("#dentro-v2 .lp2-foto")];
+    expect(telas).toHaveLength(3);
     const obs = IOFake.inst.find((o) => o.alvos.includes(telas[1]))!;
     expect(obs.opts.threshold).toBe(0.6);
     obs.cb([{ isIntersecting: true, target: telas[1], boundingClientRect: { top: 100 } }], obs);
     obs.cb([{ isIntersecting: true, target: telas[1], boundingClientRect: { top: 100 } }], obs);
-    expect(eventos().filter((e) => e.nome === "landing_fita")).toEqual([expect.objectContaining({ indice: 1, legenda: "Finanças", braco_lp: "v2" })]);
+    expect(eventos().filter((e) => e.nome === "landing_fita")).toEqual([expect.objectContaining({ indice: 1, legenda: "Saiba quanto pode gastar hoje.", braco_lp: "v2" })]);
     await abrirPagina("atual");
     expect(IOFake.inst.find((o) => o.opts.threshold === 0.6)).toBeUndefined();
   });

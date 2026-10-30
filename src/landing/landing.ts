@@ -40,9 +40,11 @@
  *   load + 800 ms (o PageView saía em 4–8 s num Android lento e a Meta contava "27% dos cliques não carregam"); o iframe da
  *   demo (4–5 MB) só começa DEPOIS do pixel (ou quando a demo entra ≥ 25% na tela, ou no 1º toque) — no braço v2, SÓ no toque
  *   ("Testar o app", pílula ou grade); o chunk do Pix tem 2ª chance + recarga (./carregar.ts).
- * BRAÇO v2 (30/10, html[data-lp="v2"]): a vitrine do topo (prints reais + preço + botão "Quero organizar minha vida"), a
- *   ordem dos blocos por CSS, o botão fixo aparece quando o botão do topo sai da tela, a tela do Pix com os 3 passos +
- *   "Pagou? Volte aqui". O braço "atual" é a página de hoje, byte a byte (teste landing-v2.test.ts).
+ * BRAÇO v2 (30/10, html[data-lp="v2"]) = v3 "produto em uso" (SINTESE.md em novidades-guardadas/2026-10-30/lp-v3): 1ª tela com UM
+ *   celular real (a Home do dia) + preço + botão "Quero organizar minha vida"; "Por dentro" com 3 painéis (os 16 no celular, Finanças
+ *   com o card R$ 146, Rotina); a ordem dos blocos por CSS; o botão fixo aparece quando o botão do topo sai da tela; a tela do Pix
+ *   com 3 passos + QR e código lado a lado + "Pagou? Volte aqui"; pós-compra com os selos das lojas primeiro, e-mail em caixa e o
+ *   1º passo. O braço "atual" é a página de hoje, byte a byte (teste landing-v2.test.ts).
  * E-mail ANTES do Pix (29/10, braço "email"): o campo fica acima do botão (no HTML, escondido pelo CSS no braço "livre" —
  * a página do "livre" é IGUAL à de hoje). Ao tocar em pagar: e-mail → sessão anônima (updateUser) → Pix. E-mail que já
  * tem conta → código do e-mail → entra na conta → Pix nela (conta com vitalício → "Você já tem o CORE"). Na tela do QR,
@@ -343,13 +345,14 @@ if ("IntersectionObserver" in window) {
     new IntersectionObserver((ens) => { if (ens.some((e) => e.isIntersecting)) viuAOferta(); }, { threshold: 0.5 }).observe(botaoPagar);
     // crítica r2 2.5: o landing_bloco "oferta" do v2 também só com metade do bloco na tela (em 844+ os 15% apareciam sem rolar)
     new IntersectionObserver((ens, o) => { if (ens.some((e) => e.isIntersecting) && !vistos.has("oferta")) { vistos.add("oferta"); evento("landing_bloco", { bloco: "oferta", via: "50" }); o.disconnect(); } }, { threshold: 0.5 }).observe($("oferta"));
-    // crítica r1 8.2: a fita "Por dentro" — qual celular foi visto (1x por celular, ≥ 60% na tela)
-    const telas = [...document.querySelectorAll<HTMLElement>("#dentro-v2 .lp2-tel")];
+    // crítica r1 8.2 / v3: os painéis do "Por dentro" — qual foi visto (1x por painel, ≥ 60% na tela). O nome do evento continua
+    // landing_fita (os painéis eram uma fita na v2; o painel do dashboard lê esse nome); a legenda é o título do painel.
+    const telas = [...document.querySelectorAll<HTMLElement>("#dentro-v2 .lp2-foto")];
     const vistas = new Set<number>();
     const fita = new IntersectionObserver((ens) => {
       for (const en of ens) {
         const i = telas.indexOf(en.target as HTMLElement);
-        if (en.isIntersecting && i >= 0 && !vistas.has(i)) { vistas.add(i); evento("landing_fita", { indice: i, legenda: (en.target.querySelector("figcaption")?.textContent ?? "").slice(0, 40) }); }
+        if (en.isIntersecting && i >= 0 && !vistas.has(i)) { vistas.add(i); evento("landing_fita", { indice: i, legenda: [...(en.target.querySelector("h3")?.childNodes ?? [])].map((n) => n.textContent).join(" ").replace(/\s+/g, " ").trim().slice(0, 40) }); }
       }
       if (vistas.size === telas.length) fita.disconnect();
     }, { threshold: 0.6 });
@@ -830,15 +833,19 @@ function renderDoCartao() {
       </ol>` : "";
     const esperando = V2
       ? `<div class="lp2-volte" data-testid="landing-volte"><i class="lp-ponto"></i><span><b>Pagou? Volte aqui.</b>${p.doEmail ? " Quando o pagamento cair, o acesso chega no seu e-mail." : " O acesso abre na hora: esta tela confirma sozinha."}<span class="lp2-vale" id="lp-validade">Este código vale por ${mmss(venceEm(p) - Date.now())}</span></span></div>
-         <p class="lp2-garantia-mini">${ICO_CHECK}<span>7 dias de garantia · não gostou, devolvemos 100%</span></p>`
+         <p class="lp2-garantia-mini">${ICO_CHECK}<span>7 dias de garantia · devolvemos 100%</span></p>`
       : `<div class="lp-esperando"><i class="lp-ponto"></i><span><b>Esperando o pagamento</b>${p.doEmail ? "Quando o pagamento cair, o acesso chega no seu e-mail." : "Esta tela confirma sozinha quando o pagamento entrar."}</span></div>`;
+    // v3 (v2): QR e código lado a lado (a tela inteira — passos, QR, Copiar e "Volte aqui" — cabe em 390×690 com o cartão no topo)
+    const qrECodigo = V2
+      ? `<div class="lp2-qr-linha"><div class="lp-qr" id="lp-qr"></div><div class="lp2-qr-lado"><p class="lp2-qr-dica">${copiado ? "Ou leia o QR code com a câmera do banco, em outro aparelho." : "Copie o código e cole no app do banco em Pix → Copia e Cola."}</p><div class="lp-codigo lp2-codigo" data-testid="landing-codigo">${esc(p.qrCode)}</div><button type="button" class="lp-copiar${copiado ? "" : " cheio"}" id="lp-copiar">${ICO_COPIAR}<span>${copiado ? "Copiar de novo" : "Copiar código Pix"}</span></button></div></div>`
+      : `<div class="lp-qr-linha"><div class="lp-qr" id="lp-qr"></div><div class="lp-qr-dica">${copiado ? "Ou leia o <b>QR code</b> com a câmera do banco, em outro aparelho." : "<b>Copie o código</b> e cole no app do banco em Pix → Copia e Cola. Ou leia o QR code."}</div></div>
+      <div class="lp-codigo" data-testid="landing-codigo">${esc(p.qrCode)}</div>
+      <button type="button" class="lp-copiar${copiado ? "" : " cheio"}" id="lp-copiar">${ICO_COPIAR}<span>${copiado ? "Copiar de novo" : "Copiar código Pix"}</span></button>`;
     caixa.innerHTML = `
       <div class="lp-pix-valor"><b>${reais(VALOR_OFERTA[p.oferta])}</b><span>${esc(V2 && p.oferta === "LN_sempre279" ? "Vitalício · pagamento único" : ROTULO_OFERTA[p.oferta])}</span></div>
       ${copiado && !V2 ? `<div class="lp-copiado" data-testid="landing-copiado">${ICO_CHECK}<span><b>Código Pix copiado</b>Agora abra o app do seu banco: Pix → Copia e Cola.</span></div>` : ""}
       ${passosV2}
-      <div class="lp-qr-linha"><div class="lp-qr" id="lp-qr"></div><div class="lp-qr-dica">${copiado ? "Ou leia o <b>QR code</b> com a câmera do banco, em outro aparelho." : "<b>Copie o código</b> e cole no app do banco em Pix → Copia e Cola. Ou leia o QR code."}</div></div>
-      <div class="lp-codigo" data-testid="landing-codigo">${esc(p.qrCode)}</div>
-      <button type="button" class="lp-copiar${copiado ? "" : " cheio"}" id="lp-copiar">${ICO_COPIAR}<span>${copiado ? "Copiar de novo" : "Copiar código Pix"}</span></button>
+      ${qrECodigo}
       ${esperando}
       ${V2 ? "" : `<div class="lp-validade" id="lp-validade">Este código vale por ${mmss(venceEm(p) - Date.now())}</div>`}
       ${aviso ? `<p class="lp-aviso" role="status">${esc(aviso)}</p>` : ""}
@@ -848,7 +855,7 @@ function renderDoCartao() {
           : `<div class="lp-ok-linha" data-testid="landing-email-garantido">${ICO_CHECK}<span>Pagou e a página fechou? O acesso chega no seu e-mail.</span></div>`)
         : estado.emailPix
         ? `<div class="lp-ok-linha">${ICO_CHECK}<span>O acesso também vai pra <b>${esc(estado.emailPix)}</b>.</span></div>`
-        : `<label for="lp-email-pix">Seu e-mail pra garantir o acesso <span style="font-weight:500">(opcional)</span></label>
+        : `<label for="lp-email-pix">${V2 ? "Seu e-mail · pra entrar no app depois" : 'Seu e-mail pra garantir o acesso <span style="font-weight:500">(opcional)</span>'}</label>
            <div class="lp-linha"><input class="lp-campo" id="lp-email-pix" type="email" inputmode="email" autocomplete="email" autocapitalize="none" placeholder="voce@email.com" /><button type="button" class="lp-mini" id="lp-email-pix-ok" disabled>Salvar</button></div>
            ${erroEmail ? `<p class="lp-erro" role="alert">${esc(erroEmail)}</p>` : ""}`}</div>
       <div class="lp-links"><button type="button" class="lp-link" id="lp-ja-paguei">${V2 ? "Já paguei e não mudou?" : "Já paguei"}</button>${brOferta === "ano" ? `<button type="button" class="lp-link" id="lp-mudar">Mudar o plano</button>` : ""}</div>`;
@@ -876,17 +883,18 @@ function renderDoCartao() {
     }, 1000);
   } else if (f === "pago") {
     const codigo = faseConta === "codigo" || faseConta === "entrando";
+    // v3 (v2, braço livre): "Pronto! Falta o seu e-mail." — o e-mail é por onde a pessoa entra no app da loja (2 em 94 pagaram sem e-mail e não entraram)
     caixa.innerHTML = `
       <div class="lp-pago" data-testid="landing-pago">
         <div class="lp-pago-check">${ICO_CHECK}</div>
-        <h3>Pagamento confirmado!</h3>
-        <p>${codigo ? `Esse e-mail já tem conta. Mandamos um código pra <b>${esc(emailDigitado)}</b>.` : "Agora só falta o seu e-mail pra criar sua conta."}</p>
+        <h3>${V2 && !codigo ? "Pronto! Falta o seu e&#8209;mail." : "Pagamento confirmado!"}</h3>
+        <p>${codigo ? `Esse e-mail já tem conta. Mandamos um código pra <b>${esc(emailDigitado)}</b>.` : V2 ? "Pagamento confirmado. O e-mail é por onde você entra no CORE, no celular e no computador." : "Agora só falta o seu e-mail pra criar sua conta."}</p>
         <div class="lp-form">
           ${codigo
             ? `<label for="lp-codigo">Código de 6 números</label><input class="lp-campo grande" id="lp-codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" />
                <button type="button" class="lp-cta" id="lp-entrar" disabled>${faseConta === "entrando" ? '<i class="lp-gira"></i>' : ""}Entrar e liberar meu CORE</button>`
             : `<label for="lp-email">Seu e-mail</label><input class="lp-campo grande" id="lp-email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" placeholder="voce@email.com" value="${esc(emailDigitado)}" />
-               <button type="button" class="lp-cta" id="lp-criar" ${EMAIL_OK.test(emailDigitado) && faseConta !== "salvando" ? "" : "disabled"}>${faseConta === "salvando" ? '<i class="lp-gira"></i>Criando sua conta…' : `Criar minha conta ${ICO_SETA}`}</button>`}
+               <button type="button" class="lp-cta" id="lp-criar" ${EMAIL_OK.test(emailDigitado) && faseConta !== "salvando" ? "" : "disabled"}>${faseConta === "salvando" ? '<i class="lp-gira"></i>Criando sua conta…' : `${V2 ? "Liberar meu acesso" : "Criar minha conta"} ${ICO_SETA}`}</button>`}
           ${erroEmail ? `<p class="lp-erro" role="alert">${esc(erroEmail)}</p>` : ""}
         </div>
       </div>`;
@@ -900,6 +908,25 @@ function renderDoCartao() {
       e.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !b.disabled) void criarConta(e.value); });
       b.addEventListener("click", () => { void criarConta(e.value); });
     }
+  } else if (f === "conta" && V2) {
+    // v3: levar pro app da loja AGORA com o e-mail certo. Selos primeiro e grandes (quem abre o app da loja no dia 0 volta 43% no D1;
+    // só no site, 15%), o site como secundário, o 1º passo em destaque (ação real no dia 0 → D1 49%). No computador, o site vem primeiro.
+    const email = estado.email ?? "";
+    const selos = `<div class="lp2-selos lp-selos"><a href="${URL_APP_STORE}" target="_blank" rel="noopener" data-loja="ios"><img src="/selos/app-store.svg" alt="Baixar na App Store" width="144" height="48" /></a><a href="${esc(urlPlay("landing"))}" target="_blank" rel="noopener" data-loja="android"><img src="/selos/google-play.png" alt="Disponível no Google Play" width="124" height="48" /></a></div>`;
+    const site = `<div class="lp-form"><button type="button" class="${plataforma === "web" ? "lp-cta" : "lp2-btn2"}" id="lp-abrir">${plataforma === "web" ? `Abrir meu CORE ${ICO_SETA}` : "Ou abrir no site agora"}</button></div>`;
+    caixa.innerHTML = `
+      <div class="lp-pago" data-testid="landing-conta">
+        <div class="lp-pago-check">${ICO_CHECK}</div>
+        <h3>Sua conta está pronta.</h3>
+        <p>${ehPraSempreTxt()} ${plataforma === "web" ? "Entre com este e-mail, aqui ou no app:" : "Baixe o app e entre com este e-mail:"}</p>
+        ${aviso ? `<p class="lp-aviso" role="status">${esc(aviso)}</p>` : ""}
+        <div class="lp2-email-caixa">${esc(email)}</div>
+        ${plataforma === "web" ? site + selos : selos + site}
+        <div class="lp2-passo1"><b>1º passo:</b> anote o que entra e o que sai. O CORE mostra quanto você pode gastar hoje.</div>
+        <p class="lp2-duvida-contato">Dúvida? contato@coreaplicativo.com.br</p>
+      </div>`;
+    $("lp-abrir").addEventListener("click", () => { evento("landing_abrir_core", {}); location.href = "/home"; });
+    caixa.querySelectorAll<HTMLAnchorElement>("a[data-loja]").forEach((a) => a.addEventListener("click", () => evento("landing_loja", { loja: a.dataset.loja, onde: "pos_compra" })));
   } else if (f === "conta") {
     const email = estado.email ?? "";
     caixa.innerHTML = `
@@ -920,7 +947,7 @@ function renderDoCartao() {
   }
   atualizarFixo();
 }
-const ehPraSempreTxt = () => (estado.pago && estado.pago.oferta !== "LN_ano279" ? "Seu CORE é seu pra sempre." : "Seu CORE está liberado por 1 ano.");
+const ehPraSempreTxt = () => (estado.pago && estado.pago.oferta !== "LN_ano279" ? (V2 ? "O CORE é seu pra sempre." : "Seu CORE é seu pra sempre.") : "Seu CORE está liberado por 1 ano.");
 
 $("lp-pagar").addEventListener("click", () => { void gerar(); });
 

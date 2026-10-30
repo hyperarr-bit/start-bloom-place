@@ -257,7 +257,46 @@ export interface DadosRetroResumo {
   diasComRegistro: number;
 }
 
+/**
+ * POUCO USO (30/10, caminho próprio de quem usou pouco — critério em
+ * retro-outubro-dados.ts › CRITERIO_POUCO_USO): um módulo REALMENTE usado,
+ * no estilo do card "um registro" do Codex — o número, o rótulo e os dias em
+ * que aconteceu. Basta 1 registro (nada é completado).
+ */
+export interface DadosRetroPouco {
+  tipo: "retro-pouco";
+  modulo: ModuloDaRetro;
+  ano: number;
+  mesIdx: number;
+  /** "1" · "3" — nunca R$ */
+  numero: string;
+  /** "dia de treino." · "lançamentos anotados." */
+  rotulo: string;
+  /** Os dias em que aconteceu ("AAAA-MM-DD"); vazio = o módulo não tem dia. */
+  dias: string[];
+}
+
+/** O FECHAMENTO do pouco uso (30/10): o que fica de outubro + o convite pra novembro. Compartilhável. */
+export interface DadosRetroFechamento {
+  tipo: "retro-fechamento";
+  ano: number;
+  mesIdx: number;
+  diasComRegistro: number;
+  /** Os módulos que tiveram card, na ordem da sequência. */
+  modulos: ModuloDaRetro[];
+}
+
+/** SEM REGISTROS (30/10): a tela acolhedora do Codex. Não é compartilhável (a tela esconde os botões). */
+export interface DadosRetroVazio {
+  tipo: "retro-vazio";
+  ano: number;
+  mesIdx: number;
+}
+
 export type DadosCard =
+  | DadosRetroPouco
+  | DadosRetroFechamento
+  | DadosRetroVazio
   | DadosLancamentos
   | DadosRetroAbertura
   | DadosRetroResumo

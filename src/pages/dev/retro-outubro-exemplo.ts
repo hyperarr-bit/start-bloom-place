@@ -97,6 +97,20 @@ export const SEMENTE_SO_DIAS: Record<string, unknown> = {
   "finance-expenses": [gasto(3, 40, "mercado", 1), gasto(25, 60, "restaurante", 1)],
 };
 
+/** 30/10 (POUCO USO, como o "um registro" do Codex): um treino só, no domingo 18/10. */
+export const SEMENTE_POUCO_1: Record<string, unknown> = { "saude-workout-log": dias([18]) };
+
+/** 30/10 (pouco uso, 3 módulos): 2 treinos, água na meta em 3 dias e 1 livro terminado — começou no dia 20. */
+export const SEMENTE_POUCO_3: Record<string, unknown> = {
+  "saude-workout-log": dias([21, 28]),
+  "core-saude-water-goal": 8,
+  "water-log": { [out(20)]: 8, [out(21)]: 9, [out(27)]: 8 },
+  "lib-books": [{ id: "b1", title: "O Pequeno Príncipe", author: "Antoine de Saint-Exupéry", status: "lido", endDate: out(29), pages: 96, cover: "" }],
+};
+
+/** 30/10 (pouco uso, nenhum dos 6 módulos): só o humor em 2 dias — a abertura conta os dias, sem card de módulo. */
+export const SEMENTE_POUCO_0: Record<string, unknown> = { "mood-log": { [out(12)]: 4, [out(13)]: 3 } };
+
 export const leitorDe = (semente: Record<string, unknown>): Leitor => (k) => semente[k];
 
 export const RETRO_EXEMPLO: RetroOutubro = montarRetroOutubro(leitorDe(SEMENTE_COMPLETA), { agora: AGORA_EXEMPLO })!;
@@ -105,3 +119,6 @@ export const RETRO_FIN_INCOMPLETA: RetroOutubro | null = montarRetroOutubro(leit
 export const RETRO_UMA_AREA: RetroOutubro | null = montarRetroOutubro(leitorDe(SEMENTE_UMA_AREA), { agora: AGORA_EXEMPLO });
 export const RETRO_DUAS_AREAS: RetroOutubro | null = montarRetroOutubro(leitorDe(SEMENTE_DUAS_AREAS), { agora: AGORA_EXEMPLO });
 export const RETRO_SO_DIAS: RetroOutubro | null = montarRetroOutubro(leitorDe(SEMENTE_SO_DIAS), { agora: AGORA_EXEMPLO });
+export const RETRO_POUCO_1: RetroOutubro | null = montarRetroOutubro(leitorDe(SEMENTE_POUCO_1), { agora: AGORA_EXEMPLO });
+export const RETRO_POUCO_3: RetroOutubro | null = montarRetroOutubro(leitorDe(SEMENTE_POUCO_3), { agora: AGORA_EXEMPLO });
+export const RETRO_POUCO_0: RetroOutubro | null = montarRetroOutubro(leitorDe(SEMENTE_POUCO_0), { agora: AGORA_EXEMPLO });

@@ -182,7 +182,7 @@ export async function liberarPix(admin: Admin, args: {
 
   const r = await transferirCompraPix(admin, deUid, paraUid);
   if (r.erro) return falha(r.erro, r.status ?? 409, r.detalhe);
-  const detalhe = { ...r.detalhe, deUid, para: email || null, pedido: pedido || null };
+  const detalhe: Record<string, unknown> = { ...r.detalhe, deUid, para: email || null, pedido: pedido || null };
   console.log(`[ADMIN-SUPORTE] transferir_pix ${deUid} -> ${paraUid} (${detalhe.plan}, ${detalhe.amount_cents}) por ${args.caller}`);
   await registrar(admin, paraUid, "admin_transferir_pix", {
     de: deUid, para: paraUid, pedido: pedido || null, email: email || null, por: args.caller,

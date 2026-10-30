@@ -56,13 +56,18 @@ describe("pedido e resposta da função", () => {
   });
 });
 
+const caixa = (de: Element | null): HTMLElement => {
+  if (!(de instanceof HTMLElement)) throw new Error("caixa");
+  return de;
+};
+
 describe("formulários", () => {
   const chamar = vi.fn();
   beforeEach(() => chamar.mockReset());
 
   it("Liberar Pix avulso manda pedido + e-mail e mostra sucesso; e-mail ruim não chama", async () => {
     render(<AcoesSuporte chamar={chamar} />);
-    const painel = screen.getByRole("heading", { name: "Liberar Pix" }).closest(".rounded-2xl")!;
+    const painel = caixa(screen.getByRole("heading", { name: "Liberar Pix" }).closest(".rounded-2xl"));
     fireEvent.change(within(painel).getByLabelText(/Pedido ou id do pagamento/), { target: { value: "qr_landing_99" } });
     fireEvent.change(within(painel).getByLabelText("E-mail da conta"), { target: { value: "nao-e-email" } });
     fireEvent.click(within(painel).getByRole("button", { name: "Liberar Pix" }));
@@ -82,7 +87,7 @@ describe("formulários", () => {
 
   it("erro do servidor aparece em texto", async () => {
     render(<AcoesSuporte chamar={chamar} />);
-    const painel = screen.getByRole("heading", { name: "Liberar Pix" }).closest(".rounded-2xl")!;
+    const painel = caixa(screen.getByRole("heading", { name: "Liberar Pix" }).closest(".rounded-2xl"));
     fireEvent.change(within(painel).getByLabelText(/Pedido ou id/), { target: { value: "qr_1" } });
     fireEvent.change(within(painel).getByLabelText("E-mail da conta"), { target: { value: "maria@exemplo.com" } });
     chamar.mockResolvedValueOnce({ error: "destino_ja_tem_assinatura" });
@@ -92,7 +97,7 @@ describe("formulários", () => {
 
   it("Trocar email manda o atual (ou id) e o novo; recusa formato e e-mail de outra conta", async () => {
     render(<AcoesSuporte chamar={chamar} />);
-    const painel = screen.getByRole("heading", { name: "Trocar email" }).closest(".rounded-2xl")!;
+    const painel = caixa(screen.getByRole("heading", { name: "Trocar email" }).closest(".rounded-2xl"));
     fireEvent.change(within(painel).getByLabelText(/E-mail atual ou id/), { target: { value: "antiga@exemplo.com" } });
     fireEvent.change(within(painel).getByLabelText("E-mail novo"), { target: { value: "ruim" } });
     fireEvent.click(within(painel).getByRole("button", { name: "Trocar email" }));
@@ -136,8 +141,8 @@ describe("a página /admin/suporte", () => {
     render(<AdminSuporte />);
     expect(await screen.findByRole("heading", { name: "Liberar Pix" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Trocar email" })).toBeInTheDocument();
-    const cardPix = screen.getByText("anon-1").closest(".rounded-2xl")!;
-    const cardDuvida = screen.getByText("user-duvida").closest(".rounded-2xl")!;
+    const cardPix = caixa(screen.getByText("anon-1").closest(".rounded-2xl"));
+    const cardDuvida = caixa(screen.getByText("user-duvida").closest(".rounded-2xl"));
     expect(within(cardPix).getByRole("button", { name: "Liberar Pix" })).toBeInTheDocument();
     expect(within(cardDuvida).queryByRole("button", { name: "Liberar Pix" })).toBeNull();
 

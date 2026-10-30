@@ -129,6 +129,9 @@ function banco(opts?: { perfilComEmail?: boolean }) {
   return { db, admin, authUpdates };
 }
 
+/** strictNullChecks está desligado: o `ok: false` não estreita a união. */
+const erroDe = (r: { ok: boolean; erro?: string }): string => (r.ok ? "" : r.erro ?? "");
+
 const ANON = "11111111-1111-4111-8111-111111111111";
 const DEST = "22222222-2222-4222-8222-222222222222";
 const OUTRA = "33333333-3333-4333-8333-333333333333";
@@ -183,17 +186,13 @@ describe("liberarPix", () => {
   it("e-mail sem conta, pedido inexistente, e-mail inválido e pedido de outra conta não movem nada", async () => {
     const b = cenario();
     const semConta = await liberarPix(b.admin, { pedido: "qr_landing_1", email: "ninguem@exemplo.com", caller: "d" });
-    expect(semConta.ok).toBe(false);
-    if (!semConta.ok) expect(semConta.erro).toBe("destino_nao_encontrado");
+    expect(erroDe(semConta)).toBe("destino_nao_encontrado");
     const semPedido = await liberarPix(b.admin, { pedido: "nao_existe", email: "maria@exemplo.com", caller: "d" });
-    expect(semPedido.ok).toBe(false);
-    if (!semPedido.ok) expect(semPedido.erro).toBe("pedido_nao_encontrado");
+    expect(erroDe(semPedido)).toBe("pedido_nao_encontrado");
     const emailRuim = await liberarPix(b.admin, { pedido: "qr_landing_1", email: "nao-e-email", caller: "d" });
-    expect(emailRuim.ok).toBe(false);
-    if (!emailRuim.ok) expect(emailRuim.erro).toBe("email_invalido");
+    expect(erroDe(emailRuim)).toBe("email_invalido");
     const outro = await liberarPix(b.admin, { deUid: DEST, pedido: "qr_landing_1", email: "maria@exemplo.com", caller: "d" });
-    expect(outro.ok).toBe(false);
-    if (!outro.ok) expect(outro.erro).toBe("pedido_nao_bate");
+    expect(erroDe(outro)).toBe("pedido_nao_bate");
     expect(b.db.subscriptions[0].user_id).toBe(ANON);
     expect(b.db.analytics_events.find((e) => e.event_name === "admin_transferir_pix")).toBeUndefined();
   });
@@ -202,9 +201,7 @@ describe("liberarPix", () => {
     const comAcesso = cenario();
     comAcesso.db.subscriptions.push({ id: "ja", user_id: DEST, status: "active", plan: "lifetime", billing_period: "lifetime", payment_method: "pix", current_period_end: "2126-01-01T00:00:00.000Z" });
     const bloqueou = await liberarPix(comAcesso.admin, { pedido: "qr_landing_1", email: "maria@exemplo.com", caller: "d" });
-    expect(bloqueou.ok).toBe(false);
-    if (bloqueou.ok) return;
-    expect(bloqueou.erro).toBe("destino_ja_tem_assinatura");
+    expect(erroDe(bloqueou)).toBe("destino_ja_tem_assinatura");
     expect(comAcesso.db.subscriptions.find((s) => s.id === "pix-1")?.user_id).toBe(ANON);
 
     const casca = cenario();
@@ -225,18 +222,14 @@ describe("liberarPix", () => {
     b.db.users[0].email = "anon@exemplo.com";
     b.db.users[0].is_anonymous = false;
     const r = await liberarPix(b.admin, { pedido: "qr_landing_1", email: "maria@exemplo.com", caller: "d" });
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
-    expect(r.erro).toBe("origem_tem_email");
+    expect(erroDe(r)).toBe("origem_tem_email");
     expect(b.db.subscriptions[0].user_id).toBe(ANON);
 
     const semLinha = banco();
     semLinha.db.users.push({ id: ANON, email: null, is_anonymous: true }, { id: DEST, email: "maria@exemplo.com" });
     semLinha.db.analytics_events.push({ user_id: ANON, event_name: "pix_order_created", event_data: { order_id: "qr_so_registro", offer: "ln279" } });
     const s = await liberarPix(semLinha.admin, { pedido: "qr_so_registro", email: "maria@exemplo.com", caller: "d" });
-    expect(s.ok).toBe(false);
-    if (s.ok) return;
-    expect(s.erro).toBe("origem_sem_pix_ativo");
+    expect(erroDe(s)).toBe("origem_sem_pix_ativo");
     expect(semLinha.db.subscriptions).toHaveLength(0);
   });
 });

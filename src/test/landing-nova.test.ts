@@ -45,7 +45,6 @@ function rodar(fonte: string, url: string, store: Record<string, string> = {}, a
   const document = { documentElement: { setAttribute: (k: string, v: string) => { attrs[k] = v; } } };
   const window: Record<string, unknown> = { localStorage };
   const Mat = Object.create(Math); Mat.random = () => aleatorio;
-  // eslint-disable-next-line no-new-func
   new Function("location", "document", "window", "localStorage", "URLSearchParams", "Math", "fetch", "sessionStorage", fonte)(
     location, document, window, localStorage, URLSearchParams, Mat, undefined, { getItem: () => null },
   );

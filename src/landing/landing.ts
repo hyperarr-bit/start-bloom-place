@@ -36,6 +36,9 @@
  *   (29/10) landing_lembrete_volta {toque: t12|t20h, order_id, restaurado: aba|link|nao} — chegou pelo e-mail de lembrete do Pix
  *   (30/10) todo evento leva braco_lp ("atual" | "v2" — AB_LP no <head>). landing_cta {onde:"topo"} = o botão da vitrine (v2);
  *           landing_demo_aberta {via: fundo|perto|botao|area|pilula|grade}; landing_erro {onde:"chunk_pagamento", tentativa}
+ *   (30/10, crítica r1 do v3, só v2) landing_cta leva {fase}; landing_lojas_topo {} (toque em "App Store · Google Play · Computador"
+ *           da 1ª tela → rola até "Sim, é um app de verdade"); landing_pix_venceu {order_id} (o relógio do QR chegou a zero);
+ *           landing_fita só com ≥ 60% por ≥ 500 ms (a rolagem suave do botão do topo não conta)
  * (30/10) NOS DOIS BRAÇOS, sem mudança visual: o pixel da Meta entra no 1º quadro + ocioso (≤ ~1,5 s; reserva 2,5 s) em vez de
  *   load + 800 ms (o PageView saía em 4–8 s num Android lento e a Meta contava "27% dos cliques não carregam"); o iframe da
  *   demo (4–5 MB) só começa DEPOIS do pixel (ou quando a demo entra ≥ 25% na tela, ou no 1º toque) — no braço v2, SÓ no toque
@@ -187,9 +190,10 @@ requestAnimationFrame(() => ocioso(carregarTerceiros, 1500));
 window.setTimeout(carregarTerceiros, 2500);
 
 /* ───────────────────────── rolar ───────────────────────── */
-const rolarAte = (el: Element | null, bloco: ScrollLogicalPosition = "start") => {
+/** suave = false: no arranque com Pix vivo/pago (crítica r1 pix 4: a pessoa via a 1ª tela e a página descendo por ~1 s) */
+const rolarAte = (el: Element | null, bloco: ScrollLogicalPosition = "start", suave = true) => {
   if (!el) return;
-  try { el.scrollIntoView({ behavior: "smooth", block: bloco }); } catch { try { el.scrollIntoView(); } catch { /* sem rolagem (teste) */ } }
+  try { el.scrollIntoView({ behavior: suave ? "smooth" : "auto", block: bloco }); } catch { try { el.scrollIntoView(); } catch { /* sem rolagem (teste) */ } }
 };
 
 /* ───────────────────────── 2. a demo ───────────────────────── */
@@ -297,7 +301,8 @@ document.querySelectorAll<HTMLButtonElement>(".lp-mod[data-m]").forEach((b) => b
 }));
 document.querySelectorAll<HTMLElement>("[data-ir]").forEach((b) => b.addEventListener("click", () => {
   const alvo = b.dataset.ir!;
-  if (alvo === "oferta") evento("landing_cta", { onde: b.closest("#lp-fixo") ? "fixo" : b.closest("#fim") ? "fim" : b.closest("#topo-v2") ? "topo" : "outro" });
+  if (alvo === "oferta") evento("landing_cta", { onde: b.closest("#lp-fixo") ? "fixo" : b.closest("#fim") ? "fim" : b.closest("#topo-v2") ? "topo" : "outro", fase: estado.fase });
+  if (alvo === "dentro-v2") evento("landing_lojas_topo", {}); // r1: "App Store · Google Play · Computador" da 1ª tela → rola até "Sim, é um app de verdade"
   rolarAte($(alvo));
 }));
 document.querySelectorAll<HTMLAnchorElement>("a[data-loja]").forEach((a) => a.addEventListener("click", () => evento("landing_loja", { loja: a.dataset.loja, onde: a.closest("#lp-pix") ? "pos_compra" : "como" })));
@@ -305,9 +310,23 @@ document.querySelectorAll<HTMLAnchorElement>("a[data-loja]").forEach((a) => a.ad
 /* ───────────────────────── o estado da compra (guardado: o banco fecha/recarrega a aba) ───────────────────────── */
 const CHAVE_ESTADO = "landing-estado-v1";
 let estadoHeap: EstadoLanding | null = null; // o Instagram zera o storage com a página viva
+/* crítica r1 (pix 3, v2): o código vencido não some em silêncio — o cartão avisa e o pedido vencido segue sendo conferido por uns
+ * minutos (quem pagou no minuto 29 e voltou no 31 não pode ver a oferta de novo e pagar 2×). Também na recarga: um Pix que
+ * venceu há < 10 min deixa o aviso. */
+let vencido: PixLanding | null = null;
+let avisoOferta: string | null = null;
+const AVISO_VENCEU = "Esse código venceu. Se você já pagou, o acesso chega no seu e-mail em instantes. Se não, é só gerar outro.";
+const JANELA_VENCIDO_MS = 10 * 60_000;
 const lerEstado = (): EstadoLanding => {
   let bruto: unknown = estadoHeap;
   if (!bruto) { try { bruto = JSON.parse(localStorage.getItem(CHAVE_ESTADO) || "null"); } catch { bruto = null; } }
+  if (V2) {
+    const e = bruto as Partial<EstadoLanding> | null;
+    if (e && e.v === 1 && e.pix && !e.pago && typeof e.salvoEm === "number") {
+      const fora = Date.now() - venceEm(e.pix);
+      if (fora > 0 && fora < JANELA_VENCIDO_MS) { vencido = e.pix; avisoOferta = AVISO_VENCEU; }
+    }
+  }
   return estadoQueVolta(bruto);
 };
 let estado: EstadoLanding = lerEstado();
@@ -319,12 +338,45 @@ if (estado.pago) { try { if (!lerCompra()) marcarCompra({ oferta: estado.pago.of
 /* ───────────────────────── blocos vistos + botão fixo ───────────────────────── */
 const fixo = $("lp-fixo");
 let passouDaDemo = false;
+/** v2: o botão do topo saiu da tela POR CIMA? (crítica r1: a trava "passou uma vez" deixava a barra ligada em cima da 1ª tela ao voltar) */
+let topoSaiuPorCima = false;
 const naTela = new Set<string>();
+/* ── v2 (crítica r1, oferta M2 / pix M1): depois do Pix gerado ou pago a página não pode continuar "vendendo" — o botão do topo, o
+ * fixo e o fim mudam de rótulo conforme a fase; com conta pronta (ou "já tem") o fixo some. ── */
+const rotuloCta = (): string => (jaTem || estado.fase === "conta") ? "Ver minha conta" : estado.fase === "pago" ? "Liberar meu acesso" : estado.fase === "qr" ? "Voltar pro meu Pix" : "Quero organizar minha vida";
+const porRotulo = (b: Element | null, t: string) => {
+  if (!b) return;
+  const n = b.firstChild;
+  if (n && n.nodeType === Node.TEXT_NODE) n.textContent = b.querySelector("svg") ? `${t} ` : t; else b.prepend(`${t} `);
+};
+const fixoValeEl = (): HTMLElement | null => (V2 ? fixo.querySelector<HTMLElement>(".lp2-fixo-p span") : null);
+let rotulosDe = "";
+function atualizarRotulos() {
+  if (!V2) return;
+  const t = rotuloCta();
+  const chave = `${t}|${estado.fase === "qr" ? estado.pix?.orderId : ""}`;
+  if (chave === rotulosDe) return; // o observador chama a cada bloco que entra/sai: só mexe no DOM quando a fase mudou
+  rotulosDe = chave;
+  porRotulo($("lp-cta-topo"), t);
+  porRotulo(fixo.querySelector('button[data-so-lp="v2"]'), t);
+  porRotulo(document.querySelector('#fim button[data-so-lp="v2"]'), t);
+  const fim = $("fim");
+  fim.dataset.fase = jaTem ? "conta" : estado.fase;
+  const fimP = fim.querySelector<HTMLElement>('p[data-so-lp="v2"]');
+  if (fimP) fimP.textContent = jaTem || estado.fase === "conta" ? "Sua conta está pronta." : estado.fase === "pago" ? "Pagamento confirmado. Falta só o seu e-mail." : estado.fase === "qr" ? "Seu Pix está logo acima." : "Vitalício por R$ 27,90 · Pix na hora";
+  const fixoB = fixo.querySelector<HTMLElement>(".lp2-fixo-p b"); const fixoS = fixoValeEl();
+  if (fixoB && fixoS) {
+    if (estado.fase === "qr" && estado.pix) { fixoB.textContent = "Pix gerado"; fixoS.textContent = `vale por ${mmss(Math.max(0, venceEm(estado.pix) - Date.now()))}`; }
+    else { fixoB.textContent = "R$ 27,90"; fixoS.innerHTML = "Vitalício<i> · Pix</i>"; }
+  }
+}
 const atualizarFixo = () => {
-  const mostrar = passouDaDemo && !naTela.has("oferta") && !naTela.has("fim") && estado.fase !== "conta" && !jaTem;
+  const vendendo = estado.fase !== "conta" && !jaTem;
+  const mostrar = (V2 ? topoSaiuPorCima && vendendo && estado.fase !== "pago" : passouDaDemo && vendendo) && !naTela.has("oferta") && !naTela.has("fim");
   // 30/10: 2 botões (um por braço; o CSS esconde o do outro) — o tabIndex vai nos dois
   if (mostrar) { fixo.setAttribute("data-on", ""); fixo.removeAttribute("aria-hidden"); fixo.querySelectorAll("button").forEach((b) => { b.tabIndex = 0; }); }
   else { fixo.removeAttribute("data-on"); fixo.setAttribute("aria-hidden", "true"); fixo.querySelectorAll("button").forEach((b) => { b.tabIndex = -1; }); }
+  atualizarRotulos();
 };
 const vistos = new Set<string>();
 let ofertaVista = false;
@@ -347,14 +399,22 @@ if ("IntersectionObserver" in window) {
     new IntersectionObserver((ens, o) => { if (ens.some((e) => e.isIntersecting) && !vistos.has("oferta")) { vistos.add("oferta"); evento("landing_bloco", { bloco: "oferta", via: "50" }); o.disconnect(); } }, { threshold: 0.5 }).observe($("oferta"));
     // crítica r1 8.2 / v3: os painéis do "Por dentro" — qual foi visto (1x por painel, ≥ 60% na tela). O nome do evento continua
     // landing_fita (os painéis eram uma fita na v2; o painel do dashboard lê esse nome); a legenda é o título do painel.
+    // crítica r1 (técnico 7.2): ≥ 60% por ≥ 500 ms — a rolagem suave do botão do topo cruzava os 3 painéis e contava "viu" sem olhar
     const telas = [...document.querySelectorAll<HTMLElement>("#dentro-v2 .lp2-foto")];
     const vistas = new Set<number>();
+    const esperando = new Map<number, number>();
     const fita = new IntersectionObserver((ens) => {
       for (const en of ens) {
         const i = telas.indexOf(en.target as HTMLElement);
-        if (en.isIntersecting && i >= 0 && !vistas.has(i)) { vistas.add(i); evento("landing_fita", { indice: i, legenda: [...(en.target.querySelector("h3")?.childNodes ?? [])].map((n) => n.textContent).join(" ").replace(/\s+/g, " ").trim().slice(0, 40) }); }
+        if (i < 0 || vistas.has(i)) continue;
+        if (en.isIntersecting) {
+          if (!esperando.has(i)) esperando.set(i, window.setTimeout(() => {
+            esperando.delete(i); vistas.add(i);
+            evento("landing_fita", { indice: i, legenda: [...(en.target.querySelector("h3")?.childNodes ?? [])].map((n) => n.textContent).join(" ").replace(/\s+/g, " ").trim().slice(0, 40) });
+            if (vistas.size === telas.length) fita.disconnect();
+          }, 500));
+        } else { const t = esperando.get(i); if (t !== undefined) { window.clearTimeout(t); esperando.delete(i); } }
       }
-      if (vistas.size === telas.length) fita.disconnect();
     }, { threshold: 0.6 });
     telas.forEach((t) => fita.observe(t));
   }
@@ -373,11 +433,11 @@ if ("IntersectionObserver" in window) {
     atualizarFixo();
   }, { threshold: 0.15 });
   document.querySelectorAll("[data-bloco]").forEach((el) => obs.observe(el));
-  // v2: o botão fixo entra assim que o botão do topo sai da tela por cima (a demo fica no fim da página)
+  // v2: o botão fixo entra ENQUANTO o botão do topo está fora da tela por cima — e sai quando ele volta (crítica r1: liga e desliga)
   const ctaTopo = V2 ? document.getElementById("lp-cta-topo") : null;
   if (ctaTopo) {
     new IntersectionObserver((ens) => {
-      for (const en of ens) if (!en.isIntersecting && en.boundingClientRect.top < 0) passouDaDemo = true;
+      for (const en of ens) topoSaiuPorCima = !en.isIntersecting && en.boundingClientRect.top < 0;
       atualizarFixo();
     }, { threshold: 0 }).observe(ctaTopo);
   }
@@ -521,7 +581,7 @@ async function gerar(comCodigo: string | null = null): Promise<void> {
       mostrarErroAntes(null);
     }
   }
-  erroPix = null; copiado = null;
+  erroPix = null; copiado = null; avisoOferta = null;
   const anteriores = estado.pix && venceEm(estado.pix) > Date.now() ? [...estado.anteriores, estado.pix] : estado.anteriores;
   let t0 = Date.now();
   if (antes && comCodigo !== null) { antes = { ...antes, fase: "entrando", erro: null }; render(); }
@@ -627,9 +687,29 @@ const aoVoltar = () => { if (document.visibilityState === "visible" && estado.fa
 document.addEventListener("visibilitychange", aoVoltar);
 window.addEventListener("pageshow", aoVoltar);
 
+/* r1 (pix 3, v2): o Pix que acabou de vencer segue sendo conferido a cada 5 s por até 10 min (o banco pode confirmar depois do relógio) */
+let loopVencido: number | null = null;
+function conferirVencidoEmLoop() {
+  if (!V2 || SIMULADO) return;
+  if (loopVencido) window.clearTimeout(loopVencido);
+  const passo = async () => {
+    const p = vencido;
+    if (!p || estado.fase === "pago" || estado.fase === "conta" || jaTem) return;
+    if (Date.now() - venceEm(p) > JANELA_VENCIDO_MS) { vencido = null; return; }
+    try {
+      const m = await pg(false);
+      if (await m.conferirPix(p, URL_DE_CHEGADA)) { vencido = null; avisoOferta = null; pago(p); return; }
+    } catch { /* tenta de novo */ }
+    if (vencido === p) loopVencido = window.setTimeout(passo, 5000);
+  };
+  loopVencido = window.setTimeout(passo, 2000);
+}
+
 function pago(p: PixLanding) {
   if (estado.fase === "pago" || estado.fase === "conta") return;
   if (loop) window.clearTimeout(loop);
+  if (loopVencido) window.clearTimeout(loopVencido);
+  vencido = null; avisoOferta = null;
   evento("landing_pix_pago", { oferta: p.oferta, valor: VALOR_OFERTA[p.oferta], order_id: p.orderId, simulado: SIMULADO });
   marcarCompra({ oferta: p.oferta, email: estado.emailPix }); // 29/10: sobrevive ao localStorage zerado (cookie)
   salvar({ fase: "pago", pago: p, anteriores: [] });
@@ -727,11 +807,33 @@ async function desenharQr(alvo: HTMLElement, p: PixLanding) {
 }
 
 let relogio: number | null = null;
+/* ── v3 (v2): o miolo da "conta pronta" — e-mail em caixa, selos das lojas primeiro (48 px), site secundário (no computador, principal),
+ * como entrar (sem senha: código por e-mail — a pessoa nunca criou senha), 1º passo, contato. Usado na conta pronta E no "Você já tem o CORE"
+ * (crítica r1 pix 9: quem voltava depois de comprar via o desenho antigo). ── */
+function miolContaV2(email: string): string {
+  const selos = `<div class="lp2-selos lp-selos"><a href="${URL_APP_STORE}" target="_blank" rel="noopener" data-loja="ios"><img src="/selos/app-store.svg" alt="Baixar na App Store" width="144" height="48" /></a><a href="${esc(urlPlay("landing"))}" target="_blank" rel="noopener" data-loja="android"><img src="/selos/google-play.png" alt="Disponível no Google Play" width="124" height="48" /></a></div>`;
+  const site = `<div class="lp-form"><button type="button" class="${plataforma === "web" ? "lp-cta" : "lp2-btn2"}" id="lp-abrir">${plataforma === "web" ? `Abrir meu CORE ${ICO_SETA}` : "Ou abrir no site agora"}</button></div>`;
+  return `
+        ${email ? `<div class="lp2-email-caixa">${esc(email)}</div>` : ""}
+        ${plataforma === "web" ? site + selos : selos + site}
+        <p class="lp2-como-entrar">Pra entrar, toque em <b>Entrar sem senha</b>: o código chega ${email ? "neste e-mail" : "no seu e-mail"}. Os passos também vão por e-mail.</p>
+        <div class="lp2-passo1"><b>1º passo:</b> anote o que entra e o que sai. O CORE mostra quanto você pode gastar hoje.</div>
+        <p class="lp2-duvida-contato">Dúvida? contato@coreaplicativo.com.br</p>`;
+}
 /** 29/10: o cartão "Você já tem o CORE" (a mesma cara da "Sua conta está pronta") no lugar da oferta. */
 function renderJaTem(m: MarcaCompra) {
   card.dataset.fase = "conta";
   const email = m.email ?? "";
-  caixa.innerHTML = `
+  if (V2) {
+    caixa.innerHTML = `
+      <div class="lp-pago" data-testid="landing-ja-tem">
+        <div class="lp-pago-check">${ICO_CHECK}</div>
+        <h3>Você já tem o CORE</h3>
+        <p>${email ? `Seu CORE já está liberado. ${plataforma === "web" ? "Entre com este e-mail, aqui ou no app:" : "Baixe o app e entre com este e-mail:"}` : "Seu CORE já está liberado. Entre com o e-mail que você usou na compra."}</p>
+        ${miolContaV2(email)}
+        <div class="lp-links"><button type="button" class="lp-link" id="lp-nao-fui-eu">Não fui eu que comprei</button></div>
+      </div>`;
+  } else caixa.innerHTML = `
       <div class="lp-pago" data-testid="landing-ja-tem">
         <div class="lp-pago-check">${ICO_CHECK}</div>
         <h3>Você já tem o CORE</h3>
@@ -749,6 +851,13 @@ function renderJaTem(m: MarcaCompra) {
   $("lp-nao-fui-eu").addEventListener("click", () => { evento("landing_ja_tem_nao_fui_eu", {}); esquecerCompra(); jaTem = null; render(); });
   atualizarFixo();
 }
+/** r1 (pix 7, v2): o erro de gerar o Pix fica colado no botão de pagar (#lp-pagar-erro), não solto abaixo do CNPJ */
+const erroNoBotao = (msg: string | null) => {
+  const el = document.getElementById("lp-pagar-erro");
+  if (!el) return false;
+  el.textContent = msg ?? ""; el.hidden = !msg;
+  return true;
+};
 
 function mostrarJaTem(via: "marcador" | "servidor" | "email_pix", email: string | null = null) {
   if (loop) window.clearTimeout(loop);
@@ -804,12 +913,12 @@ let telaRenderizada: string | null = null;
 function render() {
   renderDoCartao();
   if (!V2) return;
-  const tela = `${estado.fase}|${antes ? "codigo" : ""}|${erroPix ? "erro" : ""}|${jaTem ? "jatem" : ""}`;
+  const tela = `${estado.fase}|${antes ? "codigo" : ""}|${erroPix ? "erro" : ""}|${jaTem ? "jatem" : ""}|${avisoOferta ? "venceu" : ""}`;
   if (tela === telaRenderizada) return;
   const primeira = telaRenderizada === null;
   telaRenderizada = tela;
-  if (primeira && tela === "oferta|||") return; // a página abrindo na oferta: nada a rolar
-  rolarAte(card, "start");
+  if (primeira && tela === "oferta||||") return; // a página abrindo na oferta: nada a rolar
+  rolarAte(card, "start", !primeira); // no arranque (Pix vivo / pago / conta): direto, sem a página "descendo" (r1 pix 4)
 }
 function renderDoCartao() {
   if (relogio) { window.clearInterval(relogio); relogio = null; }
@@ -817,10 +926,12 @@ function renderDoCartao() {
   if (antes && estado.fase === "oferta") { renderCodigoAntes(antes); return; }
   card.dataset.fase = estado.fase === "erro" ? "oferta" : estado.fase;
   const f = estado.fase;
+  if (V2) erroNoBotao(f === "oferta" ? erroPix : null);
   if (f === "oferta") {
-    caixa.innerHTML = erroPix ? `<p class="lp-erro" role="alert">${esc(erroPix)}</p>` : "";
+    const erroAqui = erroPix && !(V2 && document.getElementById("lp-pagar-erro")) ? `<p class="lp-erro" role="alert">${esc(erroPix)}</p>` : "";
+    caixa.innerHTML = erroAqui + (V2 && avisoOferta ? `<p class="lp-aviso" role="status" data-testid="landing-venceu">${esc(avisoOferta)}</p>` : "");
   } else if (f === "gerando") {
-    caixa.innerHTML = `<div class="lp-pix-gerando" data-testid="landing-gerando"><span class="lp-pix-logo">${ICO_PIX}</span><b>Gerando o seu Pix…</b><div class="lp-progresso"><i></i></div><span>Sem CPF, sem cadastro. Leva 2 segundos.</span></div>`;
+    caixa.innerHTML = `<div class="lp-pix-gerando" data-testid="landing-gerando"><span class="lp-pix-logo">${ICO_PIX}</span><b>Gerando o seu Pix…</b><div class="lp-progresso"><i></i></div><span>${V2 ? "Sem CPF. Leva 2 segundos." : "Sem CPF, sem cadastro. Leva 2 segundos."}</span></div>`;
   } else if (f === "qr" && estado.pix) {
     const p = estado.pix;
     // 30/10 (v2): 3 passos curtos no lugar da caixa verde + "Pagou? Volte aqui" (quem volta do banco paga 81%; quem não
@@ -837,7 +948,7 @@ function renderDoCartao() {
       : `<div class="lp-esperando"><i class="lp-ponto"></i><span><b>Esperando o pagamento</b>${p.doEmail ? "Quando o pagamento cair, o acesso chega no seu e-mail." : "Esta tela confirma sozinha quando o pagamento entrar."}</span></div>`;
     // v3 (v2): QR e código lado a lado (a tela inteira — passos, QR, Copiar e "Volte aqui" — cabe em 390×690 com o cartão no topo)
     const qrECodigo = V2
-      ? `<div class="lp2-qr-linha"><div class="lp-qr" id="lp-qr"></div><div class="lp2-qr-lado"><p class="lp2-qr-dica">${copiado ? "Ou leia o QR code com a câmera do banco, em outro aparelho." : "Copie o código e cole no app do banco em Pix → Copia e Cola."}</p><div class="lp-codigo lp2-codigo" data-testid="landing-codigo">${esc(p.qrCode)}</div><button type="button" class="lp-copiar${copiado ? "" : " cheio"}" id="lp-copiar">${ICO_COPIAR}<span>${copiado ? "Copiar de novo" : "Copiar código Pix"}</span></button></div></div>`
+      ? `<div class="lp2-qr-linha"><div class="lp-qr" id="lp-qr"></div><div class="lp2-qr-lado"><p class="lp2-qr-dica">Ou leia o QR code com a câmera do banco, em outro aparelho.</p><div class="lp-codigo lp2-codigo" data-testid="landing-codigo">${esc(p.qrCode)}</div><button type="button" class="lp-copiar${copiado ? "" : " cheio"}" id="lp-copiar">${ICO_COPIAR}<span>${copiado ? "Copiar de novo" : "Copiar código Pix"}</span></button></div></div>`
       : `<div class="lp-qr-linha"><div class="lp-qr" id="lp-qr"></div><div class="lp-qr-dica">${copiado ? "Ou leia o <b>QR code</b> com a câmera do banco, em outro aparelho." : "<b>Copie o código</b> e cole no app do banco em Pix → Copia e Cola. Ou leia o QR code."}</div></div>
       <div class="lp-codigo" data-testid="landing-codigo">${esc(p.qrCode)}</div>
       <button type="button" class="lp-copiar${copiado ? "" : " cheio"}" id="lp-copiar">${ICO_COPIAR}<span>${copiado ? "Copiar de novo" : "Copiar código Pix"}</span></button>`;
@@ -855,7 +966,7 @@ function renderDoCartao() {
           : `<div class="lp-ok-linha" data-testid="landing-email-garantido">${ICO_CHECK}<span>Pagou e a página fechou? O acesso chega no seu e-mail.</span></div>`)
         : estado.emailPix
         ? `<div class="lp-ok-linha">${ICO_CHECK}<span>O acesso também vai pra <b>${esc(estado.emailPix)}</b>.</span></div>`
-        : `<label for="lp-email-pix">${V2 ? "Seu e-mail · pra entrar no app depois" : 'Seu e-mail pra garantir o acesso <span style="font-weight:500">(opcional)</span>'}</label>
+        : `<label for="lp-email-pix">${V2 ? "Seu e-mail (se quiser) · pra entrar no app depois" : 'Seu e-mail pra garantir o acesso <span style="font-weight:500">(opcional)</span>'}</label>
            <div class="lp-linha"><input class="lp-campo" id="lp-email-pix" type="email" inputmode="email" autocomplete="email" autocapitalize="none" placeholder="voce@email.com" /><button type="button" class="lp-mini" id="lp-email-pix-ok" disabled>Salvar</button></div>
            ${erroEmail ? `<p class="lp-erro" role="alert">${esc(erroEmail)}</p>` : ""}`}</div>
       <div class="lp-links"><button type="button" class="lp-link" id="lp-ja-paguei">${V2 ? "Já paguei e não mudou?" : "Já paguei"}</button>${brOferta === "ano" ? `<button type="button" class="lp-link" id="lp-mudar">Mudar o plano</button>` : ""}</div>`;
@@ -879,7 +990,13 @@ function renderDoCartao() {
       const el = document.getElementById("lp-validade");
       const resta = venceEm(p) - Date.now();
       if (el) el.textContent = resta > 0 ? `Este código vale por ${mmss(resta)}` : "Este código venceu.";
-      if (resta <= 0) { window.clearInterval(relogio!); salvar({ fase: "oferta" }); }
+      const fv = fixoValeEl(); if (fv && resta > 0) fv.textContent = `vale por ${mmss(resta)}`;
+      if (resta <= 0) {
+        window.clearInterval(relogio!);
+        if (V2) { vencido = p; avisoOferta = AVISO_VENCEU; evento("landing_pix_venceu", { order_id: p.orderId }); }
+        salvar({ fase: "oferta" });
+        conferirVencidoEmLoop();
+      }
     }, 1000);
   } else if (f === "pago") {
     const codigo = faseConta === "codigo" || faseConta === "entrando";
@@ -912,18 +1029,13 @@ function renderDoCartao() {
     // v3: levar pro app da loja AGORA com o e-mail certo. Selos primeiro e grandes (quem abre o app da loja no dia 0 volta 43% no D1;
     // só no site, 15%), o site como secundário, o 1º passo em destaque (ação real no dia 0 → D1 49%). No computador, o site vem primeiro.
     const email = estado.email ?? "";
-    const selos = `<div class="lp2-selos lp-selos"><a href="${URL_APP_STORE}" target="_blank" rel="noopener" data-loja="ios"><img src="/selos/app-store.svg" alt="Baixar na App Store" width="144" height="48" /></a><a href="${esc(urlPlay("landing"))}" target="_blank" rel="noopener" data-loja="android"><img src="/selos/google-play.png" alt="Disponível no Google Play" width="124" height="48" /></a></div>`;
-    const site = `<div class="lp-form"><button type="button" class="${plataforma === "web" ? "lp-cta" : "lp2-btn2"}" id="lp-abrir">${plataforma === "web" ? `Abrir meu CORE ${ICO_SETA}` : "Ou abrir no site agora"}</button></div>`;
     caixa.innerHTML = `
       <div class="lp-pago" data-testid="landing-conta">
         <div class="lp-pago-check">${ICO_CHECK}</div>
         <h3>Sua conta está pronta.</h3>
         <p>${ehPraSempreTxt()} ${plataforma === "web" ? "Entre com este e-mail, aqui ou no app:" : "Baixe o app e entre com este e-mail:"}</p>
         ${aviso ? `<p class="lp-aviso" role="status">${esc(aviso)}</p>` : ""}
-        <div class="lp2-email-caixa">${esc(email)}</div>
-        ${plataforma === "web" ? site + selos : selos + site}
-        <div class="lp2-passo1"><b>1º passo:</b> anote o que entra e o que sai. O CORE mostra quanto você pode gastar hoje.</div>
-        <p class="lp2-duvida-contato">Dúvida? contato@coreaplicativo.com.br</p>
+        ${miolContaV2(email)}
       </div>`;
     $("lp-abrir").addEventListener("click", () => { evento("landing_abrir_core", {}); location.href = "/home"; });
     caixa.querySelectorAll<HTMLAnchorElement>("a[data-loja]").forEach((a) => a.addEventListener("click", () => evento("landing_loja", { loja: a.dataset.loja, onde: "pos_compra" })));
@@ -974,9 +1086,13 @@ if (estado.fase === "oferta") { const m = lerCompra(); if (m) { jaTem = m; mostr
 /* voltou com Pix aberto (o banco recarregou a aba) / já pago: a tela certa */
 if (estado.fase === "qr") { copiado = null; conferirEmLoop(); }
 if (estado.fase !== "oferta") {
+  // r1 (pix M2, v2): no Chromium a restauração de rolagem da recarga vencia o rolarAte e deixava o QR fora da tela
+  if (V2) { try { history.scrollRestoration = "manual"; } catch { /* noop */ } }
   render();
-  if (estado.fase === "pago" || estado.fase === "conta") window.setTimeout(() => rolarAte(card, "start"), 50);
+  if (estado.fase === "pago" || estado.fase === "conta") window.setTimeout(() => rolarAte(card, "start", !V2), 50);
+  if (V2) window.addEventListener("load", () => rolarAte(card, "start", false), { once: true });
 }
+if (V2 && avisoOferta && estado.fase === "oferta" && !jaTem) { render(); conferirVencidoEmLoop(); } // o Pix venceu há pouco: o aviso fica, e a conferência segue
 
 /* ───────────────────────── medição invisível (29/10) ───────────────────────── */
 /* qual dúvida abre: 1x por pergunta por visita */

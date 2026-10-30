@@ -162,25 +162,42 @@ describe("braço atual = a página de hoje (origin/main 30/10), sem tirar nem p�
 /* ───────── 3. o que o v2 tem ───────── */
 describe("braço v2: a vitrine, a ordem e o cartão", () => {
   const html = () => { const d = document.createElement("div"); d.innerHTML = corpoDe(HTML); return d; };
-  it("a vitrine (#topo-v2) tem promessa, onde roda, 3 prints reais em celular na proporção do iPhone, preço vitalício e o botão — tudo antes de qualquer outro bloco", () => {
-    const topo = html().querySelector("#topo-v2")!;
+  it("a vitrine (#topo-v2): promessa, onde roda (ícones distintos), a GRADE dos 16 em HTML (mesmos ícones dos 16), o card real de Finanças em @3x, preço vitalício e o botão — sem vídeo, sem pergunta", () => {
+    const d = html();
+    const topo = d.querySelector("#topo-v2")!;
     expect(topo.getAttribute("data-so-lp")).toBe("v2");
     expect(topo.querySelector("h1")!.textContent).toBe("Sua vida organizada num app só.");
-    expect(topo.querySelector(".lp2-onde")!.textContent).toMatch(/App Store.*Google Play.*Computador/);
-    const imgs = [...topo.querySelectorAll(".lp2-cel img")].map((i) => i.getAttribute("src"));
-    expect(imgs).toEqual(["/landing/v2-modulos.webp", "/landing/v2-financas.webp", "/landing/v2-home.webp", "/landing/v2-meu-mes.webp"]);
-    for (const i of imgs) expect(existsSync(resolve(raiz, `public${i}`))).toBe(true);
+    const onde = [...topo.querySelectorAll(".lp2-onde li")];
+    expect(onde.map((l) => l.textContent)).toEqual(["App Store", "Google Play", "Computador"]);
+    expect(new Set(onde.map((l) => l.querySelector("svg")!.innerHTML)).size).toBe(3); // crítica 1.3: 3 ícones diferentes
+    // a grade dos 16: os MESMOS nomes, ícones e cores do bloco "os 16" (crítica 2.1: nítida, 0 bytes)
+    const grade = [...topo.querySelectorAll(".lp2-grade li")];
+    const dos16 = [...d.querySelectorAll("#modulos .lp-mod")];
+    expect(grade).toHaveLength(16);
+    expect(grade.map((l) => l.textContent!.trim())).toEqual(dos16.map((b) => b.querySelector(".lp-mod-nome")!.textContent));
+    expect(grade.map((l) => l.querySelector("svg")!.innerHTML)).toEqual(dos16.map((b) => b.querySelector("svg")!.innerHTML));
+    expect(grade.map((l) => l.querySelector(".lp2-g-ico")!.getAttribute("style"))).toEqual(dos16.map((b) => b.querySelector(".lp-mod-ico")!.getAttribute("style")));
+    // o card real (recorte @3x: 1050 px pros 350 px CSS) e os celulares (810 px pros 270 px CSS) — crítica 2.2: nada esticado em @3x
+    const card = topo.querySelector(".lp2-card img")!;
+    expect(card.getAttribute("src")).toBe("/landing/v2-posso-gastar.webp");
+    expect(Number(card.getAttribute("width"))).toBeGreaterThanOrEqual(1050);
+    const imgs = [...d.querySelectorAll("#dentro-v2 .lp2-cel img")];
+    expect(imgs.map((i) => i.getAttribute("src"))).toEqual(["/landing/v2-modulos.webp", "/landing/v2-financas.webp", "/landing/v2-home.webp", "/landing/v2-meu-mes.webp"]);
+    for (const i of imgs) { expect(Number(i.getAttribute("width"))).toBeGreaterThanOrEqual(810); expect(existsSync(resolve(raiz, `public${i.getAttribute("src")}`))).toBe(true); }
+    expect(existsSync(resolve(raiz, "public/landing/v2-posso-gastar.webp"))).toBe(true);
+    expect(HTML).toMatch(/\.lp2-tel \{[^}]*width: 270px/);
     expect(HTML).toMatch(/\.lp2-cel \{[^}]*aspect-ratio: 390 \/ 844/);
     expect(HTML).toMatch(/\.lp2-cel img \{[^}]*width: 100%; height: auto/); // nunca esticado
-    expect(topo.querySelector(".lp2-preco")!.textContent!.replace(/\s+/g, " ")).toMatch(/R\$ 27,90.*Vitalício · pagamento único no Pix.*Na App Store: R\$ 97,90 por ano/);
+    expect(topo.querySelector(".lp2-preco")!.textContent!.replace(/\s+/g, " ")).toMatch(/R\$ 27,90.*Vitalício · pagamento único.*Anual na App Store: R\$ 97,90/);
     expect(topo.querySelector("#lp-cta-topo")!.getAttribute("data-ir")).toBe("oferta");
-    expect(topo.querySelector(".lp2-miuda")!.textContent).toBe("Paga 1 vez. Nada é cobrado depois. 7 dias de garantia.");
+    expect(topo.querySelector(".lp2-miuda")!.textContent).toBe("Paga 1 vez · nada é cobrado depois · 7 dias de garantia");
     expect(topo.querySelector("video")).toBeNull();
     expect(topo.querySelector(".lp-area, .lp-pergunta")).toBeNull(); // sem a pergunta de área
+    expect(d.querySelector("#antes")!.getAttribute("data-so-lp")).toBe("atual"); // o antes/depois sai no v2 (o "Por dentro" entra no lugar)
   });
-  it("a ordem dos blocos por CSS: vitrine → oferta → antes/depois → avaliações → os 16 → como → demo (opcional) → dúvidas", () => {
+  it("a ordem dos blocos por CSS: vitrine → oferta → por dentro → avaliações → os 16 → como → demo (opcional) → dúvidas", () => {
     const ordem = (id: string) => Number(HTML.match(new RegExp(`html\\[data-lp="v2"\\] #${id} \\{ order: (-?\\d+)`))![1]);
-    const seq = ["topo-v2", "oferta", "antes", "avaliacoes", "modulos", "como", "demo", "duvidas"].map(ordem);
+    const seq = ["topo-v2", "oferta", "dentro-v2", "avaliacoes", "modulos", "como", "demo", "duvidas"].map(ordem);
     expect([...seq].sort((a, b) => a - b)).toEqual(seq);
     expect(HTML).toMatch(/html\[data-lp="v2"\] main\.lp \{ display: flex; flex-direction: column; \}/);
     expect(ordem("oferta")).toBe(ordem("topo-v2") + 1);
@@ -190,8 +207,8 @@ describe("braço v2: a vitrine, a ordem e o cartão", () => {
     const faixas = [...d.querySelectorAll(".lp-promo")];
     const v2 = faixas.find((f) => f.getAttribute("data-so-lp") === "v2")!;
     const atual = faixas.find((f) => f.getAttribute("data-so-lp") === "atual")!;
-    expect(v2.textContent).toMatch(/ACESSO VITALÍCIO/);
-    expect(v2.textContent).not.toMatch(/hoje|\d\d\/\d\d/);
+    expect(v2.textContent).toMatch(/ACESSO VITALÍCIO · R\$ 27,90 no Pix/); // crítica 1.1: curta (cabia 400 px em 390)
+    expect(v2.textContent).not.toMatch(/hoje|\d\d\/\d\d|garantia/);
     expect(atual.querySelector("#lp-promo-data")).not.toBeNull();
   });
   it("o cartão v2: 'Vitalício por R$ 27,90', âncora honesta, 'App de verdade: App Store, Google Play e computador' e a linha de confiança embaixo do botão", () => {

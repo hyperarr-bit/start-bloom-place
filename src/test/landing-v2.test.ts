@@ -216,19 +216,33 @@ describe("braço v2: a vitrine, a ordem e o cartão", () => {
     card.querySelectorAll('[data-so-lp="atual"], [data-so-oferta="ano"]').forEach((el) => el.remove());
     const t = card.textContent!.replace(/\s+/g, " ");
     expect(t).toContain("Acesso vitalício");
-    expect(t).toContain("Na App Store: R$ 97,90 por ano. Aqui:");
+    expect(t).toContain("sem renovação");
+    expect(t).toContain("Anual na App Store: R$ 97,90");
     expect(t).toContain("Vitalício por R$ 27,90");
-    expect(t).toContain("App de verdade: App Store, Google Play e computador");
-    expect(t).toContain("Pague uma vez e é seu pra sempre. Nada é cobrado depois.");
-    expect(t).toContain("7 dias de garantia");
-    expect(t).not.toMatch(/só hoje|De R\$ 97,90/i);
-    expect(card.querySelector("#lp-pagar + .lp2-confianca")!.textContent).toContain("Paga 1 vez. Nada é cobrado depois. 7 dias de garantia.");
+    expect(t).toContain("Pagamento único no Pix");
+    // crítica 3.1: 2 checks só (app de verdade + garantia) e 1 linha embaixo do botão; sem o check "pra sempre" nem a caixa verde
+    const checks = [...card.querySelectorAll(".lp-checks li")].map((l) => l.textContent!.replace(/\s+/g, " ").trim());
+    expect(checks).toEqual(["📱 App de verdade: App Store, Google Play e computador.", "7 dias de garantia. Não gostou? Devolvemos 100%."]);
+    expect(t).not.toMatch(/só hoje|De R\$ 97,90|Aqui:/i);
+    expect(card.querySelector("#lp-pagar + .lp2-confianca")!.textContent).toContain("Paga 1 vez. Nada é cobrado depois.");
+    expect((t.match(/pagamento único/gi) ?? []).length).toBe(1);
+    expect((t.match(/7 dias/gi) ?? []).length).toBe(1);
+    expect(html().querySelector("#oferta .lp-garantia")!.getAttribute("data-so-lp")).toBe("atual");
     expect(card.querySelector(".lp-email-antes")!.getAttribute("data-so-checkout")).toBe("email"); // o A/B do e-mail continua no mesmo cartão
   });
   it("a demo no v2 é opcional: botão 'Testar o app' em cima do print; o iframe só tem src no toque (ver o teste de comportamento)", () => {
     const d = html();
     expect(d.querySelector("#lp-demo-abrir")!.getAttribute("data-so-lp")).toBe("v2");
     expect(d.querySelector("#lp-demo-frame")!.getAttribute("src")).toBeNull();
+  });
+  it("crítica 3.2: um verbo só no v2 — o botão do topo, o fixo e o do fim dizem 'Quero organizar minha vida'; o atual segue 'Quero organizar tudo'", () => {
+    const d = html();
+    const v2 = (sel: string) => [...d.querySelectorAll(sel)].find((b) => b.getAttribute("data-so-lp") === "v2")!.textContent!.replace(/\s+/g, " ").trim();
+    const atual = (sel: string) => [...d.querySelectorAll(sel)].find((b) => b.getAttribute("data-so-lp") === "atual")!.textContent!.replace(/\s+/g, " ").trim();
+    expect(v2("#lp-fixo button")).toBe("Quero organizar minha vida · R$ 27,90");
+    expect(v2("#fim button")).toBe("Quero organizar minha vida");
+    expect(atual("#lp-fixo button")).toBe("Quero organizar tudo · R$ 27,90");
+    expect(atual("#fim button")).toBe("Quero organizar tudo");
   });
   it("sem link clicável pra loja antes do preço (regra do dono 28/10): os selos só no pós-compra", () => {
     const d = html();
@@ -424,6 +438,9 @@ describe("braço v2 + AB_CHECKOUT: o fluxo inteiro, nos dois braços do e-mail",
     expect(passos[2]).toMatch(/Pix Copia e Cola/);
     expect(pix.querySelector('[data-testid="landing-volte"]')!.textContent).toMatch(/Pagou\? Volte aqui\. O acesso abre na hora/);
     expect(pix.querySelector(".lp2-garantia-mini")!.textContent).toContain("7 dias de garantia");
+    expect(pix.querySelector('[data-testid="landing-volte"] #lp-validade')!.textContent).toMatch(/Este código vale por \d\d:\d\d/); // crítica 4.3
+    expect(pix.querySelectorAll("#lp-validade")).toHaveLength(1);
+    expect(document.getElementById("lp-ja-paguei")!.textContent).toBe("Já paguei e não mudou?"); // crítica 4.2
     expect(pix.querySelector('[data-testid="landing-copiado"]')).toBeNull(); // a caixa verde virou o passo 1
     expect(pix.textContent).not.toContain("Esperando o pagamento");
     expect(document.getElementById("lp-ja-paguei")).not.toBeNull();

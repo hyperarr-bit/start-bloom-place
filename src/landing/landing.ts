@@ -320,8 +320,9 @@ let passouDaDemo = false;
 const naTela = new Set<string>();
 const atualizarFixo = () => {
   const mostrar = passouDaDemo && !naTela.has("oferta") && !naTela.has("fim") && estado.fase !== "conta" && !jaTem;
-  if (mostrar) { fixo.setAttribute("data-on", ""); fixo.removeAttribute("aria-hidden"); (fixo.querySelector("button") as HTMLButtonElement).tabIndex = 0; }
-  else { fixo.removeAttribute("data-on"); fixo.setAttribute("aria-hidden", "true"); (fixo.querySelector("button") as HTMLButtonElement).tabIndex = -1; }
+  // 30/10: 2 botões (um por braço; o CSS esconde o do outro) — o tabIndex vai nos dois
+  if (mostrar) { fixo.setAttribute("data-on", ""); fixo.removeAttribute("aria-hidden"); fixo.querySelectorAll("button").forEach((b) => { b.tabIndex = 0; }); }
+  else { fixo.removeAttribute("data-on"); fixo.setAttribute("aria-hidden", "true"); fixo.querySelectorAll("button").forEach((b) => { b.tabIndex = -1; }); }
 };
 const vistos = new Set<string>();
 let ofertaVista = false;
@@ -806,7 +807,7 @@ function renderDoCartao() {
         <li><span>Escolha <b>Pix Copia e Cola</b>, cole o código e confirme.</span></li>
       </ol>` : "";
     const esperando = V2
-      ? `<div class="lp2-volte" data-testid="landing-volte"><i class="lp-ponto"></i><span><b>Pagou? Volte aqui.</b>${p.doEmail ? " Quando o pagamento cair, o acesso chega no seu e-mail." : " O acesso abre na hora: esta tela confirma sozinha."}</span></div>
+      ? `<div class="lp2-volte" data-testid="landing-volte"><i class="lp-ponto"></i><span><b>Pagou? Volte aqui.</b>${p.doEmail ? " Quando o pagamento cair, o acesso chega no seu e-mail." : " O acesso abre na hora: esta tela confirma sozinha."}<span class="lp2-vale" id="lp-validade">Este código vale por ${mmss(venceEm(p) - Date.now())}</span></span></div>
          <p class="lp2-garantia-mini">${ICO_CHECK}<span>7 dias de garantia · não gostou, devolvemos 100%</span></p>`
       : `<div class="lp-esperando"><i class="lp-ponto"></i><span><b>Esperando o pagamento</b>${p.doEmail ? "Quando o pagamento cair, o acesso chega no seu e-mail." : "Esta tela confirma sozinha quando o pagamento entrar."}</span></div>`;
     caixa.innerHTML = `
@@ -817,7 +818,7 @@ function renderDoCartao() {
       <div class="lp-codigo" data-testid="landing-codigo">${esc(p.qrCode)}</div>
       <button type="button" class="lp-copiar${copiado ? "" : " cheio"}" id="lp-copiar">${ICO_COPIAR}<span>${copiado ? "Copiar de novo" : "Copiar código Pix"}</span></button>
       ${esperando}
-      <div class="lp-validade" id="lp-validade">Este código vale por ${mmss(venceEm(p) - Date.now())}</div>
+      ${V2 ? "" : `<div class="lp-validade" id="lp-validade">Este código vale por ${mmss(venceEm(p) - Date.now())}</div>`}
       ${aviso ? `<p class="lp-aviso" role="status">${esc(aviso)}</p>` : ""}
       <div class="lp-email-opc">${brCheckout === "email" || p.doEmail
         ? (estado.emailPix
@@ -828,7 +829,7 @@ function renderDoCartao() {
         : `<label for="lp-email-pix">Seu e-mail pra garantir o acesso <span style="font-weight:500">(opcional)</span></label>
            <div class="lp-linha"><input class="lp-campo" id="lp-email-pix" type="email" inputmode="email" autocomplete="email" autocapitalize="none" placeholder="voce@email.com" /><button type="button" class="lp-mini" id="lp-email-pix-ok" disabled>Salvar</button></div>
            ${erroEmail ? `<p class="lp-erro" role="alert">${esc(erroEmail)}</p>` : ""}`}</div>
-      <div class="lp-links"><button type="button" class="lp-link" id="lp-ja-paguei">Já paguei</button>${brOferta === "ano" ? `<button type="button" class="lp-link" id="lp-mudar">Mudar o plano</button>` : ""}</div>`;
+      <div class="lp-links"><button type="button" class="lp-link" id="lp-ja-paguei">${V2 ? "Já paguei e não mudou?" : "Já paguei"}</button>${brOferta === "ano" ? `<button type="button" class="lp-link" id="lp-mudar">Mudar o plano</button>` : ""}</div>`;
     void desenharQr($("lp-qr"), p);
     $("lp-copiar").addEventListener("click", async () => {
       const ok = await copiarTexto(p.qrCode);

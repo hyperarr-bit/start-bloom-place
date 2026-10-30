@@ -437,8 +437,12 @@
       .lp2-confianca svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--verde); }
       html[data-lp="v2"] .lp-ancora { color: var(--suave); font-weight: 600; }
       html[data-lp="v2"] .lp-ancora b { color: var(--tx); }
+      html[data-lp="v2"] .lp-preco-tit b small { font-size: 60%; font-weight: 850; }
+      html[data-lp="v2"] .lp-seguro { color: var(--suave); }
       /* 3. a tela do Pix (preenchida pelo landing.ts no braço v2): 3 passos curtos; o valor numa linha só */
       html[data-lp="v2"] .lp-pix-valor b { white-space: nowrap; }
+      html[data-lp="v2"] button.lp-link { min-height: 44px; padding: 10px 8px; }
+      .lp2-vale { display: block; margin-top: 4px; color: var(--suave); font-weight: 600; font-size: 12.5px; }
       .lp2-passos { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; counter-reset: p; }
       .lp2-passos li { display: flex; align-items: center; gap: 10px; font-size: 14.5px; line-height: 1.35; color: #3d3a40; }
       .lp2-passos li::before { counter-increment: p; content: counter(p); width: 24px; height: 24px; border-radius: 50%; background: var(--grafite); color: #fff; font-size: 12.5px; font-weight: 800; display: grid; place-items: center; flex-shrink: 0; }
@@ -662,23 +666,23 @@
       <!-- ═════════ 6–8. OFERTA + PIX + DEPOIS DE PAGAR ═════════ -->
       <section class="lp-oferta" id="oferta" data-bloco="oferta">
         <div class="lp-card" id="lp-card" data-fase="oferta">
-          <div class="lp-card-faixa"><span data-so-lp="atual">Oferta especial · hoje</span><span data-so-lp="v2">Acesso vitalício</span><span class="lp-faixa-dir" data-so-oferta="ano">menos de R$ 0,08 por dia</span><span class="lp-faixa-dir" data-so-oferta="sempre">pagamento único</span></div>
+          <div class="lp-card-faixa"><span data-so-lp="atual">Oferta especial · hoje</span><span data-so-lp="v2">Acesso vitalício</span><span class="lp-faixa-dir" data-so-oferta="ano">menos de R$ 0,08 por dia</span><span class="lp-faixa-dir" data-so-oferta="sempre" data-so-lp="atual">pagamento único</span><span class="lp-faixa-dir" data-so-lp="v2">sem renovação</span></div>
           <div class="lp-card-corpo">
             <div class="lp-so-oferta">
               <p class="lp-ancora" data-so-lp="atual"><s>De R$ 97,90 por ano</s> Só hoje</p>
               <!-- 30/10 (v2): âncora honesta (o anual nas lojas custa isso mesmo) e "Vitalício" escrito no cartão (dono 30/10) -->
-              <p class="lp-ancora" data-so-lp="v2">Na App Store: <b>R$ 97,90 por ano</b>. Aqui:</p>
+              <p class="lp-ancora" data-so-lp="v2">Anual na App Store: <b>R$ 97,90</b></p>
               <h2 class="lp-preco-tit" data-so-oferta="ano">1 ano inteiro por <b>R$ 27,90</b></h2>
               <h2 class="lp-preco-tit" data-so-oferta="sempre" data-so-lp="atual">Pra sempre por <b>R$ 27,90</b></h2>
-              <h2 class="lp-preco-tit" data-so-oferta="sempre" data-so-lp="v2">Vitalício por <b>R$ 27,90</b></h2>
+              <h2 class="lp-preco-tit" data-so-oferta="sempre" data-so-lp="v2">Vitalício por <b>R$ 27<small>,90</small></b></h2>
               <p class="lp-preco-sub" data-so-oferta="ano">Pagamento único no Pix · menos de R$ 0,08 por dia</p>
               <p class="lp-preco-sub" data-so-oferta="sempre" data-so-lp="atual">Pagamento único no Pix · nunca mais paga</p>
-              <p class="lp-preco-sub" data-so-oferta="sempre" data-so-lp="v2">Pagamento único no Pix · é seu pra sempre</p>
+              <p class="lp-preco-sub" data-so-oferta="sempre" data-so-lp="v2">Pagamento único no Pix</p>
               <ul class="lp-checks">
                 <li data-so-lp="atual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span>As <b>16 áreas</b> no celular e no computador</span></li>
-                <li data-so-lp="v2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span>📱 <b>App de verdade:</b> App Store, Google Play e computador. As 16 áreas, na mesma conta.</span></li>
+                <li data-so-lp="v2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span>📱 <b>App de verdade:</b> App Store, Google Play e computador.</span></li>
                 <li data-so-oferta="ano"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span><b>Sem renovação automática.</b> Daqui a 1 ano, você decide.</span></li>
-                <li data-so-oferta="sempre"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span><b>Pague uma vez e é seu pra sempre.</b> Nada é cobrado depois.</span></li>
+                <li data-so-oferta="sempre" data-so-lp="atual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span><b>Pague uma vez e é seu pra sempre.</b> Nada é cobrado depois.</span></li>
                 <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span><b>7 dias de garantia.</b> Não gostou? Devolvemos 100%.</span></li>
               </ul>
               <label class="lp-caixinha" data-so-oferta="ano">
@@ -694,14 +698,14 @@
                 </div>
                 <button type="button" class="lp-cta" id="lp-pagar"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.2" y="5.2" width="13.6" height="13.6" rx="3.2" transform="rotate(45 12 12)" fill="none" stroke="currentColor" stroke-width="2.2"/><rect x="9.6" y="9.6" width="4.8" height="4.8" rx="1" transform="rotate(45 12 12)" fill="currentColor"/></svg><span id="lp-pagar-txt">Pagar R$ 27,90 no Pix</span></button>
                 <!-- 30/10 (v2): as duas dúvidas mais abertas ("Renova sozinho?", "Tem versão grátis?") respondidas onde a pessoa decide -->
-                <p class="lp2-confianca" data-so-lp="v2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Paga 1 vez. Nada é cobrado depois. 7 dias de garantia.</p>
+                <p class="lp2-confianca" data-so-lp="v2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Paga 1 vez. Nada é cobrado depois.</p>
                 <p class="lp-seguro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>O Pix sai aqui mesmo · CORE · CNPJ 55.041.112/0001-82</p>
               </div>
             </div>
             <div class="lp-pix" id="lp-pix" aria-live="polite"></div>
           </div>
         </div>
-        <div class="lp-garantia lp-so-oferta-fora"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg><span><b>7 dias pra testar tudo.</b>Não gostou? Devolvemos 100% no Pix, é só mandar um e-mail.</span></div>
+        <div class="lp-garantia lp-so-oferta-fora" data-so-lp="atual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg><span><b>7 dias pra testar tudo.</b>Não gostou? Devolvemos 100% no Pix, é só mandar um e-mail.</span></div>
       </section>
 
       <!-- ═════════ 9. DÚVIDAS + CHAMADA FINAL ═════════ -->
@@ -723,14 +727,16 @@
       <h2 data-so-oferta="sempre" data-so-lp="atual">Sua vida inteira num app só, por R$ 27,90. Pra sempre.</h2>
       <h2 data-so-oferta="sempre" data-so-lp="v2">Sua vida organizada num app só. Vitalício por R$ 27,90.</h2>
       <p>Pix na hora · 7 dias de garantia</p>
-      <button type="button" class="lp-cta" data-ir="oferta">Quero organizar tudo</button>
+      <button type="button" class="lp-cta" data-ir="oferta" data-so-lp="atual">Quero organizar tudo</button>
+      <button type="button" class="lp-cta" data-ir="oferta" data-so-lp="v2">Quero organizar minha vida</button>
     </section>
     <footer class="lp-rodape">
       CORE · CNPJ 55.041.112/0001-82<br />
       <a href="mailto:contato@coreaplicativo.com.br">contato@coreaplicativo.com.br</a> · <a href="/termos">Termos</a> · <a href="/privacidade">Privacidade</a>
     </footer>
     <div class="lp-fixo" id="lp-fixo" aria-hidden="true">
-      <button type="button" class="lp-cta" data-ir="oferta" tabindex="-1">Quero organizar tudo <small>· R$ 27,90</small></button>
+      <button type="button" class="lp-cta" data-ir="oferta" tabindex="-1" data-so-lp="atual">Quero organizar tudo <small>· R$ 27,90</small></button>
+      <button type="button" class="lp-cta" data-ir="oferta" tabindex="-1" data-so-lp="v2">Quero organizar minha vida <small>· R$ 27,90</small></button>
     </div>
     <script type="module" src="/src/landing/landing.ts"></script>
   </body>

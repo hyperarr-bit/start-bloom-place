@@ -768,7 +768,24 @@ function renderCodigoAntes(a: NonNullable<typeof antes>) {
   atualizarFixo();
 }
 
+/*
+ * CRÍTICA r1 4.1 (30/10, v2): a cada troca de "tela" do cartão (gerando → QR, erro, código do e-mail, pago, conta) a página
+ * ROLA até o cartão. No v2 a ordem dos blocos é por CSS `order`, e o scroll anchoring do navegador (desligado no CSS,
+ * overflow-anchor: none) empurrava a página ~580 px quando o QR aparecia — a pessoa via "Já paguei" sem QR. Com a âncora
+ * desligada, a rolagem explícita garante o QR/passos/Copiar no topo da tela. No atual nada muda (o DOM já está na ordem visual).
+ */
+let telaRenderizada: string | null = null;
 function render() {
+  renderDoCartao();
+  if (!V2) return;
+  const tela = `${estado.fase}|${antes ? "codigo" : ""}|${erroPix ? "erro" : ""}|${jaTem ? "jatem" : ""}`;
+  if (tela === telaRenderizada) return;
+  const primeira = telaRenderizada === null;
+  telaRenderizada = tela;
+  if (primeira && tela === "oferta|||") return; // a página abrindo na oferta: nada a rolar
+  rolarAte(card, "start");
+}
+function renderDoCartao() {
   if (relogio) { window.clearInterval(relogio); relogio = null; }
   if (jaTem && (estado.fase === "oferta" || estado.fase === "erro")) { renderJaTem(jaTem); return; }
   if (antes && estado.fase === "oferta") { renderCodigoAntes(antes); return; }

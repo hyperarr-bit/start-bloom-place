@@ -146,7 +146,7 @@ describe("braço atual = a página de hoje (origin/main 30/10), sem tirar nem p�
     expect(doV2).toBeDefined();
     const linhas = (s: string) => s.split("\n").map((l) => l.trim()).filter((l) => l && !/data-so-lp/.test(l));
     expect(linhas(deHoje)).toEqual(linhas(estiloDe(MAIN)));
-    for (const l of doV2.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("/*") && l !== "}" && !l.startsWith("@media"))) expect(l).toMatch(soV2);
+    for (const l of doV2.replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((l) => l.trim()).filter((l) => l && l !== "}" && !l.startsWith("@media"))) expect(l).toMatch(soV2);
   });
   it("o CSS do v2 esconde o que é do atual, e o atual (ou sem atributo) esconde o que é do v2", () => {
     expect(HTML).toContain('html:not([data-lp="v2"]) [data-so-lp="v2"], html[data-lp="v2"] [data-so-lp="atual"] { display: none !important; }');
@@ -470,5 +470,43 @@ describe("braço v2 + AB_CHECKOUT: o fluxo inteiro, nos dois braços do e-mail",
     await import("@/landing/landing");
     expect(document.querySelector('[data-testid="landing-codigo"]')).not.toBeNull();
     expect(document.querySelector('[data-testid="landing-passos"]')).not.toBeNull();
+  });
+});
+
+/* ───────── CRÍTICA r1 (30/10) ───────── */
+describe("crítica r1 · 4.1: o QR não pode sair da tela quando aparece (v2)", () => {
+  it("o CSS do v2 desliga o scroll anchoring (a âncora virava o #antes, abaixo do cartão na tela)", () => {
+    expect(HTML).toMatch(/html\[data-lp="v2"\], html\[data-lp="v2"\] body, html\[data-lp="v2"\] main\.lp \{ overflow-anchor: none; \}/);
+  });
+  it("v2: gerando → QR → pago → conta — a cada troca de tela do cartão a página rola até o cartão (start); o atual rola como hoje", async () => {
+    const rolou = vi.fn();
+    Element.prototype.scrollIntoView = function (this: Element, o?: unknown) { rolou(this.id, o); };
+    await abrirPagina("v2", "livre");
+    expect(rolou).not.toHaveBeenCalled(); // abrir na oferta: nada
+    pagar();
+    expect(rolou).toHaveBeenLastCalledWith("lp-card", { behavior: "smooth", block: "start" }); // gerando
+    rolou.mockClear();
+    await espera('[data-testid="landing-codigo"]');
+    expect(rolou).toHaveBeenCalledWith("lp-card", { behavior: "smooth", block: "start" }); // o QR apareceu
+    rolou.mockClear();
+    (document.getElementById("lp-copiar") as HTMLButtonElement).click(); // re-render da MESMA tela: não rola de novo
+    await dormir(30);
+    expect(rolou).not.toHaveBeenCalled();
+    simular().pagar();
+    await espera('[data-testid="landing-pago"]');
+    expect(rolou).toHaveBeenCalledWith("lp-card", { behavior: "smooth", block: "start" });
+    rolou.mockClear();
+    digitar("lp-email", "x@y.com"); (document.getElementById("lp-criar") as HTMLButtonElement).click();
+    await espera('[data-testid="landing-conta"]');
+    expect(rolou).toHaveBeenCalledWith("lp-card", { behavior: "smooth", block: "start" });
+  });
+  it("v2 · email com conta: a tela do código rola pro cartão; o erro de Pix também", async () => {
+    const rolou = vi.fn();
+    Element.prototype.scrollIntoView = function (this: Element, o?: unknown) { rolou(this.id, o); };
+    await abrirPagina("v2", "email");
+    digitar("lp-email-antes", "maria+existe@email.com");
+    pagar();
+    await espera('[data-testid="landing-email-tem-conta"]');
+    expect(rolou).toHaveBeenCalledWith("lp-card", { behavior: "smooth", block: "start" });
   });
 });

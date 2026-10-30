@@ -388,6 +388,10 @@
       /* ═════════ BRAÇO v2 (30/10, AB_LP) — TUDO escopado em html[data-lp="v2"] / .lp2-* / [data-so-lp]; o braço "atual" não vê nada daqui ═════════ */
       /* a ordem dos blocos (vitrine → oferta → prova → os 16 → como → demo opcional → dúvidas) sai só de CSS: nada é duplicado */
       html[data-lp="v2"] main.lp { display: flex; flex-direction: column; }
+      /* CRÍTICA r1 4.1: com a ordem por `order`, o scroll anchoring do navegador escolhia #antes (abaixo do cartão na tela, antes no
+         DOM) como âncora e, quando o QR crescia o cartão em ~580 px, empurrava a página — a pessoa via só "Já paguei". Sem âncora
+         automática no v2; o landing.ts rola até o cartão a cada troca de fase. */
+      html[data-lp="v2"], html[data-lp="v2"] body, html[data-lp="v2"] main.lp { overflow-anchor: none; }
       html[data-lp="v2"] .lp-promo { order: -2; }
       html[data-lp="v2"] .lp-barra { order: -1; height: 46px; padding-top: 12px; }
       html[data-lp="v2"] #topo-v2 { order: 1; }

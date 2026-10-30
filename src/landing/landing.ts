@@ -326,20 +326,40 @@ const atualizarFixo = () => {
 };
 const vistos = new Set<string>();
 let ofertaVista = false;
+/** "viu a oferta" (1x): o evento da régua + ViewContent + pré-aquecimento do Pix. Atual: 15% do bloco #oferta na tela (como hoje).
+ *  v2 (crítica r1 8.1): o BOTÃO DE PAGAR ≥ 50% visível — no v2 a oferta começa em y 684 e, em telas de 844+, 15% do bloco
+ *  aparecia sem rolar (a régua inflava e a Meta recebia ViewContent de quem só abriu). */
+const viuAOferta = () => {
+  if (ofertaVista) return;
+  ofertaVista = true;
+  evento("landing_oferta_vista", { via: V2 ? "botao_50" : "bloco_15" });
+  if (brCheckout === "email") evento("landing_email_antes_visto", {});
+  pixel("ViewContent", { content_name: "landing_oferta", value: 27.9, currency: "BRL" });
+  if (PIX_REAL && !SIMULADO) void pg(false).catch(() => null); // pré-aquece o Pix de verdade (sem recarregar a página se falhar)
+};
 if ("IntersectionObserver" in window) {
+  if (V2) {
+    const botaoPagar = $("lp-pagar");
+    new IntersectionObserver((ens) => { if (ens.some((e) => e.isIntersecting)) viuAOferta(); }, { threshold: 0.5 }).observe(botaoPagar);
+    // crítica r1 8.2: a fita "Por dentro" — qual celular foi visto (1x por celular, ≥ 60% na tela)
+    const telas = [...document.querySelectorAll<HTMLElement>("#dentro-v2 .lp2-tel")];
+    const vistas = new Set<number>();
+    const fita = new IntersectionObserver((ens) => {
+      for (const en of ens) {
+        const i = telas.indexOf(en.target as HTMLElement);
+        if (en.isIntersecting && i >= 0 && !vistas.has(i)) { vistas.add(i); evento("landing_fita", { indice: i, legenda: (en.target.querySelector("figcaption")?.textContent ?? "").slice(0, 40) }); }
+      }
+      if (vistas.size === telas.length) fita.disconnect();
+    }, { threshold: 0.6 });
+    telas.forEach((t) => fita.observe(t));
+  }
   const obs = new IntersectionObserver((entradas) => {
     for (const en of entradas) {
       const bloco = (en.target as HTMLElement).dataset.bloco!;
       if (en.isIntersecting) {
         naTela.add(bloco);
         if (!vistos.has(bloco)) { vistos.add(bloco); evento("landing_bloco", { bloco }); }
-        if (bloco === "oferta" && !ofertaVista) {
-          ofertaVista = true;
-          evento("landing_oferta_vista", {});
-          if (brCheckout === "email") evento("landing_email_antes_visto", {});
-          pixel("ViewContent", { content_name: "landing_oferta", value: 27.9, currency: "BRL" });
-          if (PIX_REAL && !SIMULADO) void pg(false).catch(() => null); // pré-aquece o Pix de verdade (sem recarregar a página se falhar)
-        }
+        if (bloco === "oferta" && !V2) viuAOferta(); // no v2 é o botão de pagar ≥ 50% visível (abaixo)
       } else naTela.delete(bloco);
       // passou da demo = o fim da demo já subiu acima do meio da tela
       if (bloco === "demo" && !en.isIntersecting && en.boundingClientRect.top < 0) passouDaDemo = true;

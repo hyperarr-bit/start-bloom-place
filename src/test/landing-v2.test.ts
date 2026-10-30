@@ -41,8 +41,11 @@ function rodar(fonte: string, url: string, store: Record<string, string> = {}, c
     setItem: (k: string, v: string) => { store[k] = String(v); },
     removeItem: (k: string) => { delete store[k]; },
   };
+  const preloads: Record<string, string>[] = [];
   const document = {
     documentElement: { setAttribute: (k: string, v: string) => { attrs[k] = v; } },
+    createElement: () => { const el: Record<string, string> = {}; (el as unknown as { setAttribute: (k: string, v: string) => void }).setAttribute = (k, v) => { el[k] = v; }; return el; },
+    head: { appendChild: (el: Record<string, string>) => { preloads.push(el); } },
     get cookie() { return cookie.v; },
     set cookie(c: string) { const [par] = c.split(";"); cookie.v = par; },
   } as unknown as { cookie: string };
@@ -51,7 +54,7 @@ function rodar(fonte: string, url: string, store: Record<string, string> = {}, c
   new Function("location", "document", "window", "localStorage", "URLSearchParams", "Math", "fetch", "sessionStorage", fonte)(
     location, document, window, localStorage, URLSearchParams, Math, undefined, { getItem: () => null },
   );
-  return { attrs, store, cookie, mem: window.__landing as Record<string, unknown> };
+  return { attrs, store, cookie, preloads, mem: window.__landing as Record<string, unknown> };
 }
 
 describe("o sorteio da página (AB_LP, head do landing.html)", () => {
@@ -378,11 +381,19 @@ describe("nos DOIS braços: braco_lp em todo evento, pixel cedo, demo preguiços
     expect(eventos().find((e) => e.nome === "landing_cta")).toMatchObject({ onde: "topo" });
     dispara((o) => o.alvos.includes(cta), [{ isIntersecting: false, target: cta, boundingClientRect: { top: -120 } }]);
     expect(fixo.hasAttribute("data-on")).toBe(true);
-    // com a oferta na tela, o fixo some (como hoje)
+    // com a oferta na tela, o fixo some (como hoje) — mas no v2 "viu a oferta" NÃO vem do bloco (crítica 8.1)…
     const oferta = document.getElementById("oferta")!;
     dispara((o) => o.alvos.includes(oferta), [{ isIntersecting: true, target: oferta, boundingClientRect: { top: 200 } }]);
     expect(fixo.hasAttribute("data-on")).toBe(false);
-    expect(nomes()).toContain("landing_oferta_vista");
+    expect(nomes()).not.toContain("landing_oferta_vista");
+    // …vem do BOTÃO DE PAGAR ≥ 50% visível
+    const pagarEl = document.getElementById("lp-pagar")!;
+    const obsPagar = IOFake.inst.find((o) => o.alvos.includes(pagarEl) && o.opts.threshold === 0.5);
+    expect(obsPagar).toBeDefined();
+    obsPagar!.cb([{ isIntersecting: true, target: pagarEl, boundingClientRect: { top: 500 } }], obsPagar!);
+    expect(eventos().find((e) => e.nome === "landing_oferta_vista")).toMatchObject({ via: "botao_50" });
+    obsPagar!.cb([{ isIntersecting: true, target: pagarEl, boundingClientRect: { top: 500 } }], obsPagar!);
+    expect(eventos().filter((e) => e.nome === "landing_oferta_vista")).toHaveLength(1);
   });
 });
 
@@ -542,5 +553,41 @@ describe("crítica r1 · 4.1: o QR não pode sair da tela quando aparece (v2)", 
     pagar();
     await espera('[data-testid="landing-email-tem-conta"]');
     expect(rolou).toHaveBeenCalledWith("lp-card", { behavior: "smooth", block: "start" });
+  });
+});
+
+describe("crítica r1 · 7.1 / 8.1 / 8.2: rede e medição", () => {
+  it("7.1: toda imagem do v2 é loading=lazy sem fetchpriority no HTML (fora do v2 fica display:none e não baixa); o preload da 1ª tela sai do <head> SÓ no v2", () => {
+    const d = document.createElement("div"); d.innerHTML = corpoDe(HTML);
+    const imgs = [...d.querySelectorAll('[data-so-lp="v2"] img')];
+    expect(imgs.length).toBeGreaterThanOrEqual(5);
+    for (const i of imgs) { expect(i.getAttribute("loading")).toBe("lazy"); expect(i.hasAttribute("fetchpriority")).toBe(false); }
+    expect(rodar(comChaves("off", "off"), "/organizar").preloads).toEqual([]);
+    expect(rodar(comChaves("off", "off"), "/organizar?lp=atual").preloads).toEqual([]);
+    const v2 = rodar(comChaves("off", "off"), "/organizar?lp=v2").preloads;
+    expect(v2).toHaveLength(1);
+    expect(v2[0]).toMatchObject({ rel: "preload", as: "image", href: "/landing/v2-posso-gastar.webp", fetchpriority: "high" });
+  });
+  it("8.1: no braço atual 'viu a oferta' continua sendo 15% do bloco (como hoje); no v2 só o botão ≥ 50% — o bloco #oferta na tela não dispara nada", async () => {
+    await abrirPagina("atual");
+    const oferta = document.getElementById("oferta")!;
+    dispara((o) => o.alvos.includes(oferta), [{ isIntersecting: true, target: oferta, boundingClientRect: { top: 200 } }]);
+    expect(eventos().find((e) => e.nome === "landing_oferta_vista")).toMatchObject({ via: "bloco_15" });
+    expect(IOFake.inst.find((o) => o.opts.threshold === 0.5)).toBeUndefined();
+    await abrirPagina("v2");
+    const oferta2 = document.getElementById("oferta")!;
+    dispara((o) => o.alvos.includes(oferta2), [{ isIntersecting: true, target: oferta2, boundingClientRect: { top: 200 } }]);
+    expect(nomes()).not.toContain("landing_oferta_vista");
+  });
+  it("8.2: landing_fita {indice, legenda} 1x por celular do 'Por dentro' (≥ 60% na tela), só no v2", async () => {
+    await abrirPagina("v2");
+    const telas = [...document.querySelectorAll("#dentro-v2 .lp2-tel")];
+    const obs = IOFake.inst.find((o) => o.alvos.includes(telas[1]))!;
+    expect(obs.opts.threshold).toBe(0.6);
+    obs.cb([{ isIntersecting: true, target: telas[1], boundingClientRect: { top: 100 } }], obs);
+    obs.cb([{ isIntersecting: true, target: telas[1], boundingClientRect: { top: 100 } }], obs);
+    expect(eventos().filter((e) => e.nome === "landing_fita")).toEqual([expect.objectContaining({ indice: 1, legenda: "Quanto posso gastar", braco_lp: "v2" })]);
+    await abrirPagina("atual");
+    expect(IOFake.inst.find((o) => o.opts.threshold === 0.6)).toBeUndefined();
   });
 });

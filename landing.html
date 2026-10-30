@@ -132,6 +132,9 @@
           if (AB_LP === "on") lp = ((hash("lp:" + pegaId()) >>> 16) & 1) === 0 ? "atual" : "v2";
         }
         d.setAttribute("data-lp", lp);
+        // crítica r1 7.1: a imagem da 1ª tela do v2 começa a baixar já no <head> (preload) — SÓ no v2. No HTML ela é
+        // loading="lazy" (fora do v2 fica display:none e nunca é pedida: o braço atual não baixa nada do v2)
+        if (lp === "v2") { try { var pl = document.createElement("link"); pl.rel = "preload"; pl.as = "image"; pl.href = "/landing/v2-posso-gastar.webp"; pl.setAttribute("fetchpriority", "high"); document.head.appendChild(pl); } catch (e5) {} }
         mem.lp = lp; mem.ab_lp = AB_LP;
         mem.t = t; mem.oferta = o; mem.ab_titulo = AB_TITULO; mem.ab_oferta = AB_OFERTA;
         mem.divisao = pega("ld") === "1" ? "inicio" : null;

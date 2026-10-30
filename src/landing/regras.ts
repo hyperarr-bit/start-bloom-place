@@ -189,6 +189,25 @@ export function bracoCheckoutDoAparelho(id: string): BracoCheckout {
   return h % 2 === 0 ? "livre" : "email";
 }
 
+/* ───────────────────────── a página: "atual" × "v2" (30/10, A/B "AB_LP" no <head>) ───────────────────────── */
+
+/** "atual" = a página de hoje (IDÊNTICA); "v2" = vitrine (prints reais + preço e botão na 1ª tela, oferta cedo, demo no toque). */
+export type BracoLp = "atual" | "v2";
+export function bracoLpDoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): BracoLp {
+  return el.getAttribute("data-lp") === "v2" ? "v2" : "atual";
+}
+/**
+ * O sorteio da página pelo MESMO id do aparelho do checkout, por OUTRO bit da conta: o bit 0 do djb2-xor é só a paridade
+ * dos caracteres (um prefixo não muda nada) e daria sempre o mesmo braço do checkout; o bit 16 é independente (o teste
+ * confere as 4 combinações em ~25% cada). A conta é a do <head> do landing.html.
+ */
+export function bracoLpDoAparelho(id: string): BracoLp {
+  const s = `lp:${id}`;
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return ((h >>> 16) & 1) === 0 ? "atual" : "v2";
+}
+
 /** Os erros de domínio que mais aparecem (sugestão tocável embaixo do campo; nunca bloqueia). */
 const DOMINIO_ERRADO: Record<string, string> = {
   "gmial.com": "gmail.com", "gmal.com": "gmail.com", "gmai.com": "gmail.com", "gamil.com": "gmail.com", "gnail.com": "gmail.com",

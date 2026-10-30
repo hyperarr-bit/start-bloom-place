@@ -253,15 +253,32 @@ describe("o Pix na página (simulado, fora do domínio de produção)", () => {
     expect(document.getElementById("lp-pix")!.textContent).toContain("Esse e-mail já tem conta");
   });
 
-  it("a página em si só fala 'vitalício' na faixa do topo (dono 29/10), e nunca 'teste grátis', 'sem cartão' nem nota/quantidade de avaliações", () => {
+  /* 30/10: a palavra "vitalício" entrou no CARTÃO da oferta — mas só no braço v2 (pedido do dono 30/10; o braço "atual"
+   * segue como em 29/10: só na faixa). As proibições de sempre valem nos dois: "teste grátis", "sem cartão", nota/quantidade
+   * de avaliações (regra do dono — copy-voz-do-cliente §6), banco/IA/Agenda (promessa que o app não cumpre). */
+  const textoDoBraco = (lp: "atual" | "v2") => {
     const corpo = document.body.cloneNode(true) as HTMLElement;
-    corpo.querySelector(".lp-promo")?.remove();
-    const texto = corpo.textContent!.toLowerCase();
+    corpo.querySelectorAll(`[data-so-lp="${lp === "atual" ? "v2" : "atual"}"]`).forEach((el) => el.remove());
+    corpo.querySelectorAll(".lp-promo").forEach((el) => el.remove());
+    return corpo.textContent!.toLowerCase();
+  };
+  it("braço atual: só fala 'vitalício' na faixa do topo (dono 29/10), e nunca 'teste grátis', 'sem cartão' nem nota/quantidade de avaliações", () => {
+    const texto = textoDoBraco("atual");
     expect(texto).not.toContain("vitalício");
     expect(texto).not.toContain("teste grátis");
     expect(texto).not.toContain("sem cartão");
     expect(texto).not.toMatch(/\d[,.]\d\s*(estrelas|★)|\d+\s+avalia/);
     expect(texto).not.toMatch(/open finance|inteligência artificial|google agenda/);
+    expect(texto).toContain("contato@coreaplicativo.com.br");
+  });
+  it("braço v2: 'vitalício' no cartão e na vitrine (dono 30/10); as outras proibições continuam; nada de 'só hoje'", () => {
+    const texto = textoDoBraco("v2");
+    expect(texto).toContain("vitalício por r$ 27,90");
+    expect(texto).not.toContain("só hoje");
+    expect(texto).not.toContain("teste grátis");
+    expect(texto).not.toContain("sem cartão");
+    expect(texto).not.toMatch(/\d[,.]\d\s*(estrelas|★)|\d+\s+avalia/);
+    expect(texto).not.toMatch(/open finance|inteligência artificial|google agenda|conecta (no|com o) banco/);
     expect(texto).toContain("contato@coreaplicativo.com.br");
   });
 });

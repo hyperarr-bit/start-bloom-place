@@ -29,6 +29,12 @@
                               de pagar), pelo landing_device_id (cookie + localStorage — o mesmo id do src/landing/marcador.ts;
                               a conta é a bracoCheckoutDoAparelho do src/landing/regras.ts). Forçar: ?checkout=livre|email
                               (fica neste navegador). O braço vai em html[data-checkout] e em todo evento landing_*.
+        AB_LP        "off"  → (30/10) todo mundo no braço "atual" (a página de hoje, IDÊNTICA). "on" = 50/50 estável por
+                              aparelho (o MESMO landing_device_id do AB_CHECKOUT, com outra conta — os dois sorteios são
+                              independentes) entre "atual" e "v2" (vitrine: prints reais + preço e botão na 1ª tela,
+                              oferta logo cedo, demo só no toque). Forçar: ?lp=v2|atual (fica neste navegador; ?lp=auto
+                              desfaz). O braço vai em html[data-lp] e em todo evento landing_* (braco_lp). O braço do
+                              e-mail (AB_CHECKOUT) continua sorteado por cima, nos dois.
       A divisão 50/50 do /inicio (o mesmo link da campanha) mora no index.html (DIVISAO_INICIO_LANDING, "off").
     -->
     <script>
@@ -38,6 +44,7 @@
         var BRACOS_TITULO = ["a", "b", "c"];
         var AB_OFERTA = "off";
         var AB_CHECKOUT = "on"; // 29/10 (dono, depois da compra real pelo braço email): LIGADO. e-mail antes do Pix (braço "email") × checkout de hoje ("livre") — ver o comentário acima
+        var AB_LP = "off"; // 30/10: braço "v2" (vitrine) construído e DESLIGADO — "on" liga o 50/50 contra a página de hoje ("atual")
         var d = document.documentElement, q = null, mem = {};
         try { q = new URLSearchParams(location.search); } catch (e0) {}
         var pega = function (k) { try { return q ? q.get(k) : null; } catch (e) { return null; } };
@@ -78,36 +85,54 @@
             if (o !== "ano" && o !== "sempre") { o = Math.random() < 0.5 ? "ano" : "sempre"; grava("landing-oferta", o); }
           } else o = "sempre"; // 29/10 (dono): vitalício por R$ 27,90 pra todos, sem a caixinha (o "ano" com caixinha vendia pra 5,7% de quem via o preço)
         }
+        // o id do aparelho (o MESMO do marcador.ts: localStorage "landing-device-id" + cookie "landing_device_id", 400 dias) —
+        // só nasce quando algum sorteio por aparelho está ligado (AB_CHECKOUT ou AB_LP)
+        var idAparelho = null;
+        var pegaId = function () {
+          if (idAparelho) return idAparelho;
+          var idOk = /^[A-Za-z0-9-]{8,64}$/;
+          var doLs = le("landing-device-id"), doCk = null;
+          try {
+            var cs = String(document.cookie || "").split(";");
+            for (var i = 0; i < cs.length; i++) { var j = cs[i].indexOf("="); if (j > 0 && cs[i].slice(0, j).trim() === "landing_device_id") doCk = decodeURIComponent(cs[i].slice(j + 1).trim()); }
+          } catch (e2) {}
+          var id = idOk.test(doLs || "") ? doLs : idOk.test(doCk || "") ? doCk : null;
+          if (!id) { try { id = window.crypto.randomUUID(); } catch (e3) { id = "d" + Date.now().toString(36) + Math.random().toString(36).slice(2, 12); } }
+          if (doLs !== id) grava("landing-device-id", id);
+          if (doCk !== id) {
+            try {
+              var dom = /(^|\.)coreaplicativo\.com\.br$/.test(location.hostname || "") ? "; Domain=.coreaplicativo.com.br" : "";
+              document.cookie = "landing_device_id=" + encodeURIComponent(id) + "; Max-Age=34560000; Path=/; SameSite=Lax" + dom + (location.protocol === "https:" ? "; Secure" : "");
+            } catch (e4) {}
+          }
+          idAparelho = id;
+          return id;
+        };
+        // djb2-xor; a MESMA conta do src/landing/regras.ts (bracoCheckoutDoAparelho / bracoLpDoAparelho)
+        var hash = function (s) { var h = 5381; for (var k = 0; k < s.length; k++) h = ((h * 33) ^ s.charCodeAt(k)) >>> 0; return h; };
         var pc = pega("checkout");
         if (pc === "livre" || pc === "email") grava("landing-checkout-force", pc);
         var c = (pc === "livre" || pc === "email") ? pc : le("landing-checkout-force");
         mem.checkout_forcado = (c === "livre" || c === "email");
         if (c !== "livre" && c !== "email") {
           c = "livre";
-          if (AB_CHECKOUT === "on") {
-            // o id do aparelho (o MESMO do marcador.ts: localStorage "landing-device-id" + cookie "landing_device_id", 400 dias)
-            var idOk = /^[A-Za-z0-9-]{8,64}$/;
-            var doLs = le("landing-device-id"), doCk = null;
-            try {
-              var cs = String(document.cookie || "").split(";");
-              for (var i = 0; i < cs.length; i++) { var j = cs[i].indexOf("="); if (j > 0 && cs[i].slice(0, j).trim() === "landing_device_id") doCk = decodeURIComponent(cs[i].slice(j + 1).trim()); }
-            } catch (e2) {}
-            var id = idOk.test(doLs || "") ? doLs : idOk.test(doCk || "") ? doCk : null;
-            if (!id) { try { id = window.crypto.randomUUID(); } catch (e3) { id = "d" + Date.now().toString(36) + Math.random().toString(36).slice(2, 12); } }
-            if (doLs !== id) grava("landing-device-id", id);
-            if (doCk !== id) {
-              try {
-                var dom = /(^|\.)coreaplicativo\.com\.br$/.test(location.hostname || "") ? "; Domain=.coreaplicativo.com.br" : "";
-                document.cookie = "landing_device_id=" + encodeURIComponent(id) + "; Max-Age=34560000; Path=/; SameSite=Lax" + dom + (location.protocol === "https:" ? "; Secure" : "");
-              } catch (e4) {}
-            }
-            var h = 5381;
-            for (var k = 0; k < id.length; k++) h = ((h * 33) ^ id.charCodeAt(k)) >>> 0;
-            c = h % 2 === 0 ? "livre" : "email";
-          }
+          if (AB_CHECKOUT === "on") c = hash(pegaId()) % 2 === 0 ? "livre" : "email";
         }
         d.setAttribute("data-checkout", c);
         mem.checkout = c; mem.ab_checkout = AB_CHECKOUT;
+        // 30/10: o braço da página ("atual" = a de hoje | "v2" = vitrine). ?lp=auto apaga a força.
+        var plp = pega("lp");
+        if (plp === "v2" || plp === "atual") grava("landing-lp-force", plp);
+        if (plp === "auto") grava("landing-lp-force", null);
+        var lp = (plp === "v2" || plp === "atual") ? plp : le("landing-lp-force");
+        mem.lp_forcado = (lp === "v2" || lp === "atual");
+        if (lp !== "v2" && lp !== "atual") {
+          lp = "atual";
+          // outro bit da conta (o bit 0 do djb2 é só a paridade dos caracteres — seria o MESMO braço do checkout) → independente
+          if (AB_LP === "on") lp = ((hash("lp:" + pegaId()) >>> 16) & 1) === 0 ? "atual" : "v2";
+        }
+        d.setAttribute("data-lp", lp);
+        mem.lp = lp; mem.ab_lp = AB_LP;
         mem.t = t; mem.oferta = o; mem.ab_titulo = AB_TITULO; mem.ab_oferta = AB_OFERTA;
         mem.divisao = pega("ld") === "1" ? "inicio" : null;
         d.setAttribute("data-t", t);
@@ -137,6 +162,7 @@
       html:not([data-t="a"]) [data-so-t="a"], html:not([data-t="b"]) [data-so-t="b"], html:not([data-t="c"]) [data-so-t="c"] { display: none !important; }
       html:not([data-oferta="ano"]) [data-so-oferta="ano"], html:not([data-oferta="sempre"]) [data-so-oferta="sempre"] { display: none !important; }
       html:not([data-checkout="email"]) [data-so-checkout="email"] { display: none !important; }
+      html:not([data-lp="v2"]) [data-so-lp="v2"], html[data-lp="v2"] [data-so-lp="atual"] { display: none !important; }
 
       /* ───────── 1. topo ───────── */
       /* 28/10 (dono): faixa de oferta no topo + âncora do preço normal (o anual nas lojas é R$ 97,90). Sem "do site"/"no app" na copy: o lead entendia que estava comprando um site e não o app */
@@ -358,6 +384,71 @@
         .lp-h1 { font-size: 44px; }
         .lp-topo, .lp-sec { padding-left: 24px; padding-right: 24px; }
       }
+
+      /* ═════════ BRAÇO v2 (30/10, AB_LP) — TUDO escopado em html[data-lp="v2"] / .lp2-* / [data-so-lp]; o braço "atual" não vê nada daqui ═════════ */
+      /* a ordem dos blocos (vitrine → oferta → prova → os 16 → como → demo opcional → dúvidas) sai só de CSS: nada é duplicado */
+      html[data-lp="v2"] main.lp { display: flex; flex-direction: column; }
+      html[data-lp="v2"] .lp-promo { order: -2; }
+      html[data-lp="v2"] .lp-barra { order: -1; height: 46px; padding-top: 12px; }
+      html[data-lp="v2"] #topo-v2 { order: 1; }
+      html[data-lp="v2"] #oferta { order: 2; padding-top: 44px; }
+      html[data-lp="v2"] #antes { order: 3; }
+      html[data-lp="v2"] #avaliacoes { order: 4; }
+      html[data-lp="v2"] #modulos { order: 5; }
+      html[data-lp="v2"] #como { order: 6; }
+      html[data-lp="v2"] #demo { order: 7; }
+      html[data-lp="v2"] #duvidas { order: 8; }
+      /* 1. a vitrine: promessa + onde roda + prints reais + preço + botão, tudo em 390×690 (navegador do Instagram) */
+      .lp2-topo { padding: 12px 20px 0; }
+      .lp2-topo .lp-h1 { font-size: 33px; }
+      .lp2-topo .lp-sub { font-size: 15.5px; margin-top: 8px; }
+      .lp2-onde { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+      .lp2-onde span { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 99px; background: #f4f4f5; font-size: 12px; font-weight: 700; color: var(--suave); white-space: nowrap; }
+      .lp2-onde svg { width: 13px; height: 13px; flex-shrink: 0; }
+      .lp2-fita { display: flex; gap: 12px; margin: 14px -20px 0; padding: 0 20px; height: 268px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; -webkit-mask-image: linear-gradient(to bottom, #000 82%, transparent); mask-image: linear-gradient(to bottom, #000 82%, transparent); }
+      .lp2-fita::-webkit-scrollbar { display: none; }
+      .lp2-tel { flex: 0 0 auto; width: 222px; margin: 0; scroll-snap-align: start; scroll-snap-margin-left: 20px; scroll-padding-left: 20px; }
+      .lp2-tel figcaption { font-size: 12.5px; font-weight: 750; color: var(--suave); margin: 0 0 7px 4px; letter-spacing: -.005em; }
+      /* o celular na proporção REAL do iPhone (tela 390×844); o print não é esticado nem cortado nas laterais — só sai da tela por baixo */
+      .lp2-cel { aspect-ratio: 390 / 844; border-radius: 30px; border: 5px solid #16121c; background: #fff; overflow: hidden; box-shadow: 0 16px 34px -18px rgba(22,18,28,.45), 0 1px 0 rgba(0,0,0,.04); }
+      .lp2-cel img { display: block; width: 100%; height: auto; }
+      .lp2-fita-fim { flex: 0 0 8px; }
+      .lp2-preco { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+      .lp2-preco-v { font-size: 31px; font-weight: 850; letter-spacing: -.035em; line-height: 1; white-space: nowrap; }
+      .lp2-preco-txt { display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; line-height: 1.25; }
+      .lp2-preco-txt b { font-weight: 750; font-size: 14.5px; }
+      .lp2-preco-txt span { color: var(--suave); font-weight: 600; font-size: 12.5px; }
+      .lp2-topo .lp-cta { margin-top: 12px; min-height: 56px; }
+      .lp2-topo .lp-cta small { font-weight: 600; opacity: .7; font-size: 14px; }
+      .lp2-miuda { margin: 8px 0 0; text-align: center; font-size: 12.5px; color: var(--suave); font-weight: 600; line-height: 1.35; }
+      /* 2. o cartão da oferta: só texto muda (data-so-lp); a linha de confiança embaixo do botão */
+      .lp2-confianca { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 10px 0 0; font-size: 13px; font-weight: 650; color: #3d3a40; text-align: center; line-height: 1.35; }
+      .lp2-confianca svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--verde); }
+      html[data-lp="v2"] .lp-ancora { color: var(--suave); font-weight: 600; }
+      html[data-lp="v2"] .lp-ancora b { color: var(--tx); }
+      /* 3. a tela do Pix (preenchida pelo landing.ts no braço v2): 3 passos curtos */
+      .lp2-passos { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; counter-reset: p; }
+      .lp2-passos li { display: flex; align-items: center; gap: 10px; font-size: 14.5px; line-height: 1.35; color: #3d3a40; }
+      .lp2-passos li::before { counter-increment: p; content: counter(p); width: 24px; height: 24px; border-radius: 50%; background: var(--grafite); color: #fff; font-size: 12.5px; font-weight: 800; display: grid; place-items: center; flex-shrink: 0; }
+      .lp2-passos li.feito::before { content: "✓"; background: var(--verde); }
+      .lp2-passos b { color: var(--tx); }
+      .lp2-volte { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; padding: 12px 14px; border-radius: 14px; background: var(--magenta-suave); border: 1px solid #f3cfe2; font-size: 13.5px; line-height: 1.4; color: #3d3a40; }
+      .lp2-volte b { color: var(--tx); display: block; font-size: 14.5px; }
+      .lp2-garantia-mini { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 10px; font-size: 12.5px; font-weight: 650; color: #14532d; }
+      .lp2-garantia-mini svg { width: 14px; height: 14px; color: var(--verde); }
+      /* 4. a demo vira opcional: só o toque em "Testar o app" baixa o iframe */
+      html[data-lp="v2"] .lp-celular { height: clamp(420px, 56svh, 520px); }
+      html[data-lp="v2"] .lp-celular:not([data-abrindo]) .lp-demo-carregando { display: none; }
+      html[data-lp="v2"] .lp-celular[data-abrindo] .lp2-demo-abrir, html[data-lp="v2"] .lp-celular[data-pronta] .lp2-demo-abrir { display: none; }
+      .lp2-demo-abrir { position: absolute; z-index: 3; left: 50%; top: 50%; transform: translate(-50%, -50%); min-height: 54px; padding: 0 24px; border-radius: 99px; border: 0; background: var(--grafite); color: #fff; font-size: 16px; font-weight: 750; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 10px 24px -8px rgba(0,0,0,.45); white-space: nowrap; }
+      .lp2-demo-abrir svg { width: 18px; height: 18px; }
+      .lp2-demo-veu { position: absolute; z-index: 2; inset: 0; background: linear-gradient(to bottom, rgba(255,255,255,0) 30%, rgba(255,255,255,.75)); pointer-events: none; }
+      html[data-lp="v2"] .lp-celular[data-abrindo] .lp2-demo-veu, html[data-lp="v2"] .lp-celular[data-pronta] .lp2-demo-veu { display: none; }
+      @media (min-width: 720px) {
+        .lp2-topo .lp-h1 { font-size: 40px; }
+        .lp2-tel { width: 236px; }
+        .lp2-fita { height: 290px; }
+      }
     </style>
     <!-- Meta Pixel (só a fila aqui; o fbevents.js entra no carregador adiado do landing.ts, depois da 1ª pintura) -->
     <script>
@@ -376,7 +467,9 @@
   <body>
     <main class="lp" id="lp">
       <!-- ═════════ 1. TOPO ═════════ -->
-      <div class="lp-promo" role="note"><b data-so-oferta="sempre">🔥 ACESSO VITALÍCIO</b><b data-so-oferta="ano">🔥 OFERTA ESPECIAL</b> <span>· só hoje<b id="lp-promo-data"></b></span></div>
+      <div class="lp-promo" role="note" data-so-lp="atual"><b data-so-oferta="sempre">🔥 ACESSO VITALÍCIO</b><b data-so-oferta="ano">🔥 OFERTA ESPECIAL</b> <span>· só hoje<b id="lp-promo-data"></b></span></div>
+      <!-- 30/10 (v2): a faixa sem "só hoje, DD/MM" (a data mudava sozinha todo dia = promoção eterna; risco CDC art. 37 e política da Meta). Só o que é verdade. -->
+      <div class="lp-promo" role="note" data-so-lp="v2"><b>🔥 ACESSO VITALÍCIO</b> <span>· pagamento único · 7 dias de garantia</span></div>
       <script>
         // a data de hoje no fuso de Brasília ("· válida hoje, 28/10") — sem ela, fica só "válida hoje"
         try { var dd = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" }).format(new Date()); document.getElementById("lp-promo-data").textContent = ", " + dd; } catch (e) {}
@@ -384,7 +477,7 @@
       <header class="lp-barra">
         <span class="lp-marca">CORE</span>
       </header>
-      <section class="lp-topo" id="topo" data-bloco="topo">
+      <section class="lp-topo" id="topo" data-bloco="topo" data-so-lp="atual">
         <h1 class="lp-h1" data-so-t="a">Sua vida inteira, num app só.</h1>
         <h1 class="lp-h1" data-so-t="b">Organize tudo num app só.</h1>
         <h1 class="lp-h1" data-so-t="c">Sua vida organizada em <em>5 minutos</em> por dia.</h1>
@@ -401,11 +494,36 @@
         <p class="lp-onde"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"></rect><path d="M12 18h.01"></path></svg>iPhone e Android</span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"></rect><line x1="8" x2="16" y1="21" y2="21"></line><line x1="12" x2="12" y1="17" y2="21"></line></svg>Computador</span><span>Mesma conta</span></p>
       </section>
 
+      <!-- ═════════ 1v2. A VITRINE (30/10, só no braço v2 — AB_LP) ═════════
+           O que os dados pediram (lp-web/funil 30/10 + lp-analise/topo 29/10): 61% não rolam e 75% desses somem em < 3 s; a
+           pergunta de área era tocada por 1%; a oferta ficava 4,7 telas abaixo; "É um app de verdade?" é a dúvida nº 1.
+           Aqui: promessa + onde roda + PRINTS REAIS do app (celular na proporção do iPhone, sem esticar) + preço + botão,
+           tudo dentro de 390×690 (o navegador do Instagram). Sem vídeo automático, sem pergunta, sem "só hoje". -->
+      <section class="lp2-topo" id="topo-v2" data-bloco="topo" data-so-lp="v2">
+        <h1 class="lp-h1">Sua vida organizada num app só.</h1>
+        <p class="lp-sub">Dinheiro, contas, rotina, treino e mais 12 áreas, no mesmo lugar.</p>
+        <p class="lp2-onde" aria-label="Onde o CORE funciona"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"></rect><path d="M12 18h.01"></path></svg>App Store</span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"></rect><path d="M12 18h.01"></path></svg>Google Play</span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"></rect><line x1="8" x2="16" y1="21" y2="21"></line><line x1="12" x2="12" y1="17" y2="21"></line></svg>Computador</span></p>
+        <div class="lp2-fita" id="lp-fita" aria-label="Telas do CORE">
+          <figure class="lp2-tel"><figcaption>Seu dia</figcaption><div class="lp2-cel"><img src="/landing/v2-home.webp" alt="A Home do CORE: score do dia, hábitos, água, refeições e os módulos" width="480" height="970" decoding="async" fetchpriority="high" /></div></figure>
+          <figure class="lp2-tel"><figcaption>Quanto posso gastar hoje</figcaption><div class="lp2-cel"><img src="/landing/v2-financas.webp" alt="Finanças do CORE: quanto posso gastar hoje, receitas, despesas e contas que vencem" width="480" height="970" decoding="async" /></div></figure>
+          <figure class="lp2-tel"><figcaption>Contas do mês</figcaption><div class="lp2-cel"><img src="/landing/v2-meu-mes.webp" alt="Meu mês no CORE: o calendário com as contas, o que entrou e o que saiu" width="480" height="1039" loading="lazy" decoding="async" /></div></figure>
+          <span class="lp2-fita-fim" aria-hidden="true"></span>
+        </div>
+        <div class="lp2-preco">
+          <span class="lp2-preco-v">R$ 27,90</span>
+          <span class="lp2-preco-txt"><b>Vitalício · pagamento único no Pix</b><span>Na App Store: R$ 97,90 por ano</span></span>
+        </div>
+        <button type="button" class="lp-cta" id="lp-cta-topo" data-ir="oferta">Quero organizar minha vida <small>· R$ 27,90</small></button>
+        <p class="lp2-miuda">Paga 1 vez. Nada é cobrado depois. 7 dias de garantia.</p>
+      </section>
+
       <!-- ═════════ 2. DEMO (o app de verdade) ═════════ -->
       <section class="lp-sec" id="demo" data-bloco="demo" style="padding-top:48px">
         <div class="lp-kicker" id="lp-demo-kicker">Seu CORE · Finanças</div>
-        <h2 class="lp-h2">Isso é o app de verdade, não um vídeo.</h2>
-        <p class="lp-p">Toque, anote, mexa à vontade. São dados de exemplo.</p>
+        <h2 class="lp-h2" data-so-lp="atual">Isso é o app de verdade, não um vídeo.</h2>
+        <p class="lp-p" data-so-lp="atual">Toque, anote, mexa à vontade. São dados de exemplo.</p>
+        <h2 class="lp-h2" data-so-lp="v2">Quer mexer antes de comprar?</h2>
+        <p class="lp-p" data-so-lp="v2">É o app de verdade, com dados de exemplo. Toque pra abrir.</p>
         <div class="lp-pilulas" role="tablist" aria-label="Módulos da demonstração">
           <button type="button" class="lp-pilula" data-m="financas" aria-pressed="true">💰 Finanças</button>
           <button type="button" class="lp-pilula" data-m="rotina" aria-pressed="false">📅 Rotina</button>
@@ -418,6 +536,8 @@
           <img id="lp-demo-img" src="/landing/demo-financas.webp" alt="O módulo Finanças do CORE com dados de exemplo" width="360" height="640" loading="lazy" decoding="async" />
           <iframe id="lp-demo-frame" title="Demonstração do CORE" loading="eager" tabindex="-1"></iframe>
           <span class="lp-demo-carregando"><i class="lp-gira"></i>Abrindo o app…</span>
+          <span class="lp2-demo-veu" data-so-lp="v2" aria-hidden="true"></span>
+          <button type="button" class="lp2-demo-abrir" id="lp-demo-abrir" data-so-lp="v2"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Testar o app</button>
         </div>
         <p class="lp-demo-nota">Nada do que você mexer aqui é salvo.</p>
       </section>
@@ -426,7 +546,8 @@
       <section class="lp-sec" id="modulos" data-bloco="modulos">
         <div class="lp-kicker">16 áreas, 1 app</div>
         <h2 class="lp-h2">Use as que quiser e esconda o resto.</h2>
-        <p class="lp-p">Toque numa área pra ver ela funcionando aqui em cima.</p>
+        <p class="lp-p" data-so-lp="atual">Toque numa área pra ver ela funcionando aqui em cima.</p>
+        <p class="lp-p" data-so-lp="v2">Toque numa área pra ver ela funcionando na demonstração.</p>
         <div class="lp-grade">
           <button type="button" class="lp-mod" data-m="financas" aria-label="Ver Finanças na demonstração"><span class="lp-mod-ico" style="background:rgba(251,191,36,.2);color:#d97706"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" x2="12" y1="2" y2="22"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></span><span class="lp-mod-nome">Finanças</span></button>
           <button type="button" class="lp-mod" data-m="rotina" aria-label="Ver Rotina na demonstração"><span class="lp-mod-ico" style="background:rgba(52,211,153,.2);color:#059669"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"></path><path d="M16 2v4"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><path d="M3 10h18"></path><path d="m9 16 2 2 4-4"></path></svg></span><span class="lp-mod-nome">Rotina</span></button>
@@ -498,16 +619,21 @@
       <!-- ═════════ 6–8. OFERTA + PIX + DEPOIS DE PAGAR ═════════ -->
       <section class="lp-oferta" id="oferta" data-bloco="oferta">
         <div class="lp-card" id="lp-card" data-fase="oferta">
-          <div class="lp-card-faixa"><span>Oferta especial · hoje</span><span class="lp-faixa-dir" data-so-oferta="ano">menos de R$ 0,08 por dia</span><span class="lp-faixa-dir" data-so-oferta="sempre">pagamento único</span></div>
+          <div class="lp-card-faixa"><span data-so-lp="atual">Oferta especial · hoje</span><span data-so-lp="v2">Acesso vitalício</span><span class="lp-faixa-dir" data-so-oferta="ano">menos de R$ 0,08 por dia</span><span class="lp-faixa-dir" data-so-oferta="sempre">pagamento único</span></div>
           <div class="lp-card-corpo">
             <div class="lp-so-oferta">
-              <p class="lp-ancora"><s>De R$ 97,90 por ano</s> Só hoje</p>
+              <p class="lp-ancora" data-so-lp="atual"><s>De R$ 97,90 por ano</s> Só hoje</p>
+              <!-- 30/10 (v2): âncora honesta (o anual nas lojas custa isso mesmo) e "Vitalício" escrito no cartão (dono 30/10) -->
+              <p class="lp-ancora" data-so-lp="v2">Na App Store: <b>R$ 97,90 por ano</b>. Aqui:</p>
               <h2 class="lp-preco-tit" data-so-oferta="ano">1 ano inteiro por <b>R$ 27,90</b></h2>
-              <h2 class="lp-preco-tit" data-so-oferta="sempre">Pra sempre por <b>R$ 27,90</b></h2>
+              <h2 class="lp-preco-tit" data-so-oferta="sempre" data-so-lp="atual">Pra sempre por <b>R$ 27,90</b></h2>
+              <h2 class="lp-preco-tit" data-so-oferta="sempre" data-so-lp="v2">Vitalício por <b>R$ 27,90</b></h2>
               <p class="lp-preco-sub" data-so-oferta="ano">Pagamento único no Pix · menos de R$ 0,08 por dia</p>
-              <p class="lp-preco-sub" data-so-oferta="sempre">Pagamento único no Pix · nunca mais paga</p>
+              <p class="lp-preco-sub" data-so-oferta="sempre" data-so-lp="atual">Pagamento único no Pix · nunca mais paga</p>
+              <p class="lp-preco-sub" data-so-oferta="sempre" data-so-lp="v2">Pagamento único no Pix · é seu pra sempre</p>
               <ul class="lp-checks">
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span>As <b>16 áreas</b> no celular e no computador</span></li>
+                <li data-so-lp="atual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span>As <b>16 áreas</b> no celular e no computador</span></li>
+                <li data-so-lp="v2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span>📱 <b>App de verdade:</b> App Store, Google Play e computador. As 16 áreas, na mesma conta.</span></li>
                 <li data-so-oferta="ano"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span><b>Sem renovação automática.</b> Daqui a 1 ano, você decide.</span></li>
                 <li data-so-oferta="sempre"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span><b>Pague uma vez e é seu pra sempre.</b> Nada é cobrado depois.</span></li>
                 <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span><b>7 dias de garantia.</b> Não gostou? Devolvemos 100%.</span></li>
@@ -524,6 +650,8 @@
                   <p class="lp-erro" id="lp-email-antes-erro" role="alert" hidden></p>
                 </div>
                 <button type="button" class="lp-cta" id="lp-pagar"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.2" y="5.2" width="13.6" height="13.6" rx="3.2" transform="rotate(45 12 12)" fill="none" stroke="currentColor" stroke-width="2.2"/><rect x="9.6" y="9.6" width="4.8" height="4.8" rx="1" transform="rotate(45 12 12)" fill="currentColor"/></svg><span id="lp-pagar-txt">Pagar R$ 27,90 no Pix</span></button>
+                <!-- 30/10 (v2): as duas dúvidas mais abertas ("Renova sozinho?", "Tem versão grátis?") respondidas onde a pessoa decide -->
+                <p class="lp2-confianca" data-so-lp="v2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Paga 1 vez. Nada é cobrado depois. 7 dias de garantia.</p>
                 <p class="lp-seguro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>O Pix sai aqui mesmo · CORE · CNPJ 55.041.112/0001-82</p>
               </div>
             </div>
@@ -549,7 +677,8 @@
     </main>
     <section class="lp-fim" id="fim" data-bloco="fim">
       <h2 data-so-oferta="ano">Sua vida inteira num app só, por R$ 27,90 o ano.</h2>
-      <h2 data-so-oferta="sempre">Sua vida inteira num app só, por R$ 27,90. Pra sempre.</h2>
+      <h2 data-so-oferta="sempre" data-so-lp="atual">Sua vida inteira num app só, por R$ 27,90. Pra sempre.</h2>
+      <h2 data-so-oferta="sempre" data-so-lp="v2">Sua vida organizada num app só. Vitalício por R$ 27,90.</h2>
       <p>Pix na hora · 7 dias de garantia</p>
       <button type="button" class="lp-cta" data-ir="oferta">Quero organizar tudo</button>
     </section>

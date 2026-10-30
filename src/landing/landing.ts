@@ -34,6 +34,15 @@
  *           landing_email_antes_erro {motivo: vazio|invalido|sessao|outra_conta|falhou|tem_conta|codigo_errado|codigo_nao_enviado}
  *           landing_email_antes_sugestao {} (tocou no "Você quis dizer …?")
  *   (29/10) landing_lembrete_volta {toque: t12|t20h, order_id, restaurado: aba|link|nao} — chegou pelo e-mail de lembrete do Pix
+ *   (30/10) todo evento leva braco_lp ("atual" | "v2" — AB_LP no <head>). landing_cta {onde:"topo"} = o botão da vitrine (v2);
+ *           landing_demo_aberta {via: fundo|perto|botao|area|pilula|grade}; landing_erro {onde:"chunk_pagamento", tentativa}
+ * (30/10) NOS DOIS BRAÇOS, sem mudança visual: o pixel da Meta entra no 1º quadro + ocioso (≤ ~1,5 s; reserva 2,5 s) em vez de
+ *   load + 800 ms (o PageView saía em 4–8 s num Android lento e a Meta contava "27% dos cliques não carregam"); o iframe da
+ *   demo (4–5 MB) só começa DEPOIS do pixel (ou quando a demo entra ≥ 25% na tela, ou no 1º toque) — no braço v2, SÓ no toque
+ *   ("Testar o app", pílula ou grade); o chunk do Pix tem 2ª chance + recarga (./carregar.ts).
+ * BRAÇO v2 (30/10, html[data-lp="v2"]): a vitrine do topo (prints reais + preço + botão "Quero organizar minha vida"), a
+ *   ordem dos blocos por CSS, o botão fixo aparece quando o botão do topo sai da tela, a tela do Pix com os 3 passos +
+ *   "Pagou? Volte aqui". O braço "atual" é a página de hoje, byte a byte (teste landing-v2.test.ts).
  * E-mail ANTES do Pix (29/10, braço "email"): o campo fica acima do botão (no HTML, escondido pelo CSS no braço "livre" —
  * a página do "livre" é IGUAL à de hoje). Ao tocar em pagar: e-mail → sessão anônima (updateUser) → Pix. E-mail que já
  * tem conta → código do e-mail → entra na conta → Pix nela (conta com vitalício → "Você já tem o CORE"). Na tela do QR,
@@ -47,16 +56,27 @@
 import {
 
   EMAIL_OK, MODULO_DA_AREA, NOME_DO_MODULO, ROTULO_OFERTA, VALOR_OFERTA, URL_APP_STORE,
-  bracoCheckoutDoHtml, checarEmailAntes, sugestaoDeEmail, voltaDoLembrete,
+  bracoCheckoutDoHtml, bracoLpDoHtml, checarEmailAntes, sugestaoDeEmail, voltaDoLembrete,
   bracoOfertaDoHtml, bracoTituloDoHtml, ehArea, ehModuloLanding, estadoQueVolta, mmss, ofertaEscolhida, reais, urlPlay, venceEm,
   type Area, type EstadoLanding, type MensagemDaDemo, type ModuloLanding, type OfertaLanding, type PixLanding,
 } from "./regras";
 import { esquecerCompra, idDoAparelho, lerCompra, marcarCompra, type MarcaCompra } from "./marcador";
+import { carregarComRetry, limparMarcaDeRecarga } from "./carregar";
 
-// o Pix de verdade carrega sob demanda — declarado antes do observador dos blocos, que pode pré-aquecê-lo (com PIX_REAL)
+// o Pix de verdade carrega sob demanda — declarado antes do observador dos blocos, que pode pré-aquecê-lo (com PIX_REAL).
+// 30/10: com 2ª chance; o pré-aquecimento (recarregar=false) nunca recarrega a página — só o toque em pagar.
 type Pagamento = typeof import("./pagamento");
 let pagamento: Promise<Pagamento> | null = null;
-const pg = () => (pagamento ??= import("./pagamento"));
+const pg = (recarregar = true): Promise<Pagamento> => {
+  if (pagamento) return pagamento;
+  const p = carregarComRetry(() => import("./pagamento"), {
+    recarregar,
+    aoFalhar: (tentativa, erro) => evento("landing_erro", { onde: "chunk_pagamento", tentativa, msg: String(erro).slice(0, 120) }),
+  });
+  pagamento = p;
+  p.then(limparMarcaDeRecarga, () => { pagamento = null; }); // falhou: o próximo toque tenta do zero (e pode recarregar)
+  return p;
+};
 
 /** O Pix de verdade (asaas-pix com as ofertas LN_*). Só ligar DEPOIS do deploy das funções (RELATORIO). */
 export const PIX_REAL = true; // 28/10 16h06: funções no ar com as ofertas LN_* (pix-reconcile v45, asaas-webhook v44, asaas-pix v46, pix-vincular v10)
@@ -68,14 +88,18 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 const agora = () => Math.round(performance.now());
 type Janela = Window & {
   __landingSimularJaTem?: boolean;
-  __landing?: { t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; divisao?: string | null };
+  __landing?: { t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; divisao?: string | null };
   __eventosLanding?: Record<string, unknown>[];
   __landingSimular?: { pagar: () => void };
+  /** 30/10: diagnóstico de tempo (medição de desempenho; nada vai pro banco por aqui) */
+  __landingDiag?: { terceirosEm: number | null; demoEm: number | null; demoVia: string | null };
   fbq?: (...a: unknown[]) => void;
   requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
 };
 const w = window as Janela;
 w.__eventosLanding = w.__eventosLanding || [];
+const diag = { terceirosEm: null as number | null, demoEm: null as number | null, demoVia: null as string | null };
+w.__landingDiag = diag;
 
 /* ───────────────────────── a URL do anúncio fica no heap (o Instagram zera o storage, a URL não) ───────────────────────── */
 const URL_DE_CHEGADA = location.href;
@@ -83,6 +107,8 @@ const BUSCA = new URLSearchParams(location.search);
 const brTitulo = bracoTituloDoHtml();
 const brOferta = bracoOfertaDoHtml();
 const brCheckout = bracoCheckoutDoHtml(); // 29/10: "livre" (o de hoje) | "email" (e-mail antes do Pix)
+const brLp = bracoLpDoHtml(); // 30/10: "atual" (a página de hoje) | "v2" (vitrine)
+const V2 = brLp === "v2";
 
 /* ───────────────────────── sessão + eventos ───────────────────────── */
 const novoId = () => { try { return crypto.randomUUID(); } catch { return `l${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`; } };
@@ -105,7 +131,7 @@ for (const k of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm
 if (BUSCA.get("fbclid")) atrib.tem_fbclid = "1";
 
 export function evento(nome: string, dados: Record<string, unknown> = {}): void {
-  const corpo = { ...dados, landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
+  const corpo = { ...dados, landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
   w.__eventosLanding!.push({ nome, ...corpo });
   if (!PRODUCAO) return;
   try {
@@ -125,24 +151,38 @@ requestAnimationFrame(() => {
   let ttfb: number | null = null;
   try { const n = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined; if (n) ttfb = Math.round(n.responseStart); } catch { /* noop */ }
   const m = w.__landing ?? {};
-  evento("landing_html", { tela1_ms: agora(), ttfb_ms: ttfb, t_forcado: !!m.t_forcado, oferta_forcada: !!m.oferta_forcada, checkout_forcado: !!m.checkout_forcado, divisao: m.divisao ?? null });
+  evento("landing_html", { tela1_ms: agora(), ttfb_ms: ttfb, t_forcado: !!m.t_forcado, oferta_forcada: !!m.oferta_forcada, checkout_forcado: !!m.checkout_forcado, lp_forcado: !!m.lp_forcado, divisao: m.divisao ?? null });
 });
 
-/* scripts de terceiros (pixel e Google) DEPOIS do load — nunca disputam a 1ª tela */
-const carregarScript = (src: string) => { const s = document.createElement("script"); s.async = true; s.src = src; document.head.appendChild(s); };
+/*
+ * scripts de terceiros (pixel e Google): 30/10 — no 1º QUADRO + ocioso (teto ~1,5 s), com reserva aos 2,5 s. Antes era
+ * load + 800 ms (reserva 6 s) e disputava a rede com a demo: num Android lento o PageView saía em 4–8 s e a Meta via
+ * "27% dos cliques sem página" (lp-web/funil §2b). A 1ª tela já pintou antes deste módulo rodar; ~100 KB de JS do pixel
+ * não a atrasam. Igual nos DOIS braços.
+ */
+const ocioso = (f: () => void, timeout: number) => { if (w.requestIdleCallback) w.requestIdleCallback(f, { timeout }); else window.setTimeout(f, 200); };
+const carregarScript = (src: string, aoCarregar?: () => void) => {
+  const s = document.createElement("script"); s.async = true; s.src = src;
+  if (aoCarregar) { s.onload = aoCarregar; s.onerror = aoCarregar; }
+  document.head.appendChild(s);
+};
 let terceiros = false;
+/** quem quer começar DEPOIS do pixel (a demo do braço atual): corre quando o fbevents chegou, ou 2,5 s depois do pedido */
+let pixelPronto = false;
+const esperandoPixel: Array<() => void> = [];
+const avisarPixel = () => { if (pixelPronto) return; pixelPronto = true; esperandoPixel.splice(0).forEach((f) => { try { f(); } catch { /* noop */ } }); };
+const depoisDoPixel = (f: () => void) => { if (pixelPronto) f(); else esperandoPixel.push(f); };
 const carregarTerceiros = () => {
-  if (terceiros || !PRODUCAO) return;
+  if (terceiros) return;
   terceiros = true;
-  carregarScript("https://connect.facebook.net/en_US/fbevents.js");
+  diag.terceirosEm = agora();
+  if (!PRODUCAO) { avisarPixel(); return; }
+  carregarScript("https://connect.facebook.net/en_US/fbevents.js", avisarPixel);
   carregarScript("https://www.googletagmanager.com/gtag/js?id=AW-18254888989");
+  window.setTimeout(avisarPixel, 2500);
 };
-const depoisDoLoad = (f: () => void, ms: number) => {
-  const vai = () => window.setTimeout(f, ms);
-  if (document.readyState === "complete") vai(); else window.addEventListener("load", vai, { once: true });
-};
-depoisDoLoad(carregarTerceiros, 800);
-window.setTimeout(carregarTerceiros, 6000);
+requestAnimationFrame(() => ocioso(carregarTerceiros, 1500));
+window.setTimeout(carregarTerceiros, 2500);
 
 /* ───────────────────────── rolar ───────────────────────── */
 const rolarAte = (el: Element | null, bloco: ScrollLogicalPosition = "start") => {
@@ -172,6 +212,8 @@ function iniciarDemo(via: string) {
   if (demoIniciada) return;
   demoIniciada = true;
   tInicioDemo.t = agora();
+  diag.demoEm = tInicioDemo.t; diag.demoVia = via;
+  celular.setAttribute("data-abrindo", ""); // v2: some o "Testar o app", aparece o "Abrindo o app…" (no atual o CSS não muda nada)
   frame.src = `/organizar/demo?m=${moduloAtual}`;
   evento("landing_demo_aberta", { modulo: moduloAtual, via });
 }
@@ -212,11 +254,21 @@ window.addEventListener("message", (e: MessageEvent) => {
   }
 });
 
-/* a demo começa a baixar depois da 1ª pintura: load + ocioso (ou no 1º toque) */
-depoisDoLoad(() => {
-  const vai = () => iniciarDemo("fundo");
-  if (w.requestIdleCallback) w.requestIdleCallback(vai, { timeout: 1500 }); else window.setTimeout(vai, 300);
-}, 0);
+/*
+ * 30/10: quando a demo (o app inteiro, 4–5 MB) começa a baixar.
+ *   atual: o mais cedo entre (a) o pixel carregou (ou 2,5 s depois do pedido) + ocioso — antes era load + ocioso, e a
+ *          demo disputava a rede com o PageView; (b) a demo entrou ≥ 25% na tela; (c) o 1º toque (área/pílula/grade).
+ *          Visualmente igual: a imagem leve do módulo ocupa a MESMA caixa até o iframe chegar, como hoje.
+ *   v2:    SÓ no toque ("Testar o app", pílula ou grade). 61% nunca chegavam à demo e baixavam tudo mesmo assim.
+ */
+if (!V2) {
+  depoisDoPixel(() => ocioso(() => iniciarDemo("fundo"), 1500));
+  if ("IntersectionObserver" in window) {
+    const perto = new IntersectionObserver((ens) => { if (ens.some((e) => e.isIntersecting)) { iniciarDemo("perto"); perto.disconnect(); } }, { threshold: 0.25 });
+    perto.observe($("demo"));
+  }
+}
+document.getElementById("lp-demo-abrir")?.addEventListener("click", () => { evento("landing_cta", { onde: "testar_app" }); iniciarDemo("botao"); });
 
 /* ───────────────────────── 1. topo: a área ───────────────────────── */
 document.querySelectorAll<HTMLButtonElement>(".lp-area").forEach((b) => {
@@ -240,7 +292,7 @@ document.querySelectorAll<HTMLButtonElement>(".lp-mod[data-m]").forEach((b) => b
 }));
 document.querySelectorAll<HTMLElement>("[data-ir]").forEach((b) => b.addEventListener("click", () => {
   const alvo = b.dataset.ir!;
-  if (alvo === "oferta") evento("landing_cta", { onde: b.closest("#lp-fixo") ? "fixo" : b.closest("#fim") ? "fim" : "outro" });
+  if (alvo === "oferta") evento("landing_cta", { onde: b.closest("#lp-fixo") ? "fixo" : b.closest("#fim") ? "fim" : b.closest("#topo-v2") ? "topo" : "outro" });
   rolarAte($(alvo));
 }));
 document.querySelectorAll<HTMLAnchorElement>("a[data-loja]").forEach((a) => a.addEventListener("click", () => evento("landing_loja", { loja: a.dataset.loja, onde: a.closest("#lp-pix") ? "pos_compra" : "como" })));
@@ -282,7 +334,7 @@ if ("IntersectionObserver" in window) {
           evento("landing_oferta_vista", {});
           if (brCheckout === "email") evento("landing_email_antes_visto", {});
           pixel("ViewContent", { content_name: "landing_oferta", value: 27.9, currency: "BRL" });
-          if (PIX_REAL && !SIMULADO) void pg().catch(() => null); // pré-aquece o Pix de verdade
+          if (PIX_REAL && !SIMULADO) void pg(false).catch(() => null); // pré-aquece o Pix de verdade (sem recarregar a página se falhar)
         }
       } else naTela.delete(bloco);
       // passou da demo = o fim da demo já subiu acima do meio da tela
@@ -292,6 +344,14 @@ if ("IntersectionObserver" in window) {
     atualizarFixo();
   }, { threshold: 0.15 });
   document.querySelectorAll("[data-bloco]").forEach((el) => obs.observe(el));
+  // v2: o botão fixo entra assim que o botão do topo sai da tela por cima (a demo fica no fim da página)
+  const ctaTopo = V2 ? document.getElementById("lp-cta-topo") : null;
+  if (ctaTopo) {
+    new IntersectionObserver((ens) => {
+      for (const en of ens) if (!en.isIntersecting && en.boundingClientRect.top < 0) passouDaDemo = true;
+      atualizarFixo();
+    }, { threshold: 0 }).observe(ctaTopo);
+  }
 }
 
 /* ───────────────────────── 6. oferta: caixinha ───────────────────────── */
@@ -585,7 +645,7 @@ async function prontoComEmail(email: string, via: string) {
   const p = estado.pago;
   if (!p) return;
   if (!SIMULADO) {
-    try { await (await pg()).finalizarConta(p.orderId, { attr: atrib, braco_titulo: brTitulo, braco_oferta: brOferta, oferta: p.oferta, landing_session_id: sessao }); } catch { /* o e-mail é extra */ }
+    try { await (await pg()).finalizarConta(p.orderId, { attr: atrib, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, oferta: p.oferta, landing_session_id: sessao }); } catch { /* o e-mail é extra */ }
   }
   evento("landing_email", { via });
   marcarCompra({ oferta: p.oferta, email });
@@ -717,13 +777,26 @@ function render() {
     caixa.innerHTML = `<div class="lp-pix-gerando" data-testid="landing-gerando"><span class="lp-pix-logo">${ICO_PIX}</span><b>Gerando o seu Pix…</b><div class="lp-progresso"><i></i></div><span>Sem CPF, sem cadastro. Leva 2 segundos.</span></div>`;
   } else if (f === "qr" && estado.pix) {
     const p = estado.pix;
+    // 30/10 (v2): 3 passos curtos no lugar da caixa verde + "Pagou? Volte aqui" (quem volta do banco paga 81%; quem não
+    // paga sai ~4 s depois do QR — lp-web/funil §3c) + a garantia perto do código. O braço atual segue IGUAL.
+    const passosV2 = V2 ? `
+      <ol class="lp2-passos" data-testid="landing-passos">
+        <li${copiado ? ' class="feito"' : ""}><span>${copiado ? "<b>Código Pix copiado.</b> Se precisar, toque em Copiar de novo." : "<b>Copie o código Pix</b> (botão abaixo)."}</span></li>
+        <li><span>Abra o app do seu <b>banco</b> e vá em Pix.</span></li>
+        <li><span>Escolha <b>Pix Copia e Cola</b>, cole o código e confirme.</span></li>
+      </ol>` : "";
+    const esperando = V2
+      ? `<div class="lp2-volte" data-testid="landing-volte"><i class="lp-ponto"></i><span><b>Pagou? Volte aqui.</b>${p.doEmail ? " Quando o pagamento cair, o acesso chega no seu e-mail." : " O acesso abre na hora: esta tela confirma sozinha."}</span></div>
+         <p class="lp2-garantia-mini">${ICO_CHECK}<span>7 dias de garantia · não gostou, devolvemos 100%</span></p>`
+      : `<div class="lp-esperando"><i class="lp-ponto"></i><span><b>Esperando o pagamento</b>${p.doEmail ? "Quando o pagamento cair, o acesso chega no seu e-mail." : "Esta tela confirma sozinha quando o pagamento entrar."}</span></div>`;
     caixa.innerHTML = `
       <div class="lp-pix-valor"><b>${reais(VALOR_OFERTA[p.oferta])}</b><span>${esc(ROTULO_OFERTA[p.oferta])}</span></div>
-      ${copiado ? `<div class="lp-copiado" data-testid="landing-copiado">${ICO_CHECK}<span><b>Código Pix copiado</b>Agora abra o app do seu banco: Pix → Copia e Cola.</span></div>` : ""}
+      ${copiado && !V2 ? `<div class="lp-copiado" data-testid="landing-copiado">${ICO_CHECK}<span><b>Código Pix copiado</b>Agora abra o app do seu banco: Pix → Copia e Cola.</span></div>` : ""}
+      ${passosV2}
       <div class="lp-qr-linha"><div class="lp-qr" id="lp-qr"></div><div class="lp-qr-dica">${copiado ? "Ou leia o <b>QR code</b> com a câmera do banco, em outro aparelho." : "<b>Copie o código</b> e cole no app do banco em Pix → Copia e Cola. Ou leia o QR code."}</div></div>
       <div class="lp-codigo" data-testid="landing-codigo">${esc(p.qrCode)}</div>
       <button type="button" class="lp-copiar${copiado ? "" : " cheio"}" id="lp-copiar">${ICO_COPIAR}<span>${copiado ? "Copiar de novo" : "Copiar código Pix"}</span></button>
-      <div class="lp-esperando"><i class="lp-ponto"></i><span><b>Esperando o pagamento</b>${p.doEmail ? "Quando o pagamento cair, o acesso chega no seu e-mail." : "Esta tela confirma sozinha quando o pagamento entrar."}</span></div>
+      ${esperando}
       <div class="lp-validade" id="lp-validade">Este código vale por ${mmss(venceEm(p) - Date.now())}</div>
       ${aviso ? `<p class="lp-aviso" role="status">${esc(aviso)}</p>` : ""}
       <div class="lp-email-opc">${brCheckout === "email" || p.doEmail

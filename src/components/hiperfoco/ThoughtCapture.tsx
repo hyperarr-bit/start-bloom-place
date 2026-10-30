@@ -141,6 +141,8 @@ export const ThoughtCapture = () => {
                 <button
                   onClick={() => setExpandedHour(isExpanded ? null : hour)}
                   className="flex items-center gap-2 mb-1"
+                  data-dica={hour === new Date().getHours() ? "mente-agora" : undefined}
+                  data-selecionado={isExpanded ? "true" : undefined}
                 >
                   <span className="text-xs font-mono font-semibold text-muted-foreground">{String(hour).padStart(2, "0")}:00</span>
                   {!hasThoughts && !isExpanded && (

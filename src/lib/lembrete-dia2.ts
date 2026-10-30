@@ -28,6 +28,7 @@
  * O estado mora no localStorage do APARELHO (`core-dia2`, mantida nas duas
  * listas KEEP do logout — use-auth e use-user-data), como a Missão do iPhone.
  */
+import { modo1012 } from "@/lib/modo-1012";
 import { isNativeShell } from "./native-shell";
 import { localDayKey } from "./utils";
 import { CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK, calcularSequencia, diasEfetivos, somarDias } from "./sequencia";
@@ -340,6 +341,20 @@ export function conteudoDaMissao(missao: EstadoMissaoDoses | null, hoje: string 
   if (!missao || !missao.boasVindas || missaoCumprida(missao)) return null;
   const pendente = passoPendente(missao);
   if (!pendente) return null;
+  // 29/10 (dono): no modo 1.0.12 o texto volta a ser EXATAMENTE o da 1.0.12 — "🔥 Dia N da missão: <módulo>",
+  // sem "Dia 2 do seu plano", sem "Hoje dá pra gastar até R$ X" e sem o "Dia 3: feche seus 3 dias seguidos"
+  if (modo1012()) {
+    if (diaDaMissao(missao, somarDias(hoje, 1)) > 5) return null;
+    const cfg12 = MODULOS[pendente.modulo];
+    const feitos12 = ([1, 2, 3] as const).filter((n) => missao.feitos[n]).length;
+    return {
+      title: `🔥 Dia ${pendente.n} da missão: ${cfg12.emoji} ${cfg12.nome}`,
+      body: `${cfg12.pedido} — 40 segundos e o passo ${pendente.n} de 3 fica feito${feitos12 ? ` (${feitos12} de 3 já foram)` : ""}.`,
+      modulo: "missao",
+      temNumero: false,
+      rota: cfg12.rota,
+    };
+  }
   // 1.0.16, braço A (desenho 8 seção 4.6): a missão anda até o 7º dia; quem escolheu "Explorar" fica com o
   // texto do módulo mais usado (com o número dela)
   if (ehUmPorDia(missao)) {

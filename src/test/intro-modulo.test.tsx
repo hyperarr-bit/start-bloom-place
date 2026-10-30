@@ -248,7 +248,8 @@ describe("chave, constantes e classificação", () => {
 describe("chave desligada (web) = o app de hoje", () => {
   it("a porta do módulo segue pro Dicas para começar; a IntroDoModulo não monta nada; nenhum evento, nada no storage", () => {
     montar(<BoasVindasDoModulo moduleId="casa" tips={["Dica antiga"]} />);
-    expect(screen.getByText("Dica antiga")).toBeTruthy();
+    // 28/10: a lista do uso real (lib/dicas-do-modulo) vence o `tips` antigo
+    expect(screen.getByText("Liste os afazeres de cada cômodo e marque ao fazer")).toBeTruthy();
     expect(card()).toBeNull();
     const { container } = montar(<IntroDoModulo moduleId="financas" />);
     expect(container.innerHTML).toBe("");

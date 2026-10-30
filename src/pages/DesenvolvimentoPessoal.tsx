@@ -9,6 +9,7 @@ import { PhotoPicker } from "@/components/ui/PhotoPicker";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useHumorDoDia } from "@/hooks/use-humor-do-dia";
 import { useLocation } from "react-router-dom";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { toast } from "sonner";
@@ -54,12 +55,14 @@ const motivationalQuotes = [
   "Foco no progresso, não na perfeição.", "Cada dia é uma nova chance de mudar sua vida.",
 ];
 
+// 1.0.22 (dono 28/10): a MESMA escala do "+" da Home (1 Péssimo · 2 Ruim · 3 Neutro · 4 Bom · 5 Ótimo) — antes aqui o 2 era "Meh"
+// e o 1 "Ruim", e quem tocava "Ruim" no "+" via "Meh" marcado. Só nomes/emojis; os valores gravados não mudam.
 const moodOptions = [
-  { emoji: "😄", label: "Ótimo", value: 5, color: "bg-green-400" },
-  { emoji: "🙂", label: "Bem", value: 4, color: "bg-green-300" },
+  { emoji: "🤩", label: "Ótimo", value: 5, color: "bg-green-400" },
+  { emoji: "🙂", label: "Bom", value: 4, color: "bg-green-300" },
   { emoji: "😐", label: "Neutro", value: 3, color: "bg-yellow-300" },
-  { emoji: "😕", label: "Meh", value: 2, color: "bg-orange-300" },
-  { emoji: "😞", label: "Ruim", value: 1, color: "bg-red-300" },
+  { emoji: "😔", label: "Ruim", value: 2, color: "bg-orange-300" },
+  { emoji: "😡", label: "Péssimo", value: 1, color: "bg-red-300" },
 ];
 
 /* Abas do módulo, fora do componente (mesma referência em todo render — o
@@ -410,7 +413,9 @@ const DesenvolvimentoPessoal = () => {
   const [todayPrompt] = useState(() => journalEntries[today]?.prompt || journalPrompts[Math.floor(Math.random() * journalPrompts.length)]);
 
   // === NEW: MOOD TRACKER ===
-  const [moodLog, setMoodLog] = usePersistedState<Record<string, number>>("dp-mood-log", {});
+  // 1.0.22 (28/10): o humor do dia é um só (lib/humor-do-dia) — lê `dp-mood-log`, o `mood-log` da Rotina e o
+  // `core-mood-log` do "+" da Home; grava nas 3. `moodLog` aqui é o histórico UNIFICADO { dia: 1–5 }.
+  const { historico: moodLog, registrar: registrarHumor } = useHumorDoDia(today);
 
   // === NEW: BREATHING TIMER ===
   const [breathPhase, setBreathPhase] = useState<"idle" | "in" | "hold" | "out">("idle");
@@ -540,15 +545,7 @@ const DesenvolvimentoPessoal = () => {
       </div>
 
       <main className="max-w-5xl mx-auto px-4 py-4">
-        <BoasVindasDoModulo
-          moduleId="desenvolvimento"
-          tips={[
-            "Defina suas metas de vida, bucket list e quadro de visão na aba Metas",
-            "Escreva 3 coisas pelas quais é grato no diário de gratidão",
-            "Defina seus valores e forças pessoais na aba 🧠 Sobre Mim",
-            "Crie afirmações positivas e leia-as diariamente"
-          ]}
-        />
+        <BoasVindasDoModulo moduleId="desenvolvimento" />
 
 
           {/* ========== SOBRE MIM ========== */}
@@ -649,7 +646,7 @@ const DesenvolvimentoPessoal = () => {
                   abaixo de ~430 px (a 360 saíam 5 px pra cada lado). */}
               <div className="flex justify-center gap-2 sm:gap-3 mb-4">
                 {moodOptions.map(m => (
-                  <button key={m.value} onClick={() => setMoodLog({ ...moodLog, [today]: m.value })} aria-label={m.label} aria-pressed={moodLog[today] === m.value}
+                  <button key={m.value} onClick={() => registrarHumor(m.value)} aria-label={m.label} aria-pressed={moodLog[today] === m.value}
                     className={`text-2xl sm:text-3xl p-2 sm:p-3 rounded-xl border-2 transition-all ${moodLog[today] === m.value ? `${m.color} border-primary scale-110` : "border-border hover:scale-105"}`}>
                     {m.emoji}
                   </button>

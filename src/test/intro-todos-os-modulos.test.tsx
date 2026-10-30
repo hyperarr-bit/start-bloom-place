@@ -12,7 +12,8 @@
  *
  * 1.0.21 (dono 27/10): a regra acima foi REVOGADA pelo FLUXO ENXUTO (lib/fluxo-enxuto). Tudo acima é a chave `off`
  * (o setup da suíte deixa o padrão do app em "off"); o bloco "FLUXO ENXUTO ligado" no fim faz a MESMA grade com a chave
- * `on`: nenhum módulo abre com tutorial (intro, cartões, "Dicas para começar", holofote, "Dicas"), em nenhum caso — a
+ * `on`: nenhum módulo abre com tutorial (intro, cartões, holofote, "Dicas"), em nenhum caso — 28/10: o "Dicas para
+ * começar" (lib/dicas-do-modulo) VOLTA, só ele — a
  * dose de hoje continua sendo do módulo (a missão aponta a ação direto).
  */
 process.env.TZ = "America/Sao_Paulo";
@@ -419,7 +420,7 @@ describe("FLUXO ENXUTO ligado (1.0.21): os 16 módulos × os casos — NUNCA tut
   for (const m of TODOS) {
     for (const [braco, pos] of CASOS) {
       const caso = braco === "sem" ? "sem missão" : `braço ${braco} · ${pos}`;
-      it(`${m} · ${caso}: nem intro, nem cartões, nem dicas, nem holofote (conta nova e conta antiga)`, () => {
+      it(`${m} · ${caso}: nem intro, nem cartões, nem holofote — só o "Dicas para começar" (conta nova e conta antiga)`, () => {
         const plano = planoPara(m, pos);
         armarMissao(braco, plano);
         for (const conta of ["nova", "antiga"] as const) {
@@ -440,7 +441,9 @@ describe("FLUXO ENXUTO ligado (1.0.21): os 16 módulos × os casos — NUNCA tut
           expect(document.querySelector("[data-testid=cartoes-modulo]"), `${m} ${caso} ${conta}: cartões`).toBeNull();
           expect(document.querySelector("[data-camada-guia]"), `${m} ${caso} ${conta}: holofote/camada de guia`).toBeNull();
           expect(document.querySelector("[data-testid=conhecer-mais-acesso]"), `${m} ${caso} ${conta}: lâmpada Dicas`).toBeNull();
-          expect(screen.queryByText("dica 1"), `${m} ${caso} ${conta}: Dicas para começar`).toBeNull();
+          // 28/10 (dono: "quero as dicas de volta"): SÓ o "Dicas para começar" volta, com a lista do uso real (lib/dicas-do-modulo)
+          expect(screen.queryByText("dica 1"), `${m} ${caso} ${conta}: dicas antigas`).toBeNull();
+          expect(document.querySelector("[data-testid=dicas-modulo]"), `${m} ${caso} ${conta}: Dicas para começar`).toBeTruthy();
           r.unmount();
         }
         // a dose de HOJE continua sendo deste módulo (a missão não muda: a dose aponta a ação direto)

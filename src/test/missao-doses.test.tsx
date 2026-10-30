@@ -334,13 +334,14 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     expect(screen.queryByTestId("missao-doses-amanha")).toBeNull();
     fireEvent.click(screen.getByTestId("missao-doses-ver-fim"));
     const fim = screen.getByTestId("missao-doses-fim");
-    // 1.0.17 (dono: "minimalista"): o título e 3 números grandes (dias seguidos, score, adesivos) — nada de 5 blocos
-    expect(fim).toHaveTextContent("Você construiu isso em 3 dias");
-    expect(screen.getByTestId("missao-doses-fim-numeros").children).toHaveLength(3);
-    // 1.0.17: 3 números grandes — dias seguidos, score de hoje, adesivos
-    expect(screen.getByTestId("missao-doses-fim-sequencia")).toBeInTheDocument();
-    expect(screen.getByTestId("missao-doses-fim-score")).toBeInTheDocument();
-    expect(screen.getByTestId("missao-doses-fim-adesivos")).toBeInTheDocument();
+    // 29/10 (A/B do resumo, lib/construiu-ab): título pelos números (sem sequência aqui: "Seu CORE começou."), o que ela fez
+    // em cada módulo e o próximo passo — nada de score
+    expect(screen.getByTestId("missao-doses-fim-titulo")).toHaveTextContent("Seu CORE começou.");
+    expect(screen.getByTestId("missao-doses-fim-modulo-financas")).toHaveTextContent("Café · R$ 12");
+    expect(screen.getByTestId("missao-doses-fim-modulo-rotina")).toBeInTheDocument();
+    expect(screen.getByTestId("missao-doses-fim-modulo-saude")).toBeInTheDocument();
+    expect(screen.getByTestId("missao-doses-fim-proximo")).toHaveTextContent(/Amanhã/);
+    expect(fim.textContent).not.toMatch(/score/i);
     expect(eventos).toContainEqual(["missao_doses_fim", expect.objectContaining({ modulos: ["financas", "rotina", "saude"] })]);
     fireEvent.click(screen.getByTestId("missao-doses-continuar"));
     expect(screen.queryByTestId("missao-doses-fim")).toBeNull();
@@ -464,11 +465,16 @@ describe("'O que você construiu em 3 dias' numa tela de iPhone (revisão tela a
     expect(aoContinuar).toHaveBeenCalledTimes(1);
   });
 
-  it("o título equilibra as 2 linhas (text-balance) e o '3 dias' não se separa — nunca 'dias' sozinho na 2ª linha", () => {
-    render(<MemoryRouter><Provedor store={montarStore(conta())}><ConstruiuEm3Dias missao={missaoCumprida()} aoContinuar={() => {}} /></Provedor></MemoryRouter>);
-    const titulo = screen.getByTestId("missao-doses-fim-titulo");
-    expect(titulo.tagName).toBe("H1");
-    expect(titulo.className.split(/\s+/)).toContain("text-balance");
-    expect(titulo.textContent).toBe("Você construiu isso em 3\u00a0dias");
+  it("29/10: o título é um H1 que sai dos números (nunca '3 dias' ao lado de outro número) e equilibra as linhas (text-wrap: balance no CSS)", () => {
+    for (const braco of ["a", "b"] as const) {
+      render(<MemoryRouter><Provedor store={montarStore(conta())}><ConstruiuEm3Dias missao={missaoCumprida()} braco={braco} aoContinuar={() => {}} /></Provedor></MemoryRouter>);
+      const titulo = screen.getByTestId("missao-doses-fim-titulo");
+      expect(titulo.tagName).toBe("H1");
+      expect(titulo.className.split(/\s+/)).toContain("cr-h1");
+      expect(titulo.textContent).not.toContain("3 dias");
+      cleanup();
+    }
+    const css = fs.readFileSync(path.resolve(__dirname, "../components/missao-doses/missao-doses.css"), "utf8");
+    expect(/\.cr-h1\s*\{[^}]*text-wrap:\s*balance/.test(css)).toBe(true);
   });
 });

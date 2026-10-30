@@ -1,4 +1,6 @@
 import { lazy, Suspense, useState, useEffect, useMemo, useRef } from "react";
+import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
+import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
 import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 import { reais } from "@/lib/dinheiro";
 import { localDayKey } from "@/lib/utils";
@@ -42,7 +44,7 @@ import { MonthlyBudget } from "@/components/MonthlyBudget";
 import { WishlistItems } from "@/components/WishlistItems";
 import { InvestmentsTracker } from "@/components/InvestmentsTracker";
 import { FinancialHealth } from "@/components/FinancialHealth";
-import { TravelBudget } from "@/components/travel/TravelBudget";
+import { AtalhoParaOutroModulo } from "@/components/sem-repeticao/AtalhoParaOutroModulo";
 import { PedirLembretes } from "@/components/finance/PedirLembretes";
 import { Dashboard } from "@/components/Dashboard";
 import { Simulators } from "@/components/Simulators";
@@ -95,7 +97,8 @@ interface PropsDoConteudo {
 
 /** 21/10 (plano de 30 dias por área, src/lib/plano-30-areas): `/financas?aba=<aba>` abre direto nessa aba — o mesmo
  *  `?aba=` que Rotina, Saúde e Treino já leem. Sem o parâmetro (ou com aba desconhecida), nada muda. */
-export const ABAS_DE_FINANCAS_NA_URL = ["dashboard", "financeiro", "investimentos", "itens", "viagem", "simuladores", "limites", "relatorios", "saude"] as const;
+// 28/10 (sem repetição): "viagem" fica no fim só pro link ANTIGO — abre o atalho "Abrir em Viagens" (a aba saiu da fileira)
+export const ABAS_DE_FINANCAS_NA_URL = ["dashboard", "financeiro", "investimentos", "itens", "simuladores", "limites", "relatorios", "saude", "viagem"] as const;
 const abaDaUrlDeFinancas = (): string | null => {
   try {
     const a = new URLSearchParams(window.location.search).get("aba");
@@ -466,19 +469,21 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
     if (d.alvo) window.setTimeout(() => document.querySelector(d.alvo!)?.scrollIntoView({ behavior: "smooth", block: "center" }), 250);
   };
 
-  const tabs = [
-    { id: "dashboard", label: "📊 DASHBOARD" },
-    ...(temKit ? [{ id: "kit", label: "📒 KIT 30 DIAS" }] : []),
-    { id: "financeiro", label: "💰 MEU FINANCEIRO" },
-    { id: "investimentos", label: "📈 INVESTIMENTOS" },
-    { id: "itens", label: "❤️ DESEJOS" },
-    { id: "viagem", label: "✈️ VIAGEM" },
-    { id: "simuladores", label: "🧮 SIMULADORES" },
-    
-    { id: "limites", label: "🎯 LIMITES" },
-    { id: "relatorios", label: "📋 RELATÓRIOS" },
-    { id: "saude", label: "💚 SAÚDE FINANCEIRA" },
-  ];
+  // 1.0.22 (ocultar abas): a fileira é a AbasOcultaveis de todos os módulos — "Organizar abas" no fim (lib/abas-ocultas)
+  const tabs = useMemo(() => [
+    { id: "dashboard", label: "DASHBOARD", icon: "📊" },
+    ...(temKit ? [{ id: "kit", label: "KIT 30 DIAS", icon: "📒" }] : []),
+    { id: "financeiro", label: "MEU FINANCEIRO", icon: "💰", spotlight: "financeiro" },
+    { id: "investimentos", label: "INVESTIMENTOS", icon: "📈" },
+    { id: "itens", label: "DESEJOS", icon: "❤️" },
+    // SEM REPETIÇÃO (28/10): a aba ✈️ VIAGEM era o MESMO componente/chave (`travel-trips-v2`) de Viagens › Budget e
+    // tinha 0,4% de uso real — saiu da fileira. Quem chega nela (`?aba=viagem`, aba que estava aberta) vê o atalho.
+    { id: "simuladores", label: "SIMULADORES", icon: "🧮" },
+    { id: "limites", label: "LIMITES", icon: "🎯" },
+    { id: "relatorios", label: "RELATÓRIOS", icon: "📋" },
+    { id: "saude", label: "SAÚDE FINANCEIRA", icon: "💚" },
+  ], [temKit]);
+  const abasDeFinancas = useAbasOcultas("financas", tabs);
 
   // travado por MONTAR_FINANCAS_NO_MODULO (17/10, ver lá em cima): o módulo não abre o quiz sozinho
   if (MONTAR_FINANCAS_NO_MODULO && montar.estado === "decidindo") return <div className="min-h-screen bg-background" />;
@@ -558,19 +563,8 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
             <AcessoConhecerMais moduleId="financas" /><ThemeToggle />
           </div>
         </div>
-        {/* Tabs */}
-        <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto scrollbar-hide">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id} data-active={activeTab === tab.id}
-              data-spotlight={tab.id === "financeiro" ? "financeiro" : `tab-${tab.id}`}
-              onClick={() => setActiveTab(tab.id)}
-              className={`notion-tab whitespace-nowrap text-[11px] ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* Tabs (1.0.22: ocultar/organizar — components/ui/abas-ocultaveis) */}
+        <AbasOcultaveis abas={abasDeFinancas} ativa={activeTab} onTrocar={setActiveTab} corrigirAbaDesconhecida={false} className="max-w-7xl mx-auto px-4 pb-2" />
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-5 space-y-5">
@@ -581,7 +575,10 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
             Finanças monta os dois à mão). */}
         {!isPreview && (guardarForcaDaIntro(), introLigada())
           ? <IntroDoModulo moduleId="financas" />
-          : !isPreview && (guardarForcasDaUrl(), cartoesLigados()) && <CartoesDoModulo config={cartoesFinancas({ irParaFinanceiro: () => setActiveTab("financeiro") })} />}
+          : !isPreview && (guardarForcasDaUrl(), cartoesLigados())
+            ? <CartoesDoModulo config={cartoesFinancas({ irParaFinanceiro: () => setActiveTab("financeiro") })} />
+            /* 28/10: Finanças ganha o "Dicas para começar" (lib/dicas-do-modulo) — inclusive no fluxo enxuto/modo 1.0.12 */
+            : !isPreview && <ModuleTip moduleId="financas" />}
         {/* Compact summary bar - all tabs except dashboard and financeiro */}
         {activeTab !== "dashboard" && activeTab !== "financeiro" && activeTab !== "kit" && (
           /* 2×2 EM VEZ DE FAIXA ROLÁVEL (29/07, foto do dono: "essa parte que
@@ -693,11 +690,8 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 lembrar queima a única chance no Android 13+. */}
             <PedirLembretes dueDays={dueDaysTodos as never} />
             {temKit && <KitHojeNoPainel abrirKit={() => { setActiveTab("kit"); window.scrollTo({ top: 0 }); }} />}
-            {!demoDoFunil && (
-              <TrackedCard cardKey="weekly-challenge" tab="dashboard">
-                <WeeklyChallenge expenses={expenses} />
-              </TrackedCard>
-            )}
+            {/* 1.0.22 (28/10): o DESAFIO DA SEMANA desce pra logo DEPOIS do QUANTO POSSO GASTAR HOJE (`depoisDoTopo`),
+                que agora abre o Dashboard — o número da promessa é o 1º card da aba. */}
             <TrackedCard cardKey="dashboard" tab="dashboard">
               <Dashboard
                 totalIncome={totalIncome}
@@ -713,6 +707,11 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 onNavigate={(tab) => setActiveTab(tab)}
                 perfil={perfilValido}
                 gastoDeHoje={gastoDeHoje}
+                depoisDoTopo={!demoDoFunil ? (
+                  <TrackedCard cardKey="weekly-challenge" tab="dashboard">
+                    <WeeklyChallenge expenses={expenses} />
+                  </TrackedCard>
+                ) : undefined}
             />
             </TrackedCard>
             <TrackedCard cardKey="month-comparison" tab="dashboard">
@@ -732,6 +731,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
               <MonthlySheet month={openMonth.month} year={openMonth.year} onClose={() => setOpenMonth(null)} />
             ) : (
               <>
+                {/* 29/10 (dono): sem o QUANTO POSSO GASTAR HOJE compacto aqui — ele fica só no Dashboard, logo abaixo dos 4 números */}
                 {getUserData<string>("spotlight-done-financas", "") !== "true" && (
                   <>
                     <QuizWelcome />
@@ -781,7 +781,10 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 <div className="grid lg:grid-cols-[1fr_280px] gap-4 min-w-0">
                   <div className="min-w-0">
                     <TrackedCard cardKey="incomes" tab="financeiro">
+                      {/* id: alvo do "Anotar minha renda" do QUANTO POSSO GASTAR HOJE compacto (1.0.22) */}
+                      <div id="fin-receitas" className="scroll-mt-20">
                       <IncomeTable incomes={incomes} setIncomes={setIncomes} prefillExample={getUserData<string>("spotlight-done-financas", "") !== "true" && incomes.length === 0} />
+                      </div>
                     </TrackedCard>
                   </div>
                   <TrackedCard cardKey="calculator" tab="financeiro">
@@ -899,9 +902,13 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
         )}
 
         {activeTab === "viagem" && (
-          <TrackedCard cardKey="travel-budget" tab="viagem">
-            <TravelBudget />
-          </TrackedCard>
+          <AtalhoParaOutroModulo
+            emoji="✈️"
+            titulo="O orçamento de viagem mora em Viagens"
+            texto="É o mesmo orçamento de antes, com as mesmas viagens e gastos — só ficou num lugar só: Viagens › Budget."
+            rotulo="Abrir em Viagens"
+            para="/viagens?aba=budget"
+          />
         )}
 
         {activeTab === "simuladores" && (

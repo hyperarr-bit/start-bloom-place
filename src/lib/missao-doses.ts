@@ -192,7 +192,7 @@ export const MODULOS: Record<ModuloDaMissao, PassoDoModulo> = {
   estudos: { modulo: "estudos", nome: "Estudos", emoji: "📚", rota: "/estudos", onde: "nos seus Estudos", cor: "#FFF4C2", pedido: "Anota 1 matéria", toque: "1 matéria", chaves: ["estudos-subjects", "estudos-aprendizados", "estudos-pomodoro-count"], olhar: { titulo: "A sua grade", texto: "A matéria entra na grade; revisões e provas ficam no lugar." } },
   carreira: { modulo: "carreira", nome: "Carreira", emoji: "💼", rota: "/carreira", onde: "na sua Carreira", cor: "#EDEFF3", pedido: "Anota 1 tarefa do dia", toque: "1 tarefa", chaves: ["career-day-tasks", "career-skills"], olhar: { titulo: "O seu dia de trabalho", texto: "As fases do dia e as tarefas ficam no mesmo lugar." } },
   biblioteca: { modulo: "biblioteca", nome: "Biblioteca", emoji: "📖", rota: "/biblioteca", onde: "na sua Biblioteca", cor: "#FFE9D6", pedido: "Anota 1 livro que você está lendo", toque: "1 livro", chaves: ["lib-books", "lib-read-log"], olhar: { titulo: "A sua estante", texto: "O livro entra na estante; cada página marcada avança a barra dele." } },
-  casa: { modulo: "casa", nome: "Casa", emoji: "🏠", rota: "/casa", onde: "na sua Casa", cor: "#E6F8D9", pedido: "Anota 1 item da compra", toque: "1 item", chaves: ["casa-shopping-list", "casa-maint-tasks"], olhar: { titulo: "A lista da casa", texto: "O item entra na lista; no mercado, é só marcar." } },
+  casa: { modulo: "casa", nome: "Casa", emoji: "🏠", rota: "/casa", onde: "na sua Casa", cor: "#E6F8D9", pedido: "Anota 1 item da compra", toque: "1 item", chaves: ["casa-shopping-list", "casa-maint-tasks", "casa-grocery-categories"], olhar: { titulo: "A lista da casa", texto: "O item entra na lista; no mercado, é só marcar." } },
   beleza: { modulo: "beleza", nome: "Beleza", emoji: "💄", rota: "/beleza", onde: "na sua Beleza", cor: "#FFE4F1", pedido: "Marca 1 passo da rotina de hoje", toque: "1 passo", chaves: ["skincare-morning-checked", "skincare-night-checked", "skincare-daily-checkin", "skincare-de-hoje", "skincare-do-dia", "skincare-diary"], olhar: { titulo: "A rotina de hoje", texto: "Cada passo marcado fecha a rotina da manhã ou da noite." } },
   viagens: { modulo: "viagens", nome: "Viagens", emoji: "✈️", rota: "/viagens", onde: "nas suas Viagens", cor: "#E3E8FF", pedido: "Anota 1 destino", toque: "1 destino", chaves: ["travel-bucket"], olhar: { titulo: "A sua lista de destinos", texto: "O destino entra na lista; depois vem o roteiro e a mala." } },
   relacionamentos: { modulo: "relacionamentos", nome: "Relações", emoji: "💞", rota: "/relacionamentos", onde: "nas suas Relações", cor: "#FFE1E7", pedido: "Anota 1 pessoa que importa", toque: "1 pessoa", chaves: ["rel-people", "rel-dates", "rel-moments", "relacoes-pessoas", "relacoes-datas", "relacoes-momentos"], olhar: { titulo: "As pessoas que importam", texto: "Datas e momentos ficam ligados à pessoa." } },
@@ -344,6 +344,9 @@ export interface EstadoMissaoDoses {
   /** dia 3+: quantas vezes o resumo APARECEU sozinho (conta na hora em que entra): fechou o app sem o "Continuar" →
    *  volta 1 vez, depois nunca mais (MAX_VISTAS_SEM_DECISAO) */
   fimAoAbrirVistas?: number;
+  /** 29/10: quantas vezes o resumo depois da 3ª dose APARECEU (conta ao aparecer): fechou o app sem o "Continuar" →
+   *  não volta (a orquestra marca fimVisto na próxima abertura) */
+  fimVistas?: number;
 }
 
 /**
@@ -923,5 +926,6 @@ export function construiuAoAbrirDevido(m: EstadoMissaoDoses | null, hoje: string
   if (!dias23NaMissao(m) || !m!.boasVindas || m!.fimVisto) return false;
   const dia = diaDaMissao(m!, hoje);
   if (dia < 3 || dia > DIA_FIM_DA_MISSAO) return false;
-  return (m!.fimAoAbrirVistas ?? 0) - (naTela ? 1 : 0) < MAX_VISTAS_SEM_DECISAO;
+  // 29/10 (dono: "a tela não pode voltar depois de vista"): 1 vista e pronto — fechou o app com ele na tela, não volta
+  return (m!.fimAoAbrirVistas ?? 0) - (naTela ? 1 : 0) < 1;
 }

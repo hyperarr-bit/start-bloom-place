@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AlarmClock, ArrowDown, ArrowUp, Bell, BellOff, CalendarClock, CalendarDays, Check, ChevronRight, Flag, ListChecks, NotebookText, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -32,9 +33,14 @@ import {
 } from "@/lib/ficou-de-ontem";
 import {
   AVISO_PADRAO_TAREFA, AVISOS_TAREFA, apareceHoje, avisoDaTarefa, avisoJaPassou, dataDeCriacao, detalhesDaTarefa, diaDoAviso, ehPrioridade, estadoDoPrazo,
-  horaDaTarefa, horaDoAviso, montarSubtarefas, moverTarefaNoDia, normalizarHora, ordenarPorHora, posicaoNoDia, prazoDaTarefa, progressoDasSubtarefas,
-  resumoDosDetalhes, subtarefasDaTarefa, textoDoAviso, type EstadoDoPrazo, type Subtarefa, type TarefaDoDia,
+  diaSeguinte, horaDaTarefa, horaDoAviso, montarSubtarefas, moverTarefaNoDia, normalizarHora, ordenarPorHora, posicaoNoDia, prazoDaTarefa, progressoDasSubtarefas,
+  resumoDosDetalhes, rotuloCurtoDoDia, rotuloDoDia, subtarefasDaTarefa, tarefasFuturas, textoDoAviso, type EstadoDoPrazo, type Subtarefa, type TarefaDoDia,
+  CHAVE_TAREFAS_CARREIRA, CHAVE_TAREFAS_ROTINA,
 } from "@/lib/tarefas";
+import {
+  CHAVE_TAREFAS_ESTUDOS, ROTULO_ORIGEM_CARREIRA, ROTULO_ORIGEM_ESTUDOS, alternarTarefaDosEstudos, tarefasDeHojeDosEstudos,
+} from "@/lib/tarefas-de-outros";
+import { LinhaDoFeriado } from "@/components/feriados/LinhaDoFeriado";
 import { COR_DO_DIA, DIAS_DA_SEMANA, Pautado, Quadradinho, textoDoDia } from "@/components/treino/planner";
 
 /* ------------------------------------------------------------ utilidades */
@@ -43,6 +49,8 @@ import { COR_DO_DIA, DIAS_DA_SEMANA, Pautado, Quadradinho, textoDoDia } from "@/
 export const nomeDoDiaDeHoje = (d: Date = new Date()) => DIAS_DA_SEMANA[(d.getDay() + 6) % 7];
 /** "28/09" */
 export const diaCurto = (dia: string) => `${dia.slice(8, 10)}/${dia.slice(5, 7)}`;
+/** "YYYY-MM-DD" → Date local (meia-noite), montado por partes. */
+const dataDoDia = (dia: string) => new Date(Number(dia.slice(0, 4)), Number(dia.slice(5, 7)) - 1, Number(dia.slice(8, 10)));
 
 /** O pedaço do tom que a tabela usa (o TomDoDia do Treino serve; a Rotina passa o azul-céu dela). */
 export type TomDaTabela = { claro: string; linha: string; titulo: string };
@@ -53,7 +61,8 @@ const COLUNAS = "grid grid-cols-[3.4rem_minmax(0,1fr)_3rem]";
 
 /* ------------------------------------------------------- estado da lista */
 
-type CamposNovos = Pick<TarefaDoDia, "texto" | "hora" | "aviso" | "detalhes" | "prioridade" | "subtarefas" | "prazo">;
+/** `dia` (28/10): só vem quando a pessoa ESCOLHEU um dia no formulário (Hoje · Amanhã · Escolher dia); ausente = não muda. */
+type CamposNovos = Pick<TarefaDoDia, "texto" | "hora" | "aviso" | "detalhes" | "prioridade" | "subtarefas" | "prazo"> & { dia?: string };
 
 /** Monta a tarefa só com o que existe — campo vazio não vira chave (tarefa sem hora fica igual às antigas). */
 const comCampos = <T extends { id: string; feito: boolean; dia: string }>(base: T, c: CamposNovos): TarefaDoDia => {
@@ -62,8 +71,11 @@ const comCampos = <T extends { id: string; feito: boolean; dia: string }>(base: 
   const detalhes = (c.detalhes ?? "").trim();
   const subtarefas = montarSubtarefas(c.subtarefas ?? []);
   const prazo = prazoDaTarefa({ prazo: c.prazo });
+  // 28/10: tarefa pra outro dia — o MESMO campo `dia`, no mesmo formato; sem escolha, fica o que era
+  const dia = typeof c.dia === "string" && /^\d{4}-\d{2}-\d{2}$/.test(c.dia) ? c.dia : null;
   return {
     ...(resto as { id: string; feito: boolean; dia: string }),
+    ...(dia ? { dia } : {}),
     texto: c.texto.trim(),
     ...(hora ? { hora, aviso: Number.isInteger(c.aviso) ? (c.aviso as number) : AVISO_PADRAO_TAREFA } : {}),
     ...(detalhes ? { detalhes } : {}),
@@ -302,8 +314,11 @@ export function FormTarefa({
   onSalvar,
   focarQuando = false,
   salvarPreso = false,
+  onDiaMudou,
 }: {
   inicial?: Partial<CamposNovos>;
+  /** 28/10: a folha de nova tarefa troca o "Tarefa de hoje" da faixa quando a pessoa escolhe outro dia */
+  onDiaMudou?: (dia: string) => void;
   rotuloSalvar?: string;
   onSalvar: (c: CamposNovos) => void;
   /** quem abre a folha diz QUANDO o campo foca (depois da folha assentar) — ver o foco abaixo */
@@ -339,15 +354,31 @@ export function FormTarefa({
   const [prazo, setPrazo] = useState(prazoDaTarefa({ prazo: inicial?.prazo }) ?? "");
 
   const hoje = localDayKey();
+  // 28/10 (chamado 18/10: "uma tarefa para fazer daqui a dois dias"): o DIA da tarefa — Hoje · Amanhã · Escolher dia.
+  // Só vai pro salvar se a pessoa mexeu (editar uma tarefa antiga sem tocar aqui não muda o `dia` dela).
+  const [dia, setDiaEstado] = useState(() => (typeof inicial?.dia === "string" && /^\d{4}-\d{2}-\d{2}$/.test(inicial.dia) ? inicial.dia : hoje));
+  const [diaTocado, setDiaTocado] = useState(false);
+  const amanha = diaSeguinte(hoje);
+  const escolherDia = (novo: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(novo)) return;
+    setDiaEstado(novo);
+    setDiaTocado(true);
+    // prazo antes do dia da tarefa não faz sentido: sai (a pessoa põe outro se quiser)
+    if (prazo && prazo < novo) setPrazo("");
+    onDiaMudou?.(novo);
+  };
+  const diaFuturo = dia > hoje;
   const estadoPrazo = prazo ? estadoDoPrazo({ prazo, feito: false }, hoje) : null;
-  // com prazo, o aviso é do dia do prazo (a tarefa segue na lista até lá)
-  const diaDoToque = prazo || hoje;
+  // com prazo, o aviso é do dia do prazo (a tarefa segue na lista até lá); sem prazo, do dia da tarefa
+  const diaDoToque = prazo || (diaFuturo ? dia : hoje);
   const passou = !!hora && avisoJaPassou(diaDoToque, hora, aviso);
-  const quandoToca = prazo && prazo !== hoje ? `${estadoPrazo?.rotulo.replace(/^vence /, "") ?? diaCurto(prazo)} às ${horaDoAviso(hora, aviso)}` : `às ${horaDoAviso(hora, aviso)}`;
+  const quandoToca = prazo && prazo !== hoje
+    ? `${estadoPrazo?.rotulo.replace(/^vence /, "") ?? diaCurto(prazo)} às ${horaDoAviso(hora, aviso)}`
+    : !prazo && diaFuturo ? `${rotuloDoDia(dia, hoje)} às ${horaDoAviso(hora, aviso)}` : `às ${horaDoAviso(hora, aviso)}`;
   const dica = !hora
     ? prazo
-      ? "Sem horário, ela fica na lista todo dia até o prazo, sem aviso."
-      : "Sem horário, ela fica na lista do dia, sem aviso."
+      ? diaFuturo ? `Sem horário, ela aparece a partir de ${rotuloDoDia(dia, hoje)} e fica até ser feita, sem aviso.` : "Sem horário, ela fica na lista todo dia até o prazo, sem aviso."
+      : diaFuturo ? `Sem horário, ela aparece na lista de ${rotuloDoDia(dia, hoje)}, sem aviso.` : "Sem horário, ela fica na lista do dia, sem aviso."
     : aviso < 0
       ? "Sem aviso: o horário fica só anotado."
       : passou
@@ -358,8 +389,13 @@ export function FormTarefa({
     if (!texto.trim()) { toast.error("Escreve o que precisa fazer"); return; }
     // um passo digitado e não "adicionado" não se perde no Salvar
     const subs = montarSubtarefas([...subtarefas, novoPasso]);
-    onSalvar({ texto, hora: hora || undefined, aviso: hora ? aviso : undefined, detalhes, prioridade: prioridade ? "alta" : undefined, subtarefas: subs, prazo: prazo || undefined });
+    onSalvar({ texto, hora: hora || undefined, aviso: hora ? aviso : undefined, detalhes, prioridade: prioridade ? "alta" : undefined, subtarefas: subs, prazo: prazo || undefined, ...(diaTocado ? { dia } : {}) });
   };
+  const outroDia = dia !== hoje && dia !== amanha;
+  const chip = (ativo: boolean) => cn(
+    "relative h-9 rounded-full border text-[13px] font-bold inline-flex items-center justify-center gap-1 px-3 transition-colors",
+    ativo ? "bg-foreground text-background border-foreground" : "border-border text-muted-foreground",
+  );
 
   return (
     <div className="px-4 pt-4 space-y-3.5" data-testid="form-tarefa">
@@ -375,6 +411,28 @@ export function FormTarefa({
           ref={campoRef}
         />
       </label>
+
+      {/* 28/10 — o DIA da tarefa (padrão Hoje). Não é o prazo: a tarefa só entra na lista no dia dela. */}
+      <div data-testid="form-dia">
+        <span className={cn(ROTULO, "inline-flex items-center gap-1")}><CalendarDays className="w-3 h-3" aria-hidden="true" /> QUANDO</span>
+        <div className="mt-1 flex gap-1.5" role="group" aria-label="Dia da tarefa">
+          <button type="button" className={chip(dia === hoje)} aria-pressed={dia === hoje} onClick={() => escolherDia(hoje)}>Hoje</button>
+          <button type="button" className={chip(dia === amanha)} aria-pressed={dia === amanha} onClick={() => escolherDia(amanha)}>Amanhã</button>
+          {/* o seletor de data nativo, invisível POR CIMA do chip: tocar no chip abre o calendário do sistema */}
+          <label className={cn(chip(outroDia), "flex-1 min-w-0 overflow-hidden")} data-testid="chip-escolher-dia">
+            <CalendarDays className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+            <span className="truncate">{outroDia ? rotuloCurtoDoDia(dia) : "Escolher dia"}</span>
+            <input
+              type="date"
+              value={dia}
+              min={hoje}
+              onChange={(e) => escolherDia(e.target.value)}
+              aria-label="Escolher dia"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+          </label>
+        </div>
+      </div>
 
       <div>
         <div className="grid grid-cols-2 rounded-xl border border-border overflow-hidden">
@@ -428,7 +486,7 @@ export function FormTarefa({
             <input
               type="date"
               value={prazo}
-              min={hoje}
+              min={dia > hoje ? dia : hoje}
               onChange={(e) => setPrazo(prazoDaTarefa({ prazo: e.target.value }) ?? "")}
               aria-label="Prazo da tarefa"
               className={cn("h-9 min-w-0 flex-1 bg-transparent outline-none text-[15px] font-bold tabular-nums", prazo ? "text-foreground" : "text-muted-foreground")}
@@ -535,8 +593,11 @@ export function FolhaNovaTarefa({
   onSalvar,
   onde = "Rotina",
   salvarPreso = false,
+  diaInicial,
 }: {
   aberta: boolean;
+  /** 28/10: abrir já num dia (o "+ Tarefa pra esse dia" do Meu mês); ausente = hoje */
+  diaInicial?: string;
   onFechar: () => void;
   textoInicial?: string;
   onSalvar: (c: CamposNovos) => void;
@@ -551,11 +612,13 @@ export function FolhaNovaTarefa({
   const area = useAreaVisivel(aberta);
   // a folha ASSENTOU (fim da animação de abrir; ou 600 ms, porque sem animação não há animationend): só então o campo foca
   const [assentou, setAssentou] = useState(false);
+  // 28/10: o dia escolhido no formulário (a faixa diz "Tarefa de amanhã"); cada abertura começa em hoje
+  const [diaEscolhido, setDiaEscolhido] = useState<string | null>(diaInicial ?? null);
   useEffect(() => {
-    if (!aberta) { setAssentou(false); return; }
+    if (!aberta) { setAssentou(false); setDiaEscolhido(diaInicial ?? null); return; }
     const t = window.setTimeout(() => setAssentou(true), 600);
     return () => window.clearTimeout(t);
-  }, [aberta]);
+  }, [aberta, diaInicial]);
   return (
     <Sheet open={aberta} onOpenChange={(v) => !v && onFechar()}>
       <SheetContent
@@ -563,10 +626,20 @@ export function FolhaNovaTarefa({
         onAnimationEnd={(e) => { if (e.target === e.currentTarget) setAssentou(true); }}
         data-testid="folha-nova-tarefa" data-folha="tarefa-nova" data-teclado={area.teclado ? "1" : undefined}
       >
-        <FaixaDaFolha titulo={`${nomeDoDiaDeHoje()} · NOVA TAREFA`} sub={`Tarefa de hoje, ${diaCurto(hoje)} · ${onde}`} onFechar={onFechar} />
+        <FaixaDaFolha
+          titulo={`${nomeDoDiaDeHoje()} · NOVA TAREFA`}
+          sub={diaEscolhido && diaEscolhido !== hoje ? `Tarefa de ${rotuloDoDia(diaEscolhido, hoje)}${diaEscolhido === diaSeguinte(hoje) ? `, ${diaCurto(diaEscolhido)}` : ""} · ${onde}` : `Tarefa de hoje, ${diaCurto(hoje)} · ${onde}`}
+          onFechar={onFechar}
+        />
         <div className="overflow-y-auto pb-[calc(1rem+env(safe-area-inset-bottom))]" onFocus={(e) => rolarCampoFocado(e)}>
           {/* o conteúdo da folha só existe aberta (o Radix desmonta ao fechar): cada abertura é um formulário novo */}
-          <FormTarefa inicial={{ texto: textoInicial }} focarQuando={assentou && !textoInicial} salvarPreso={salvarPreso} onSalvar={(c) => { onSalvar(c); onFechar(); }} />
+          <FormTarefa
+            inicial={{ texto: textoInicial, dia: diaInicial }}
+            focarQuando={assentou && !textoInicial}
+            salvarPreso={salvarPreso}
+            onDiaMudou={setDiaEscolhido}
+            onSalvar={(c) => { onSalvar(diaInicial && !c.dia ? { ...c, dia: diaInicial } : c); onFechar(); }}
+          />
         </div>
       </SheetContent>
     </Sheet>
@@ -617,7 +690,9 @@ export function FichaDaTarefa({ ficha: fichaAtual, onFechar }: { ficha: FichaAbe
   const prioridade = ehPrioridade(t);
   // 09/10: prazo — e a tarefa com prazo que nasceu outro dia é "de hoje" por estar na lista, não pelo `dia`
   const prazo = t ? estadoDoPrazo({ ...t, feito: !!ficha?.feito }, hoje) : null;
-  const diaDaFaixa = t && t.dia !== hoje && prazoDaTarefa(t) ? hoje : (t?.dia ?? hoje);
+  const diaDaFaixa = t && t.dia < hoje && prazoDaTarefa(t) ? hoje : (t?.dia ?? hoje);
+  // 28/10: tarefa marcada pra um dia que ainda não chegou
+  const futura = !!t && t.dia > hoje;
   // TECLADO (26/10): editando, a folha se ancora acima do teclado e cabe na área visível (ver FolhaNovaTarefa)
   const area = useAreaVisivel(aberta);
 
@@ -627,14 +702,15 @@ export function FichaDaTarefa({ ficha: fichaAtual, onFechar }: { ficha: FichaAbe
         {ficha && (
           <>
             <FaixaDaFolha
-              titulo={`${nomeDoDiaDeHoje()} · ${diaCurto(diaDaFaixa)}`}
-              sub={editando ? "Editando a tarefa" : `${prazoDaTarefa(t) ? "Tarefa com prazo" : "Tarefa de hoje"} · ${ficha.onde}`}
+              titulo={`${futura ? nomeDoDiaDeHoje(dataDoDia(diaDaFaixa)) : nomeDoDiaDeHoje()} · ${diaCurto(diaDaFaixa)}`}
+              dia={futura ? nomeDoDiaDeHoje(dataDoDia(diaDaFaixa)) : undefined}
+              sub={editando ? "Editando a tarefa" : `${futura ? `Tarefa de ${rotuloDoDia(t!.dia, hoje)}` : prazoDaTarefa(t) ? "Tarefa com prazo" : "Tarefa de hoje"} · ${ficha.onde}`}
               onFechar={onFechar}
             />
             <div className="overflow-y-auto pb-[calc(1rem+env(safe-area-inset-bottom))]" onFocus={(e) => rolarCampoFocado(e)}>
               {editando && ficha.onSalvar ? (
                 <FormTarefa
-                  inicial={{ texto: t?.texto ?? ficha.texto, hora: hora ?? undefined, aviso: t && Number.isInteger(t.aviso) ? t.aviso : undefined, detalhes, prioridade: t?.prioridade, subtarefas, prazo: prazoDaTarefa(t) ?? undefined }}
+                  inicial={{ texto: t?.texto ?? ficha.texto, hora: hora ?? undefined, aviso: t && Number.isInteger(t.aviso) ? t.aviso : undefined, detalhes, prioridade: t?.prioridade, subtarefas, prazo: prazoDaTarefa(t) ?? undefined, dia: t?.dia }}
                   rotuloSalvar="Salvar alterações"
                   onSalvar={(c) => { ficha.onSalvar?.(c); setEditando(false); }}
                 />
@@ -814,10 +890,62 @@ export const TOM_CEU: TomDaTabela = { claro: "bg-sky-50", linha: "border-sky-100
  * BlocoDeFases também usa as mesmas tarefas nos fechamentos da semana e do mês
  * (dois hooks na mesma chave não se enxergam na hora).
  */
-export function ListaTarefasDeHoje({ tarefas, placeholder = "Nova tarefa...", onde }: {
+export function ListaTarefasDeHoje(props: {
   tarefas: ReturnType<typeof useTarefasDoDia>;
   placeholder?: string;
   onde: string;
+}) {
+  // 1.0.22 (sem repetição): a lista da ROTINA junta as de hoje da Carreira e dos Estudos (com etiqueta e ✓ na origem)
+  return props.tarefas.chave === CHAVE_TAREFAS_ROTINA ? <ListaComOutrosModulos {...props} /> : <ListaDoDia {...props} extras={[]} />;
+}
+
+/** Uma linha de OUTRO módulo na lista do dia: a linha pronta + a ficha (o ✓ dela grava na chave de origem). */
+export type LinhaDeOutroModulo = LinhaVisivel & { ficha: Omit<FichaAberta, "texto" | "feito"> };
+
+/**
+ * As de HOJE da Carreira (`career-day-tasks`, etiqueta "Trabalho") e dos Estudos (`estudos-week-tasks`, "Estudos")
+ * como linhas da lista da Rotina. Lê as chaves de origem e escreve nelas; nada muda de lugar nem de formato.
+ */
+export function useLinhasDeOutrosModulos(prefixo = ""): LinhaDeOutroModulo[] {
+  const navigate = useNavigate();
+  const carreira = useTarefasDoDia(CHAVE_TAREFAS_CARREIRA);
+  const [estudos, setEstudos] = usePersistedState<unknown>(CHAVE_TAREFAS_ESTUDOS, {});
+  const hoje = localDayKey();
+  const linhas: LinhaDeOutroModulo[] = [];
+  carreira.lista.filter((t): t is TarefaDoDia => !!t && typeof t.texto === "string" && apareceHoje(t, hoje)).forEach((t) => {
+    linhas.push({
+      key: `${prefixo}cd-${t.id}`, origem: ROTULO_ORIGEM_CARREIRA, texto: t.texto, feito: !!t.feito,
+      detalhe: t.veioDe ? `veio de ${diaCurto(t.veioDe)}` : undefined,
+      hora: horaDaTarefa(t) ?? undefined, aviso: avisoDaTarefa(t), detalhes: detalhesDaTarefa(t),
+      prioridade: ehPrioridade(t), checklist: progressoDasSubtarefas(t), prazo: estadoDoPrazo(t, hoje),
+      onAlternar: () => carreira.alternar(t.id), onAbrir: () => {},
+      ficha: {
+        onde: ROTULO_ORIGEM_CARREIRA, tarefa: t, onAlternar: () => carreira.alternar(t.id), onSalvar: (c) => carreira.salvar(t.id, c),
+        onApagar: () => carreira.apagar(t.id), onAlternarSubtarefa: (subId) => carreira.alternarSubtarefa(t.id, subId),
+      },
+    });
+  });
+  tarefasDeHojeDosEstudos(estudos).forEach((t) => {
+    const alternar = () => setEstudos((prev) => alternarTarefaDosEstudos(prev, t.coluna, t.indice));
+    linhas.push({
+      key: `${prefixo}es-${t.coluna}-${t.indice}`, origem: ROTULO_ORIGEM_ESTUDOS, texto: t.texto, feito: t.feito,
+      onAlternar: alternar, onAbrir: () => {},
+      ficha: { onde: ROTULO_ORIGEM_ESTUDOS, onAlternar: alternar, abrirModulo: { rotulo: "Abrir em Estudos", ir: () => navigate("/estudos?aba=tarefas") } },
+    });
+  });
+  return linhas;
+}
+
+function ListaComOutrosModulos(props: { tarefas: ReturnType<typeof useTarefasDoDia>; placeholder?: string; onde: string }) {
+  const extras = useLinhasDeOutrosModulos();
+  return <ListaDoDia {...props} extras={extras} />;
+}
+
+function ListaDoDia({ tarefas, placeholder = "Nova tarefa...", onde, extras }: {
+  tarefas: ReturnType<typeof useTarefasDoDia>;
+  placeholder?: string;
+  onde: string;
+  extras: LinhaDeOutroModulo[];
 }) {
   const [novaTarefa, setNovaTarefa] = useState("");
   const [criando, setCriando] = useState(false);
@@ -825,14 +953,19 @@ export function ListaTarefasDeHoje({ tarefas, placeholder = "Nova tarefa...", on
   const hoje = localDayKey();
   // 09/10: as de hoje + as com PRAZO ainda pendentes (ficam na lista todo dia até serem feitas)
   const tarefasHoje = tarefas.lista.filter((t) => apareceHoje(t, hoje));
-  const feitasHoje = tarefasHoje.filter((t) => t.feito).length;
+  const feitasHoje = tarefasHoje.filter((t) => t.feito).length + extras.filter((l) => l.feito).length;
+  const totalHoje = tarefasHoje.length + extras.length;
   const addTarefa = () => {
     if (!novaTarefa.trim()) return;
     tarefas.adicionar({ texto: novaTarefa });
     setNovaTarefa("");
   };
-  const tarefaAberta = aberta ? tarefasHoje.find((t) => t.id === aberta) : undefined;
-  const ficha: FichaAberta | null = tarefaAberta ? {
+  // 28/10: as marcadas pra outro dia não entram hoje — ficam num "Nos próximos dias" fechado sob a lista
+  const futuras = tarefasFuturas(tarefas.lista, hoje);
+  const [verFuturas, setVerFuturas] = useState(false);
+  const tarefaAberta = aberta ? (tarefasHoje.find((t) => t.id === aberta) ?? futuras.find((t) => t.id === aberta)) : undefined;
+  const extraAberta = aberta ? extras.find((l) => l.key === aberta) : undefined;
+  const ficha: FichaAberta | null = extraAberta ? { texto: extraAberta.texto, feito: extraAberta.feito, ...extraAberta.ficha } : tarefaAberta ? {
     texto: tarefaAberta.texto, feito: !!tarefaAberta.feito, onde, tarefa: tarefaAberta,
     onAlternar: () => tarefas.alternar(tarefaAberta.id),
     onSalvar: (c) => tarefas.salvar(tarefaAberta.id, c),
@@ -852,28 +985,27 @@ export function ListaTarefasDeHoje({ tarefas, placeholder = "Nova tarefa...", on
       <div className="rounded-xl border border-border overflow-hidden" data-testid="tarefas-de-hoje">
         <div className="bg-sky-200 dark:bg-sky-800/50 px-4 py-2 flex items-center justify-between">
           <span className="text-[10px] font-bold uppercase tracking-wider">✅ TAREFAS DE HOJE</span>
-          <span className="text-[9px] text-muted-foreground">{feitasHoje}/{tarefasHoje.length}</span>
+          <span className="text-[9px] text-muted-foreground">{feitasHoje}/{totalHoje}</span>
         </div>
+        {/* 28/10: hoje é feriado nacional — só informa (não é tarefa, não conta, não avisa) */}
+        <LinhaDoFeriado dia={hoje} className="px-4 py-1.5 border-b border-sky-100 bg-card" />
         <div className="bg-card">
-          {tarefasHoje.length === 0 ? (
+          {totalHoje === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-3">Nenhuma tarefa hoje ainda.</p>
           ) : (
             <>
               <CabecalhoDaTabela tom={TOM_CEU} />
-              {[false, true].flatMap((feita) => ordenarPorHora(tarefasHoje.filter((t) => !!t.feito === feita).map((t) => ({ ...t, hora: horaDaTarefa(t) ?? undefined }))))
-                .map((t, i) => (
-                  <LinhaDeTarefa
-                    key={t.id}
-                    tom={TOM_CEU}
-                    primeira={i === 0}
-                    l={{
-                      key: t.id, texto: t.texto, feito: !!t.feito, hora: t.hora, aviso: avisoDaTarefa(t), detalhes: detalhesDaTarefa(t),
-                      detalhe: t.veioDe ? `veio de ${diaCurto(t.veioDe)}` : undefined,
-                      prioridade: ehPrioridade(t), checklist: progressoDasSubtarefas(t), prazo: estadoDoPrazo(t, hoje),
-                      onAlternar: () => tarefas.alternar(t.id), onAbrir: () => setAberta(t.id),
-                    }}
-                  />
-                ))}
+              {[false, true].flatMap((feita) => ordenarPorHora<LinhaVisivel>([
+                ...tarefasHoje.filter((t) => !!t.feito === feita).map((t): LinhaVisivel => ({
+                  key: t.id, texto: t.texto, feito: !!t.feito, hora: horaDaTarefa(t) ?? undefined, aviso: avisoDaTarefa(t), detalhes: detalhesDaTarefa(t),
+                  detalhe: t.veioDe ? `veio de ${diaCurto(t.veioDe)}` : undefined,
+                  prioridade: ehPrioridade(t), checklist: progressoDasSubtarefas(t), prazo: estadoDoPrazo(t, hoje),
+                  onAlternar: () => tarefas.alternar(t.id), onAbrir: () => setAberta(t.id),
+                })),
+                // 1.0.22: as de hoje do Trabalho e dos Estudos, com a etiqueta — o ✓ grava na chave de origem
+                ...extras.filter((l) => l.feito === feita).map(({ ficha: _f, ...l }): LinhaVisivel => ({ ...l, onAbrir: () => setAberta(l.key) })),
+              ]))
+                .map((l, i) => <LinhaDeTarefa key={l.key} tom={TOM_CEU} primeira={i === 0} l={l} />)}
             </>
           )}
           <div className="flex gap-2 p-2.5 border-t border-sky-100 bg-sky-50">
@@ -886,6 +1018,7 @@ export function ListaTarefasDeHoje({ tarefas, placeholder = "Nova tarefa...", on
           </div>
         </div>
       </div>
+      {futuras.length > 0 && <ProximosDias futuras={futuras} aberto={verFuturas} onAlternar={() => setVerFuturas((v) => !v)} onAbrir={setAberta} />}
       <FolhaNovaTarefa
         aberta={criando}
         onFechar={() => setCriando(false)}
@@ -895,6 +1028,34 @@ export function ListaTarefasDeHoje({ tarefas, placeholder = "Nova tarefa...", on
       />
       <FichaDaTarefa ficha={ficha} onFechar={() => setAberta(null)} />
     </>
+  );
+}
+
+/**
+ * "Nos próximos dias" (28/10): as tarefas marcadas pra depois de hoje, fechadas numa linha discreta
+ * sob a lista — pra quem marcou "daqui a dois dias" achar, editar ou mudar o dia. Tocar abre a ficha.
+ */
+export function ProximosDias({ futuras, aberto, onAlternar, onAbrir }: { futuras: TarefaDoDia[]; aberto: boolean; onAlternar: () => void; onAbrir: (id: string) => void }) {
+  const hoje = localDayKey();
+  return (
+    <div className="mt-2" data-testid="proximos-dias">
+      <button type="button" onClick={onAlternar} aria-expanded={aberto} className="w-full flex items-center gap-1.5 px-1 h-8 text-[12px] font-semibold text-muted-foreground">
+        <CalendarDays className="w-3.5 h-3.5" aria-hidden="true" />
+        {futuras.length === 1 ? "1 tarefa nos próximos dias" : `${futuras.length} tarefas nos próximos dias`}
+        <ChevronRight className={cn("w-3.5 h-3.5 ml-auto transition-transform", aberto && "rotate-90")} aria-hidden="true" />
+      </button>
+      {aberto && (
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          {futuras.slice(0, 20).map((t, i) => (
+            <button key={t.id} type="button" onClick={() => onAbrir(t.id)} className={cn("w-full text-left flex items-center gap-2 px-3 min-h-[40px] text-[13px]", i > 0 && "border-t border-border/70")} data-testid="tarefa-futura">
+              <span className="w-[4.6rem] shrink-0 text-[11.5px] font-bold text-muted-foreground tabular-nums">{rotuloDoDia(t.dia, hoje) === "amanhã" ? "amanhã" : rotuloCurtoDoDia(t.dia)}</span>
+              {horaDaTarefa(t) && <span className="shrink-0 text-[12px] font-bold tabular-nums text-sky-700 dark:text-sky-300">{horaDaTarefa(t)}</span>}
+              <span className="min-w-0 flex-1 truncate">{t.texto}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

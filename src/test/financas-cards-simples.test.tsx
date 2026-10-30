@@ -117,7 +117,7 @@ describe("padrão = simples; força 'off' = o Dashboard de antes", () => {
     expect(document.querySelector('[data-testid="pode-gastar-simples"]')).not.toBeNull();
     expect(document.querySelector('[data-testid="previsao-simples"]')).not.toBeNull();
   });
-  it("força 'off': os cards de sempre, com todas as linhas e explicações de antes, previsão ANTES do gastar", () => {
+  it("força 'off': os cards de sempre, com todas as linhas e explicações de antes; 1.0.22: o gastar no TOPO, antes da previsão", () => {
     desligar();
     montar();
     expect(document.querySelector('[data-testid="pode-gastar-simples"]')).toBeNull();
@@ -128,7 +128,7 @@ describe("padrão = simples; força 'off' = o Dashboard de antes", () => {
     for (const s of ["Saldo atual", "Receita menos tudo que sai no mês, contas pagas ou não", "Disponível livre", "O que sobra depois de reservar para contas futuras", "÷ 15 dias", "= R$ 123/dia", "Disponível livre dividido pelos dias que faltam no mês", "Receita total", "Soma de todos os ganhos registrados no mês", "Já gasto (fixos + variáveis)", "Projeção variável (14d × R$ 1)", "Saldo projetado", "O que deve sobrar (ou faltar) no fim do mês", "já saiu R$ 12 dos R$ 123 do dia", "15 dias restantes no mês, contando hoje"]) {
       expect(t).toContain(s);
     }
-    antesDe("PREVISÃO FIM DO MÊS", "QUANTO POSSO GASTAR HOJE");
+    antesDe("QUANTO POSSO GASTAR HOJE", "PREVISÃO FIM DO MÊS"); // 1.0.22: o card abre o Dashboard
     expect(t).not.toContain("PREVISÃO DO FIM DO MÊS");
     expect(t).not.toContain("Como chegamos nesse número");
   });

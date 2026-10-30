@@ -2,7 +2,7 @@ import { useEffect, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
-import { EMPRESA } from "@/lib/empresa";
+import { EMPRESA, enderecoVisivel } from "@/lib/empresa";
 import { ehApple } from "@/lib/loja";
 import { RodapeSite } from "@/components/site/RodapeSite";
 
@@ -53,7 +53,7 @@ function LegalShell({ titulo, children, atualizado = ATUALIZADO }: { titulo: str
           <p>
             O CORE é operado por <span className="font-semibold text-foreground">{EMPRESA.razaoSocial}</span>
             {EMPRESA.cnpj && <>, inscrita no CNPJ sob o nº {EMPRESA.cnpj}</>}
-            {EMPRESA.endereco && <>, com sede em {EMPRESA.endereco}</>}.
+            {enderecoVisivel() && <>, com sede em {enderecoVisivel()}</>}.
           </p>
           <p className="mt-1">
             Contato:{" "}

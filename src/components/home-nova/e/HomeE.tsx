@@ -44,6 +44,7 @@ import { usePadraoDeWidgetsDoNovato, usePendenciasNovato } from "./use-novato-na
 import { MAX_LINHAS_NOVATO } from "@/lib/pendencias-novato";
 import "../home-nova.css";
 import "./home-e.css";
+import { DEPOIS_DA_SAIDA_MS } from "./folha-arrasto";
 
 /**
  * A HOME NOVA — OPÇÃO E (1.0.19; a Home de hoje é pages/Home.tsx, que monta ESTA quando a chave `home_nova`
@@ -230,7 +231,7 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
         <FolhaSequencia
           aberta={folhaSequencia} onFechar={() => setFolhaSequencia(false)} seq={seq} trilha={trilha} origem="home"
           onIr={(rota) => navigate(rota)}
-          onAdesivo={(b) => { setFolhaSequencia(false); window.setTimeout(() => navigate("/conquistas", { state: { origem: "home", figurinha: b.id } }), 180); }}
+          onAdesivo={(b) => { setFolhaSequencia(false); window.setTimeout(() => navigate("/conquistas", { state: { origem: "home", figurinha: b.id } }), DEPOIS_DA_SAIDA_MS); }}
         />
         {/* rodada 2: Widgets e Personalizar pendências no estilo da Home nova (as mesmas chaves e regras de hoje) */}
         <EscolherWidgetsE aberta={picker} onFechar={() => setPicker(false)} ativos={widgetsE.ativos} onToggle={widgetsE.alternar} />

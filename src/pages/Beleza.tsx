@@ -1,4 +1,5 @@
-import { fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
+import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
+import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
 import { useEffect, useState } from "react";
 import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 import { useSearchParams } from "react-router-dom";
@@ -26,7 +27,6 @@ import { cartoesBeleza } from "@/components/cartoes-modulo/cartoes-beleza";
 import { cartoesLigados, guardarForcasDaUrl } from "@/lib/tour-home";
 import { guardarForcaDaIntro, introLigada } from "@/lib/intro-modulo";
 import { IntroDoModulo } from "@/components/intro-modulo/IntroDoModulo";
-import { isNativeShell } from "@/lib/native-shell";
 
 /*
  * AS ABAS DA BELEZA (28/09, dono). "ROTINA" virou SKINCARE ("rotina não tem a ver
@@ -60,6 +60,7 @@ const Beleza = () => {
   const [params] = useSearchParams();
   const pedida = ABA_DO_LINK[(params.get("aba") ?? "").toLowerCase()];
   const [activeTab, setActiveTab] = useState<Aba>(pedida && pedida !== "fotos" ? pedida : "routine");
+  const abasDoModulo = useAbasOcultas("beleza", tabs);
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
   /* ROTINA VAZIA VAI PRO TOPO (28/09, protótipo): quem ainda não tem rotina vê as
@@ -118,37 +119,19 @@ const Beleza = () => {
             <ThemeToggle />
           </div>
         </div>
-        <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              data-spotlight={`tab-${tab.id}`}
-              data-active={activeTab === tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
-            >
-              <span>{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* 1.0.22: ocultar/organizar abas (components/ui/abas-ocultaveis) */}
+        <AbasOcultaveis abas={abasDoModulo} ativa={activeTab} onTrocar={(id) => handleTabChange(id as Aba)} className="max-w-5xl mx-auto px-4 pb-2" />
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4 space-y-4">
         {comIntro && <IntroDoModulo moduleId="beleza" />}
         {comCartoes && <CartoesDoModulo config={cartoesBeleza({ irParaSkincare: () => handleTabChange("routine") })} />}
+        {/* 28/10: as dicas (lib/dicas-do-modulo) ficam em todas as abas até o X — a 2ª leva pra CABELO; com o fluxo
+            enxuto/modo 1.0.12 elas voltam (só elas; a intro continua fora) */}
+        {!comCartoes && !demo && <DicasDaBeleza />}
         {activeTab === "routine" && (
           <>
             {rotinaNoTopo && rotina}
-            {!comCartoes && !fluxoEnxutoLigado() && <DicasDaBeleza
-              dicas={[
-                "3 perguntas e a sua rotina sai pronta, de manhã e de noite",
-                "Toque num passo pra escolher o produto e os dias da semana",
-                // 17/10 (revisão tela a tela #86): dentro do app "No app do celular" soa errado — lá a dica é só o que fazer
-                isNativeShell() ? "Ligue o lembrete da manhã e da noite — ele diz o passo do dia" : "No app do celular, ligue o lembrete da manhã e da noite — ele diz o passo do dia",
-                "Cadastre seus produtos para rastrear validade e custo por dose",
-              ]}
-            />}
             <DailyMirror />
             {!rotinaNoTopo && rotina}
             <SkinDiary />

@@ -262,10 +262,10 @@ describe("pages/Index — cliente antigo fica com o painel de hoje", () => {
     const controle = montarIndex(MES_COM_DADO);
     await abrirDashboard();
     expect(secoesNaTela()).toEqual([
-      "DESAFIO DA SEMANA", "Saldo do Mês", "ALERTAS INTELIGENTES", "GASTOS POR CATEGORIA", "RECEITAS VS DESPESAS", "EVOLUÇÃO DO PATRIMÔNIO",
+      // 29/10 (dono): os 4 números no topo, logo abaixo o QUANTO POSSO GASTAR HOJE e então o Desafio da semana
+      "Saldo do Mês", "QUANTO POSSO GASTAR HOJE", "DESAFIO DA SEMANA", "ALERTAS INTELIGENTES", "GASTOS POR CATEGORIA", "RECEITAS VS DESPESAS", "EVOLUÇÃO DO PATRIMÔNIO",
       "PROGRESSO DO MÊS", "GASTO POR MÉTODO", "FIXOS VS VARIÁVEIS", "TOP 5 MAIORES GASTOS", "ÚLTIMAS TRANSAÇÕES",
-      // 17/10 (dono): os CARDS SIMPLES são o padrão pra todo mundo (lib/financas-cards-simples) — o gastar sobe pra antes da previsão
-      "QUANTO POSSO GASTAR HOJE", "PREVISÃO DO FIM DO MÊS", "COMPARAÇÃO MENSAL", "COMPARAÇÃO ANUAL",
+      "PREVISÃO DO FIM DO MÊS", "COMPARAÇÃO MENSAL", "COMPARAÇÃO ANUAL",
     ]);
     expect(document.querySelector('[data-painel="limpo"]')).toBeNull();
     expect(screen.queryByTestId("sobram-pra-hoje")).toBeNull(); // sem gasto HOJE: o card de sempre, sem a linha "pra hoje"
@@ -514,5 +514,41 @@ describe("pages/Index — conta nova abre com o painel limpo QUANDO a chave é l
     montarIndex(MES_COM_DADO);
     await abrirDashboard();
     expect(document.querySelector('[data-painel="limpo"]')).toBeNull();
+  });
+});
+
+/* ───────────── 29/10: a 1ª entrada da conta NOVA (painel limpo desligado = o Dashboard de sempre) ───────────── */
+describe("pages/Index — 1ª entrada da conta nova em Finanças (29/10)", () => {
+  // o iPhone de hoje: fluxo enxuto ligado (sem intro/cartões; o "Dicas para começar" é o que abre o módulo)
+  beforeEach(() => localStorage.setItem("fluxo-enxuto-force", "on"));
+  const ordem = (...textos: string[]) => {
+    const t = document.body.textContent ?? "";
+    return textos.map((s) => t.indexOf(s));
+  };
+  it("sem dado nenhum: Dicas para começar (com a lâmpada) → os 4 números → QUANTO POSSO GASTAR HOJE vazio; o DESAFIO DA SEMANA espera o 1º gasto (e não grava opções)", { timeout: 40_000 }, async () => {
+    contaNova();
+    const controle = montarIndex({ "spotlight-done-financas": "true" });
+    await abrirDashboard();
+    expect(document.querySelector('[data-painel="limpo"]')).toBeNull();
+    const [dicas, saldo, pode] = ordem("Dicas para começar", "Saldo do Mês", "QUANTO POSSO GASTAR HOJE");
+    expect(dicas).toBeGreaterThanOrEqual(0);
+    expect(dicas).toBeLessThan(saldo);
+    expect(saldo).toBeLessThan(pode);
+    expect(screen.getByTestId("dicas-lampada")).toBeInTheDocument();
+    expect(screen.getByTestId("pode-gastar-vazio")).toBeInTheDocument();
+    expect(screen.queryByText("DESAFIO DA SEMANA")).toBeNull();
+    expect(controle.escritas().map((e) => e.k)).not.toContain("finance-challenges");
+  });
+  it("com o 1º gasto (sem renda): os 4 números → QUANTO POSSO GASTAR HOJE ('Falta só quanto entra no mês') → DESAFIO DA SEMANA com as opções, sem 'cumprido'", { timeout: 40_000 }, async () => {
+    contaNova();
+    montarIndex({
+      "spotlight-done-financas": "true",
+      "finance-expenses": [{ id: "e1", description: "Restaurante", value: 35, date: "2026-10-16", category: "restaurante", paymentMethod: "pix" }],
+    });
+    await abrirDashboard();
+    expect(secoesNaTela().slice(0, 3)).toEqual(["Saldo do Mês", "QUANTO POSSO GASTAR HOJE", "DESAFIO DA SEMANA"]);
+    expect(screen.getByTestId("pode-gastar-vazio")).toHaveTextContent("Falta só quanto entra no mês");
+    expect(screen.getByTestId("desafio-ofertas")).toBeInTheDocument();
+    expect(screen.queryByText("Desafio cumprido!")).toBeNull();
   });
 });

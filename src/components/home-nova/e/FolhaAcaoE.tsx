@@ -4,6 +4,8 @@ import { Check, ChevronRight, Droplets, Dumbbell, Plus } from "lucide-react";
 import type { ActionId } from "@/components/home/QuickActions";
 import type { LifeHubData } from "@/hooks/use-life-hub-data";
 import { useUserData } from "@/hooks/use-user-data";
+import { humorDoDia } from "@/lib/humor-do-dia";
+import { localDayKey } from "@/lib/utils";
 import {
   CATEGORIAS_DE_GASTO, EMOJI_DA_REFEICAO, HUMORES, TIPOS_DE_GANHO, gravarAgua, gravarDetox, gravarGanho, gravarGasto, gravarGratidao, gravarHumor,
   gravarIdeia, gravarPeso, gravarRefeicao, gravarSono, gravarTreino, hojeStr, marcarAcaoRapidaFeita, refeicoesDeHoje, type ContextoAcao,
@@ -120,6 +122,8 @@ export const FolhaAcaoE = ({ acao, data, assentada, onFeito, onFechar }: Props) 
   const navigate = useNavigate();
   const ctx: ContextoAcao = { get, set, navigate, waterGoal: data.waterGoal };
   const conquista = () => marcarAcaoRapidaFeita(get, set);
+  // 1.0.22: o humor de hoje (de qualquer um dos 3 lugares — lib/humor-do-dia) vem marcado no "Como você está agora?"
+  const humorHoje = acao === "mood" ? humorDoDia(get, localDayKey())?.valor ?? null : null;
   const campoRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
   const [texto, setTexto] = useState("");
   const [escolha, setEscolha] = useState<string>(acao === "expense" ? "Outros" : acao === "income" ? TIPOS_DE_GANHO[0] : "");
@@ -172,7 +176,7 @@ export const FolhaAcaoE = ({ acao, data, assentada, onFeito, onFechar }: Props) 
           <p className="text-[15px] text-muted-foreground">Como você está agora?</p>
           <div className="mt-3 grid grid-cols-5 gap-2">
             {HUMORES.map((m) => (
-              <button key={m.value} type="button" data-humor={m.value} onClick={() => { gravarHumor(ctx, { value: m.value, emoji: m.emoji }, conquista); onFeito("mood"); }} className="rounded-[20px] py-3 flex flex-col items-center gap-1.5 active:scale-95 transition-transform" style={{ background: "hsl(var(--muted) / 0.55)" }}>
+              <button key={m.value} type="button" data-humor={m.value} aria-pressed={humorHoje === m.value} onClick={() => { gravarHumor(ctx, { value: m.value, emoji: m.emoji }, conquista); onFeito("mood"); }} className={`rounded-[20px] py-3 flex flex-col items-center gap-1.5 active:scale-95 transition-transform ${humorHoje === m.value ? "ring-2 ring-primary" : ""}`} style={{ background: "hsl(var(--muted) / 0.55)" }}>
                 <span className="text-[30px] leading-none" aria-hidden>{m.emoji}</span>
                 <span className="text-[11.5px] font-semibold">{m.label}</span>
               </button>

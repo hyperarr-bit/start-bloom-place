@@ -23,6 +23,7 @@ vi.mock("@/lib/analytics", async (orig) => ({
 
 import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
 import { SpotlightOverlay, type SpotlightStep } from "@/components/onboarding/SpotlightOverlay";
+import { marcarTutorialNestaAbertura } from "@/lib/tutorial-abertura";
 
 function criarStore(inicial: Record<string, unknown>) {
   const estado = { dados: { ...inicial } };
@@ -75,6 +76,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 const montar = (alvoNoHeader: boolean) => {
   const store = criarStore({ "tutorial-replay-modules": ["financas"] });
+  marcarTutorialNestaAbertura(); // 27/10: a fila só liga o holofote se o tutorial foi pedido nesta abertura
   render(<MemoryRouter><store.Provedor><Tela alvoNoHeader={alvoNoHeader} /></store.Provedor></MemoryRouter>);
 };
 

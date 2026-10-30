@@ -3,7 +3,7 @@ import { checkIsAdmin } from "@/lib/admin";
 import { isNativeShell } from "@/lib/native-shell";
 import { webHomeNovaLigada } from "@/lib/web-home-nova";
 import {
-  EVENTO_ORIGEM_HOME_NOVA, adminHomeNovaConhecido, fixarModoDaAbertura, forcaHomeNova, guardarAdmin, homeNovaLigada, homeNovaPrecisaDeAdmin,
+  EVENTO_ESCOLHA_HOME, EVENTO_ORIGEM_HOME_NOVA, adminHomeNovaConhecido, escolhaConhecida, escolhaDaHomeVale, fixarModoDaAbertura, forcaHomeNova, guardarAdmin, homeNovaLigada, homeNovaPrecisaDeAdmin,
   informarAdminHomeNova, lerAdminGuardado, modoHomeNova, origemConhecida, origemJaTentada, type ModoHomeNova,
 } from "@/lib/home-nova";
 
@@ -57,6 +57,8 @@ function ouvirAdmin(userId: string, ouvinte: (ok: boolean) => void): () => void 
 export function esperaOrigemDaConta(userId: string | null | undefined, modo: ModoHomeNova): boolean {
   if (!userId || (!isNativeShell() && !webHomeNovaLigada()) || forcaHomeNova() !== null) return false; // 27/10: no site com WEB_HOME_NOVA também
   if (modo !== "novas" && modo !== "novas+admin") return false;
+  // 1.0.22: a pessoa ESCOLHEU a Home (Você › Home) — a origem não decide mais nada, nada a esperar
+  if (escolhaConhecida(userId) && escolhaDaHomeVale(modo)) return false;
   return origemConhecida(userId) === null && !origemJaTentada(userId);
 }
 
@@ -80,7 +82,9 @@ export function useHomeNova(user: { id?: string } | null | undefined, contaCarre
   useEffect(() => {
     const reler = () => setOrigemVersao((v) => v + 1);
     window.addEventListener(EVENTO_ORIGEM_HOME_NOVA, reler);
-    return () => window.removeEventListener(EVENTO_ORIGEM_HOME_NOVA, reler);
+    // 1.0.22: a escolha da Home (Você › Home, o convite, ou a conta trazendo a escolha de outro aparelho) também
+    window.addEventListener(EVENTO_ESCOLHA_HOME, reler);
+    return () => { window.removeEventListener(EVENTO_ORIGEM_HOME_NOVA, reler); window.removeEventListener(EVENTO_ESCOLHA_HOME, reler); };
   }, []);
 
   // 26/10: a espera pela origem tem teto (ESPERA_MAX_ORIGEM_MS) — passou, decide com o que tem (origem desconhecida = não)
@@ -93,5 +97,5 @@ export function useHomeNova(user: { id?: string } | null | undefined, contaCarre
   }, [espera, contaCarregada]);
 
   // sem resposta de admin ainda (null), a decisão é "não": a Home de hoje, na hora — nunca a tela em branco
-  return { ligada: homeNovaLigada(admin, origemConhecida(user?.id)), modo, esperandoOrigem: espera && !desistiu };
+  return { ligada: homeNovaLigada(admin, origemConhecida(user?.id), escolhaConhecida(user?.id)), modo, esperandoOrigem: espera && !desistiu };
 }

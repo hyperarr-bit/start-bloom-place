@@ -85,9 +85,9 @@ describe("Abas ocultas por módulo", () => {
     fireEvent.click(screen.getByRole("button", { name: "1 aba oculta" }));
     fireEvent.click(screen.getByRole("switch", { name: "Mostrar 📆 MÊS" }));
     expect(store.dados["abas-ocultas:teste"]).toEqual([]);
-    // com a folha aberta o resto da tela fica fora da árvore de acessibilidade
+    // Esc fecha a folha (1.0.22: "Organizar abas", no padrão das folhas da Home nova); a aba voltou pra fileira
     fireEvent.keyDown(document.activeElement || document.body, { key: "Escape" });
-    expect(screen.getByRole("button", { name: /MÊS/, hidden: true })).toBeInTheDocument();
+    expect(document.querySelector('[data-spotlight="tab-mes"]')).toBeInTheDocument();
   });
 
   it("NUNCA deixa ocultar a última aba visível", () => {

@@ -1,4 +1,6 @@
 import { CHAVE_ACOES_CONQUISTAS, registrarAcao } from "@/lib/conquistas-acoes";
+import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
+import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
 import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 /**
  * TREINO — redesenho de 26/09 (mockups p1–p4 e p7 aprovados pelo dono).
@@ -36,6 +38,7 @@ import { localDayKey, parseLocalDay, semanaAtualId } from "@/lib/utils";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { tutorialNestaAbertura } from "@/lib/tutorial-abertura";
 import { useUserData } from "@/hooks/use-user-data";
 import { ProximoPasso } from "@/components/modules/ProximoPasso";
 import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
@@ -168,6 +171,7 @@ const Treino = () => {
   const voltarDoModulo = useVoltarDoModulo();
   const [abaPedida] = useState(abaDaUrl);
   const [activeTab, setActiveTab] = useState<Aba>(() => abaPedida ?? "hoje");
+  const abasDoModulo = useAbasOcultas("treino", ABAS);
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
   const today = localDayKey();
@@ -177,6 +181,10 @@ const Treino = () => {
   // Garantir que o tutorial encontra o alvo: força aba "hoje" quando há tutorial pendente.
   const { get: getUserData, set: setUserData, isGuest, loaded } = useUserData();
   const tutorialPendente = useCallback(() => {
+    // 27/10 (QA do "Ver tutorial", conta vazia): o tutorial pedido pelo menu também — sem isso o plano vazio abria no
+    // PLANO (modelos prontos) e o passo único caía no "Não achei esse item aqui"
+    const fila = getUserData<string[]>("tutorial-replay-modules", []);
+    if (Array.isArray(fila) && fila.includes("treino") && tutorialNestaAbertura()) return true;
     const forceNewUser = !!getUserData<string>("force-new-user-tutorial", "") || (typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true");
     if (!isGuest && !forceNewUser) return false;
     return getUserData<string>("quickstart-target-module", "") === "treino" && !getUserData<string>("spotlight-done-treino", "");
@@ -765,7 +773,7 @@ const Treino = () => {
       <SpotlightOverlay
         moduleKey="treino"
         steps={[
-          { selector: '[data-spotlight="add-exercise"]', label: "Digite o exercício e toque no + para adicionar o treino de hoje.", advanceOnAction: "first_workout" },
+          { selector: '[data-spotlight="add-exercise"]', label: "Digite o exercício e toque no + para adicionar o treino de hoje.", advanceOnAction: "first_workout", onEnter: () => setActiveTab("hoje") },
         ]}
       />
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur">
@@ -794,38 +802,14 @@ const Treino = () => {
             letra maior e mais espaçada, abas esticadas) e destoava dos outros módulos.
             Agora é a MESMA faixa do AbasOcultaveis: notion-tab 11 px, largura natural,
             rola pro lado quando não cabe (a aba ativa entra na tela sozinha). */}
-        <div className="relative max-w-5xl mx-auto px-4 pb-2">
-          <div className="flex gap-1 overflow-x-auto scrollbar-hide pt-2 -mt-2">
-            {ABAS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                data-spotlight={`tab-${tab.id}`}
-                data-active={activeTab === tab.id}
-                data-testid={`aba-${tab.id}`}
-                onClick={() => trocarAba(tab.id)}
-                className={`notion-tab shrink-0 whitespace-nowrap text-[11px] flex items-center gap-1 select-none ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
-              >
-                <span aria-hidden="true">{tab.icon}</span>
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <AbasOcultaveis abas={abasDoModulo} ativa={activeTab} onTrocar={(id) => trocarAba(id as Aba)} testIds className="max-w-5xl mx-auto px-4 pb-2" />
       </header>
 
       <main
         className="max-w-5xl mx-auto px-4 py-4"
         style={{ paddingBottom: mostraRodape ? `calc(${alturaRodape + 20}px + var(--teste-banner-h, 0px))` : "calc(2rem + var(--teste-banner-h, 0px))" }}
       >
-        <BoasVindasDoModulo
-          moduleId="treino"
-          tips={[
-            "No 📋 PLANO você monta a semana: modelo pronto, exercícios, séries e carga",
-            "Marque cada série no HOJE — o descanso começa sozinho",
-            "Recordes e a carga de cada exercício aparecem em 📈 EVOLUÇÃO",
-          ]}
-        />
+        <BoasVindasDoModulo moduleId="treino" />
 
         {activeTab === "hoje" && !treinoVazio && <PeDoEsqueceu hoje={today} log={log} onAbrir={setDiaEsquecido} />}
 

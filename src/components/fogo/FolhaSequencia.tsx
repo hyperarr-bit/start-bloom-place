@@ -6,12 +6,12 @@ import { raridadeDe, type Badge } from "@/components/gamification/types";
 import { AdesivoRaro } from "@/components/conquistas/adesivos-raridade";
 import { marcoDoAdesivo } from "@/components/conquistas/nova/recompensas";
 import { fogoDoCaderno, proximoFogoDoCaderno } from "@/components/conquistas/nova/fogo-caderno";
-import { ROTULOS_DA_SEMANA, segundaDaSemana, semanaDaSequencia, type EstadoDia } from "@/lib/sequencia-semana";
+import { ROTULOS_DA_SEMANA, estadoDoDia, primeiroDiaAnotado, segundaDaSemana, semanaDaSequencia, type EstadoDia } from "@/lib/sequencia-semana";
 import { normalizarDias, somarDias } from "@/lib/sequencia";
 import { trackEvent } from "@/lib/analytics";
 import { useLembreteDaSequencia } from "@/components/conquistas/LembreteDaSequencia";
 import { FogoSequencia, estadoDoFogo } from "./FogoSequencia";
-import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, FaixaDoRelogioSobFolha, propsDaFolha } from "@/components/home-nova/e/folha-arrasto";
+import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, FaixaDoRelogioSobFolha, propsDaFolha, DEPOIS_DA_SAIDA_MS } from "@/components/home-nova/e/folha-arrasto";
 import "./fogo-sequencia.css";
 
 /**
@@ -97,7 +97,8 @@ const QuatroSemanas = ({ seq, cor }: { seq: Sequencia; cor: string }) => {
   const protegidos = useMemo(() => new Set(seq.usados), [seq.usados]);
   const inicio = somarDias(segundaDaSemana(seq.hoje), -21);
   const dias = Array.from({ length: 28 }, (_, i) => somarDias(inicio, i));
-  const estado = (d: string): EstadoDia => (anotados.has(d) ? "feito" : protegidos.has(d) ? "gelo" : d === seq.hoje ? "hoje" : d > seq.hoje ? "futuro" : "vazio");
+  const primeiro = useMemo(() => primeiroDiaAnotado(anotados), [anotados]);
+  const estado = (d: string): EstadoDia => estadoDoDia(d, anotados, protegidos, seq.hoje, primeiro);
   return (
     <div className="mt-3 grid grid-cols-7 gap-y-2 justify-items-center" data-testid="he-seq-quatro-semanas">
       {dias.map((d) => <Bolinha key={d} estado={estado(d)} cor={cor} tamanho={24} rotulo={d} />)}
@@ -179,7 +180,7 @@ export const FolhaSequencia = ({ aberta, onFechar, seq, trilha, origem, onAdesiv
   const fazer = () => {
     trackEvent("sequencia_folha_acao", { acao: seq.acao.id, destino: seq.acao.rota, dias: seq.dias, origem });
     onFechar();
-    window.setTimeout(() => onIr(seq.acao.rota), 180);
+    window.setTimeout(() => onIr(seq.acao.rota), DEPOIS_DA_SAIDA_MS);
   };
   const tocarAdesivo = (b: Badge) => {
     trackEvent("sequencia_folha_acao", { acao: "figurinha", destino: b.id, dias: seq.dias, origem });
@@ -189,7 +190,7 @@ export const FolhaSequencia = ({ aberta, onFechar, seq, trilha, origem, onAdesiv
     if (lembrete.ligado) {
       trackEvent("sequencia_folha_acao", { acao: "lembretes", destino: "/notificacoes", dias: seq.dias, origem });
       onFechar();
-      window.setTimeout(() => onIr("/notificacoes"), 180);
+      window.setTimeout(() => onIr("/notificacoes"), DEPOIS_DA_SAIDA_MS);
       return;
     }
     void lembrete.ligar();

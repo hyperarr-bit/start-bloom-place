@@ -742,7 +742,8 @@ body {
 .app-safe-top-guard {
   position: fixed;
   z-index: 2147483647;
-  top: 0;
+  /* --vv-topo: o deslocamento da área visível com o teclado (lib/topo-com-teclado); 0 fora disso */
+  top: var(--vv-topo, 0px);
   left: 0;
   right: 0;
   height: calc(var(--app-safe-top) + min(8px, var(--app-safe-top)));
@@ -800,7 +801,9 @@ html.faixa-relogio-transparente .cf-chegada[data-tipo="comum"] {
    ============================================================ */
 header.sticky.top-0 {
   position: sticky;
-  top: var(--app-safe-top);
+  /* + --vv-topo (1.0.22, dono 29/10): com campo focado e a página no fim, o iPhone desloca a área visível e o cabeçalho
+     ia parar embaixo do relógio (lib/topo-com-teclado) */
+  top: calc(var(--app-safe-top) + var(--vv-topo, 0px));
   z-index: 40;
 }
 /* 1.0.22: com a faixa do relógio em vidro que some pra baixo (acima), o conteúdo que rola por trás do cabeçalho
@@ -817,6 +820,7 @@ header.sticky.top-0::before {
   background: inherit;
   pointer-events: none;
 }
+/* 29/10 (dono: "deixa como tá hoje"): o cabeçalho dos módulos continua LISO — o vidro testado no ramo v1022-borrao-modulos ficou de fora */
 
 /* ============================================================
    Barra do tour da demo (27/07)
@@ -827,12 +831,12 @@ header.sticky.top-0::before {
    ============================================================ */
 .demo-tour-nav {
   position: sticky;
-  top: var(--app-safe-top);
+  top: calc(var(--app-safe-top) + var(--vv-topo, 0px));
   z-index: 60;
 }
 
 .demo-com-tour header.sticky.top-0 {
-  top: calc(var(--app-safe-top) + var(--demo-nav-h, 49px));
+  top: calc(var(--app-safe-top) + var(--vv-topo, 0px) + var(--demo-nav-h, 49px));
 }
 
 
@@ -1235,4 +1239,17 @@ button:has(> svg:only-child):not(.md-botao):not([class*="bg-"]):not([style*="bac
     --mov-troca: 150ms;
     --mov-passo: 0px;
   }
+}
+
+/* "Dicas para começar" tocáveis (lib/dicas-do-modulo, 28/10): o alvo da dica acende por 2,4 s depois do toque. */
+@keyframes dica-alvo-pulso {
+  0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0); }
+  30%, 70% { box-shadow: 0 0 0 3px hsl(var(--primary) / 0.55), 0 0 0 7px hsl(var(--primary) / 0.15); }
+}
+[data-dica-aceso] {
+  border-radius: 0.75rem;
+  animation: dica-alvo-pulso 1.2s ease-in-out 2;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-dica-aceso] { animation: none; box-shadow: 0 0 0 3px hsl(var(--primary) / 0.55); }
 }

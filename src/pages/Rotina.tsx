@@ -7,6 +7,7 @@ import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { semanaAtualId, localDayKey, dataSegura } from "@/lib/utils";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useHumorDoDia } from "@/hooks/use-humor-do-dia";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { SerieHistorico } from "@/components/historico/SerieHistorico";
@@ -14,6 +15,7 @@ import { BlocoDeFases, type Fase } from "@/components/fases/BlocoDeFases";
 import { TarefasDeHoje } from "@/components/tarefas/tarefas-do-dia";
 import { PedirLembreteRotina } from "@/components/rotina/PedirLembreteRotina";
 import { CompromissosDoDia, ProximosCompromissos } from "@/components/rotina/Compromissos";
+import { FeriadoETarefasDoDia, InterruptorFeriados, useMarcasDoMes } from "@/components/rotina/DiaDoMes";
 import { CHAVE_COMPROMISSOS, ocorrencias, type Compromisso } from "@/lib/compromissos";
 import { parseLocalDay } from "@/lib/utils";
 import { pedirAvaliacaoSePuder } from "@/lib/avaliacao";
@@ -89,12 +91,14 @@ const motivationalQuotes = [
   "SEJA MELHOR QUE ONTEM",
 ];
 
+// 1.0.22 (dono 28/10): a MESMA escala do "+" da Home (1 Péssimo · 2 Ruim · 3 Neutro · 4 Bom · 5 Ótimo) — antes aqui o 2 era "Meh"
+// e o 1 "Ruim", e quem tocava "Ruim" no "+" via "Meh" marcado. Só nomes/emojis; os valores gravados não mudam.
 const moodEmojis = [
-  { emoji: "😄", label: "Ótimo", color: "bg-green-400", value: 5 },
-  { emoji: "🙂", label: "Bem", color: "bg-green-300", value: 4 },
+  { emoji: "🤩", label: "Ótimo", color: "bg-green-400", value: 5 },
+  { emoji: "🙂", label: "Bom", color: "bg-green-300", value: 4 },
   { emoji: "😐", label: "Neutro", color: "bg-yellow-300", value: 3 },
-  { emoji: "😕", label: "Meh", color: "bg-orange-300", value: 2 },
-  { emoji: "😞", label: "Ruim", color: "bg-red-300", value: 1 },
+  { emoji: "😔", label: "Ruim", color: "bg-orange-300", value: 2 },
+  { emoji: "😡", label: "Péssimo", color: "bg-red-300", value: 1 },
 ];
 
 const getHabitName = (habit: unknown) => {
@@ -204,28 +208,30 @@ const useFasesEmUso = () => {
    continua lendo só o `mood` e não muda nada. */
 const EMOCOES = ["Calmo", "Ansioso", "Grato", "Cansado", "Animado", "Triste", "Irritado", "Focado", "Estressado", "Feliz", "Entediado", "Esperançoso"];
 
-const MoodTracker = () => {
-  const [moodLog, setMoodLog] = usePersistedState<Record<string, { mood: number; note: string; emocoes?: string[] }>>("mood-log", {});
+/* 1.0.22 (28/10): O HUMOR DO DIA É UM SÓ (lib/humor-do-dia). Este card lê o humor de hoje das 3 chaves (`mood-log`
+   desta tela, `core-mood-log` do "+" da Home, `dp-mood-log` do Dev. Pessoal) e grava nas 3 — o humor registrado
+   pelo "+" da Home aparece aqui, já marcado, e no histórico. A nota e as emoções continuam só no `mood-log`. */
+export const MoodTracker = () => {
   const today = getDateKey();
+  const { hoje: humorHoje, historico, registrar, mapaRotina: moodLog, setMapaRotina: setMoodLog } = useHumorDoDia(today);
   const todayMood = moodLog[today];
+  const valorHoje = humorHoje?.valor ?? null;
   const [note, setNote] = useState(todayMood?.note || "");
   const emocoesHoje = Array.isArray(todayMood?.emocoes) ? todayMood!.emocoes! : [];
 
-  const logMood = (value: number) => {
-    setMoodLog(prev => ({ ...prev, [today]: { ...prev[today], mood: value, note: prev[today]?.note || "" } }));
-  };
+  const logMood = (value: number) => registrar(value);
 
   const toggleEmocao = (e: string) => {
     setMoodLog(prev => {
       const atual = Array.isArray(prev[today]?.emocoes) ? prev[today]!.emocoes! : [];
       const emocoes = atual.includes(e) ? atual.filter(x => x !== e) : [...atual, e];
-      return { ...prev, [today]: { ...prev[today], mood: prev[today]?.mood ?? 0, note: prev[today]?.note || "", emocoes } };
+      return { ...prev, [today]: { ...prev[today], mood: prev[today]?.mood || valorHoje || 0, note: prev[today]?.note || "", emocoes } };
     });
   };
 
   const saveNote = () => {
-    if (todayMood) {
-      setMoodLog(prev => ({ ...prev, [today]: { ...prev[today], note } }));
+    if (valorHoje) {
+      setMoodLog(prev => ({ ...prev, [today]: { ...prev[today], mood: prev[today]?.mood || valorHoje, note } }));
     }
   };
 
@@ -241,14 +247,8 @@ const MoodTracker = () => {
    * continua sendo { mood, note } por dia; a série lê o `mood` e ignora o
    * resto. Sem `mood` (dia só com nota) o valor é 0 e o SerieHistorico já
    * trata 0 como "dia sem registro". */
-  const serieHumor = useMemo(() => {
-    const fora: Record<string, number> = {};
-    for (const [dia, reg] of Object.entries(moodLog)) {
-      const v = Number(reg?.mood);
-      if (Number.isFinite(v) && v > 0) fora[dia] = v;
-    }
-    return fora;
-  }, [moodLog]);
+  // 1.0.22: a série lê o histórico UNIFICADO (os dias do "+" da Home e do Dev. Pessoal entram) — lib/humor-do-dia
+  const serieHumor = historico;
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
@@ -262,7 +262,8 @@ const MoodTracker = () => {
             <button
               key={m.value}
               onClick={() => logMood(m.value)}
-              className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-all ${todayMood?.mood === m.value ? "bg-primary/10 ring-2 ring-primary scale-110" : "hover:bg-muted"}`}
+              aria-pressed={valorHoje === m.value}
+              className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-all ${valorHoje === m.value ? "bg-primary/10 ring-2 ring-primary scale-110" : "hover:bg-muted"}`}
             >
               <span className="text-2xl">{m.emoji}</span>
               <span className="text-[10px] text-muted-foreground">{m.label}</span>
@@ -270,7 +271,7 @@ const MoodTracker = () => {
           ))}
         </div>
 
-        {todayMood && (
+        {valorHoje !== null && (
           <div className="flex flex-wrap gap-1.5" data-testid="emocoes-do-dia">
             {EMOCOES.map(e => {
               const on = emocoesHoje.includes(e);
@@ -289,7 +290,7 @@ const MoodTracker = () => {
           </div>
         )}
 
-        {todayMood && (
+        {valorHoje !== null && (
           <div className="flex gap-2">
             <Input
               placeholder="O que aconteceu hoje? (opcional)"
@@ -771,6 +772,8 @@ const MonthlyPlanning = () => {
     () => new Set(ocorrencias(compromissos, new Date(currentYear, currentMonth, 1), totalDays).map((o) => o.dia)),
     [compromissos, currentYear, currentMonth, totalDays],
   );
+  // 28/10: feriados nacionais (se ligados) e dias com tarefa marcada — components/rotina/DiaDoMes
+  const { feriados, diasComTarefa } = useMarcasDoMes(currentYear, currentMonth);
   const abrirDia = (dia: string) => {
     const d = parseLocalDay(dia);
     setCurrentYear(d.getFullYear());
@@ -831,21 +834,30 @@ const MonthlyPlanning = () => {
               const hasNote = !!dayNotes[dayKey];
               const isToday = dayNum === now.getDate() && currentMonth === now.getMonth() && currentYear === now.getFullYear();
               const isSelected = selectedDay === dayKey;
+              const feriado = feriados.get(dayKey);
+              const temTarefa = diasComTarefa.has(dayKey);
               return (
                 <button
                   key={dayNum}
                   onClick={() => setSelectedDay(isSelected ? null : dayKey)}
+                  aria-label={feriado ? `${dayNum} — ${feriado.facultativo ? "ponto facultativo" : "feriado"}: ${feriado.nome}` : undefined}
+                  data-feriado={feriado ? "true" : undefined}
+                  data-dica={isToday ? "mes-hoje" : undefined}
+                  data-selecionado={isSelected ? "true" : undefined}
                   className={`aspect-square rounded-md text-xs font-medium flex items-center justify-center relative transition-all
                     ${isToday ? "bg-primary text-primary-foreground font-bold" : ""}
                     ${isSelected ? "ring-2 ring-primary" : ""}
                     ${!isToday && !isSelected ? "hover:bg-muted" : ""}
+                    ${feriado && !isToday ? "text-rose-600 dark:text-rose-400 font-bold" : ""}
                   `}
                 >
                   {dayNum}
-                  {(hasNote || diasComCompromisso.has(dayKey)) && (
+                  {(hasNote || diasComCompromisso.has(dayKey) || feriado || temTarefa) && (
                     <div className="absolute bottom-0.5 flex gap-0.5">
+                      {feriado && <div className="w-1 h-1 rounded-full bg-rose-500" data-testid="ponto-feriado" />}
                       {hasNote && <div className="w-1 h-1 rounded-full bg-teal-500" />}
                       {diasComCompromisso.has(dayKey) && <div className="w-1 h-1 rounded-full bg-sky-500" data-testid="ponto-compromisso" />}
+                      {temTarefa && <div className="w-1 h-1 rounded-full bg-amber-500" data-testid="ponto-tarefa" />}
                     </div>
                   )}
                 </button>
@@ -855,6 +867,7 @@ const MonthlyPlanning = () => {
 
           {selectedDay && (
             <div className="mt-3 p-3 bg-muted/30 rounded-md space-y-3">
+              <FeriadoETarefasDoDia dia={selectedDay} feriado={feriados.get(selectedDay)} />
               <CompromissosDoDia dia={selectedDay} lista={compromissos} onChange={setCompromissos} />
               <div className="space-y-2">
                 {/* dd/mm na tela (26/09, varredura) — a chave continua AAAA-MM-DD */}
@@ -868,6 +881,7 @@ const MonthlyPlanning = () => {
               </div>
             </div>
           )}
+          <InterruptorFeriados />
         </div>
       </div>
 
@@ -1402,15 +1416,7 @@ const Rotina = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-5 space-y-5">
-        <BoasVindasDoModulo
-          moduleId="rotina"
-          tips={[
-            "Adicione seus hábitos diários e marque conforme concluir cada um",
-            "Monte sua rotina semanal hora a hora no card Rotina semanal, aqui em Minha Semana",
-            "Crie rituais matinais e noturnos para automatizar seu dia",
-            "Acompanhe seu humor diário e veja padrões ao longo do tempo"
-          ]}
-        />
+        <BoasVindasDoModulo moduleId="rotina" />
 
         {/* Convite pro lembrete de fechamento do dia — só com sequência viva.
             Fica na aba "Minha Semana" porque é onde os hábitos são marcados:

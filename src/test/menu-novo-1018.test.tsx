@@ -134,7 +134,8 @@ describe("o menu novo: 3 grupos + Sair", () => {
   it("web: você (conta, plano, conquistas) · App (aparência, tutorial) · Ajuda (ajuda, privacidade e termos) · Sair — sem Retrospectiva", () => {
     montarMenu();
     expect(ids(screen.getByTestId("menu-grupo-voce"))).toEqual(["conta", "plano", "conquistas"]);
-    expect(ids(screen.getByTestId("menu-grupo-app"))).toEqual(["aparencia", "tutorial"]);
+    // 1.0.22 (28/10): no site o menu ganha "Home · Nova/Clássica" (a escolha da Home — lib/home-nova; Android não tem)
+    expect(ids(screen.getByTestId("menu-grupo-app"))).toEqual(["aparencia", "tutorial"]); // 1.0.22: a linha "Home" é só do app do iPhone
     expect(ids(screen.getByTestId("menu-grupo-ajuda"))).toEqual(["ajuda", "legal"]);
     expect(within(screen.getByTestId("menu-grupo-app")).getByText("App")).toBeTruthy();
     expect(within(screen.getByTestId("menu-grupo-ajuda")).getByText("Ajuda")).toBeTruthy();
@@ -221,7 +222,7 @@ describe("o menu novo: 3 grupos + Sair", () => {
     fireEvent.click(screen.getByText("Termos de uso"));
     expect(screen.getByTestId("onde").textContent).toBe("/termos");
   });
-  it("Rever tutorial fecha a folha e chama o tutorial; Sair chama signOut", () => {
+  it("Ver tutorial fecha a folha e chama o tutorial; Sair chama signOut", () => {
     const rever = vi.fn();
     const fechar = vi.fn();
     montarMenu({ onReplayTutorial: rever, onOpenChange: fechar });
@@ -315,7 +316,7 @@ describe("chave off = o menu e o topo de hoje (1.0.17)", () => {
     nativo.v = true;
     montarMenu();
     expect(screen.getByText("Menu")).toBeTruthy();
-    for (const t of ["Minha conta", "Meu acesso", "Retrospectiva", "Conquistas", "Notificações", "Usar no computador", "Ajuda e suporte", "Rever tutorial", "Sair"]) expect(screen.getByText(t)).toBeTruthy();
+    for (const t of ["Minha conta", "Meu acesso", "Retrospectiva", "Conquistas", "Notificações", "Usar no computador", "Ajuda e suporte", "Ver tutorial", "Sair"]) expect(screen.getByText(t)).toBeTruthy();
     expect(screen.queryByTestId("menu-novo")).toBeNull();
     expect(screen.queryByText("Aparência")).toBeNull();
     fireEvent.click(screen.getByText("Retrospectiva"));

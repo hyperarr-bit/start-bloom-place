@@ -8,6 +8,7 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { UserDataContext, UserDataContextType } from "@/hooks/use-user-data";
 import { FocusTimerWidget } from "@/components/home/widgets/FocusTimerWidget";
+import { _zerarPomodoro } from "@/lib/pomodoro-agora";
 
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ isSubscribed: true, user: null }) }));
 const toasts: string[] = [];
@@ -27,7 +28,7 @@ const criarStore = (inicial: Record<string, unknown> = {}) => {
 const renderizar = (store: ReturnType<typeof criarStore>) =>
   render(<MemoryRouter><UserDataContext.Provider value={store.valor}><FocusTimerWidget /></UserDataContext.Provider></MemoryRouter>);
 
-afterEach(() => { vi.useRealTimers(); toasts.length = 0; });
+afterEach(() => { vi.useRealTimers(); toasts.length = 0; _zerarPomodoro(); });
 
 describe("Timer de foco da Home", () => {
   it("segue o tempo escolhido no Pomodoro (45 min), não o 25 fixo", () => {
@@ -41,7 +42,9 @@ describe("Timer de foco da Home", () => {
     expect(screen.getByTestId("widget-foco-tempo")).toHaveTextContent("25:00");
   });
 
-  it("concluir grava o foco do dia (insígnias), o total e a sessão, e volta pro tempo cheio", () => {
+  // 1.0.22 (sem repetição): o widget é o MESMO timer da Rotina/Carreira — depois do foco vem a pausa (antes ele
+  // voltava pro foco cheio porque tinha relógio próprio, sem pausa)
+  it("concluir grava o foco do dia (insígnias), o total e a sessão, e segue pra pausa como o Pomodoro", () => {
     vi.useFakeTimers({ now: new Date(2026, 8, 28, 10, 0) });
     const store = criarStore({ "pomodoro-duracoes": { focus: 15, break: 5, longBreak: 15 }, "pomodoro-total-focus": 100 });
     renderizar(store);
@@ -52,7 +55,8 @@ describe("Timer de foco da Home", () => {
     expect(store.dados["pomodoro-sessions-dia"]).toBe("2026-09-28");
     expect(store.dados["pomodoro-sessions-today"]).toBe(1);
     expect(toasts).toEqual(["Foco de 15 min concluído"]);
-    expect(screen.getByTestId("widget-foco-tempo")).toHaveTextContent("15:00");
+    expect(screen.getByTestId("widget-foco-tempo")).toHaveTextContent("5:00");
+    expect(screen.getByTestId("widget-foco")).toHaveTextContent(/Pausa · 5 min/);
   });
 
   it("tela travada (relógio anda sem tique): ao voltar, o mostrador alcança o tempo real", () => {

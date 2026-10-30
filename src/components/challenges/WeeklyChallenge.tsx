@@ -100,9 +100,18 @@ export const WeeklyChallenge = ({ expenses, agoraDev }: Props) => {
     () => (estado.ofertas?.weekStart === thisMonday ? estado.ofertas : montarOfertas(dadosDaSemana, estado)),
     [estado, thisMonday, dadosDaSemana],
   );
+  /* 29/10 (dono, 1ª entrada em Finanças): o DESAFIO DA SEMANA espera o 1º GASTO. Sem gasto nenhum anotado (nesta semana
+     nem nas 8 anteriores, em todos os baldes) e sem nada de desafio na conta (ativo, histórico ou opções já mostradas),
+     o card não aparece (nem grava as opções) — "dias sem gastar" sem dado nenhum é vitória de graça, e a 1ª entrada é pra anotar renda e
+     gasto. Turma do iPhone 21/09–25/10: escolher o desafio DEPOIS do 1º gasto 39,7% pagaram (n=78) × sem gasto nos
+     3 dias 21,4% (n=70) — correlação. Quem já viu o card (ofertas gravadas), escolheu, ocultou ou religou continua vendo. */
+  const temGasto = expenses.length > 0 || dadosDaSemana.semana.length > 0 || dadosDaSemana.historico8.length > 0;
+  const jaTeveDesafio = !!estado.active || estado.history.length > 0 || !!estado.ofertas || get<unknown>("finance-challenges-hidden", undefined) !== undefined;
+  const esperandoGasto = !temGasto && !jaTeveDesafio;
+
   const ofertasGravadasPara = useRef<string | null>(null);
   useEffect(() => {
-    if (!loaded || hidden || !rodizio || fechamentoPendente || (active && ativoConhecido)) return;
+    if (!loaded || hidden || esperandoGasto || !rodizio || fechamentoPendente || (active && ativoConhecido)) return;
     if (estado.ofertas?.weekStart === thisMonday || ofertasGravadasPara.current === thisMonday) return;
     ofertasGravadasPara.current = thisMonday;
     const novo = { ...base, ...estado, ofertas: ofertasDaSemana } as ChallengesState;
@@ -110,7 +119,7 @@ export const WeeklyChallenge = ({ expenses, agoraDev }: Props) => {
     avisarEscritaDeFora(CHAVE, novo);
     trackEvent("desafio_ofertas", { keys: ofertasDaSemana.itens.map((i) => i.key), niveis: ofertasDaSemana.itens.map((i) => i.nivel), weekStart: thisMonday });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, hidden, rodizio, fechamentoPendente, active, ativoConhecido, estado.ofertas?.weekStart, thisMonday, ofertasDaSemana]);
+  }, [loaded, hidden, esperandoGasto, rodizio, fechamentoPendente, active, ativoConhecido, estado.ofertas?.weekStart, thisMonday, ofertasDaSemana]);
 
   const evaluation: Avaliacao | null = useMemo(() => {
     if (!active) return null;
@@ -193,6 +202,8 @@ export const WeeklyChallenge = ({ expenses, agoraDev }: Props) => {
     );
   }
 
+  if (esperandoGasto) return null;
+
   const cabecalho = (
     <div className="flex items-center justify-between mb-3">
       <h4 className="text-xs font-bold flex items-center gap-2">
@@ -232,7 +243,7 @@ export const WeeklyChallenge = ({ expenses, agoraDev }: Props) => {
       );
     }
 
-    const abertas = ofertasVisiveis({ ...estado, ofertas: ofertasDaSemana }, thisMonday);
+    const abertas = ofertasVisiveis({ ...estado, ofertas: ofertasDaSemana }, thisMonday, dadosDaSemana);
     const etiqueta = (o: OfertaDaSemana) => (o.origem === "variacao" ? `nível ${o.nivel}` : o.origem === "revanche" ? "revanche" : null);
     return (
       <div className="bg-card rounded-lg border border-border p-4" data-testid="desafio-ofertas" data-track-bloco="desafio-semana">

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useVoltarDaSubpagina } from "@/lib/volta-da-demo";
-import { AlarmClock, ArrowLeft, BellOff, BookOpen, Cake, CalendarCheck, CalendarClock, Droplets, Dumbbell, Flame, Gift, Mail, PartyPopper, Pill, Receipt, Salad, Sparkles, Sunrise, Wallet, Wrench } from "lucide-react";
+import { AlarmClock, Bell, BellOff, BookOpen, Cake, CalendarCheck, CalendarClock, ChevronDown, ChevronLeft, Droplets, Dumbbell, Flame, Gift, Heart, Home, Mail, PartyPopper, Pill, Receipt, Repeat, Salad, Sparkles, Sunrise, Wallet, Wrench, type LucideIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useUserData } from "@/hooks/use-user-data";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -21,6 +21,13 @@ import { CHAVE_LEMBRETE as CHAVE_LEMBRETE_PET } from "@/lib/pet";
 import { algumLigadoPet, lerPrefsLembretePet, type PrefsLembretePet } from "@/lib/pet-avisos";
 import { PawPrint } from "lucide-react";
 import { CHAVE_LEMBRETE_RELACOES, lerLembreteRelacoes, type LembreteRelacoes } from "@/lib/relacoes-lembrete";
+import { ESSENCIAIS, GRUPOS, IDS_LEMBRETES, itensDoGrupo, type GrupoLembretes, type IdLembrete } from "@/lib/lembretes-tela";
+import { SUAVIDADE_HOME_NOVA } from "@/lib/home-nova";
+import { FolhaLembrete, type ControleDeHora } from "@/components/notificacoes/FolhaLembrete";
+import { TRACO, corDoModulo, tintaDoModulo } from "@/components/home-nova/e/paleta";
+import { useFundoDaTelaE } from "@/components/home-nova/e/fundo-da-tela";
+import "@/components/home-nova/home-nova.css";
+import "@/components/home-nova/e/home-e.css";
 
 /**
  * Central de notificações (27/07).
@@ -37,12 +44,12 @@ import { CHAVE_LEMBRETE_RELACOES, lerLembreteRelacoes, type LembreteRelacoes } f
  *  2. Sem permissão os interruptores não somem: ficam visíveis e o primeiro
  *     toque PEDE a permissão. Esconder faria a pessoa achar que o app não tem
  *     lembrete nenhum.
- *  3. Os quatro lembretes diários vêm DESLIGADOS e ficam abaixo de uma
- *     divisória própria. Quem abre a tela vê primeiro o que já está ligado,
- *     e o resto se apresenta como oferta — não como algo a desativar.
+ *  3. (29/10, A6 aprovada pelo dono) A ARRUMAÇÃO mora em lib/lembretes-tela.ts: "N ligados" no topo,
+ *     ESSENCIAIS pelo uso real (Remédios, Contas, Fechamento do dia, Compromissos) e o resto POR MÓDULO, em
+ *     sanfona quando o módulo tem mais de 1 (os 3 de aniversário juntos em Relações). Cada linha tem 1 frase
+ *     curta; o texto completo de antes, o estado do agendamento e o horário ficam na folha (toque na linha ou
+ *     na pílula do horário). Chaves gravadas, padrões, reagendamento e eventos notif_pref: os de sempre.
  */
-
-const HORAS = [6, 7, 8, 9, 10, 12, 18, 20, 21, 22];
 
 type ChaveLiga = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "aniversario" | "casa" | "compromissos" | "tarefas" | "limite" | "sequencia";
 
@@ -64,6 +71,11 @@ const Notificacoes = () => {
   // 08/10: alarme exato do Android (ver `estadoAlarmeExato`). "indisponivel" no iPhone e no Android < 12.
   const [alarmeExato, setAlarmeExato] = useState<EstadoAlarmeExato>("indisponivel");
   const [agendados, setAgendados] = useState<Partial<Record<TipoDeLembrete, number>>>({});
+  // 29/10 (A6): os grupos abertos na sanfona e o lembrete com a folha aberta
+  const [abertos, setAbertos] = useState<Set<string>>(() => new Set());
+  const [folha, setFolha] = useState<IdLembrete | null>(null);
+  const alternarGrupo = (id: string) => setAbertos((a) => { const n = new Set(a); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  useFundoDaTelaE(); // a faixa do relógio e a casca na cor da Home nova (como a aba Você)
 
   const p = lerPrefs(prefs);
   const permitido = permissao === "granted";
@@ -361,18 +373,191 @@ const Notificacoes = () => {
     return n > 0 ? `${n} ${n === 1 ? "aviso agendado" : "avisos agendados"}` : vazio;
   };
 
-  return (
-    <div className="min-h-[100dvh] bg-background">
-      <header className="sticky top-0 z-10 flex items-center gap-3 px-4 py-3 bg-background/85 backdrop-blur border-b border-border">
-        <button onClick={voltar} aria-label="Voltar" className="p-1.5 -ml-1.5 rounded-lg hover:bg-muted transition-colors">
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <h1 className="text-base font-bold">Notificações</h1>
-      </header>
+  /* 29/10 (A6): cada lembrete com o MESMO interruptor/rodapé/horário de antes; o texto longo de antes vai pra folha
+     (toque na linha ou na pílula). `curta` é a legenda de 1 linha da lista. */
+  const L: Record<IdLembrete, DefLembrete> = {
+    contas: {
+      titulo: "Conta a vencer", curta: "Na véspera", Icone: Receipt, modulo: "financas",
+      descricao: "Um aviso na véspera, com o nome das contas do dia. No máximo um por dia.",
+      ligado: p.contas, onChange: (v) => void alternar("contas", v),
+      rodape: rodapeDe("contas", p.contas, "Nenhuma conta em aberto pra avisar por enquanto"),
+      hora: { tipo: "cheia", hora: p.horaContas, onHora: (h) => void aplicar({ horaContas: h }) },
+    },
+    retrospectiva: {
+      titulo: "Retrospectiva do mês", curta: "Todo dia 1º", Icone: Sparkles, modulo: "core",
+      descricao: "Todo dia 1º, seu mês anterior em números — pronto pra compartilhar.",
+      ligado: p.retrospectiva, onChange: (v) => void alternar("retrospectiva", v),
+      rodape: rodapeDe("retrospectiva", p.retrospectiva, "Agenda no próximo dia 1º"),
+    },
+    /* 03/10: o Lembrete do dia 2 / 1ª semana (lib/lembrete-dia2). Nasce ligado, vale 7 dias; a hora é a da abertura do
+       app (ou a combinada na missão) — por isso não tem horário aqui. */
+    primeiraSemana: {
+      titulo: "Primeira semana", curta: "1 por dia, nos 7 primeiros dias", Icone: Sparkles, modulo: "core",
+      descricao: "Nos 7 primeiros dias, 1 aviso por dia na hora em que você costuma abrir o CORE — com o que te espera hoje. Depois, para sozinho.",
+      ligado: p.primeiraSemana, onChange: (v) => void alternarPrimeiraSemana(v),
+      rodape: p.primeiraSemana && naLoja && permitido ? rodapeDaPrimeiraSemana() : undefined,
+    },
+    remedios: {
+      titulo: "Remédios e vitaminas", curta: "Na hora de cada dose", Icone: Pill, modulo: "saude",
+      descricao: "Na hora que você cadastrou em Saúde, item por item. Já marcou como tomado? O aviso de hoje não vem.",
+      ligado: remediosLigado, onChange: (v) => void alternarRemedios(v),
+      rodape: rodapeDe("saude", remediosLigado, "Cadastre um remédio com horário em Saúde"),
+    },
+    consultas: {
+      titulo: "Consultas médicas", curta: "Na véspera e 2 h antes", Icone: CalendarClock, modulo: "saude",
+      descricao: "Na véspera, às 19h, e 2 horas antes de cada consulta marcada em Saúde (sem horário, só na véspera).",
+      ligado: consultasLigado, onChange: (v) => void alternarConsultas(v),
+      rodape: rodapeDe("consulta", consultasLigado, "Marque uma consulta com data em Saúde"),
+    },
+    aniversario: {
+      titulo: "Aniversário chegando", rotulo: "Na véspera", curta: "Pra não chegar de surpresa", Icone: Cake, modulo: "relacionamentos",
+      descricao: "Na véspera do aniversário de quem está em Relações, na hora que você escolher.",
+      ligado: p.aniversario, onChange: (v) => void alternar("aniversario", v),
+      rodape: rodapeDe("aniversario", p.aniversario, "Cadastre alguém com data de aniversário em Relações"),
+      hora: { tipo: "cheia", hora: p.horaAniversario, onHora: (h) => void aplicar({ horaAniversario: h }) },
+    },
+    rel_noDia: {
+      titulo: "Parabéns no dia", rotulo: "No dia", curta: "Pra mandar os parabéns", Icone: PartyPopper, modulo: "relacionamentos",
+      descricao: `No dia do aniversário de quem está em Relações, às ${relLembrete.noDia.hora}, pra mandar os parabéns. O horário muda em Relações → Avisos.`,
+      ligado: relLembrete.noDia.ligado, onChange: (v) => void alternarRelacoes("noDia", v),
+      rodape: rodapeDe("relacoes", relLembrete.noDia.ligado, "Cadastre alguém com data de aniversário em Relações"),
+      hora: { tipo: "fixa", texto: relLembrete.noDia.hora },
+    },
+    rel_semana: {
+      titulo: "Aniversário daqui a uma semana", rotulo: "1 semana antes", curta: "Com as ideias de presente", Icone: Gift, modulo: "relacionamentos",
+      descricao: `Sete dias antes, às ${relLembrete.semana.hora}, com as ideias de presente que você guardou em Relações.`,
+      ligado: relLembrete.semana.ligado, onChange: (v) => void alternarRelacoes("semana", v),
+      rodape: rodapeDe("relacoes", relLembrete.semana.ligado && !relLembrete.noDia.ligado, "Cadastre alguém com data de aniversário em Relações"),
+      hora: { tipo: "fixa", texto: relLembrete.semana.hora },
+    },
+    rel_contato: {
+      titulo: "Pra mandar um oi", curta: "Pra quem você quer falar", Icone: Mail, modulo: "relacionamentos",
+      descricao: "Pra quem tem “lembrar de falar” na ficha, em Relações. Se a conversa não for anotada, repete de 7 em 7 dias — nunca todo dia.",
+      ligado: relLembrete.contato.ligado, onChange: (v) => void alternarRelacoes("contato", v),
+      rodape: rodapeDe("relacoes", relLembrete.contato.ligado && !relLembrete.noDia.ligado && !relLembrete.semana.ligado, "Na ficha de alguém em Relações, escolha de quanto em quanto tempo lembrar"),
+      hora: { tipo: "fixa", texto: relLembrete.contato.hora },
+    },
+    compromissos: {
+      titulo: "Compromissos", curta: "Na antecedência de cada um", Icone: CalendarClock, modulo: "rotina",
+      descricao: "Consulta, reunião, aula: na antecedência que você escolhe em cada compromisso (Rotina → Meu mês).",
+      ligado: p.compromissos, onChange: (v) => void alternar("compromissos", v),
+      rodape: rodapeDe("compromisso", p.compromissos, "Cadastre um compromisso com hora em Rotina → Meu mês"),
+    },
+    tarefas: {
+      titulo: "Tarefas com horário", curta: "Na hora da tarefa", Icone: AlarmClock, modulo: "rotina",
+      descricao: "Na hora que você pôs em cada tarefa de hoje, ou antes, se escolher. Marcou como feita? O aviso não vem.",
+      ligado: p.tarefas, onChange: (v) => void alternar("tarefas", v),
+      rodape: rodapeDe("tarefa", p.tarefas, "Ponha um horário numa tarefa de hoje (Home ou Rotina)"),
+    },
+    pet: {
+      titulo: "Cuidados do pet", curta: "Vacina, vermífugo, remédio", Icone: PawPrint, modulo: "pet",
+      descricao: "No dia da vacina, do vermífugo e do antipulgas (vacina, consulta e banho também antes — você escolhe no Pet), e o remédio do pet na hora de cada dose.",
+      ligado: petLigado, onChange: (v) => void alternarPet({ ...prefsPet, cuidados: v, remedios: v }),
+      rodape: rodapeDe("pet", petLigado, "Anote a última vacina ou vermífugo em Pet → Saúde"),
+      hora: { tipo: "cheia", hora: prefsPet.hora, onHora: (h) => void alternarPet({ ...prefsPet, hora: h }) },
+    },
+    casa: {
+      titulo: "Manutenção da casa", curta: "No dia em que vence", Icone: Wrench, modulo: "casa",
+      descricao: "No dia em que uma manutenção de Casa vence, pela frequência que você definiu. O que já venceu avisa uma vez.",
+      ligado: p.casa, onChange: (v) => void alternar("casa", v),
+      rodape: rodapeDe("casa", p.casa, "Marque uma manutenção como feita em Casa pra ter um prazo"),
+      hora: { tipo: "cheia", hora: p.horaCasa, onHora: (h) => void aplicar({ horaCasa: h }) },
+    },
+    limite: {
+      titulo: "Limite do dia", curta: "Quanto dá pra gastar hoje", Icone: Wallet, modulo: "financas",
+      descricao: "De manhã, um toque pra ver quanto você pode gastar hoje sem apertar o mês. Se você já abriu Finanças no dia, ele não vem.",
+      ligado: p.limite, onChange: (v) => void alternar("limite", v),
+      rodape: rodapeDe("limite", p.limite, "Lance uma receita ou um gasto em Finanças pra ter o que calcular"),
+      hora: { tipo: "cheia", hora: p.horaLimite, onHora: (h) => void aplicar({ horaLimite: h }) },
+    },
+    sequencia: {
+      titulo: "Sequência", curta: "Só se você não anotou nada", Icone: Flame, modulo: "core",
+      descricao: "À noite, só se você ainda não anotou nada no dia — pra sua sequência de dias não cair. Anotou, ele não vem.",
+      ligado: p.sequencia, onChange: (v) => void alternar("sequencia", v),
+      rodape: rodapeDe("sequencia", p.sequencia, "Anote qualquer coisa hoje pra começar uma sequência"),
+      hora: { tipo: "cheia", hora: p.horaSequencia, onHora: (h) => void aplicar({ horaSequencia: h }) },
+    },
+    skincare: {
+      titulo: "Skincare", curta: "Manhã e noite", Icone: Droplets, modulo: "beleza",
+      descricao: `De manhã (${skincare.manha.hora}) e à noite (${skincare.noite.hora}), com os passos do dia da sua rotina de pele. Os horários mudam na Beleza.`,
+      ligado: algumLigado(skincare), onChange: (v) => void alternarSkincare(v),
+      rodape: rodapeDe("beleza", algumLigado(skincare), "Monte sua rotina na Beleza pra ter o que lembrar"),
+      hora: { tipo: "fixa", texto: `${skincare.manha.hora} · ${skincare.noite.hora}` },
+    },
+    cabelo: {
+      titulo: "Cabelo", curta: "No dia de lavar", Icone: Sparkles, modulo: "beleza",
+      descricao: `No dia de lavar (${cabelo.dia.hora}), com a etapa do cronograma: hidratação, nutrição ou reconstrução. A véspera e o horário mudam na Beleza.`,
+      ligado: lembreteCabeloLigado(cabelo), onChange: (v) => void alternarCabelo(v),
+      rodape: rodapeDe("cabelo", lembreteCabeloLigado(cabelo), "Monte seu cronograma na Beleza pra ter o que lembrar"),
+      hora: { tipo: "fixa", texto: cabelo.dia.hora },
+    },
+    cuidados: {
+      titulo: "Cuidados", curta: "Unha, sobrancelha, depilação", Icone: CalendarClock, modulo: "beleza",
+      descricao: "Unha, sobrancelha, depilação: às 09:00, alguns dias antes da próxima vez. Com horário marcado, quem avisa é o compromisso. Os dias mudam em cada cuidado, na Beleza.",
+      ligado: algumAvisoDeCuidado(cuidados), onChange: (v) => void alternarCuidados(v),
+      rodape: rodapeDe("cuidados", algumAvisoDeCuidado(cuidados), "Marque a última vez de um cuidado na Beleza pra ter o que lembrar"),
+      hora: { tipo: "fixa", texto: "09:00" },
+    },
+    validade: {
+      titulo: "Validade dos produtos", curta: `${validade.diasAntes} dias antes de vencer`, Icone: AlarmClock, modulo: "beleza",
+      descricao: `${validade.diasAntes} dias antes de um produto de MEUS PRODUTOS vencer (a data impressa ou a de depois de aberto, a que vier primeiro), às ${validade.hora}.`,
+      ligado: validade.ligado, onChange: (v) => void alternarValidade(v),
+      rodape: rodapeDe("validade", validade.ligado, "Cadastre a validade de um produto na Beleza pra ter o que lembrar"),
+      hora: { tipo: "fixa", texto: validade.hora },
+    },
+    rotina_manha: {
+      titulo: "Rotina de manhã", curta: "Os hábitos do dia", Icone: Sunrise, modulo: "rotina",
+      descricao: `Todo dia às ${rotinaManha.hora}, com os hábitos do dia. O que você já marcou não entra no aviso.`,
+      ligado: rotinaManha.ligado, onChange: (v) => void aplicarRotinaManha({ ligado: v }, "rotina_manha"),
+      rodape: rodapeDe("rotinaManha", rotinaManha.ligado, "Crie um hábito na Rotina pra ter o que lembrar"),
+      hora: { tipo: "minuto", hora: rotinaManha.hora, rotulo: "Horário do lembrete de manhã", onHora: (hhmm) => void aplicarRotinaManha({ hora: hhmm }, "rotina_manha_hora") },
+    },
+    rotina: {
+      titulo: "Fechamento do dia", curta: "Pra marcar os hábitos", Icone: CalendarCheck, modulo: "rotina",
+      descricao: "Um toque à noite pra marcar os hábitos. Se você já marcou, o aviso do dia não vem.",
+      ligado: p.rotina, onChange: (v) => void alternar("rotina", v),
+      rodape: rodapeDe("rotina", p.rotina, "Tudo marcado por hoje"),
+      hora: { tipo: "cheia", hora: p.horaRotina, onHora: (h) => void aplicar({ horaRotina: h }) },
+    },
+    treino: {
+      titulo: "Dia de treino", curta: "Com o treino do dia", Icone: Dumbbell, modulo: "treino",
+      descricao: "Só nos dias que você marcou como treino, com o grupo muscular do dia.",
+      ligado: p.treino, onChange: (v) => void alternar("treino", v),
+      rodape: rodapeDe("treino", p.treino, "Marque seus dias de treino no módulo Treino"),
+      hora: { tipo: "cheia", hora: p.horaTreino, onHora: (h) => void aplicar({ horaTreino: h }) },
+    },
+    leitura: {
+      titulo: "Hora de ler", curta: "Segunda, quarta e sexta", Icone: BookOpen, modulo: "biblioteca",
+      descricao: "Segunda, quarta e sexta — com quantas páginas faltam pro fim do livro.",
+      ligado: p.leitura, onChange: (v) => void alternar("leitura", v),
+      rodape: rodapeDe("leitura", p.leitura, "Marque um livro como 'lendo' na Biblioteca"),
+      hora: { tipo: "cheia", hora: p.horaLeitura, onHora: (h) => void aplicar({ horaLeitura: h }) },
+    },
+    dieta: {
+      titulo: "Diário da dieta", curta: "Pra fechar o dia", Icone: Salad, modulo: "dieta",
+      descricao: "Um toque pra fechar o dia. Se você já preencheu, o aviso não vem.",
+      ligado: p.dieta, onChange: (v) => void alternar("dieta", v),
+      rodape: rodapeDe("dieta", p.dieta, "Diário de hoje já preenchido"),
+      hora: { tipo: "cheia", hora: p.horaDieta, onHora: (h) => void aplicar({ horaDieta: h }) },
+    },
+  };
 
-      <div className="px-4 py-5 space-y-3 pb-[max(1.5rem,var(--app-safe-bottom))]">
+  const ligados = IDS_LEMBRETES.filter((id) => L[id].ligado).length;
+  const def = folha ? L[folha] : null;
+
+  return (
+    <div className="hn he min-h-[100dvh]" data-testid="tela-lembretes" data-suave={SUAVIDADE_HOME_NOVA}>
+      <main className="max-w-lg mx-auto px-4 pt-2 pb-[max(1.5rem,var(--app-safe-bottom))]">
+        <header className="pt-1">
+          <button onClick={voltar} aria-label="Voltar" className="h-9 -ml-1.5 pr-2 flex items-center rounded-lg active:bg-muted/60">
+            <ChevronLeft className="w-6 h-6" strokeWidth={2} />
+          </button>
+          <h1 className="mt-1 text-[26px] leading-[1.15] font-bold tracking-[-0.025em]">Lembretes</h1>
+          <p className="mt-1 text-[13.5px] text-muted-foreground" data-testid="lembretes-ligados">{ligados} {ligados === 1 ? "ligado" : "ligados"}</p>
+        </header>
+
         {!naLoja && (
-          <div className="rounded-2xl border border-border bg-muted/40 p-4">
+          <div className="hn-card mt-4 p-4">
             <p className="text-sm font-semibold">Disponível no aplicativo</p>
             <p className="text-[13px] text-muted-foreground mt-1 leading-relaxed">
               Os lembretes chegam pelo app instalado no celular. Aqui no navegador
@@ -384,7 +569,7 @@ const Notificacoes = () => {
         {/* Só quem foi BLOQUEADO vê o aviso pesado. Quem nunca foi perguntado
             ("prompt") não vê nada — o próprio interruptor pede a permissão. */}
         {naLoja && permissao === "denied" && (
-          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
+          <div className="mt-4 rounded-[20px] border border-amber-500/30 bg-amber-500/10 p-4">
             <p className="flex items-center gap-2 text-sm font-semibold">
               <BellOff className="w-4 h-4 shrink-0" /> Notificações bloqueadas
             </p>
@@ -402,7 +587,7 @@ const Notificacoes = () => {
             pessoa liga a tela. Só aparece com a permissão de avisos já dada e
             o alarme exato negado; o botão abre a tela do sistema. */}
         {naLoja && permitido && alarmeExato === "denied" && (
-          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4" data-testid="alarme-exato-negado">
+          <div className="mt-4 rounded-[20px] border border-amber-500/30 bg-amber-500/10 p-4" data-testid="alarme-exato-negado">
             <p className="flex items-center gap-2 text-sm font-semibold">
               <AlarmClock className="w-4 h-4 shrink-0" /> Lembretes podem atrasar
             </p>
@@ -424,317 +609,152 @@ const Notificacoes = () => {
           </div>
         )}
 
-        <LinhaAviso
-          icone={<Receipt className="w-4 h-4" />}
-          titulo="Conta a vencer"
-          descricao="Um aviso na véspera, com o nome das contas do dia. No máximo um por dia."
-          ligado={p.contas}
-          onChange={(v) => void alternar("contas", v)}
-          rodape={rodapeDe("contas", p.contas, "Nenhuma conta em aberto pra avisar por enquanto")}
-          hora={p.contas ? p.horaContas : undefined}
-          onHora={(h) => void aplicar({ horaContas: h })}
-        />
+        <h2 className="px-4 mt-6 mb-2 text-[12px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Essenciais</h2>
+        <ul className="hn-card overflow-hidden py-1" data-testid="lembretes-essenciais">
+          {ESSENCIAIS.map((id, i) => (
+            <LinhaLembrete key={id} id={id} d={L[id]} ultima={i === ESSENCIAIS.length - 1} onAbrir={() => setFolha(id)} />
+          ))}
+        </ul>
 
-        <LinhaAviso
-          icone={<Sparkles className="w-4 h-4" />}
-          titulo="Retrospectiva do mês"
-          descricao="Todo dia 1º, seu mês anterior em números — pronto pra compartilhar."
-          ligado={p.retrospectiva}
-          onChange={(v) => void alternar("retrospectiva", v)}
-          rodape={rodapeDe("retrospectiva", p.retrospectiva, "Agenda no próximo dia 1º")}
-        />
+        <h2 className="px-4 mt-6 mb-2 text-[12px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Por módulo</h2>
+        <ul className="hn-card overflow-hidden py-1" data-testid="lembretes-por-modulo">
+          {GRUPOS.map((g, i) => {
+            const itens = itensDoGrupo(g);
+            const ultima = i === GRUPOS.length - 1;
+            if (itens.length === 1) {
+              const id = itens[0];
+              return <LinhaLembrete key={g.id} id={id} d={L[id]} ultima={ultima} onAbrir={() => setFolha(id)} grupo={g} />;
+            }
+            const n = itens.filter((id) => L[id].ligado).length;
+            const aberto = abertos.has(g.id);
+            return (
+              <li key={g.id} data-testid={`grupo-${g.id}`} data-aberto={aberto ? "1" : undefined}>
+                <button
+                  type="button" aria-expanded={aberto} onClick={() => alternarGrupo(g.id)}
+                  className="relative w-full min-h-[62px] flex items-center gap-3 px-3.5 py-2.5 text-left active:bg-muted/50"
+                >
+                  <Disco modulo={g.id} Icone={ICONE_DO_GRUPO[g.id] ?? Bell} ativo={n > 0} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15.5px] font-semibold leading-tight truncate">{g.nome}</span>
+                    <span className="block mt-0.5 text-[12.5px] text-muted-foreground truncate">{g.legenda}</span>
+                  </span>
+                  <span className={`shrink-0 text-[13px] ${n ? "font-semibold text-accent" : "text-muted-foreground"}`} data-testid={`grupo-${g.id}-conta`}>
+                    {n ? `${n} de ${itens.length}` : "desligados"}
+                  </span>
+                  <ChevronDown className={`w-[18px] h-[18px] shrink-0 -ml-1 text-muted-foreground/55 transition-transform ${aberto ? "rotate-180" : ""}`} strokeWidth={2} aria-hidden />
+                  {!ultima && !aberto && <Fio esquerda={62} />}
+                </button>
+                {aberto && (
+                  <div className="bg-foreground/[0.028] dark:bg-foreground/[0.035] border-y border-foreground/10">
+                    {g.blocos.map((b) => (
+                      <div key={b.titulo ?? "itens"}>
+                        {b.titulo && <p className="px-[23px] pt-3 pb-0.5 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">{b.titulo}</p>}
+                        <ul>
+                          {b.itens.map((id, j) => (
+                            <LinhaLembrete key={id} id={id} d={L[id]} sub ultima={j === b.itens.length - 1} onAbrir={() => setFolha(id)} />
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
 
-        {/* 03/10: o Lembrete do dia 2 / 1ª semana (lib/lembrete-dia2). Nasce ligado, vale 7 dias; a hora é a da
-            abertura do app (ou a combinada na missão) — por isso não tem seletor de horário aqui. */}
-        <LinhaAviso
-          icone={<Sparkles className="w-4 h-4" />}
-          titulo="Primeira semana"
-          descricao="Nos 7 primeiros dias, 1 aviso por dia na hora em que você costuma abrir o CORE — com o que te espera hoje. Depois, para sozinho."
-          ligado={p.primeiraSemana}
-          onChange={(v) => void alternarPrimeiraSemana(v)}
-          rodape={p.primeiraSemana && naLoja && permitido ? rodapeDaPrimeiraSemana() : undefined}
-        />
-
-        <LinhaAviso
-          icone={<Pill className="w-4 h-4" />}
-          titulo="Remédios e vitaminas"
-          descricao="Na hora que você cadastrou em Saúde, item por item. Já marcou como tomado? O aviso de hoje não vem."
-          ligado={remediosLigado}
-          onChange={(v) => void alternarRemedios(v)}
-          rodape={rodapeDe("saude", remediosLigado, "Cadastre um remédio com horário em Saúde")}
-        />
-
-        <LinhaAviso
-          icone={<CalendarClock className="w-4 h-4" />}
-          titulo="Consultas médicas"
-          descricao="Na véspera, às 19h, e 2 horas antes de cada consulta marcada em Saúde (sem horário, só na véspera)."
-          ligado={consultasLigado}
-          onChange={(v) => void alternarConsultas(v)}
-          rodape={rodapeDe("consulta", consultasLigado, "Marque uma consulta com data em Saúde")}
-        />
-
-        <LinhaAviso
-          icone={<Cake className="w-4 h-4" />}
-          titulo="Aniversário chegando"
-          descricao="Na véspera do aniversário de quem está em Relações, na hora que você escolher."
-          ligado={p.aniversario}
-          onChange={(v) => void alternar("aniversario", v)}
-          rodape={rodapeDe("aniversario", p.aniversario, "Cadastre alguém com data de aniversário em Relações")}
-          hora={p.aniversario ? p.horaAniversario : undefined}
-          onHora={(h) => void aplicar({ horaAniversario: h })}
-        />
-
-        <LinhaAviso
-          icone={<PartyPopper className="w-4 h-4" />}
-          titulo="Parabéns no dia"
-          descricao={`No dia do aniversário de quem está em Relações, às ${relLembrete.noDia.hora}, pra mandar os parabéns. O horário muda em Relações → Avisos.`}
-          ligado={relLembrete.noDia.ligado}
-          onChange={(v) => void alternarRelacoes("noDia", v)}
-          rodape={rodapeDe("relacoes", relLembrete.noDia.ligado, "Cadastre alguém com data de aniversário em Relações")}
-        />
-
-        <LinhaAviso
-          icone={<Gift className="w-4 h-4" />}
-          titulo="Aniversário daqui a uma semana"
-          descricao={`Sete dias antes, às ${relLembrete.semana.hora}, com as ideias de presente que você guardou em Relações.`}
-          ligado={relLembrete.semana.ligado}
-          onChange={(v) => void alternarRelacoes("semana", v)}
-          rodape={rodapeDe("relacoes", relLembrete.semana.ligado && !relLembrete.noDia.ligado, "Cadastre alguém com data de aniversário em Relações")}
-        />
-
-        <LinhaAviso
-          icone={<Mail className="w-4 h-4" />}
-          titulo="Pra mandar um oi"
-          descricao="Pra quem tem “lembrar de falar” na ficha, em Relações. Se a conversa não for anotada, repete de 7 em 7 dias — nunca todo dia."
-          ligado={relLembrete.contato.ligado}
-          onChange={(v) => void alternarRelacoes("contato", v)}
-          rodape={rodapeDe("relacoes", relLembrete.contato.ligado && !relLembrete.noDia.ligado && !relLembrete.semana.ligado, "Na ficha de alguém em Relações, escolha de quanto em quanto tempo lembrar")}
-        />
-
-        <LinhaAviso
-          icone={<CalendarClock className="w-4 h-4" />}
-          titulo="Compromissos"
-          descricao="Consulta, reunião, aula: na antecedência que você escolhe em cada compromisso (Rotina → Meu mês)."
-          ligado={p.compromissos}
-          onChange={(v) => void alternar("compromissos", v)}
-          rodape={rodapeDe("compromisso", p.compromissos, "Cadastre um compromisso com hora em Rotina → Meu mês")}
-        />
-
-        <LinhaAviso
-          icone={<AlarmClock className="w-4 h-4" />}
-          titulo="Tarefas com horário"
-          descricao="Na hora que você pôs em cada tarefa de hoje, ou antes, se escolher. Marcou como feita? O aviso não vem."
-          ligado={p.tarefas}
-          onChange={(v) => void alternar("tarefas", v)}
-          rodape={rodapeDe("tarefa", p.tarefas, "Ponha um horário numa tarefa de hoje (Home ou Rotina)")}
-        />
-
-        <LinhaAviso
-          icone={<PawPrint className="w-4 h-4" />}
-          titulo="Cuidados do pet"
-          descricao="No dia da vacina, do vermífugo e do antipulgas (vacina, consulta e banho também antes — você escolhe no Pet), e o remédio do pet na hora de cada dose."
-          ligado={petLigado}
-          onChange={(v) => void alternarPet({ ...prefsPet, cuidados: v, remedios: v })}
-          rodape={rodapeDe("pet", petLigado, "Anote a última vacina ou vermífugo em Pet → Saúde")}
-          hora={prefsPet.cuidados ? prefsPet.hora : undefined}
-          onHora={(h) => void alternarPet({ ...prefsPet, hora: h })}
-        />
-
-        <LinhaAviso
-          icone={<Wrench className="w-4 h-4" />}
-          titulo="Manutenção da casa"
-          descricao="No dia em que uma manutenção de Casa vence, pela frequência que você definiu. O que já venceu avisa uma vez."
-          ligado={p.casa}
-          onChange={(v) => void alternar("casa", v)}
-          rodape={rodapeDe("casa", p.casa, "Marque uma manutenção como feita em Casa pra ter um prazo")}
-          hora={p.casa ? p.horaCasa : undefined}
-          onHora={(h) => void aplicar({ horaCasa: h })}
-        />
-
-        <div className="pt-4 pb-1 px-1">
-          <p className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground">Lembretes do dia a dia</p>
-          <p className="text-[12px] text-muted-foreground/80 mt-1 leading-snug">
-            Vêm desligados. Ligue só o que você quer ser lembrado — e no horário que for seu.
-          </p>
-        </div>
-
-        <LinhaAviso
-          icone={<Wallet className="w-4 h-4" />}
-          titulo="Limite do dia"
-          descricao="De manhã, um toque pra ver quanto você pode gastar hoje sem apertar o mês. Se você já abriu Finanças no dia, ele não vem."
-          ligado={p.limite}
-          onChange={(v) => void alternar("limite", v)}
-          rodape={rodapeDe("limite", p.limite, "Lance uma receita ou um gasto em Finanças pra ter o que calcular")}
-          hora={p.limite ? p.horaLimite : undefined}
-          onHora={(h) => void aplicar({ horaLimite: h })}
-        />
-
-        <LinhaAviso
-          icone={<Flame className="w-4 h-4" />}
-          titulo="Sequência"
-          descricao="À noite, só se você ainda não anotou nada no dia — pra sua sequência de dias não cair. Anotou, ele não vem."
-          ligado={p.sequencia}
-          onChange={(v) => void alternar("sequencia", v)}
-          rodape={rodapeDe("sequencia", p.sequencia, "Anote qualquer coisa hoje pra começar uma sequência")}
-          hora={p.sequencia ? p.horaSequencia : undefined}
-          onHora={(h) => void aplicar({ horaSequencia: h })}
-        />
-
-        <LinhaAviso
-          icone={<Droplets className="w-4 h-4" />}
-          titulo="Skincare"
-          descricao={`De manhã (${skincare.manha.hora}) e à noite (${skincare.noite.hora}), com os passos do dia da sua rotina de pele. Os horários mudam na Beleza.`}
-          ligado={algumLigado(skincare)}
-          onChange={(v) => void alternarSkincare(v)}
-          rodape={rodapeDe("beleza", algumLigado(skincare), "Monte sua rotina na Beleza pra ter o que lembrar")}
-        />
-
-        <LinhaAviso
-          icone={<Sparkles className="w-4 h-4" />}
-          titulo="Cabelo"
-          descricao={`No dia de lavar (${cabelo.dia.hora}), com a etapa do cronograma: hidratação, nutrição ou reconstrução. A véspera e o horário mudam na Beleza.`}
-          ligado={lembreteCabeloLigado(cabelo)}
-          onChange={(v) => void alternarCabelo(v)}
-          rodape={rodapeDe("cabelo", lembreteCabeloLigado(cabelo), "Monte seu cronograma na Beleza pra ter o que lembrar")}
-        />
-
-        <LinhaAviso
-          icone={<CalendarClock className="w-4 h-4" />}
-          titulo="Cuidados"
-          descricao="Unha, sobrancelha, depilação: às 09:00, alguns dias antes da próxima vez. Com horário marcado, quem avisa é o compromisso. Os dias mudam em cada cuidado, na Beleza."
-          ligado={algumAvisoDeCuidado(cuidados)}
-          onChange={(v) => void alternarCuidados(v)}
-          rodape={rodapeDe("cuidados", algumAvisoDeCuidado(cuidados), "Marque a última vez de um cuidado na Beleza pra ter o que lembrar")}
-        />
-
-        <LinhaAviso
-          icone={<AlarmClock className="w-4 h-4" />}
-          titulo="Validade dos produtos"
-          descricao={`${validade.diasAntes} dias antes de um produto de MEUS PRODUTOS vencer (a data impressa ou a de depois de aberto, a que vier primeiro), às ${validade.hora}.`}
-          ligado={validade.ligado}
-          onChange={(v) => void alternarValidade(v)}
-          rodape={rodapeDe("validade", validade.ligado, "Cadastre a validade de um produto na Beleza pra ter o que lembrar")}
-        />
-
-        <LinhaAviso
-          icone={<Sunrise className="w-4 h-4" />}
-          titulo="Rotina de manhã"
-          descricao={`Todo dia às ${rotinaManha.hora}, com os hábitos do dia. O que você já marcou não entra no aviso.`}
-          ligado={rotinaManha.ligado}
-          onChange={(v) => void aplicarRotinaManha({ ligado: v }, "rotina_manha")}
-          rodape={rodapeDe("rotinaManha", rotinaManha.ligado, "Crie um hábito na Rotina pra ter o que lembrar")}
-          extra={rotinaManha.ligado ? (
-            <label className="flex items-center justify-between gap-3">
-              <span className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground">Horário</span>
-              <input
-                type="time"
-                aria-label="Horário do lembrete de manhã"
-                value={rotinaManha.hora}
-                onChange={(e) => { if (/^\d{2}:\d{2}$/.test(e.target.value)) void aplicarRotinaManha({ hora: e.target.value }, "rotina_manha_hora"); }}
-                className="h-10 rounded-full bg-muted px-4 text-[14px] font-semibold tabular-nums text-foreground"
-              />
-            </label>
-          ) : undefined}
-        />
-
-        <LinhaAviso
-          icone={<CalendarCheck className="w-4 h-4" />}
-          titulo="Fechamento do dia"
-          descricao="Um toque à noite pra marcar os hábitos. Se você já marcou, o aviso do dia não vem."
-          ligado={p.rotina}
-          onChange={(v) => void alternar("rotina", v)}
-          rodape={rodapeDe("rotina", p.rotina, "Tudo marcado por hoje")}
-          hora={p.rotina ? p.horaRotina : undefined}
-          onHora={(h) => void aplicar({ horaRotina: h })}
-        />
-
-        <LinhaAviso
-          icone={<Dumbbell className="w-4 h-4" />}
-          titulo="Dia de treino"
-          descricao="Só nos dias que você marcou como treino, com o grupo muscular do dia."
-          ligado={p.treino}
-          onChange={(v) => void alternar("treino", v)}
-          rodape={rodapeDe("treino", p.treino, "Marque seus dias de treino no módulo Treino")}
-          hora={p.treino ? p.horaTreino : undefined}
-          onHora={(h) => void aplicar({ horaTreino: h })}
-        />
-
-        <LinhaAviso
-          icone={<BookOpen className="w-4 h-4" />}
-          titulo="Hora de ler"
-          descricao="Segunda, quarta e sexta — com quantas páginas faltam pro fim do livro."
-          ligado={p.leitura}
-          onChange={(v) => void alternar("leitura", v)}
-          rodape={rodapeDe("leitura", p.leitura, "Marque um livro como 'lendo' na Biblioteca")}
-          hora={p.leitura ? p.horaLeitura : undefined}
-          onHora={(h) => void aplicar({ horaLeitura: h })}
-        />
-
-        <LinhaAviso
-          icone={<Salad className="w-4 h-4" />}
-          titulo="Diário da dieta"
-          descricao="Um toque pra fechar o dia. Se você já preencheu, o aviso não vem."
-          ligado={p.dieta}
-          onChange={(v) => void alternar("dieta", v)}
-          rodape={rodapeDe("dieta", p.dieta, "Diário de hoje já preenchido")}
-          hora={p.dieta ? p.horaDieta : undefined}
-          onHora={(h) => void aplicar({ horaDieta: h })}
-        />
-
-        <p className="text-[11px] text-muted-foreground text-center pt-3 px-6 leading-relaxed">
+        <p className="text-[11.5px] text-muted-foreground/80 text-center pt-5 px-6 leading-relaxed">
           O CORE não manda propaganda por notificação. Só o que você pediu pra lembrar.
         </p>
-      </div>
+      </main>
+
+      <FolhaLembrete
+        aberta={!!def}
+        onFechar={() => setFolha(null)}
+        titulo={def?.titulo ?? ""}
+        descricao={def?.descricao ?? ""}
+        rodape={def?.rodape}
+        icone={def ? <Disco modulo={def.modulo} Icone={def.Icone} ativo={def.ligado} tamanho={40} /> : null}
+        controle={def?.hora}
+      />
     </div>
   );
 };
 
-const LinhaAviso = ({
-  icone, titulo, descricao, ligado, onChange, rodape, hora, onHora, extra,
-}: {
-  icone: React.ReactNode;
+interface DefLembrete {
   titulo: string;
+  /** o nome curto dentro do bloco (Aniversários: "Na véspera", "No dia", "1 semana antes") */
+  rotulo?: string;
+  curta: string;
   descricao: string;
+  Icone: LucideIcon;
+  modulo: string;
   ligado: boolean;
   onChange: (v: boolean) => void;
   rodape?: string;
-  hora?: number;
-  onHora?: (h: number) => void;
-  /** 17/10: um controle próprio embaixo (a Rotina de manhã tem hora com minuto) */
-  extra?: React.ReactNode;
-}) => (
-  <div className={`rounded-2xl border p-4 transition-colors ${ligado ? "border-border bg-card" : "border-border/60 bg-card/40"}`}>
-    <div className="flex items-start gap-3">
-      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${ligado ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-        {icone}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-bold leading-tight">{titulo}</p>
-        <p className="mt-1 text-[12.5px] leading-snug text-muted-foreground">{descricao}</p>
-      </div>
-      <Switch checked={ligado} onCheckedChange={onChange} aria-label={titulo} />
-    </div>
-    {rodape && <p className="mt-2.5 pl-12 text-[11.5px] text-muted-foreground/80">{rodape}</p>}
-    {extra && <div className="mt-3.5 pt-3.5 border-t border-border/60">{extra}</div>}
-    {hora !== undefined && onHora && (
-      <div className="mt-3.5 pt-3.5 border-t border-border/60">
-        <p className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground mb-2">Horário</p>
-        <div className="flex flex-wrap gap-1.5">
-          {HORAS.map((h) => (
-            <button
-              key={h}
-              onClick={() => onHora(h)}
-              className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold tabular-nums transition-colors ${
-                hora === h ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"
-              }`}
-            >
-              {rotuloHora(h)}
-            </button>
-          ))}
-        </div>
-      </div>
-    )}
-  </div>
+  hora?: ControleDeHora;
+}
+
+const ICONE_DO_GRUPO: Record<string, LucideIcon> = {
+  financas: Wallet, rotina: Repeat, saude: Pill, relacionamentos: Heart, treino: Dumbbell, biblioteca: BookOpen,
+  dieta: Salad, casa: Home, beleza: Droplets, pet: PawPrint, core: Bell,
+};
+
+/** A cor do módulo (paleta da Home nova); "core" = o magenta da marca (--accent). */
+const corDe = (modulo: string) => (modulo === "core" ? "hsl(var(--accent))" : corDoModulo(modulo));
+const tintaDe = (modulo: string) => (modulo === "core" ? "hsl(var(--accent) / 0.12)" : tintaDoModulo(modulo));
+
+const Disco = ({ modulo, Icone, ativo, tamanho = 36 }: { modulo: string; Icone: LucideIcon; ativo: boolean; tamanho?: number }) => (
+  <span
+    className="grid place-items-center rounded-full shrink-0"
+    style={{ width: tamanho, height: tamanho, background: ativo ? tintaDe(modulo) : "hsl(var(--muted))", color: ativo ? corDe(modulo) : "hsl(var(--muted-foreground))" }}
+    aria-hidden
+  >
+    <Icone style={{ width: tamanho / 2, height: tamanho / 2 }} strokeWidth={TRACO} />
+  </span>
 );
+
+/** O fio entre linhas (meio ponto, começando depois do ícone, como o iOS). */
+const Fio = ({ esquerda }: { esquerda: number }) => (
+  <span className="pointer-events-none absolute right-0 bottom-0 h-px bg-foreground/[0.12] scale-y-50 origin-bottom" style={{ left: esquerda }} aria-hidden />
+);
+
+const textoDaPilula = (h?: ControleDeHora): string | null =>
+  !h ? null : h.tipo === "cheia" ? rotuloHora(h.hora) : h.tipo === "minuto" ? h.hora : h.texto;
+
+const LinhaLembrete = ({ id, d, ultima, onAbrir, sub, grupo }: {
+  id: IdLembrete; d: DefLembrete; ultima: boolean; onAbrir: () => void;
+  /** dentro da sanfona (ícone solto, recuado) */
+  sub?: boolean;
+  /** módulo de 1 lembrete só: a linha leva o nome do módulo e o lembrete embaixo */
+  grupo?: GrupoLembretes;
+}) => {
+  const pilula = textoDaPilula(d.hora);
+  const titulo = grupo ? grupo.nome : sub && d.rotulo ? d.rotulo : d.titulo;
+  const legenda = grupo ? d.titulo : d.curta;
+  return (
+    <li className={`relative flex items-center gap-3 ${sub ? "min-h-[56px] pl-[23px] pr-3.5 py-2" : "min-h-[62px] px-3.5 py-2.5"}`} data-testid={`lembrete-${id}`} data-ligado={d.ligado ? "1" : "0"}>
+      <button type="button" onClick={onAbrir} aria-label={`Detalhes: ${d.titulo}`} className="min-w-0 flex-1 flex items-center gap-3 text-left">
+        {sub
+          ? <d.Icone className="w-[18px] h-[18px] shrink-0" strokeWidth={TRACO} style={{ color: d.ligado ? corDe(d.modulo) : "hsl(var(--muted-foreground))" }} aria-hidden />
+          : <Disco modulo={grupo ? grupo.id : d.modulo} Icone={grupo ? ICONE_DO_GRUPO[grupo.id] ?? d.Icone : d.Icone} ativo={d.ligado} />}
+        <span className="min-w-0 flex-1">
+          <span className={`block font-semibold leading-tight truncate ${sub ? "text-[14.5px]" : "text-[15.5px]"}`}>{titulo}</span>
+          <span className="block mt-0.5 text-[12.5px] text-muted-foreground truncate">{legenda}</span>
+        </span>
+      </button>
+      {pilula && (
+        <button
+          type="button" onClick={onAbrir} aria-label={`Horário: ${d.titulo}, ${pilula}`}
+          className={`shrink-0 h-[30px] px-2.5 rounded-full bg-muted text-[13px] font-semibold tabular-nums ${d.ligado ? "text-foreground" : "text-muted-foreground/70"}`}
+        >
+          {pilula}
+        </button>
+      )}
+      <Switch checked={d.ligado} onCheckedChange={d.onChange} aria-label={d.titulo} />
+      {!ultima && <Fio esquerda={sub ? 53 : 62} />}
+    </li>
+  );
+};
 
 export default Notificacoes;

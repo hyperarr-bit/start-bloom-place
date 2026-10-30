@@ -1,3 +1,5 @@
+import { isNativeShell } from "@/lib/native-shell";
+
 /**
  * IDENTIFICAÇÃO DA EMPRESA — fonte única.
  *
@@ -39,6 +41,16 @@ export const EMPRESA = {
   prazoResposta: "até 48 horas úteis",
   site: "https://coreaplicativo.com.br",
 } as const;
+
+/**
+ * 1.0.22 (dono 27/10: "tirar meu endereço e CEP do app, deixar só o nome da empresa e o CNPJ"): DENTRO DO APP das lojas
+ * o endereço não aparece (Suporte, Termos/Privacidade) — a compra lá é da Apple/Google, que já mostram o vendedor. No
+ * SITE ele continua: o site vende (Pix) e o Decreto 7.962/2013 (art. 2º, I) pede o endereço físico de quem vende online.
+ */
+export const enderecoVisivel = (): string => {
+  try { if (isNativeShell()) return ""; } catch { /* sem a casca: site */ }
+  return EMPRESA.endereco;
+};
 
 /** "CORE é um produto de RAZÃO SOCIAL — CNPJ 00.000.000/0001-00" */
 export const assinaturaEmpresa = () =>

@@ -52,6 +52,7 @@ export const DailyNudge = () => {
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 280 }}
             className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border rounded-t-3xl shadow-2xl"
+            data-daily-nudge="" /* 1.0.22: o convite da Home nova (EscolhaDaHome) espera esta folha sair */
           >
             <div className="max-w-lg mx-auto px-5 pt-3 pb-6">
               {/* Drag handle */}

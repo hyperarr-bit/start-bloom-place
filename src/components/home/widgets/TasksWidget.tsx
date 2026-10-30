@@ -7,8 +7,12 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { cn, localDayKey } from "@/lib/utils";
 import {
   CHAVE_TAREFAS_CARREIRA, CHAVE_TAREFAS_ROTINA, apareceHoje, avisoDaTarefa, avisoJaPassou, detalhesDaTarefa, diaDoAviso, ehPrioridade, estadoDoPrazo, horaDaTarefa,
-  horaDoAviso, ordenarPorHora, progressoDasSubtarefas, type TarefaDoDia,
+  horaDoAviso, ordenarPorHora, progressoDasSubtarefas, rotuloDoDia, type TarefaDoDia,
 } from "@/lib/tarefas";
+import {
+  CHAVE_TAREFAS_ESTUDOS, ROTULO_ORIGEM_CARREIRA, ROTULO_ORIGEM_ESTUDOS, alternarTarefaDosEstudos, tarefasDeHojeDosEstudos,
+} from "@/lib/tarefas-de-outros";
+import { LinhaDoFeriado } from "@/components/feriados/LinhaDoFeriado";
 import { COR_DO_DIA, textoDoDia, tomDoDia } from "@/components/treino/planner";
 import { FicouDeOntem } from "@/components/tarefas/ficou-de-ontem";
 import {
@@ -54,6 +58,7 @@ export const TasksWidget = () => {
   const [todos, setTodos] = usePersistedState<Todo[]>("todo-list", []);
   const rotina = useTarefasDoDia(CHAVE_TAREFAS_ROTINA);
   const carreira = useTarefasDoDia(CHAVE_TAREFAS_CARREIRA);
+  const [estudos, setEstudos] = usePersistedState<unknown>(CHAVE_TAREFAS_ESTUDOS, {});
   const [urgencias, setUrgencias] = usePersistedState<Urgencia[]>("rotina-urgencies", []);
   const [chores] = usePersistedState<Chore[]>("casa-chores", []);
   const [members] = usePersistedState<Member[]>("casa-members", []);
@@ -126,7 +131,18 @@ export const TasksWidget = () => {
       });
     });
   doDia(rotina, "rd", "Rotina");
-  doDia(carreira, "cd", "Carreira");
+  // 1.0.22 (sem repetição): a etiqueta é a mesma da lista do dia da Rotina — "Trabalho" e "Estudos"
+  doDia(carreira, "cd", ROTULO_ORIGEM_CARREIRA);
+
+  // Estudos › Tarefas (`estudos-week-tasks`): a coluna de hoje; o ✓ grava lá, na mesma linha (lib/tarefas-de-outros)
+  tarefasDeHojeDosEstudos(estudos).forEach((t) => {
+    const key = `es-${t.coluna}-${t.indice}`;
+    const alternar = () => setEstudos((prev) => alternarTarefaDosEstudos(prev, t.coluna, t.indice));
+    linhas.push({
+      key, origem: ROTULO_ORIGEM_ESTUDOS, texto: t.texto, feito: t.feito, onAlternar: alternar, onAbrir: () => setAberta(key),
+      ficha: { onde: ROTULO_ORIGEM_ESTUDOS, onAlternar: alternar, abrirModulo: { rotulo: "Abrir em Estudos", ir: () => navigate("/estudos?aba=tarefas") } },
+    });
+  });
 
   const membros = lista<Member>(members);
   lista<Chore>(chores).forEach((c) => {
@@ -165,8 +181,12 @@ export const TasksWidget = () => {
     const t = rotina.adicionar(c);
     const aviso = avisoDaTarefa(t);
     const hora = horaDaTarefa(t);
-    toast.success("Tarefa anotada", {
-      description: hora && aviso >= 0 && !avisoJaPassou(diaDoAviso(t), hora, aviso) ? `🔔 O aviso toca às ${horaDoAviso(hora, aviso)}${t.prazo && t.prazo !== t.dia ? ` em ${diaCurto(t.prazo)}` : ""}` : undefined,
+    // 28/10: tarefa pra outro dia — o toast diz pra quando (ela não aparece na lista de hoje)
+    const futura = t.dia > hoje;
+    toast.success(futura ? `Tarefa anotada pra ${rotuloDoDia(t.dia, hoje)}` : "Tarefa anotada", {
+      description: hora && aviso >= 0 && !avisoJaPassou(diaDoAviso(t), hora, aviso)
+        ? `🔔 O aviso toca às ${horaDoAviso(hora, aviso)}${t.prazo && t.prazo !== t.dia ? ` em ${diaCurto(t.prazo)}` : futura ? ` de ${rotuloDoDia(t.dia, hoje)}` : ""}`
+        : futura ? "Ela aparece na lista no dia dela." : undefined,
     });
   };
 
@@ -194,6 +214,9 @@ export const TasksWidget = () => {
           </div>
         )}
       </div>
+
+      {/* 28/10: hoje é feriado nacional — só informa */}
+      <LinhaDoFeriado dia={hoje} className="px-4 py-2 border-b border-border/50" />
 
       {/* 02/10: o que ficou sem fazer nos últimos 7 dias, no topo — a pessoa decide (trazer, concluir, apagar) */}
       <FicouDeOntem fontes={[{ chave: CHAVE_TAREFAS_ROTINA, tarefas: rotina }, { chave: CHAVE_TAREFAS_CARREIRA, tarefas: carreira }]} envolver />

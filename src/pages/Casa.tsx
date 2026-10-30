@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
+import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
 import { IconeDoModulo } from "@/components/modules/IconeDoModulo";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
@@ -34,7 +36,14 @@ const tabs = [
 const Casa = () => {
   // seta ←: no app, o hub; na demo, o destino do botão de baixo dela (P5, 30/09 — antes, /auth)
   const voltarDoModulo = useVoltarDoModulo();
-  const [activeTab, setActiveTab] = useState("comodos");
+  // `?aba=` (28/10, sem repetição): "Ver" da lista de compras gerada na Dieta abre direto no Mercado
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const a = new URLSearchParams(window.location.search).get("aba");
+      return a && tabs.some((t) => t.id === a) ? a : "comodos";
+    } catch { return "comodos"; }
+  });
+  const abasDoModulo = useAbasOcultas("casa", tabs);
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
 
@@ -65,30 +74,12 @@ const Casa = () => {
             <ThemeToggle />
           </div>
         </div>
-        <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              data-spotlight={`tab-${tab.id}`}
-              onClick={() => handleTabChange(tab.id)}
-              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
-            >
-              <span>{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* 1.0.22: ocultar/organizar abas (components/ui/abas-ocultaveis) */}
+        <AbasOcultaveis abas={abasDoModulo} ativa={activeTab} onTrocar={handleTabChange} className="max-w-5xl mx-auto px-4 pb-2" />
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-5 space-y-5">
-        <BoasVindasDoModulo
-          moduleId="casa"
-          tips={[
-            "Na Despensa, mude um produto para 'Acabou' e ele vai direto pra lista do Mercado",
-            "Use o Cardápio para planejar as refeições da semana",
-            "Cadastre plantas e pets para nunca esquecer de regar ou dar remédio",
-          ]}
-        />
+        <BoasVindasDoModulo moduleId="casa" />
 
         {activeTab === "comodos" && <RoomManager />}
         {activeTab === "mercado" && <GroceryList />}

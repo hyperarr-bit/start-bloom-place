@@ -9,6 +9,7 @@ import { trackEvent } from "@/lib/analytics";
 import { AREAS, getFunnelArea } from "@/lib/funnel";
 import { useAuthOpcional } from "@/hooks/use-auth";
 import { missaoDosesMandaNoApp } from "@/lib/missao-doses";
+import { supabase } from "@/integrations/supabase/client";
 
 /** Marca de DISPOSITIVO — de propósito fora do useUserData.
  *
@@ -36,6 +37,17 @@ const marcarVisto = () => {
 };
 /** 1.0.21 (fluxo enxuto): a TelaParabens do cadastro do iPhone fez o papel desta tela — ela não volta na abertura. */
 export const marcarBoasVindasPagoVista = marcarVisto;
+
+/** 29/10 (alarme da build 53): a marca do aparelho não atravessa celular novo nem outro navegador — no iPhone a tela
+ *  voltava a cada compra nova (outro celular, mensal, presente) e no site a cada navegador. A CONTA guarda também
+ *  (user_metadata do Auth: chega junto com a sessão em qualquer aparelho, sem depender do user_data). A do aparelho
+ *  continua sendo a primeira, por causa do location.href logo depois (ver CHAVE_DISPOSITIVO). */
+type ComMetadata = { user_metadata?: Record<string, unknown> | null } | null | undefined;
+export const boasVindasVistaNaConta = (u: ComMetadata): boolean => u?.user_metadata?.boas_vindas_pago_vista === true;
+const marcarNaConta = (u: ComMetadata) => {
+  if (!u || boasVindasVistaNaConta(u)) return;
+  try { void supabase.auth.updateUser({ data: { boas_vindas_pago_vista: true } }).catch(() => { /* a do aparelho já vale */ }); } catch { /* noop */ }
+};
 export const boasVindasPagoJaVista = jaViu;
 
 /** Confete: 22 pedaços, uma vez só, e acabou. Nada de laço infinito — o que
@@ -94,16 +106,26 @@ export const BoasVindasPago = ({ nome, onComecar, imediato, nuncaPula = false }:
   const { loaded } = useUserData();
   const user = useAuthOpcional()?.user;
   const pula = (criadoEm?: string | null) => !nuncaPula && pulaPelaMissao(criadoEm);
-  const [visivel, setVisivel] = useState(!!imediato && !pula(user?.created_at));
+  const [visivel, setVisivel] = useState(!!imediato && !pula(user?.created_at) && !boasVindasVistaNaConta(user));
   const pulou = useRef(false);
 
   useEffect(() => {
     if (pulou.current) return;
     const origem = imediato ? "compra" : "abertura";
     if (!imediato && (!loaded || jaViu())) return;
+    // já viu nesta CONTA (outro celular, outro navegador, ou uma 2ª compra): não volta — segue direto
+    if (boasVindasVistaNaConta(user)) {
+      pulou.current = true;
+      marcarVisto();
+      trackEvent("boas_vindas_pago_repetida_evitada", { origem });
+      setVisivel(false);
+      if (imediato) onComecar();
+      return;
+    }
     if (pula(user?.created_at)) {
       pulou.current = true;
       marcarVisto();
+      marcarNaConta(user);
       trackEvent("boas_vindas_pago_visto", { origem, pulada: true });
       trackEvent("boas_vindas_pago_seguiu", { pulada: true });
       setVisivel(false);
@@ -130,6 +152,7 @@ export const BoasVindasPago = ({ nome, onComecar, imediato, nuncaPula = false }:
 
   const seguir = () => {
     marcarVisto();
+    marcarNaConta(user);
     trackEvent("boas_vindas_pago_seguiu", {});
     setVisivel(false);
     onComecar();

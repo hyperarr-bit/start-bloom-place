@@ -74,24 +74,33 @@ serve(async (req) => {
       return json({ preview: await mandar(caller) });
     }
 
+    // o banco devolve no máximo 1000 linhas por consulta: pagina até acabar (31/10: sem isso o público parava em 999)
+    // deno-lint-ignore no-explicit-any
+    const todas = async (monta: () => any): Promise<Record<string, unknown>[]> => {
+      const out: Record<string, unknown>[] = [];
+      for (let de = 0; ; de += 1000) {
+        const { data, error } = await monta().range(de, de + 999);
+        if (error) throw error;
+        out.push(...(data ?? []));
+        if ((data ?? []).length < 1000) return out;
+      }
+    };
+
     // o público: vitalício da web ativo que já abriu o app no iPhone
-    const { data: subs, error: e1 } = await admin.from("subscriptions")
-      .select("user_id, customer_email").eq("plan", "lifetime").eq("status", "active").eq("payment_method", "pix").limit(20000);
-    if (e1) throw e1;
+    const subs = await todas(() => admin.from("subscriptions")
+      .select("user_id, customer_email").eq("plan", "lifetime").eq("status", "active").eq("payment_method", "pix").order("created_at"));
     const emailDe = new Map<string, string | null>();
-    for (const s of subs ?? []) if (s.user_id && !emailDe.has(s.user_id)) emailDe.set(s.user_id, s.customer_email ?? null);
+    for (const s of subs) if (s.user_id && !emailDe.has(s.user_id as string)) emailDe.set(s.user_id as string, (s.customer_email as string) ?? null);
     const ids = [...emailDe.keys()];
     const iphone = new Set<string>();
     const jaRecebeu = new Set<string>();
-    for (let i = 0; i < ids.length; i += 80) {
-      const ch = ids.slice(i, i + 80);
-      const { data: ev, error: e2 } = await admin.from("analytics_events").select("user_id")
-        .eq("event_name", "app_device_info").eq("event_data->>plataforma", "ios").gte("created_at", "2026-09-01").in("user_id", ch).limit(5000);
-      if (e2) throw e2;
-      for (const e of ev ?? []) iphone.add(e.user_id as string);
-      const { data: ja, error: e3 } = await admin.from("analytics_events").select("user_id").eq("event_name", EVENTO).in("user_id", ch).limit(1000);
-      if (e3) throw e3;
-      for (const e of ja ?? []) jaRecebeu.add(e.user_id as string);
+    for (let i = 0; i < ids.length; i += 50) {
+      const ch = ids.slice(i, i + 50);
+      const ev = await todas(() => admin.from("analytics_events").select("user_id")
+        .eq("event_name", "app_device_info").eq("event_data->>plataforma", "ios").gte("created_at", "2026-09-01").in("user_id", ch).order("created_at"));
+      for (const e of ev) iphone.add(e.user_id as string);
+      const ja = await todas(() => admin.from("analytics_events").select("user_id").eq("event_name", EVENTO).in("user_id", ch).order("created_at"));
+      for (const e of ja) jaRecebeu.add(e.user_id as string);
     }
     const fila = [...iphone].filter((u) => !jaRecebeu.has(u));
 

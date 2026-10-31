@@ -21,3 +21,17 @@ export const ehCaminhoDeDemo = (pathname: string | null | undefined): boolean =>
 export const emCaminhoDeDemo = (): boolean => {
   try { return ehCaminhoDeDemo(window.location.pathname); } catch { return false; }
 };
+
+/**
+ * 31/10 (presente do dia 3): as demos que rodam DENTRO de uma página de venda — a da landing (/organizar → iframe
+ * /organizar/demo) e a do /hoje (/hoje/demo) — usam a MESMA sessão de quem acabou de pagar. O uso medido lá
+ * (`module_analytics`) fazia a conta parecer "entrou no app" sem nunca ter aberto o app. Estas não medem uso.
+ * As outras demos (/preview, /experimente, /liberar) continuam medindo como sempre (relatórios antigos dependem delas).
+ */
+export const ehDemoDaVenda = (pathname: string | null | undefined): boolean => {
+  const p = String(pathname ?? "");
+  return p === "/organizar/demo" || p === "/hoje/demo" || p.startsWith("/hoje/demo/");
+};
+export const emDemoDaVenda = (): boolean => {
+  try { return ehDemoDaVenda(window.location.pathname); } catch { return false; }
+};

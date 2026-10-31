@@ -19,6 +19,10 @@
  * `pix_generated`) e não entrava aqui. A passada própria (_shared/lembrete-pix-landing.ts) manda 2 toques por pedido —
  * ~12 min (com o copia-e-cola, o Pix ainda vivo) e ~20 h — só pra quem tem e-mail, 1x cada, e para se pagou.
  * Desligar sem deploy: secret LEMBRETE_PIX_LANDING=off. Preview (só caixas da equipe): {preview, lembrete: "t12"|"t20h"}.
+ *
+ * 31/10 — O PRESENTE DO DIA 3 também pega carona (_shared/presente-dia3.ts): 1 e-mail "Leve alguém junto" pra quem
+ * comprou o vitalício na web há 72–96 h, das 9h às 20h, e já entrou no app. Liga só com o secret PRESENTE_DIA3=on (sem
+ * ele, nada roda). Preview (só caixas da equipe): {preview, presente: "d3"}.
  */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -28,6 +32,7 @@ import { OFERTAS_PLANO_LANDING } from "../_shared/ofertas-landing.ts";
 import {
   JANELA_BUSCA_MS, pixPagoNaAsaas, previewDoLembrete, varrerLembretesLanding, type Mensagem,
 } from "../_shared/lembrete-pix-landing.ts";
+import { SECRET_PRESENTE_DIA3, dia3Ligado, previewDia3, varrerPresenteDia3 } from "../_shared/presente-dia3.ts";
 
 const log = (m: string, x?: unknown) => console.log(`[pix-pendente-email] ${m}`, x ? JSON.stringify(x) : "");
 const PRECOS: Record<string, string> = { w27: "27,90", downsell: "14,90", w25: "24,90", w47: "47,90", w97: "97,90", lifetime: "97,90" };
@@ -83,6 +88,7 @@ serve(async (req) => {
       // segurança 21/10: o preview só sai pras caixas da equipe (a anon key pública basta pra chamar a função)
       const destino = destinoDePreview(body.preview);
       if (!destino) return Response.json({ error: "forbidden" }, { status: 403 });
+      if (body.presente === "d3") return Response.json({ ok: await enviarLembrete(destino, previewDia3(site), {}) });
       if (body.lembrete === "t12" || body.lembrete === "t20h") {
         const ok = await enviarLembrete(destino, previewDoLembrete(body.lembrete, site), { lembrete: `preview_${body.lembrete}` });
         return Response.json({ preview: true, lembrete: body.lembrete, ok });
@@ -159,7 +165,26 @@ serve(async (req) => {
         log("landing falhou", landing);
       }
     }
-    return Response.json({ candidatos: porPessoa.size, enviados, pagos, jaAvisados, semEmail, testes, falhas, landing });
+    /* 31/10: o presente do dia 3 — só com PRESENTE_DIA3=on. Contagens no log; nada de e-mail/id. Nunca derruba o resto. */
+    let presenteD3: Record<string, number> | { erro: string } | "desligado" = "desligado";
+    if (dia3Ligado(Deno.env.get(SECRET_PRESENTE_DIA3))) {
+      try {
+        presenteD3 = await varrerPresenteDia3(supabase, {
+          agora, site,
+          conta: async (uid) => {
+            const { data } = await supabase.auth.admin.getUserById(uid);
+            const meta = data?.user?.user_metadata ?? {};
+            return { email: data?.user?.email ?? null, nome: (meta.full_name ?? meta.name ?? null) as string | null };
+          },
+          enviar: (para, assunto, html, tags) => enviarLembrete(para, { assunto, html }, tags),
+        });
+        log("presente_d3", presenteD3);
+      } catch (e) {
+        presenteD3 = { erro: String((e as Error)?.message ?? e).slice(0, 120) };
+        log("presente_d3 falhou", presenteD3);
+      }
+    }
+    return Response.json({ candidatos: porPessoa.size, enviados, pagos, jaAvisados, semEmail, testes, falhas, landing, presente_d3: presenteD3 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     log("ERROR", { msg });

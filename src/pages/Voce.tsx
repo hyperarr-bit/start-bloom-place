@@ -39,6 +39,7 @@ import { AccountDrawer } from "@/components/home/AccountDrawer";
 import { PainelAparencia } from "@/components/account/PainelAparencia";
 import { linhaDoPlano } from "@/lib/linha-do-plano";
 import { versaoVisivel } from "@/lib/versao-visivel";
+import { AvisoPresente } from "@/presente/AvisoPresente";
 
 /**
  * ABA VOCÊ (1.0.17) — a página que substitui a folha "Menu" do avatar da Home.
@@ -194,6 +195,7 @@ export default function Voce() {
     return (
       <VoceE
         nome={nome} email={user?.email ?? ""} iniciais={iniciais} secoes={secoes} versao={versao}
+        aviso={<AvisoPresente estilo="e" />}
         onAvaliar={podeAvaliar ? () => { clicar("avaliar"); trackEvent("voce_avaliar_card", {}); abrirPaginaDeAvaliacao("voce"); } : undefined}
         onConta={() => { clicar("conta"); trackEvent("account_drawer_open", { via: "voce" }); setFolha("account"); }}
         onSair={() => { clicar("sair"); void signOut(); }}
@@ -243,6 +245,9 @@ export default function Voce() {
             <ChevronRight className="w-4 h-4 text-muted-foreground/60 shrink-0" aria-hidden />
           </button>
         </section>
+
+        {/* 31/10: o presente do dia 3 — 1 linha discreta embaixo da conta/plano, fechável; chave PRESENTE_AVISO (off) */}
+        <AvisoPresente estilo="classico" />
 
         <Grupo titulo="Seu progresso">{progresso.map((i) => <Linha key={i.id} item={i} />)}</Grupo>
         <Grupo titulo="App">{app.map((i) => <Linha key={i.id} item={i} />)}</Grupo>

@@ -46,6 +46,37 @@ export async function resgatar(codigo: string): Promise<{ motivo: MotivoResgate;
   return { motivo: ((d.motivo as MotivoResgate) ?? "erro"), de };
 }
 
+/* ───────── 31/10: o presente do DIA 3 (/presente/dar) — pelo TOKEN do e-mail, sem login (_shared/presente-dia3.ts) ───────── */
+
+export type PixDia3 = { orderId: string; qrCode: string; qrCodeBase64: string | null; expiresAt: string };
+export type EstadoDia3 =
+  | { ok: false; motivo: "token" | "sem_acesso" | "pix" | "rede" }
+  | { ok: true; pago: true; pedido: string; codigo: string; de: string | null; resgatado: boolean }
+  | { ok: true; pago: false; pix: PixDia3 | null };
+
+/** O estado da página: o Pix (gerado agora com `gerar`) ou pago + o código. `pedido` = o QR que está na tela. */
+export async function estadoDia3(t: string, opts: { pedido?: string | null; gerar?: boolean; conferir?: boolean } = {}): Promise<EstadoDia3> {
+  const d = await chamar({ action: "dia3", t, ...(opts.pedido ? { pedido: opts.pedido } : {}), ...(opts.gerar ? { gerar: true } : {}), ...(opts.conferir ? { conferir: true } : {}) });
+  if (!d) return { ok: false, motivo: "rede" };
+  if (d.ok !== true) return { ok: false, motivo: (["token", "sem_acesso", "pix"].includes(String(d.motivo)) ? d.motivo : "pix") as "token" | "sem_acesso" | "pix" };
+  if (d.pago === true && typeof d.codigo === "string") {
+    return { ok: true, pago: true, pedido: String(d.pedido ?? ""), codigo: d.codigo, de: (d.de as string | null) ?? null, resgatado: d.resgatado === true };
+  }
+  const p = d.pix as PixDia3 | null | undefined;
+  return { ok: true, pago: false, pix: p && typeof p.orderId === "string" && typeof p.qrCode === "string" ? p : null };
+}
+
+export async function nomeDia3(t: string, pedido: string, nome: string): Promise<boolean> {
+  const d = await chamar({ action: "dia3_nome", t, pedido, nome });
+  return d?.ok === true;
+}
+
+/** Com login (o aviso da página Você): o token da própria conta. null = sem acesso pra sempre ou erro. */
+export async function tokenDia3(): Promise<string | null> {
+  const d = await chamar({ action: "dia3_token" });
+  return d?.ok === true && typeof d.t === "string" ? d.t : null;
+}
+
 /** Copiar no navegador do Instagram: clipboard API e, se negar, o textarea de sempre. */
 export async function copiarTexto(texto: string): Promise<boolean> {
   try { await navigator.clipboard.writeText(texto); return true; } catch { /* plano B */ }

@@ -159,10 +159,14 @@ const reais = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
 
 /* ───────────────────────── o cartão (presente pago) ───────────────────────── */
 
-function TelaCartao({ estado, nomeSugerido, evento, onCodigo, onNome, onContinuar }: {
+/** 31/10: exportado pra página /presente/dar (presente do dia 3) — lá não tem sessão: `buscarPresente`/`gravarNome` vão pelo token. */
+export function TelaCartao({ estado, nomeSugerido, evento, onCodigo, onNome, onContinuar, buscarPresente = meuPresente, gravarNome = gravarNomeDoPresente, rotuloContinuar = "Continuar" }: {
   estado: EstadoPresente; nomeSugerido: string | null;
   evento: (nome: string, extra?: Record<string, unknown>) => void;
   onCodigo: (codigo: string, de: string | null) => void; onNome: (de: string) => void; onContinuar: () => void;
+  buscarPresente?: (pedido: string) => Promise<{ codigo: string; de: string | null } | null>;
+  gravarNome?: (pedido: string, nome: string) => Promise<boolean>;
+  rotuloContinuar?: string;
 }) {
   const [nome, setNome] = useState(() => estado.de ?? nomeSugerido ?? "");
   const [copiado, setCopiado] = useState(false);
@@ -176,7 +180,7 @@ function TelaCartao({ estado, nomeSugerido, evento, onCodigo, onNome, onContinua
     let vivo = true;
     let tentativa = 0;
     const buscar = async () => {
-      const m = await meuPresente(pedido);
+      const m = await buscarPresente(pedido);
       if (!vivo) return;
       if (m) { onCodigo(m.codigo, m.de); if (m.de && !nome) setNome(m.de); return; }
       if (++tentativa < 6) window.setTimeout(() => { void buscar(); }, 2000);
@@ -193,7 +197,7 @@ function TelaCartao({ estado, nomeSugerido, evento, onCodigo, onNome, onContinua
     if (!pedido || limpo === (salvo.current ?? "")) return;
     salvo.current = limpo;
     onNome(limpo);
-    await gravarNomeDoPresente(pedido, limpo);
+    await gravarNome(pedido, limpo);
   };
   useEffect(() => {
     const t = window.setTimeout(() => { void salvarNome(); }, 900);
@@ -254,7 +258,7 @@ function TelaCartao({ estado, nomeSugerido, evento, onCodigo, onNome, onContinua
           {/* o texto em <span>: um <svg> sozinho como elemento faria a regra de área de toque do index.css (margem −8 px) pegar */}
           {copiado ? <><Check size={18} strokeWidth={3} /><span>Link copiado</span></> : <><Copy size={18} strokeWidth={2.4} /><span>Copiar link</span></>}
         </button>
-        <button type="button" className="pv-nao" onClick={() => { void salvarNome(); onContinuar(); }} data-testid="presente-continuar">Continuar</button>
+        <button type="button" className="pv-nao" onClick={() => { void salvarNome(); onContinuar(); }} data-testid="presente-continuar">{rotuloContinuar}</button>
       </div>
     </div>
   );

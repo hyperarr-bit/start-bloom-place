@@ -1,7 +1,7 @@
 /**
  * PLANNER 2027 VERSÃO B (31/10 — novidades-guardadas/2026-10-31/upsell-planner/BRIEF.md).
  *   · chaves: tudo OFF; com a chave off o app, o planner (A, byte a byte) e a oferta (/organizar e Fluxo2027) ficam na versão A;
- *   · o planner: 12 folhas nas 2 direções, com os dados dela (Seu 2027 + Rotina + Finanças do perfil ativo), escapados;
+ *   · o planner: 14 folhas (v2 de 31/10, eram 12) nas 2 direções, com os dados dela (Seu 2027 + Rotina + Finanças do perfil ativo), escapados;
  *     conta VAZIA = linhas pra escrever (nada de "undefined", "NaN", "R$ 0");
  *   · o app com a chave: prévia + o que entrou + convite pra planejar quando é pouco; site = janela de impressão;
  *     iPhone = as 12 folhas em PNG pela folha nativa (Share.share com 12 arquivos), nunca <a download>;
@@ -33,7 +33,7 @@ import { CHAVE_PACOTE_2027, CHAVE_PLANO_2027, CHAVE_DICA_2027, novoPlano2027, ty
 import { htmlDoPlanner2027 } from "@/lib/pacote-2027-pdf";
 import {
   CONTRASTE_DA_LINHA, EXEMPLO_DO_PLANNER, PLANNER_2027, PLANNER_ESTILO, TOTAL_DE_FOLHAS, estiloDoPlanner, folhasDoPlanner, htmlDoPlannerNovo, lerExtrasDoPlanner,
-  linhasDosTons, contraste, plannerNovoLigado, resumoDoPlanner, cssDoPlanner, type DadosDoPlanner,
+  linhasDosTons, contraste, plannerNovoLigado, ROTULOS_DAS_FOLHAS, resumoDoPlanner, cssDoPlanner, type DadosDoPlanner,
 } from "@/lib/planner-2027";
 import { NOTA_U2027_PLANNER, PLANNER_B_NO_APP_IPHONE, U27_PLANNER, ehLinkDoPlannerB, imagemDoPlanner, portaDoLink, srcsetDoPlanner, u27PlannerLigado } from "@/lib/planner-2027-chave";
 import { destinoSeguro } from "@/lib/destino-seguro";
@@ -116,9 +116,9 @@ describe("as chaves (tudo desligado)", () => {
 
 const sujeira = /undefined|NaN|\bnull\b|R\$ 0(?![\d,.])|\[object/;
 
-describe("o planner B: 12 folhas, 2 direções, os dados dela", () => {
+describe("o planner B: as folhas, 2 direções, os dados dela", () => {
   for (const estilo of ["core", "codex"] as const) {
-    it(`${estilo}: 12 folhas com as metas, o dinheiro, as datas, os hábitos e as contas — escapados`, () => {
+    it(`${estilo}: as folhas com as metas, o dinheiro, as datas, os hábitos e as contas — escapados`, () => {
       const d: DadosDoPlanner = { ...EXEMPLO_DO_PLANNER, plano: { ...EXEMPLO_DO_PLANNER.plano, metas: ["Juntar <R$ 5 mil> & \"viajar\"", "Ler", ""] } };
       const f = folhasDoPlanner(d, estilo);
       expect(f).toHaveLength(TOTAL_DE_FOLHAS);
@@ -127,8 +127,8 @@ describe("o planner B: 12 folhas, 2 direções, os dados dela", () => {
       expect(h).not.toContain("<R$ 5 mil>");
       for (const s of ["R$ 3.200", "R$ 450", "R$ 5.400", "Aniversário da mãe", "Água ao acordar", "Aluguel", "R$ 1.450", "R$ 1.378", "Dev. Pessoal", "Detox"]) expect(h).toContain(s);
       expect(h).not.toMatch(sujeira);
-      for (let i = 1; i <= 12; i++) expect(h).toContain(`data-folha="${i}"`);
-      expect(h).toContain(`${12} / ${12} · feito com CORE`);
+      for (let i = 1; i <= TOTAL_DE_FOLHAS; i++) expect(h).toContain(`data-folha="${i}"`);
+      expect(h).toContain(`${TOTAL_DE_FOLHAS} / ${TOTAL_DE_FOLHAS} · feito com CORE`);
     });
     it(`${estilo}: conta VAZIA = linhas pra escrever, sem 'R$ 0', 'undefined' nem painel sem nada`, () => {
       const h = folhasDoPlanner(VAZIO, estilo).join("");
@@ -164,7 +164,7 @@ describe("o planner B: 12 folhas, 2 direções, os dados dela", () => {
   });
   it("crítica r1: trilhas de grid que encolhem (o texto longo corta com '…' em vez de estourar o painel e o calendário)", () => {
     const css = cssDoPlanner("core");
-    for (const r of [".pl-metas{display:grid;grid-template-columns:minmax(0,1fr)", ".pl-datas{display:grid;grid-template-columns:minmax(0,1fr)", "grid-template-columns:repeat(3,minmax(0,1fr))", ".pl-mes{min-width:0}", ".pl-extra{margin-left:auto"]) expect(css).toContain(r);
+    for (const r of [".pl-metas{display:grid;grid-template-columns:minmax(0,1fr)", ".pl-datas{display:grid;grid-template-columns:minmax(0,1fr)", "grid-template-columns:repeat(3,minmax(0,1fr))", ".pl-mes{min-width:0", ".pl-extra{margin-left:auto"]) expect(css).toContain(r);
     // a régua de verdade (Chromium + WebKit, 80 letras em toda meta e data): scripts/planner-2027-medir.ts
   });
   it("crítica r1: 7+ datas → '+N no calendário' é a 6ª linha da lista (não o cabeçalho); contas fixas: 7 + '+N no seu Finanças'", () => {
@@ -173,15 +173,48 @@ describe("o planner B: 12 folhas, 2 direções, os dados dela", () => {
     const f = folhasDoPlanner({ ...EXEMPLO_DO_PLANNER, plano: { ...EXEMPLO_DO_PLANNER.plano, datas }, contas }, "core");
     expect(f[1]).toContain('<li class="mais">+4 no calendário</li>');
     expect(f[1]).not.toContain('class="pl-extra">+');
-    // crítica r2 (técnico BAIXA 5): com mais de 8, 7 contas + "+N no seu Finanças" (nada some sem aviso)
-    expect(f[4]).toContain('<tr class="pl-tr-mais"><td colspan="4">+5 no seu Finanças</td></tr>');
-    expect((f[4].match(/<tr><td>/g) ?? []).length).toBe(12 + 7);
+    // v2: o "Meu mês" (folha 6) mostra até 6 vencimentos; com mais, 5 + "+N no seu Finanças" (nada some sem aviso) e o total de TODAS
+    expect(f[5]).toContain('<div class="pl-venc-mais">+7 no seu Finanças</div>');
+    expect((f[5].match(/class="pl-vn"/g) ?? []).length).toBe(5);
+    expect(f[5]).toContain("Total das contas</span><b>R$ 120</b>");
+  });
+  it("v2 (31/10, 'piorou o do Codex'): Finanças = 'Meu mês' do Codex (cartões + Receitas, Gastos, Orçamento, Vencimentos) com os dados dela", () => {
+    expect(TOTAL_DE_FOLHAS).toBe(14);
+    expect(ROTULOS_DAS_FOLHAS).toHaveLength(TOTAL_DE_FOLHAS);
+    for (const e of ["codex", "core"] as const) {
+      const mes = folhasDoPlanner(EXEMPLO_DO_PLANNER, e)[5];
+      for (const s of ["Meu", "mês", "Receitas", "Despesas", "Saldo do mês", "Gastos", "Orçamento", "Vencimentos", "posso gastar R$ 3.200", "quero guardar R$ 450", "Limite do mês</span><b>R$ 3.200</b>", "Aluguel", "Dia 5", "R$ 1.450", "Total das contas</span><b>R$ 1.798,70</b>"]) expect(mes).toContain(s);
+      expect(mes).not.toContain("Fevereiro"); // nada de tabela de 12 meses repetindo o mesmo valor
+      const vazio = folhasDoPlanner(VAZIO, e)[5];
+      expect(vazio).not.toMatch(sujeira);
+      expect((vazio.match(/Dia __/g) ?? []).length).toBe(6); // 6 vencimentos pra escrever
+    }
+  });
+  it("v2: Rotina = 'Minha semana' do Codex (hábitos com 7 bolinhas S–D, agenda, O que importa, Uma nota pra mim)", () => {
+    for (const e of ["codex", "core"] as const) {
+      const sem = folhasDoPlanner(EXEMPLO_DO_PLANNER, e)[6];
+      for (const s of ["semana", "Pequenos hábitos", "Minha agenda", "O que importa", "Uma nota pra mim", "Água ao acordar", "Dormir mais cedo", "SEG", "DOM"]) expect(sem).toContain(s);
+      expect((sem.split('class="pl-hab"')[1].split("</div>")[0].match(/<i><\/i>/g) ?? []).length).toBe(5 * 7);
+      const longa = folhasDoPlanner({ ...EXEMPLO_DO_PLANNER, habitos: Array.from({ length: 9 }, (_, i) => `Hábito ${i}`) }, e)[6];
+      expect(longa).toContain("+4 na sua Rotina");
+      expect((folhasDoPlanner(VAZIO, e)[6].split('class="pl-hab"')[1].match(/class="pl-hab-nome"><span class="pl-ln"/g) ?? []).length).toBe(5);
+    }
+  });
+  it("v2: a escala do original do Codex — corpo 26 px, título de painel 32, valor em destaque 44 (1240 de largura)", () => {
+    const css = cssDoPlanner("codex");
+    expect(css).toContain("font-size:26px;line-height:1.3");
+    expect(css).toMatch(/\.pl-ptopo h3,\.pl \.pl-bcab h3\{[^}]*font-size:32px/);
+    expect(css).toMatch(/\.pl-cards b\{[^}]*font-size:44px/);
+    // nenhuma letra abaixo de 18 px no CSS das folhas (a régua de verdade no navegador: scripts/planner-2027-medir.ts)
+    for (const m of css.matchAll(/font-size:(\d+)px/g)) expect(Number(m[1])).toBeGreaterThanOrEqual(18);
   });
   it("crítica r1: a B tem a capa com os 4 módulos que entram e os 3 cards do dinheiro no tom do Finanças", () => {
     const f = folhasDoPlanner(EXEMPLO_DO_PLANNER, "core");
     expect((f[0].match(/class="pl-ico"/g) ?? []).length).toBe(4);
-    const cards = f[4].split('class="pl-cards"')[1].split("</div></div>")[0];
-    expect((cards.match(/--p:#fffbeb/g) ?? []).length).toBe(3);
+    for (const i of [1, 5]) { // os cartões do "Meu ano" e do "Meu mês"
+      const cards = f[i].split('class="pl-cards"')[1].split("</div></div>")[0];
+      expect((cards.match(/--p:#fffbeb/g) ?? []).length).toBe(3);
+    }
   });
   it("a impressão do site: A4 sem margem, 1 folha por página, fontes carregadas (Inter + Instrument Serif)", () => {
     const h = htmlDoPlannerNovo(EXEMPLO_DO_PLANNER, "codex", "https://www.coreaplicativo.com.br");
@@ -190,7 +223,7 @@ describe("o planner B: 12 folhas, 2 direções, os dados dela", () => {
     expect(h).toContain("https://www.coreaplicativo.com.br/fonts/instrument-serif-italic-latin.woff2");
     expect(h).toContain("https://www.coreaplicativo.com.br/fonts/inter-latin.woff2");
     expect(h).not.toContain("googleapis");
-    expect((h.match(/class="pg pl-folha/g) ?? []).length).toBe(12);
+    expect((h.match(/class="pg pl-folha/g) ?? []).length).toBe(TOTAL_DE_FOLHAS);
     // crítica r1: no celular a janela tinha 591 px e nenhuma saída — barra Voltar/Imprimir (só na tela) e zoom que cabe
     expect(h).toContain('data-testid="planner-barra-impressao"');
     expect(h).toContain("← Voltar");
@@ -262,7 +295,7 @@ describe("o app: chave on (QA ?planner27=on)", () => {
     fireEvent.click(screen.getByTestId("pacote-2027-pdf"));
     const b = await screen.findByTestId("planner-b");
     expect(b.getAttribute("data-estilo")).toBe("core");
-    expect(screen.getAllByRole("img", { name: /^Folha \d+/ })).toHaveLength(12);
+    expect(screen.getAllByRole("img", { name: /^Folha \d+/ })).toHaveLength(TOTAL_DE_FOLHAS);
     const itens = screen.getByTestId("planner-b-itens").textContent!;
     for (const s of ["3 metas de 2027", "Gastar e guardar por mês", "5 datas marcadas", "2 hábitos da sua Rotina", "1 conta fixa do Finanças"]) expect(itens).toContain(s);
     expect(screen.queryByTestId("planner-b-planejar")).toBeNull();
@@ -274,7 +307,7 @@ describe("o app: chave on (QA ?planner27=on)", () => {
     montar(CONTA_VAZIA);
     fireEvent.click(screen.getByTestId("pacote-2027-pdf"));
     await screen.findByTestId("planner-b");
-    expect(screen.getAllByRole("img", { name: /^Folha \d+/ })).toHaveLength(12);
+    expect(screen.getAllByRole("img", { name: /^Folha \d+/ })).toHaveLength(TOTAL_DE_FOLHAS);
     expect(screen.getByTestId("planner-b-itens").textContent).toContain("Metas: linhas pra escrever");
     expect(screen.getByTestId("planner-b").innerHTML).not.toMatch(sujeira);
     fireEvent.click(screen.getByTestId("planner-b-planejar"));
@@ -291,7 +324,7 @@ describe("o app: chave on (QA ?planner27=on)", () => {
     expect(abrir).toHaveBeenCalledTimes(1);
     const html = String(janela.document.write.mock.calls[0][0]);
     expect(html).toContain('class="pl pl-codex"');
-    expect((html.match(/data-folha=/g) ?? []).length).toBe(12);
+    expect((html.match(/data-folha=/g) ?? []).length).toBe(TOTAL_DE_FOLHAS);
     await waitFor(() => expect(janela.print).toHaveBeenCalled(), { timeout: 3000 });
     abrir.mockRestore();
   });
@@ -304,9 +337,9 @@ describe("o app: chave on (QA ?planner27=on)", () => {
     expect((await screen.findByTestId("planner-b-baixar")).textContent).toContain("Salvar ou imprimir");
     fireEvent.click(screen.getByTestId("planner-b-baixar"));
     await waitFor(() => expect(cap.share).toHaveBeenCalledTimes(1), { timeout: 4000 });
-    expect(foto.gerarPng).toHaveBeenCalledTimes(12);
+    expect(foto.gerarPng).toHaveBeenCalledTimes(TOTAL_DE_FOLHAS);
     const arg = (cap.share.mock.calls[0] as unknown as [{ files: string[] }])[0];
-    expect(arg.files).toHaveLength(12);
+    expect(arg.files).toHaveLength(TOTAL_DE_FOLHAS);
     expect(arg.files[0]).toMatch(/\/planner-2027-01\.png$/); // crítica r1: o nome não diz a direção
     expect(criar.mock.calls.filter((c) => c[0] === "a")).toHaveLength(0);
     criar.mockRestore();
@@ -368,7 +401,7 @@ describe("crítica r1: o site no CELULAR não depende do window.print", () => {
     fireEvent.click(de);
     await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
     const arg = (share.mock.calls[0] as unknown as [{ files: File[] }])[0];
-    expect(arg.files).toHaveLength(12);
+    expect(arg.files).toHaveLength(TOTAL_DE_FOLHAS);
     expect(arg.files[11].name).toBe("planner-2027-12.png");
     expect(abrir).not.toHaveBeenCalled();
     expect(criar.mock.calls.filter((c) => c[0] === "a")).toHaveLength(0);
@@ -432,7 +465,7 @@ describe("crítica r1: o site no CELULAR não depende do window.print", () => {
     montar(CONTA_CHEIA);
     fireEvent.click(screen.getByTestId("pacote-2027-pdf"));
     expect(await screen.findByTestId("planner-b-compartilhar", undefined, { timeout: 4000 })).toBeTruthy();
-    expect(foto.gerarPng).toHaveBeenCalledTimes(12);
+    expect(foto.gerarPng).toHaveBeenCalledTimes(TOTAL_DE_FOLHAS);
   });
 
   it("crítica r2 (compradora ALTA 1): no Instagram as 12 folhas viram IMAGENS na prévia (toque e segure pra salvar) + o link", async () => {
@@ -446,7 +479,7 @@ describe("crítica r1: o site no CELULAR não depende do window.print", () => {
       fireEvent.click(screen.getByTestId("pacote-2027-pdf"));
       expect((await screen.findByTestId("planner-b-segure", undefined, { timeout: 4000 })).textContent).toBe("Toque e segure uma folha pra salvar");
       const imgs = screen.getAllByTestId("planner-b-imagem");
-      expect(imgs).toHaveLength(12);
+      expect(imgs).toHaveLength(TOTAL_DE_FOLHAS);
       // (o -webkit-touch-callout:default vai no style; o jsdom não guarda essa propriedade — conferido no Playwright)
       expect(screen.getByTestId("planner-b-copiar-link")).toBeTruthy();
       // conta vazia: o convite vem DEPOIS do bloco de salvar (crítica r2, MEDIA 5: o botão fica na 1ª tela)

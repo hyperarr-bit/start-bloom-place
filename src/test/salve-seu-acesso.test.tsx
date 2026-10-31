@@ -125,10 +125,10 @@ describe("a folha", () => {
     const suporte = screen.getByText("Falar com o suporte").closest("a")!;
     expect(suporte.getAttribute("href")).toMatch(/^mailto:contato@coreaplicativo\.com\.br\?subject=/);
     expect(decodeURIComponent(suporte.getAttribute("href")!)).toContain(anonima.id);
-    fireEvent.change(screen.getByLabelText("Código de 6 números"), { target: { value: "123456" } });
+    fireEvent.change(screen.getByLabelText("Código de 8 números"), { target: { value: "12345678" } });
     fireEvent.click(screen.getByRole("button", { name: "Entrar e juntar minha compra" }));
     await waitFor(() => expect(h.trazer).toHaveBeenCalled());
-    expect(h.verifyOtp).toHaveBeenCalledWith({ email: "maria@email.com", token: "123456", type: "email" });
+    expect(h.verifyOtp).toHaveBeenCalledWith({ email: "maria@email.com", token: "12345678", type: "email" });
     expect(h.eventos).toContainEqual(["salve_acesso_ok", { via: "codigo", compra: "movida" }]);
   });
 
@@ -140,7 +140,7 @@ describe("a folha", () => {
     fireEvent.change(screen.getByLabelText("Seu e-mail"), { target: { value: "maria@email.com" } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar meu acesso" }));
     await screen.findByText("Esse e-mail já tem conta");
-    fireEvent.change(screen.getByLabelText("Código de 6 números"), { target: { value: "123456" } });
+    fireEvent.change(screen.getByLabelText("Código de 8 números"), { target: { value: "12345678" } });
     fireEvent.click(screen.getByRole("button", { name: "Entrar e juntar minha compra" }));
     await screen.findByText(/ficou guardada à parte/);
   });
@@ -152,7 +152,7 @@ describe("a folha", () => {
     fireEvent.change(screen.getByLabelText("Seu e-mail"), { target: { value: "maria@email.com" } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar meu acesso" }));
     await screen.findByText("Esse e-mail já tem conta");
-    fireEvent.change(screen.getByLabelText("Código de 6 números"), { target: { value: "000000" } });
+    fireEvent.change(screen.getByLabelText("Código de 8 números"), { target: { value: "00000000" } });
     fireEvent.click(screen.getByRole("button", { name: "Entrar e juntar minha compra" }));
     await screen.findByText(/Código errado/);
     expect(h.trazer).not.toHaveBeenCalled();

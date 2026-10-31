@@ -12,7 +12,7 @@
  *   fixo      o botão do rodapé só aparece depois que a pessoa passou pela demo (e some com a oferta/fim na tela).
  *
  * PIX_REAL = false (protótipo): as ofertas LN_* ainda não existem nas funções no ar. Fora do domínio de produção o Pix
- * é SIMULADO (mesmas telas; "Já paguei" confirma; e-mail com "+existe" simula conta existente, código 123456). No
+ * é SIMULADO (mesmas telas; "Já paguei" confirma; e-mail com "+existe" simula conta existente, código 12345678). No
  * domínio de produção com PIX_REAL false, o botão avisa que o pagamento desta página ainda não está ligado.
  *
  * Eventos (analytics_events, mesmo endpoint/chave anon do /missao; SÓ no domínio de produção; no dev ficam em
@@ -388,7 +388,7 @@ function passoDoEmail(email: string): Promise<PassoEmail> {
   return pg().then((m) => m.emailAntesDoPix(email)).catch(() => ({ erro: "Não consegui salvar seu e-mail agora. Tenta de novo em alguns segundos.", motivo: "falhou" }));
 }
 function passoDoCodigo(email: string, codigo: string): Promise<PassoEmail> {
-  if (SIMULADO) return espera(500).then(() => (codigo.trim() === "123456" ? { ok: true as const, via: "codigo" } : { erro: "Código errado ou vencido. Confere no seu e-mail.", motivo: "codigo_errado" }));
+  if (SIMULADO) return espera(500).then(() => (codigo.trim() === "12345678" ? { ok: true as const, via: "codigo" } : { erro: "Código errado ou vencido. Confere no seu e-mail.", motivo: "codigo_errado" }));
   return pg().then((m) => m.entrarAntesDoPix(email, codigo)).catch(() => ({ erro: "Não consegui entrar agora. Tenta de novo em alguns segundos.", motivo: "falhou" }));
 }
 function criarPix(oferta: OfertaLanding, emailConhecido: string | null): Promise<Gerado> {
@@ -619,7 +619,7 @@ async function entrarComCodigo(codigo: string) {
   faseConta = "entrando"; erroEmail = null; render();
   if (SIMULADO) {
     await espera(600);
-    if (codigo.trim() !== "123456") { faseConta = "codigo"; erroEmail = "Código errado. Confere no seu e-mail."; render(); return; }
+    if (codigo.trim() !== "12345678") { faseConta = "codigo"; erroEmail = "Código errado. Confere no seu e-mail."; render(); return; }
     faseConta = "email"; await prontoComEmail(emailDigitado, "codigo"); return;
   }
   const r = await (await pg()).entrarComCodigo(emailDigitado, codigo);
@@ -679,15 +679,15 @@ function renderCodigoAntes(a: NonNullable<typeof antes>) {
         <h3>Esse e-mail já tem conta</h3>
         <p>Mandamos um código pra <b>${esc(a.email)}</b>. Digite aqui e o Pix sai na sua conta.</p>
         <div class="lp-form">
-          <label for="lp-codigo-antes">Código de 6 números</label>
-          <input class="lp-campo grande" id="lp-codigo-antes" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" value="${esc(codigoAntes)}" />
-          <button type="button" class="lp-cta" id="lp-entrar-pagar" ${codigoAntes.trim().length >= 6 && !entrando ? "" : "disabled"}>${entrando ? '<i class="lp-gira"></i>Entrando…' : `Entrar e pagar ${reais(VALOR_OFERTA[ofertaAtual()])}`}</button>
+          <label for="lp-codigo-antes">Código de 8 números</label>
+          <input class="lp-campo grande" id="lp-codigo-antes" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="00000000" value="${esc(codigoAntes)}" />
+          <button type="button" class="lp-cta" id="lp-entrar-pagar" ${codigoAntes.trim().length >= 8 && !entrando ? "" : "disabled"}>${entrando ? '<i class="lp-gira"></i>Entrando…' : `Entrar e pagar ${reais(VALOR_OFERTA[ofertaAtual()])}`}</button>
           ${a.erro ? `<p class="lp-erro" role="alert">${esc(a.erro)}</p>` : ""}
         </div>
         <div class="lp-links"><button type="button" class="lp-link" id="lp-outro-email">Usar outro e-mail</button><button type="button" class="lp-link" id="lp-reenviar">Mandar de novo</button></div>
       </div>`;
   const c = $<HTMLInputElement>("lp-codigo-antes"); const b = $<HTMLButtonElement>("lp-entrar-pagar");
-  c.addEventListener("input", () => { codigoAntes = c.value.replace(/\D/g, "").slice(0, 6); b.disabled = codigoAntes.length < 6 || antes?.fase === "entrando"; });
+  c.addEventListener("input", () => { codigoAntes = c.value.replace(/\D/g, "").slice(0, 8); b.disabled = codigoAntes.length < 8 || antes?.fase === "entrando"; });
   c.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !b.disabled) void gerar(codigoAntes); });
   b.addEventListener("click", () => { void gerar(codigoAntes); });
   $("lp-outro-email").addEventListener("click", () => {
@@ -767,7 +767,7 @@ function render() {
         <p>${codigo ? `Esse e-mail já tem conta. Mandamos um código pra <b>${esc(emailDigitado)}</b>.` : "Agora só falta o seu e-mail pra criar sua conta."}</p>
         <div class="lp-form">
           ${codigo
-            ? `<label for="lp-codigo">Código de 6 números</label><input class="lp-campo grande" id="lp-codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" />
+            ? `<label for="lp-codigo">Código de 8 números</label><input class="lp-campo grande" id="lp-codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="00000000" />
                <button type="button" class="lp-cta" id="lp-entrar" disabled>${faseConta === "entrando" ? '<i class="lp-gira"></i>' : ""}Entrar e liberar meu CORE</button>`
             : `<label for="lp-email">Seu e-mail</label><input class="lp-campo grande" id="lp-email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" placeholder="voce@email.com" value="${esc(emailDigitado)}" />
                <button type="button" class="lp-cta" id="lp-criar" ${EMAIL_OK.test(emailDigitado) && faseConta !== "salvando" ? "" : "disabled"}>${faseConta === "salvando" ? '<i class="lp-gira"></i>Criando sua conta…' : `Criar minha conta ${ICO_SETA}`}</button>`}
@@ -776,7 +776,7 @@ function render() {
       </div>`;
     if (codigo) {
       const c = $<HTMLInputElement>("lp-codigo"); const b = $<HTMLButtonElement>("lp-entrar");
-      c.addEventListener("input", () => { b.disabled = c.value.trim().length < 6; });
+      c.addEventListener("input", () => { b.disabled = c.value.trim().length < 8; });
       b.addEventListener("click", () => { void entrarComCodigo(c.value); });
     } else {
       const e = $<HTMLInputElement>("lp-email"); const b = $<HTMLButtonElement>("lp-criar");

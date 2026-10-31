@@ -256,10 +256,10 @@ describe("braço email: o e-mail ANTES do Pix", () => {
     expect(document.getElementById("lp-card")!.getAttribute("data-fase")).toBe("codigo"); // o CSS esconde a oferta
     expect(nomes()).not.toContain("landing_pix_gerado");
     expect(eventos().find((e) => e.nome === "landing_email_antes_erro")).toMatchObject({ motivo: "tem_conta" });
-    digitar("lp-codigo-antes", "111111");
+    digitar("lp-codigo-antes", "11111111");
     (document.getElementById("lp-entrar-pagar") as HTMLButtonElement).click();
     await vi.waitFor(() => expect(document.querySelector('[data-testid="landing-email-tem-conta"] .lp-erro')?.textContent).toContain("Código errado"), { timeout: 3000 });
-    digitar("lp-codigo-antes", "123456");
+    digitar("lp-codigo-antes", "12345678");
     (document.getElementById("lp-entrar-pagar") as HTMLButtonElement).click();
     await espera('[data-testid="landing-codigo"]');
     expect(document.querySelector('[data-testid="landing-email-garantido"]')!.textContent).toContain("maria+existe@email.com");
@@ -283,7 +283,7 @@ describe("braço email: o e-mail ANTES do Pix", () => {
     digitar("lp-email-antes", "maria+jatem@email.com");
     pagar();
     await espera('[data-testid="landing-email-tem-conta"]');
-    digitar("lp-codigo-antes", "123456");
+    digitar("lp-codigo-antes", "12345678");
     (document.getElementById("lp-entrar-pagar") as HTMLButtonElement).click();
     const card = await espera('[data-testid="landing-ja-tem"]');
     expect(card.textContent).toContain("maria+jatem@email.com");

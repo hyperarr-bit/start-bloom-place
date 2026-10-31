@@ -136,13 +136,13 @@ export default function SalveSeuAcesso() {
             <p className="mt-2 text-[15px] leading-snug text-muted-foreground">
               Mandamos um código pra <b className="text-foreground">{limpo}</b>. Entre com ele e a sua compra vai junto pra essa conta.
             </p>
-            <label htmlFor="salve-acesso-codigo" className="mt-5 block text-[13px] font-semibold text-muted-foreground">Código de 6 números</label>
-            <input id="salve-acesso-codigo" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" value={codigo}
-              onChange={(e) => setCodigo(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              onKeyDown={(e) => { if (e.key === "Enter" && codigo.length >= 6 && !ocupado) void entrar(); }}
+            <label htmlFor="salve-acesso-codigo" className="mt-5 block text-[13px] font-semibold text-muted-foreground">Código de 8 números</label>
+            <input id="salve-acesso-codigo" inputMode="numeric" autoComplete="one-time-code" maxLength={8} placeholder="00000000" value={codigo}
+              onChange={(e) => setCodigo(e.target.value.replace(/\D/g, "").slice(0, 8))}
+              onKeyDown={(e) => { if (e.key === "Enter" && codigo.length >= 8 && !ocupado) void entrar(); }}
               className="mt-2 h-14 w-full rounded-xl border-[1.5px] border-border bg-background px-4 text-[18px] tracking-[0.3em] outline-none focus:border-primary" />
             {erro && <p role="alert" className="mt-2 text-[13.5px] font-semibold text-destructive">{erro}</p>}
-            <button type="button" disabled={codigo.length < 6 || ocupado} onClick={() => void entrar()}
+            <button type="button" disabled={codigo.length < 8 || ocupado} onClick={() => void entrar()}
               className="mt-4 h-14 w-full rounded-2xl bg-foreground text-[16px] font-bold text-background disabled:opacity-45">
               {fase === "entrando" ? "Entrando…" : "Entrar e juntar minha compra"}
             </button>

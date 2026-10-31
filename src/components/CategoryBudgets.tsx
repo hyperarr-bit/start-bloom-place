@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/EmptyState";
 import { useFinanceCategories, type FinanceCategory } from "@/lib/finance-categories";
 import { doPerfil, nomeDoPerfil, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
-import { type Parcela, valorDaParcelaNoMes } from "@/lib/finance-parcelas";
+import { type Parcela, parcelasComoGastos } from "@/lib/finance-parcelas";
 import { numeroBR } from "@/lib/data-normalizers";
 
 /** Dinheiro com 2 casas (26/09): "R$ 1.850,00 / R$ 1.900,00". */
@@ -19,10 +19,8 @@ const brl = (v: number) => (Number(v) || 0).toLocaleString("pt-BR", { minimumFra
  * e variáveis. A parcela do mês entra como gasto da categoria dela, com o
  * perfil dela (o filtro por perfil de cada bloco vale pra ela também).
  */
-export const parcelasComoGastos = (parcelas: Parcela[]): { category: string; value: number; perfil?: string }[] =>
-  (Array.isArray(parcelas) ? parcelas : [])
-    .map((p) => ({ category: p?.category === "roupa" ? "vestuario" : p?.category || "outros", value: valorDaParcelaNoMes(p), perfil: p?.perfil }))
-    .filter((g) => g.value > 0);
+// 31/10: mora em lib/finance-parcelas (o planner 2027 soma igual, sem React)
+export { parcelasComoGastos };
 
 /**
  * LIMITES POR PERFIL (09/09) — cliente pagante: "a divisão de empresa e

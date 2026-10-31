@@ -118,6 +118,9 @@ w.__landingDiag = diag;
 /* ───────────────────────── a URL do anúncio fica no heap (o Instagram zera o storage, a URL não) ───────────────────────── */
 const URL_DE_CHEGADA = location.href;
 const BUSCA = new URLSearchParams(location.search);
+/** 31/10 (crítica r1 técnico MEDIA 4): só no simulado — ?simconta=ms atrasa a "conta pronta" (o finalizarConta de verdade
+ *  leva 1–3 s), pra testar o caminho de produção do 2027 antecipado no navegador. Em produção não existe. */
+const SIM_CONTA_MS = SIMULADO ? Math.min(20_000, Math.max(0, Number(BUSCA.get("simconta")) || 0)) : 0;
 const brTitulo = bracoTituloDoHtml();
 const brOferta = bracoOfertaDoHtml();
 const brCheckout = bracoCheckoutDoHtml(); // 29/10: "livre" (o de hoje) | "email" (e-mail antes do Pix)
@@ -1047,6 +1050,7 @@ async function salvarEmailPix(email: string) {
 async function prontoComEmail(email: string, via: string) {
   const p = estado.pago;
   if (!p) return;
+  if (SIMULADO && SIM_CONTA_MS) await espera(SIM_CONTA_MS);
   if (!SIMULADO) {
     try { await (await pg()).finalizarConta(p.orderId, { attr: atrib, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, oferta: p.oferta, landing_session_id: sessao }); } catch { /* o e-mail é extra */ }
   }
@@ -1304,7 +1308,11 @@ function renderDoCartao() {
         if (rot) { const antes = rot.textContent; rot.textContent = "Copiado ✓"; window.setTimeout(() => { if (rot.isConnected && rot.textContent === "Copiado ✓") rot.textContent = antes; }, 1500); }
       }
     });
-    $("lp-ja-paguei").addEventListener("click", () => { void jaPaguei(); });
+    $("lp-ja-paguei").addEventListener("click", (ev) => {
+      // 31/10 (crítica r1 compradora BAIXA 5, só com o 2027 ligado): o toque responde na hora — o corte pra página é a resposta
+      if (U2027) { const b = ev.currentTarget as HTMLButtonElement; b.textContent = "Conferindo…"; b.disabled = true; }
+      void jaPaguei();
+    });
     // 29/10 (dono): no vitalício só existe 1 plano — o "Mudar o plano" só tirava a pessoa do Pix gerado; fica só no braço "ano" (caixinha)
     document.getElementById("lp-mudar")?.addEventListener("click", () => { evento("landing_cta", { onde: "mudar_plano" }); aviso = null; salvar({ fase: "oferta" }); });
     const campo = document.getElementById("lp-email-pix") as HTMLInputElement | null;
@@ -1431,6 +1439,8 @@ const apiU2027 = (): import("./upsell-2027").ApiU2027 => SIMULADO
  * e o e-mail conhecido, a oferta toma o cartão JÁ no pago; o Pix do 2027 espera a conta final (contaPronta) por dentro.
  */
 let u27Antes = false;
+/** a oferta antecipada voltou por uma RECARGA (não há QR na tela pra ficar parado: o "Pagamento confirmado" entra já) */
+let u27AntesDaRecarga = false;
 let avisarContaU27: (() => void) | null = null;
 const contaProntaU27 = new Promise<void>((ok) => { avisarContaU27 = ok; });
 /** só a oferta ANTECIPADA (no pago, conta ainda sendo finalizada) espera; o link do e-mail, a retomada e a conta pronta, não */
@@ -1473,9 +1483,10 @@ function u2027Toma(): boolean {
       card.dataset.fase = "conta";
       caixa.innerHTML = `<div class="lp-pago" data-testid="u2027-carregando"><div class="lp-pix-gerando"><b>Pagamento confirmado</b><div class="lp-progresso"><i></i></div></div></div>`;
     };
-    if (!(estado.fase === "pago" && u27Antes)) carregando();
+    if (!(estado.fase === "pago" && u27Antes) || u27AntesDaRecarga) carregando();
     // rede lenta: o QR parado depois do "Já paguei" parece que nada aconteceu — passou de 1,2 s, mostra que confirmou
-    else window.setTimeout(() => { if (!modU2027 && estado.fase === "pago" && u27Antes) carregando(); }, 1200);
+    // crítica r1 (técnico BAIXA 6): 400 ms (1,2 s parecia travado)
+    else window.setTimeout(() => { if (!modU2027 && estado.fase === "pago" && u27Antes) carregando(); }, 400);
     void carregarU2027().then(() => render(), () => render());
     return true;
   }
@@ -1585,6 +1596,12 @@ if (VOLTA_U2027) {
 
 /* voltou com Pix aberto (o banco recarregou a aba) / já pago: a tela certa */
 if (estado.fase === "qr") { copiado = null; conferirEmLoop(); }
+/* 31/10 (crítica r1 técnico BAIXA 5, só com o 2027 ligado): recarregou no meio da conta sendo finalizada, com o e-mail já
+ * dado — a oferta antecipada volta e a conta termina sozinha (antes: o cartão pedia o e-mail de novo, campo vazio) */
+if (U2027 && estado.fase === "pago" && estado.pago && estado.emailPix && !VOLTA_U2027) {
+  u27Antes = true; u27AntesDaRecarga = true;
+  void prontoComEmail(estado.emailPix, "recarga");
+}
 if (estado.fase !== "oferta") {
   // r1 (pix M2, v2): no Chromium a restauração de rolagem da recarga vencia o rolarAte e deixava o QR fora da tela
   if (V2) { try { history.scrollRestoration = "manual"; } catch { /* noop */ } }

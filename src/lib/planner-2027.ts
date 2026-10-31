@@ -340,6 +340,8 @@ function fSemana(d: DadosDoPlanner, e: EstiloPlanner): string {
  * escrever. Nada de "R$ 0": valor zero vira linha. Lista maior que o espaço = as que cabem + "+N no seu Finanças/Rotina". */
 const MAX_RECEITAS = 6;
 const MAX_GASTOS = 6;
+/** crítica r1 (honestidade BAIXA 6) pediu 6 — medido em A4 (WebKit) com 4 horários na agenda e 5 hábitos: cabem 3 no codex e
+ *  4 no core; 6 escondia 2–3 tarefas SEM o "+N". Fica 3 + "+N na sua Rotina" (nada some calado). */
 const MAX_IMPORTA = 3;
 const MAX_ORC = 6;
 const reais = (v: number) => (v < 0 ? `−${brl(-v)}` : brl(v));
@@ -377,22 +379,29 @@ function fMeuMesCheio(d: DadosDoPlanner, m: MesDoPlanner, e: EstiloPlanner): str
   const pGastos = bloco("saida", e, "Gastos", m.gastos.length ? "do seu Finanças" : "No mês",
     `<div class="pl-pauta pl-pauta-f">${cab("Dia", "Com o quê", "", "Valor")}${linhasCheias(m.gastos, MAX_GASTOS, "Finanças", linhaValor)}</div>`, total("Total dos gastos", m.totalGastos));
   const orc = m.orcamento.slice(0, MAX_ORC);
-  const limiteDoMes = p.gastarMes > 0 ? p.gastarMes : Math.round(m.orcamento.reduce((s, o) => s + o.limite, 0) * 100) / 100;
+  // crítica r1 (honestidade MEDIA 4): "Limite do mês" com o gastar do 2027 parecia a soma da coluna e não era — com limites,
+  // o rodapé é a SOMA dos limites da folha; sem limite nenhum, o "posso gastar" do Seu 2027 (com o nome dele)
+  const somaLimites = Math.round(orc.reduce((s, o) => s + o.limite, 0) * 100) / 100;
   const pOrc = bloco("orcamento", e, "Orçamento", "Gastei · Limite", `<div class="pl-orc">${
     orc.map((o) => `<div class="pl-orc-f${o.limite > 0 && o.gastei > o.limite ? " passou" : ""}"><span class="pl-txt">${esc(o.nome)}</span><b>${o.gastei > 0 ? brl(o.gastei) : "—"}</b><b>${o.limite > 0 ? brl(o.limite) : '<span class="pl-ln"></span>'}</b></div>`).join("")}${
     CATEGORIAS.slice(0, Math.max(0, MAX_ORC - orc.length)).map(() => `<div><span class="pl-ln"></span><span class="pl-ln"></span><span class="pl-ln"></span></div>`).join("")}</div>`,
-    total("Limite do mês", limiteDoMes));
+    somaLimites > 0 ? total("Soma dos limites", somaLimites) : total("Posso gastar no mês", p.gastarMes));
   const v = [...m.vencimentos].sort((a, b) => Number(a.paga) - Number(b.paga) || (a.dia ?? 99) - (b.dia ?? 99)); // pendências primeiro (o Codex)
-  const mais = v.length > MAX_CONTAS;
-  const contas = v.slice(0, mais ? MAX_CONTAS - 1 : MAX_CONTAS);
-  const soma = Math.round(v.reduce((s, c) => s + c.valor, 0) * 100) / 100;
+  // crítica r1 (honestidade MEDIA 3): as parcelas do mês ganham linha (Despesas = gastos + contas + parcelas fecha) e a
+  // fatura do cartão aparece como no app, FORA do total (os gastos dela já estão em Gastos/parcelas)
+  const parcelas = m.parcelas && m.parcelas > 0 ? m.parcelas : 0;
+  const vagas = MAX_CONTAS - (parcelas ? 1 : 0);
+  const mais = v.length > vagas;
+  const contas = v.slice(0, mais ? vagas - 1 : vagas);
+  const soma = Math.round((v.reduce((s, c) => s + (c.fatura ? 0 : c.valor), 0) + parcelas) * 100) / 100;
   const pagas = v.filter((c) => c.paga).length;
+  const linhaParcelas = parcelas ? `<div class="pl-venc-parc"><span class="pl-caixa"></span><span class="pl-vn"><b class="pl-txt">Parcelas do mês</b><small>no seu Finanças</small></span><b class="pl-vv">${brl(parcelas)}</b></div>` : "";
   const pVenc = bloco("vencimento", e, "Vencimentos", v.length ? `${pagas} de ${v.length} pagas` : "Contas do mês", `<div class="pl-venc">${
-    contas.map((c) => `<div><span class="pl-caixa${c.paga ? " ok" : ""}">${c.paga ? ICO_OK : ""}</span><span class="pl-vn"><b class="pl-txt">${esc(c.nome)}</b><small>${c.dia ? `Dia ${c.dia}` : "Dia __"}</small></span><b class="pl-vv">${c.valor > 0 ? brl(c.valor) : RS_LINHA}</b></div>`).join("")}${
-    mais ? `<div class="pl-venc-mais">+${v.length - contas.length} no seu Finanças</div>` : ""}${
-    Array.from({ length: mais ? 0 : MAX_CONTAS - contas.length }, () => `<div class="vazia"><span class="pl-caixa"></span><span class="pl-ln"></span><small>Dia __</small></div>`).join("")}</div>`,
-    total(v.length ? "Total das contas" : "Total", soma));
-  return folha(6, `${cabecalho(e, "PLANNER FINANCEIRO", "Meu", "mês", `${esc(m.rotulo)} · do seu Finanças`, "dinheiro", 6)}
+    contas.map((c) => `<div><span class="pl-caixa${c.paga ? " ok" : ""}">${c.paga ? ICO_OK : ""}</span><span class="pl-vn"><b class="pl-txt">${esc(c.nome)}</b><small>${c.dia ? `Dia ${c.dia}` : "Dia __"}${c.fatura ? " · já nos gastos" : ""}</small></span><b class="pl-vv">${c.valor > 0 ? brl(c.valor) : RS_LINHA}</b></div>`).join("")}${
+    mais ? `<div class="pl-venc-mais">+${v.length - contas.length} no seu Finanças</div>` : ""}${linhaParcelas}${
+    Array.from({ length: mais ? 0 : vagas - contas.length }, () => `<div class="vazia"><span class="pl-caixa"></span><span class="pl-ln"></span><small>Dia __</small></div>`).join("")}</div>`,
+    total(v.length || parcelas ? (parcelas ? "Contas + parcelas" : "Total das contas") : "Total", soma));
+  return folha(6, `${cabecalho(e, "PLANNER FINANCEIRO", "Meu", "mês", `${esc(m.rotulo)} · do seu Finanças${m.atualizado ? `, em ${esc(m.atualizado)}` : ""}`, "dinheiro", 6)}
     <div class="pl-corpo">${cards}<div class="pl-dupla">${pReceitas}${pGastos}</div><div class="pl-dupla pl-auto">${pOrc}${pVenc}</div></div>`, "pl-f-mes pl-cheia");
 }
 
@@ -414,7 +423,7 @@ function fSemanaCheia(s: SemanaDoPlanner, e: EstiloPlanner): string {
   const imp = s.importa.slice(0, maisImp ? MAX_IMPORTA - 1 : MAX_IMPORTA);
   const pImporta = painel("importa", e, "O que importa", `<div class="pl-pauta">${imp.map((t) => `<div class="pl-tarefa pl-tarefa-f"><span class="pl-caixa"></span><span class="pl-txt">${esc(t)}</span></div>`).join("")}${maisImp ? `<div class="pl-lv-mais">+${s.importa.length - imp.length} na sua Rotina</div>` : ""}${tarefa.repeat(Math.max(0, 8 - s.importa.length))}</div>`, s.importa.length ? "da sua Rotina" : "", "pl-enche");
   const pNota = painel("nota", e, "Uma nota pra mim", preencher(8), "", "pl-enche");
-  return folha(7, `${cabecalho(e, "PLANNER SEMANAL", "Minha", "semana", `${esc(s.rotulo)} · da sua Rotina`, "rotina", 7)}
+  return folha(7, `${cabecalho(e, "PLANNER SEMANAL", "Minha", "semana", `${esc(s.rotulo)} · da sua Rotina${s.atualizado ? `, em ${esc(s.atualizado)}` : ""}`, "rotina", 7)}
     <div class="pl-corpo">${pHab}${pAgenda}<div class="pl-dupla">${pImporta}${pNota}</div></div>`, "pl-cheia");
 }
 
@@ -670,6 +679,7 @@ function cssBase(estilo: EstiloPlanner): string {
 .pl-orc-f>b .pl-ln{height:40px}
 .pl-orc-f.passou>b:nth-child(2){color:var(--f)}
 .pl-caixa.ok{display:inline-grid;place-items:center}
+.pl-venc>div.pl-venc-parc .pl-caixa{visibility:hidden}
 .pl-hab i.ok{display:grid;place-items:center;background:var(--f);border-color:var(--f)}
 .pl-ag-dia b{display:block;font-size:30px;line-height:1.1;margin-top:2px;letter-spacing:0;font-weight:${codex ? 600 : 800};${tintaCore}}
 .pl-agenda.pl-agenda-f i{height:76px}
@@ -741,7 +751,7 @@ export const EXEMPLO_DO_PLANNER: DadosDoPlanner = {
 export const EXEMPLO_PREENCHIDO: DadosDoPlanner = {
   ...EXEMPLO_DO_PLANNER,
   mes: {
-    rotulo: "Janeiro de 2027",
+    rotulo: "Janeiro de 2027", atualizado: "22/01",
     receitas: [{ dia: 5, nome: "Salário", valor: 4800 }, { dia: 12, nome: "Freela de design", valor: 650 }, { dia: 20, nome: "Venda no brechó", valor: 120 }],
     gastos: [
       { dia: 3, nome: "Mercado do mês", valor: 612.4 }, { dia: 6, nome: "Farmácia", valor: 48.9 }, { dia: 8, nome: "Uber", valor: 32.5 },
@@ -759,7 +769,7 @@ export const EXEMPLO_PREENCHIDO: DadosDoPlanner = {
     ],
   },
   semana: {
-    rotulo: "4 de jan a 10 de jan",
+    rotulo: "4 de jan a 10 de jan", atualizado: "07/01",
     dias: [4, 5, 6, 7, 8, 9, 10],
     habitos: [
       { nome: "Água ao acordar", feitos: [true, true, true, true, false, false, false] },

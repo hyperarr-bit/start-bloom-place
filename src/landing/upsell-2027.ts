@@ -32,7 +32,8 @@ import { gravarEstadoU2027, lerEstadoU2027 } from "./u2027-estado";
 import {
   CTA_PRONTO_U2027_PLANNER, DESC_U2027_PLANNER, ITEM_PLANNER_U2027, LEGENDA_U2027_PLANNER, LINK_PLANEJAR_2027, NOTA_U2027_PLANNER, ZOOM_U2027_PLANNER, portaDoLink,
   bracoDoPlanner, camposDoBraco, folhaAnoDoPlanner, imagemDoPlanner, srcsetDoPlanner, u27PlannerLigado,
-  u27PaginaLigada, imagemPreenchida, srcsetPreenchida, imagemPreenchidaGrande, plannerBNosApps, PROMESSA_PLANNER, PROMESSA_PLANNER_DESC,
+  u27PaginaLigada, imagemPreenchida, srcsetPreenchida, imagemPreenchidaGrande, PROMESSA_PLANNER, PROMESSA_PLANNER_DESC,
+  ondeU27Pagina, SUB_U27_PAGINA, QUANDO_U27_PAGINA,
   type EstiloPlanner, type FolhaPreenchida,
 } from "@/lib/planner-2027-chave";
 
@@ -84,6 +85,8 @@ export const NOTA_U2027 = "É separado do CORE que você já pagou. Por enquanto
 export const ITEM_PLANNER_PAGINA = "Planner que se preenche com o que você anota";
 const TOTAL_FOLHAS_TXT = "14 folhas";
 export const ONDE_U2027 = "Fica no módulo <b>Desenvolvimento Pessoal</b>, aba <b>Seu 2027</b>. Por enquanto, no site e no app do iPhone.";
+/** crítica r1 da página (compradora BAIXA 6): o "Pronto" da página diz o mesmo que a página disse antes de pagar */
+const ONDE_U2027_PAGINA = () => { const o = ondeU27Pagina(); return `Fica no módulo <b>Desenvolvimento Pessoal</b>, aba <b>Seu 2027</b>.${o ? ` ${o}` : ""}`; };
 /**
  * VERSÃO B (31/10, novidades-guardadas/2026-10-31/upsell-planner): a oferta mostra 2 FOLHAS REAIS do planner (capa + "Meu
  * ano", geradas pelo código do planner com dados de exemplo: scripts/planner-2027-miniaturas.ts) e diz que o planner sai
@@ -168,13 +171,20 @@ const CSS_PAGINA = `
 @font-face{font-family:'Instrument Serif';font-style:italic;font-weight:400;font-display:swap;src:url(/fonts/instrument-serif-italic-latin.woff2) format('woff2')}
 .u27p{position:fixed;inset:0;z-index:2147482000;display:flex;flex-direction:column;background:var(--u-papel);color:var(--u-tx);text-align:left;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;
   --u-papel:#fff;--u-tx:#1c1a1f;--u-suave:#6b6670;--u-fio:#ebe8ee;--u-acento:#d6338a;--u-ok:#16a34a;
-  --u-metas:#faf5ff;--u-metas-t:#7e22ce;--u-din:#fffbeb;--u-din-t:#b45309;--u-rev:#faf5ff;--u-rev-t:#7e22ce;--u-cof:#fffbeb;--u-cof-t:#d97706;--u-borda:1px solid var(--u-fio)}
+  --u-metas:#faf5ff;--u-metas-t:#7e22ce;--u-din:#fffbeb;--u-din-t:#b45309;--u-rev:#ecfdf3;--u-rev-t:#15803d;--u-cof:#fffbeb;--u-cof-t:#d97706;--u-borda:1px solid var(--u-fio)}
 .u27p[data-estilo="codex"]{--u-papel:#fbfaf6;--u-tx:#30362f;--u-suave:#656b5d;--u-fio:#e4e1d6;--u-acento:#55734c;--u-ok:#55734c;
   --u-metas:#ebe5f0;--u-metas-t:#706278;--u-din:#f6eccd;--u-din-t:#776844;--u-rev:#eaf3ed;--u-rev-t:#36563f;--u-cof:#f8e8ef;--u-cof-t:#92566f;--u-borda:0}
 .u27p-faixa{flex:none;display:flex;align-items:center;justify-content:center;gap:7px;min-height:36px;padding:7px 16px calc(7px);padding-top:max(7px,env(safe-area-inset-top));background:#ecfdf3;color:#14532d;font-size:13px;font-weight:650;line-height:1.25;text-align:center}
 .u27p[data-estilo="codex"] .u27p-faixa{background:#e5efe2;color:#2f4a2c}
+/* crítica r1 (honestidade BAIXA 9): o QR e o "Pronto" dentro da página codex usam os tons dela (não o verde forte / cinza do app) */
+.u27p[data-estilo="codex"]{--verde:#55734c;--verde-suave:#e5efe2;--grafite:#30362f;--borda:#e4e1d6;--papel:#f1efe7;--tx:#30362f;--suave:#656b5d;--fraco:#8b907f;--magenta:#55734c}
+.u27p[data-estilo="codex"] .u27 .lp-cta{background:#30362f}
 .u27p-faixa svg{width:16px;height:16px;padding:2.5px;border-radius:50%;background:var(--u-ok);color:#fff;flex:none}
 .u27p-faixa b{font-weight:800}
+/* crítica r1 (honestidade MEDIA 5): fora da oferta a faixa não diz "Pagamento confirmado" em cima de um Pix a pagar */
+.u27p-faixa[data-tipo="neutra"]{min-height:30px;padding-top:max(6px,env(safe-area-inset-top));padding-bottom:6px;background:var(--u-papel);color:var(--u-suave);font-size:12.5px;font-weight:600;border-bottom:1px solid var(--u-fio)}
+.u27p-faixa[data-tipo="neutra"] svg{display:none}
+.u27p-faixa[hidden]{display:none}
 .u27p-rolo{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .u27p-miolo{max-width:520px;margin:0 auto;padding:22px 16px 28px;animation:u27-surge .25s ease-out both}
 .u27p-kicker{margin:0;font-size:11.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--u-acento)}
@@ -183,36 +193,37 @@ const CSS_PAGINA = `
 .u27p[data-estilo="codex"] h1{font-weight:650;letter-spacing:-.02em}
 .u27p[data-estilo="codex"] h1 em,.u27p[data-estilo="codex"] .u27p-h2 em{font-family:'Instrument Serif',Georgia,serif;font-style:italic;font-weight:400;font-size:1.18em;letter-spacing:-.01em;color:var(--u-tx)}
 .u27p-sub{margin:8px 0 0;font-size:15px;line-height:1.45;color:var(--u-suave);text-wrap:pretty}
-.u27p-app{position:relative;margin:16px 0 0;padding:12px;border-radius:22px;background:var(--u-papel);border:1px solid var(--u-fio);box-shadow:0 10px 30px -14px rgba(30,20,40,.25);display:grid;gap:8px}
+.u27p-app{position:relative;margin:14px 0 0;padding:12px 14px 10px;border-radius:20px;background:var(--u-papel);border:1px solid var(--u-fio);box-shadow:0 10px 30px -14px rgba(30,20,40,.25)}
 .u27p-ex{position:absolute;top:-9px;right:14px;padding:2px 8px;border-radius:99px;background:var(--u-tx);color:var(--u-papel);font-size:10px;font-weight:800;letter-spacing:.1em}
-.u27p-bl{border-radius:14px;padding:10px 12px;border:var(--u-borda)}
-.u27p-bl h4{margin:0 0 7px;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
-.u27p-bl small{display:block;margin-top:6px;font-size:12px;opacity:.85}
-.u27p-metas{background:var(--u-metas);color:var(--u-metas-t);border-color:#e9d5ff}
-.u27p-metas ol{list-style:none;margin:0;padding:0;display:grid;gap:5px}
-.u27p-metas li{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:650;color:var(--u-tx)}
-.u27p-metas li i{flex:none;width:21px;height:21px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:11.5px;font-weight:800;background:var(--u-metas-t);color:#fff}
-.u27p-din{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.u27p-din>div{background:var(--u-din);color:var(--u-din-t);border-color:#fde68a}
-.u27p-din b{display:block;font-size:19px;font-weight:850;letter-spacing:-.02em;color:var(--u-tx)}
-.u27p-din small{margin:0 0 2px;font-size:11.5px;font-weight:700}
-.u27p-rev{background:var(--u-rev);color:var(--u-rev-t);border-color:#e9d5ff}
-.u27p-meses{display:grid;grid-template-columns:repeat(12,1fr);gap:4px}
-.u27p-meses i{height:21px;border-radius:7px;display:grid;place-items:center;font-style:normal;font-size:10.5px;font-weight:800;background:#ffffffb3;border:1.5px solid currentColor;opacity:.75}
-.u27p-meses i.ok{background:var(--u-rev-t);border-color:var(--u-rev-t);color:#fff;opacity:1}
-.u27p-cof{background:var(--u-cof);color:var(--u-cof-t);border-color:#fde68a}
-.u27p-sem{display:grid;grid-template-columns:repeat(26,1fr);gap:2px}
-.u27p-sem i{aspect-ratio:1;border-radius:3px;background:#ffffffb3;border:1.2px solid currentColor;opacity:.5}
-.u27p-sem i.ok{background:var(--u-cof-t);border-color:var(--u-cof-t);opacity:1}
-.u27p-h2{margin:28px 0 0;font-size:22px;line-height:1.15;font-weight:850;letter-spacing:-.025em}
+/* crítica r1 da página (compradora/honestidade MEDIA): o bloco do 2027 compacto, em linhas — as folhas sobem pra 1ª tela */
+.u27p-l{display:grid;grid-template-columns:70px 1fr;gap:8px;align-items:baseline;padding:6px 0;border-top:1px solid var(--u-fio);font-size:13.5px;line-height:1.35}
+.u27p-l:first-of-type{border-top:0;padding-top:2px}
+.u27p-l>small{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.u27p-l>div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.u27p-l>div{min-width:0;color:var(--u-tx)}
+.u27p-l b{font-weight:800}
+.u27p-l em{font-style:normal;color:var(--u-suave)}
+.u27p-metas>small{color:var(--u-metas-t)}.u27p-din>small{color:var(--u-din-t)}.u27p-rev>small{color:var(--u-rev-t)}.u27p-cof>small{color:var(--u-cof-t)}
+.u27p-metas ol{list-style:none;margin:0;padding:0;display:grid;gap:1px;font-weight:650}
+.u27p-metas li{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.u27p-fio{display:grid;gap:2px;margin-top:5px}
+.u27p-fio i{height:6px;border-radius:2px;background:currentColor;opacity:.18}
+.u27p-fio i.ok{opacity:1}
+.u27p-rev .u27p-fio{grid-template-columns:repeat(12,1fr);color:var(--u-rev-t)}
+.u27p-cof .u27p-fio{grid-template-columns:repeat(52,1fr);gap:1px;color:var(--u-cof-t)}
+.u27p-cof .u27p-fio i{height:5px;border-radius:1px}
+.u27p-h2{margin:18px 0 0;font-size:21px;line-height:1.15;font-weight:850;letter-spacing:-.025em}
+.u27p-h2+.u27p-sub{margin-top:4px;font-size:14.5px}
 .u27p[data-estilo="codex"] .u27p-h2{font-weight:650}
-.u27p-folhas{margin:14px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.u27p-folhas{margin:10px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .u27p-folhas button{position:relative;display:block;padding:0;border:0;background:none;cursor:zoom-in;text-align:left;-webkit-tap-highlight-color:transparent}
 .u27p-folhas img{display:block;width:100%;height:auto;aspect-ratio:1240/1754;border-radius:8px;background:#fff;box-shadow:0 10px 26px -10px rgba(30,20,40,.4),0 0 0 1px rgba(30,20,40,.06)}
 .u27p-folhas .u27p-ex{top:8px;right:8px}
 .u27p-folhas span{display:block;margin-top:7px;font-size:13px;font-weight:700;color:var(--u-tx)}
 .u27p-folhas span small{display:block;font-size:12px;font-weight:500;color:var(--u-suave)}
+.u27p-toque{margin:8px 0 0;font-size:12px;color:var(--u-suave);text-align:center}
 .u27p-mini{margin:12px 0 0;font-size:13px;line-height:1.4;color:var(--u-suave)}
+.u27p-mini+.u27p-mini{margin-top:6px}
 .u27p .u27-nota{margin-top:18px}
 .u27p-barra{flex:none;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:var(--u-papel);border-top:1px solid var(--u-fio);box-shadow:0 -10px 24px -18px rgba(30,20,40,.35)}
 .u27p-barra>div{max-width:520px;margin:0 auto}
@@ -229,15 +240,15 @@ const CSS_PAGINA = `
 /** o exemplo do 2027 como fica no app (a página mostra, marcado EXEMPLO; os mesmos dados do planner de exemplo) */
 const EXEMPLO_2027 = {
   metas: ["Juntar R$ 5 mil de reserva", "Viajar pro Nordeste em julho", "Correr 5 km sem parar"],
-  gastar: 3200, guardar: 450, revisao: "Dia 1, às 20:00 · 5 minutos", semanas: 9,
+  /** crítica r1 (compradora BAIXA 4): 3 semanas do cofrinho = o fim de janeiro (a revisão de janeiro está ✓) */
+  gastar: 3200, guardar: 450, semanas: 3,
 };
-const MESES_CURTOS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
 /** "R$ 3.200" / "R$ 45" (o reais() da landing é do preço: "R$ 14,90") */
 const brlInteiro = (v: number) => `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
 /** o zoom das folhas preenchidas (a mesma janela do "Meu ano") */
 function abrirZoomDaFolha(estilo: EstiloPlanner, folha: FolhaPreenchida, aoFechar: () => void): void {
   abrirZoom(imagemPreenchidaGrande(estilo, folha), folha === "mes" ? "Exemplo da folha Meu mês, preenchida com os dados do Finanças" : "Exemplo da folha Minha semana, preenchida com os dados da Rotina",
-    "EXEMPLO · SAI COM O QUE VOCÊ ANOTA NO CORE", aoFechar);
+    folha === "mes" ? "EXEMPLO · O SEU SAI COM O MÊS EM QUE VOCÊ BAIXAR" : "EXEMPLO · O SEU SAI COM A SEMANA EM QUE VOCÊ BAIXAR", aoFechar);
 }
 
 /** crítica r1 (compradora MEDIA 2): tocar na imagem abre a folha "Meu ano" grande (legível). Fecha no ×, no toque fora e no Esc. */
@@ -345,7 +356,11 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
   const comPagina = !!braco && u27PaginaLigada();
   if (braco) {
     garantirCssPlanner();
-    if (typeof Image !== "undefined") { const pre = new Image(); pre.srcset = srcsetDoPlanner(braco.estilo); pre.src = imagemDoPlanner(braco.estilo); }
+    // crítica r1 (técnico BAIXA 7): a página usa as folhas Meu mês/Minha semana — a imagem do cartão B só no cartão B
+    if (typeof Image !== "undefined") {
+      if (comPagina) for (const f of ["mes", "semana"] as FolhaPreenchida[]) { const pre = new Image(); pre.srcset = srcsetPreenchida(braco.estilo, f); pre.src = imagemPreenchida(braco.estilo, f); }
+      else { const pre = new Image(); pre.srcset = srcsetDoPlanner(braco.estilo); pre.src = imagemDoPlanner(braco.estilo); }
+    }
   }
   /** crítica r2: voltou pelo cookie com o storage zerado (a sessão foi junto: esta aba não confere sozinha) */
   let retomada = false;
@@ -471,12 +486,29 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
   /* ───────── as telas ───────── */
   /** 31/10 (upsell-tela-cheia): a página por cima da landing (só com a versão B + U27_PAGINA). null = fechada. */
   let pagina: HTMLElement | null = null;
+  /**
+   * crítica r1 (técnico MEDIA 1): a página é "própria" — o Voltar do celular fecha ELA (como o "Agora não"), não o site.
+   * Abrir = 1 entrada no histórico com a marca desta compra (a recarga já tem a marca: não empilha de novo); o popstate
+   * sem a marca fecha; fechar pelos botões volta essa entrada (history.back) e o popstate dela é ignorado.
+   */
+  const MARCA_U27 = "u27Pagina";
+  const marcaNoHist = (): boolean => { try { const h = history.state as Record<string, unknown> | null; return !!h && typeof h === "object" && h[MARCA_U27] === compra; } catch { return false; } };
+  let ignorarPop = false;
   const fecharPagina = () => {
     if (!pagina) return;
     pagina.remove();
     pagina = null;
     try { document.documentElement.style.removeProperty("overflow"); } catch { /* noop */ }
+    if (marcaNoHist()) { ignorarPop = true; try { history.back(); } catch { ignorarPop = false; } }
   };
+  const aoPop = () => {
+    if (ignorarPop) { ignorarPop = false; return; }
+    if (!pagina || marcaNoHist() || e.etapa === "fim") return;
+    if (e.etapa === "pronto") ev("landing_u2027_continuar", { de: "voltar" });
+    else ev("landing_u2027_nao", { de: "voltar", etapa: e.etapa });
+    salvar({ etapa: "fim" });
+  };
+  window.addEventListener("popstate", aoPop);
   /** abre (1x) e devolve onde pintar o miolo e a barra */
   function abrirPagina(): { miolo: HTMLElement; barra: HTMLElement } {
     if (!pagina || !pagina.isConnected) {
@@ -489,35 +521,63 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
       pagina.setAttribute("role", "dialog");
       pagina.setAttribute("aria-modal", "true");
       pagina.setAttribute("aria-label", TITULO_U2027);
-      const faixa = ctx.faixaConfirmada?.() ?? "o CORE é seu pra sempre";
-      pagina.innerHTML = `<div class="u27p-faixa" data-testid="u2027-faixa">${ICO_CHECK}<span><b>Pagamento confirmado</b> · ${esc(faixa)}</span></div><div class="u27p-rolo"><div class="u27p-miolo-alvo"></div></div><div class="u27p-barra" hidden><div></div></div>`;
+      pagina.innerHTML = `<div class="u27p-faixa" data-testid="u2027-faixa"></div><div class="u27p-rolo"><div class="u27p-miolo-alvo"></div></div><div class="u27p-barra" hidden><div></div></div>`;
       document.body.appendChild(pagina);
       try { document.documentElement.style.overflow = "hidden"; } catch { /* noop */ }
+      if (!marcaNoHist()) {
+        try {
+          const h = history.state && typeof history.state === "object" ? { ...(history.state as Record<string, unknown>) } : {};
+          delete h.lpDemoCheia; // a marca da demo em tela cheia da landing (landing.ts MARCA_CHEIA) não vem junto
+          history.pushState({ ...h, [MARCA_U27]: compra }, "");
+        } catch { /* sem histórico: fecha só pelos botões */ }
+      }
     }
+    pintarFaixa();
     return { miolo: pagina.querySelector<HTMLElement>(".u27p-miolo-alvo")!, barra: pagina.querySelector<HTMLElement>(".u27p-barra")! };
+  }
+
+  /** a faixa fina do topo, por etapa (crítica r1, honestidade MEDIA 5): na oferta, "✓ Pagamento confirmado"; no QR do 2027,
+   *  neutra ("Seu CORE está pago · este Pix é só do 2027"); no "Pronto" some (o ✓ grande já diz) */
+  function pintarFaixa(): void {
+    const f = pagina?.querySelector<HTMLElement>(".u27p-faixa");
+    if (!f) return;
+    const etapa = e.etapa;
+    if (etapa === "pronto") { f.hidden = true; return; }
+    f.hidden = false;
+    if (etapa === "qr") {
+      const v = ctx.valorPago?.() ?? null;
+      f.dataset.tipo = "neutra";
+      pintar(f, `<span data-testid="u2027-ja-pago">Seu CORE${v ? ` (${reais(v)})` : ""} está pago · este Pix é só do 2027</span>`);
+      return;
+    }
+    delete f.dataset.tipo;
+    pintar(f, `${ICO_CHECK}<span><b>Pagamento confirmado</b> · ${esc(ctx.faixaConfirmada?.() ?? "o CORE é seu pra sempre")}</span>`);
   }
 
   /** a oferta em página: o 2027 como fica no app (EXEMPLO) + o planner que se preenche sozinho (EXEMPLO) */
   function htmlDaPagina(estilo: EstiloPlanner): string {
     const folha = (f: FolhaPreenchida, nome: string, de: string) =>
       `<button type="button" data-folha="${f}" aria-label="Ver o exemplo da folha ${nome}"><img src="${imagemPreenchida(estilo, f)}" srcset="${srcsetPreenchida(estilo, f)}" width="620" height="877" alt="Exemplo da folha ${nome} preenchida" decoding="async"><b class="u27p-ex">EXEMPLO</b><span>${nome}<small>${de}</small></span></button>`;
-    const titulo = estilo === "codex" ? "Seu 2027 <em>organizado</em>" : "Seu 2027 <em>organizado</em>";
+    const fio = (n: number, ok: number) => `<span class="u27p-fio" aria-hidden="true">${Array.from({ length: n }, (_, i) => `<i${i < ok ? ' class="ok"' : ""}></i>`).join("")}</span>`;
+    const onde = ondeU27Pagina();
     return `
       <div class="u27p-miolo" data-testid="u2027-oferta" data-pagina="1">
         <p class="u27p-kicker">Espera, tem mais uma coisa</p>
-        <h1>${titulo}</h1>
-        <p class="u27p-sub">Montado com o que você anota no CORE: metas, dinheiro, datas e rotina.</p>
+        <h1>Seu 2027 <em>organizado</em></h1>
+        <p class="u27p-sub">${SUB_U27_PAGINA}</p>
         <div class="u27p-app" data-testid="u2027-app">
           <b class="u27p-ex">EXEMPLO</b>
-          <div class="u27p-bl u27p-metas"><h4>3 metas</h4><ol>${EXEMPLO_2027.metas.map((m, i) => `<li><i>${i + 1}</i>${esc(m)}</li>`).join("")}</ol></div>
-          <div class="u27p-din"><div class="u27p-bl"><small>Gastar por mês</small><b>${brlInteiro(EXEMPLO_2027.gastar)}</b></div><div class="u27p-bl"><small>Guardar por mês</small><b>${brlInteiro(EXEMPLO_2027.guardar)}</b></div></div>
-          <div class="u27p-bl u27p-rev"><h4>12 revisões do mês</h4><div class="u27p-meses">${MESES_CURTOS.map((m, i) => `<i${i === 0 ? ' class="ok"' : ""}>${m}</i>`).join("")}</div><small>${EXEMPLO_2027.revisao}</small></div>
-          <div class="u27p-bl u27p-cof"><h4>Cofrinho de 52 semanas</h4><div class="u27p-sem">${Array.from({ length: 52 }, (_, i) => `<i${i < EXEMPLO_2027.semanas ? ' class="ok"' : ""}></i>`).join("")}</div><small>${brlInteiro((EXEMPLO_2027.semanas * (EXEMPLO_2027.semanas + 1)) / 2)} guardados · no fim do ano, ${brlInteiro(1378)}</small></div>
+          <div class="u27p-l u27p-metas"><small>3 metas</small><ol>${EXEMPLO_2027.metas.map((m) => `<li>${esc(m)}</li>`).join("")}</ol></div>
+          <div class="u27p-l u27p-din"><small>Por mês</small><div>Gastar <b>${brlInteiro(EXEMPLO_2027.gastar)}</b> · guardar <b>${brlInteiro(EXEMPLO_2027.guardar)}</b></div></div>
+          <div class="u27p-l u27p-rev"><small>Revisões</small><div>12 revisões <em>· todo dia 1, em 5 min</em>${fio(12, 1)}</div></div>
+          <div class="u27p-l u27p-cof"><small>Cofrinho</small><div>52 semanas <em>· R$ 1 a mais por semana</em>${fio(52, EXEMPLO_2027.semanas)}</div></div>
         </div>
         <h2 class="u27p-h2">${estilo === "codex" ? `O planner se <em>preenche sozinho</em>` : PROMESSA_PLANNER}</h2>
         <p class="u27p-sub">${PROMESSA_PLANNER_DESC}</p>
-        <div class="u27p-folhas" data-testid="u2027-folhas">${folha("mes", "Meu mês", "do seu Finanças")}${folha("semana", "Minha semana", "da sua Rotina")}</div>
-        <p class="u27p-mini">${TOTAL_FOLHAS_TXT} pra salvar no celular ou imprimir.${plannerBNosApps() ? "" : " Por enquanto, o planner baixa pelo site."}</p>
+        <div class="u27p-folhas" data-testid="u2027-folhas">${folha("mes", "Meu mês", "do Finanças, no mês em que você baixar")}${folha("semana", "Minha semana", "da Rotina, na semana em que você baixar")}</div>
+        <p class="u27p-toque">Toque numa folha pra ver grande</p>
+        <p class="u27p-mini">${TOTAL_FOLHAS_TXT} pra salvar no celular ou imprimir. ${QUANDO_U27_PAGINA}</p>
+        ${onde ? `<p class="u27p-mini" data-testid="u2027-onde-pagina">${onde}</p>` : ""}
         <p class="u27-nota">É separado do CORE que você já pagou.</p>
       </div>`;
   }
@@ -611,7 +671,7 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
       const semOferta = veioDoLink || retomada;
       if (pintar(c, `
       <div class="u27" data-testid="u2027-qr">
-        <div class="u27-ok u27-ok-qr" data-testid="u2027-ja-pago">${ICO_CHECK}<span>Seu CORE${v ? ` (${reais(v)})` : ""} está pago. Este Pix é só do 2027.</span></div>
+        ${comPagina ? "" : `<div class="u27-ok u27-ok-qr" data-testid="u2027-ja-pago">${ICO_CHECK}<span>Seu CORE${v ? ` (${reais(v)})` : ""} está pago. Este Pix é só do 2027.</span></div>`}
         ${semOferta ? `<p class="u27-qual" data-testid="u2027-qual"><b>${TITULO_U2027}</b> · 3 metas, revisões do mês e cofrinho</p>` : ""}
         <div class="u27-valor"><b>${reais(VALOR_U2027)}</b><span>Seu 2027 · uma vez</span></div>
         <div class="u27-copiado${copiado ? "" : " falta"}" data-testid="u2027-copiado">${copiado ? ICO_CHECK : ICO_COPIAR}<span>${copiado
@@ -651,7 +711,7 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
         <div class="lp-pago-check">${ICO_CHECK}</div>
         <h3>Pronto, seu 2027 tá no seu CORE</h3>
         <ul class="u27-lista">${(comPlanner ? [...ITENS_U2027.slice(0, 3), comPagina ? ITEM_PLANNER_PAGINA : ITEM_PLANNER_U2027] : ITENS_U2027).map((t) => `<li>${ICO_CHECK}<span>${t}</span></li>`).join("")}</ul>
-        <div class="u27-onde" data-testid="u2027-onde">${ONDE_U2027}${email ? ` Entre com <b>${esc(email)}</b>.` : ""}</div>
+        <div class="u27-onde" data-testid="u2027-onde">${comPagina ? ONDE_U2027_PAGINA() : ONDE_U2027}${email ? ` Entre com <b>${esc(email)}</b>.` : ""}</div>
         ${comPlanner
           ? `<div class="lp-form"><button type="button" class="lp-cta" id="u27-planejar" data-testid="u2027-planejar" data-href="${esc(portaDoLink(LINK_PLANEJAR_2027, email))}">${CTA_PRONTO_U2027_PLANNER}</button></div>
         <div class="lp-links"><button type="button" class="lp-link" id="u27-continuar">Depois · ver minha conta</button></div>`
@@ -698,6 +758,6 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
     retomar,
     simularPago: () => { if (e.etapa === "qr") pago(); },
     etapa: () => e.etapa,
-    parar: () => { parar(); fecharPagina(); document.removeEventListener("visibilitychange", aoVoltar); window.removeEventListener("pageshow", aoVoltar); },
+    parar: () => { parar(); fecharPagina(); document.removeEventListener("visibilitychange", aoVoltar); window.removeEventListener("pageshow", aoVoltar); window.removeEventListener("popstate", aoPop); },
   };
 }

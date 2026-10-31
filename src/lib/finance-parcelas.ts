@@ -138,6 +138,15 @@ export const valorDaParcelaNoMes = (p: Parcela): number => (parcelaAtiva(p) ? n(
 export const somaParcelasDoMes = (lista: Parcela[] | undefined | null): number =>
   (Array.isArray(lista) ? lista : []).reduce((s, p) => s + valorDaParcelaNoMes(p), 0);
 
+/**
+ * PARCELA CONTA NO LIMITE (26/09, varredura — era de components/CategoryBudgets; 31/10 aqui, sem React, pro planner 2027
+ * somar igual ao Orçamento do app). A parcela do mês entra como gasto da categoria dela, com o perfil dela.
+ */
+export const parcelasComoGastos = (parcelas: Parcela[]): { category: string; value: number; perfil?: string }[] =>
+  (Array.isArray(parcelas) ? parcelas : [])
+    .map((p) => ({ category: p?.category === "roupa" ? "vestuario" : p?.category || "outros", value: valorDaParcelaNoMes(p), perfil: p?.perfil }))
+    .filter((g) => g.value > 0);
+
 /** Carimba o registro com o mês da chave (legado ganha `parcelaDoMes = paid+1`). */
 export const carimbar = (p: Parcela, mes: string): Parcela =>
   ehMesId(p.startMonth) ? p : { ...p, startMonth: mes, parcelaDoMes: parcelaDoMes(p) };

@@ -8,22 +8,30 @@
  *
  * Tudo puro (recebe `get` e `agora`) e tolerante: formato estranho vira lista vazia, nunca "NaN"/"undefined".
  *
- * Finanças (perfil ativo, etiqueta `perfil` — doPerfil):
- *   finance-incomes / finance-expenses   só os itens com data NO MÊS ATUAL
+ * Finanças (perfil ativo, etiqueta `perfil` — doPerfil; "Tudo junto" = tudo, com os limites do Pessoal):
+ *   finance-incomes / finance-expenses   o balde inteiro, como o app (Index soma sem olhar a data) — crítica r1: receita
+ *                                        com data 30/09 no balde de outubro conta. Só com a virada PENDENTE (balde ainda
+ *                                        do mês passado) filtra pela data do mês atual.
  *   finance-fixed-expenses               entram todo mês
  *   finance-installments                 somaParcelasDoMes, só se finance-last-seen-month = mês atual
  *   finance-dueDays                      as contas do mês com ✓ (mês visto ≠ atual: vencimentos saem dos fixos, sem ✓)
- *   finance-category-budgets(-perfis)    limite por categoria
+ *   faturas do cartão                    a MESMA linha do app (faturasAVencer): aparece em Vencimentos, fora do total
+ *                                        (os gastos dela já estão nas despesas)
+ *   finance-category-budgets(-perfis)    limite por categoria; o gasto soma as parcelas (parcelasComoGastos, como o app)
  *   despesas = variáveis + fixos + parcelas + contas avulsas (a MESMA regra do app: finance-totals.ts)
  * Rotina:
  *   rotina-habits + rotina-habits-checked + rotina-habits-week (carimbo: outra semana = nada marcado)
  *   rotina-schedule {"7:00": {Segunda: "…"}} + rotina-compromissos (ocorrencias da semana) → agenda por horário
  *   rotina-urgencies (não feitas) → "O que importa"
  */
-import { doPerfil, doPerfilDueDays, PERFIL_PESSOAL, PERFIL_TODOS } from "@/lib/finance-perfil";
+import { doPerfil, doPerfilDueDays, registrarPerfis, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
 import { computeLooseBillsOutflow, computeMonthlyOutflow } from "@/lib/finance-totals";
-import { somaParcelasDoMes, type Parcela } from "@/lib/finance-parcelas";
-import { nomesDosHabitos, DIAS_DA_ROTINA } from "@/lib/rotina-habitos";
+import { parcelasComoGastos, somaParcelasDoMes, type Parcela } from "@/lib/finance-parcelas";
+import { CHAVE_FATURAS_PAGAS, cartaoDoId, faturasAVencer, parcelasDoMesPassado } from "@/lib/finance-faturas";
+import type { CardConfig } from "@/lib/finance-fatura";
+import { CARD_CONFIG_KEY, CUSTOM_CARDS_KEY, DEFAULT_CARDS } from "@/lib/finance-cards-dados";
+import { chaveArquivada } from "@/lib/virada-do-mes";
+import { DIAS_DA_ROTINA } from "@/lib/rotina-habitos";
 import { ocorrencias } from "@/lib/compromissos";
 import { localDayKey } from "@/lib/utils";
 
@@ -31,6 +39,8 @@ export interface LinhaDoMes { dia: number | null; nome: string; valor: number }
 export interface MesDoPlanner {
   /** "Outubro de 2026" */
   rotulo: string;
+  /** "31/10" — o dia em que a folha foi montada (crítica r1: ela sai com o mês de AGORA, não com janeiro de 2027) */
+  atualizado?: string;
   receitas: LinhaDoMes[];
   gastos: LinhaDoMes[];
   totalReceitas: number;
@@ -39,11 +49,16 @@ export interface MesDoPlanner {
   /** a saída do mês inteira (variáveis + fixos + parcelas + avulsas) — o cartão "Despesas" */
   totalDespesas: number;
   orcamento: { nome: string; gastei: number; limite: number }[];
-  vencimentos: { nome: string; dia: number | null; valor: number; paga: boolean }[];
+  /** fatura = a linha "Fatura Nubank" do app: já está nos gastos, fica FORA do total das contas */
+  vencimentos: { nome: string; dia: number | null; valor: number; paga: boolean; fatura?: boolean }[];
+  /** as parcelas do mês (crítica r1: entravam nas Despesas sem linha nenhuma — a conta não fechava) */
+  parcelas?: number;
 }
 export interface SemanaDoPlanner {
   /** "26 de out a 1 de nov" */
   rotulo: string;
+  /** "31/10" — o dia em que a folha foi montada */
+  atualizado?: string;
   /** o dia do mês de seg…dom */
   dias: number[];
   habitos: { nome: string; feitos: boolean[] }[];
@@ -82,22 +97,30 @@ const diaDe = (data: unknown): number | null => {
   return d >= 1 && d <= 31 ? d : null;
 };
 
+const diaMes = (d: Date) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+
 /** O mês ATUAL do Finanças (null = nada do Finanças pra pôr na folha: o modelo com linhas). */
 export function lerMesDoPlanner(get: Get, agora: Date = new Date()): MesDoPlanner | null {
+  // crítica r1 (técnico BAIXA 8): etiqueta de empresa apagada volta pro Pessoal (o app registra a lista ao abrir o Finanças)
+  const perfis = get<unknown>("finance-perfis", null);
+  if (Array.isArray(perfis)) registrarPerfis(perfis.filter((x): x is Perfil => !!x && typeof x === "object" && typeof (x as Perfil).id === "string"));
   const perfilBruto = get<unknown>("finance-perfil-ativo", PERFIL_PESSOAL);
-  const perfil = typeof perfilBruto === "string" && perfilBruto && perfilBruto !== PERFIL_TODOS ? perfilBruto : PERFIL_PESSOAL;
+  /** "Tudo junto" (PERFIL_TODOS): tudo entra, como na visão consolidada do app; os limites são os do Pessoal */
+  const perfil = typeof perfilBruto === "string" && perfilBruto ? perfilBruto : PERFIL_PESSOAL;
   const mesId = mesIdDe(agora);
   const visto = get<unknown>("finance-last-seen-month", "");
   const mesVisto = visto === `${MESES[agora.getMonth()]}-${agora.getFullYear()}`;
-  /** o item é deste mês: com data, a data; sem data, só se o Finanças já virou pro mês atual */
-  const doMes = (i: Record<string, unknown>) => (typeof i.date === "string" && /^\d{4}-\d{2}/.test(i.date) ? i.date.startsWith(mesId) : mesVisto);
+  /** crítica r1 (técnico MEDIA 2): com o mês visto, o balde inteiro (a regra do app). Virada pendente: só o que tem data
+   *  do mês atual (o resto é do mês passado). */
+  const doMes = (i: Record<string, unknown>) => mesVisto || (typeof i.date === "string" && i.date.startsWith(mesId));
 
   const incomes = doPerfil(lista(get<unknown>("finance-incomes", [])), perfil).filter(doMes);
   const expenses = doPerfil(lista(get<unknown>("finance-expenses", [])), perfil).filter(doMes);
   const fixed = doPerfil(lista(get<unknown>("finance-fixed-expenses", [])), perfil);
   const parcelas = mesVisto ? doPerfil(lista(get<unknown>("finance-installments", [])), perfil) : [];
   const dueDaysBrutos = mesVisto ? lista(get<unknown>("finance-dueDays", [])).filter((d) => Number.isInteger(d.day) && Array.isArray(d.bills)) : [];
-  const dueDays = doPerfilDueDays(dueDaysBrutos as unknown as { day: number; bills: Record<string, unknown>[] }[], perfil);
+  const dueDays = doPerfilDueDays(dueDaysBrutos as unknown as { day: number; bills: Record<string, unknown>[] }[], perfil)
+    .map((d) => ({ ...d, bills: (d.bills ?? []).filter((b) => !cartaoDoId((b as Record<string, unknown>)?.id)) }));
 
   const linha = (i: Record<string, unknown>, rotuloPadrao: string): LinhaDoMes => ({
     dia: diaDe(i.date), nome: limpa(i.description ?? i.name, 60) || rotuloPadrao, valor: centavos(Math.max(0, num(i.value ?? i.amount))),
@@ -117,18 +140,43 @@ export function lerMesDoPlanner(get: Get, agora: Date = new Date()): MesDoPlanne
     nome: limpa(b.name ?? b.description, 60), dia: Number.isInteger(d.day) && d.day >= 1 && d.day <= 31 ? d.day : null,
     valor: centavos(Math.max(0, num(b.value))), paga: b.paid === true,
   }))).filter((c) => c.nome);
-  const vencimentos = (contasDoMes.length ? contasDoMes : fixed.map((f) => {
+  const vencimentos: MesDoPlanner["vencimentos"] = (contasDoMes.length ? contasDoMes : fixed.map((f) => {
     const dia = Number(f.day);
     return { nome: limpa(f.description ?? f.name, 60), dia: Number.isInteger(dia) && dia >= 1 && dia <= 31 ? dia : null, valor: centavos(Math.max(0, num(f.value ?? f.amount))), paga: false };
-  }).filter((c) => c.nome)).sort((a, b) => (a.dia ?? 99) - (b.dia ?? 99));
+  }).filter((c) => c.nome));
+  // crítica r1 (honestidade MEDIA 3): a fatura do cartão que o app mostra nas contas do mês (a mesma regra: faturasAVencer)
+  if (mesVisto) {
+    try {
+      const custom = lista(get<unknown>(CUSTOM_CARDS_KEY, []));
+      const rotulos = new Map<string, string>([
+        ...DEFAULT_CARDS.map((c) => [c.value, c.label] as [string, string]),
+        ...custom.filter((c) => typeof c.value === "string" && typeof c.label === "string").map((c) => [c.value as string, c.label as string] as [string, string]),
+      ]);
+      const config = (get<unknown>(CARD_CONFIG_KEY, {}) ?? {}) as Record<string, CardConfig>;
+      const pagas = (get<unknown>(CHAVE_FATURAS_PAGAS, {}) ?? {}) as Record<string, boolean>;
+      const doArquivo = (m: string) => doPerfil(lista(get<unknown>(chaveArquivada(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1, "expenses"), [])), perfil);
+      const faturas = faturasAVencer({
+        mes: mesId,
+        gastosDoMes: (m) => (m === mesId ? expenses : m > mesId ? [] : doArquivo(m)) as never[],
+        parcelasDoMes: (m) => (m === mesId ? parcelas as unknown as Parcela[] : doPerfil(parcelasDoMesPassado(m, (k) => lista(get<unknown>(k, [])) as unknown as Parcela[]), perfil)),
+        fixos: fixed as never[], cards: [...rotulos.keys()],
+        configOf: (c) => (config && typeof config === "object" ? config[c] : undefined), labelOf: (c) => rotulos.get(c) ?? c, pagas: pagas && typeof pagas === "object" ? pagas : {},
+      });
+      for (const f of faturas) {
+        vencimentos.push({ nome: `Fatura ${limpa(f.label, 40)}`, dia: f.dueDay, valor: centavos(f.variaveis + f.parcelas + (f.estimativa ?? 0)), paga: f.paga, fatura: true });
+      }
+    } catch { /* dado torto num cartão: a folha sai sem a fatura, nunca sem as contas */ }
+  }
+  vencimentos.sort((a, b) => (a.dia ?? 99) - (b.dia ?? 99));
 
   // orçamento: as categorias com limite (maiores primeiro); sem limite nenhum, as que mais gastaram (o limite fica pra escrever)
   const custom = new Map(lista(get<unknown>("finance-custom-categories", [])).map((c) => [String(c.value ?? ""), limpa(c.label, 30)] as const).filter(([v, l]) => v && l));
-  const limites: Record<string, unknown> = perfil === PERFIL_PESSOAL
+  const limites: Record<string, unknown> = perfil === PERFIL_PESSOAL || perfil === PERFIL_TODOS
     ? (get<unknown>("finance-category-budgets", {}) as Record<string, unknown>) ?? {}
     : ((get<unknown>("finance-category-budgets-perfis", {}) as Record<string, Record<string, unknown>>) ?? {})[perfil] ?? {};
   const gasto = new Map<string, number>();
-  for (const e of [...expenses, ...fixed]) {
+  // crítica r1 (técnico MEDIA 3): as parcelas do mês contam no gasto da categoria, como no Orçamento do app
+  for (const e of [...expenses, ...fixed, ...parcelasComoGastos(parcelas as unknown as Parcela[])] as Record<string, unknown>[]) {
     const c = typeof e.category === "string" ? e.category : "outros";
     gasto.set(c, (gasto.get(c) ?? 0) + Math.max(0, num(e.value ?? e.amount)));
   }
@@ -138,10 +186,10 @@ export function lerMesDoPlanner(get: Get, agora: Date = new Date()): MesDoPlanne
     ? comLimite.map((x) => ({ nome: rotuloDaCategoria(x.c, custom), gastei: centavos(gasto.get(x.c) ?? 0), limite: x.limite }))
     : [...gasto.entries()].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([c, v]) => ({ nome: rotuloDaCategoria(c, custom), gastei: centavos(v), limite: 0 })));
 
-  if (!receitas.length && !gastos.length && !vencimentos.length && !orcamento.length) return null;
+  if (!receitas.length && !gastos.length && !vencimentos.length && !orcamento.length && somaParcelas <= 0) return null;
   return {
-    rotulo: `${MESES[agora.getMonth()]} de ${agora.getFullYear()}`,
-    receitas, gastos, totalReceitas, totalGastos: centavos(somaVar), totalDespesas, orcamento, vencimentos,
+    rotulo: `${MESES[agora.getMonth()]} de ${agora.getFullYear()}`, atualizado: diaMes(agora),
+    receitas, gastos, totalReceitas, totalGastos: centavos(somaVar), totalDespesas, orcamento, vencimentos, parcelas: centavos(somaParcelas),
   };
 }
 
@@ -155,10 +203,15 @@ export function lerSemanaDoPlanner(get: Get, agora: Date = new Date()): SemanaDo
   const diasDaSemana = Array.from({ length: 7 }, (_, i) => new Date(seg.getFullYear(), seg.getMonth(), seg.getDate() + i));
   const semanaId = localDayKey(seg);
 
-  const nomes = nomesDosHabitos(get<unknown>("rotina-habits", [])).map((h) => limpa(h)).filter(Boolean).slice(0, 12);
+  // crítica r1 (técnico BAIXA 9): a grade do app guarda o ✓ pelo índice ORIGINAL da lista (hábito sem nome conta) —
+  // o índice é guardado antes de filtrar os vazios
+  const brutos = get<unknown>("rotina-habits", []);
+  const nomes = (Array.isArray(brutos) ? brutos : [])
+    .map((h, i) => ({ nome: limpa(typeof h === "string" ? h : (h as { name?: unknown })?.name), i }))
+    .filter((h) => h.nome).slice(0, 12);
   const daSemana = get<unknown>("rotina-habits-week", "") === semanaId;
   const checked = daSemana ? (get<unknown>("rotina-habits-checked", {}) as Record<string, unknown>) ?? {} : {};
-  const habitos = nomes.map((nome, i) => ({
+  const habitos = nomes.map(({ nome, i }) => ({
     nome,
     feitos: DIAS_DA_ROTINA.map((dia) => { const l = (checked as Record<string, unknown>)[dia]; return Array.isArray(l) && l[i] === true; }),
   }));
@@ -197,7 +250,7 @@ export function lerSemanaDoPlanner(get: Get, agora: Date = new Date()): SemanaDo
   if (!habitos.length && !agenda.length && !importa.length) return null;
   const [a, b] = [diasDaSemana[0], diasDaSemana[6]];
   return {
-    rotulo: `${a.getDate()} de ${MESES_CURTOS[a.getMonth()]} a ${b.getDate()} de ${MESES_CURTOS[b.getMonth()]}`,
+    rotulo: `${a.getDate()} de ${MESES_CURTOS[a.getMonth()]} a ${b.getDate()} de ${MESES_CURTOS[b.getMonth()]}`, atualizado: diaMes(agora),
     dias: diasDaSemana.map((d) => d.getDate()),
     habitos, agenda, importa,
   };

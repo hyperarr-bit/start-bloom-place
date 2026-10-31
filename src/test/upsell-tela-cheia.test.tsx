@@ -27,6 +27,7 @@ import { CHAVE_PACOTE_2027, CHAVE_PLANO_2027, CHAVE_DICA_2027, novoPlano2027 } f
 import { EXEMPLO_DO_PLANNER, EXEMPLO_PREENCHIDO, folhasDoPlanner, lerMesDoPlanner, lerSemanaDoPlanner, resumoDoPlanner, type DadosDoPlanner } from "@/lib/planner-2027";
 import { PLANNER_B_NO_APP_ANDROID, PLANNER_B_NO_APP_IPHONE, U27_PAGINA, imagemPreenchida, imagemPreenchidaGrande, plannerBNosApps, u27PaginaLigada } from "@/lib/planner-2027-chave";
 import { criarUpsell2027, type CtxU2027 } from "@/landing/upsell-2027";
+import { esquecerPerfis } from "@/lib/finance-perfil";
 
 const raiz = resolve(__dirname, "../..");
 const sujeira = /undefined|NaN|R\$ 0(?![\d,])|null|\[object/;
@@ -35,7 +36,7 @@ const AGORA = new Date(2026, 9, 31, 12, 0); // sábado, 31/10/2026 (semana 26/10
 const loja = (s: Record<string, unknown>) => <T,>(k: string, f: T) => (k in s ? (s[k] as T) : f);
 
 beforeEach(() => { localStorage.clear(); window.history.replaceState(null, "", "/"); });
-afterEach(() => { cleanup(); vi.clearAllMocks(); localStorage.clear(); document.getElementById("u27-pag")?.remove(); document.documentElement.style.removeProperty("overflow"); window.history.replaceState(null, "", "/"); });
+afterEach(() => { esquecerPerfis(); cleanup(); vi.clearAllMocks(); localStorage.clear(); document.getElementById("u27-pag")?.remove(); document.documentElement.style.removeProperty("overflow"); window.history.replaceState(null, "", "/"); });
 
 describe("as chaves", () => {
   it("U27_PAGINA 'on' só dentro da versão B (as duas chaves off = nada muda); os 2 apps das lojas ainda sem o planner novo", () => {
@@ -59,7 +60,7 @@ describe("as chaves", () => {
 const FINANCAS = {
   "finance-perfil-ativo": "pessoal",
   "finance-last-seen-month": "Outubro-2026",
-  "finance-incomes": [{ id: "i1", date: "2026-10-05", value: 5000, description: "Salário" }, { id: "i0", date: "2026-09-05", value: 9999, description: "Mês passado" }],
+  "finance-incomes": [{ id: "i1", date: "2026-10-05", value: 5000, description: "Salário" }],
   "finance-expenses": [
     { id: "e1", date: "2026-10-03", value: 200, category: "mercado", description: "Mercado" },
     { id: "e2", date: "2026-10-09", value: 50.5, category: "lazer", description: "Cinema <b>" },
@@ -85,6 +86,43 @@ describe("Meu mês: o mês ATUAL do Finanças", () => {
   it("o Finanças ainda não virou o mês: contas saem dos fixos sem ✓ (o ✓ era do mês passado)", () => {
     const m = lerMesDoPlanner(loja({ ...FINANCAS, "finance-last-seen-month": "Setembro-2026" }), AGORA)!;
     expect(m.vencimentos.map((v) => [v.nome, v.paga])).toEqual([["Aluguel", false], ["Internet", false]]);
+  });
+  it("crítica r1 (técnico MEDIA 2): com o mês visto, o balde inteiro conta, como no app (receita de 30/09 no balde de outubro)", () => {
+    const m = lerMesDoPlanner(loja({ "finance-last-seen-month": "Outubro-2026", "finance-incomes": [{ id: "i", date: "2026-09-30", value: 3000, description: "Salário" }] }), AGORA)!;
+    expect(m).not.toBeNull();
+    expect(m.totalReceitas).toBe(3000);
+    // virada pendente (balde ainda de setembro): o que tem data de outubro, só
+    expect(lerMesDoPlanner(loja({ "finance-last-seen-month": "Setembro-2026", "finance-incomes": [{ id: "i", date: "2026-09-30", value: 3000 }] }), AGORA)).toBeNull();
+  });
+  it("crítica r1 (técnico MEDIA 3 / honestidade MEDIA 3): a parcela soma no orçamento da categoria e ganha linha nos vencimentos", () => {
+    const parcela = { id: "p1", description: "Celular", installmentValue: 100, totalInstallments: 10, paidInstallments: 0, category: "eletronicos", startMonth: "2026-10", parcelaDoMes: 1 };
+    const m = lerMesDoPlanner(loja({ "finance-last-seen-month": "Outubro-2026", "finance-expenses": [{ id: "e", date: "2026-10-02", value: 10, category: "eletronicos", description: "Cabo" }], "finance-installments": [parcela], "finance-category-budgets": { eletronicos: 500 } }), AGORA)!;
+    expect(m.orcamento).toEqual([{ nome: "Eletrônicos", gastei: 110, limite: 500 }]);
+    expect(m.parcelas).toBe(100);
+    expect(m.totalDespesas).toBe(110);
+    const f = folhasDoPlanner({ ...VAZIO, mes: m }, "core")[5];
+    expect(f).toContain("Parcelas do mês");
+    expect(f).toContain("Contas + parcelas</span><b>R$ 100</b>"); // gastos 10 + contas/parcelas 100 = despesas 110
+    expect(f).toContain("Soma dos limites</span><b>R$ 500</b>");
+    expect(f).not.toContain("Limite do mês");
+  });
+  it("crítica r1 (honestidade MEDIA 3): a fatura do cartão aparece como no app, fora do total (os gastos dela já contam)", () => {
+    const m = lerMesDoPlanner(loja({
+      "finance-last-seen-month": "Outubro-2026",
+      "finance-expenses": [{ id: "e", date: "2026-10-10", value: 100, category: "mercado", description: "Mercado", paymentMethod: "credito", cardName: "nubank" }],
+      "finance-card-config": { nubank: { closingDay: 20, dueDay: 27 } },
+      "finance-dueDays": [{ day: 5, bills: [{ id: "b1", name: "Aluguel", value: 1500, paid: true }] }],
+    }), AGORA)!;
+    expect(m.vencimentos).toEqual([{ nome: "Aluguel", dia: 5, valor: 1500, paga: true }, { nome: "Fatura Nubank", dia: 27, valor: 100, paga: false, fatura: true }]);
+    const f = folhasDoPlanner({ ...VAZIO, mes: m }, "codex")[5];
+    expect(f).toContain("Fatura Nubank");
+    expect(f).toContain("já nos gastos");
+    expect(f).toContain("Total das contas</span><b>R$ 1.500</b>");
+  });
+  it("'Tudo junto' lê todos os perfis; empresa apagada volta pro Pessoal (técnico BAIXA 8)", () => {
+    const base = { "finance-last-seen-month": "Outubro-2026", "finance-expenses": [{ id: "a", date: "2026-10-02", value: 50, description: "PJ", perfil: "pj-1" }, { id: "b", date: "2026-10-02", value: 20, description: "Meu" }] };
+    expect(lerMesDoPlanner(loja({ ...base, "finance-perfil-ativo": "__todos__" }), AGORA)!.totalGastos).toBe(70);
+    expect(lerMesDoPlanner(loja({ ...base, "finance-perfis": [] }), AGORA)!.totalGastos).toBe(70); // pj-1 não existe mais
   });
   it("conta vazia (ou lixo) = null", () => {
     expect(lerMesDoPlanner(loja({}), AGORA)).toBeNull();
@@ -113,6 +151,11 @@ describe("Minha semana: a semana ATUAL da Rotina", () => {
       { hora: "18:00", celulas: ["", "", "", "Dentista", "", "", ""] },
     ]);
     expect(s.importa).toEqual(["Pagar a fatura"]);
+  });
+  it("hábito sem nome no meio não desalinha os ✓ (técnico BAIXA 9)", () => {
+    const s = lerSemanaDoPlanner(loja({ "rotina-habits": ["Água", "", "Ler"], "rotina-habits-week": "2026-10-26", "rotina-habits-checked": { SEGUNDA: [false, false, true] } }), AGORA)!;
+    expect(s.habitos.map((h) => [h.nome, h.feitos[0]])).toEqual([["Água", false], ["Ler", true]]);
+    expect(s.atualizado).toBe("31/10");
   });
   it("marcas de OUTRA semana não voltam; nada da Rotina = null", () => {
     const s = lerSemanaDoPlanner(loja({ ...ROTINA, "rotina-habits-week": "2026-10-19" }), AGORA)!;
@@ -175,12 +218,13 @@ describe("a oferta em PÁGINA PRÓPRIA (versão B)", () => {
     expect(document.documentElement.style.overflow).toBe("hidden");
     expect(pag.querySelector("[data-testid=u2027-faixa]")!.textContent).toBe("Pagamento confirmado · o CORE é seu pra sempre");
     const t = pag.textContent!;
-    for (const s of ["Espera, tem mais uma coisa", "Seu 2027 organizado", "3 metas", "Gastar por mês", "R$ 3.200", "12 revisões do mês", "Cofrinho de 52 semanas", "O planner se preenche sozinho", "Baixe quando quiser, sai sempre atualizado", "R$ 14,90", "Quero · copiar o Pix", "Agora não · ver minha conta"]) expect(t).toContain(s);
+    for (const s of ["Espera, tem mais uma coisa", "Seu 2027 organizado", "Você planeja em 5 minutos", "3 metas", "Por mês", "R$ 3.200", "12 revisões", "Cofrinho", "52 semanas", "O planner se preenche sozinho", "Baixe quando quiser", "mês em que você baixar", "Toque numa folha", "R$ 14,90", "Quero · copiar o Pix", "Agora não · ver minha conta"]) expect(t).toContain(s);
     expect(pag.querySelectorAll(".u27p-ex").length).toBe(3); // o app e as 2 folhas: todos marcados EXEMPLO
     expect(pag.querySelector('[data-folha="mes"] img')!.getAttribute("src")).toBe("/landing/planner-2027-core-mes.webp");
     // honestidade: ela acabou de comprar, a conta está vazia — nada de "já vem preenchido"
     expect(t).not.toMatch(/já (vem|está|sai) preenchid|seu planner já/i);
-    expect(t).toContain("Por enquanto, o planner baixa pelo site.");
+    // crítica r1 (honestidade ALTA 1): ANTES de pagar ela sabe que o Android ainda não tem (as 2 chaves das lojas off)
+    expect(pag.querySelector("[data-testid=u2027-onde-pagina]")!.textContent).toBe("Por enquanto, no site e no app do iPhone (o planner baixa pelo site). No Android, na próxima versão.");
     expect(caixa.querySelector("[data-testid=u2027-na-pagina]")).not.toBeNull();
     u.parar();
     expect(document.getElementById("u27-pag")).toBeNull();
@@ -201,9 +245,17 @@ describe("a oferta em PÁGINA PRÓPRIA (versão B)", () => {
     (document.getElementById("u27-quero") as HTMLButtonElement).click();
     await vi.waitFor(() => expect(document.querySelector("#u27-pag [data-testid=u2027-qr]")).not.toBeNull());
     expect((document.querySelector("#u27-pag .u27p-barra") as HTMLElement).hidden).toBe(true);
+    // crítica r1 (honestidade MEDIA 5): em cima do Pix a pagar, a faixa é neutra (sem "Pagamento confirmado") e não repete
+    const faixa = document.querySelector<HTMLElement>("#u27-pag [data-testid=u2027-faixa]")!;
+    expect(faixa.dataset.tipo).toBe("neutra");
+    expect(faixa.textContent).toBe("Seu CORE está pago · este Pix é só do 2027");
+    expect(document.querySelector("#u27-pag").textContent).not.toContain("Pagamento confirmado");
+    expect(document.querySelectorAll("#u27-pag [data-testid=u2027-ja-pago]").length).toBe(1);
     (document.getElementById("u27-ja-paguei") as HTMLButtonElement).click();
     await vi.waitFor(() => expect(document.querySelector("#u27-pag [data-testid=u2027-pronto]")).not.toBeNull());
+    expect(faixa.hidden).toBe(true);
     expect(document.querySelector("#u27-pag")!.textContent).toContain("Planner que se preenche com o que você anota");
+    expect(document.querySelector("#u27-pag [data-testid=u2027-onde]")!.textContent).toContain("No Android, na próxima versão.");
     u.parar();
   });
   it("o 'glitch': o Pix do 2027 espera a conta pronta (contaPronta); o mesmo render não repinta", async () => {
@@ -218,6 +270,31 @@ describe("a oferta em PÁGINA PRÓPRIA (versão B)", () => {
     expect(document.querySelector("#u27-pag .u27p-miolo")).toBe(antes); // o mesmo nó: nada piscou
     pronta();
     await vi.waitFor(() => expect(gerar).toHaveBeenCalledTimes(1));
+    u.parar();
+  });
+  it("crítica r1 (técnico MEDIA 1): o Voltar do celular fecha a página como o 'Agora não' — e não sai do site", async () => {
+    window.history.replaceState({ outra: 1 }, "", "/organizar?u27planner=on&planner27=on&u27pagina=on");
+    const eventos: [string, Record<string, unknown>][] = [];
+    const { u, aoTerminar } = oferta("c-volta", { evento: (n, d = {}) => { eventos.push([n, d]); } });
+    expect(window.history.state).toMatchObject({ outra: 1, u27Pagina: "c-volta" }); // 1 entrada nova, com a marca desta compra
+    u.render(); u.render();
+    expect(window.history.state.u27Pagina).toBe("c-volta");
+    window.history.back();
+    await vi.waitFor(() => expect(document.getElementById("u27-pag")).toBeNull());
+    expect(aoTerminar).toHaveBeenCalled();
+    expect(eventos.find(([n]) => n === "landing_u2027_nao")?.[1]).toMatchObject({ de: "voltar", etapa: "oferta" });
+    expect(window.location.pathname).toBe("/organizar");
+    u.parar();
+  });
+  it("recarga com a página aberta (a marca já está no histórico): não empilha de novo; 'Agora não' volta a entrada dela", async () => {
+    window.history.replaceState({ u27Pagina: "c-rec" }, "", "/organizar?u27planner=on&planner27=on&u27pagina=on");
+    const antes = window.history.length;
+    const { u, aoTerminar } = oferta("c-rec");
+    expect(window.history.length).toBe(antes);
+    (document.getElementById("u27-nao") as HTMLButtonElement).click();
+    expect(aoTerminar).toHaveBeenCalledTimes(1);
+    await new Promise((r) => setTimeout(r, 30));
+    expect(aoTerminar).toHaveBeenCalledTimes(1); // o popstate do nosso back() não fecha 2×
     u.parar();
   });
   it("versão A (chaves off): a oferta no cartão, sem página; o render repetido também não repinta", () => {

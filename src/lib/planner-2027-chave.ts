@@ -91,6 +91,16 @@ export const PLANNER_B_NO_APP_IPHONE = false;
 export const PLANNER_B_NO_APP_ANDROID = false;
 /** o planner que se preenche sozinho já está nos 2 apps das lojas? (a oferta só diz "no app" quando os 2 têm) */
 export const plannerBNosApps = (): boolean => PLANNER_B_NO_APP_IPHONE && PLANNER_B_NO_APP_ANDROID;
+/**
+ * Crítica r1 da página (honestidade ALTA 1): ANTES de pagar, a página diz onde o 2027 funciona — o Android da loja (131)
+ * não tem nem a aba Seu 2027, e o planner B só sai pelo site até a build. Some sozinho quando as 2 chaves virarem true.
+ */
+export const ondeU27Pagina = (iphone: boolean = PLANNER_B_NO_APP_IPHONE, android: boolean = PLANNER_B_NO_APP_ANDROID): string => {
+  if (iphone && android) return "";
+  if (!android && !iphone) return "Por enquanto, no site e no app do iPhone (o planner baixa pelo site). No Android, na próxima versão.";
+  if (!android) return "Por enquanto, no site e no app do iPhone. No Android, na próxima versão.";
+  return "Por enquanto, o planner baixa pelo site e pelo app do Android. No iPhone, na próxima versão.";
+};
 /* crítica r2 (compradora MEDIA 3): "sai pelo site" confundia quem já está no site — agora diz o que ela recebe. */
 export const NOTA_U2027_PLANNER = "É separado do CORE que você já pagou. O planner sai em 14 folhas pra salvar no celular ou imprimir.";
 
@@ -147,4 +157,8 @@ export const srcsetPreenchida = (estilo: EstiloPlanner, folha: FolhaPreenchida) 
 export const imagemPreenchidaGrande = (estilo: EstiloPlanner, folha: FolhaPreenchida) => `/landing/planner-2027-${estilo}-${folha}-grande.webp`;
 /** a promessa (honesta: ela ACABOU de comprar, a conta está vazia — o planner se preenche com o que ela ANOTAR) */
 export const PROMESSA_PLANNER = "O planner se preenche sozinho";
-export const PROMESSA_PLANNER_DESC = "O que você anota no CORE vira planner: o mês do Finanças e a semana da Rotina. Baixe quando quiser, sai sempre atualizado.";
+export const PROMESSA_PLANNER_DESC = "Com o que você anota no CORE. Baixe quando quiser.";
+/** crítica r1 da página (compradora MEDIA 2): "montado com o que você anota" escondia que ela PLANEJA (5 min) */
+export const SUB_U27_PAGINA = "Você planeja em 5 minutos. O CORE guarda e te lembra o ano todo.";
+/** crítica r1 da página (compradora MEDIA 3): o exemplo mostra janeiro, mas a folha sai com o mês/semana em que ela baixar */
+export const QUANDO_U27_PAGINA = "Meu mês e Minha semana saem com o mês e a semana em que você baixar.";

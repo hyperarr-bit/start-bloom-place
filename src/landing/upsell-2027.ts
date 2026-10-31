@@ -27,13 +27,13 @@
  * braco_planner_via ("email" | "reserva" | "forca" | "fixo" | "padrao") — o teste A/B dos 2 desenhos (31/10,
  * src/lib/planner-2027-braco.ts). Sem a versão B os eventos ficam iguais aos de antes.
  */
-import { VALOR_U2027, reais, validadeU2027, type EstadoU2027, type PixU2027 } from "./regras";
+import { URL_APP_STORE, VALOR_U2027, reais, urlPlay, validadeU2027, type EstadoU2027, type PixU2027 } from "./regras";
 import { gravarEstadoU2027, lerEstadoU2027 } from "./u2027-estado";
 import {
   CTA_PRONTO_U2027_PLANNER, DESC_U2027_PLANNER, ITEM_PLANNER_U2027, LEGENDA_U2027_PLANNER, LINK_PLANEJAR_2027, NOTA_U2027_PLANNER, ZOOM_U2027_PLANNER, portaDoLink,
   bracoDoPlanner, camposDoBraco, folhaAnoDoPlanner, imagemDoPlanner, srcsetDoPlanner, u27PlannerLigado,
   u27PaginaLigada, imagemPreenchida, srcsetPreenchida, imagemPreenchidaGrande, PROMESSA_PLANNER, PROMESSA_PLANNER_DESC,
-  ondeU27Pagina, SUB_U27_PAGINA, QUANDO_U27_PAGINA,
+  ondeU27Pagina, ondeCurtoU27Pagina, SUB_U27_PAGINA, QUANDO_U27_PAGINA,
   type EstiloPlanner, type FolhaPreenchida,
 } from "@/lib/planner-2027-chave";
 
@@ -159,9 +159,12 @@ const CSS_PLANNER = `
 .u27-planner figcaption { margin-top: 2px; font-size: 12.5px; color: var(--fraco, #9a95a0); }
 .u27-planner figcaption u { text-decoration: none; font-weight: 700; color: var(--tx, #1c1a1f); white-space: nowrap; }
 .u27-planner + .u27-desc { margin-top: 10px; }
-.u27-zoom { position: fixed; inset: 0; z-index: 2147483000; background: rgba(20, 18, 24, .86); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 56px 16px 24px; overflow: auto; overscroll-behavior: contain; }
+.u27-zoom { position: fixed; inset: 0; z-index: 2147483000; background: rgba(20, 18, 24, .94); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 56px 16px 24px; overflow: auto; overscroll-behavior: contain; }
 .u27-zoom img { display: block; width: 100%; max-width: 560px; height: auto; border-radius: 10px; box-shadow: 0 18px 50px -12px rgba(0,0,0,.6); }
-.u27-zoom small { color: #fff; opacity: .8; font-size: 12.5px; letter-spacing: .04em; }
+/* crítica r2 (compradora MEDIA 3 / honestidade BAIXA 4): a legenda do exemplo numa pílula sólida, 1 linha, caixa normal —
+ * nada da página por trás atravessa a frase que marca o exemplo */
+.u27-zoom small { flex: none; max-width: 100%; padding: 6px 12px; border-radius: 99px; background: #fff; color: #1c1a1f; font-size: 12.5px; font-weight: 600; line-height: 1.3; text-align: center; }
+.u27-zoom small b { font-weight: 800; letter-spacing: .08em; }
 .u27-zoom button { position: fixed; top: 10px; right: 10px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: #fff; color: #1c1a1f; font-size: 24px; line-height: 44px; cursor: pointer; }
 `;
 /* 31/10 (upsell-tela-cheia): a PÁGINA PRÓPRIA da oferta B. Por cima da landing (position:fixed), em coluna: a faixa fina, o
@@ -183,6 +186,7 @@ const CSS_PAGINA = `
 .u27p-faixa b{font-weight:800}
 /* crítica r1 (honestidade MEDIA 5): fora da oferta a faixa não diz "Pagamento confirmado" em cima de um Pix a pagar */
 .u27p-faixa[data-tipo="neutra"]{min-height:30px;padding-top:max(6px,env(safe-area-inset-top));padding-bottom:6px;background:var(--u-papel);color:var(--u-suave);font-size:12.5px;font-weight:600;border-bottom:1px solid var(--u-fio)}
+.u27p[data-estilo="codex"] .u27p-faixa[data-tipo="neutra"]{background:var(--u-papel);color:var(--u-suave)}
 .u27p-faixa[data-tipo="neutra"] svg{display:none}
 .u27p-faixa[hidden]{display:none}
 .u27p-rolo{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
@@ -218,7 +222,10 @@ const CSS_PAGINA = `
 .u27p-folhas{margin:10px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .u27p-folhas button{position:relative;display:block;padding:0;border:0;background:none;cursor:zoom-in;text-align:left;-webkit-tap-highlight-color:transparent}
 .u27p-folhas img{display:block;width:100%;height:auto;aspect-ratio:1240/1754;border-radius:8px;background:#fff;box-shadow:0 10px 26px -10px rgba(30,20,40,.4),0 0 0 1px rgba(30,20,40,.06)}
-.u27p-folhas .u27p-ex{top:8px;right:8px}
+/* crítica r2 (honestidade BAIXA 9): o selo sai de cima do ícone/da flor do canto — fica no canto ESQUERDO, metade pra fora da
+ * borda (como o do bloco do 2027); embaixo ele sumia atrás da barra na 1ª tela de 390×690 */
+.u27p-fimg{display:block;position:relative;font-style:normal}
+.u27p-folhas .u27p-ex{top:-8px;right:auto;left:8px}
 .u27p-folhas span{display:block;margin-top:7px;font-size:13px;font-weight:700;color:var(--u-tx)}
 .u27p-folhas span small{display:block;font-size:12px;font-weight:500;color:var(--u-suave)}
 .u27p-toque{margin:8px 0 0;font-size:12px;color:var(--u-suave);text-align:center}
@@ -230,12 +237,22 @@ const CSS_PAGINA = `
 .u27p-preco{display:flex;align-items:baseline;justify-content:center;gap:8px;margin:0 0 8px}
 .u27p-preco b{font-size:22px;font-weight:850;letter-spacing:-.02em}
 .u27p-preco span{font-size:13px;font-weight:650;color:var(--u-suave)}
+.u27p-onde{margin:-4px 0 8px;font-size:12px;font-weight:600;line-height:1.3;color:var(--u-suave);text-align:center}
 .u27p-barra button.lp-cta{min-height:52px}
 .u27p[data-estilo="codex"] .u27p-barra button.lp-cta{background:#30362f}
 .u27p-nao{display:block;width:100%;min-height:44px;margin-top:4px;border:0;background:none;color:var(--u-suave);font-size:14.5px;font-weight:700}
 .u27p .u27{animation:none}
+/* crítica r2 (compradora BAIXA 6): no QR do 2027, "Já paguei" é botão (contorno) e "Agora não" fica menor embaixo */
+.u27p .u27 .lp-links{display:flex;flex-direction:column;align-items:stretch;gap:2px}
+.u27p #u27-ja-paguei{min-height:46px;border:1.5px solid var(--u-tx);border-radius:12px;background:none;color:var(--u-tx);font-size:15px;font-weight:750;text-decoration:none}
+.u27p #u27-sair{min-height:40px;font-size:13.5px;color:var(--u-suave)}
+/* crítica r2 (compradora MEDIA 2): o "Pronto" do 2027 também mostra as lojas (regra de 18/10: todo pós-compra da web) */
+.u27-pronto-lojas{margin:14px 0 0;text-align:center}
+.u27-pronto-lojas p{margin:0 0 8px;font-size:13px;color:var(--suave,#6b6670)}
+.u27-pronto-lojas .lp-selos{display:flex;justify-content:center;gap:10px;margin:0}
+.u27-pronto-lojas img{display:block;height:36px;width:auto}
 .u27p-miolo-alvo>.u27{max-width:520px;margin:0 auto;padding:22px 16px 28px}
-@media (max-height:700px){.u27p-miolo{padding-top:16px}.u27p h1{font-size:28px}.u27p-barra{padding-top:8px}.u27p-preco{margin-bottom:6px}.u27p-barra button.lp-cta{min-height:48px}.u27p-nao{min-height:40px;margin-top:2px}}
+@media (max-height:700px){.u27p-onde{margin:-3px 0 6px}.u27p-miolo{padding-top:16px}.u27p h1{font-size:28px}.u27p-barra{padding-top:8px}.u27p-preco{margin-bottom:6px}.u27p-barra button.lp-cta{min-height:48px}.u27p-nao{min-height:40px;margin-top:2px}}
 `;
 /** o exemplo do 2027 como fica no app (a página mostra, marcado EXEMPLO; os mesmos dados do planner de exemplo) */
 const EXEMPLO_2027 = {
@@ -248,12 +265,12 @@ const brlInteiro = (v: number) => `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
 /** o zoom das folhas preenchidas (a mesma janela do "Meu ano") */
 function abrirZoomDaFolha(estilo: EstiloPlanner, folha: FolhaPreenchida, aoFechar: () => void): void {
   abrirZoom(imagemPreenchidaGrande(estilo, folha), folha === "mes" ? "Exemplo da folha Meu mês, preenchida com os dados do Finanças" : "Exemplo da folha Minha semana, preenchida com os dados da Rotina",
-    folha === "mes" ? "EXEMPLO · O SEU SAI COM O MÊS EM QUE VOCÊ BAIXAR" : "EXEMPLO · O SEU SAI COM A SEMANA EM QUE VOCÊ BAIXAR", aoFechar);
+    folha === "mes" ? "<b>EXEMPLO</b> · o seu sai com o mês em que você baixar" : "<b>EXEMPLO</b> · o seu sai com a semana em que você baixar", aoFechar);
 }
 
 /** crítica r1 (compradora MEDIA 2): tocar na imagem abre a folha "Meu ano" grande (legível). Fecha no ×, no toque fora e no Esc. */
 function abrirZoomDoPlanner(estilo: EstiloPlanner, aoFechar: () => void): void {
-  abrirZoom(folhaAnoDoPlanner(estilo), "Exemplo de uma folha do planner: Meu ano", "EXEMPLO · O SEU SAI COM O QUE VOCÊ PLANEJAR", aoFechar,
+  abrirZoom(folhaAnoDoPlanner(estilo), "Exemplo de uma folha do planner: Meu ano", "<b>EXEMPLO</b> · o seu sai com o que você planejar", aoFechar,
     "A folha Meu ano do planner 2027, com metas, dinheiro, cofrinho, datas e hábitos de exemplo");
 }
 function abrirZoom(src: string, rotulo: string, aviso: string, aoFechar: () => void, alt = rotulo): void {
@@ -322,6 +339,16 @@ export type Upsell2027 = {
   parar: () => void;
 };
 
+/** crítica r2 (técnico BAIXA 2): no QR do vitalício, as 2 folhas da página já começam a baixar (a página abre com elas). */
+const folhasPreaquecidas = new Set<string>();
+export function preaquecerFolhasU27(email: string | null, reserva: string): void {
+  if (typeof Image === "undefined" || !u27PlannerLigado() || !u27PaginaLigada()) return;
+  const { estilo } = bracoDoPlanner({ email, reserva });
+  if (folhasPreaquecidas.has(estilo)) return;
+  folhasPreaquecidas.add(estilo);
+  for (const f of ["mes", "semana"] as FolhaPreenchida[]) { const pre = new Image(); pre.srcset = srcsetPreenchida(estilo, f); pre.src = imagemPreenchida(estilo, f); }
+}
+
 export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
   garantirCss();
   let e: EstadoU2027 = lerEstadoU2027(compra);
@@ -383,7 +410,9 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
     if (e.pix && Date.parse(e.pix.expiresAt) - Date.now() > 60_000) { promessa = Promise.resolve(e.pix); return; }
     tPre = Date.now();
     // 31/10 (o "glitch"): a oferta pode aparecer antes da conta final ficar pronta — o Pix espera a conta (a sessão dela)
-    const p = (ctx.contaPronta ? ctx.contaPronta() : Promise.resolve()).then(() => { tPre = Date.now(); return ctx.api.gerar(compra); }).catch((x): GeradoU2027 => ({ erro: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.", onde: String(x).slice(0, 120) }));
+    // crítica r2 (técnico BAIXA 4): a espera tem teto — se a conta travar na rede, segue pro gerar (a sessão já é dela) em 8 s
+    const conta = ctx.contaPronta ? Promise.race([ctx.contaPronta(), new Promise<void>((ok) => { window.setTimeout(ok, 8000); })]) : Promise.resolve();
+    const p = conta.then(() => { tPre = Date.now(); return ctx.api.gerar(compra); }).catch((x): GeradoU2027 => ({ erro: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.", onde: String(x).slice(0, 120) }));
     promessa = p;
     void p.then((r) => {
       const ok = "qrCode" in r;
@@ -494,15 +523,36 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
   const MARCA_U27 = "u27Pagina";
   const marcaNoHist = (): boolean => { try { const h = history.state as Record<string, unknown> | null; return !!h && typeof h === "object" && h[MARCA_U27] === compra; } catch { return false; } };
   let ignorarPop = false;
+  /* crítica r2 (honestidade MEDIA 2): com a rolagem do navegador em "auto", o history.back() do fechar devolvia o y de
+   * quando a página abriu (o QR, mais alto que a conta pronta) e a conta aparecia cortada, sem o título. Com a página
+   * aberta a restauração fica "manual"; ao fechar, a conta pronta vai pro topo depois do popstate. */
+  let restauracaoAntes: ScrollRestoration | null = null;
+  let empilharNoLoad: (() => void) | null = null;
+  const pousarNaConta = () => {
+    const ir = () => { try { ctx.card.scrollIntoView({ block: "start", behavior: "auto" }); } catch { /* sem rolagem (teste) */ } };
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(ir); else ir();
+    if (restauracaoAntes) { try { history.scrollRestoration = restauracaoAntes; } catch { /* noop */ } restauracaoAntes = null; }
+  };
+  /* crítica r2 (técnico BAIXA 3): aberta, a landing por baixo sai do teclado/leitor (inert) e o Esc = "Agora não" */
+  let inertes: Element[] = [];
+  const teclaPagina = (k: KeyboardEvent) => {
+    if (k.key !== "Escape" || !pagina || e.etapa !== "oferta" || document.getElementById("u27-zoom")) return;
+    ev("landing_u2027_nao", { de: "esc" });
+    salvar({ etapa: "fim" });
+  };
   const fecharPagina = () => {
     if (!pagina) return;
     pagina.remove();
     pagina = null;
+    inertes.forEach((el) => el.removeAttribute("inert")); inertes = [];
+    document.removeEventListener("keydown", teclaPagina);
+    if (empilharNoLoad) { window.removeEventListener("load", empilharNoLoad); empilharNoLoad = null; }
     try { document.documentElement.style.removeProperty("overflow"); } catch { /* noop */ }
-    if (marcaNoHist()) { ignorarPop = true; try { history.back(); } catch { ignorarPop = false; } }
+    if (marcaNoHist()) { ignorarPop = true; try { history.back(); } catch { ignorarPop = false; pousarNaConta(); } }
+    else pousarNaConta();
   };
   const aoPop = () => {
-    if (ignorarPop) { ignorarPop = false; return; }
+    if (ignorarPop) { ignorarPop = false; pousarNaConta(); return; }
     if (!pagina || marcaNoHist() || e.etapa === "fim") return;
     if (e.etapa === "pronto") ev("landing_u2027_continuar", { de: "voltar" });
     else ev("landing_u2027_nao", { de: "voltar", etapa: e.etapa });
@@ -523,14 +573,24 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
       pagina.setAttribute("aria-label", TITULO_U2027);
       pagina.innerHTML = `<div class="u27p-faixa" data-testid="u2027-faixa"></div><div class="u27p-rolo"><div class="u27p-miolo-alvo"></div></div><div class="u27p-barra" hidden><div></div></div>`;
       document.body.appendChild(pagina);
+      inertes = Array.from(document.querySelectorAll("main.lp, #fim")).filter((el) => !el.hasAttribute("inert"));
+      inertes.forEach((el) => el.setAttribute("inert", ""));
+      document.addEventListener("keydown", teclaPagina);
       try { document.documentElement.style.overflow = "hidden"; } catch { /* noop */ }
-      if (!marcaNoHist()) {
+      try { if (restauracaoAntes === null) { restauracaoAntes = history.scrollRestoration; history.scrollRestoration = "manual"; } } catch { /* noop */ }
+      const empilhar = () => {
+        empilharNoLoad = null;
+        if (!pagina || marcaNoHist()) return;
         try {
           const h = history.state && typeof history.state === "object" ? { ...(history.state as Record<string, unknown>) } : {};
           delete h.lpDemoCheia; // a marca da demo em tela cheia da landing (landing.ts MARCA_CHEIA) não vem junto
           history.pushState({ ...h, [MARCA_U27]: compra }, "");
         } catch { /* sem histórico: fecha só pelos botões */ }
-      }
+      };
+      // crítica r2 (técnico MEDIA 1): no WebKit, uma navegação de iframe DEPOIS do pushState entra no histórico conjunto e
+      // o 1º Voltar desfaz ela (a página não fecha). Aberta antes do load (a recarga na volta do banco), empilha no load.
+      if (document.readyState === "complete") empilhar();
+      else { empilharNoLoad = empilhar; window.addEventListener("load", empilhar, { once: true }); }
     }
     pintarFaixa();
     return { miolo: pagina.querySelector<HTMLElement>(".u27p-miolo-alvo")!, barra: pagina.querySelector<HTMLElement>(".u27p-barra")! };
@@ -557,7 +617,7 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
   /** a oferta em página: o 2027 como fica no app (EXEMPLO) + o planner que se preenche sozinho (EXEMPLO) */
   function htmlDaPagina(estilo: EstiloPlanner): string {
     const folha = (f: FolhaPreenchida, nome: string, de: string) =>
-      `<button type="button" data-folha="${f}" aria-label="Ver o exemplo da folha ${nome}"><img src="${imagemPreenchida(estilo, f)}" srcset="${srcsetPreenchida(estilo, f)}" width="620" height="877" alt="Exemplo da folha ${nome} preenchida" decoding="async"><b class="u27p-ex">EXEMPLO</b><span>${nome}<small>${de}</small></span></button>`;
+      `<button type="button" data-folha="${f}" aria-label="Ver o exemplo da folha ${nome}"><i class="u27p-fimg"><img src="${imagemPreenchida(estilo, f)}" srcset="${srcsetPreenchida(estilo, f)}" width="620" height="877" alt="Exemplo da folha ${nome} preenchida" decoding="async"><b class="u27p-ex">EXEMPLO</b></i><span>${nome}<small>${de}</small></span></button>`;
     const fio = (n: number, ok: number) => `<span class="u27p-fio" aria-hidden="true">${Array.from({ length: n }, (_, i) => `<i${i < ok ? ' class="ok"' : ""}></i>`).join("")}</span>`;
     const onde = ondeU27Pagina();
     return `
@@ -623,6 +683,8 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
         ${erro ? `<p class="lp-erro" role="alert">${esc(erro)}</p>` : ""}`;
       if (comPagina && barra) {
         if (pintar(c, htmlDaPagina(braco!.estilo))) {
+          const h1 = c.querySelector<HTMLElement>("h1");
+          if (h1) { h1.tabIndex = -1; try { h1.focus({ preventScroll: true }); } catch { /* noop */ } }
           c.querySelectorAll<HTMLButtonElement>(".u27p-folhas button").forEach((b) => b.addEventListener("click", () => {
             const f = b.dataset.folha as FolhaPreenchida;
             ev("landing_u2027_zoom", { folha: f });
@@ -631,6 +693,7 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
         }
         barra.hidden = false;
         if (pintar(barra.firstElementChild as HTMLElement, `<div data-testid="u2027-barra"><div class="u27p-preco"><b data-testid="u2027-preco">${reais(VALOR_U2027)}</b><span>uma vez, sem mensalidade</span></div>
+        ${ondeCurtoU27Pagina() ? `<p class="u27p-onde" data-testid="u2027-onde-barra">${ondeCurtoU27Pagina()}</p>` : ""}
         ${botoes}
         <button type="button" class="u27p-nao" id="u27-nao">Agora não · ver minha conta</button></div>`)) {
           barra.querySelector<HTMLButtonElement>("#u27-quero")!.addEventListener("click", () => { void quero(); });
@@ -711,9 +774,10 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
         <div class="lp-pago-check">${ICO_CHECK}</div>
         <h3>Pronto, seu 2027 tá no seu CORE</h3>
         <ul class="u27-lista">${(comPlanner ? [...ITENS_U2027.slice(0, 3), comPagina ? ITEM_PLANNER_PAGINA : ITEM_PLANNER_U2027] : ITENS_U2027).map((t) => `<li>${ICO_CHECK}<span>${t}</span></li>`).join("")}</ul>
-        <div class="u27-onde" data-testid="u2027-onde">${comPagina ? ONDE_U2027_PAGINA() : ONDE_U2027}${email ? ` Entre com <b>${esc(email)}</b>.` : ""}</div>
+        <div class="u27-onde" data-testid="u2027-onde">${comPagina ? ONDE_U2027_PAGINA() : ONDE_U2027}${email ? (comPlanner ? ` Entre com o código que vai pro <b>${esc(email)}</b>, sem senha.` : ` Entre com <b>${esc(email)}</b>.`) : ""}</div>
         ${comPlanner
           ? `<div class="lp-form"><button type="button" class="lp-cta" id="u27-planejar" data-testid="u2027-planejar" data-href="${esc(portaDoLink(LINK_PLANEJAR_2027, email))}">${CTA_PRONTO_U2027_PLANNER}</button></div>
+        <div class="u27-pronto-lojas" data-testid="u2027-pronto-lojas"><p>Ou no app, com o mesmo e-mail:</p><div class="lp-selos"><a href="${URL_APP_STORE}" target="_blank" rel="noopener" data-loja="ios"><img src="/selos/app-store.svg" alt="Baixar na App Store" width="108" height="36"></a><a href="${esc(urlPlay("landing"))}" target="_blank" rel="noopener" data-loja="android"><img src="/selos/google-play.png" alt="Disponível no Google Play" width="93" height="36"></a></div></div>
         <div class="lp-links"><button type="button" class="lp-link" id="u27-continuar">Depois · ver minha conta</button></div>`
           : '<div class="lp-form"><button type="button" class="lp-cta" id="u27-continuar">Continuar</button></div>'}
       </div>`)) {

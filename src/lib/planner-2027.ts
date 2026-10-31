@@ -302,7 +302,7 @@ function fMeuMes(d: DadosDoPlanner, e: EstiloPlanner): string {
   const pReceitas = bloco("entrada", e, "Receitas", "No mês", preencher(8, linhaValor, cab("Dia", "De onde", "", "Valor")), total("Total do mês"));
   const pGastos = bloco("saida", e, "Gastos", "No mês", preencher(12, linhaValor, cab("Dia", "Com o quê", "", "Valor")), total("Total do mês"));
   const pOrc = bloco("orcamento", e, "Orçamento", "Gastei · Limite", `<div class="pl-orc">${CATEGORIAS.map((c) => `<div><span>${c}</span><span class="pl-ln"></span><span class="pl-ln"></span></div>`).join("")}</div>`,
-    total("Limite do mês", p.gastarMes));
+    total("Posso gastar no mês", p.gastarMes)); // crítica r2 (honestidade BAIXA 6): o mesmo nome da folha preenchida
   const mais = d.contas.length > MAX_CONTAS;
   const contas = d.contas.slice(0, mais ? MAX_CONTAS - 1 : MAX_CONTAS);
   const soma = Math.round(d.contas.reduce((s, c) => s + c.valor, 0) * 100) / 100;
@@ -421,7 +421,7 @@ function fSemanaCheia(s: SemanaDoPlanner, e: EstiloPlanner): string {
   const tarefa = `<div class="pl-tarefa"><span class="pl-caixa"></span><div class="pl-ln"></div></div>`;
   const maisImp = s.importa.length > MAX_IMPORTA;
   const imp = s.importa.slice(0, maisImp ? MAX_IMPORTA - 1 : MAX_IMPORTA);
-  const pImporta = painel("importa", e, "O que importa", `<div class="pl-pauta">${imp.map((t) => `<div class="pl-tarefa pl-tarefa-f"><span class="pl-caixa"></span><span class="pl-txt">${esc(t)}</span></div>`).join("")}${maisImp ? `<div class="pl-lv-mais">+${s.importa.length - imp.length} na sua Rotina</div>` : ""}${tarefa.repeat(Math.max(0, 8 - s.importa.length))}</div>`, s.importa.length ? "da sua Rotina" : "", "pl-enche");
+  const pImporta = painel("importa", e, "O que importa", `<div class="pl-pauta">${imp.map((t) => `<div class="pl-tarefa pl-tarefa-f"><span class="pl-caixa"></span><span class="pl-txt">${esc(t)}</span></div>`).join("")}${maisImp ? `<div class="pl-lv-mais">+${s.importa.length - imp.length} na sua Rotina</div>` : ""}${maisImp ? "" : tarefa.repeat(Math.max(0, 8 - s.importa.length))}</div>`, s.importa.length ? "da sua Rotina" : "", "pl-enche");
   const pNota = painel("nota", e, "Uma nota pra mim", preencher(8), "", "pl-enche");
   return folha(7, `${cabecalho(e, "PLANNER SEMANAL", "Minha", "semana", `${esc(s.rotulo)} · da sua Rotina${s.atualizado ? `, em ${esc(s.atualizado)}` : ""}`, "rotina", 7)}
     <div class="pl-corpo">${pHab}${pAgenda}<div class="pl-dupla">${pImporta}${pNota}</div></div>`, "pl-cheia");
@@ -684,6 +684,8 @@ function cssBase(estilo: EstiloPlanner): string {
 .pl-ag-dia b{display:block;font-size:30px;line-height:1.1;margin-top:2px;letter-spacing:0;font-weight:${codex ? 600 : 800};${tintaCore}}
 .pl-agenda.pl-agenda-f i{height:76px}
 .pl-pauta-f>.pl-lv-f,.pl-pauta-f>.pl-lv-mais{height:46px;line-height:46px}.pl-pauta-f .pl-ln{height:46px}
+/* crítica r2 (honestidade BAIXA 7): com a semana preenchida, a célula vazia é só um fundo claro (o olho vai pro que tem) */
+.pl-agenda-f i:not(.cheia){background:#ffffff8c;border:1px solid var(--w);border-color:color-mix(in srgb,var(--w) 35%,transparent)}
 .pl-agenda-f i.cheia{display:flex;align-items:center;padding:6px 8px;background:var(--t);border-color:var(--t);font-style:normal;font-size:18px;line-height:1.2;font-weight:600;${tintaCore}}
 .pl-3l{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;overflow-wrap:anywhere;min-width:0}
 .pl-tarefa.pl-tarefa-f{align-items:center;height:54px;border-bottom:2px solid var(--w)}.pl-tarefa.pl-tarefa-f .pl-caixa{margin-bottom:0}.pl-tarefa-f .pl-txt{flex:1;font-size:25px;${tintaCore}}

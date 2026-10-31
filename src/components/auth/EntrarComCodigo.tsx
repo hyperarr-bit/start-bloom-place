@@ -22,8 +22,10 @@ import { trackEvent } from "@/lib/analytics";
 
 const TAMANHO = 8;
 
-export function EntrarComCodigo({ email, funil, onSession, className = "", rotulo = "Entrar sem senha — receber código por e-mail" }: {
+export function EntrarComCodigo({ email, funil, onSession, className = "", rotulo = "Entrar sem senha — receber código por e-mail", cheio = false }: {
   email: string;
+  /** Botão cheio (quando o código é o caminho principal da tela, ex.: o "Planejar meu 2027"). */
+  cheio?: boolean;
   /** Texto do botão (o checkout Pix já explica em cima e usa um curto). */
   rotulo?: string;
   funil: string;
@@ -76,7 +78,7 @@ export function EntrarComCodigo({ email, funil, onSession, className = "", rotul
           type="button"
           onClick={() => void enviar()}
           disabled={fase === "enviando"}
-          className="w-full h-12 rounded-xl border-2 border-foreground text-foreground text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
+          className={`w-full h-12 rounded-xl border-2 border-foreground text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60 ${cheio ? "bg-foreground text-background" : "text-foreground"}`}
           data-testid="entrar-com-codigo"
         >
           {fase === "enviando" ? <Loader2 className="w-4 h-4 animate-spin" /> : <><MailCheck className="w-4 h-4" /> {rotulo}</>}

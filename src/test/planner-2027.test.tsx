@@ -183,7 +183,7 @@ describe("o planner B: as folhas, 2 direções, os dados dela", () => {
     expect(ROTULOS_DAS_FOLHAS).toHaveLength(TOTAL_DE_FOLHAS);
     for (const e of ["codex", "core"] as const) {
       const mes = folhasDoPlanner(EXEMPLO_DO_PLANNER, e)[5];
-      for (const s of ["Meu", "mês", "Receitas", "Despesas", "Saldo do mês", "Gastos", "Orçamento", "Vencimentos", "posso gastar R$ 3.200", "quero guardar R$ 450", "Limite do mês</span><b>R$ 3.200</b>", "Aluguel", "Dia 5", "R$ 1.450", "Total das contas</span><b>R$ 1.798,70</b>"]) expect(mes).toContain(s);
+      for (const s of ["Meu", "mês", "Receitas", "Despesas", "Saldo do mês", "Gastos", "Orçamento", "Vencimentos", "posso gastar R$ 3.200", "quero guardar R$ 450", "Posso gastar no mês</span><b>R$ 3.200</b>", "Aluguel", "Dia 5", "R$ 1.450", "Total das contas</span><b>R$ 1.798,70</b>"]) expect(mes).toContain(s);
       expect(mes).not.toContain("Fevereiro"); // nada de tabela de 12 meses repetindo o mesmo valor
       const vazio = folhasDoPlanner(VAZIO, e)[5];
       expect(vazio).not.toMatch(sujeira);

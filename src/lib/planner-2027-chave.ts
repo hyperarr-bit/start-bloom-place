@@ -101,6 +101,15 @@ export const ondeU27Pagina = (iphone: boolean = PLANNER_B_NO_APP_IPHONE, android
   if (!android) return "Por enquanto, no site e no app do iPhone. No Android, na próxima versão.";
   return "Por enquanto, o planner baixa pelo site e pelo app do Android. No iPhone, na próxima versão.";
 };
+/**
+ * crítica r2 (honestidade MEDIA 1): a frase de onde funciona ficava 350 px abaixo da dobra no Android (390×690). A versão
+ * curta mora na barra fixa, sob o preço — à vista desde a 1ª tela, junto do "Quero". Some junto com a longa.
+ */
+export const ondeCurtoU27Pagina = (iphone: boolean = PLANNER_B_NO_APP_IPHONE, android: boolean = PLANNER_B_NO_APP_ANDROID): string => {
+  if (iphone && android) return "";
+  if (!android) return "Hoje no site e no iPhone · Android na próxima versão";
+  return "Hoje no site e no Android · planner no iPhone na próxima versão";
+};
 /* crítica r2 (compradora MEDIA 3): "sai pelo site" confundia quem já está no site — agora diz o que ela recebe. */
 export const NOTA_U2027_PLANNER = "É separado do CORE que você já pagou. O planner sai em 14 folhas pra salvar no celular ou imprimir.";
 
@@ -159,6 +168,6 @@ export const imagemPreenchidaGrande = (estilo: EstiloPlanner, folha: FolhaPreenc
 export const PROMESSA_PLANNER = "O planner se preenche sozinho";
 export const PROMESSA_PLANNER_DESC = "Com o que você anota no CORE. Baixe quando quiser.";
 /** crítica r1 da página (compradora MEDIA 2): "montado com o que você anota" escondia que ela PLANEJA (5 min) */
-export const SUB_U27_PAGINA = "Você planeja em 5 minutos. O CORE guarda e te lembra o ano todo.";
+export const SUB_U27_PAGINA = "Você planeja em 5 minutos. O CORE guarda e abre a revisão todo dia 1."; // crítica r2 (honestidade BAIXA 8): no site não há notificação
 /** crítica r1 da página (compradora MEDIA 3): o exemplo mostra janeiro, mas a folha sai com o mês/semana em que ela baixar */
 export const QUANDO_U27_PAGINA = "Meu mês e Minha semana saem com o mês e a semana em que você baixar.";

@@ -310,10 +310,13 @@ window.addEventListener("message", (e: MessageEvent) => {
 // (a) depois do pixel E do load: o iframe antes do `load` segurava o evento load da página em ~5 s na medição (a barra de
 // progresso do navegador do Instagram ficaria girando) — no main de hoje a demo também só entra depois do load
 const depoisDoLoad = (f: () => void) => { if (document.readyState === "complete") f(); else window.addEventListener("load", f, { once: true }); };
+/* crítica r2 do upsell 2027 (técnico MEDIA 1, só com o 2027 ligado): quem já está no Pix/pago não precisa da demo de 4–5 MB — e,
+ * no WebKit, o iframe navegando depois do pushState da página do 2027 comia o 1º Voltar. Com a chave off, igual a antes. */
+const demoDeFundoServe = () => !(U2027 && estado.fase !== "oferta");
 if (!V2) {
-  depoisDoPixel(() => depoisDoLoad(() => ocioso(() => iniciarDemo("fundo"), 1500)));
+  depoisDoPixel(() => depoisDoLoad(() => ocioso(() => { if (demoDeFundoServe()) iniciarDemo("fundo"); }, 1500)));
   if ("IntersectionObserver" in window) {
-    const perto = new IntersectionObserver((ens) => { if (ens.some((e) => e.isIntersecting)) { iniciarDemo("perto"); perto.disconnect(); } }, { threshold: 0.25 });
+    const perto = new IntersectionObserver((ens) => { if (ens.some((e) => e.isIntersecting) && demoDeFundoServe()) { iniciarDemo("perto"); perto.disconnect(); } }, { threshold: 0.25 });
     perto.observe($("demo"));
   }
 }
@@ -1258,7 +1261,7 @@ function renderDoCartao() {
     caixa.innerHTML = `<div class="lp-pix-gerando" data-testid="landing-gerando"><span class="lp-pix-logo">${ICO_PIX}</span><b>Gerando o seu Pix…</b><div class="lp-progresso"><i></i></div><span>${V2 ? "Sem CPF. Leva 2 segundos." : "Sem CPF, sem cadastro. Leva 2 segundos."}</span></div>`;
   } else if (f === "qr" && estado.pix) {
     const p = estado.pix;
-    if (U2027) void carregarU2027().catch(() => null); // 31/10 (o "glitch"): o módulo do 2027 já chega com o QR na tela
+    if (U2027) void carregarU2027().then((m) => m.preaquecerFolhasU27(estado.emailPix ?? estado.email ?? null, p.orderId)).catch(() => null); // 31/10 (o "glitch"): o módulo do 2027 já chega com o QR na tela (r2: e as folhas da página)
     // 30/10 (v2): 3 passos curtos no lugar da caixa verde + "Pagou? Volte aqui" (quem volta do banco paga 81%; quem não
     // paga sai ~4 s depois do QR — lp-web/funil §3c) + a garantia perto do código. O braço atual segue IGUAL.
     const passosV2 = V2 ? `

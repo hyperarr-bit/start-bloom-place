@@ -26,6 +26,7 @@
  */
 import { VALOR_U2027, reais, validadeU2027, type EstadoU2027, type PixU2027 } from "./regras";
 import { gravarEstadoU2027, lerEstadoU2027 } from "./u2027-estado";
+import { DESC_U2027_PLANNER, LEGENDA_U2027_PLANNER, estiloDoPlanner, imagemDoPlanner, u27PlannerLigado } from "@/lib/planner-2027-chave";
 
 export type GeradoU2027 = (PixU2027 & { comEmail?: boolean }) | { jaTem2027: true } | { erro: string; onde: string };
 export type ApiU2027 = {
@@ -65,6 +66,14 @@ export const TITULO_U2027 = "Seu 2027 organizado";
 export const DESC_U2027 = "3 metas, quanto gastar e guardar por mês, 12 revisões do mês e o cofrinho de 52 semanas.";
 export const NOTA_U2027 = "É separado do CORE que você já pagou. Por enquanto fica no site e no app do iPhone.";
 export const ONDE_U2027 = "Fica no módulo <b>Desenvolvimento Pessoal</b>, aba <b>Seu 2027</b>. Por enquanto, no site e no app do iPhone.";
+/**
+ * VERSÃO B (31/10, novidades-guardadas/2026-10-31/upsell-planner): a oferta mostra 2 FOLHAS REAIS do planner (capa + "Meu
+ * ano", geradas pelo código do planner com dados de exemplo: scripts/planner-2027-miniaturas.ts) e diz que o planner sai
+ * com os dados dela. Chave U27_PLANNER "off" (padrão) = a oferta da versão A, igual. QA: ?u27planner=on|off|auto. A direção
+ * da miniatura segue a do app (PLANNER_ESTILO / ?planner-estilo=codex|core).
+ */
+export { U27_PLANNER, u27PlannerLigado, DESC_U2027_PLANNER, LEGENDA_U2027_PLANNER, imagemDoPlanner, type ModoU27Planner } from "@/lib/planner-2027-chave";
+
 /** O laço de conferência (crítica r1): rápido nos 10 primeiros minutos, devagar até 30 min, depois só na volta / "Já paguei". */
 export const LACO_U2027 = { rapidoMs: 3000, lentoMs: 30_000, viraLentoMs: 10 * 60e3, paraMs: 30 * 60e3 } as const;
 
@@ -121,6 +130,20 @@ const CSS = `
 .u27-onde b { color: var(--tx, #1c1a1f); }
 @media (max-width: 359px) { .u27 h3 { font-size: 22px; } .u27-qr .lp-qr { width: 100px; height: 100px; } }
 `;
+/* versão B: só entra com a chave U27_PLANNER ligada (desligada, o CSS da página é o da versão A, igual) */
+const CSS_PLANNER = `
+.u27-planner { margin: 12px 0 0; text-align: center; }
+.u27-planner img { display: block; width: 100%; max-width: 300px; height: auto; aspect-ratio: 640 / 460; margin: 0 auto; }
+.u27-planner figcaption { margin-top: 2px; font-size: 12.5px; color: var(--fraco, #9a95a0); }
+.u27-planner + .u27-desc { margin-top: 10px; }
+`;
+function garantirCssPlanner(): void {
+  if (document.getElementById("lp-u27-planner-css")) return;
+  const st = document.createElement("style");
+  st.id = "lp-u27-planner-css";
+  st.textContent = CSS_PLANNER;
+  document.head.appendChild(st);
+}
 function garantirCss(): void {
   if (document.getElementById("lp-u27-css")) return;
   const st = document.createElement("style");
@@ -169,6 +192,12 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
   let venceu = false;
   /** quando o QR apareceu nesta aba (o laço rápido/lento conta daqui) */
   let qrDesde = 0;
+  /** versão B: a oferta com as folhas do planner (lido 1x por compra: a recarga do banco não troca a oferta no meio) */
+  const comPlanner = u27PlannerLigado();
+  if (comPlanner) {
+    garantirCssPlanner();
+    if (typeof Image !== "undefined") { const pre = new Image(); pre.src = imagemDoPlanner(); }
+  }
   /** crítica r2: voltou pelo cookie com o storage zerado (a sessão foi junto: esta aba não confere sozinha) */
   let retomada = false;
   const fora = () => e.pix?.donoIgual === false || !!e.pix?.doEmail || retomada;
@@ -315,7 +344,7 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
       return true;
     }
     if (e.etapa === "oferta") {
-      if (!vistaOferta) { vistaOferta = true; ev("landing_u2027_view"); }
+      if (!vistaOferta) { vistaOferta = true; ev("landing_u2027_view", comPlanner ? { planner: estiloDoPlanner() } : {}); }
       preaquecer();
       c.innerHTML = `
       <div class="u27" data-testid="u2027-oferta">
@@ -323,7 +352,10 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
         <div class="u27-sep"></div>
         <div class="u27-kicker">Quer ir além?</div>
         <h3>${TITULO_U2027}</h3>
-        <p class="u27-desc">${DESC_U2027}</p>
+        ${comPlanner
+          ? `<figure class="u27-planner" data-testid="u2027-planner"><img src="${imagemDoPlanner()}" width="640" height="460" alt="Duas folhas do planner 2027: a capa e o ano numa página" decoding="async"><figcaption>${LEGENDA_U2027_PLANNER}</figcaption></figure>
+        <p class="u27-desc">${DESC_U2027_PLANNER}</p>`
+          : `<p class="u27-desc">${DESC_U2027}</p>`}
         <div class="u27-preco"><b data-testid="u2027-preco">${reais(VALOR_U2027)}</b><span>uma vez, sem mensalidade</span></div>
         ${gerando
           ? '<button type="button" class="lp-cta" id="u27-quero" disabled><i class="lp-gira"></i>Gerando o Pix…</button>'

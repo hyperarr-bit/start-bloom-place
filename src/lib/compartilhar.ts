@@ -72,3 +72,51 @@ export const compartilharPlanilha = (csv: string, nome: string, titulo: string, 
 /** 21/10 (Seu 2027): o Planner 2027 em HTML pronto pra imprimir — no app abre a folha nativa (Arquivos, imprimir, e-mail). */
 export const compartilharHtml = (html: string, nome: string, titulo: string, origem: string) =>
   compartilharArquivo(new Blob([html], { type: "text/html;charset=utf-8" }), nome, titulo, origem, "text/html");
+
+/**
+ * 31/10 (planner 2027, versão B): VÁRIAS imagens de uma vez — as 12 folhas A4 do planner. No app (iPhone) vão todas
+ * juntas pela folha nativa (Imprimir, Salvar imagens, Arquivos, AirDrop): o `<a download>` do Codex não funciona no
+ * WebView. Na web: Web Share com os arquivos; sem ele (PC), baixa uma por uma. Nunca finge que salvou.
+ */
+export async function compartilharImagens(blobs: Blob[], nomes: string[], titulo: string, origem: string): Promise<ResultadoCompartilhar> {
+  const fim = (resultado: ResultadoCompartilhar, via: string) => {
+    trackEvent("compartilhar_resultado", { origem, resultado, via, arquivos: blobs.length });
+    return resultado;
+  };
+  if (!blobs.length) return fim("failed", "vazio");
+  if (isNativeShell()) {
+    try {
+      const [{ Filesystem, Directory }, { Share }] = await Promise.all([import("@capacitor/filesystem"), import("@capacitor/share")]);
+      const uris: string[] = [];
+      for (let i = 0; i < blobs.length; i++) {
+        const { uri } = await Filesystem.writeFile({ path: nomes[i], data: await blobParaBase64(blobs[i]), directory: Directory.Cache });
+        uris.push(uri);
+      }
+      await Share.share({ title: titulo, files: uris });
+      return fim("shared", "nativo");
+    } catch (e) {
+      if (/cancel/i.test(String((e as Error)?.message ?? e))) return fim("cancelled", "nativo");
+    }
+  }
+  const files = blobs.map((b, i) => new File([b], nomes[i], { type: "image/png" }));
+  if (typeof navigator !== "undefined" && navigator.canShare?.({ files })) {
+    try {
+      await navigator.share({ files, title: titulo });
+      return fim("shared", "web");
+    } catch (e) {
+      return fim((e as Error)?.name === "AbortError" ? "cancelled" : "failed", "web");
+    }
+  }
+  if (isNativeShell()) return fim("failed", "sem-share");
+  for (let i = 0; i < blobs.length; i++) {
+    const url = URL.createObjectURL(blobs[i]);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nomes[i];
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  }
+  return fim("downloaded", "download");
+}

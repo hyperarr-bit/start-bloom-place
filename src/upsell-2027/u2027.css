@@ -109,3 +109,8 @@ button.u27-nao { min-height: 44px; border: 0; background: none; color: var(--u27
 .u27-confete i { position: absolute; top: -12px; width: 8px; height: 12px; border-radius: 2px; opacity: 0; animation: u27-cai 2.4s ease-in forwards; }
 @keyframes u27-cai { 0% { opacity: 1; transform: translateY(0) rotate(0); } 100% { opacity: 0; transform: translateY(520px) rotate(540deg); } }
 @media (prefers-reduced-motion: reduce) { .u27-confete { display: none; } }
+
+/* 31/10 versão B: as folhas do planner na oferta (U27_PLANNER) */
+.u27-planner-img { margin: 4px auto 6px; max-width: 320px; text-align: center; }
+.u27-planner-img img { display: block; width: 100%; height: auto; aspect-ratio: 640 / 460; }
+.u27-planner-img figcaption { margin-top: 2px; font-size: 12px; opacity: .6; }

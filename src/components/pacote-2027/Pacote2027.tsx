@@ -12,6 +12,9 @@ import {
 } from "@/lib/pacote-2027";
 import { htmlDoPlanner2027, imprimirPlanner2027 } from "@/lib/pacote-2027-pdf";
 import { Planejar2027 } from "./Planejar2027";
+import { useUserData } from "@/hooks/use-user-data";
+import { estiloDoPlanner, lerExtrasDoPlanner, plannerNovoLigado } from "@/lib/planner-2027";
+import { PlannerB } from "./PlannerB";
 
 const ddmm = (d: Date) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR")}`;
@@ -25,7 +28,10 @@ const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR")}`;
 export function Pacote2027() {
   const { pacote, plano, cofrinho, dicaVista, loaded, salvarProgresso, salvarCofrinho, salvarPlano, marcarDicaVista } = usePacote2027();
   const navigate = useNavigate();
-  const [vista, setVista] = useState<"inicio" | "cofrinho" | number>("inicio");
+  const [vista, setVista] = useState<"inicio" | "cofrinho" | "planner" | number>("inicio");
+  // 31/10 versão B (chave PLANNER_2027, off = a versão A igual): o planner com os dados dela, prévia + baixar nativo
+  const [plannerB] = useState(() => plannerNovoLigado());
+  const { get } = useUserData();
   const [planejando, setPlanejando] = useState(false);
   const [verTodos, setVerTodos] = useState(false);
   const contou = useRef(false);
@@ -55,6 +61,7 @@ export function Pacote2027() {
 
   const abrirPlanejar = (via: string) => { if (!dicaVista) marcarDicaVista(); trackEvent("plano2027_aberto", { via }); setPlanejando(true); };
   const imprimir = async () => {
+    if (plannerB) { trackEvent("plano2027_planner_abrir", {}); setVista("planner"); return; }
     const nativo = isNativeShell();
     trackEvent("plano2027_pdf", { nativo });
     const ok = await imprimirPlanner2027(htmlDoPlanner2027(plano, cofrinho), nativo);
@@ -87,6 +94,11 @@ export function Pacote2027() {
         </div>
       </div>
     );
+  }
+
+  /* ── o planner da versão B ── */
+  if (vista === "planner") {
+    return <PlannerB dados={{ plano, cofrinho, ...lerExtrasDoPlanner(get) }} estilo={estiloDoPlanner()} onVoltar={() => setVista("inicio")} onPlanejar={() => { setVista("inicio"); abrirPlanejar("planner_b"); }} />;
   }
 
   /* ── uma revisão do mês ── */
@@ -186,7 +198,7 @@ export function Pacote2027() {
           </button>
           <button type="button" onClick={() => void imprimir()} data-testid="pacote-2027-pdf"
             className={`flex-1 h-10 rounded-lg text-[12px] font-bold inline-flex items-center justify-center gap-1 ${plano.salvoEm ? "bg-foreground text-background" : "border border-border bg-card"}`}>
-            <span>🖨️ Planner pra imprimir</span>
+            <span>{plannerB ? "🖨️ Seu planner 2027" : "🖨️ Planner pra imprimir"}</span>
           </button>
         </div>
       </div>

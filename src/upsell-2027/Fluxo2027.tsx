@@ -9,6 +9,7 @@ import {
 import { PixHoje, type PixSalvo } from "@/pages/hoje/PixHoje";
 import type { OfertaHoje } from "@/pages/hoje/conteudo";
 import { Confete2027, IlustraPlanner } from "./IlustraPlanner";
+import { LEGENDA_U2027_PLANNER, imagemDoPlanner, u27PlannerLigado } from "@/lib/planner-2027-chave";
 import "@/pages/hoje/funil-hoje.css";
 import "./u2027.css";
 
@@ -37,6 +38,8 @@ export function Fluxo2027({ origem, compra, valorPago, ids, onFim, versao = VERS
   versao?: VersaoOferta2027;
 }) {
   const [e, setE] = useState<Estado2027>(() => lerEstado2027(compra));
+  // 31/10 versão B (U27_PLANNER, off = a oferta de sempre): as 2 folhas reais do planner no lugar do caderno desenhado
+  const [comPlanner] = useState(() => u27PlannerLigado());
   const set = useCallback((f: (x: Estado2027) => Estado2027) => {
     setE((x) => { const n = f(x); gravarEstado2027(n); return n; });
   }, []);
@@ -97,13 +100,15 @@ export function Fluxo2027({ origem, compra, valorPago, ids, onFim, versao = VERS
       <div className="u27-tela" data-testid="u2027-oferta" data-versao="visual">
         <div className="u27-col">
           {topo}
-          <div className="u27-cena"><IlustraPlanner size={140} /></div>
+          {comPlanner
+            ? <figure className="u27-planner-img" data-testid="u2027-planner"><img src={imagemDoPlanner()} width={640} height={460} alt="Duas folhas do planner 2027: a capa e o ano numa página" decoding="async" /><figcaption>{LEGENDA_U2027_PLANNER}</figcaption></figure>
+            : <div className="u27-cena"><IlustraPlanner size={140} /></div>}
           <h1 className="u27-titulo">Seu 2027 <em>organizado</em></h1>
           <p className="u27-sub">No seu CORE, por <b data-testid="u2027-preco">{reais2027(VALOR_2027)}</b>, uma vez</p>
-          <div className="u27-folha">
+          {!comPlanner && <div className="u27-folha">
             <div className="u27-folha-topo"><b>PLANNER 2027</b><small>revisão no dia 1 de cada mês</small></div>
             <div className="u27-meses">{MESES_CURTOS.map((m, i) => <span key={m} data-on={i === 0 ? "" : undefined}><i />{m}</span>)}</div>
-          </div>
+          </div>}
           <div className="u27-chips">{PILULAS_2027.map((p) => <span key={p}>{p}</span>)}</div>
         </div>
         {rodape}

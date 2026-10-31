@@ -18,6 +18,10 @@ import { MENSAGEM_DOWNSELL_INDISPONIVEL, ehDownsell, podePedirDownsell } from ".
 import { ehOfertaLanding } from "../_shared/ofertas-landing.ts";
 import { EMAIL_OK as EMAIL_LANDING_OK, jaTemOCore, temVitalicioAtivo } from "../_shared/landing-travas.ts";
 import { chaveQr } from "../_shared/lembrete-pix-landing.ts";
+import {
+  avisarPronto2027, blocoLigado, blocoU2027, chaveU2027, compraDoUpsell, expiraSegundos, garantirPixUpsell, mandaPurchaseMeta, SECRET_U2027_EMAIL, sessaoPodePedir,
+} from "../_shared/pix-upsell.ts";
+import { ASAAS_API, asaasHeaders, criarQrAsaas, obterChavePix, postarQrEstatico } from "../_shared/asaas-qr.ts";
 
 /**
  * Pix in-app via ASAAS (21/07) — gateway principal, substitui a Pagar.me.
@@ -30,6 +34,8 @@ import { chaveQr } from "../_shared/lembrete-pix-landing.ts";
  * Por isso usamos QR CODE ESTÁTICO (/v3/pix/qrCodes/static): é o ÚNICO
  * caminho 100% sem CPF, e ainda por cima aceita expiração em SEGUNDOS
  * (expirationSeconds: 1800 = 30 min exatos, coisa que o dinâmico não faz).
+ * 31/10: os Pix de UPSELL (u2027, pv149) valem 24 h (_shared/pix-upsell.ts expiraSegundos); o vitalício, os LN_* e o
+ * resto seguem em 30 min. O QR em si mora em _shared/asaas-qr.ts (o e-mail e o cron também geram, sem sessão).
  *
  * Contrato de request/response IDÊNTICO ao abacate-pix/pagarme-pix — o
  * PixCheckout só troca o nome da função.
@@ -51,7 +57,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const ASAAS_API = "https://api.asaas.com/v3";
 /* 01/09: entra o w97 — o funil W da web sobe pra R$ 97,90. Motivo medido na
  * 1ª noite: o Pix fechou 33% dos QRs maduros contra 13% da folha do Google,
  * então o preço aguenta mais. O mapa é a ÚNICA fonte do valor: oferta sem
@@ -91,7 +96,6 @@ const CONCESSAO: Record<string, { plano: string; periodo: string; dias: number |
 const DESCRICAO_PIX: Record<string, string> = {
   lifetime: "CORE vitalicio", downsell: "CORE vitalicio (oferta)", w97: "CORE vitalicio", w25: "CORE 1 mes", w47: "CORE vitalicio", w27: "CORE vitalicio", a97: "CORE anual", a69: "CORE anual", ...DESCRICAO_HOJE, ...DESCRICAO_PRESENTE, ...DESCRICAO_PLANO30,
 };
-const EXPIRA_SEGUNDOS = 1800; // 30 min — mesmo prazo dos outros gateways
 
 const logStep = (step: string, details?: unknown) => {
   const d = details ? ` - ${JSON.stringify(details)}` : "";
@@ -106,31 +110,8 @@ const jsonResponse = (body: Record<string, unknown>, status = 200) =>
 
 const utcStamp = (d: Date) => d.toISOString().slice(0, 19).replace("T", " ");
 
-/** Headers do Asaas: access_token próprio (NÃO é Bearer) + User-Agent
- *  obrigatório pra contas criadas depois de 13/06/2024. */
-const asaasHeaders = (key: string) => ({
-  access_token: key,
-  "User-Agent": "CORE/1.0 (Supabase Edge)",
-  "Content-Type": "application/json",
-});
-
-/** A chave Pix da conta (necessária pro QR estático). Cacheada no módulo —
- *  a instância da edge function vive entre invocações. */
-let chavePixCache: string | null = null;
-async function obterChavePix(key: string): Promise<string | null> {
-  if (chavePixCache) return chavePixCache;
-  const envKey = Deno.env.get("ASAAS_PIX_KEY");
-  if (envKey) { chavePixCache = envKey; return envKey; }
-  try {
-    const res = await fetch(`${ASAAS_API}/pix/addressKeys`, { headers: asaasHeaders(key) });
-    const out = await res.json().catch(() => ({}));
-    const ativa = (out?.data ?? []).find((k: { status?: string }) => k.status === "ACTIVE") ?? (out?.data ?? [])[0];
-    if (ativa?.key) { chavePixCache = ativa.key as string; return chavePixCache; }
-  } catch (e) {
-    logStep("Falha buscando chave Pix", { message: String(e).slice(0, 120) });
-  }
-  return null;
-}
+/* 31/10: ASAAS_API, asaasHeaders e obterChavePix moram em _shared/asaas-qr.ts (o e-mail de compra confirmada gera o Pix do
+ * "Seu 2027" sem sessão). */
 
 /** "2026-07-21 16:30:00" (horário de Brasília) → ISO com offset, que é o que
  *  o countdown do client entende. Sem isso o QR nasce "já expirado" no fuso. */
@@ -345,6 +326,10 @@ serve(async (req) => {
 
     let body: Record<string, unknown>;
     try { body = await req.json(); } catch { return jsonResponse({ error: "Invalid JSON body" }, 400); }
+    /** 31/10: o bloco do "Seu 2027" no e-mail de compra confirmada desta compra ("" com a chave off / sem LN_* / já tem). */
+    const blocoDoEmail = (compra: string, dono: string, offer: string): Promise<string> => blocoU2027(supabaseAdmin, {
+      ligado: blocoLigado(Deno.env.get(SECRET_U2027_EMAIL)), compra, dono, offer, criarQr: criarQrAsaas(apiKey, logStep),
+    });
     const action = String(body.action ?? "create");
 
     // -------------------------------------------------------------- CREATE
@@ -361,6 +346,30 @@ serve(async (req) => {
           logStep("Downsell fora do fluxo — recusado", { userId: user.id.slice(0, 8) });
           return jsonResponse({ error: MENSAGEM_DOWNSELL_INDISPONIVEL, motivo: v.motivo }, 403);
         }
+      }
+      /* 31/10 (landing /organizar, "Seu 2027" R$ 14,90 no pós-pago): com `compra` (o pedido do vitalício LN_*), o Pix é UM por
+       * compra e vale 24 h — o MESMO código vai pro e-mail de compra confirmada (_shared/pix-upsell.ts). O dono é a conta
+       * FINAL (a dona da linha viva do vitalício: pix-vincular / e-mail de destino levam a linha), nunca a anônima. A sessão
+       * tem que ser essa conta ou a anônima que pagou. `dono_igual: false` = a página não confirma sozinha (outro texto). */
+      if (eh2027(offer) && typeof body.compra === "string" && body.compra) {
+        const compra = String(body.compra).slice(0, 80);
+        const c = await compraDoUpsell(supabaseAdmin, compra);
+        if (!c.ok) return jsonResponse({ error: "Não achei a sua compra. Tenta de novo em alguns segundos.", motivo: c.motivo }, c.motivo === "sem_linha" ? 409 : 403);
+        if (!sessaoPodePedir(c, user.id)) return jsonResponse({ error: "Essa compra é de outra conta.", motivo: "outra_conta" }, 403);
+        if (c.jaTemPacote) return jsonResponse({ ja_tem_2027: true });
+        const pix = await garantirPixUpsell(supabaseAdmin, {
+          chave: chaveU2027(compra), dono: c.dono, oferta: offer, valorCentavos: amount, descricao: DESCRICAO_PIX[offer] ?? "CORE seu 2027",
+          criarQr: criarQrAsaas(apiKey, logStep), extraPedido: { origem: "landing", compra },
+        });
+        if ("erro" in pix) {
+          logStep("Seu 2027: Pix não gerado", { motivo: pix.erro });
+          return jsonResponse({ error: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.", motivo: pix.erro }, 502);
+        }
+        logStep("Seu 2027: Pix pronto", { novo: pix.novo, dono_igual: c.dono === user.id });
+        return jsonResponse({
+          orderId: pix.orderId, amount: (amount / 100).toFixed(2), qrCode: pix.qrCode, qrCodeBase64: pix.qrCodeBase64, expiresAt: pix.expiresAt,
+          dono_igual: c.dono === user.id, no_email: blocoLigado(Deno.env.get(SECRET_U2027_EMAIL)),
+        });
       }
       /* 21/10: o presente (pv149) é upsell de quem JÁ é pra sempre (acabou de pagar o vitalício). Sem isso, o vitalício
        * sairia por R$ 14,90 pra qualquer um (paga o "presente" e resgata numa 2ª conta). A compra pode ter sido levada
@@ -396,7 +405,7 @@ serve(async (req) => {
         }
       }
 
-      const chave = await obterChavePix(apiKey);
+      const chave = await obterChavePix(apiKey, logStep);
       if (!chave) {
         logStep("Conta Asaas SEM chave Pix cadastrada");
         return jsonResponse({
@@ -405,20 +414,12 @@ serve(async (req) => {
         }, 503);
       }
 
-      const res = await fetch(`${ASAAS_API}/pix/qrCodes/static`, {
-        method: "POST",
-        headers: asaasHeaders(apiKey),
-        body: JSON.stringify({
-          addressKey: chave,
-          description: DESCRICAO_PIX[offer] ?? "CORE vitalicio",
-          value: amount / 100, // Asaas trabalha em REAIS, não centavos
-          format: "ALL",
-          expirationSeconds: EXPIRA_SEGUNDOS,
-          allowsMultiplePayments: false, // 1 QR = 1 pagamento = 1 pessoa
-          externalReference: `${user.id}:${offer}`,
-        }),
+      // 31/10: a validade por oferta (upsell 24 h; o resto 30 min, como sempre) — _shared/pix-upsell.ts
+      const res = await postarQrEstatico(apiKey, chave, {
+        descricao: DESCRICAO_PIX[offer] ?? "CORE vitalicio", valorCentavos: amount, expiraSegundos: expiraSegundos(offer), ref: `${user.id}:${offer}`,
       });
-      const out = await res.json().catch(() => ({}));
+      // deno-lint-ignore no-explicit-any
+      const out = res.out as Record<string, any>;
       if (!res.ok || !out?.payload || !out?.id) {
         logStep("Asaas create error", { status: res.status, body: JSON.stringify(out).slice(0, 600) });
         return jsonResponse({
@@ -552,7 +553,8 @@ serve(async (req) => {
         }
         if (await reservar(supabaseAdmin, chaveCapiPresente(id), "capi")) {
           await sendToUtmify(supabaseAdmin, { userId: user.id, email: user.email ?? null, orderId: id, offer, amountCents: PRECOS_CENTAVOS[offer], name: null });
-          await sendMetaCapi(supabaseAdmin, {
+          // 31/10: upsell não manda Purchase pra Meta (_shared/pix-upsell.ts META_PURCHASE_UPSELL) — só a UTMify
+          if (mandaPurchaseMeta(offer)) await sendMetaCapi(supabaseAdmin, {
             userId: user.id, email: user.email ?? null, orderId: id, offer, amountCents: PRECOS_CENTAVOS[offer], req,
             fbp: (body.fbp as string | undefined) ?? null, fbc: (body.fbc as string | undefined) ?? null, sourceUrl: (body.sourceUrl as string | undefined) ?? null,
           });
@@ -596,13 +598,16 @@ serve(async (req) => {
           userId: user.id, orderId: id, origem: "upsell",
           enviarCompra: async () => {
             await sendToUtmify(supabaseAdmin, { userId: user.id, email: user.email ?? null, orderId: id, offer, amountCents: PRECOS_CENTAVOS[offer], name: null });
-            await sendMetaCapi(supabaseAdmin, {
+            // 31/10: upsell não manda Purchase pra Meta (_shared/pix-upsell.ts META_PURCHASE_UPSELL) — só a UTMify
+            if (mandaPurchaseMeta(offer)) await sendMetaCapi(supabaseAdmin, {
               userId: user.id, email: user.email ?? null, orderId: id, offer, amountCents: PRECOS_CENTAVOS[offer], req,
               fbp: (body.fbp as string | undefined) ?? null, fbc: (body.fbc as string | undefined) ?? null, sourceUrl: (body.sourceUrl as string | undefined) ?? null,
             });
           },
         });
         if (p27.r === "falhou") { logStep("Seu 2027 pago mas o pacote não gravou — tenta de novo", { id }); return jsonResponse({ paid: false, status: "PENDING" }); }
+        // 31/10: o e-mail curto "Pronto, seu 2027 tá no seu CORE" (1 por pedido; o mesmo do webhook e do reconcile)
+        await avisarPronto2027(supabaseAdmin, { orderId: id, para: user.email, enviar: enviarResend });
         logStep("Seu 2027 pago — pacote na conta", { id, r: p27.r });
         return jsonResponse({ paid: true, status: "PAID", pacote2027: true });
       }
@@ -674,10 +679,11 @@ serve(async (req) => {
            * `boas_vindas`, depois que a pessoa salva o e-mail. Com e-mail já na conta, manda agora, com a reserva única. */
           if (ehOfertaHoje(offer)) {
             if (resendKey && user.email && await reservarBoasVindas(supabaseAdmin, id)) {
+              const extra = await blocoDoEmail(id, user.id, offer); // 31/10: o "Seu 2027" (só com UPSELL_2027_EMAIL=on e LN_*)
               const r = await fetch("https://api.resend.com/emails", {
                 method: "POST",
                 headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-                body: JSON.stringify({ from, to: [user.email], subject: assuntoVenda(periodoDoEmailVenda(offer)!), html: htmlVenda({ email: user.email, nome: displayName, periodo: periodoDoEmailVenda(offer)!, fim: g.fim, hoje: true }) }),
+                body: JSON.stringify({ from, to: [user.email], subject: assuntoVenda(periodoDoEmailVenda(offer)!), html: htmlVenda({ email: user.email, nome: displayName, periodo: periodoDoEmailVenda(offer)!, fim: g.fim, hoje: true, extra }) }),
               }).catch(() => null);
               if (!r?.ok) await soltarBoasVindas(supabaseAdmin, id);
             }
@@ -703,7 +709,7 @@ serve(async (req) => {
       /* 18/10 (/hoje): e-mail de destino salvo na tela do Pix (e-mail que já tinha conta) → a compra vai pra essa conta
        * e o acesso sai por e-mail — cobre quem paga e fecha a aba antes do pós-compra (_shared/destino-hoje.ts). */
       if (ehPlanoHoje(offer) || ehUpsellHoje(offer)) {
-        const d = await encaminharParaDestino(supabaseAdmin as never, { uidAnonimo: user.id, orderId: id, offer, enviar: enviarResend }).catch(() => null);
+        const d = await encaminharParaDestino(supabaseAdmin as never, { uidAnonimo: user.id, orderId: id, offer, enviar: enviarResend, extra: (dono) => blocoDoEmail(id, dono, offer) }).catch(() => null);
         if (d && d.r === "movido") logStep("Compra levada pro e-mail de destino", { id, linhas: d.linhas, email: d.email });
       }
       return jsonResponse({ paid: true, status: "PAID" });
@@ -739,7 +745,7 @@ serve(async (req) => {
       const r = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from, to: [user.email], subject: assuntoVenda(periodo), html: htmlVenda({ email: user.email, nome: (p?.display_name as string | undefined) ?? null, periodo, fim: fimEmail, hoje: true }) }),
+        body: JSON.stringify({ from, to: [user.email], subject: assuntoVenda(periodo), html: htmlVenda({ email: user.email, nome: (p?.display_name as string | undefined) ?? null, periodo, fim: fimEmail, hoje: true, extra: await blocoDoEmail(id, user.id, offer) }) }),
       }).catch(() => null);
       if (!r?.ok) {
         await soltarBoasVindas(supabaseAdmin, id);
@@ -777,7 +783,7 @@ serve(async (req) => {
         const reg = await registroDoPedido(supabaseAdmin, id, logStep);
         const offer = String((reg?.[0]?.event_data as Record<string, string> | undefined)?.offer ?? "");
         if (reg?.[0]?.user_id === user.id && (ehPlanoHoje(offer) || ehUpsellHoje(offer))) {
-          const d = await encaminharParaDestino(supabaseAdmin as never, { uidAnonimo: user.id, orderId: id, offer, enviar: enviarResend }).catch(() => null);
+          const d = await encaminharParaDestino(supabaseAdmin as never, { uidAnonimo: user.id, orderId: id, offer, enviar: enviarResend, extra: (dono) => blocoDoEmail(id, dono, offer) }).catch(() => null);
           encaminhado = d?.r === "movido";
         }
       }

@@ -222,7 +222,8 @@ describe("/hoje com ?presente=on — quero presentear", () => {
     expect(invocacoes("asaas-pix", "create").map((b) => b.offer)).toEqual(["hv279", "pv149"]);
     expect(screen.getByTestId("hoje-pix-valor").textContent).toBe("R$ 14,90");
     expect(texto()).toContain("Presente pra alguém especial");
-    expect(markPixPurchasePending).toHaveBeenCalledWith({ offer: "pv149", orderId: "qr_2_pv149" });
+    // 31/10: o Pix de upsell não marca Purchase (decisão do dono, _shared/pix-upsell.ts META_PURCHASE_UPSELL)
+    expect(markPixPurchasePending).not.toHaveBeenCalledWith(expect.objectContaining({ offer: "pv149" }));
     expect(eventos("presente_pix_gerado")[0]).toMatchObject({ order_id: "qr_2_pv149", valor: 14.9 });
 
     await pagarEConferir("pv149");

@@ -2,7 +2,7 @@
  * UPSELL "SEU 2027 JÁ ORGANIZADO" (21/10) — a chave, as copies e o estado do fluxo do lado do SITE.
  *
  * Depois do "pagamento confirmado" do vitalício (R$ 27,90) no /inicio e no /hoje, ANTES das lojas: "Seu 2027 já
- * organizado" por R$ 19,90 (Pix Asaas `u2027`, uma vez só). Pago → "Pronto, seu 2027 tá no seu CORE" → o pós-compra de
+ * organizado" por R$ 14,90 (31/10; era 19,90) (Pix Asaas `u2027`, uma vez só). Pago → "Pronto, seu 2027 tá no seu CORE" → o pós-compra de
  * sempre. O servidor grava `core-pacote-2027` na conta de quem pagou (supabase/functions/_shared/pacote-2027.ts); o app
  * mostra a aba "SEU 2027" em Desenvolvimento Pessoal (src/lib/pacote-2027.ts). A COMPRA é só na web: o app nunca mostra
  * a oferta nem link de pagamento.
@@ -31,7 +31,8 @@ export function upsell2027Ligado(busca: string = typeof window === "undefined" ?
 /* ───────────────────────── oferta ───────────────────────── */
 
 export const OFERTA_2027 = "u2027" as const;
-export const VALOR_2027 = 19.9;
+/** 31/10: R$ 14,90 (era 19,90) — o mesmo PRECOS_HOJE.u2027 do servidor. */
+export const VALOR_2027 = 14.9;
 
 /** As 2 versões da oferta (mockups a1-oferta-visual e a2-oferta-curta) — o dono escolhe. */
 export type VersaoOferta2027 = "visual" | "curta";

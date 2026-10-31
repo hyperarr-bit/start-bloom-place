@@ -144,9 +144,9 @@ describe("a chave (padrão OFF)", () => {
     expect(upsell2027Ligado("?up2027=on")).toBe(true);
     expect(upsell2027Ligado("")).toBe(true);
   });
-  it("o preço bate com o servidor (R$ 19,90 = 1990)", () => {
-    expect(VALOR_OFERTA.u2027).toBe(19.9);
-    expect(PRECOS_HOJE.u2027).toBe(1990);
+  it("o preço bate com o servidor (R$ 14,90 = 1490; 31/10, era 19,90)", () => {
+    expect(VALOR_OFERTA.u2027).toBe(14.9);
+    expect(PRECOS_HOJE.u2027).toBe(1490);
   });
   it("proximoPosCompra: sem a chave nada muda; com a chave, pra sempre → u2027 (1 vez); quem não é pra sempre nunca vê", () => {
     const vit = { pagos: [{ oferta: "hv279" as const, orderId: "x", em: 0 }], recusou: [], parceiro: null };
@@ -172,14 +172,14 @@ describe("a chave (padrão OFF)", () => {
 });
 
 describe("/hoje com ?up2027=on", () => {
-  it("quero → Pix u2027 R$ 19,90 → pronto (onde fica + lojas) → pós-compra; o pacote vai pra conta final", async () => {
+  it("quero → Pix u2027 R$ 14,90 → pronto (onde fica + lojas) → pós-compra; o pacote vai pra conta final", async () => {
     await pagarVitalicio();
     await waitFor(() => expect(screen.getByTestId("u2027-oferta")).toBeTruthy());
     expect(etapa()).toBe("u2027");
     expect(screen.getByTestId("u2027-oferta").getAttribute("data-versao")).toBe(VERSAO_OFERTA_2027);
     expect(screen.getByTestId("u2027-confirmado").textContent).toContain("Pagamento confirmado · R$ 27,90");
     expect(texto()).toContain("Seu 2027 já organizado");
-    expect(screen.getByTestId("u2027-preco").textContent).toBe("R$ 19,90");
+    expect(screen.getByTestId("u2027-preco").textContent).toBe("R$ 14,90");
     expect(screen.getByTestId("u2027-nao").textContent).toBe("Agora não");
     expect(eventos("u2027_oferta_view")[0]).toMatchObject({ origem: "hoje", versao: VERSAO_OFERTA_2027 });
 
@@ -187,14 +187,15 @@ describe("/hoje com ?up2027=on", () => {
     expect(eventos("u2027_quero")).toHaveLength(1);
     await waitFor(() => expect(screen.getByTestId("hoje-copiar")).toBeTruthy());
     expect(invocacoes("asaas-pix", "create").map((b) => b.offer)).toEqual(["hv279", "u2027"]);
-    expect(screen.getByTestId("hoje-pix-valor").textContent).toBe("R$ 19,90");
+    expect(screen.getByTestId("hoje-pix-valor").textContent).toBe("R$ 14,90");
     expect(texto()).toContain("Seu 2027 já organizado");
-    expect(markPixPurchasePending).toHaveBeenCalledWith({ offer: "u2027", orderId: "qr_2_u2027" });
-    expect(eventos("u2027_pix_gerado")[0]).toMatchObject({ order_id: "qr_2_u2027", valor: 19.9 });
+    // 31/10: o Pix de upsell não marca Purchase (decisão do dono, _shared/pix-upsell.ts META_PURCHASE_UPSELL)
+    expect(markPixPurchasePending).not.toHaveBeenCalledWith(expect.objectContaining({ offer: "u2027" }));
+    expect(eventos("u2027_pix_gerado")[0]).toMatchObject({ order_id: "qr_2_u2027", valor: 14.9 });
 
     await pagarEConferir("u2027");
     await waitFor(() => expect(screen.getByTestId("u2027-pronto")).toBeTruthy());
-    expect(eventos("u2027_pago")[0]).toMatchObject({ order_id: "qr_2_u2027", valor: 19.9, origem: "hoje" });
+    expect(eventos("u2027_pago")[0]).toMatchObject({ order_id: "qr_2_u2027", valor: 14.9, origem: "hoje" });
     expect(texto()).toContain("Pronto, seu 2027 tá no seu CORE");
     expect(screen.getByTestId("u2027-onde").textContent).toContain("Dev. Pessoal → Seu 2027");
     expect(screen.getByTestId("selos-das-lojas")).toBeTruthy();
@@ -205,7 +206,7 @@ describe("/hoje com ?up2027=on", () => {
     expect(eventos("plano30_view")).toHaveLength(0);
     // 21/10 (segurança): o pacote é conteúdo pago — quem grava é o SERVIDOR (asaas-pix check/webhook/reconcile); a página não
     expect(upsertDoPacote()).toBeUndefined();
-    // o pós-compra mostra o total pago (27,90 + 19,90) e as lojas
+    // o pós-compra mostra o total pago (27,90 + 14,90) e as lojas
     expect(screen.getByTestId("hoje-lojas")).toBeTruthy();
   });
 
@@ -249,7 +250,7 @@ describe("a versão curta da oferta", () => {
     expect(screen.getByTestId("u2027-oferta").getAttribute("data-versao")).toBe("curta");
     for (const s of ["Planejar 2027 em 5 minutos", "12 revisões do mês", "Cofrinho das 52 semanas", "Planner 2027 pra imprimir", "Aparece no app e no site, na hora"]) expect(texto()).toContain(s);
     expect((texto().match(/BÔNUS/g) ?? []).length).toBe(2);
-    expect(screen.getByTestId("u2027-preco").textContent).toBe("R$ 19,90");
+    expect(screen.getByTestId("u2027-preco").textContent).toBe("R$ 14,90");
     // nada de IA nem de promessa que o app não cumpre
     expect(texto().toLowerCase()).not.toMatch(/\bia\b|intelig[eê]ncia artificial|garant/);
   });

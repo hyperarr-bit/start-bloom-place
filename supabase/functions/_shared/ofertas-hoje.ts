@@ -28,9 +28,10 @@ import { CONCESSAO_LANDING, DESCRICAO_LANDING, OFERTAS_PLANO_LANDING, PRECOS_LAN
 
 export const PRECOS_HOJE: Record<string, number> = {
   h279: 2790, h149: 1490, h279k: 3780, h149k: 2480, hv279: 2790, hv47: 4700, hv27: 2700, hc199: 1990,
-  // 21/10: o upsell "Seu 2027 já organizado" (R$ 19,90, uma vez) — NÃO é assinatura: fora do CONCESSAO_HOJE; o pagamento
+  // 21/10: o upsell "Seu 2027 já organizado" (uma vez) — NÃO é assinatura: fora do CONCESSAO_HOJE; o pagamento
   // grava o pacote na conta de quem pagou (_shared/pacote-2027.ts). Aqui pra entrar nas 3 funções pelo `...PRECOS_HOJE`.
-  u2027: 1990,
+  // 31/10 (dono, "Faz"): R$ 14,90 (era 19,90). Um QR antigo de 19,90 ainda cobre (valorCobre aceita valor ≥ preço).
+  u2027: 1490,
   ...PRECOS_ANUAL_INICIO,
   ...PRECOS_LANDING,
 };
@@ -75,6 +76,6 @@ export const chaveCapiCasal = (orderId: string): string => `hoje-casal-capi:${or
 /** Chave da liberação da(o) parceira(o): 1 pedido = 1 conta liberada. */
 export const chaveParceiro = (orderId: string): string => `hoje-casal:${orderId}`;
 
-/** 21/10: o upsell "Seu 2027 já organizado" (R$ 19,90) — conteúdo do app na conta de quem pagou, não acesso. */
+/** 21/10: o upsell "Seu 2027 já organizado" (R$ 14,90 desde 31/10) — conteúdo do app na conta de quem pagou, não acesso. */
 export const OFERTA_2027 = "u2027";
 export const eh2027 = (o: string | null | undefined): boolean => o === OFERTA_2027;

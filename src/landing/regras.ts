@@ -265,3 +265,62 @@ export function voltaDoLembrete(busca: URLSearchParams, agora: number = Date.now
   }
   return { toque: r, pedido, pix };
 }
+
+/* ───────────────────────── "Seu 2027 organizado" no pós-pago (31/10, chave UPSELL_2027 no <head>) ───────────────────────── */
+
+/** A chave do 2027 no pós-pago: html[data-u2027="on"] (decidida no <head>: UPSELL_2027 ou ?u2027=on|off; ?u2027=auto desfaz). */
+export function upsell2027DoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): boolean {
+  return el.getAttribute("data-u2027") === "on";
+}
+/** R$ 14,90 — o MESMO PRECOS_HOJE.u2027 do servidor (supabase/functions/_shared/ofertas-hoje.ts; o teste confere). */
+export const VALOR_U2027 = 14.9;
+export type EtapaU2027 = "oferta" | "qr" | "pronto" | "fim";
+export type PixU2027 = {
+  orderId: string; qrCode: string; qrCodeBase64: string | null; expiresAt: string;
+  /** a sessão desta aba é a dona do Pix (a página confere sozinha); false = a compra foi levada pra outra conta */
+  donoIgual: boolean;
+  /** reaberto pelo link do e-mail de compra confirmada (talvez em outro navegador) */
+  doEmail?: boolean;
+};
+export type EstadoU2027 = { v: 1; compra: string; etapa: EtapaU2027; pix: PixU2027 | null; salvoEm: number };
+export const TTL_U2027_MS = 2 * 24 * 3600e3;
+export const novoEstadoU2027 = (compra: string, agora: number = Date.now()): EstadoU2027 => ({ v: 1, compra, etapa: "oferta", pix: null, salvoEm: agora });
+
+/** O estado guardado volta pra ESTA compra? (outra compra/velho/corrompido = começa na oferta; QR vencido = oferta de novo) */
+export function estadoU2027QueVolta(bruto: unknown, compra: string, agora: number = Date.now()): EstadoU2027 {
+  const e = bruto as Partial<EstadoU2027> | null;
+  if (!e || e.v !== 1 || e.compra !== compra || typeof e.salvoEm !== "number" || agora - e.salvoEm > TTL_U2027_MS) return novoEstadoU2027(compra, agora);
+  const etapa: EtapaU2027 = e.etapa === "qr" || e.etapa === "pronto" || e.etapa === "fim" ? e.etapa : "oferta";
+  const pix = e.pix && typeof e.pix.orderId === "string" && typeof e.pix.qrCode === "string" && typeof e.pix.expiresAt === "string" ? e.pix : null;
+  if (etapa === "qr" && (!pix || Date.parse(pix.expiresAt) <= agora)) return { ...novoEstadoU2027(compra, agora) };
+  return { v: 1, compra, etapa, pix, salvoEm: e.salvoEm };
+}
+
+/** "Vale por 24 horas." / "Vale por mais 5 h." / "Vale por mais 12 min." / "Este código venceu." */
+export function validadeU2027(restaMs: number): string {
+  if (restaMs <= 0) return "Este código venceu.";
+  const h = restaMs / 3600e3;
+  if (h >= 23.5) return "Vale por 24 horas.";
+  if (h >= 1) return `Vale por mais ${Math.floor(h)} h.`;
+  return `Vale por mais ${Math.max(1, Math.ceil(restaMs / 60_000))} min.`;
+}
+
+export type VoltaU2027 = { compra: string; pix: PixU2027 | null };
+/**
+ * O link do bloco do e-mail de compra confirmada (_shared/pix-upsell.ts linkU2027):
+ * /organizar?r=u2027&compra=<vitalício>&pedido=<id do QR do 2027>&pix=<copia-e-cola>&vence=<ms>. Devolve o MESMO Pix
+ * pra reabrir quando ainda vale ≥ 1 min (vencido: pix null — a página mostra a oferta e gera outro).
+ */
+export function voltaDoEmailU2027(busca: URLSearchParams, agora: number = Date.now()): VoltaU2027 | null {
+  if (busca.get("r") !== "u2027") return null;
+  const ok = (v: string | null) => (v && /^[A-Za-z0-9_-]{6,80}$/.test(v) ? v : null);
+  const compra = ok(busca.get("compra"));
+  if (!compra) return null;
+  const pedido = ok(busca.get("pedido"));
+  const codigo = busca.get("pix") ?? "";
+  const vence = Number(busca.get("vence"));
+  const pix: PixU2027 | null = pedido && /^000201[\x20-\x7e]{20,600}$/.test(codigo) && Number.isFinite(vence) && vence - agora > 60_000
+    ? { orderId: pedido, qrCode: codigo, qrCodeBase64: null, expiresAt: new Date(vence).toISOString(), donoIgual: false, doEmail: true }
+    : null;
+  return { compra, pix };
+}

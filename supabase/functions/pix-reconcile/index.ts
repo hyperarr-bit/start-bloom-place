@@ -8,6 +8,8 @@ import { valorCobre } from "../_shared/trava-grant.ts";
 import { nomeDoProduto } from "../_shared/email-venda.ts";
 import { CONCESSAO_HOJE, PRECOS_HOJE, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
 import { encaminharParaDestino, lerDestino } from "../_shared/destino-hoje.ts";
+import { avisarPronto2027, blocoLigado, blocoU2027, mandaPurchaseMeta, SECRET_U2027_EMAIL } from "../_shared/pix-upsell.ts";
+import { criarQrAsaas } from "../_shared/asaas-qr.ts";
 import { fetchNosPixels } from "../_shared/meta-pixels.ts";
 import { ehOfertaLanding } from "../_shared/ofertas-landing.ts";
 import { nomeDoPagadorAsaas, varrerPagosSemEmail } from "../_shared/landing-travas.ts";
@@ -443,11 +445,18 @@ serve(async (req) => {
         const p27 = await confirmarPacote2027(admin, {
           userId: o.uid, orderId: o.orderId, origem: "upsell",
           enviarCompra: async () => {
+            // 31/10: upsell não manda Purchase pra Meta (_shared/pix-upsell.ts META_PURCHASE_UPSELL) — a UTMify do reconcile
+            // não existe pra u2027 (nunca existiu); a receita aparece pelo check/webhook
+            if (!mandaPurchaseMeta("u2027")) { capi = "upsell_sem_meta"; return; }
             const { data: au } = await admin.auth.admin.getUserById(o.uid);
             capi = await capi2027(o, au?.user?.email ?? null, cents);
           },
         });
         if (p27.r === "falhou") { falhas.push({ orderId: o.orderId, erro: "pacote2027_gravar" }); continue; }
+        { // 31/10: "Pronto, seu 2027 tá no seu CORE" — 1 por pedido (a mesma trava do check e do webhook)
+          const { data: au } = await admin.auth.admin.getUserById(o.uid);
+          await avisarPronto2027(admin, { orderId: o.orderId, para: au?.user?.email ?? null, enviar: enviarResend });
+        }
         jaTemPacote.add(o.uid);
         await admin.from("analytics_events").insert({
           event_name: "pix_reconciled", user_id: o.uid,
@@ -587,7 +596,11 @@ serve(async (req) => {
         creditados.push({ uid, email, orderId: o.orderId, offer: o.offer, criadoEm: o.criadoEm, status: v.status, capi });
         // 18/10 (/hoje): o e-mail de destino da tela do Pix (quem pagou e sumiu) — a compra vai pra essa conta
         if (ehPlanoHoje(o.offer) || ehUpsellHoje(o.offer)) {
-          await encaminharParaDestino(admin as never, { uidAnonimo: uid, orderId: o.orderId, offer: o.offer, enviar: enviarResend }).catch(() => null);
+          await encaminharParaDestino(admin as never, {
+            uidAnonimo: uid, orderId: o.orderId, offer: o.offer, enviar: enviarResend,
+            // 31/10: o bloco do "Seu 2027" (UPSELL_2027_EMAIL=on, LN_*) — o mesmo Pix da página
+            extra: (dono) => blocoU2027(admin, { ligado: blocoLigado(Deno.env.get(SECRET_U2027_EMAIL)), compra: o.orderId, dono, offer: o.offer, criarQr: criarQrAsaas(asaasKey) }),
+          }).catch(() => null);
         }
         if (ehUpsellHoje(o.offer)) continue; // 18/10: upsell não encerra a pessoa (pode haver o plano e outro upsell)
         jaTem.add(uid);
@@ -616,7 +629,8 @@ serve(async (req) => {
         const { data: au } = await admin.auth.admin.getUserById(o.uid);
         const email = au?.user?.email ?? null;
         let capi = "ja_enviado";
-        if (await reservar(admin, chaveCapiPresente(o.orderId), "capi")) capi = await capiPresente(o, email, cents);
+        // 31/10: upsell não manda Purchase pra Meta (_shared/pix-upsell.ts META_PURCHASE_UPSELL)
+        if (await reservar(admin, chaveCapiPresente(o.orderId), "capi")) capi = mandaPurchaseMeta("pv149") ? await capiPresente(o, email, cents) : "upsell_sem_meta";
         if (email) {
           const from = Deno.env.get("WELCOME_EMAIL_FROM") || Deno.env.get("RECOVERY_EMAIL_FROM") || "onboarding@resend.dev";
           await mandarLinkPorEmail(admin, { orderId: o.orderId, codigo: p.codigo, para: email, de: from, enviar: enviarCorpoResend });

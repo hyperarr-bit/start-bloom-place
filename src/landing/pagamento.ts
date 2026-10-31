@@ -23,7 +23,7 @@ import { firePixPurchaseOnce, markPixPurchasePending } from "@/lib/purchase-trac
 import { cookiesDaMeta } from "@/pages/venda/rastreio";
 import { EMAIL_OK, abrirSessaoParaPagar, emailAtual, gravarAtribuicao, pedirBoasVindas, salvarEmailDaCompra, sessaoViva, trazerCompraParaConta } from "@/pages/hoje/conta";
 import { definirEmailDaCompra, guardarCompraAnonima, limparBatismo, vincularCompraAnonima } from "@/lib/sessao-anonima";
-import type { OfertaLanding, PixLanding } from "./regras";
+import type { OfertaLanding, PixLanding, PixU2027 } from "./regras";
 
 /** 29/10: o servidor recusou o Pix porque esta pessoa JÁ tem o CORE pra sempre (a página mostra "Você já tem o CORE"). */
 export type JaTem = { jaTem: true; via: string };
@@ -165,4 +165,35 @@ export async function entrarAntesDoPix(email: string, codigo: string): Promise<E
   } catch {
     return { erro: "Não consegui entrar agora. Tenta de novo em alguns segundos.", motivo: "falhou" };
   }
+}
+
+/* ───────────────────────── 31/10: o "Seu 2027" no pós-pago (./upsell-2027.ts) ───────────────────────── */
+
+export type GeradoU2027 = (PixU2027 & { comEmail: boolean }) | { jaTem2027: true } | { erro: string; onde: string };
+
+/**
+ * O Pix do 2027 desta compra (o MESMO do e-mail de compra confirmada: o servidor guarda 1 por compra, 24 h). NUNCA marca
+ * Purchase (markPixPurchasePending): o upsell não manda Purchase pra Meta (decisão do dono, _shared/pix-upsell.ts).
+ */
+export async function gerarPixU2027(compra: string): Promise<GeradoU2027> {
+  try {
+    await sessaoViva();
+    const { data, error } = await supabase.functions.invoke("asaas-pix", { body: { action: "create", offer: "u2027", compra } });
+    const d = data as { orderId?: string; qrCode?: string; qrCodeBase64?: string | null; expiresAt?: string | null; dono_igual?: boolean; no_email?: boolean; ja_tem_2027?: boolean; error?: string } | null;
+    if (d?.ja_tem_2027) return { jaTem2027: true };
+    if (error || !d?.orderId || !d?.qrCode) return { erro: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.", onde: String(error?.message || d?.error || "sem_qr").slice(0, 160) };
+    return {
+      orderId: d.orderId, qrCode: d.qrCode, qrCodeBase64: d.qrCodeBase64 ?? null,
+      expiresAt: d.expiresAt ?? new Date(Date.now() + 24 * 3600e3).toISOString(), donoIgual: d.dono_igual !== false, comEmail: d.no_email === true,
+    };
+  } catch (e) {
+    return { erro: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.", onde: String(e).slice(0, 120) };
+  }
+}
+
+/** Uma conferência do Pix do 2027. Sem sessão (link do e-mail em outro navegador) nem chama. NUNCA dispara o pixel. */
+export async function conferirPixU2027(pix: PixU2027): Promise<boolean> {
+  if (!(await sessaoViva())) return false;
+  const { data } = await supabase.functions.invoke("asaas-pix", { body: { action: "check", id: pix.orderId, offer: "u2027" } });
+  return !!(data as { paid?: boolean } | null)?.paid;
 }

@@ -35,6 +35,10 @@
                               oferta logo cedo, demo só no toque). Forçar: ?lp=v2|atual (fica neste navegador; ?lp=auto
                               desfaz). O braço vai em html[data-lp] e em todo evento landing_* (braco_lp). O braço do
                               e-mail (AB_CHECKOUT) continua sorteado por cima, nos dois.
+        UPSELL_2027  "off"  → (31/10) nada muda. "on" = depois do pagamento e do e-mail, o cartão oferece "Seu 2027 organizado"
+                              (R$ 14,90, Pix de 24 h já gerado, uma vez) antes da conta pronta, nos DOIS braços do AB_LP
+                              (src/landing/upsell-2027.ts). QA: ?u2027=on|off (fica neste navegador: localStorage + cookie;
+                              ?u2027=auto desfaz). Ligada, vira html[data-u2027="on"]. Rollback: "off".
       A divisão 50/50 do /inicio (o mesmo link da campanha) mora no index.html (DIVISAO_INICIO_LANDING, "off").
     -->
     <script>
@@ -45,6 +49,7 @@
         var AB_OFERTA = "off";
         var AB_CHECKOUT = "on"; // 29/10 (dono, depois da compra real pelo braço email): LIGADO. e-mail antes do Pix (braço "email") × checkout de hoje ("livre") — ver o comentário acima
         var AB_LP = "off"; // 30/10: braço "v2" (vitrine) construído e DESLIGADO — "on" liga o 50/50 contra a página de hoje ("atual")
+        var UPSELL_2027 = "off"; // 31/10: "Seu 2027" R$ 14,90 no pós-pago, construído e DESLIGADO — "on" liga nos dois braços (rollback: "off")
         var d = document.documentElement, q = null, mem = {};
         try { q = new URLSearchParams(location.search); } catch (e0) {}
         var pega = function (k) { try { return q ? q.get(k) : null; } catch (e) { return null; } };
@@ -140,6 +145,18 @@
         // 2× e avisava "preloaded but not used"; medido na r2: 1 pedido e 0 avisos nos 2 motores com esta receita.
         if (lp === "v2") { try { var prel = document.createElement("link"); prel.rel = "preload"; prel.as = "image"; prel.href = "/landing/v3-home.webp"; prel.setAttribute("fetchpriority", "high"); document.head.appendChild(prel); } catch (e) {} }
         mem.lp = lp; mem.ab_lp = AB_LP;
+        // 31/10: o "Seu 2027" no pós-pago. ?u2027=on|off força (localStorage + cookie: o Instagram zera o storage); ?u2027=auto desfaz
+        var pu = pega("u2027"), cku = null;
+        try { var csu = String(document.cookie || "").split(";"); for (var iu = 0; iu < csu.length; iu++) { var ju = csu[iu].indexOf("="); if (ju > 0 && csu[iu].slice(0, ju).trim() === "landing_u2027_force") cku = csu[iu].slice(ju + 1).trim(); } } catch (eu0) {}
+        if (pu === "on" || pu === "off" || pu === "auto") {
+          grava("landing-u2027-force", pu === "auto" ? null : pu);
+          try { document.cookie = "landing_u2027_force=" + (pu === "auto" ? "; Max-Age=0" : pu + "; Max-Age=2592000") + "; Path=/; SameSite=Lax"; } catch (eu1) {}
+        }
+        var u27 = (pu === "on" || pu === "off") ? pu : pu === "auto" ? null : (le("landing-u2027-force") || cku);
+        mem.u2027_forcado = (u27 === "on" || u27 === "off");
+        if (u27 !== "on" && u27 !== "off") u27 = UPSELL_2027 === "on" ? "on" : "off";
+        if (u27 === "on") d.setAttribute("data-u2027", "on");
+        mem.u2027 = u27; mem.ab_u2027 = UPSELL_2027;
         mem.t = t; mem.oferta = o; mem.ab_titulo = AB_TITULO; mem.ab_oferta = AB_OFERTA;
         mem.divisao = pega("ld") === "1" ? "inicio" : null;
         d.setAttribute("data-t", t);

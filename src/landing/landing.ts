@@ -223,7 +223,7 @@ function marcarModulo(m: ModuloLanding) {
   celular.dataset.modulo = m;
   kicker.textContent = `Seu CORE · ${NOME_DO_MODULO[m]}`;
   if (cheiaModulo) cheiaModulo.textContent = NOME_DO_MODULO[m];
-  document.querySelectorAll<HTMLButtonElement>(".lp-pilula[data-m]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.m === m)));
+  if (!V2) document.querySelectorAll<HTMLButtonElement>(".lp-pilula[data-m]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.m === m)));
 }
 
 function iniciarDemo(via: string) {
@@ -312,6 +312,39 @@ document.getElementById("lp-demo-abrir")?.addEventListener("click", () => {
  *          landing_demo_fechada {ms, via: seta|voltar|comprar|seta_app|oferta_app|fase, modulo} · landing_cta {onde: "demo_tela_cheia", fase}
  */
 const MARCA_CHEIA = "lpDemoCheia";
+/** r1 (persona 1): o print real do módulo que vai abrir, na tela cheia, até a demo pintar (Finanças e Rotina = os do "Por dentro",
+ *  já no cache: algo do app na tela no mesmo quadro do toque; Treino = o print do braço atual, baixa no toque; Dieta/Saúde = branco). */
+const PRINT_V2: Partial<Record<ModuloLanding, string>> = { financas: "/landing/v3-financas.webp", rotina: "/landing/v3-rotina.webp", treino: "/landing/demo-treino.webp" };
+const pilulas = document.querySelector<HTMLElement>("#demo .lp-pilulas");
+if (V2) {
+  // r1 (técnico 4): no v2 as pílulas abrem a tela cheia (não são abas): grupo de botões, sem "escolhida"
+  pilulas?.setAttribute("role", "group");
+  pilulas?.querySelectorAll(".lp-pilula").forEach((b) => b.removeAttribute("aria-pressed"));
+  // r1 (técnico 1): fechada, a camada (e o iframe vivo dentro dela) fica fora do teclado e do leitor de tela
+  celular.setAttribute("inert", "");
+  // r1 (persona 6): o apelido da avaliação é texto da página ("camvbs · "), vindo do data-nome; vazio = some
+  document.querySelectorAll<HTMLElement>("#avaliacoes-v2 .lp2-aval-nome").forEach((el) => {
+    const n = (el.getAttribute("data-nome") ?? "").trim();
+    el.textContent = n ? `${n} · ` : "";
+  });
+}
+/** a altura das 2 barras da tela cheia (safe-area e fonte do sistema mudam): o print encosta embaixo da de cima, o "Abrindo…" acima da de baixo */
+const medirBarras = () => {
+  const topo = celular.querySelector<HTMLElement>(".lp2-cheia-topo");
+  const baixo = celular.querySelector<HTMLElement>(".lp2-cheia-baixo");
+  if (topo?.offsetHeight) celular.style.setProperty("--lp2-topo-h", `${topo.offsetHeight}px`);
+  if (baixo?.offsetHeight) celular.style.setProperty("--lp2-baixo-h", `${baixo.offsetHeight}px`);
+};
+if (V2) window.addEventListener("resize", () => { if (cheiaAberta) medirBarras(); }, { passive: true });
+function mostrarPrint(m: ModuloLanding) {
+  if (demoPronta) return;
+  const p = PRINT_V2[m];
+  if (!p) { celular.removeAttribute("data-tem-print"); img.removeAttribute("src"); return; }
+  if (img.getAttribute("src") !== p) img.src = p;
+  img.alt = `O módulo ${NOME_DO_MODULO[m]} do CORE com dados de exemplo`;
+  img.removeAttribute("width"); img.removeAttribute("height");
+  celular.setAttribute("data-tem-print", "");
+}
 type EstadoHist = { [MARCA_CHEIA]?: 1; y?: number; m?: string } & Record<string, unknown>;
 const estadoHist = (): EstadoHist | null => { try { const e = history.state; return e && typeof e === "object" ? (e as EstadoHist) : null; } catch { return null; } };
 let cheiaAberta = false;
@@ -322,6 +355,9 @@ let fechandoVia: string | null = null;
 let depoisDeFechar: (() => void) | null = null;
 let reservaDoFechar: number | null = null;
 let restauracaoAntes: ScrollRestoration | null = null;
+/** r1 (técnico 3): um history.back() nosso ainda sem o popstate — a restauração de rolagem só volta ao do navegador DEPOIS dele */
+let esperandoPop = false;
+let timerRestauracao: number | null = null;
 let quemAbriu: HTMLElement | null = null;
 const cheiaVoltar = document.getElementById("lp2-cheia-voltar");
 const cheiaComprar = document.getElementById("lp2-cheia-comprar");
@@ -340,6 +376,7 @@ function abrirCheia(m: ModuloLanding, origem: "botao" | "pilula" | "cartao" | "r
   if (!V2 || cheiaAberta) return;
   const mudou = m !== moduloAtual;
   marcarModulo(m);
+  mostrarPrint(m);
   if (!demoIniciada) iniciarDemo(origem);
   else if (mudou) {
     if (demoPronta) { try { frame.contentWindow?.postMessage({ tipo: "landing:modulo", m }, location.origin); } catch { /* noop */ } }
@@ -350,7 +387,9 @@ function abrirCheia(m: ModuloLanding, origem: "botao" | "pilula" | "cartao" | "r
   try { if (restauracaoAntes === null) restauracaoAntes = history.scrollRestoration; history.scrollRestoration = "manual"; } catch { /* noop */ }
   if (origem !== "recarga") { try { history.pushState({ ...(estadoHist() ?? {}), [MARCA_CHEIA]: 1, y: yDaPagina, m }, ""); } catch { /* sem histórico: fecha só pelos botões */ } }
   travarPagina(yDaPagina);
+  celular.removeAttribute("inert");
   document.documentElement.setAttribute("data-demo-cheia", "");
+  medirBarras();
   celular.setAttribute("role", "dialog"); celular.setAttribute("aria-modal", "true"); celular.setAttribute("aria-label", "Demonstração do CORE");
   cheiaAberta = true; cheiaDesde = agora(); cheiaVezes += 1;
   quemAbriu = origem === "recarga" || origem === "avancar" ? null : (document.activeElement as HTMLElement | null);
@@ -367,14 +406,39 @@ function fecharCheia(via: string) {
   if (reservaDoFechar !== null) { window.clearTimeout(reservaDoFechar); reservaDoFechar = null; }
   document.documentElement.removeAttribute("data-demo-cheia");
   celular.removeAttribute("aria-modal");
+  // r1 (técnico 1): o foco não fica no iframe escondido (no WebKit o toque não foca o botão: quemAbriu era o body)
+  const focoDentro = !!document.activeElement && document.activeElement !== document.body && celular.contains(document.activeElement);
+  celular.setAttribute("inert", "");
   soltarPagina(yDaPagina);
   evento("landing_demo_fechada", { ms: agora() - cheiaDesde, via, modulo: moduloAtual });
   const depois = depoisDeFechar; depoisDeFechar = null;
   if (depois) depois();
-  else if (quemAbriu && document.contains(quemAbriu)) { try { quemAbriu.focus({ preventScroll: true }); } catch { /* noop */ } }
+  else if (quemAbriu && quemAbriu !== document.body && document.contains(quemAbriu)) { try { quemAbriu.focus({ preventScroll: true }); } catch { /* noop */ } }
+  if (focoDentro || (document.activeElement && celular.contains(document.activeElement))) {
+    const abrir = document.getElementById("lp-demo-abrir");
+    try { if (!depois && abrir) abrir.focus({ preventScroll: true }); else (document.activeElement as HTMLElement | null)?.blur?.(); } catch { /* noop */ }
+  }
   quemAbriu = null;
-  // devolve a restauração de rolagem do navegador depois que a volta do histórico terminou
-  window.setTimeout(() => { if (!cheiaAberta && restauracaoAntes !== null) { try { history.scrollRestoration = restauracaoAntes; } catch { /* noop */ } restauracaoAntes = null; } }, 400);
+  devolverRestauracao();
+}
+
+/** Devolve a restauração de rolagem do navegador 400 ms depois que a volta do histórico terminou (o popstate do nosso back()
+ *  chegou) — nunca antes: com "auto" ativo na chegada atrasada, o navegador restauraria o y antigo por cima do "levar ao cartão". */
+function devolverRestauracao() {
+  if (timerRestauracao !== null) { window.clearTimeout(timerRestauracao); timerRestauracao = null; }
+  if (esperandoPop) return; // o popstate chama de novo
+  timerRestauracao = window.setTimeout(() => {
+    timerRestauracao = null;
+    if (!cheiaAberta && !esperandoPop && restauracaoAntes !== null) { try { history.scrollRestoration = restauracaoAntes; } catch { /* noop */ } restauracaoAntes = null; }
+  }, 400);
+}
+/** o back() nosso: espera o popstate (com teto de 3 s — um navegador que nunca o devolve não deixa a rolagem "manual" pra sempre) */
+let tetoDoPop: number | null = null;
+function voltarHistorico() {
+  esperandoPop = true;
+  if (tetoDoPop !== null) window.clearTimeout(tetoDoPop);
+  tetoDoPop = window.setTimeout(() => { tetoDoPop = null; if (esperandoPop) { esperandoPop = false; if (!cheiaAberta) devolverRestauracao(); } }, 3000);
+  try { history.back(); } catch (e) { esperandoPop = false; throw e; }
 }
 
 /** Fechar pela seta / barra de baixo / app: volta 1 entrada no histórico (a que o abrir criou) e o popstate fecha. */
@@ -383,7 +447,7 @@ function pedirFechar(via: string, depois?: () => void) {
   fechandoVia = via;
   depoisDeFechar = depois ?? null;
   if (estadoHist()?.[MARCA_CHEIA]) {
-    try { history.back(); } catch { fecharCheia(via); return; }
+    try { voltarHistorico(); } catch { fecharCheia(via); return; }
     // reserva: um navegador que não devolve o popstate (ou demora) não prende ninguém na tela cheia
     reservaDoFechar = window.setTimeout(() => { reservaDoFechar = null; if (cheiaAberta) fecharCheia(via); }, 700);
   } else fecharCheia(via);
@@ -393,13 +457,18 @@ function pedirFechar(via: string, depois?: () => void) {
 let pularProximoPop = false;
 function fecharCheiaJa(via: string) {
   if (!cheiaAberta) return;
-  if (estadoHist()?.[MARCA_CHEIA]) { pularProximoPop = true; try { history.back(); } catch { pularProximoPop = false; } }
+  if (estadoHist()?.[MARCA_CHEIA]) { pularProximoPop = true; try { voltarHistorico(); } catch { pularProximoPop = false; } }
   fecharCheia(via);
 }
 
 window.addEventListener("popstate", (e: PopStateEvent) => {
   if (!V2 || !document.contains(celular)) return; // !contains: uma página anterior deste mesmo documento (testes) não mexe na atual
   const marca = !!(e.state && typeof e.state === "object" && (e.state as EstadoHist)[MARCA_CHEIA]);
+  if (esperandoPop) {
+    esperandoPop = false;
+    if (tetoDoPop !== null) { window.clearTimeout(tetoDoPop); tetoDoPop = null; }
+    if (!cheiaAberta) devolverRestauracao(); // a reserva de 700 ms já fechou: agora sim
+  }
   if (pularProximoPop) { pularProximoPop = false; if (!marca) return; }
   if (cheiaAberta && !marca) fecharCheia(fechandoVia ?? "voltar");
   else if (!cheiaAberta && marca && ehModuloLanding((e.state as EstadoHist).m)) abrirCheia((e.state as EstadoHist).m as ModuloLanding, "avancar", Math.round(window.scrollY || 0));

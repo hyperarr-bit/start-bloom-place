@@ -24,7 +24,8 @@ import { financasNoNumeroDaLanding } from "@/lib/preview-seeds-financas-landing"
  * Os 16 módulos sob demanda (o mesmo lazy do /preview). Sempre no tema claro (a página é clara).
  * 30/10 (landing v2, &lp=v2 na URL do iframe): Finanças com os gastos do mês acompanhando o dia — o "quanto posso gastar hoje"
  * fecha nos R$ 146 que a página promete em qualquer dia do mês (lib/preview-seeds-financas-landing). Sem o parâmetro (o braço
- * atual), as sementes de sempre.
+ * atual), as sementes de sempre. 31/10 (r1): com &lp=v2 a seta ← do cabeçalho do módulo some (a página tem o "← Voltar") e o
+ * overscroll fica contido.
  */
 const lazyModulo = (carregar: () => Promise<{ default?: unknown }>) =>
   lazy(async () => {
@@ -85,6 +86,22 @@ export default function DemoDaLanding() {
     raiz.style.colorScheme = "light";
     raiz.setAttribute("data-landing-demo", "");
   }, []);
+
+  // r1 da tela cheia (31/10, só v2): a barra "← Voltar" da página é a ÚNICA saída — a seta ← do cabeçalho do módulo some (a do
+  // header fixo de cada um dos 16 módulos: o 1º botão do header.sticky; só existe um por módulo). E o puxar-pra-baixo no topo do
+  // app não passa pra página (Android: recarga; iOS: elástico). Sem &lp=v2 (o braço atual), nada muda.
+  useLayoutEffect(() => {
+    if (!numeroDaLanding) return;
+    const raiz = document.documentElement;
+    raiz.setAttribute("data-landing-demo-v2", "");
+    raiz.style.overscrollBehavior = "contain";
+    document.body.style.overscrollBehavior = "contain";
+    const estilo = document.createElement("style");
+    estilo.setAttribute("data-landing-demo-v2", "");
+    estilo.textContent = `html[data-landing-demo-v2] [data-testid="landing-demo"] header.sticky > div > :first-child:is([aria-label="Voltar"], [aria-label="Todos os módulos"]) { display: none !important; }`;
+    document.head.appendChild(estilo);
+    return () => { estilo.remove(); raiz.removeAttribute("data-landing-demo-v2"); raiz.style.overscrollBehavior = ""; document.body.style.overscrollBehavior = ""; };
+  }, [numeroDaLanding]);
 
   useEffect(() => {
     const ouvir = (e: MessageEvent) => {

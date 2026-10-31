@@ -527,9 +527,15 @@
       html[data-lp="v2"] button.lp-pilula[aria-pressed="true"] { background: #fff; border-color: var(--borda); color: var(--tx); } /* na página nenhuma pílula está "escolhida": cada uma abre a tela cheia no seu módulo */
       html[data-lp="v2"] .lp-celular { position: fixed; z-index: 200; top: 0; left: 0; right: 0; width: 100%; height: 100vh; height: 100dvh; margin: 0; border: 0; border-radius: 0; box-shadow: none; display: flex; flex-direction: column; background: #fff; visibility: hidden; transform: translateY(100%); transition: transform .28s ease, visibility 0s linear .28s; }
       html[data-lp="v2"][data-demo-cheia] .lp-celular { visibility: visible; transform: none; transition: transform .28s ease; }
-      html[data-lp="v2"] .lp-celular img { display: none; } /* sem o print esticado em tela cheia: fundo branco + "Abrindo o app…" até a demo avisar que pintou */
+      html[data-lp="v2"] .lp-celular { overscroll-behavior: contain; } /* r1 (técnico 2): o puxar-pra-baixo no topo do app não passa pra página (Android: recarga; iOS: elástico) */
+      /* r1 (persona 1): enquanto a demo carrega, o PRINT REAL do módulo que vai abrir (Finanças/Rotina: os do "Por dentro", já no cache),
+         encostado logo abaixo da barra de cima, na largura toda e na proporção dele (height auto, nunca esticado); "Abrindo o app…" por
+         cima, embaixo. O iframe sobe por cima quando a demo avisa que pintou. Módulo sem print = o branco de antes. */
+      html[data-lp="v2"] .lp-celular img { display: none; }
+      html[data-lp="v2"] .lp-celular[data-tem-print] img { display: block; top: var(--lp2-topo-h, 48px); bottom: auto; inset-inline: 0; height: auto; object-fit: fill; }
       html[data-lp="v2"] .lp-celular iframe { position: relative; inset: auto; flex: 1 1 auto; width: 100%; height: auto; min-height: 0; }
-      html[data-lp="v2"] .lp-demo-carregando { top: 50%; bottom: auto; transform: translate(-50%, -50%); }
+      html[data-lp="v2"] .lp2-cheia-topo, html[data-lp="v2"] .lp2-cheia-baixo { position: relative; z-index: 3; } /* as 2 barras por cima do print */
+      html[data-lp="v2"] .lp-demo-carregando { top: auto; bottom: calc(var(--lp2-baixo-h, 70px) + 18px); z-index: 4; }
       html[data-lp="v2"] .lp-celular:not([data-abrindo]) .lp-demo-carregando { display: none; }
       .lp2-cheia-topo { flex: none; display: flex; align-items: center; gap: 8px; min-height: 48px; padding: env(safe-area-inset-top) 14px 0 4px; background: #fff; border-bottom: 1px solid var(--borda); }
       button.lp2-cheia-voltar { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px 0 10px; border: 0; background: none; color: var(--tx); font-size: 16px; font-weight: 750; flex: none; }
@@ -540,7 +546,7 @@
       html[data-lp="v2"] .lp2-cheia-baixo .lp-cta { margin: 0; flex: 1; min-width: 0; min-height: 48px; font-size: 15.5px; line-height: 1.15; padding: 0 10px; } /* a mesma barra do botão fixo da página */
       /* ── 4b. avaliações (30/10 noite, dono: "faz as 2"): ★★★★★ + "apelido · loja · mês/ano"; o apelido vem do data-nome (vazio = só a loja) ── */
       .lp2-estrelas { margin: 0 0 6px; color: #f5a524; font-size: 15px; letter-spacing: 2px; line-height: 1; }
-      .lp2-aval-nome::after { content: attr(data-nome) " ·"; color: var(--tx); font-weight: 700; }
+      /* r1 (persona 5/6): o apelido é TEXTO da página (o landing.ts escreve "data-nome · " no span; vazio = some), no mesmo peso e cor da loja */
       .lp2-aval-nome[data-nome=""] { display: none; }
       /* ── 7. fim + barra fixa (preço à esquerda, botão numa linha) ── */
       html[data-lp="v2"] .lp-fim { background: #fbe4ee; color: var(--tx); margin-top: 48px; padding: 32px 20px 28px; }
@@ -651,7 +657,7 @@
              página. Aqui fica um cartão no estilo dos painéis do "Por dentro" (celular em proporção real, print nítido — a Home da 1ª
              tela, já baixada —, corte reto embaixo); o toque no cartão, no botão ou numa pílula abre o app de verdade POR CIMA da
              página, em tela cheia (o .lp-celular vira a camada fixa; o iframe só ganha src nesse toque). -->
-        <figure class="lp2-foto lilas lp2-demo-cartao" id="lp2-demo-cartao" data-so-lp="v2">
+        <figure class="lp2-foto lilas lp2-demo-cartao" id="lp2-demo-cartao" data-so-lp="v2" aria-hidden="true">
           <div class="lp2-fone"><div class="lp2-fone-tela"><div class="lp2-fone-barra" aria-hidden="true"><span>9:41</span><svg viewBox="0 0 54 12"><g fill="#111"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="4.5" y="5" width="3" height="7" rx="1"/><rect x="9" y="3" width="3" height="9" rx="1"/><rect x="13.5" y="1" width="3" height="11" rx="1"/></g><path d="M26 4.2a7 7 0 0 1 8 0l-1 1.3a5.3 5.3 0 0 0-6 0zM27.6 6.6a4.4 4.4 0 0 1 4.8 0l-1 1.3a2.7 2.7 0 0 0-2.8 0zM30 9l1.2 1.6L30 12l-1.2-1.4z" fill="#111"/><rect x="37" y="1.5" width="14" height="9" rx="2.5" fill="none" stroke="#111" stroke-width="1.2"/><rect x="38.5" y="3" width="10" height="6" rx="1.2" fill="#111"/><rect x="52" y="4.5" width="1.5" height="3" rx=".6" fill="#111"/></svg></div><div class="lp2-fone-ilha" aria-hidden="true"></div><img data-src="/landing/v3-home.webp" alt="A Home do CORE: Bom dia, Ana, com a próxima conta, o orçamento do mês, o treino e o sono do dia" width="720" height="1070" style="aspect-ratio:720/1070" loading="lazy" fetchpriority="low" decoding="async" /></div></div>
         </figure>
         <button type="button" class="lp-cta lp2-demo-cta" id="lp-demo-abrir" data-so-lp="v2">Testar o app aqui <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
@@ -668,15 +674,15 @@
           <!-- v2: a barra de cima da tela cheia (voltar + o módulo aberto) -->
           <div class="lp2-cheia-topo" data-so-lp="v2"><button type="button" class="lp2-cheia-voltar" id="lp2-cheia-voltar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>Voltar</button><span class="lp2-cheia-onde">Demonstração · <b id="lp2-cheia-modulo">Finanças</b></span></div>
           <img id="lp-demo-img" src="/landing/demo-financas.webp" alt="O módulo Finanças do CORE com dados de exemplo" width="360" height="640" loading="lazy" decoding="async" />
-          <!-- r1 (prova-e-meio 1.5 / técnico 7.3): no v2 o fundo do "Testar o app" é um print já baixado (o demo-financas.webp de 720 px ficava esticado 1,41× em @3x). r3 (visitante-frio 4 / prova-e-meio 1.5): a Home da 1ª tela (v3-home, 0 bytes a mais) num celular em RETRATO de 240 px que some pra baixo — era a única janela da página em paisagem, e mostrava o card "R$ 146" pela 3ª vez. Roda no parse, antes de o lazy pedir a imagem; o atual segue com a de hoje. -->
-          <script data-so-lp="v2">if (document.documentElement.getAttribute("data-lp") === "v2") { var di = document.getElementById("lp-demo-img"); di.src = "/landing/v3-home.webp"; di.width = 720; di.height = 1070; }</script>
+          <!-- 31/10 (r1 da tela cheia): no v2 esta imagem é o print do módulo que vai abrir, na tela cheia, até a demo pintar — o landing.ts põe o src no toque (Finanças/Rotina = os do "Por dentro", já no cache). Roda no parse, antes de o lazy pedir a imagem; o atual segue com a de hoje. -->
+          <script data-so-lp="v2">if (document.documentElement.getAttribute("data-lp") === "v2") { document.getElementById("lp-demo-img").removeAttribute("src"); }</script>
           <iframe id="lp-demo-frame" title="Demonstração do CORE" loading="eager" tabindex="-1"></iframe>
           <span class="lp-demo-carregando"><i class="lp-gira"></i>Abrindo o app…</span>
           <!-- v2: a barra de baixo da tela cheia (o preço + o mesmo botão da página): fecha a tela cheia e leva ao cartão da oferta -->
           <div class="lp2-cheia-baixo" data-so-lp="v2"><span class="lp2-fixo-p"><b>R$ 27,90</b><span>Vitalício<i> · Pix</i></span></span><button type="button" class="lp-cta" id="lp2-cheia-comprar">Quero organizar minha vida</button></div>
         </div>
         <p class="lp-demo-nota" data-so-lp="atual">Nada do que você mexer aqui é salvo.</p>
-        <p class="lp-demo-nota" data-so-lp="v2">Dados de exemplo com a data de hoje · nada é salvo.</p>
+        <p class="lp-demo-nota" data-so-lp="v2">Dados de exemplo · nada é salvo.</p>
       </section>
 
       <!-- ═════════ 3. OS 16 ═════════ -->
@@ -784,12 +790,13 @@
         <h2 class="lp-h2">Avaliações de verdade, das lojas.</h2>
         <!-- 30/10 noite (dono: "faz as 2"): ★★★★★ + "apelido · loja · mês/ano" em cada uma. Tudo conferido na loja em 30/10 (texto, nota,
              mês): o apelido sai EXATAMENTE como está na loja ("camvbs", "ywonvu"), sem inventar nome. Os 2 do Google Play ainda sem o
-             nome conferido: data-nome vazio = só "Google Play · mês/ano"; pra pôr o nome, é só preencher o data-nome (o CSS mostra "nome · "). -->
+             nome conferido: data-nome vazio = só "Google Play · mês/ano"; pra pôr o nome, é só preencher o data-nome (o landing.ts escreve "nome · ").
+             r1 (persona 5): as 2 da App Store primeiro (70% do tráfego é iPhone); o apelido no mesmo peso e cor da loja. -->
         <div class="lp-avals">
+          <figure class="lp-aval"><p class="lp2-estrelas" role="img" aria-label="5 de 5 estrelas">★★★★★</p><blockquote>“Muito bom pra quem quer se organizar em todas as áreas da vida.”</blockquote><figcaption><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.7c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9s-2-.9-3.3-.8C6.1 7 4.6 8 3.7 9.5c-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.3.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.8-1.1-2.9-4.2zM13.9 5.3c.7-.8 1.2-2 1-3.2-1 0-2.3.7-3 1.5-.6.7-1.2 1.9-1.1 3.1 1.2.1 2.3-.6 3.1-1.4z"/></svg><span class="lp2-aval-nome" data-nome="camvbs">camvbs · </span>App Store · out/2026</figcaption></figure>
+          <figure class="lp-aval"><p class="lp2-estrelas" role="img" aria-label="5 de 5 estrelas">★★★★★</p><blockquote>“Sem dúvidas, o mais completo que já usei até hoje.”</blockquote><figcaption><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.7c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9s-2-.9-3.3-.8C6.1 7 4.6 8 3.7 9.5c-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.3.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.8-1.1-2.9-4.2zM13.9 5.3c.7-.8 1.2-2 1-3.2-1 0-2.3.7-3 1.5-.6.7-1.2 1.9-1.1 3.1 1.2.1 2.3-.6 3.1-1.4z"/></svg><span class="lp2-aval-nome" data-nome="ywonvu">ywonvu · </span>App Store · set/2026</figcaption></figure>
           <figure class="lp-aval"><p class="lp2-estrelas" role="img" aria-label="5 de 5 estrelas">★★★★★</p><blockquote>“Design ótimo, interfaces completas sem ser complexas. Agradável de usar.”</blockquote><figcaption><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 2.2 13.8 12 3.6 21.8c-.4-.2-.6-.6-.6-1.1V3.3c0-.5.2-.9.6-1.1zm11.7 11.3 2.8 2.8-10.4 6c-.6.3-1.2.3-1.7 0zM18.1 8.6l3.1 1.8c1 .6 1 1.6 0 2.2l-3.1 1.8L15.3 12zM5.8 1.9l10.3 6-2.8 2.8L5.8 2c.5-.3 1.2-.3 1.7 0z"/></svg><span class="lp2-aval-nome" data-nome=""></span>Google Play · set/2026</figcaption></figure>
           <figure class="lp-aval"><p class="lp2-estrelas" role="img" aria-label="5 de 5 estrelas">★★★★★</p><blockquote>“Tudo que eu sempre quis num planner online.”</blockquote><figcaption><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 2.2 13.8 12 3.6 21.8c-.4-.2-.6-.6-.6-1.1V3.3c0-.5.2-.9.6-1.1zm11.7 11.3 2.8 2.8-10.4 6c-.6.3-1.2.3-1.7 0zM18.1 8.6l3.1 1.8c1 .6 1 1.6 0 2.2l-3.1 1.8L15.3 12zM5.8 1.9l10.3 6-2.8 2.8L5.8 2c.5-.3 1.2-.3 1.7 0z"/></svg><span class="lp2-aval-nome" data-nome=""></span>Google Play · ago/2026</figcaption></figure>
-          <figure class="lp-aval"><p class="lp2-estrelas" role="img" aria-label="5 de 5 estrelas">★★★★★</p><blockquote>“Muito bom pra quem quer se organizar em todas as áreas da vida.”</blockquote><figcaption><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.7c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9s-2-.9-3.3-.8C6.1 7 4.6 8 3.7 9.5c-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.3.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.8-1.1-2.9-4.2zM13.9 5.3c.7-.8 1.2-2 1-3.2-1 0-2.3.7-3 1.5-.6.7-1.2 1.9-1.1 3.1 1.2.1 2.3-.6 3.1-1.4z"/></svg><span class="lp2-aval-nome" data-nome="camvbs"></span>App Store · out/2026</figcaption></figure>
-          <figure class="lp-aval"><p class="lp2-estrelas" role="img" aria-label="5 de 5 estrelas">★★★★★</p><blockquote>“Sem dúvidas, o mais completo que já usei até hoje.”</blockquote><figcaption><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.7c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9s-2-.9-3.3-.8C6.1 7 4.6 8 3.7 9.5c-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.3.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.8-1.1-2.9-4.2zM13.9 5.3c.7-.8 1.2-2 1-3.2-1 0-2.3.7-3 1.5-.6.7-1.2 1.9-1.1 3.1 1.2.1 2.3-.6 3.1-1.4z"/></svg><span class="lp2-aval-nome" data-nome="ywonvu"></span>App Store · set/2026</figcaption></figure>
         </div>
       </section>
 

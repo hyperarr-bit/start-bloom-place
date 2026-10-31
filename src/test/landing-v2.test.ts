@@ -316,12 +316,12 @@ describe("braço v2 · cartão, avaliações, como funciona, dúvidas, demo, fim
     expect(card.querySelector("#lp-pagar-txt")!.textContent).toBe("Pagar R$ 27,90 no Pix");
     expect(html().querySelector("#oferta .lp-garantia")!.getAttribute("data-so-lp")).toBe("atual");
   });
-  it("avaliações do v2 (30/10 noite, dono: 'faz as 2'): 4 textos reais das lojas, 'Design ótimo…' em 1º; cada uma com ★★★★★ e 'apelido · loja · mês/ano' — o apelido EXATO da loja; os 2 do Google Play com data-nome vazio (só loja · mês); sem nota média nem quantidade", () => {
+  it("avaliações do v2 (30/10 noite, dono: 'faz as 2'; r1 31/10: App Store primeiro): 4 textos reais das lojas, 'Muito bom…' em 1º; cada uma com ★★★★★ e 'apelido · loja · mês/ano' — o apelido EXATO da loja; os 2 do Google Play com data-nome vazio (só loja · mês); sem nota média nem quantidade", () => {
     const d = html();
     const deHoje = [...d.querySelectorAll("#avaliacoes blockquote")].map((b) => b.textContent);
     const doV2 = [...d.querySelectorAll("#avaliacoes-v2 .lp-aval")];
     expect(doV2).toHaveLength(4);
-    expect(doV2[0].querySelector("blockquote")!.textContent).toBe("“Design ótimo, interfaces completas sem ser complexas. Agradável de usar.”");
+    expect(doV2[0].querySelector("blockquote")!.textContent).toBe("“Muito bom pra quem quer se organizar em todas as áreas da vida.”");
     const linhas = doV2.map((a) => ({
       texto: a.querySelector("blockquote")!.textContent,
       estrelas: a.querySelector(".lp2-estrelas")!.textContent,
@@ -331,15 +331,16 @@ describe("braço v2 · cartão, avaliações, como funciona, dúvidas, demo, fim
       icone: a.querySelector("figcaption svg path")!.getAttribute("d")!.slice(0, 6),
     }));
     for (const l of linhas) { expect(deHoje).toContain(l.texto); expect(l.estrelas).toBe("★★★★★"); expect(l.rotulo).toBe("5 de 5 estrelas"); }
+    // r1 (persona 6): o apelido é TEXTO da página, já no HTML (sem JS também aparece)
     expect(linhas.map((l) => [l.nome, l.legenda])).toEqual([
+      ["camvbs", "camvbs · App Store · out/2026"],
+      ["ywonvu", "ywonvu · App Store · set/2026"],
       ["", "Google Play · set/2026"],
       ["", "Google Play · ago/2026"],
-      ["camvbs", "App Store · out/2026"],
-      ["ywonvu", "App Store · set/2026"],
     ]);
-    expect(linhas.map((l) => l.icone)).toEqual(["M3.6 2", "M3.6 2", "M16.4 ", "M16.4 "]); // o ícone da loja certa (Play × Apple)
-    // o nome vem do data-nome pelo CSS ("camvbs ·"); vazio = some (fica só "Google Play · set/2026")
-    expect(HTML).toContain('.lp2-aval-nome::after { content: attr(data-nome) " ·";');
+    expect(linhas.map((l) => l.icone)).toEqual(["M16.4 ", "M16.4 ", "M3.6 2", "M3.6 2"]); // o ícone da loja certa (Apple × Play)
+    // r1 (persona 5): sem negrito preto no apelido (o mesmo peso e cor da loja); vazio = some (fica só "Google Play · set/2026")
+    expect(HTML).not.toMatch(/\.lp2-aval-nome::after/);
     expect(HTML).toContain('.lp2-aval-nome[data-nome=""] { display: none; }');
     expect(d.querySelector("#avaliacoes-v2")!.textContent).not.toMatch(/\d[,.]\d|\d+ avaliações/);
   });
@@ -432,7 +433,7 @@ describe("braço v2 · cartão, avaliações, como funciona, dúvidas, demo, fim
     // r1 (7.3): no v2 o fundo do "Testar o app" é o print de Finanças já baixado (escala 0,94), trocado no parse; o atual segue com o de hoje
     const demoScript = d.querySelector("#lp-celular script")!;
     expect(demoScript.getAttribute("data-so-lp")).toBe("v2");
-    expect(demoScript.textContent).toContain('di.src = "/landing/v3-home.webp"'); // r3 (visitante-frio 4 / prova-e-meio 1.5): a Home da 1ª tela, num celular em retrato
+    expect(demoScript.textContent).toContain('document.getElementById("lp-demo-img").removeAttribute("src")'); // r1 da tela cheia (31/10): no v2 o print do módulo entra só no toque (o da camada)
     expect(HTML).toContain('html[data-lp="v2"] .lp-celular img { display: none; }'); // 30/10 noite: na tela cheia sem o print esticado (fundo branco + "Abrindo o app…")
     expect(d.querySelector("#lp-demo-img")!.getAttribute("src")).toBe("/landing/demo-financas.webp");
     expect(d.querySelector('img[src*="/landing/v2-"]')).toBeNull();
@@ -464,7 +465,7 @@ const dispara = (achar: (o: IOFake) => boolean, entradas: Entrada[]) => { const 
  * só dispara quando o teste manda — senão a demo do braço atual começaria "perto" na hora e nada daria pra medir */
 const IO_DO_SETUP = (window as unknown as { IntersectionObserver: unknown }).IntersectionObserver;
 const trocarIO = (v: unknown) => { (window as unknown as { IntersectionObserver: unknown }).IntersectionObserver = v; (globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver = v; };
-async function abrirPagina(lp: "atual" | "v2" | null, checkout: "livre" | "email" = "livre", estadoDoHistorico: unknown = null) {
+async function abrirPagina(lp: "atual" | "v2" | null, checkout: "livre" | "email" = "livre", estadoDoHistorico: unknown = null, antesDoScript?: () => void) {
   await dormir(25); // o rAF (landing_html) da página anterior esvazia antes de zerar a lista de eventos
   vi.resetModules();
   localStorage.clear(); sessionStorage.clear(); apagarCookies();
@@ -478,6 +479,7 @@ async function abrirPagina(lp: "atual" | "v2" | null, checkout: "livre" | "email
   if (lp) document.documentElement.setAttribute("data-lp", lp); else document.documentElement.removeAttribute("data-lp");
   document.documentElement.removeAttribute("data-demo-cheia"); document.body.removeAttribute("style"); // a tela cheia de um teste anterior
   document.body.innerHTML = corpo;
+  antesDoScript?.();
   await import("@/landing/landing");
 }
 afterEach(() => { trocarIO(IO_DO_SETUP); });
@@ -1279,7 +1281,7 @@ describe("crítica r2 do v3 · aviso do vencido no topo do cartão, 'Copiado ✓
     expect(HTML).toMatch(/\.lp2-onde \{ position: relative; display: flex;/);
     expect(HTML).toMatch(/\.lp2-miuda \{ margin: 6px 0 0; text-align: center; font-size: 13px;/);
     expect(HTML).toContain('<span class="lp2-preco-txt"><b>Vitalício</b><span>Pagamento único no&nbsp;Pix</span></span>');
-    expect(HTML).toContain('<p class="lp-demo-nota" data-so-lp="v2">Dados de exemplo com a data de hoje · nada é salvo.</p>');
+    expect(HTML).toContain('<p class="lp-demo-nota" data-so-lp="v2">Dados de exemplo · nada é salvo.</p>'); // r1 da tela cheia (persona 3): o cartão é a Home de um dia fixo — sem prometer "a data de hoje" embaixo dele
     expect(HTML).toContain('.lp-preco-sub[data-so-lp="v2"] { font-size: 14px; }');
     expect(HTML).toContain('<p class="lp-demo-nota" data-so-lp="atual">Nada do que você mexer aqui é salvo.</p>');
     expect(HTML).toContain('.lp2-disp span + span::before { content: "·";');
@@ -1445,6 +1447,95 @@ describe("v2 · a demo em tela cheia (voltar do celular, seta, comprar, recarga)
     await dormir(50);
     expect(history.state?.lpDemoCheia).toBeUndefined();
     scrollTo.mockRestore();
+  });
+
+  /* ── r1 da tela cheia (31/10) ── */
+  it("r1 · ao abrir, o PRINT do módulo que vai abrir aparece na hora (Finanças/Rotina = os do 'Por dentro'; Dieta = sem print, o branco), abaixo da barra de cima e na largura toda; some quando a demo pinta", async () => {
+    await abrirPagina("v2");
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    const cel = document.getElementById("lp-celular")!;
+    const img = document.getElementById("lp-demo-img") as HTMLImageElement;
+    expect(cel.hasAttribute("data-tem-print")).toBe(false);
+    clicar("#lp-demo-abrir");
+    expect(cel.hasAttribute("data-tem-print")).toBe(true);
+    expect(img.getAttribute("src")).toBe("/landing/v3-financas.webp"); // o mesmo URL do painel do "Por dentro": cache
+    expect(img.hasAttribute("width")).toBe(false); // a proporção é a do print (height auto), nunca a 360×640 do atual
+    expect(img.alt).toMatch(/Finanças/);
+    clicar("#lp2-cheia-voltar"); await voltou();
+    clicar('.lp-pilula[data-m="rotina"]');
+    expect(img.getAttribute("src")).toBe("/landing/v3-rotina.webp");
+    clicar("#lp2-cheia-voltar"); await voltou();
+    clicar('.lp-pilula[data-m="dieta"]');
+    expect(cel.hasAttribute("data-tem-print")).toBe(false);
+    clicar("#lp2-cheia-voltar"); await voltou();
+    expect(HTML).toContain('html[data-lp="v2"] .lp-celular[data-tem-print] img { display: block; top: var(--lp2-topo-h, 48px); bottom: auto; inset-inline: 0; height: auto; object-fit: fill; }');
+    expect(HTML).toContain('html[data-lp="v2"] .lp2-cheia-topo, html[data-lp="v2"] .lp2-cheia-baixo { position: relative; z-index: 3; }');
+    expect(HTML).toContain('html[data-lp="v2"] .lp-celular { overscroll-behavior: contain; }');
+    scrollTo.mockRestore();
+  });
+
+  it("r1 · fechada, a camada é inert; o foco que ficou dentro (o iframe) volta pro 'Testar o app aqui'; as pílulas do v2 são um grupo de botões (sem aria-pressed); o cartão é aria-hidden", async () => {
+    await abrirPagina("v2");
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    const cel = document.getElementById("lp-celular")!;
+    expect(cel.hasAttribute("inert")).toBe(true);
+    const pil = document.querySelector("#demo .lp-pilulas")!;
+    expect(pil.getAttribute("role")).toBe("group");
+    expect(pil.querySelectorAll("[aria-pressed]")).toHaveLength(0);
+    expect(document.getElementById("lp2-demo-cartao")!.getAttribute("aria-hidden")).toBe("true");
+    clicar('.lp-pilula[data-m="treino"]');
+    expect(cel.hasAttribute("inert")).toBe(false);
+    expect(pil.querySelectorAll("[aria-pressed]")).toHaveLength(0); // abrir num módulo não "marca" pílula
+    frame().focus(); // WebKit: o toque não focou o botão; o teclado entrou no app
+    clicar("#lp2-cheia-voltar"); await voltou();
+    expect(cel.hasAttribute("inert")).toBe(true);
+    expect(document.activeElement?.id).toBe("lp-demo-abrir");
+    scrollTo.mockRestore();
+  });
+
+  it("r1 · a restauração de rolagem só volta ao 'auto' DEPOIS do popstate do nosso back() (aparelho lento: a reserva de 700 ms fecha antes)", async () => {
+    await abrirPagina("v2");
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    history.scrollRestoration = "auto";
+    const real = history.back.bind(history);
+    const back = vi.spyOn(history, "back").mockImplementation(() => { window.setTimeout(real, 1300); }); // o popstate chega em 1,3 s
+    clicar("#lp-demo-abrir");
+    expect(history.scrollRestoration).toBe("manual");
+    clicar("#lp2-cheia-comprar");
+    await voltou(); // a reserva (700 ms) fechou
+    await dormir(400);
+    expect(history.scrollRestoration).toBe("manual"); // antes: "auto" aqui — o popstate atrasado restauraria o y antigo
+    await vi.waitFor(() => { if (history.state?.lpDemoCheia) throw new Error("ainda sem popstate"); }, { timeout: 2000, interval: 20 });
+    await vi.waitFor(() => { if (history.scrollRestoration !== "auto") throw new Error("ainda manual"); }, { timeout: 1500, interval: 20 });
+    expect(fechadas().map((e) => e.via)).toEqual(["comprar"]);
+    back.mockRestore(); scrollTo.mockRestore();
+  });
+
+  it("r1 · avaliações: o apelido é texto, escrito pelo script a partir do data-nome (o dono só preenche o data-nome); vazio = nada", async () => {
+    await abrirPagina("v2", "livre", null, () => {
+      const spans = document.querySelectorAll<HTMLElement>("#avaliacoes-v2 .lp2-aval-nome");
+      spans.forEach((s) => { s.textContent = ""; });
+      spans[2].setAttribute("data-nome", "Mariana S."); // o dono preencheu o 1º do Google Play
+    });
+    const legendas = [...document.querySelectorAll("#avaliacoes-v2 figcaption")].map((f) => f.textContent);
+    expect(legendas).toEqual(["camvbs · App Store · out/2026", "ywonvu · App Store · set/2026", "Mariana S. · Google Play · set/2026", "Google Play · ago/2026"]);
+  });
+
+  it("r1 · a demo aberta pelo v2 esconde a seta ← do cabeçalho do módulo (a barra '← Voltar' da página é a única saída) e contém o overscroll; o atual não muda", () => {
+    const fonte = readFileSync(resolve(raiz, "src/pages/organizar/DemoDaLanding.tsx"), "utf8");
+    expect(fonte).toContain('if (!numeroDaLanding) return;');
+    expect(fonte).toContain('header.sticky > div > :first-child:is([aria-label="Voltar"], [aria-label="Todos os módulos"]) { display: none !important; }');
+    expect(fonte).toContain('raiz.style.overscrollBehavior = "contain";');
+    // cada um dos 16 módulos tem UM header.sticky, e a seta é o 1º filho do div dele (o seletor acima não pega outra coisa)
+    for (const m of ["Index", "Rotina", "Treino", "Dieta", "Saude", "Casa", "Estudos", "Carreira", "Biblioteca", "Beleza", "Viagens", "Hiperfoco", "Relacionamentos", "Pet", "Detox", "DesenvolvimentoPessoal"]) {
+      const f = readFileSync(resolve(raiz, `src/pages/${m}.tsx`), "utf8");
+      expect((f.match(/<header className="[^"]*sticky/g) ?? []).length, m).toBe(1);
+      const depois = f.slice(f.search(/<header className="[^"]*sticky/)).replace(/\{\/\*[\s\S]*?\*\/\}/g, ""); // sem os comentários JSX
+      const div = depois.indexOf("<div");
+      const primeiro = depois.slice(div).split("\n").slice(1).map((l) => l.trim()).find(Boolean);
+      expect(primeiro, m).toMatch(/^<(button|Button)\b/);
+      expect(depois.slice(div, div + 900), m).toMatch(/voltarDoModulo/);
+    }
   });
 
   it("braço atual: nada disso existe — a pílula troca o módulo da caixa de hoje, sem camada, sem histórico; o iframe pede a URL de sempre", async () => {

@@ -185,7 +185,7 @@ describe("braço v2 · a 1ª tela: uma frase, UM celular real, um preço, um bot
     expect(Number(img.getAttribute("width"))).toBeGreaterThanOrEqual(657);
     expect(img.getAttribute("alt")).toMatch(/Home do CORE/);
     expect(existsSync(resolve(raiz, "public/landing/v3-home.webp"))).toBe(true);
-    expect(HTML).toMatch(/\.lp2-hero-cel \.lp2-fone \{ --w: 232px; \}/);
+    expect(HTML).toMatch(/\.lp2-hero-cel \.lp2-fone \{ --w: 232px; padding-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; \}/); // 30/10 noite (dono): o celular segue reto pra baixo do painel
     expect(HTML).toMatch(/\.lp2-fone img \{ display: block; width: 100%; height: auto; \}/);
     expect(HTML).toMatch(/\.lp2-fone \{[^}]*border-radius: calc\(var\(--w\) \* \.14\)/); // moldura proporcional à largura
     // sem grade solta, sem card solto, sem sub, sem pílulas, sem vídeo, sem pergunta, sem âncora de preço (o "sem sentido" da v2)
@@ -214,15 +214,15 @@ describe("braço v2 · a 1ª tela: uma frase, UM celular real, um preço, um bot
     const elementos = [topo.querySelector("h1.lp2-h1-a"), topo.querySelector(".lp2-fone"), topo.querySelector(".lp2-onde"), topo.querySelector(".lp2-preco"), cta, topo.querySelector(".lp2-miuda")];
     expect(elementos.every(Boolean)).toBe(true); // + a faixa = 7
   });
-  it("a faixa do v2 carrega o nome (CORE · ACESSO VITALÍCIO · R$ 27,90 no Pix), sem 'só hoje' nem data; a barra de marca some no v2; a do atual continua com a data", () => {
+  it("a faixa do v2 é a MESMA do ar (dono 30/10 noite: '🔥 ACESSO VITALÍCIO · só hoje, DD/MM'); a barra de marca some no v2; a do atual continua com a data", () => {
     const d = html();
     const faixas = [...d.querySelectorAll(".lp-promo")];
     const v2 = faixas.find((f) => f.getAttribute("data-so-lp") === "v2")!;
     const atual = faixas.find((f) => f.getAttribute("data-so-lp") === "atual")!;
-    expect(v2.textContent!.replace(/\s+/g, " ").trim()).toBe("CORE · ACESSO VITALÍCIO · R$ 27,90 no Pix");
-    expect(v2.querySelector("span")!.innerHTML).toBe("· R$ 27,90 no&nbsp;Pix"); // r3 (primeira-tela B1): "no Pix" junto; o pedaço do preço desce inteiro (nowrap no span)
-    expect(HTML).toContain('html[data-lp="v2"] .lp-promo span { opacity: 1; white-space: nowrap; }');
-    expect(v2.textContent).not.toMatch(/hoje|\d\d\/\d\d|garantia/);
+    expect(v2.querySelector("b")!.textContent).toBe("🔥 ACESSO VITALÍCIO");
+    expect(v2.querySelector("span")!.textContent).toBe("· só hoje");
+    expect(v2.querySelector("#lp2-promo-data")).not.toBeNull();
+    expect(HTML).toContain('html[data-lp="v2"] .lp-promo { order: -2; }');
     expect(atual.querySelector("#lp-promo-data")).not.toBeNull();
     expect(HTML).toContain('html[data-lp="v2"] .lp-barra { display: none; }');
   });

@@ -398,8 +398,7 @@
       /* com a ordem por `order`, o scroll anchoring do navegador tomava um bloco abaixo na tela (antes no DOM) como âncora e, quando o QR
          crescia o cartão, empurrava a página (a pessoa via só "Já paguei"). Sem âncora automática; o landing.ts rola até o cartão a cada troca de fase. */
       html[data-lp="v2"], html[data-lp="v2"] body, html[data-lp="v2"] main.lp { overflow-anchor: none; }
-      html[data-lp="v2"] .lp-promo { order: -2; display: block; white-space: normal; height: auto; min-height: 34px; padding: 8px 12px 7px; line-height: 1.3; background: #d4328a; } /* fonte do sistema +15%: quebra como texto corrido (2 linhas), não por pedaços. r2: #d4328a = 4,54:1 com branco (o #d6338a da marca dá 4,47, 0,03 abaixo do AA em 12,5 px) — igual a olho; decisão de marca se quiser o #d6338a de volta */
-      html[data-lp="v2"] .lp-promo span { opacity: 1; white-space: nowrap; } /* r2: o "· R$ 27,90 no Pix" sem o .95 (ficava abaixo do AA). r3 (primeira-tela B1): nowrap só no pedaço do preço — com fonte grande ele desce inteiro pra 2ª linha, em vez de rasgar "R$ / 27,90" ou deixar "Pix" sozinho */
+      html[data-lp="v2"] .lp-promo { order: -2; } /* 30/10 noite (dono): a faixa igual à do ar (flex, 34 px, uma linha) — só a ordem no topo do v2 */
       html[data-lp="v2"] .lp-barra { display: none; } /* a faixa já carrega "CORE": sem barra de marca (46 px a mais pro celular da 1ª tela) */
       html[data-lp="v2"] #topo-v2 { order: 1; }
       html[data-lp="v2"] #dentro-v2 { order: 2; }
@@ -416,7 +415,8 @@
       html[data-lp="v2"][data-t="b"] .lp2-h3-a, html[data-lp="v2"]:not([data-t="b"]) .lp2-h3-b { display: none; } /* r3 (prova-e-meio 1.3): no braço B o h1 já diz "16 áreas da vida. / Em um só app." — o painel 1 não repete */
       /* 350 px = o que cabe da Home (de "Bom dia, Ana" até 8 px abaixo dos rótulos da 1ª fileira) num celular de 232 px */
       .lp2-hero-cel { height: 350px; margin-top: 8px; display: flex; justify-content: center; overflow: hidden; }
-      .lp2-hero-cel .lp2-fone { --w: 232px; }
+      .lp2-hero-cel .lp2-fone { --w: 232px; padding-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+      .lp2-hero-cel .lp2-fone-tela { border-bottom-left-radius: 0; border-bottom-right-radius: 0; } /* 30/10 noite (dono: "a parte de baixo parece que falta um pedaço"): a tela terminava 4 px antes do corte com os cantos de baixo redondos e a moldura cortada — agora o celular segue reto pra baixo do painel, como nos painéis do "Por dentro" */
       /* o celular: proporção REAL (só a largura é fixa; a altura segue o print — nunca esticado); moldura, ilha e barra como um iPhone */
       .lp2-fone { --w: 300px; width: var(--w); flex: none; background: #1b1a1d; border-radius: calc(var(--w) * .14); padding: calc(var(--w) * .028); box-shadow: 0 18px 40px -16px rgba(28,26,31,.45), 0 0 0 1px rgba(0,0,0,.06); position: relative; }
       .lp2-fone-tela { background: #fff; border-radius: calc(var(--w) * .114); overflow: hidden; position: relative; }
@@ -563,7 +563,7 @@
       <!-- ═════════ 1. TOPO ═════════ -->
       <div class="lp-promo" role="note" data-so-lp="atual"><b data-so-oferta="sempre">🔥 ACESSO VITALÍCIO</b><b data-so-oferta="ano">🔥 OFERTA ESPECIAL</b> <span>· só hoje<b id="lp-promo-data"></b></span></div>
       <!-- 30/10 (v2): a faixa sem "só hoje, DD/MM" (a data mudava sozinha todo dia = promoção eterna; risco CDC art. 37 e política da Meta). Só o que é verdade. -->
-      <div class="lp-promo" role="note" data-so-lp="v2"><b>CORE · ACESSO VITALÍCIO</b> <span>· R$ 27,90 no&nbsp;Pix</span></div>
+      <div class="lp-promo" role="note" data-so-lp="v2"><!-- 30/10 noite (dono, testando no iPhone): "o cabeçalho fica melhor como tá hoje no ar, com a copy do dia" — a mesma faixa do braço atual (🔥 ACESSO VITALÍCIO · só hoje, DD/MM), decisão dele --><b>🔥 ACESSO VITALÍCIO</b> <span>· só hoje<b id="lp2-promo-data"></b></span><script>try { document.getElementById("lp2-promo-data").textContent = ", " + new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" }).format(new Date()); } catch (e) {}</script></div>
       <script>
         // a data de hoje no fuso de Brasília ("· válida hoje, 28/10") — sem ela, fica só "válida hoje"
         try { var dd = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" }).format(new Date()); document.getElementById("lp-promo-data").textContent = ", " + dd; } catch (e) {}

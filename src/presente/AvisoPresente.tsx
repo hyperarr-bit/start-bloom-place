@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import {
-  CHAVE_AVISO_PRESENTE, SUB_AVISO, avisoEscondido, avisoLigadoAqui, compraQueLiberaAviso, gravarMarcaDoAparelho, lerMarcaDoAparelho,
+  CHAVE_AVISO_PRESENTE, SUB_AVISO, avisoEscondido, avisoLigadoAqui, compraQueLiberaAviso, gravarMarcaDoAparelho, lerMarcaDoAparelho, sessaoDoAviso,
   type LinhaDoAviso, type MarcaAviso,
 } from "@/lib/presente-aviso";
 import { tokenDia3 } from "./api";
@@ -16,7 +16,7 @@ import { tokenDia3 } from "./api";
  * 3 lugares que são "a página Você": a aba Você (as 2 caras, pages/Voce.tsx) e o menu do avatar da Home clássica
  * (AccountDrawer, MenuNovo) — no site com a Home clássica a aba Você nem existe.
  * Regras e chave em src/lib/presente-aviso.ts (PRESENTE_AVISO, padrão "off"). Some no × ou no toque (pra sempre) e
- * sozinho 7 dias depois da 1ª vez. Eventos: presente_aviso_view · presente_aviso_toque · presente_aviso_fechar.
+ * na próxima visita (crítica r2: "1 vez" — a marca guarda a sessão em que apareceu). Eventos: presente_aviso_view · presente_aviso_toque · presente_aviso_fechar.
  */
 export function AvisoPresente({ estilo }: { estilo: "classico" | "e" | "menu" }) {
   const { user } = useAuth();
@@ -25,7 +25,8 @@ export function AvisoPresente({ estilo }: { estilo: "classico" | "e" | "menu" })
   const ligado = avisoLigadoAqui();
   const marcaConta = get<MarcaAviso | null>(CHAVE_AVISO_PRESENTE, null);
   const [marcaAparelho, setMarcaAparelho] = useState<MarcaAviso | null>(() => lerMarcaDoAparelho());
-  const escondido = avisoEscondido(marcaConta) || avisoEscondido(marcaAparelho);
+  const [sessao] = useState(() => sessaoDoAviso());
+  const escondido = avisoEscondido(marcaConta, Date.now(), sessao) || avisoEscondido(marcaAparelho, Date.now(), sessao);
   const [elegivel, setElegivel] = useState(false);
   const [abrindo, setAbrindo] = useState(false);
   const [erro, setErro] = useState(false);
@@ -45,18 +46,18 @@ export function AvisoPresente({ estilo }: { estilo: "classico" | "e" | "menu" })
 
   const mostrar = ligado && !!uid && !escondido && elegivel;
 
-  /* a 1ª vez que aparece: guarda o dia (some sozinho 7 dias depois) — conta + aparelho */
+  /* a 1ª vez que aparece: guarda o dia e a sessão (outra sessão não mostra de novo) — conta + aparelho */
   const contou = useRef(false);
   useEffect(() => {
     if (!mostrar || contou.current) return;
     contou.current = true;
     trackEvent("presente_aviso_view", { estilo });
     if (!marcaConta?.vistoEm && !marcaAparelho?.vistoEm) {
-      const m: MarcaAviso = { vistoEm: new Date().toISOString() };
+      const m: MarcaAviso = { vistoEm: new Date().toISOString(), sessao };
       set(CHAVE_AVISO_PRESENTE, m, { system: true });
       gravarMarcaDoAparelho(m);
     }
-  }, [mostrar, estilo, marcaConta?.vistoEm, marcaAparelho?.vistoEm, set]);
+  }, [mostrar, estilo, marcaConta?.vistoEm, marcaAparelho?.vistoEm, set, sessao]);
 
   if (!mostrar) return null;
 

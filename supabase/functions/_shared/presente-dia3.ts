@@ -192,7 +192,7 @@ export function htmlDia3(a: { link: string; nome?: string | null; sair?: string 
     <p style="font-size:15.5px;line-height:1.5;margin:0 0 6px;color:#3b3542;">${oi}dê o CORE pra sempre pra quem você quer bem.</p>
     <p style="font-size:15.5px;line-height:1.5;margin:0 0 18px;color:#3b3542;"><b style="color:#16121c;">R$ 14,90, uma vez.</b> Sem mensalidade.<br><span style="font-size:14px;color:#6b6575;">Preço de presente, só pra quem já tem o CORE.</span></p>
     <a href="${esc(a.link)}" style="display:block;background:#16121c;color:#fff;text-decoration:none;font-size:16px;font-weight:800;padding:15px 24px;border-radius:999px;text-align:center;">Dar de presente</a>
-    <p style="font-size:13px;line-height:1.5;margin:14px 0 0;color:#6b6575;">Você paga no Pix e recebe um link pra mandar no WhatsApp. Quem abrir cria a conta e ganha o CORE pra sempre.</p>
+    <p style="font-size:13px;line-height:1.5;margin:14px 0 0;color:#6b6575;">Você paga no Pix e recebe um link pra mandar no WhatsApp. Quem abrir cria a conta e ganha o mesmo CORE que você usa, com tudo, pra sempre. Se fechar antes de mandar, o link também chega por e-mail.</p>
     <p style="font-size:14px;line-height:1.5;margin:20px 0 0;color:#5b5560;">Um abraço,<br>Equipe CORE</p>
   </div>
   <p style="font-size:11px;color:#8a838f;text-align:center;margin:14px 0 0;">Você recebeu este e-mail porque tem o CORE pra sempre. É uma mensagem só, não vamos repetir.${a.sair ? `<br><a href="${esc(a.sair)}" style="color:#8a838f;text-decoration:underline;">Não quero ofertas por e-mail</a>` : ""}</p>
@@ -305,9 +305,14 @@ export async function estadoDia3(admin: ClienteMin, a: {
       typeof a.pedido === "string" && /^[A-Za-z0-9_-]{4,80}$/.test(a.pedido) ? a.pedido : null,
       typeof guardado?.orderId === "string" ? guardado.orderId : null,
     ].filter(Boolean) as string[])];
-    for (const pedido of pedidos) {
+    // crítica r2 (dinheiro, baixa 2): os QRs trocados desta chave (menos de 2 h de validade) seguem pagáveis — quem pagou o
+    // código antigo que ficou copiado vê o "pago" (só pelo presente que o webhook criou; a Asaas não é consultada por eles)
+    const anteriores = (Array.isArray(guardado?.anteriores) ? guardado!.anteriores as unknown[] : [])
+      .filter((x): x is string => typeof x === "string" && /^[A-Za-z0-9_-]{4,80}$/.test(x) && !pedidos.includes(x)).slice(0, 3);
+    for (const pedido of [...pedidos, ...anteriores]) {
+      const antigo = anteriores.includes(pedido);
       let p = await presentePorPedido(admin, pedido);
-      if (!p && a.pagamento && await pedidoDoDono(admin, pedido, dono)) {
+      if (!p && !antigo && a.pagamento && await pedidoDoDono(admin, pedido, dono)) {
         // o webhook ainda não chegou: confere na Asaas e cria o código (idempotente; UTMify + e-mail ficam com o webhook/reconcile)
         const pg = await a.pagamento(pedido).catch(() => null);
         if (pg?.pago && valorCobre(pg.valor, PRECO_PRESENTE_CENTAVOS)) {

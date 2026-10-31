@@ -125,7 +125,7 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
         return;
       }
       const novo: PixSalvo = { orderId: d.orderId, qrCode: d.qrCode, qrCodeBase64: d.qrCodeBase64 ?? null, expiresAt: d.expiresAt ?? null, criadoEm: Date.now(), oferta };
-      // 31/10 (decisão do dono, _shared/pix-upsell.ts META_PURCHASE_UPSELL): o Pix de upsell (u2027/pv149) não manda Purchase
+      // 31/10 (recomendação, confirmar com o dono: _shared/pix-upsell.ts META_PURCHASE_UPSELL): o Pix de upsell (u2027/pv149) não manda Purchase
       if (!SEM_PURCHASE.has(oferta)) markPixPurchasePending({ offer: oferta, orderId: novo.orderId });
       onPix(novo);
       trackEvent("hoje_pix_gerado", { order_id: novo.orderId, oferta, valor, ...ids() });

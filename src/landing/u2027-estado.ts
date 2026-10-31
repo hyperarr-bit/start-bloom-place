@@ -19,10 +19,10 @@ let heap: EstadoU2027 | null = null;
 const etapas: readonly EtapaU2027[] = ["oferta", "qr", "pronto", "fim"];
 
 /** compra~etapa~pedido~vence~dono~código (o código Pix só tem ASCII imprimível; "~" não aparece em BR Code). O campo dono
- *  leva um "c" no fim quando o código já foi copiado ("1c"/"0c"; crítica r1). */
+ *  leva marcas depois do 1/0: "c" = o código já foi copiado (crítica r1), "e" = também foi pro e-mail (crítica r2). */
 export function paraCookie(e: EstadoU2027): string {
   const p = e.pix;
-  return [e.compra, e.etapa, p?.orderId ?? "", p ? Date.parse(p.expiresAt) : "", p ? `${p.donoIgual ? "1" : "0"}${e.copiado ? "c" : ""}` : "", p?.qrCode ?? ""].join("~");
+  return [e.compra, e.etapa, p?.orderId ?? "", p ? Date.parse(p.expiresAt) : "", p ? `${p.donoIgual ? "1" : "0"}${e.copiado ? "c" : ""}${e.comEmail ? "e" : ""}` : "", p?.qrCode ?? ""].join("~");
 }
 export function doCookie(v: string | null, agora: number = Date.now()): EstadoU2027 | null {
   if (!v) return null;
@@ -33,7 +33,8 @@ export function doCookie(v: string | null, agora: number = Date.now()): EstadoU2
   const pix: PixU2027 | null = pedido && codigo && Number.isFinite(venceMs) && venceMs > 0
     ? { orderId: pedido, qrCode: codigo, qrCodeBase64: null, expiresAt: new Date(venceMs).toISOString(), donoIgual: (dono ?? "").startsWith("1") }
     : null;
-  return { v: 1, compra, etapa: etapa as EtapaU2027, pix, salvoEm: agora, ...(pix && (dono ?? "").endsWith("c") ? { copiado: true } : {}) };
+  const marcas = (dono ?? "").slice(1);
+  return { v: 1, compra, etapa: etapa as EtapaU2027, pix, salvoEm: agora, ...(pix && marcas.includes("c") ? { copiado: true } : {}), ...(pix && marcas.includes("e") ? { comEmail: true } : {}) };
 }
 
 /** O estado do 2027 desta compra (heap → localStorage → cookie; nada = a oferta). */
@@ -44,6 +45,24 @@ export function lerEstadoU2027(compra: string, agora: number = Date.now()): Esta
   }
   if (!bruto) { const c = doCookie(lerCookie(COOKIE_U2027), agora); if (c && c.compra === compra) bruto = c; }
   return estadoU2027QueVolta(bruto, compra, agora);
+}
+
+/**
+ * Crítica r2 (dinheiro 1): o 2027 guardado SEM saber a compra — heap → localStorage → cookie. O Instagram zera o localStorage
+ * (e com ele o estado do vitalício, então a landing não sabe mais qual compra é); o cookie do 2027 sobrevive e diz qual é.
+ * Só volta o que vale reabrir: o QR ainda vivo (etapa "qr") ou o "Pronto". O resto (oferta, fim, vencido) = null.
+ */
+export function lerU2027Guardado(agora: number = Date.now()): EstadoU2027 | null {
+  const candidatos: unknown[] = [heap];
+  try { candidatos.push(JSON.parse(localStorage.getItem(CHAVE_U2027) || "null")); } catch { /* sem storage */ }
+  candidatos.push(doCookie(lerCookie(COOKIE_U2027), agora));
+  for (const c of candidatos) {
+    const compra = (c as { compra?: unknown } | null)?.compra;
+    if (typeof compra !== "string" || !compra) continue;
+    const e = estadoU2027QueVolta(c, compra, agora);
+    if ((e.etapa === "qr" && e.pix && Date.parse(e.pix.expiresAt) > agora) || e.etapa === "pronto") return e;
+  }
+  return null;
 }
 
 export function gravarEstadoU2027(e: EstadoU2027): void {

@@ -21,7 +21,8 @@ import "@/presente/presente.css";
  * — o token diz de quem é (supabase/functions/_shared/presente-dia3.ts).
  *
  *   abre → o Pix já é gerado (pré-aquecido; 24 h, 1 por conta) → "Copiar o Pix" copia NO TOQUE → "Pagou? Volte aqui"
- *        → a tela confere sozinha (a cada 4 s e na volta do app do banco) → pago → o cartão do presente com o link
+ *        → a tela confere sozinha (LACO_DAR: 4 s nos 10 primeiros minutos, 30 s até 30 min, depois para; sempre na volta do
+ *          app do banco e no "Já paguei" — crítica r2: era 4 s sem teto por 24 h) → pago → o cartão do presente com o link
  *          /presente/<código> + "Enviar no WhatsApp" (o TelaCartao de 21/10) → "Pronto" abre o CORE.
  *   Sem token e logado (conta com o CORE pra sempre) → pede o token da conta. Sem os dois → "Abra pelo link do e-mail".
  *
@@ -30,7 +31,7 @@ import "@/presente/presente.css";
  * "Não quero ofertas por e-mail" e não gera Pix nenhum.
  *
  * Eventos: presente_d3_view {origem} · presente_d3_copiar {ok} · presente_d3_pago · presente_d3_erro {motivo}
- * (+ os do cartão com origem "dia3": presente_whatsapp, presente_link_copiado). Nenhum Purchase (decisão do dono:
+ * (+ os do cartão com origem "dia3": presente_whatsapp, presente_link_copiado). Nenhum Purchase (recomendação, confirmar com o dono:
  * upsell não manda Purchase pra Meta; o servidor manda só a UTMify).
  */
 type Fase = "carregando" | "pix" | "pago" | "sem_link" | "token" | "sem_acesso" | "erro" | "saiu";
@@ -41,12 +42,16 @@ const lerCopiado = (pedido: string): boolean => { try { return localStorage.getI
 const gravarCopiado = (pedido: string) => { try { localStorage.setItem(CHAVE_COPIADO, pedido); } catch { /* fica na memória */ } };
 const querSair = (): boolean => { try { return new URLSearchParams(window.location.search).get("sair") === "1"; } catch { return false; } };
 
-const CONFERE_MS = 4000;
-const valeAte = (iso: string): string => {
-  const ms = Date.parse(iso) - Date.now();
+/** O laço de conferência (crítica r2, o mesmo desenho do LACO_U2027 da /organizar): rápido nos 10 primeiros minutos (a Asaas
+ *  1 a cada 3), devagar até 30 min (a Asaas a cada vez), depois para — ficam a volta da aba e o "Já paguei". */
+export const LACO_DAR = { rapidoMs: 4000, lentoMs: 30_000, viraLentoMs: 10 * 60e3, paraMs: 30 * 60e3, asaasCada: 3 } as const;
+/** "Vale por 24 h" num código novo (crítica r2: abria em "mais 23 h", que parece código velho; igual ao validadeU2027). */
+export const valeAte = (iso: string, agora: number = Date.now()): string => {
+  const ms = Date.parse(iso) - agora;
   if (!Number.isFinite(ms) || ms <= 0) return "";
-  const h = Math.floor(ms / 3_600_000);
-  return h >= 1 ? `Vale por mais ${h} h` : `Vale por mais ${Math.max(1, Math.round(ms / 60_000))} min`;
+  const h = ms / 3_600_000;
+  if (h >= 23.5) return "Vale por 24 h";
+  return h >= 1 ? `Vale por mais ${Math.floor(h)} h` : `Vale por mais ${Math.max(1, Math.round(ms / 60_000))} min`;
 };
 
 export default function DarPresenteRota() {
@@ -64,6 +69,9 @@ export function DarPresente() {
   const [pix, setPix] = useState<PixDia3 | null>(null);
   const [pago, setPago] = useState<{ pedido: string; codigo: string; de: string | null } | null>(null);
   const [copiado, setCopiado] = useState(false);
+  /** o navegador negou a cópia (crítica r2: dizia "Código copiado" mesmo assim) */
+  const [copiaFalhou, setCopiaFalhou] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [gerando, setGerando] = useState(false);
   const origem = useRef<string>((() => { try { return new URLSearchParams(window.location.search).get("utm_source") ?? "direto"; } catch { return "direto"; } })());
 
@@ -129,25 +137,46 @@ export function DarPresente() {
     void gerar();
   }, [t, gerar]);
 
-  /* confere sozinha: a cada 4 s (com a aba à vista) e na volta do app do banco; na Asaas 1 a cada 3 (e sempre na volta) */
+  /* confere sozinha (LACO_DAR): 4 s nos 10 primeiros minutos (Asaas 1 a cada 3), 30 s até 30 min (Asaas sempre), depois
+   * para; só com a aba à vista. A volta do app do banco e o "Já paguei" conferem na Asaas e religam o laço (dentro dos 30 min). */
   const pedidoNaTela = pix?.orderId ?? null;
+  const conferirAgora = useRef<() => Promise<boolean>>(async () => false);
   useEffect(() => {
     if (!t || fase !== "pix" || !pedidoNaTela) return;
     let parado = false;
     let n = 0;
     let rodando = false;
-    const conferir = async (forcar = false) => {
-      if (parado || rodando || document.visibilityState === "hidden") return;
+    let timer: number | null = null;
+    const desde = Date.now();
+    const conferir = async (forcar = false): Promise<boolean> => {
+      if (parado || rodando || (!forcar && document.visibilityState === "hidden")) return false;
       rodando = true;
-      try { aplicar(await estadoDia3(t, { pedido: pedidoNaTela, conferir: forcar || ++n % 3 === 0 }), false); } finally { rodando = false; }
+      const lento = Date.now() - desde >= LACO_DAR.viraLentoMs;
+      try {
+        const r = await estadoDia3(t, { pedido: pedidoNaTela, conferir: forcar || lento || ++n % LACO_DAR.asaasCada === 0 });
+        aplicar(r, false);
+        return r.ok === true && r.pago === true;
+      } finally { rodando = false; }
     };
-    const timer = window.setInterval(() => { void conferir(); }, CONFERE_MS);
-    const aoVoltar = () => { if (document.visibilityState === "visible") void conferir(true); };
+    const proximo = () => {
+      if (parado || timer !== null) return;
+      const passou = Date.now() - desde;
+      if (passou > LACO_DAR.paraMs || document.visibilityState === "hidden") return; // a volta da aba religa
+      timer = window.setTimeout(() => {
+        timer = null;
+        if (Date.now() - desde > LACO_DAR.paraMs) return; // o último passo cairia depois dos 30 min
+        void conferir().then(() => proximo());
+      }, passou < LACO_DAR.viraLentoMs ? LACO_DAR.rapidoMs : LACO_DAR.lentoMs);
+    };
+    conferirAgora.current = () => conferir(true);
+    proximo();
+    const aoVoltar = () => { if (document.visibilityState === "visible") { void conferir(true); proximo(); } };
     document.addEventListener("visibilitychange", aoVoltar);
     window.addEventListener("pageshow", aoVoltar);
     return () => {
       parado = true;
-      window.clearInterval(timer);
+      if (timer !== null) window.clearTimeout(timer);
+      conferirAgora.current = async () => false;
       document.removeEventListener("visibilitychange", aoVoltar);
       window.removeEventListener("pageshow", aoVoltar);
     };
@@ -156,9 +185,16 @@ export function DarPresente() {
   const copiar = async () => {
     if (!pix) return;
     const ok = await copiarTexto(pix.qrCode);
-    setCopiado(true); // o código fica visível embaixo pra copiar na mão se o navegador negar
-    gravarCopiado(pix.orderId);
+    // crítica r2: só diz "copiado" quando copiou; senão o código fica selecionável e a tela pede o toque nele
+    setCopiado(ok);
+    setCopiaFalhou(!ok);
+    if (ok) gravarCopiado(pix.orderId);
     trackEvent("presente_d3_copiar", { ok, origem: origem.current });
+  };
+  const jaPaguei = async () => {
+    trackEvent("presente_d3_ja_paguei", { origem: origem.current });
+    setAviso(null);
+    if (!(await conferirAgora.current())) setAviso("Ainda não chegou. Confere no app do banco: quando cair, esta tela muda sozinha.");
   };
 
   const topo = (
@@ -175,7 +211,8 @@ export function DarPresente() {
         onNome={(de) => setPago((x) => (x ? { ...x, de } : x))}
         buscarPresente={async () => ({ codigo: pago.codigo, de: pago.de })}
         gravarNome={(pedido, nome) => (t ? nomeDia3(t, pedido, nome) : Promise.resolve(false))}
-        rotuloContinuar="Pronto" onContinuar={() => navigate(ENTRADA_APP)} />
+        rotuloContinuar="Pronto" onContinuar={() => navigate(ENTRADA_APP)}
+        nota="O link também foi pro seu e-mail, se você fechar antes de mandar." />
     );
   } else if (fase === "pix" && pix) {
     const validade = valeAte(pix.expiresAt);
@@ -192,10 +229,15 @@ export function DarPresente() {
               <b>Código copiado.</b> Cole no app do banco: Pix → Copia e Cola.
               <span><i />Pagou? Volte aqui. A tela muda sozinha.</span>
             </div>
+          ) : copiaFalhou ? (
+            <div className="dp-volte dp-falta" data-testid="dar-copia-falhou" role="status">
+              <b>Toque no código pra copiar.</b> Depois cole no app do banco: Pix → Copia e Cola.
+              <span><i />Pagou? Volte aqui. A tela muda sozinha.</span>
+            </div>
           ) : (
             <div className="pv-como"><div><b>1</b>Você paga o Pix</div><div><b>2</b>Manda o link</div><div><b>3</b>A pessoa cria a conta</div></div>
           )}
-          <div className="fn-codigo" data-testid="dar-codigo" style={{ margin: "14px 0 0" }}>{pix.qrCode}</div>
+          <div className="fn-codigo" data-testid="dar-codigo" style={{ margin: "14px 0 0", ...(copiaFalhou ? { userSelect: "all" as const, WebkitUserSelect: "all" as const } : {}) }}>{pix.qrCode}</div>
           <details className="fn-qr" data-testid="dar-qr" style={{ margin: "10px 0 0" }}>
             <summary><QrCode size={18} strokeWidth={2.2} />Pagar com QR Code<span>de outro aparelho</span></summary>
             <div className="fn-qr-caixa"><div>
@@ -205,12 +247,14 @@ export function DarPresente() {
             </div></div>
           </details>
           {validade && <div className="fn-validade" data-testid="dar-validade" style={{ margin: "10px 0 0" }}>{validade}</div>}
+          {aviso && <p className="dp-preco" role="status" data-testid="dar-aviso" style={{ marginTop: 10 }}>{aviso}</p>}
         </div>
         <div className="pv-rodape">
           <button type="button" className="pv-cta" data-testid="dar-copiar" data-ok={copiado ? "" : undefined}
             style={copiado ? { background: "#16a34a" } : undefined} onClick={() => { void copiar(); }}>
             {copiado ? <><Check size={19} strokeWidth={3} /><span>Copiado · copiar de novo</span></> : <><Copy size={19} strokeWidth={2.4} /><span>Copiar o Pix · R$ 14,90</span></>}
           </button>
+          {(copiado || copiaFalhou) && <button type="button" className="pv-nao" data-testid="dar-ja-paguei" onClick={() => { void jaPaguei(); }}>Já paguei</button>}
           <p className="pv-miuda" data-testid="dar-cnpj" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}><ShieldCheck size={13} strokeWidth={2.4} style={{ color: "#16a34a", flexShrink: 0 }} /><span>CORE · CNPJ {EMPRESA.cnpj}</span></p>
         </div>
       </div>
@@ -228,9 +272,11 @@ export function DarPresente() {
     );
   } else {
     const textos: Record<Exclude<Fase, "carregando" | "pix" | "pago">, { titulo: string; texto: string; botao: string; acao: () => void }> = {
-      saiu: { titulo: "Pronto, sem ofertas por e-mail", texto: "Não mandamos mais ofertas pra você. Os e-mails da sua conta continuam chegando.", botao: "Abrir o CORE", acao: () => navigate(ENTRADA_APP) },
-      sem_link: { titulo: "Abra pelo link do e-mail", texto: "Ou entre no CORE e toque em “Leve alguém junto”, na página Você.", botao: "Entrar no CORE", acao: () => navigate("/entrar") },
-      token: { titulo: "Esse link não vale mais", texto: "Entre no CORE e toque em “Leve alguém junto”, na página Você.", botao: "Entrar no CORE", acao: () => navigate("/entrar") },
+      // crítica r2 (honestidade): a recusa só vale pra este e-mail (o único de oferta hoje) — não prometer mais que isso
+      saiu: { titulo: "Pronto, esse e-mail não chega mais", texto: "Os e-mails da sua conta continuam chegando.", botao: "Abrir o CORE", acao: () => navigate(ENTRADA_APP) },
+      // crítica r2: a linha "Leve alguém junto" da página Você quase nunca existe (chave off, só site, some no ×) — não mandar procurar
+      sem_link: { titulo: "Abra pelo link do e-mail", texto: "O botão do e-mail “Leve alguém junto” abre esta página. Dúvidas: contato@coreaplicativo.com.br", botao: "Abrir o CORE", acao: () => navigate(ENTRADA_APP) },
+      token: { titulo: "Esse link venceu", texto: "Fale com a gente: contato@coreaplicativo.com.br", botao: "Abrir o CORE", acao: () => navigate(ENTRADA_APP) },
       sem_acesso: { titulo: "O presente é pra quem tem o CORE pra sempre", texto: "Dúvidas: contato@coreaplicativo.com.br", botao: "Abrir o CORE", acao: () => navigate(ENTRADA_APP) },
       erro: { titulo: "Não consegui gerar o Pix agora", texto: "Tenta de novo em alguns segundos.", botao: "Tentar de novo", acao: () => { void gerar(); } },
     };
@@ -260,6 +306,7 @@ const CSS_DAR = `
 .dp-preco { margin: 6px 0 0; font-size: 13.5px; line-height: 1.4; color: #6b6575; text-align: center; }
 .dp-volte { margin-top: 18px; padding: 14px 16px; border-radius: 18px; background: #fff; box-shadow: 0 1px 2px rgba(22,18,28,.05), 0 10px 30px rgba(22,18,28,.09); font-size: 14.5px; line-height: 1.45; color: #3b3542; text-align: center; }
 .dp-volte b { color: #15803d; }
+.dp-volte.dp-falta b { color: #16121c; }
 .dp-volte span { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; font-weight: 700; color: #16121c; }
 .dp-volte span i { width: 8px; height: 8px; border-radius: 50%; background: #d97706; animation: fn-pulsa 1.4s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .dp-volte span i { animation: none; } }

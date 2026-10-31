@@ -66,7 +66,7 @@ export function Fluxo2027({ origem, compra, valorPago, ids, onFim, versao = VERS
           onClick={() => { evento("u2027_quero"); set((x) => ({ ...x, etapa: "pix" })); }}><span>Quero meu 2027 organizado</span></button>
         <button type="button" className="u27-nao" data-testid="u2027-nao"
           onClick={() => { evento("u2027_nao"); set((x) => ({ ...x, pix: null, etapa: "fim" })); }}>Agora não</button>
-        {versao === "curta" && <p className="u27-miuda">Aparece no app e no site, na hora</p>}
+        {versao === "curta" && <p className="u27-miuda">Por enquanto, no site e no app do iPhone</p>}
       </div>
     );
     const topo = (
@@ -80,8 +80,8 @@ export function Fluxo2027({ origem, compra, valorPago, ids, onFim, versao = VERS
         <div className="u27-tela" data-testid="u2027-oferta" data-versao="curta">
           <div className="u27-col">
             {topo}
-            <h1 className="u27-titulo" style={{ marginTop: 34 }}>Seu 2027 já <em>organizado</em></h1>
-            <p className="u27-sub">Tudo montado no seu CORE hoje. Uma vez só.</p>
+            <h1 className="u27-titulo" style={{ marginTop: 34 }}>Seu 2027 <em>organizado</em></h1>
+            <p className="u27-sub">Entra no seu CORE assim que o Pix cair. Uma vez só.</p>
             <div className="u27-lista"><ul>
               {ITENS_2027.map((it) => (
                 <li key={it.titulo}><i aria-hidden>{it.emoji}</i><span><b>{it.titulo}</b><small>{it.sub}</small></span>{it.bonus && <em data-bonus="">BÔNUS</em>}</li>
@@ -98,8 +98,8 @@ export function Fluxo2027({ origem, compra, valorPago, ids, onFim, versao = VERS
         <div className="u27-col">
           {topo}
           <div className="u27-cena"><IlustraPlanner size={140} /></div>
-          <h1 className="u27-titulo">Seu 2027 já <em>organizado</em></h1>
-          <p className="u27-sub">Montado no seu CORE hoje, por <b data-testid="u2027-preco">{reais2027(VALOR_2027)}</b></p>
+          <h1 className="u27-titulo">Seu 2027 <em>organizado</em></h1>
+          <p className="u27-sub">No seu CORE, por <b data-testid="u2027-preco">{reais2027(VALOR_2027)}</b>, uma vez</p>
           <div className="u27-folha">
             <div className="u27-folha-topo"><b>PLANNER 2027</b><small>revisão no dia 1 de cada mês</small></div>
             <div className="u27-meses">{MESES_CURTOS.map((m, i) => <span key={m} data-on={i === 0 ? "" : undefined}><i />{m}</span>)}</div>
@@ -115,7 +115,7 @@ export function Fluxo2027({ origem, compra, valorPago, ids, onFim, versao = VERS
     const oferta = OFERTA_2027 as OfertaHoje;
     return (
       <PixHoje key={oferta} oferta={oferta} valor={VALOR_2027} rotulo="Seu 2027 no CORE · uma vez só"
-        faixa={<div className="u27-pix-cabeca">🗓️ Seu 2027 já organizado</div>}
+        faixa={<div className="u27-pix-cabeca">🗓️ Seu 2027 organizado</div>}
         pix={e.pix && e.pix.oferta === oferta ? (e.pix as unknown as PixSalvo) : null}
         onPix={(p) => {
           if (p && p.orderId !== e.pix?.orderId) evento("u2027_pix_gerado", { order_id: p.orderId, valor: VALOR_2027 });
@@ -145,9 +145,9 @@ export function Fluxo2027({ origem, compra, valorPago, ids, onFim, versao = VERS
             <li><i><Check size={13} strokeWidth={3.4} /></i>Planejar 2027 (5 minutos)</li>
             <li><i><Check size={13} strokeWidth={3.4} /></i>12 revisões do mês</li>
             <li><i><Check size={13} strokeWidth={3.4} /></i>Cofrinho das 52 semanas</li>
-            <li><i><Check size={13} strokeWidth={3.4} /></i>Planner 2027 em PDF</li>
+            <li><i><Check size={13} strokeWidth={3.4} /></i>Planner 2027 pra imprimir</li>
           </ul></div>
-          <div className="u27-onde" data-testid="u2027-onde">No app e no site: <b>Dev. Pessoal → Seu 2027</b>.<br />Entre com o mesmo e-mail da compra.</div>
+          <div className="u27-onde" data-testid="u2027-onde">Fica no módulo <b>Desenvolvimento Pessoal</b>, aba <b>Seu 2027</b>. Por enquanto, no site e no app do iPhone.<br />Entre com o mesmo e-mail da compra.</div>
           <SelosDasLojas onde="u2027_pronto" prefixo="web" altura={40} className="justify-center mt-3" />
         </div>
         <div className="u27-rodape">

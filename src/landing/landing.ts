@@ -71,7 +71,7 @@ import {
   ESTADO_VAZIO, bracoOfertaDoHtml, bracoTituloDoHtml, ehArea, ehModuloLanding, estadoQueVolta, mmss, ofertaEscolhida, reais, urlPlay, venceEm,
   type Area, type EstadoLanding, type MensagemDaDemo, type ModuloLanding, type OfertaLanding, type PixLanding, type PixU2027,
 } from "./regras";
-import { lerEstadoU2027 } from "./u2027-estado";
+import { lerEstadoU2027, lerU2027Guardado } from "./u2027-estado";
 import { esquecerCompra, esquecerPixVivo, gravarPixVivo, idDoAparelho, lerCompra, lerPixVivo, marcarCompra, type MarcaCompra } from "./marcador";
 import { carregarComRetry, limparMarcaDeRecarga } from "./carregar";
 
@@ -135,6 +135,8 @@ let u27Compra: string | null = null;
 let u27Volta = false;
 /** o cartão está mostrando o 2027 agora */
 let u27Tela = false;
+/** crítica r2 (dinheiro 1): o 2027 guardado no cookie (QR vivo / "Pronto") quando o estado do vitalício sumiu desta aba */
+let u27Retomada: import("./regras").EstadoU2027 | null = null;
 
 /* ───────────────────────── sessão + eventos ───────────────────────── */
 const novoId = () => { try { return crypto.randomUUID(); } catch { return `l${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`; } };
@@ -588,7 +590,7 @@ const naTela = new Set<string>();
 /* ── v2 (crítica r1, oferta M2 / pix M1): depois do Pix gerado ou pago a página não pode continuar "vendendo" — o botão do topo, o
  * fixo e o fim mudam de rótulo conforme a fase; com conta pronta (ou "já tem") o fixo some. ── */
 /** a página está mostrando a conta (ou o 2027 de quem já pagou, inclusive pelo link do e-mail): nada de "vender" o vitalício */
-const contaNaTela = (): boolean => !!jaTem || estado.fase === "conta" || (u27Volta && u27Tela);
+const contaNaTela = (): boolean => !!jaTem || estado.fase === "conta" || ((u27Volta || !!u27Retomada) && u27Tela);
 const rotuloCta = (): string => contaNaTela() ? "Ver minha conta" : estado.fase === "pago" ? "Liberar meu acesso" : estado.fase === "qr" ? "Voltar pro meu Pix" : "Quero organizar minha vida";
 const porRotulo = (b: Element | null, t: string) => {
   if (!b) return;
@@ -1236,6 +1238,7 @@ function render() {
 function renderDoCartao() {
   if (relogio) { window.clearInterval(relogio); relogio = null; }
   u27Tela = u2027Toma(); // 31/10: o "Seu 2027" toma o cartão (chave ligada + conta pronta, ou o link do e-mail)
+  paginaDoU2027();
   if (u27Tela) { atualizarFixo(); return; }
   if (u27) card.removeAttribute("data-u27");
   if (jaTem && (estado.fase === "oferta" || estado.fase === "erro")) { renderJaTem(jaTem); return; }
@@ -1419,7 +1422,27 @@ const apiU2027 = (): import("./upsell-2027").ApiU2027 => SIMULADO
 function u2027DaTela(): string | null {
   if (u27Volta && VOLTA_U2027) return VOLTA_U2027.compra;
   if (U2027 && estado.fase === "conta" && estado.pago && !jaTem) return estado.pago.orderId;
+  // crítica r2 (dinheiro 1): o Instagram zerou o localStorage com o QR do 2027 aberto — o estado do vitalício morreu (e o marcador
+  // virou "já tem"), mas o cookie do 2027 diz qual compra é: o MESMO QR (ou o "Pronto") volta, nunca "Você já tem o CORE" sem ele
+  if (U2027 && !estado.pago && u27Retomada) return u27Retomada.compra;
   return null;
+}
+/**
+ * Crítica r2 (compradora 5): com o 2027 na tela, a caixa "7 dias pra testar tudo" (do vitalício) não fica embaixo dele — ela
+ * lia como garantia do 2027. E pelo link do e-mail (ou na retomada) a página de venda do vitalício some inteira: só o cartão.
+ * Só existe com o 2027 em jogo (a página sem a chave e sem ?r=u2027 nunca ganha o atributo nem o estilo).
+ */
+function paginaDoU2027(): void {
+  const modo = u27Tela ? (((u27Volta && VOLTA_U2027) || u27Retomada) ? "link" : "pos") : (jaTemDoLink ? "link" : null);
+  const html = document.documentElement;
+  if (!modo) { html.removeAttribute("data-u27-pag"); return; }
+  if (!document.getElementById("lp-u27-pag-css")) {
+    const st = document.createElement("style");
+    st.id = "lp-u27-pag-css";
+    st.textContent = 'html[data-u27-pag] #oferta .lp-garantia{display:none}html[data-u27-pag="link"] main.lp>:not(.lp-barra):not(#oferta),html[data-u27-pag="link"] #fim{display:none!important}';
+    document.head.appendChild(st);
+  }
+  html.setAttribute("data-u27-pag", modo);
 }
 function u2027Toma(): boolean {
   const compra = u2027DaTela();
@@ -1438,11 +1461,14 @@ function u2027Toma(): boolean {
     u27 = modU2027.criarUpsell2027(compra, {
       caixa, card, api: apiU2027(), evento, copiarNoToque, copiarTexto: (c) => copiarTexto(c), desenharQr: (alvo, p) => desenharQr(alvo, p),
       email: () => estado.email ?? estado.emailPix ?? lerCompra()?.email ?? null,
-      linhaConfirmada: () => (estado.pago ? `${ehPraSempreTxt()} O acesso também vai pro seu e-mail.` : "Seu CORE já está pago. O acesso está no e-mail da compra."),
+      // crítica r2: "O CORE é seu pra sempre." nos 2 braços (o atual dizia "Seu CORE é seu pra sempre."; a conta pronta do atual não muda)
+      linhaConfirmada: () => (estado.pago ? `${estado.pago.oferta !== "LN_ano279" ? "O CORE é seu pra sempre." : "O CORE está liberado por 1 ano."} O acesso também vai pro seu e-mail.` : "Seu CORE já está pago. O acesso está no e-mail da compra."),
+      valorPago: () => (estado.pago ? VALOR_OFERTA[estado.pago.oferta] ?? null : null),
       aoTerminar: () => { saidaDoLinkU2027(); u27Volta = false; render(); rolarAte(card, "start"); },
       aoMudar: () => { atualizarFixo(); rolarAte(card, "start"); },
     });
     if (u27Volta && VOLTA_U2027) u27.voltaDoEmail(VOLTA_U2027.pix);
+    else if (u27Retomada && u27Retomada.compra === compra) u27.retomar();
   }
   if (!u27.ativo()) { saidaDoLinkU2027(); u27Volta = false; return false; }
   return u27.render();
@@ -1453,13 +1479,15 @@ function u2027Toma(): boolean {
  * ("Só hoje · R$ 27,90 · Pagar"). Grava o marcador de compra: a recarga e as próximas visitas também ficam na conta.
  */
 function saidaDoLinkU2027(): void {
-  if (!u27Volta || !VOLTA_U2027 || estado.pago) return;
+  const doLink = u27Volta && !!VOLTA_U2027;
+  if ((!doLink && !u27Retomada) || estado.pago) return;
+  u27Retomada = null; // crítica r2: a retomada (cookie) sai do mesmo jeito — "Você já tem o CORE", sem "Não fui eu que comprei"
   jaTemDoLink = true;
   if (jaTem) return;
   marcarCompra({});
   jaTem = lerCompra() ?? { em: Date.now(), oferta: null, email: null };
   jaTemDoLink = true;
-  evento("landing_ja_tem", { via: "link_u2027" });
+  evento("landing_ja_tem", { via: doLink ? "link_u2027" : "retomada_u2027" });
 }
 
 /* r3 (oferta M1 / pix M1 / visitante-frio M1 — WebKit, 70% do tráfego): toda abertura que leva ao cartão (Pix vivo, pago, conta,
@@ -1486,8 +1514,21 @@ if (cartaoNoArranque) {
   }
 }
 
+/* crítica r2 (dinheiro 1): o localStorage foi zerado (Instagram) com o QR do 2027 aberto ou já no "Pronto" — o cookie do 2027
+ * traz a MESMA tela de volta (antes do "já tem", que pintaria "Você já tem o CORE" sem o código). */
+if (U2027 && !VOLTA_U2027 && !estado.pago && (estado.fase === "oferta" || estado.fase === "erro")) {
+  u27Retomada = lerU2027Guardado();
+  if (u27Retomada) jaTemDoLink = true; // a saída dela é "Você já tem o CORE" sem "Não fui eu que comprei"
+}
+
 /* 29/10: o aparelho já comprou (cookie/localStorage) e a página voltou na oferta → "Você já tem o CORE" */
 if (estado.fase === "oferta") { const m = lerCompra(); if (m) { jaTem = m; mostrarJaTem("marcador"); } }
+if (u27Retomada) {
+  evento("landing_u2027_retomado", { etapa: u27Retomada.etapa, order_id: u27Retomada.compra });
+  try { history.scrollRestoration = "manual"; } catch { /* noop */ }
+  render();
+  window.setTimeout(() => rolarAte(card, "start", false), 60);
+}
 
 /* 29/10: chegou pelo e-mail de lembrete do Pix (?r=t12|t20h): o Pix ainda vivo reabre (mesmo nesta aba nova) */
 {

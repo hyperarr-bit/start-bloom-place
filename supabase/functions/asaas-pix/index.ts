@@ -20,7 +20,7 @@ import { EMAIL_OK as EMAIL_LANDING_OK, jaTemOCore, temVitalicioAtivo } from "../
 import { chaveQr } from "../_shared/lembrete-pix-landing.ts";
 import {
   avisarPronto2027, blocoFoiProEmail, blocoLigado, blocoU2027, chaveU2027, compraDoUpsell, donoNaHora, EXPIRA_PADRAO_S, garantirPixUpsell, mandaPurchaseMeta,
-  registrarDobro2027, SECRET_U2027_EMAIL, sessaoPodePedir,
+  ehDobro2027, registrarDobro2027, SECRET_U2027_EMAIL, sessaoPodePedir,
 } from "../_shared/pix-upsell.ts";
 import { ASAAS_API, asaasHeaders, criarQrAsaas, obterChavePix, postarQrEstatico } from "../_shared/asaas-qr.ts";
 
@@ -618,10 +618,14 @@ serve(async (req) => {
           },
         });
         if (p27.r === "falhou") { logStep("Seu 2027 pago mas o pacote não gravou — tenta de novo", { id }); return jsonResponse({ paid: false, status: "PENDING" }); }
-        if (p27.r === "ja_tinha") await registrarDobro2027(supabaseAdmin, { userId: dono27, orderId: id, amountCents: PRECOS_CENTAVOS[offer] });
-        // 31/10: o e-mail curto "Pronto, seu 2027 tá no seu CORE" (1 por pedido; o mesmo do webhook e do reconcile)
-        const emailDono = dono27 === user.id ? user.email : (await supabaseAdmin.auth.admin.getUserById(dono27)).data?.user?.email ?? null;
-        await avisarPronto2027(supabaseAdmin, { orderId: id, para: emailDono, enviar: enviarResend });
+        // crítica r2: o pagamento em dobro (vai ser devolvido) vira chamado e NÃO ganha outro "Pronto"
+        const dobro27 = p27.r === "ja_tinha" && await ehDobro2027(supabaseAdmin, { userId: dono27, orderId: id });
+        if (dobro27) await registrarDobro2027(supabaseAdmin, { userId: dono27, orderId: id, amountCents: PRECOS_CENTAVOS[offer] });
+        else {
+          // 31/10: o e-mail curto "Pronto, seu 2027 tá no seu CORE" (1 por pedido; o mesmo do webhook e do reconcile)
+          const emailDono = dono27 === user.id ? user.email : (await supabaseAdmin.auth.admin.getUserById(dono27)).data?.user?.email ?? null;
+          await avisarPronto2027(supabaseAdmin, { orderId: id, para: emailDono, enviar: enviarResend });
+        }
         logStep("Seu 2027 pago — pacote na conta", { id, r: p27.r });
         return jsonResponse({ paid: true, status: "PAID", pacote2027: true });
       }

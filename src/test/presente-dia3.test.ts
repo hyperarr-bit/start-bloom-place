@@ -380,3 +380,24 @@ describe("a fonte: o cron, a função, o medidor de uso", () => {
     expect(ler("src/pages/presente/DarPresente.tsx")).not.toMatch(/firePixPurchaseOnce|markPixPurchasePending|fbq\(/);
   });
 });
+
+describe("crítica r2: o QR trocado (perto de vencer) e pago pelo código antigo", () => {
+  it("a página vê o 'pago' do presente criado pelo webhook no QR antigo (sem consultar a Asaas por ele)", async () => {
+    let agora = Date.parse("2026-10-31T15:00:00Z");
+    const b = bancoFalso({ subscriptions: [linhaVit("ana", 80)] });
+    const t = (await tokenDoDono(b.admin, "ana", { gerar: tokenFixo, agora }))!;
+    const qr = qrFalso();
+    const r1 = await estadoDia3(b.admin, { t, gerar: true, criarQr: qr.criar, agora: () => agora });
+    const velho = pedidoDe(r1) as string;
+    agora += 23 * 3600e3; // sobram < 2 h: a recarga troca o QR
+    const r2 = await estadoDia3(b.admin, { t, gerar: true, criarQr: qr.criar, agora: () => agora });
+    const novo = pedidoDe(r2) as string;
+    expect(novo).not.toBe(velho);
+    // ela pagou o código ANTIGO (ficou copiado): o webhook cria o presente desse pedido
+    b.t.presentes.push({ codigo: "VELHO234", comprador_id: "ana", pedido: velho, valor_centavos: 1490, de_nome: null, resgatado_por: null, resgatado_em: null });
+    const consultas: string[] = [];
+    const r3 = await estadoDia3(b.admin, { t, pedido: novo, criarQr: qr.criar, agora: () => agora, pagamento: async (p) => { consultas.push(p); return { pago: false, valor: null }; } });
+    expect(r3.ok && r3.pago && (r3 as { codigo: string }).codigo).toBe("VELHO234");
+    expect(consultas).not.toContain(velho);
+  });
+});

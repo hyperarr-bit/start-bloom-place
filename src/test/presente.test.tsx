@@ -222,7 +222,7 @@ describe("/hoje com ?presente=on — quero presentear", () => {
     expect(invocacoes("asaas-pix", "create").map((b) => b.offer)).toEqual(["hv279", "pv149"]);
     expect(screen.getByTestId("hoje-pix-valor").textContent).toBe("R$ 14,90");
     expect(texto()).toContain("Presente pra alguém especial");
-    // 31/10: o Pix de upsell não marca Purchase (decisão do dono, _shared/pix-upsell.ts META_PURCHASE_UPSELL)
+    // 31/10: o Pix de upsell não marca Purchase (recomendação, confirmar com o dono: _shared/pix-upsell.ts META_PURCHASE_UPSELL)
     expect(markPixPurchasePending).not.toHaveBeenCalledWith(expect.objectContaining({ offer: "pv149" }));
     expect(eventos("presente_pix_gerado")[0]).toMatchObject({ order_id: "qr_2_pv149", valor: 14.9 });
 
@@ -384,7 +384,7 @@ describe("a página /presente/<código> (quem ganhou)", () => {
 describe("copy sem ele/ela", () => {
   it("mensagem do WhatsApp e os textos das telas novas", () => {
     expect(mensagemDoPresente("K7QM2XPA", "Ana")).toBe("Ana te deu o CORE pra sempre 💛\nAbre aqui pra ativar o seu: https://www.coreaplicativo.com.br/presente/K7QM2XPA");
-    expect(mensagemDoPresente("K7QM2XPA", null)).toMatch(/^Ganhei pra você o CORE pra sempre/);
+    expect(mensagemDoPresente("K7QM2XPA", null)).toMatch(/^Um presente pra você: o CORE pra sempre 💛/); // crítica r2: sem "Ganhei"
     for (const f of ["src/presente/FluxoPresente.tsx", "src/presente/OfertaPlano30.tsx", "src/pages/presente/ResgatePresente.tsx", "src/lib/presente.ts"]) {
       const jsx = readFileSync(join(process.cwd(), f), "utf8").split("\n").filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join("\n");
       expect(jsx, f).not.toMatch(ELE_ELA);

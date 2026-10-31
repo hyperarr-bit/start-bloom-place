@@ -171,7 +171,7 @@ describe("chave LIGADA: oferta → Quero → QR → pago → Pronto → conta co
         const oferta = await espera('[data-testid="u2027-oferta"]');
         expect(oferta.textContent).toContain("Pagamento confirmado");
         // crítica r1: a 1ª linha diz o que ela já tem; o título sem "já"; sem "orçamento do ano"; sem "no app" (o Android não tem)
-        expect(oferta.querySelector('[data-testid="u2027-linha"]')!.textContent).toMatch(/^(O|Seu) CORE é seu pra sempre\. O acesso também vai pro seu e-mail\.$/);
+        expect(oferta.querySelector('[data-testid="u2027-linha"]')!.textContent).toBe("O CORE é seu pra sempre. O acesso também vai pro seu e-mail."); // crítica r2: nos 2 braços
         expect(oferta.querySelector("h3")!.textContent).toBe("Seu 2027 organizado");
         expect(oferta.textContent).toContain("3 metas, quanto gastar e guardar por mês, 12 revisões do mês e o cofrinho de 52 semanas.");
         expect(oferta.textContent).toContain("Por enquanto fica no site e no app do iPhone.");
@@ -195,6 +195,10 @@ describe("chave LIGADA: oferta → Quero → QR → pago → Pronto → conta co
         expect(qr.querySelector('[data-testid="u2027-volte"]')!.textContent).toMatch(/Pagou\? Volte aqui\.Esta tela confirma sozinha\./);
         expect(qr.textContent).toContain("Vale por 24 horas.");
         expect(qr.textContent).toContain("O código também foi pro seu e-mail.");
+        // crítica r2 (compradora 1): o QR diz que o CORE já está pago e que este Pix é só do 2027
+        expect(qr.querySelector('[data-testid="u2027-ja-pago"]')!.textContent).toBe("Seu CORE (R$ 27,90) está pago. Este Pix é só do 2027.");
+        expect(qr.querySelector('[data-testid="u2027-qual"]')).toBeNull(); // ela acabou de ver a oferta
+        expect(document.documentElement.getAttribute("data-u27-pag")).toBe("pos"); // a garantia do vitalício sai de baixo do 2027
         expect(document.getElementById("u27-sair")!.textContent).toBe("Agora não"); // sai pra conta pronta, sem trava
         simular().pagarU2027();
         const pronto = await espera('[data-testid="u2027-pronto"]');
@@ -208,6 +212,7 @@ describe("chave LIGADA: oferta → Quero → QR → pago → Pronto → conta co
         expect(conta.querySelector('a[href*="apps.apple.com"]')).not.toBeNull();
         expect(conta.querySelector('a[href*="play.google.com"]')).not.toBeNull();
         expect(document.getElementById("lp-card")!.hasAttribute("data-u27")).toBe(false);
+        expect(document.documentElement.hasAttribute("data-u27-pag")).toBe(false); // a conta pronta de sempre
         expect(nomes()).toEqual(expect.arrayContaining(["landing_u2027_view", "landing_u2027_quero", "landing_u2027_copiado", "landing_u2027_pago", "landing_u2027_continuar"]));
         for (const e of eventos().filter((x) => x.nome.startsWith("landing_u2027"))) {
           expect(e).toMatchObject({ braco_lp: lp, braco_checkout: checkout });
@@ -288,6 +293,12 @@ describe("chave LIGADA: os caminhos de saída e de volta", () => {
     expect(qr.querySelector('[data-testid="u2027-codigo"]')!.textContent).toBe(codigo);
     expect(qr.querySelector('[data-testid="u2027-volte"]')!.textContent).toContain("Quando o pagamento cair, o 2027 entra na sua conta e a gente avisa por e-mail.");
     expect(qr.textContent).toContain("Vale por mais 19 h.");
+    // crítica r2: chegou sem a tela da oferta → diz que o CORE está pago, que este Pix é só do 2027 e o que é o 2027
+    expect(qr.querySelector('[data-testid="u2027-ja-pago"]')!.textContent).toBe("Seu CORE está pago. Este Pix é só do 2027.");
+    expect(qr.querySelector('[data-testid="u2027-qual"]')!.textContent).toBe("Seu 2027 organizado · 3 metas, revisões do mês e cofrinho");
+    // crítica r2 (compradora 5): pelo link a página de venda do vitalício some (só o cartão) e a garantia do vitalício também
+    expect(document.documentElement.getAttribute("data-u27-pag")).toBe("link");
+    expect(document.getElementById("lp-u27-pag-css")!.textContent).toMatch(/main\.lp>:not\(\.lp-barra\):not\(#oferta\)/);
     expect(eventos().find((e) => e.nome === "landing_u2027_volta_email")).toMatchObject({ restaurado: "link", order_id: "qr_vitalicio_77" });
     expect(document.getElementById("lp-card")!.dataset.fase).toBe("conta"); // a oferta do vitalício some atrás do Pix do 2027
     clicar("#u27-sair");
@@ -346,6 +357,57 @@ describe("chave LIGADA: os caminhos de saída e de volta", () => {
     await dormir(150);
     expect(document.querySelector('[data-testid^="u2027-"]')).toBeNull();
     expect(nomes().some((n) => n.startsWith("landing_u2027"))).toBe(false);
+  });
+});
+
+describe("crítica r2: storage zerado com o QR do 2027 aberto (o Instagram) e a volta do banco", () => {
+  for (const lp of ["atual", "v2"] as const) {
+    it(`${lp}: localStorage.clear() + recarga → o MESMO código (pelo cookie), sem "Não fui eu"; pagou → "Pronto" → "Você já tem o CORE"`, async () => {
+      await abrirPagina({ lp, checkout: "email", u2027: true });
+      await pagarVitalicio("email");
+      await espera('[data-testid="u2027-oferta"]');
+      clicar("#u27-quero");
+      const codigo = (await espera('[data-testid="u2027-codigo"]')).textContent;
+      expect(document.cookie).toMatch(/landing_u2027=/);
+      await abrirPagina({ lp, checkout: "email", u2027: true, limpar: false, antes: () => { localStorage.clear(); } });
+      const qr = await espera('[data-testid="u2027-qr"]');
+      expect(qr.querySelector('[data-testid="u2027-codigo"]')!.textContent).toBe(codigo);
+      expect(document.querySelector('[data-testid="landing-ja-tem"]')).toBeNull();
+      // a sessão foi junto com o storage: esta aba não confere sozinha — o texto honesto de quem confirma pelo e-mail
+      expect(qr.querySelector('[data-testid="u2027-volte"]')!.textContent).toContain("Quando o pagamento cair, o 2027 entra na sua conta e a gente avisa por e-mail.");
+      expect(qr.querySelector('[data-testid="u2027-ja-pago"]')!.textContent).toBe("Seu CORE está pago. Este Pix é só do 2027.");
+      expect(qr.querySelector('[data-testid="u2027-qual"]')).not.toBeNull();
+      expect(document.getElementById("lp-card")!.hasAttribute("data-u27")).toBe(true); // sem a faixa "OFERTA ESPECIAL · HOJE"
+      expect(eventos().find((e) => e.nome === "landing_u2027_retomado")).toMatchObject({ etapa: "qr" });
+      simular().pagarU2027();
+      await espera('[data-testid="u2027-pronto"]');
+      // e a recarga no "Pronto" (storage zerado de novo) volta pro "Pronto"
+      await abrirPagina({ lp, checkout: "email", u2027: true, limpar: false, antes: () => { localStorage.clear(); } });
+      await espera('[data-testid="u2027-pronto"]');
+      clicar("#u27-continuar");
+      await espera('[data-testid="landing-ja-tem"]');
+      expect(document.getElementById("lp-nao-fui-eu")).toBeNull();
+      expect(pix().textContent).not.toMatch(/Pagar|R\$ 27,90/);
+    });
+  }
+
+  it("\"O código também foi pro seu e-mail\" volta com a recarga (guardado no estado e no cookie)", async () => {
+    await abrirPagina({ lp: "v2", u2027: true });
+    await pagarVitalicio("livre");
+    await espera('[data-testid="u2027-oferta"]');
+    clicar("#u27-quero");
+    expect((await espera('[data-testid="u2027-qr"]')).textContent).toContain("O código também foi pro seu e-mail.");
+    await abrirPagina({ lp: "v2", u2027: true, limpar: false, antes: () => { localStorage.removeItem("landing-u2027-v1"); } });
+    expect((await espera('[data-testid="u2027-qr"]')).textContent).toContain("O código também foi pro seu e-mail.");
+  });
+
+  it("o cookie leva as marcas copiado (c) e e-mail (e)", () => {
+    const agora = Date.parse("2026-10-31T12:00:00Z");
+    const e = { v: 1 as const, compra: "c1", etapa: "qr" as const, pix: { orderId: "q1", qrCode: "000201abc", qrCodeBase64: null, expiresAt: new Date(agora + 3600e3).toISOString(), donoIgual: true }, salvoEm: agora, copiado: true, comEmail: true };
+    const v = paraCookie(e);
+    expect(v.split("~")[4]).toBe("1ce");
+    expect(doCookie(v, agora)).toMatchObject({ copiado: true, comEmail: true, pix: { donoIgual: true } });
+    expect(doCookie(paraCookie({ ...e, copiado: false, comEmail: false }), agora)).not.toHaveProperty("comEmail");
   });
 });
 

@@ -8,7 +8,7 @@ import { valorCobre } from "../_shared/trava-grant.ts";
 import { nomeDoProduto } from "../_shared/email-venda.ts";
 import { CONCESSAO_HOJE, PRECOS_HOJE, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
 import { encaminharParaDestino, lerDestino } from "../_shared/destino-hoje.ts";
-import { avisarPronto2027, blocoLigado, blocoU2027, consultarUpsellAgora, donoNaHora, mandaPurchaseMeta, SECRET_U2027_EMAIL } from "../_shared/pix-upsell.ts";
+import { avisarPronto2027, blocoLigado, blocoU2027, consultarUpsellAgora, donoNaHora, ehDobro2027, mandaPurchaseMeta, registrarDobro2027, SECRET_U2027_EMAIL } from "../_shared/pix-upsell.ts";
 import { utmifyUpsell } from "../_shared/utmify-upsell.ts";
 import { criarQrAsaas } from "../_shared/asaas-qr.ts";
 import { fetchNosPixels } from "../_shared/meta-pixels.ts";
@@ -463,7 +463,10 @@ serve(async (req) => {
           },
         });
         if (p27.r === "falhou") { falhas.push({ orderId: o.orderId, erro: "pacote2027_gravar" }); continue; }
-        { // 31/10: "Pronto, seu 2027 tá no seu CORE" — 1 por pedido (a mesma trava do check e do webhook)
+        // crítica r2: o 2º pagamento do 2027 (vai ser devolvido) vira chamado e não ganha outro "Pronto"
+        if (p27.r === "ja_tinha" && await ehDobro2027(admin, { userId: dono27, orderId: o.orderId })) {
+          await registrarDobro2027(admin, { userId: dono27, orderId: o.orderId, amountCents: cents });
+        } else { // 31/10: "Pronto, seu 2027 tá no seu CORE" — 1 por pedido (a mesma trava do check e do webhook)
           const { data: au } = await admin.auth.admin.getUserById(dono27);
           await avisarPronto2027(admin, { orderId: o.orderId, para: au?.user?.email ?? null, enviar: enviarResend });
         }

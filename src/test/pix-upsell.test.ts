@@ -12,7 +12,7 @@ import { join } from "node:path";
 import {
   EXPIRA_PADRAO_S, EXPIRA_UPSELL_S, META_PURCHASE_UPSELL, PRECO_U2027_CENTAVOS, REUSO_MIN_MS, avisarPronto2027, blocoLigado, blocoU2027,
   chavePixUpsell, chaveU2027, compraDoUpsell, expiraSegundos, garantirPixUpsell, htmlBlocoU2027, htmlPronto2027, linkU2027, mandaPurchaseMeta, sessaoPodePedir,
-  blocoFoiProEmail, chaveBlocoNoEmail, consultarUpsellAgora, donoNaHora, registrarDobro2027, validadeNoEmail,
+  blocoFoiProEmail, chaveBlocoNoEmail, consultarUpsellAgora, donoNaHora, registrarDobro2027, validadeNoEmail, ehDobro2027, NOTA_ONDE_EMAIL, TETO_BLOCO_MS,
   type CriarQr,
 } from "../../supabase/functions/_shared/pix-upsell";
 import { PRECOS_HOJE } from "../../supabase/functions/_shared/ofertas-hoje";
@@ -196,7 +196,7 @@ describe("de quem é o 2027 desta compra (a conta FINAL)", () => {
   });
 });
 
-describe("pixel: o upsell NÃO manda Purchase pra Meta (decisão do dono) — só a UTMify", () => {
+describe("pixel: o upsell NÃO manda Purchase pra Meta (recomendação, confirmar com o dono) — só a UTMify", () => {
   it("a chave é false; o vitalício e os planos continuam mandando", () => {
     expect(META_PURCHASE_UPSELL).toBe(false);
     expect(mandaPurchaseMeta("u2027")).toBe(false);
@@ -354,7 +354,7 @@ describe("crítica r1 (31/10): os consertos do dinheiro", () => {
     const tk = (t as Record<string, Array<Record<string, unknown>>>).support_tickets;
     expect(tk).toHaveLength(1);
     expect(String(tk[0].message)).toContain("Pedido a devolver: qr_u27_2");
-    for (const f of ["asaas-pix", "asaas-webhook"]) expect(readFileSync(join(__dirname, `../../supabase/functions/${f}/index.ts`), "utf8")).toMatch(/if \(p27\.r === "ja_tinha"\) await registrarDobro2027\(/);
+    for (const f of ["asaas-pix", "asaas-webhook"]) expect(readFileSync(join(__dirname, `../../supabase/functions/${f}/index.ts`), "utf8")).toMatch(/const dobro27 = p27\.r === "ja_tinha" && await ehDobro2027\([^)]*\);\s*if \(dobro27\) await registrarDobro2027\(/);
   });
   it("o reconcile: Pix de upsell pré-aquecido (com upsell_chave) é consultado sempre nas 2 primeiras horas, depois 1x por hora", () => {
     const criado = "2026-10-31T12:00:00Z";
@@ -376,5 +376,66 @@ describe("crítica r1 (31/10): os consertos do dinheiro", () => {
     const s = readFileSync(join(__dirname, "../../supabase/functions/_shared/pix-upsell.ts"), "utf8");
     expect(s).not.toMatch(/DECISÃO DO DONO/);
     expect(s).toMatch(/CONFIRMAR COM O DONO/);
+  });
+});
+
+describe("crítica r2 (31/10): dinheiro e honestidade", () => {
+  it("o bloco do e-mail tem teto (a Asaas travada não segura o paid do vitalício): estourou → '' e sem a marca 'foi pro e-mail'", async () => {
+    expect(TETO_BLOCO_MS).toBeLessThanOrEqual(5000);
+    const { admin, t } = bancoFalso();
+    const travado: CriarQr = () => new Promise(() => { /* a Asaas nunca responde */ });
+    const ini = Date.now();
+    const html = await blocoU2027(admin, { ligado: true, compra: "qr_vit_1", dono: "u1", offer: "LN_sempre279", criarQr: travado, tetoMs: 60 });
+    expect(html).toBe("");
+    expect(Date.now() - ini).toBeLessThan(1000);
+    expect(t.webhook_events.some((l) => l.id === chaveBlocoNoEmail("qr_vit_1"))).toBe(false);
+  });
+  it("o bloco não espera a reserva da página 12 × 400 ms: 2 voltas e sai", async () => {
+    const { admin } = bancoFalso({ webhook_events: [{ id: chavePixUpsell(chaveU2027("qr_vit_1")), source: "upsell", event: `reservando:${Date.now()}` }] });
+    const qr = qrFalso();
+    const esperas: number[] = [];
+    const html = await blocoU2027(admin, { ligado: true, compra: "qr_vit_1", dono: "u1", offer: "LN_sempre279", criarQr: qr.criar, esperar: async (ms) => { esperas.push(ms); } });
+    expect(html).toBe("");
+    expect(esperas).toHaveLength(2);
+    expect(qr.chamadas).toHaveLength(0);
+  });
+  it("o QR de upsell tem timeout de 4 s na Asaas (chave Pix e POST); o vitalício não muda", () => {
+    const q = readFileSync(join(__dirname, "../../supabase/functions/_shared/asaas-qr.ts"), "utf8");
+    expect(q).toMatch(/TIMEOUT_QR_UPSELL_MS = 4000/);
+    expect(q).toMatch(/obterChavePix\(apiKey, log, sinalComTeto\(TIMEOUT_QR_UPSELL_MS\)\)/);
+    expect(q).toMatch(/postarQrEstatico\(apiKey, chave, a, sinalComTeto\(TIMEOUT_QR_UPSELL_MS\)\)/);
+  });
+  it("o bloco: 'Já pagou o 2027 na página? Pode ignorar' acima do código e 'onde fica' antes de pagar (o Android não tem a aba)", () => {
+    const h = htmlBlocoU2027({ compra: "qr_vit_1", pix: { orderId: "qr_u27_1", qrCode: "000201abc", expiresAt: new Date(Date.now() + 24 * 3600e3).toISOString() } });
+    expect(h).toContain("Já pagou o 2027 na página? Pode ignorar este bloco.");
+    expect(h.indexOf("Já pagou o 2027 na página")).toBeLessThan(h.indexOf("000201abc"));
+    expect(NOTA_ONDE_EMAIL).toBe("Por enquanto fica no site e no app do iPhone.");
+    expect(h).toContain("É separado do CORE que você já pagou. Por enquanto fica no site e no app do iPhone.");
+  });
+  it("pagamento em dobro: ehDobro2027 só quando o pacote veio de OUTRO pedido; os 3 caminhos pulam o 'Pronto' nesse caso", async () => {
+    const { admin } = bancoFalso({ user_data: [{ user_id: "u1", key: "core-pacote-2027", value: { comprado: true, pedido: "qr_u27_1" } }] });
+    expect(await ehDobro2027(admin, { userId: "u1", orderId: "qr_u27_1" })).toBe(false);
+    expect(await ehDobro2027(admin, { userId: "u1", orderId: "qr_u27_2" })).toBe(true);
+    expect(await ehDobro2027(admin, { userId: "u2", orderId: "qr_u27_2" })).toBe(false);
+    for (const f of ["asaas-pix", "asaas-webhook", "pix-reconcile"]) {
+      const src = readFileSync(join(__dirname, `../../supabase/functions/${f}/index.ts`), "utf8");
+      const i = src.indexOf("await ehDobro2027(");
+      expect(i).toBeGreaterThan(0);
+      const trecho = src.slice(i, src.indexOf("avisarPronto2027(", i) + 1);
+      expect(trecho).toMatch(/registrarDobro2027\(/);
+      expect(trecho).toMatch(/else \{/); // o "Pronto" só no else (não é dobro)
+    }
+  });
+  it("o QR trocado (perto de vencer) fica em `anteriores` (até 3) — ainda pode ser pago", async () => {
+    let agora = Date.parse("2026-10-31T12:00:00Z");
+    const { admin, t } = bancoFalso();
+    const qr = qrFalso();
+    const pedir = () => garantirPixUpsell(admin, { chave: "pv149-d3:u1", dono: "u1", oferta: "pv149", valorCentavos: 1490, descricao: "x", criarQr: qr.criar, agora: () => agora });
+    const a = await pedir();
+    agora += 23 * 3600e3; // sobram < 2 h → troca
+    const b = await pedir();
+    expect("orderId" in a && "orderId" in b && a.orderId !== b.orderId).toBe(true);
+    const linha = t.webhook_events.find((l) => l.id === chavePixUpsell("pv149-d3:u1"))!;
+    expect(JSON.parse(String(linha.event)).anteriores).toEqual(["orderId" in a ? a.orderId : ""]);
   });
 });

@@ -1,6 +1,6 @@
 /**
  * O Pix do "Seu 2027" de verdade (src/landing/pagamento.ts, 31/10) — o invoke do asaas-pix com a compra, e NENHUM Purchase
- * (nem marca pendente, nem dispara): o upsell não manda Purchase pra Meta (decisão do dono, _shared/pix-upsell.ts).
+ * (nem marca pendente, nem dispara): o upsell não manda Purchase pra Meta (recomendação, confirmar com o dono: _shared/pix-upsell.ts).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 

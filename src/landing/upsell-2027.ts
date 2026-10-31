@@ -46,6 +46,8 @@ export type CtxU2027 = {
   email: () => string | null;
   /** a linha sob "Pagamento confirmado" (o que ela já tem: "O CORE é seu pra sempre…") */
   linhaConfirmada: () => string;
+  /** quanto ela pagou no CORE (null = esta aba não sabe: o link do e-mail, a retomada pelo cookie) */
+  valorPago?: () => number | null;
   /** terminou (Agora não / Continuar): a landing volta pra conta pronta */
   aoTerminar: () => void;
   /** a tela do cartão mudou (a landing rola até o cartão) */
@@ -95,6 +97,10 @@ const CSS = `
 .u27-copiado b { display: block; font-size: 15.5px; }
 .u27-copiado.falta { background: var(--papel, #f7f5f8); color: var(--tx, #1c1a1f); }
 .u27-copiado.falta svg { background: var(--grafite, #262626); }
+.u27-ok-qr { font-size: 12.5px; font-weight: 700; margin: 0 0 10px; line-height: 1.3; }
+.u27-ok-qr svg { width: 16px; height: 16px; padding: 3px; }
+.u27-qual { margin: -2px 0 10px; font-size: 13.5px; line-height: 1.35; color: var(--suave, #6b6670); }
+.u27-qual b { color: var(--tx, #1c1a1f); }
 .u27-valor { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 12px; }
 .u27-valor b { font-size: 22px; font-weight: 850; letter-spacing: -.02em; }
 .u27-valor span { font-size: 13px; font-weight: 650; color: var(--suave, #6b6670); }
@@ -132,6 +138,8 @@ export type Upsell2027 = {
   preaquecer: () => void;
   /** chegou pelo link do e-mail: reabre o MESMO QR (ou a oferta, se o código venceu) */
   voltaDoEmail: (pix: PixU2027 | null) => void;
+  /** crítica r2: a aba perdeu o estado da compra (storage zerado) e o cookie trouxe o 2027 de volta — sem sessão pra conferir */
+  retomar: () => void;
   /** dev/testes: confirma o Pix simulado */
   simularPago: () => void;
   etapa: () => EstadoU2027["etapa"];
@@ -148,7 +156,7 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
   let gerando = false;
   let erro: string | null = null;
   let aviso: string | null = null;
-  let comEmail = false;
+  let comEmail = e.comEmail === true; // crítica r2: a frase "também foi pro seu e-mail" volta com a recarga do banco
   let loop: number | null = null;
   let relogio: number | null = null;
   let vistaOferta = false;
@@ -161,7 +169,9 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
   let venceu = false;
   /** quando o QR apareceu nesta aba (o laço rápido/lento conta daqui) */
   let qrDesde = 0;
-  const fora = () => e.pix?.donoIgual === false || !!e.pix?.doEmail;
+  /** crítica r2: voltou pelo cookie com o storage zerado (a sessão foi junto: esta aba não confere sozinha) */
+  let retomada = false;
+  const fora = () => e.pix?.donoIgual === false || !!e.pix?.doEmail || retomada;
   const semComoGerar = (r: GeradoU2027) => "erro" in r && (r.onde === "sem_sessao" || r.onde === "outra_conta");
   const base = () => ({ order_id: compra, pedido_u2027: e.pix?.orderId ?? null });
   const ev = (nome: string, d: Record<string, unknown> = {}) => ctx.evento(nome, { ...base(), ...d });
@@ -184,7 +194,11 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
     void p.then((r) => {
       const ok = "qrCode" in r;
       ev("landing_u2027_pix_pronto", { ms: Date.now() - tPre, ok, ...(ok ? {} : { motivo: "jaTem2027" in r ? "ja_tem" : r.onde }) });
-      if ("qrCode" in r) { comEmail = !!r.comEmail; if (!e.pix || e.pix.orderId !== r.orderId) { e = { ...e, pix: { orderId: r.orderId, qrCode: r.qrCode, qrCodeBase64: r.qrCodeBase64, expiresAt: r.expiresAt, donoIgual: r.donoIgual }, copiado: false }; gravarEstadoU2027(e); } }
+      if ("qrCode" in r) {
+        comEmail = !!r.comEmail;
+        if (!e.pix || e.pix.orderId !== r.orderId) { e = { ...e, pix: { orderId: r.orderId, qrCode: r.qrCode, qrCodeBase64: r.qrCodeBase64, expiresAt: r.expiresAt, donoIgual: r.donoIgual }, copiado: false, comEmail }; gravarEstadoU2027(e); }
+        else if (e.comEmail !== comEmail) { e = { ...e, comEmail }; gravarEstadoU2027(e); }
+      }
       else if (veioDoLink && semComoGerar(r)) { venceu = true; ev("landing_u2027_venceu", { motivo: (r as { onde: string }).onde }); }
       else { promessa = null; } // falhou: o toque em "Quero" tenta de novo (lá mesmo)
       if (esperandoLink) { esperandoLink = false; if (e.etapa === "oferta") render(); }
@@ -268,7 +282,7 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
     ev("landing_u2027_ja_paguei");
     if (ctx.api.simulado) { pago(); return; }
     if (!(await conferirUmaVez())) {
-      aviso = e.pix?.donoIgual === false || e.pix?.doEmail
+      aviso = fora()
         ? "Quando o pagamento cair, o 2027 entra na sua conta e a gente avisa por e-mail."
         : "Ainda não chegou. Confere no app do banco: quando cair, esta tela muda sozinha.";
       render();
@@ -325,10 +339,16 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
     if (e.etapa === "qr" && e.pix) {
       const p = e.pix;
       if (e.copiado && copiado === null) copiado = true; // a volta do banco: ela já copiou (e colou)
-      const fora = p.donoIgual === false || !!p.doEmail;
+      const fora = p.donoIgual === false || !!p.doEmail || retomada;
       const resta = () => Date.parse(p.expiresAt) - Date.now();
+      // crítica r2 (compradora 1): na volta do banco / pelo link, a tela diz que o CORE está pago e que ESTE Pix é só do 2027;
+      // sem a tela da oferta antes (link do e-mail, retomada), diz também o que é o "Seu 2027"
+      const v = ctx.valorPago?.() ?? null;
+      const semOferta = veioDoLink || retomada;
       c.innerHTML = `
       <div class="u27" data-testid="u2027-qr">
+        <div class="u27-ok u27-ok-qr" data-testid="u2027-ja-pago">${ICO_CHECK}<span>Seu CORE${v ? ` (${reais(v)})` : ""} está pago. Este Pix é só do 2027.</span></div>
+        ${semOferta ? `<p class="u27-qual" data-testid="u2027-qual"><b>${TITULO_U2027}</b> · 3 metas, revisões do mês e cofrinho</p>` : ""}
         <div class="u27-valor"><b>${reais(VALOR_U2027)}</b><span>Seu 2027 · uma vez</span></div>
         <div class="u27-copiado${copiado ? "" : " falta"}" data-testid="u2027-copiado">${copiado ? ICO_CHECK : ICO_COPIAR}<span>${copiado
           ? "<b>Código copiado.</b>Cole no app do banco, em Pix Copia e Cola."
@@ -377,6 +397,12 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
     return render();
   }
 
+  function retomar() {
+    retomada = true;
+    if (loop) { window.clearTimeout(loop); loop = null; } // sem sessão nesta aba: nada de laço (o "Já paguei" ainda confere)
+    ev("landing_u2027_volta_email", { restaurado: `cookie_${e.etapa}` });
+  }
+
   function voltaDoEmail(pix: PixU2027 | null) {
     veioDoLink = true;
     let restaurado = "oferta";
@@ -396,6 +422,7 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
     render,
     preaquecer,
     voltaDoEmail,
+    retomar,
     simularPago: () => { if (e.etapa === "qr") pago(); },
     etapa: () => e.etapa,
     parar: () => { parar(); document.removeEventListener("visibilitychange", aoVoltar); window.removeEventListener("pageshow", aoVoltar); },

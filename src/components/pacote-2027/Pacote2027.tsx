@@ -186,7 +186,7 @@ export function Pacote2027() {
           </button>
           <button type="button" onClick={() => void imprimir()} data-testid="pacote-2027-pdf"
             className={`flex-1 h-10 rounded-lg text-[12px] font-bold inline-flex items-center justify-center gap-1 ${plano.salvoEm ? "bg-foreground text-background" : "border border-border bg-card"}`}>
-            <span>🖨️ Planner em PDF</span>
+            <span>🖨️ Planner pra imprimir</span>
           </button>
         </div>
       </div>

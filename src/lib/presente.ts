@@ -64,7 +64,8 @@ export const linkCurto = (codigo: string): string => `coreaplicativo.com.br/pres
 /** A mensagem do WhatsApp — sem "ele/ela": serve pra amigo, amiga, namorado, namorada. */
 export function mensagemDoPresente(codigo: string, de: string | null): string {
   const quem = (de ?? "").trim();
-  return `${quem ? `${quem} te deu` : "Ganhei pra você"} o CORE pra sempre 💛\nAbre aqui pra ativar o seu: ${linkDoPresente(codigo)}`;
+  // crítica r2 (honestidade): sem nome, "Ganhei pra você" soava sorteio/coisa grátis
+  return `${quem ? `${quem} te deu o CORE pra sempre 💛` : "Um presente pra você: o CORE pra sempre 💛"}\nAbre aqui pra ativar o seu: ${linkDoPresente(codigo)}`;
 }
 export const urlWhatsApp = (texto: string): string => `https://wa.me/?text=${encodeURIComponent(texto)}`;
 

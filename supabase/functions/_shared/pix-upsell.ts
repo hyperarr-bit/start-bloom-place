@@ -81,7 +81,10 @@ export type QrCriado = { id: string; payload: string; encodedImage?: string | nu
 export type CriarQr = (a: { descricao: string; valorCentavos: number; expiraSegundos: number; ref: string }) => Promise<QrCriado | null>;
 export type FalhaPixUpsell = { erro: "ocupado" | "qr" | "ponte" | "reserva" };
 
-type Guardado = { orderId: string; payload: string; expiresAt: string; dono: string; oferta: string };
+/** `anteriores` (crítica r2): os QRs desta chave que foram trocados (menos de 2 h de validade) — continuam pagáveis; quem
+ *  confere a página olha eles também (o dia 3: um presente pago pelo código antigo copiado não vira 2º pagamento). Até 3. */
+type Guardado = { orderId: string; payload: string; expiresAt: string; dono: string; oferta: string; anteriores?: string[] };
+export const MAX_ANTERIORES = 3;
 const RESERVA = "reservando:";
 /** Uma reserva mais velha que isso é de um create que morreu no meio (a próxima chamada assume). */
 export const RESERVA_VELHA_MS = 25_000;
@@ -137,6 +140,10 @@ export async function garantirPixUpsell(admin: ClienteMin, a: {
       }
       const r = reservaDe(l.event);
       if (r !== null && agora() - r < RESERVA_VELHA_MS) { await esperar(400); continue; } // outro caminho está criando
+      // o QR que vai ser trocado (mesmo dono e oferta, perto de vencer) ainda pode ser pago: guarda o id
+      const anteriores = g && g.dono === a.dono && g.oferta === a.oferta
+        ? [g.orderId, ...(Array.isArray(g.anteriores) ? g.anteriores.filter((x) => typeof x === "string") : [])].slice(0, MAX_ANTERIORES)
+        : [];
       // reserva: linha nova (insert) ou troca da velha/vencida/de outro dono (update condicionado ao valor lido)
       const marca = `${RESERVA}${agora()}`;
       let reservou = false;
@@ -159,7 +166,7 @@ export async function garantirPixUpsell(admin: ClienteMin, a: {
       // sem a ponte o pagamento não tem dono (ninguém credita): melhor não entregar o QR
       if (pontErr) { await soltar(); return { erro: "ponte" }; }
       const expiresAt = paraIso(qr.expirationDate) ?? new Date(agora() + expiraSegundos(a.oferta) * 1000).toISOString();
-      const guardado: Guardado = { orderId: qr.id, payload: String(qr.payload).slice(0, 1000), expiresAt, dono: a.dono, oferta: a.oferta };
+      const guardado: Guardado = { orderId: qr.id, payload: String(qr.payload).slice(0, 1000), expiresAt, dono: a.dono, oferta: a.oferta, ...(anteriores.length ? { anteriores } : {}) };
       await admin.from("webhook_events").update({ event: JSON.stringify(guardado) }).eq("id", id).then(() => {}, () => {});
       return { orderId: qr.id, qrCode: guardado.payload, qrCodeBase64: imagemDe(qr.encodedImage), expiresAt, dono: a.dono, oferta: a.oferta, novo: true };
     }
@@ -217,6 +224,14 @@ export async function donoNaHora(admin: ClienteMin, a: { registrado: string; com
  * devolver pela Asaas. Só quando o pacote da conta veio de OUTRO pedido (o mesmo pedido confirmado por 2 caminhos não conta).
  */
 export const chaveDobro2027 = (orderId: string): string => `u2027-dobro:${orderId}`;
+/** Este pedido é um 2º pagamento do 2027 (o pacote da conta veio de OUTRO pedido)? Crítica r2: aí não sai outro "Pronto". */
+export async function ehDobro2027(admin: ClienteMin, a: { userId: string; orderId: string }): Promise<boolean> {
+  try {
+    const { data } = await admin.from("user_data").select("value").eq("user_id", a.userId).eq("key", "core-pacote-2027").maybeSingle();
+    const anterior = (data as { value?: { pedido?: unknown } } | null)?.value?.pedido;
+    return typeof anterior === "string" && !!anterior && anterior !== a.orderId;
+  } catch { return false; }
+}
 export async function registrarDobro2027(admin: ClienteMin, a: { userId: string; orderId: string; amountCents: number | null }): Promise<boolean> {
   try {
     const { data } = await admin.from("user_data").select("value").eq("user_id", a.userId).eq("key", "core-pacote-2027").maybeSingle();
@@ -275,16 +290,20 @@ export function validadeNoEmail(expiresAt: string, agora: number = Date.now()): 
 /** Onde o pacote fica (crítica r1: o Android da loja ainda NÃO tem a aba — só o site e o iPhone 1.0.20+). */
 export const ONDE_U2027_HTML = "no módulo <b>Desenvolvimento Pessoal</b>, aba <b>Seu 2027</b>. Por enquanto, no site (coreaplicativo.com.br) e no app do iPhone";
 
-/** O HTML do bloco (puro). Curto: a pergunta, o preço, o código pra copiar, o botão e a validade. */
+/** Crítica r2 (honestidade): o bloco vende pra todo comprador (inclusive Android) — diz onde fica ANTES do pagamento. */
+export const NOTA_ONDE_EMAIL = "Por enquanto fica no site e no app do iPhone.";
+
+/** O HTML do bloco (puro). Curto: a pergunta, o preço, "já pagou na página? ignore", o código, o botão, a validade e onde fica. */
 export function htmlBlocoU2027(a: { compra: string; pix: Pick<PixUpsell, "orderId" | "qrCode" | "expiresAt">; site?: string; agora?: number }): string {
   const link = linkU2027(a);
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0 4px;background:#fff7fb;border:1px solid #f3d6e6;border-radius:14px;" data-bloco="u2027"><tr><td style="padding:16px 16px 14px;">
       <div style="font-size:15px;font-weight:800;color:#16121c;margin:0 0 4px;">Quer o seu 2027 organizado?</div>
       <div style="font-size:13.5px;line-height:1.45;color:#5b5560;margin:0 0 10px;">3 metas, quanto gastar e guardar por mês, 12 revisões do mês e o cofrinho de 52 semanas. <b style="color:#16121c;">${reais(PRECO_U2027_CENTAVOS)}, uma vez</b>, sem mensalidade.</div>
+      <div style="font-size:12.5px;line-height:1.45;color:#5b5560;margin:0 0 10px;" data-linha="ja-pegou">Já pagou o 2027 na página? Pode ignorar este bloco.</div>
       <div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:#8a838f;text-transform:uppercase;margin:0 0 6px;">Pix copia e cola</div>
       <div style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;line-height:1.4;color:#16121c;background:#fff;border:1px dashed #e2c3d4;border-radius:8px;padding:10px;word-break:break-all;-webkit-user-select:all;user-select:all;">${esc(a.pix.qrCode)}</div>
       <table role="presentation" cellpadding="0" cellspacing="0" style="margin:12px 0 0;"><tr><td><a href="${esc(link)}" style="display:inline-block;background:#d22d80;color:#fff;text-decoration:none;font-size:14px;font-weight:800;padding:11px 18px;border-radius:999px;">Abrir o Pix</a></td></tr></table>
-      <div style="font-size:12px;line-height:1.45;color:#8a838f;margin:10px 0 0;">${validadeNoEmail(a.pix.expiresAt, a.agora)} Pagou? A gente avisa por e-mail quando cair. É separado do CORE que você já pagou.</div>
+      <div style="font-size:12px;line-height:1.45;color:#8a838f;margin:10px 0 0;">${validadeNoEmail(a.pix.expiresAt, a.agora)} Pagou? A gente avisa por e-mail quando cair. É separado do CORE que você já pagou. ${NOTA_ONDE_EMAIL}</div>
     </td></tr></table>`;
 }
 
@@ -299,23 +318,36 @@ export async function blocoFoiProEmail(admin: ClienteMin, compra: string): Promi
  * ainda sem o pacote. O Pix é o MESMO da página (garantirPixUpsell, chave u2027:<compra>). Nunca lança: o e-mail de
  * compra confirmada sai de qualquer jeito.
  */
+/** Crítica r2 (dinheiro 3): o bloco roda ANTES de responder o `paid` do vitalício (check, boas_vindas, webhook) — teto total. */
+export const TETO_BLOCO_MS = 5000;
+
 export async function blocoU2027(admin: ClienteMin, a: {
   ligado: boolean; compra: string; dono: string; offer: string; criarQr: CriarQr; site?: string;
+  /** só testes */ tetoMs?: number; esperar?: (ms: number) => Promise<void>;
 }): Promise<string> {
-  try {
-    if (!a.ligado || !ehOfertaLanding(a.offer) || !a.dono || !a.compra) return "";
-    const { data: pac } = await admin.from("user_data").select("value").eq("user_id", a.dono).eq("key", "core-pacote-2027").maybeSingle();
-    if ((pac as { value?: { comprado?: unknown } } | null)?.value?.comprado === true) return "";
-    const pix = await garantirPixUpsell(admin, {
-      chave: chaveU2027(a.compra), dono: a.dono, oferta: OFERTA_2027, valorCentavos: PRECO_U2027_CENTAVOS, descricao: "CORE seu 2027", criarQr: a.criarQr,
-      extraPedido: { origem: "email_compra", compra: a.compra },
-    });
-    if ("erro" in pix) return "";
-    // a marca da página ("o código também foi pro seu e-mail"): gravada quando o bloco sai montado pro e-mail. Se o envio
-    // em si falhar, a marca fica (raro: o Resend fora) — aceito, ver BUILD.md (crítica r1, honestidade 5)
-    await admin.from("webhook_events").insert({ id: chaveBlocoNoEmail(a.compra), source: "upsell", event: "u2027_bloco" }).then(() => {}, () => {});
-    return htmlBlocoU2027({ compra: a.compra, pix, site: a.site });
-  } catch { return ""; }
+  if (!a.ligado || !ehOfertaLanding(a.offer) || !a.dono || !a.compra) return "";
+  // crítica r2 (dinheiro 3): o e-mail de compra confirmada (e o `paid: true` da página do vitalício) não espera o QR do upsell
+  // mais que TETO_BLOCO_MS. Estourou → o e-mail sai sem o bloco (o Pix, se nascer depois, é o mesmo da página).
+  let estourou = false;
+  const montar = async (): Promise<string> => {
+    try {
+      const { data: pac } = await admin.from("user_data").select("value").eq("user_id", a.dono).eq("key", "core-pacote-2027").maybeSingle();
+      if ((pac as { value?: { comprado?: unknown } } | null)?.value?.comprado === true) return "";
+      const pix = await garantirPixUpsell(admin, {
+        chave: chaveU2027(a.compra), dono: a.dono, oferta: OFERTA_2027, valorCentavos: PRECO_U2027_CENTAVOS, descricao: "CORE seu 2027", criarQr: a.criarQr,
+        extraPedido: { origem: "email_compra", compra: a.compra },
+        tentativas: 2, ...(a.esperar ? { esperar: a.esperar } : {}), // crítica r2: o e-mail não espera a reserva da página por 12 × 400 ms
+      });
+      if ("erro" in pix || estourou) return "";
+      // a marca da página ("o código também foi pro seu e-mail"): gravada quando o bloco sai montado pro e-mail. Se o envio
+      // em si falhar, a marca fica (raro: o Resend fora) — aceito, ver BUILD.md (crítica r1, honestidade 5)
+      await admin.from("webhook_events").insert({ id: chaveBlocoNoEmail(a.compra), source: "upsell", event: "u2027_bloco" }).then(() => {}, () => {});
+      return estourou ? "" : htmlBlocoU2027({ compra: a.compra, pix, site: a.site });
+    } catch { return ""; }
+  };
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const teto = new Promise<string>((ok) => { timer = setTimeout(() => { estourou = true; ok(""); }, a.tetoMs ?? TETO_BLOCO_MS); });
+  try { return await Promise.race([montar(), teto]); } finally { if (timer !== undefined) clearTimeout(timer); }
 }
 
 /* ───────────────────────── o e-mail "Pronto, seu 2027 tá no seu CORE" ───────────────────────── */

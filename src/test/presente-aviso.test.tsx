@@ -2,8 +2,8 @@
  * O AVISO DO PRESENTE NO APP (31/10, src/lib/presente-aviso.ts + src/presente/AvisoPresente.tsx).
  *   · chave PRESENTE_AVISO "off" por padrão; QA ?presente-aviso=on|off|auto; só o SITE: iPhone e Android da loja NUNCA (crítica r1:
  *     o modo "web+android" saiu — a regra de pagamentos da Play), nem com o QA; a 2ª linha não parece cobrança do plano;
- *   · só vitalício pago na web, 3 dias ou mais depois da compra;
- *   · × e toque escondem pra sempre (conta + aparelho); some sozinho 7 dias depois da 1ª vez;
+ *   · só vitalício pago na web, 5 dias ou mais depois da compra (crítica r2: o e-mail sai no dia 3);
+ *   · × e toque escondem pra sempre (conta + aparelho); "1 vez": outra sessão não mostra de novo (crítica r2);
  *   · mora na página Você (as 2 caras), nunca na Home; a chave da conta está nas listas do aparelho.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -45,9 +45,9 @@ const vit = (diasAtras: number, extra: Record<string, unknown> = {}) => ({
 });
 
 beforeEach(() => {
-  dados.mapa.clear(); dados.sets.length = 0; linhas.v = [vit(4)]; plataforma.v = "web"; tokenDia3.mockReset();
+  dados.mapa.clear(); dados.sets.length = 0; linhas.v = [vit(6)]; plataforma.v = "web"; tokenDia3.mockReset();
   authState.user = { id: "ana", email: "ana@exemplo.com.br" };
-  try { localStorage.clear(); } catch { /* */ }
+  try { localStorage.clear(); sessionStorage.clear(); } catch { /* */ }
   window.history.replaceState({}, "", "/voce?presente-aviso=on");
   vi.mocked(trackEvent).mockClear();
 });
@@ -72,9 +72,10 @@ describe("a chave", () => {
     expect(forcaDoAviso("")).toBe("on"); // guardado no aparelho
     expect(forcaDoAviso("?presente-aviso=auto")).toBeNull();
   });
-  it("só vitalício pago na web, 3 dias ou mais depois da compra", () => {
-    expect(compraQueLiberaAviso([vit(3)], Date.now())).toBe(true);
-    expect(compraQueLiberaAviso([vit(2.9)], Date.now())).toBe(false);
+  it("só vitalício pago na web, 5 dias ou mais depois da compra (crítica r2: o e-mail do dia 3 não cai no mesmo dia)", () => {
+    expect(compraQueLiberaAviso([vit(5)], Date.now())).toBe(true);
+    expect(compraQueLiberaAviso([vit(4.9)], Date.now())).toBe(false);
+    expect(compraQueLiberaAviso([vit(3)], Date.now())).toBe(false);
     expect(compraQueLiberaAviso([vit(10, { payment_method: "play_store" })])).toBe(false);
     expect(compraQueLiberaAviso([vit(10, { payment_method: "presente" })])).toBe(false);
     expect(compraQueLiberaAviso([vit(10, { billing_period: "annual", plan: "core-pro" })])).toBe(false);
@@ -87,6 +88,11 @@ describe("a chave", () => {
     expect(avisoEscondido({ fechado: "2026-10-30T00:00:00Z" }, AGORA)).toBe(true);
     expect(avisoEscondido({ vistoEm: new Date(AGORA - 6 * DIA).toISOString() }, AGORA)).toBe(false);
     expect(avisoEscondido({ vistoEm: new Date(AGORA - 7 * DIA).toISOString() }, AGORA)).toBe(true);
+  });
+  it("crítica r2 ('1 vez'): apareceu numa sessão → a mesma sessão segue vendo; outra sessão não", () => {
+    const m = { vistoEm: new Date(AGORA - 60_000).toISOString(), sessao: "s1" };
+    expect(avisoEscondido(m, AGORA, "s1")).toBe(false);
+    expect(avisoEscondido(m, AGORA, "s2")).toBe(true);
   });
 });
 
@@ -109,6 +115,19 @@ describe("o aviso na tela", () => {
     await waitFor(() => expect(dados.sets.some(([k, v]) => k === CHAVE_AVISO_PRESENTE && !!(v as { vistoEm?: string }).vistoEm)).toBe(true));
     expect(JSON.parse(localStorage.getItem(CHAVE_AVISO_PRESENTE) ?? "{}").vistoEm).toBeTruthy();
     expect(trackEvent).toHaveBeenCalledWith("presente_aviso_view", { estilo: "classico" });
+  });
+  it("crítica r2: a mesma sessão (outra tela da Você) ainda vê; numa sessão nova não aparece mais", async () => {
+    montar();
+    await screen.findByTestId("aviso-presente");
+    await waitFor(() => expect(JSON.parse(localStorage.getItem(CHAVE_AVISO_PRESENTE) ?? "{}").sessao).toBeTruthy());
+    cleanup();
+    montar();
+    expect(await screen.findByTestId("aviso-presente")).toBeTruthy(); // mesma aba
+    cleanup();
+    sessionStorage.clear(); // outra visita
+    montar();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByTestId("aviso-presente")).toBeNull();
   });
   it("× fecha pra sempre (não volta ao montar de novo)", async () => {
     montar();
@@ -133,11 +152,11 @@ describe("o aviso na tela", () => {
     fireEvent.click(await screen.findByTestId("aviso-presente-abrir"));
     await waitFor(() => expect(screen.getByTestId("aviso-presente").textContent).toMatch(/tentar de novo/));
   });
-  it("não aparece: chave off, iPhone, compra de 2 dias, compra na loja", async () => {
+  it("não aparece: chave off, iPhone, compra de 4 dias, compra na loja", async () => {
     const casos: Array<() => void> = [
       () => { window.history.replaceState({}, "", "/voce"); },
       () => { plataforma.v = "ios"; },
-      () => { linhas.v = [vit(2)]; },
+      () => { linhas.v = [vit(4)]; },
       () => { linhas.v = [vit(10, { payment_method: "play_store" })]; },
     ];
     for (const prep of casos) {

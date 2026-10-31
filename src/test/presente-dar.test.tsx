@@ -35,10 +35,10 @@ vi.mock("@/presente/api", async (orig) => ({
 }));
 
 import { trackEvent } from "@/lib/analytics";
-import DarPresenteRota from "@/pages/presente/DarPresente";
+import DarPresenteRota, { LACO_DAR, valeAte } from "@/pages/presente/DarPresente";
 
 const TOKEN = "Tk".padEnd(32, "x");
-const PIX = { orderId: "qr_pv_1", qrCode: "00020126PIXDOPRESENTE5204000053039865405" + "14.90" + "6304ABCD", qrCodeBase64: null, expiresAt: new Date(Date.now() + 23.5 * 3600e3).toISOString() };
+const PIX = { orderId: "qr_pv_1", qrCode: "00020126PIXDOPRESENTE5204000053039865405" + "14.90" + "6304ABCD", qrCodeBase64: null, expiresAt: new Date(Date.now() + 24 * 3600e3).toISOString() };
 
 const montar = (busca: string) => {
   window.history.replaceState({}, "", `/presente/dar${busca}`);
@@ -71,7 +71,8 @@ describe("/presente/dar com o token do e-mail", () => {
     expect(screen.getByText(/Leve alguém/)).toBeTruthy();
     expect(screen.getByText(/pra quem você quer bem/)).toBeTruthy();
     expect(screen.getByTestId("dar-codigo").textContent).toBe(PIX.qrCode);
-    expect(screen.getByTestId("dar-validade").textContent).toMatch(/Vale por mais 2[23] h/);
+    // crítica r2: código novo diz "Vale por 24 h" (não "mais 23 h", que parece código velho)
+    expect(screen.getByTestId("dar-validade").textContent).toBe("Vale por 24 h");
     const botao = screen.getByTestId("dar-copiar");
     expect(botao.textContent).toMatch(/Copiar o Pix · R\$ 14,90/);
     fireEvent.click(botao);
@@ -101,7 +102,7 @@ describe("/presente/dar com o token do e-mail", () => {
     expect(purchase.markPixPurchasePending).not.toHaveBeenCalled();
   });
 
-  it("confere sozinha a cada 4 s (Asaas 1 vez a cada 3)", async () => {
+  it("confere sozinha a cada 4 s nos primeiros minutos (Asaas 1 vez a cada 3)", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     estadoDia3.mockResolvedValueOnce({ ok: true, pago: false, pix: PIX });
     montar(`?t=${TOKEN}`);
@@ -120,11 +121,13 @@ describe("/presente/dar com o token do e-mail", () => {
     expect(screen.getByTestId("presente-cartao-de").textContent).toMatch(/Ana te deu/);
   });
 
-  it("token vencido → 'Esse link não vale mais'; erro de Pix → 'Tentar de novo' gera de novo", async () => {
+  it("token vencido → 'Esse link venceu' + contato (sem mandar procurar a página Você); erro de Pix → 'Tentar de novo' gera de novo", async () => {
     estadoDia3.mockResolvedValueOnce({ ok: false, motivo: "token" });
     montar(`?t=${TOKEN}`);
     expect(await screen.findByTestId("dar-token")).toBeTruthy();
-    expect(screen.getByText("Esse link não vale mais")).toBeTruthy();
+    expect(screen.getByText("Esse link venceu")).toBeTruthy();
+    expect(screen.getByTestId("dar-token").textContent).toContain("contato@coreaplicativo.com.br");
+    expect(screen.getByTestId("dar-token").textContent).not.toContain("página Você");
     cleanup();
     estadoDia3.mockResolvedValueOnce({ ok: false, motivo: "pix" }).mockResolvedValueOnce({ ok: true, pago: false, pix: PIX });
     montar(`?t=${TOKEN}`);
@@ -138,6 +141,7 @@ describe("/presente/dar sem token", () => {
   it("sem login → 'Abra pelo link do e-mail' (nada de Pix)", async () => {
     montar("");
     expect(await screen.findByTestId("dar-sem_link")).toBeTruthy();
+    expect(screen.getByTestId("dar-sem_link").textContent).not.toContain("página Você");
     expect(estadoDia3).not.toHaveBeenCalled();
   });
   it("sessão anônima conta como sem login", async () => {
@@ -194,8 +198,80 @@ describe("crítica r1", () => {
   });
   it("?sair=1 (o rodapé do e-mail) grava a recusa e NÃO gera Pix", async () => {
     montar(`?t=${TOKEN}&sair=1`);
-    expect((await screen.findByTestId("dar-saiu")).textContent).toContain("Pronto, sem ofertas por e-mail");
+    expect((await screen.findByTestId("dar-saiu")).textContent).toContain("Pronto, esse e-mail não chega mais");
+    expect(screen.getByTestId("dar-saiu").textContent).not.toMatch(/Não mandamos mais ofertas/);
     expect(sairDia3).toHaveBeenCalledWith(TOKEN);
     expect(estadoDia3).not.toHaveBeenCalled();
+  });
+});
+
+describe("crítica r2", () => {
+  it("o laço tem teto: 4 s nos 10 min (Asaas 1/3), 30 s até 30 min (Asaas sempre), depois para; a volta da aba confere", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    estadoDia3.mockResolvedValueOnce({ ok: true, pago: false, pix: PIX });
+    montar(`?t=${TOKEN}`);
+    await screen.findByTestId("dar-pix");
+    estadoDia3.mockResolvedValue({ ok: true, pago: false, pix: PIX });
+    const depois = () => estadoDia3.mock.calls.slice(1).map((c) => (c[1] as { conferir?: boolean }).conferir);
+    await act(async () => { await vi.advanceTimersByTimeAsync(10 * 60e3); });
+    const rapido = depois();
+    expect(rapido.length).toBeGreaterThanOrEqual(140);
+    expect(rapido.length).toBeLessThanOrEqual(151);
+    expect(rapido.filter(Boolean).length).toBeLessThanOrEqual(Math.ceil(rapido.length / 3) + 1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(20 * 60e3); });
+    const lento = depois().slice(rapido.length);
+    expect(lento.length).toBeGreaterThanOrEqual(38);
+    expect(lento.length).toBeLessThanOrEqual(41);
+    expect(lento.every(Boolean)).toBe(true); // no modo lento cada conferência vai na Asaas (a cada 30 s)
+    const n = estadoDia3.mock.calls.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(60 * 60e3); });
+    expect(estadoDia3.mock.calls.length).toBe(n); // parou
+    // a volta do app do banco ainda confere (na Asaas)
+    await act(async () => { window.dispatchEvent(new Event("pageshow")); await vi.advanceTimersByTimeAsync(10); });
+    expect(estadoDia3.mock.calls.length).toBe(n + 1);
+    expect(estadoDia3).toHaveBeenLastCalledWith(TOKEN, expect.objectContaining({ conferir: true }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(5 * 60e3); });
+    expect(estadoDia3.mock.calls.length).toBe(n + 1); // e não religa o laço depois dos 30 min
+    expect(LACO_DAR).toMatchObject({ rapidoMs: 4000, lentoMs: 30_000, paraMs: 30 * 60e3 });
+  });
+
+  it("cópia negada → nada de 'Código copiado': pede o toque no código, que fica selecionável", async () => {
+    copiarTexto.mockResolvedValueOnce(false);
+    estadoDia3.mockResolvedValue({ ok: true, pago: false, pix: PIX });
+    montar(`?t=${TOKEN}`);
+    fireEvent.click(await screen.findByTestId("dar-copiar"));
+    const falta = await screen.findByTestId("dar-copia-falhou");
+    expect(falta.textContent).toContain("Toque no código pra copiar.");
+    expect(screen.queryByTestId("dar-volte")).toBeNull();
+    expect(screen.getByTestId("dar-copiar").textContent).toMatch(/Copiar o Pix · R\$ 14,90/);
+    expect(screen.getByTestId("dar-copiar").textContent).not.toMatch(/Copiado/);
+    expect((screen.getByTestId("dar-codigo") as HTMLElement).style.userSelect).toBe("all");
+    expect(localStorage.getItem("presente-d3-copiado")).toBeNull();
+  });
+
+  it("'Já paguei' confere na Asaas; não caiu → 'Ainda não chegou'", async () => {
+    estadoDia3.mockResolvedValue({ ok: true, pago: false, pix: PIX });
+    montar(`?t=${TOKEN}`);
+    fireEvent.click(await screen.findByTestId("dar-copiar"));
+    fireEvent.click(await screen.findByTestId("dar-ja-paguei"));
+    expect((await screen.findByTestId("dar-aviso")).textContent).toContain("Ainda não chegou");
+    expect(estadoDia3).toHaveBeenLastCalledWith(TOKEN, expect.objectContaining({ pedido: "qr_pv_1", conferir: true }));
+  });
+
+  it("pago: a tela diz que o link também foi pro e-mail; 'Link copiado' só quando copiou", async () => {
+    estadoDia3.mockResolvedValueOnce({ ok: true, pago: true, pedido: "qr_pv_1", codigo: "ZZZZ2345", de: null, resgatado: false });
+    copiarTexto.mockResolvedValueOnce(false);
+    montar(`?t=${TOKEN}`);
+    expect((await screen.findByTestId("presente-nota")).textContent).toContain("O link também foi pro seu e-mail");
+    fireEvent.click(screen.getByTestId("presente-copiar"));
+    expect(await screen.findByTestId("presente-copia-falhou")).toBeTruthy();
+    expect(screen.getByTestId("presente-copiar").textContent).not.toContain("Link copiado");
+  });
+
+  it("validade: 24 h num código novo, 'mais N h' depois", () => {
+    const agora = Date.parse("2026-10-31T12:00:00Z");
+    expect(valeAte(new Date(agora + 24 * 3600e3 - 1000).toISOString(), agora)).toBe("Vale por 24 h");
+    expect(valeAte(new Date(agora + 23 * 3600e3).toISOString(), agora)).toBe("Vale por mais 23 h");
+    expect(valeAte(new Date(agora + 30 * 60e3).toISOString(), agora)).toBe("Vale por mais 30 min");
   });
 });

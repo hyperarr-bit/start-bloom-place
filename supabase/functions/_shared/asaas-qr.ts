@@ -18,12 +18,12 @@ const env = (k: string): string | undefined => (globalThis as unknown as { Deno?
 
 /** A chave Pix da conta (necessária pro QR estático). Cacheada no módulo — a instância vive entre invocações. */
 let chavePixCache: string | null = null;
-export async function obterChavePix(key: string, log?: (p: string, d?: unknown) => void): Promise<string | null> {
+export async function obterChavePix(key: string, log?: (p: string, d?: unknown) => void, signal?: AbortSignal): Promise<string | null> {
   if (chavePixCache) return chavePixCache;
   const envKey = env("ASAAS_PIX_KEY");
   if (envKey) { chavePixCache = envKey; return envKey; }
   try {
-    const res = await fetch(`${ASAAS_API}/pix/addressKeys`, { headers: asaasHeaders(key) });
+    const res = await fetch(`${ASAAS_API}/pix/addressKeys`, { headers: asaasHeaders(key), ...(signal ? { signal } : {}) });
     const out = await res.json().catch(() => ({}));
     const ativa = (out?.data ?? []).find((k: { status?: string }) => k.status === "ACTIVE") ?? (out?.data ?? [])[0];
     if (ativa?.key) { chavePixCache = ativa.key as string; return chavePixCache; }
@@ -36,9 +36,10 @@ export async function obterChavePix(key: string, log?: (p: string, d?: unknown) 
 export type RespostaQr = { ok: boolean; status: number; out: Record<string, unknown> };
 
 /** O POST cru (o asaas-pix precisa do status/corpo pro debug). */
-export async function postarQrEstatico(apiKey: string, chave: string, a: { descricao: string; valorCentavos: number; expiraSegundos: number; ref: string }): Promise<RespostaQr> {
+export async function postarQrEstatico(apiKey: string, chave: string, a: { descricao: string; valorCentavos: number; expiraSegundos: number; ref: string }, signal?: AbortSignal): Promise<RespostaQr> {
   const res = await fetch(`${ASAAS_API}/pix/qrCodes/static`, {
     method: "POST",
+    ...(signal ? { signal } : {}),
     headers: asaasHeaders(apiKey),
     body: JSON.stringify({
       addressKey: chave,
@@ -54,13 +55,20 @@ export async function postarQrEstatico(apiKey: string, chave: string, a: { descr
   return { ok: res.ok, status: res.status, out: (out ?? {}) as Record<string, unknown> };
 }
 
+/** Crítica r2 (dinheiro 3): o QR de upsell nasce no caminho do e-mail de compra / do `paid` do vitalício — a Asaas travada
+ *  não pode segurar isso. 4 s por chamada (o vitalício, que usa o postarQrEstatico direto do asaas-pix, não muda). */
+export const TIMEOUT_QR_UPSELL_MS = 4000;
+const sinalComTeto = (ms: number): AbortSignal | undefined => {
+  try { return (AbortSignal as unknown as { timeout?: (ms: number) => AbortSignal }).timeout?.(ms); } catch { return undefined; }
+};
+
 /** O `criarQr` do garantirPixUpsell pra esta conta Asaas. */
 export function criarQrAsaas(apiKey: string, log?: (p: string, d?: unknown) => void): CriarQr {
   return async (a) => {
     if (!apiKey) return null;
-    const chave = await obterChavePix(apiKey, log);
+    const chave = await obterChavePix(apiKey, log, sinalComTeto(TIMEOUT_QR_UPSELL_MS));
     if (!chave) return null;
-    const r = await postarQrEstatico(apiKey, chave, a).catch(() => null);
+    const r = await postarQrEstatico(apiKey, chave, a, sinalComTeto(TIMEOUT_QR_UPSELL_MS)).catch(() => null);
     if (!r?.ok || !r.out?.payload || !r.out?.id) {
       log?.("Asaas QR de upsell falhou", { status: r?.status ?? null });
       return null;

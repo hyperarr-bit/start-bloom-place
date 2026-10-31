@@ -25,8 +25,8 @@ import { svgDoIcone, type IconeDoPlanner } from "@/lib/planner-2027-icones";
 
 /* ───────────────────────── as chaves (src/lib/planner-2027-chave.ts: a landing lê sem baixar o planner) ───────────────────────── */
 export {
-  PLANNER_2027, PLANNER_ESTILO, PARAM_QA_PLANNER, PARAM_QA_ESTILO, CHAVE_FORCA_PLANNER, CHAVE_FORCA_ESTILO, plannerNovoLigado, estiloDoPlanner,
-  type ModoPlanner, type EstiloPlanner,
+  PLANNER_2027, PLANNER_ESTILO, PARAM_QA_PLANNER, PARAM_QA_ESTILO, CHAVE_FORCA_PLANNER, CHAVE_FORCA_ESTILO, plannerNovoLigado, estiloDoPlanner, bracoDoPlanner, camposDoBraco,
+  type ModoPlanner, type EstiloPlanner, type ModoEstilo, type BracoDoPlanner,
 } from "@/lib/planner-2027-chave";
 import type { EstiloPlanner } from "@/lib/planner-2027-chave";
 

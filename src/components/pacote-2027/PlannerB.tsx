@@ -58,7 +58,9 @@ function dicaDe(modo: ModoDeEntrega, ios: boolean, pronto: boolean): string {
  * crítica r2: as folhas começam a ser preparadas quando a tela abre (técnico MEDIA 4: 5–11 s no celular) — no app e no
  * Safari, quando ela toca, o normal é já estar pronto. Quem planejou pouco vê um convite de 1 linha (não bloqueia).
  */
-export function PlannerB({ dados, estilo, onVoltar, onPlanejar }: { dados: DadosDoPlanner; estilo: EstiloPlanner; onVoltar: () => void; onPlanejar: () => void }) {
+export function PlannerB({ dados, estilo, via, onVoltar, onPlanejar }: { dados: DadosDoPlanner; estilo: EstiloPlanner; via?: string; onVoltar: () => void; onPlanejar: () => void }) {
+  /* 31/10 teste A/B dos desenhos: todo evento do planner leva o braço (o mesmo nome dos eventos da oferta) */
+  const doBraco = { braco_planner: estilo, ...(via ? { braco_planner_via: via } : {}) };
   const [modo, setModo] = useState<ModoDeEntrega>(() => modoDeEntrega());
   const [escala] = useState(escalaDaTela);
   const nativo = modo === "nativo";
@@ -77,7 +79,7 @@ export function PlannerB({ dados, estilo, onVoltar, onPlanejar }: { dados: Dados
 
   useEffect(() => { garantirCssDoPlanner(estilo); }, [estilo]);
   useEffect(() => {
-    trackEvent("plano2027_planner_view", { estilo, nativo, modo, metas: r.metas, datas: r.datas, habitos: r.habitos, contas: r.contas, pouco: r.pouco });
+    trackEvent("plano2027_planner_view", { estilo, nativo, modo, metas: r.metas, datas: r.datas, habitos: r.habitos, contas: r.contas, pouco: r.pouco, ...doBraco });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -90,7 +92,7 @@ export function PlannerB({ dados, estilo, onVoltar, onPlanejar }: { dados: Dados
     preparo.current = prepararFolhas(dados, estilo, (n) => { if (vivo.current) setFeitas(n); })
       .catch(() => null)
       .then((p) => {
-        trackEvent("plano2027_planner_preparado", { ok: !!p, ms: Date.now() - inicio, estilo, modo });
+        trackEvent("plano2027_planner_preparado", { ok: !!p, ms: Date.now() - inicio, estilo, modo, ...doBraco });
         if (!vivo.current) return p;
         setFeitas(null);
         if (p) setProntas(p);
@@ -134,7 +136,7 @@ export function PlannerB({ dados, estilo, onVoltar, onPlanejar }: { dados: Dados
   };
 
   const baixar = async () => {
-    trackEvent("plano2027_pdf", { nativo, modo, versao: "b", estilo, pouco: r.pouco });
+    trackEvent("plano2027_pdf", { nativo, modo, versao: "b", estilo, pouco: r.pouco, ...doBraco });
     if (modo === "imprimir") {
       if (!imprimirPlannerNoSite(dados, estilo)) toast.error("A janela de impressão não abriu. Toque de novo.");
       return;
@@ -143,11 +145,11 @@ export function PlannerB({ dados, estilo, onVoltar, onPlanejar }: { dados: Dados
     enviando.current = true;
     try {
       const p = await preparar();
-      if (!p) { trackEvent("plano2027_pdf_resultado", { resultado: "failed", estilo, modo }); falhou(); return; }
+      if (!p) { trackEvent("plano2027_pdf_resultado", { resultado: "failed", estilo, modo, ...doBraco }); falhou(); return; }
       // app: o share do Capacitor não pede gesto recente — manda já. Site: o 2º toque (botão "Salvar as 12 folhas").
       if (nativo) {
         const res = await p.compartilhar();
-        trackEvent("plano2027_pdf_resultado", { resultado: res, estilo, modo });
+        trackEvent("plano2027_pdf_resultado", { resultado: res, estilo, modo, ...doBraco });
         if (res === "failed") falhou();
       }
     } finally {
@@ -159,14 +161,14 @@ export function PlannerB({ dados, estilo, onVoltar, onPlanejar }: { dados: Dados
   const compartilharAgora = () => {
     if (!prontas) return;
     void prontas.compartilhar().then((res) => {
-      trackEvent("plano2027_pdf_resultado", { resultado: res, estilo, modo });
+      trackEvent("plano2027_pdf_resultado", { resultado: res, estilo, modo, ...doBraco });
       if (res === "failed") irPraImpressao();
     });
   };
 
   const copiarLink = async () => {
     const ok = await copiar(`${location.origin}${portaDoLink(LINK_DO_PLANNER)}`);
-    trackEvent("plano2027_pdf_resultado", { resultado: ok ? "link_copiado" : "link_falhou", estilo, modo });
+    trackEvent("plano2027_pdf_resultado", { resultado: ok ? "link_copiado" : "link_falhou", estilo, modo, ...doBraco });
     if (ok) toast.success(`Link copiado. Cole no ${ios ? "Safari" : "navegador"}.`);
     else toast.error(`Não deu pra copiar. Abra o site no ${ios ? "Safari" : "navegador"}.`);
   };
@@ -254,9 +256,9 @@ export function PlannerB({ dados, estilo, onVoltar, onPlanejar }: { dados: Dados
 }
 
 /** O que o Pacote2027 monta (carregado sob demanda: com a chave off, nada do planner B entra no módulo). */
-export default function PlannerDoPacote({ plano, cofrinho, get, estilo, onVoltar, onPlanejar }: {
-  plano: Plano2027; cofrinho: Cofrinho2027; get: <T>(k: string, f: T) => T; estilo: EstiloPlanner; onVoltar: () => void; onPlanejar: () => void;
+export default function PlannerDoPacote({ plano, cofrinho, get, estilo, via, onVoltar, onPlanejar }: {
+  plano: Plano2027; cofrinho: Cofrinho2027; get: <T>(k: string, f: T) => T; estilo: EstiloPlanner; via?: string; onVoltar: () => void; onPlanejar: () => void;
 }) {
   const dados = useMemo<DadosDoPlanner>(() => ({ plano, cofrinho, ...lerExtrasDoPlanner(get) }), [plano, cofrinho, get]);
-  return <PlannerB dados={dados} estilo={estilo} onVoltar={onVoltar} onPlanejar={onPlanejar} />;
+  return <PlannerB dados={dados} estilo={estilo} via={via} onVoltar={onVoltar} onPlanejar={onPlanejar} />;
 }

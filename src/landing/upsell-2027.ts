@@ -23,12 +23,16 @@
  * Eventos (todos com braco_lp/braco_checkout pelo `evento` da landing + order_id = a compra do vitalício):
  *   landing_u2027_view · _quero · _nao {de} · _pix_pronto {ms, ok, motivo?} · _copiado {ok, via} · _pago · _continuar ·
  *   _volta_email {restaurado} · _erro {onde}
+ * Com a versão B (U27_PLANNER + PLANNER_2027 ligadas), TODO evento do 2027 leva também braco_planner ("codex" | "core") e
+ * braco_planner_via ("email" | "reserva" | "forca" | "fixo" | "padrao") — o teste A/B dos 2 desenhos (31/10,
+ * src/lib/planner-2027-braco.ts). Sem a versão B os eventos ficam iguais aos de antes.
  */
 import { VALOR_U2027, reais, validadeU2027, type EstadoU2027, type PixU2027 } from "./regras";
 import { gravarEstadoU2027, lerEstadoU2027 } from "./u2027-estado";
 import {
   CTA_PRONTO_U2027_PLANNER, DESC_U2027_PLANNER, ITEM_PLANNER_U2027, LEGENDA_U2027_PLANNER, LINK_PLANEJAR_2027, NOTA_U2027_PLANNER, ZOOM_U2027_PLANNER, portaDoLink,
-  estiloDoPlanner, folhaAnoDoPlanner, imagemDoPlanner, srcsetDoPlanner, u27PlannerLigado,
+  bracoDoPlanner, camposDoBraco, folhaAnoDoPlanner, imagemDoPlanner, srcsetDoPlanner, u27PlannerLigado,
+  type EstiloPlanner,
 } from "@/lib/planner-2027-chave";
 
 export type GeradoU2027 = (PixU2027 & { comEmail?: boolean }) | { jaTem2027: true } | { erro: string; onde: string };
@@ -147,7 +151,7 @@ const CSS_PLANNER = `
 .u27-zoom button { position: fixed; top: 10px; right: 10px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: #fff; color: #1c1a1f; font-size: 24px; line-height: 44px; cursor: pointer; }
 `;
 /** crítica r1 (compradora MEDIA 2): tocar na imagem abre a folha "Meu ano" grande (legível). Fecha no ×, no toque fora e no Esc. */
-function abrirZoomDoPlanner(aoFechar: () => void): void {
+function abrirZoomDoPlanner(estilo: EstiloPlanner, aoFechar: () => void): void {
   if (document.getElementById("u27-zoom")) return;
   const z = document.createElement("div");
   z.id = "u27-zoom";
@@ -155,7 +159,7 @@ function abrirZoomDoPlanner(aoFechar: () => void): void {
   z.setAttribute("role", "dialog");
   z.setAttribute("aria-modal", "true");
   z.setAttribute("aria-label", "Exemplo de uma folha do planner: Meu ano");
-  z.innerHTML = `<button type="button" aria-label="Fechar">×</button><small>EXEMPLO · O SEU SAI COM O QUE VOCÊ PLANEJAR</small><img src="${folhaAnoDoPlanner()}" width="1080" height="1528" alt="A folha Meu ano do planner 2027, com metas, dinheiro, cofrinho, datas e hábitos de exemplo">`;
+  z.innerHTML = `<button type="button" aria-label="Fechar">×</button><small>EXEMPLO · O SEU SAI COM O QUE VOCÊ PLANEJAR</small><img src="${folhaAnoDoPlanner(estilo)}" width="1080" height="1528" alt="A folha Meu ano do planner 2027, com metas, dinheiro, cofrinho, datas e hábitos de exemplo">`;
   const fechar = () => { z.remove(); document.removeEventListener("keydown", tecla); aoFechar(); };
   const tecla = (k: KeyboardEvent) => { if (k.key === "Escape") fechar(); };
   z.addEventListener("click", (ev) => { if (ev.target === z || (ev.target as HTMLElement).tagName === "BUTTON") fechar(); });
@@ -220,16 +224,22 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
   let qrDesde = 0;
   /** versão B: a oferta com as folhas do planner (lido 1x por compra: a recarga do banco não troca a oferta no meio) */
   const comPlanner = u27PlannerLigado();
-  if (comPlanner) {
+  /**
+   * 31/10 teste A/B dos desenhos: o braço sai do e-mail da compradora (o mesmo hash que o app faz com o e-mail da conta —
+   * ela vê no app o desenho que viu aqui). Sem e-mail nesta aba (o link do e-mail noutro navegador): a compra (reserva).
+   * Decidido 1x por compra (a recarga do banco não troca o desenho no meio).
+   */
+  const braco = comPlanner ? bracoDoPlanner({ email: ctx.email(), reserva: compra }) : null;
+  if (braco) {
     garantirCssPlanner();
-    if (typeof Image !== "undefined") { const pre = new Image(); pre.srcset = srcsetDoPlanner(); pre.src = imagemDoPlanner(); }
+    if (typeof Image !== "undefined") { const pre = new Image(); pre.srcset = srcsetDoPlanner(braco.estilo); pre.src = imagemDoPlanner(braco.estilo); }
   }
   /** crítica r2: voltou pelo cookie com o storage zerado (a sessão foi junto: esta aba não confere sozinha) */
   let retomada = false;
   const fora = () => e.pix?.donoIgual === false || !!e.pix?.doEmail || retomada;
   const semComoGerar = (r: GeradoU2027) => "erro" in r && (r.onde === "sem_sessao" || r.onde === "outra_conta");
   const base = () => ({ order_id: compra, pedido_u2027: e.pix?.orderId ?? null });
-  const ev = (nome: string, d: Record<string, unknown> = {}) => ctx.evento(nome, { ...base(), ...d });
+  const ev = (nome: string, d: Record<string, unknown> = {}) => ctx.evento(nome, { ...base(), ...(braco ? camposDoBraco(braco) : {}), ...d });
 
   const salvar = (novo: Partial<EstadoU2027>) => {
     const antes = e.etapa;
@@ -370,7 +380,7 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
       return true;
     }
     if (e.etapa === "oferta") {
-      if (!vistaOferta) { vistaOferta = true; ev("landing_u2027_view", comPlanner ? { planner: estiloDoPlanner() } : {}); }
+      if (!vistaOferta) { vistaOferta = true; ev("landing_u2027_view", braco ? { planner: braco.estilo } : {}); }
       preaquecer();
       c.innerHTML = `
       <div class="u27" data-testid="u2027-oferta">
@@ -379,7 +389,7 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
         <div class="u27-kicker">Quer ir além?</div>
         <h3>${TITULO_U2027}</h3>
         ${comPlanner
-          ? `<figure class="u27-planner" data-testid="u2027-planner"><button type="button" id="u27-zoom-abrir" aria-label="${ZOOM_U2027_PLANNER}"><img src="${imagemDoPlanner()}" srcset="${srcsetDoPlanner()}" width="640" height="460" alt="Duas folhas do planner 2027: a capa e o ano numa página" decoding="async"></button><figcaption>${LEGENDA_U2027_PLANNER} <u>${ZOOM_U2027_PLANNER}</u></figcaption></figure>
+          ? `<figure class="u27-planner" data-testid="u2027-planner" data-estilo="${braco!.estilo}"><button type="button" id="u27-zoom-abrir" aria-label="${ZOOM_U2027_PLANNER}"><img src="${imagemDoPlanner(braco!.estilo)}" srcset="${srcsetDoPlanner(braco!.estilo)}" width="640" height="460" alt="Duas folhas do planner 2027: a capa e o ano numa página" decoding="async"></button><figcaption>${LEGENDA_U2027_PLANNER} <u>${ZOOM_U2027_PLANNER}</u></figcaption></figure>
         <p class="u27-desc">${DESC_U2027_PLANNER}</p>`
           : `<p class="u27-desc">${DESC_U2027}</p>`}
         <div class="u27-preco"><b data-testid="u2027-preco">${reais(VALOR_U2027)}</b><span>uma vez, sem mensalidade</span></div>
@@ -393,7 +403,7 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
       c.querySelector<HTMLButtonElement>("#u27-quero")!.addEventListener("click", () => { void quero(); });
       c.querySelector<HTMLButtonElement>("#u27-nao")!.addEventListener("click", () => { ev("landing_u2027_nao", { de: "oferta" }); salvar({ etapa: "fim" }); });
       const zoom = c.querySelector<HTMLButtonElement>("#u27-zoom-abrir");
-      zoom?.addEventListener("click", () => { ev("landing_u2027_zoom"); abrirZoomDoPlanner(() => zoom.focus()); });
+      zoom?.addEventListener("click", () => { ev("landing_u2027_zoom"); abrirZoomDoPlanner(braco!.estilo, () => zoom.focus()); });
       return true;
     }
     if (e.etapa === "qr" && e.pix) {

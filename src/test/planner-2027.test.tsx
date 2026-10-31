@@ -52,13 +52,13 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); localStorage.clear(); window.hi
 /* ───────────────────────── as chaves ───────────────────────── */
 
 describe("as chaves (tudo desligado)", () => {
-  it("PLANNER_2027 e U27_PLANNER saem 'off'; a direção padrão é 'core'", () => {
+  it("PLANNER_2027 e U27_PLANNER saem 'off'; a direção é o teste A/B ('ab', 31/10 — planner-2027-ab.test.tsx)", () => {
     expect(PLANNER_2027).toBe("off");
     expect(U27_PLANNER).toBe("off");
-    expect(PLANNER_ESTILO).toBe("core");
+    expect(PLANNER_ESTILO).toBe("ab");
     expect(plannerNovoLigado("")).toBe(false);
     expect(u27PlannerLigado("")).toBe(false);
-    expect(estiloDoPlanner("")).toBe("core");
+    expect(estiloDoPlanner("")).toBe("codex"); // "ab" sem e-mail nem reserva (só QA): o padrão do sorteio
   });
   it("QA: ?planner27=on fica guardado no aparelho; ?planner27=auto volta pra chave; o mesmo pro estilo e pra oferta", () => {
     expect(plannerNovoLigado("?planner27=on")).toBe(true);
@@ -68,7 +68,7 @@ describe("as chaves (tudo desligado)", () => {
     expect(estiloDoPlanner("?planner-estilo=codex")).toBe("codex");
     expect(estiloDoPlanner("")).toBe("codex");
     expect(estiloDoPlanner("?planner-estilo=lixo")).toBe("codex");
-    expect(estiloDoPlanner("?planner-estilo=auto")).toBe("core");
+    expect(estiloDoPlanner("?planner-estilo=auto", { email: "b@x.com" })).toBe("core"); // volta pro sorteio (b@x.com = core)
     // crítica r2: a oferta B só liga com a entrega B junto (u27planner sozinho não faz nada)
     expect(u27PlannerLigado("?u27planner=on&planner27=off")).toBe(false);
     expect(u27PlannerLigado("?u27planner=on&planner27=on")).toBe(true);
@@ -260,14 +260,14 @@ describe("o app: chave on (QA ?planner27=on)", () => {
     montar(CONTA_CHEIA);
     expect(screen.getByTestId("pacote-2027-pdf").textContent).toBe("🖨️ Seu planner 2027");
     fireEvent.click(screen.getByTestId("pacote-2027-pdf"));
-    const b = await screen.findByTestId("planner-b");
-    expect(b.getAttribute("data-estilo")).toBe("core");
+    const b = await screen.findByTestId("planner-b", {}, { timeout: 8000 }); // 1ª carga do PlannerB (lazy): sob carga passa de 1 s
+    expect(b.getAttribute("data-estilo")).toBe("codex"); // 31/10 teste A/B: ana@exemplo.com (a conta do mock) cai em "codex"
     expect(screen.getAllByRole("img", { name: /^Folha \d+/ })).toHaveLength(12);
     const itens = screen.getByTestId("planner-b-itens").textContent!;
     for (const s of ["3 metas de 2027", "Gastar e guardar por mês", "5 datas marcadas", "2 hábitos da sua Rotina", "1 conta fixa do Finanças"]) expect(itens).toContain(s);
     expect(screen.queryByTestId("planner-b-planejar")).toBeNull();
     expect(screen.getByTestId("planner-b-baixar").textContent).toContain("Imprimir ou salvar em PDF");
-    expect(document.getElementById("pl-css-core")).not.toBeNull();
+    expect(document.getElementById("pl-css-codex")).not.toBeNull();
   });
 
   it("conta VAZIA: as folhas saem com linhas pra escrever + convite curto pra planejar (abre o Planejar)", async () => {

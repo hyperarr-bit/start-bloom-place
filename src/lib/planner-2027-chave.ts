@@ -3,15 +3,21 @@
  * /organizar (src/landing/upsell-2027.ts) leem a MESMA direção de cara sem a landing baixar o planner inteiro.
  *
  *   PLANNER_2027   "off" (padrão) = o app fica na versão A (planner antigo, byte a byte). "on" = prévia + dados dela + PNG no iPhone.
- *   PLANNER_ESTILO "core" (padrão) | "codex" — as 2 direções de cara, mesmo layout (BRIEF.md).
+ *   PLANNER_ESTILO "ab" (padrão, 31/10) = teste A/B meio a meio pelo e-mail (./planner-2027-braco.ts) | "core" | "codex" fixo.
  * QA neste aparelho: ?planner27=on|off|auto · ?planner-estilo=codex|core|auto (guardados em localStorage; "auto" volta pra chave).
  */
+import { sortearEstilo, type EstiloDoBraco, type ViaDoSorteio } from "./planner-2027-braco";
 export type ModoPlanner = "off" | "on";
-export type EstiloPlanner = "codex" | "core";
+export type EstiloPlanner = EstiloDoBraco;
+/** "ab" = cada compradora cai em "codex" ou "core" (50%), pelo e-mail; "core"/"codex" = todo mundo no mesmo (como antes). */
+export type ModoEstilo = EstiloPlanner | "ab";
 /** A versão B do planner no app. "off" = a versão A (rollback). */
 export const PLANNER_2027: ModoPlanner = "off";
-/** A direção de cara. "core" = a cara dos módulos (padrão, BRIEF.md: o planner pago tem que parecer o app que ela comprou). */
-export const PLANNER_ESTILO: EstiloPlanner = "core";
+/**
+ * A direção de cara. 31/10 (pedido do dono): "ab" = teste dos 2 desenhos, meio a meio, pelo e-mail da compradora (a oferta
+ * e o app calculam o mesmo braço sem dividir armazenamento). Desligar o teste = "core" ou "codex" (todo mundo no mesmo).
+ */
+export const PLANNER_ESTILO: ModoEstilo = "ab";
 
 export const PARAM_QA_PLANNER = "planner27";
 export const PARAM_QA_ESTILO = "planner-estilo";
@@ -35,8 +41,24 @@ const buscaAtual = () => (typeof window === "undefined" ? "" : window.location.s
 /** A versão B está ligada neste aparelho? (a chave, ou o QA) */
 export const plannerNovoLigado = (busca: string = buscaAtual()): boolean =>
   (forca<ModoPlanner>(PARAM_QA_PLANNER, CHAVE_FORCA_PLANNER, ["on", "off"], busca) ?? PLANNER_2027) === "on";
-export const estiloDoPlanner = (busca: string = buscaAtual()): EstiloPlanner =>
-  forca<EstiloPlanner>(PARAM_QA_ESTILO, CHAVE_FORCA_ESTILO, ["codex", "core"], busca) ?? PLANNER_ESTILO;
+
+/** De onde veio o braço: "forca" (QA: ?planner-estilo= / a chave guardada) · "fixo" (PLANNER_ESTILO core/codex) · o sorteio. */
+export type ViaDoBraco = "forca" | "fixo" | ViaDoSorteio;
+export type BracoDoPlanner = { estilo: EstiloPlanner; via: ViaDoBraco };
+/**
+ * O braço do teste A/B dos desenhos. A força de QA vence; com PLANNER_ESTILO fixo, todo mundo no fixo (como antes); com "ab",
+ * o sorteio pelo e-mail (sem e-mail: a reserva — o id da compra na oferta, o id da conta no app).
+ */
+export function bracoDoPlanner(quem: { email?: string | null; reserva?: string | null } = {}, busca: string = buscaAtual(), modo: ModoEstilo = PLANNER_ESTILO): BracoDoPlanner {
+  const f = forca<EstiloPlanner>(PARAM_QA_ESTILO, CHAVE_FORCA_ESTILO, ["codex", "core"], busca);
+  if (f) return { estilo: f, via: "forca" };
+  if (modo !== "ab") return { estilo: modo, via: "fixo" };
+  return sortearEstilo(quem);
+}
+/** Os campos que os eventos levam (o nome que a análise lê: braco_planner, como braco_lp/braco_checkout). */
+export const camposDoBraco = (b: BracoDoPlanner) => ({ braco_planner: b.estilo, braco_planner_via: b.via });
+export const estiloDoPlanner = (busca: string = buscaAtual(), quem: { email?: string | null; reserva?: string | null } = {}): EstiloPlanner =>
+  bracoDoPlanner(quem, busca).estilo;
 
 
 /* ── a OFERTA do 2027 com as folhas do planner (a /organizar e o Fluxo2027 do /hoje e /inicio) ── */

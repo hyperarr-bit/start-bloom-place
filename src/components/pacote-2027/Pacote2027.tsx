@@ -13,7 +13,8 @@ import {
 import { htmlDoPlanner2027, imprimirPlanner2027 } from "@/lib/pacote-2027-pdf";
 import { Planejar2027 } from "./Planejar2027";
 import { useUserData } from "@/hooks/use-user-data";
-import { estiloDoPlanner, plannerNovoLigado } from "@/lib/planner-2027-chave";
+import { bracoDoPlanner, camposDoBraco, plannerNovoLigado } from "@/lib/planner-2027-chave";
+import { useAuth } from "@/hooks/use-auth";
 /* crítica r1 (técnico BAIXA 5): o planner B (12 folhas + CSS + ícones) só baixa quando ela abre — com a chave off o
  * módulo Desenvolvimento Pessoal fica do tamanho da versão A */
 const PlannerDoPacote = lazy(() => import("./PlannerB"));
@@ -33,6 +34,11 @@ export function Pacote2027() {
   const [vista, setVista] = useState<"inicio" | "cofrinho" | "planner" | number>("inicio");
   // 31/10 versão B (chave PLANNER_2027, off = a versão A igual): o planner com os dados dela, prévia + baixar nativo
   const [plannerB] = useState(() => plannerNovoLigado());
+  /* 31/10 teste A/B dos desenhos: o braço pelo e-mail da conta — o MESMO hash da oferta (src/lib/planner-2027-braco.ts), então
+   * ela recebe o desenho que viu ao comprar. Sem e-mail de verdade na conta: o id da conta (reserva). */
+  const { user } = useAuth();
+  const braco = plannerB ? bracoDoPlanner({ email: user?.email ?? null, reserva: user?.id ?? null }) : null;
+  const doBraco = braco ? camposDoBraco(braco) : {};
   const { get } = useUserData();
   const [planejando, setPlanejando] = useState(false);
   const [verTodos, setVerTodos] = useState(false);
@@ -46,7 +52,7 @@ export function Pacote2027() {
     let q: URLSearchParams;
     try { q = new URLSearchParams(window.location.search); } catch { return; }
     if (q.get("planejar") === "1") { if (!dicaVista) marcarDicaVista(); trackEvent("plano2027_aberto", { via: "link_pronto" }); setPlanejando(true); }
-    else if (q.get("planner") === "1") { if (!dicaVista) marcarDicaVista(); trackEvent("plano2027_planner_abrir", { via: "link" }); setVista("planner"); }
+    else if (q.get("planner") === "1") { if (!dicaVista) marcarDicaVista(); trackEvent("plano2027_planner_abrir", { via: "link", ...doBraco }); setVista("planner"); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plannerB, loaded, pacote]);
 
@@ -75,7 +81,7 @@ export function Pacote2027() {
 
   const abrirPlanejar = (via: string) => { if (!dicaVista) marcarDicaVista(); trackEvent("plano2027_aberto", { via }); setPlanejando(true); };
   const imprimir = async () => {
-    if (plannerB) { trackEvent("plano2027_planner_abrir", {}); setVista("planner"); return; }
+    if (plannerB) { trackEvent("plano2027_planner_abrir", { ...doBraco }); setVista("planner"); return; }
     const nativo = isNativeShell();
     trackEvent("plano2027_pdf", { nativo });
     const ok = await imprimirPlanner2027(htmlDoPlanner2027(plano, cofrinho), nativo);
@@ -114,7 +120,7 @@ export function Pacote2027() {
   if (vista === "planner") {
     return (
       <Suspense fallback={<div className="h-40 grid place-items-center text-[13px] text-muted-foreground" data-testid="planner-b-carregando">Montando o seu planner…</div>}>
-        <PlannerDoPacote plano={plano} cofrinho={cofrinho} get={get} estilo={estiloDoPlanner()} onVoltar={() => setVista("inicio")} onPlanejar={() => { setVista("inicio"); abrirPlanejar("planner_b"); }} />
+        <PlannerDoPacote plano={plano} cofrinho={cofrinho} get={get} estilo={braco?.estilo ?? "codex"} via={braco?.via} onVoltar={() => setVista("inicio")} onPlanejar={() => { setVista("inicio"); abrirPlanejar("planner_b"); }} />
       </Suspense>
     );
   }

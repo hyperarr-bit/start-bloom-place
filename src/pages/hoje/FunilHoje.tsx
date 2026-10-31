@@ -602,6 +602,7 @@ export function FunilHoje() {
         {e.etapa === "u2027" && (
           <Suspense fallback={null}>
             <Fluxo2027 origem="hoje" compra={(pagoPlano ?? ultimoPago)?.orderId ?? "hoje"} valorPago={ultimoPago ? VALOR_OFERTA[ultimoPago.oferta] : valorPlano} ids={ids}
+              email={estado.email ?? estado.emailPix?.email ?? null}
               onFim={(r) => setEstado((x) => {
                 const u2027 = { pedido: r.pedido };
                 return { ...x, u2027, banner: false, etapa: proximoPosCompra({ ...x, u2027 }, UPSELL_A_DOIS, ofertasAqui) };

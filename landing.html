@@ -420,6 +420,9 @@
       /* o celular: proporção REAL (só a largura é fixa; a altura segue o print — nunca esticado); moldura, ilha e barra como um iPhone */
       .lp2-fone { --w: 300px; width: var(--w); flex: none; background: #1b1a1d; border-radius: calc(var(--w) * .14); padding: calc(var(--w) * .028); box-shadow: 0 18px 40px -16px rgba(28,26,31,.45), 0 0 0 1px rgba(0,0,0,.06); position: relative; }
       .lp2-fone-tela { background: #fff; border-radius: calc(var(--w) * .114); overflow: hidden; position: relative; }
+      /* 31/10 (dono no iPhone: "o topo do celular tá com a cor diferente, branco, e o app é meio cinza"): a barra do relógio é o fundo da tela (#fff), mas o print da Home tem fundo #F2F2F2 e o dos módulos #FAFAFA — a tela pega a cor do topo do próprio print (amostrada nos .webp) */
+      .lp2-fone-tela:has(img[data-src$="/v3-home.webp"]), .lp2-fone-tela:has(img[src$="/v3-home.webp"]) { background: #f2f2f2; }
+      .lp2-fone-tela:has(img[data-src$="/v3-modulos.webp"]), .lp2-fone-tela:has(img[src$="/v3-modulos.webp"]) { background: #fafafa; }
       .lp2-fone-barra { height: calc(var(--w) * .1); display: flex; align-items: center; justify-content: space-between; padding: 0 calc(var(--w) * .085) 0 calc(var(--w) * .09); font-size: calc(var(--w) * .046); font-weight: 700; color: #111; }
       .lp2-fone-barra svg { height: calc(var(--w) * .036); width: auto; }
       .lp2-fone-ilha { position: absolute; top: calc(var(--w) * .028); left: 50%; transform: translateX(-50%); width: calc(var(--w) * .27); height: calc(var(--w) * .074); background: #0b0b0c; border-radius: 99px; }

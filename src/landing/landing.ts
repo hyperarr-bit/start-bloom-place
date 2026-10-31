@@ -208,10 +208,21 @@ let demoIniciada = false;
 let demoPronta = false;
 const tInicioDemo = { t: 0 };
 
+/** v2 (30/10 noite): a demo aberta pela landing v2 leva &lp=v2 — Finanças com o "quanto posso gastar hoje" nos R$ 146 da página em
+ *  qualquer dia do mês (lib/preview-seeds-financas-landing). O atual pede a URL de sempre. */
+const urlDemo = (m: ModuloLanding) => (V2 ? `/organizar/demo?m=${m}&lp=v2` : `/organizar/demo?m=${m}`);
+/** v2: trocar a demo de módulo antes de ela ficar pronta SEM criar uma entrada no histórico (o "voltar" do celular é o fechar da tela cheia) */
+const trocarSrc = (m: ModuloLanding) => {
+  if (V2) { try { if (frame.contentWindow) { frame.contentWindow.location.replace(urlDemo(m)); return; } } catch { /* cai no src */ } }
+  frame.src = urlDemo(m);
+};
+const cheiaModulo = document.getElementById("lp2-cheia-modulo");
+
 function marcarModulo(m: ModuloLanding) {
   moduloAtual = m;
   celular.dataset.modulo = m;
   kicker.textContent = `Seu CORE · ${NOME_DO_MODULO[m]}`;
+  if (cheiaModulo) cheiaModulo.textContent = NOME_DO_MODULO[m];
   document.querySelectorAll<HTMLButtonElement>(".lp-pilula[data-m]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.m === m)));
 }
 
@@ -220,9 +231,9 @@ function iniciarDemo(via: string) {
   demoIniciada = true;
   tInicioDemo.t = agora();
   diag.demoEm = tInicioDemo.t; diag.demoVia = via;
-  celular.setAttribute("data-abrindo", ""); // v2: some o "Testar o app", aparece o "Abrindo o app…" (no atual o CSS não muda nada)
-  frame.src = `/organizar/demo?m=${moduloAtual}`;
-  evento("landing_demo_aberta", { modulo: moduloAtual, via });
+  celular.setAttribute("data-abrindo", ""); // v2: aparece o "Abrindo o app…" na tela cheia (no atual o CSS não muda nada)
+  frame.src = urlDemo(moduloAtual);
+  if (!V2) evento("landing_demo_aberta", { modulo: moduloAtual, via }); // v2: o landing_demo_aberta {via: "tela_cheia"} sai a cada abertura (abrirCheia)
 }
 
 function abrirModulo(m: ModuloLanding, via: "area" | "pilula" | "grade") {
@@ -231,7 +242,7 @@ function abrirModulo(m: ModuloLanding, via: "area" | "pilula" | "grade") {
   if (!demoPronta) {
     // a demo ainda não chegou: a imagem certa (se houver) e a demo nasce no módulo novo
     if (IMAGENS[m]) img.src = IMAGENS[m]!;
-    if (demoIniciada && mudou) frame.src = `/organizar/demo?m=${m}`;
+    if (demoIniciada && mudou) trocarSrc(m);
     iniciarDemo(via);
   } else if (mudou) {
     try { frame.contentWindow?.postMessage({ tipo: "landing:modulo", m }, location.origin); } catch { /* noop */ }
@@ -255,7 +266,10 @@ window.addEventListener("message", (e: MessageEvent) => {
     evento("landing_demo_modulo", { modulo: d.modulo, via: "dentro" });
   } else if (d.tipo === "landing:oferta") {
     evento("landing_demo_saida", { destino: String(d.destino).slice(0, 80), modulo: moduloAtual });
-    rolarAte($("oferta"));
+    // v2: a seta ← do próprio módulo fecha a tela cheia (volta pra onde a pessoa estava); o resto (algo que só existe com conta) fecha
+    // e leva ao cartão. A seta manda 2 avisos ("seta" e o destino dela): o 1º manda, o 2º cai no "já fechando".
+    if (V2 && cheiaAberta) { if (d.destino === "seta") pedirFechar("seta_app"); else pedirFechar("oferta_app", () => rolarAte($("oferta"), "start", false)); }
+    else rolarAte($("oferta"));
   } else if (d.tipo === "landing:mexeu" && ehModuloLanding(d.modulo)) {
     evento("landing_demo_mexeu", { modulo: d.modulo });
   }
@@ -278,7 +292,125 @@ if (!V2) {
     perto.observe($("demo"));
   }
 }
-document.getElementById("lp-demo-abrir")?.addEventListener("click", () => { evento("landing_cta", { onde: "testar_app" }); iniciarDemo("botao"); });
+document.getElementById("lp-demo-abrir")?.addEventListener("click", () => {
+  evento("landing_cta", { onde: "testar_app" });
+  if (V2) abrirCheia(moduloAtual, "botao"); else iniciarDemo("botao");
+});
+
+/*
+ * ───────── v2 · A DEMO EM TELA CHEIA (30/10 noite, dono no iPhone: "a proporção do app ficou estranha") ─────────
+ * Na página fica um cartão (celular em proporção real + "Testar o app aqui" + pílulas). O toque abre o app de verdade POR CIMA da
+ * página: o próprio .lp-celular vira uma camada fixa de 100dvh (o iframe nunca muda de lugar no DOM — mover um iframe o recarrega),
+ * com "← Voltar" + o módulo em cima e "R$ 27,90 · Vitalício · Pix | Quero organizar minha vida" embaixo.
+ *   · abrir = history.pushState (mesma URL) + trava a página por baixo (body fixed em −y: sem pulo no WebKit, sem rolar por trás);
+ *   · o voltar do celular/gesto (popstate) fecha; a seta e a barra de baixo fecham por history.back() (uma entrada só, nunca 2);
+ *   · fechar devolve a página EXATAMENTE no y de antes (a barra de baixo leva ao cartão da oferta);
+ *   · recarregar com a tela cheia aberta (o Instagram recarrega a aba) reabre no mesmo módulo e no mesmo y — menos com Pix vivo, pago
+ *     ou "já tem": aí o cartão manda (y 0) e a marca sai do histórico;
+ *   · o iframe só ganha src no 1º toque (como antes); depois de aberto continua vivo escondido — reabrir é instantâneo, no mesmo lugar.
+ * Eventos: landing_demo_aberta {modulo, via: "tela_cheia", origem: botao|pilula|cartao|recarga|avancar, vez}
+ *          landing_demo_fechada {ms, via: seta|voltar|comprar|seta_app|oferta_app|fase, modulo} · landing_cta {onde: "demo_tela_cheia", fase}
+ */
+const MARCA_CHEIA = "lpDemoCheia";
+type EstadoHist = { [MARCA_CHEIA]?: 1; y?: number; m?: string } & Record<string, unknown>;
+const estadoHist = (): EstadoHist | null => { try { const e = history.state; return e && typeof e === "object" ? (e as EstadoHist) : null; } catch { return null; } };
+let cheiaAberta = false;
+let cheiaDesde = 0;
+let cheiaVezes = 0;
+let yDaPagina = 0;
+let fechandoVia: string | null = null;
+let depoisDeFechar: (() => void) | null = null;
+let reservaDoFechar: number | null = null;
+let restauracaoAntes: ScrollRestoration | null = null;
+let quemAbriu: HTMLElement | null = null;
+const cheiaVoltar = document.getElementById("lp2-cheia-voltar");
+const cheiaComprar = document.getElementById("lp2-cheia-comprar");
+
+function travarPagina(y: number) {
+  const b = document.body.style;
+  b.position = "fixed"; b.top = `-${y}px`; b.left = "0"; b.right = "0"; b.width = "100%"; b.overflow = "hidden";
+}
+function soltarPagina(y: number) {
+  const b = document.body.style;
+  b.position = ""; b.top = ""; b.left = ""; b.right = ""; b.width = ""; b.overflow = "";
+  try { window.scrollTo(0, y); } catch { /* jsdom */ }
+}
+
+function abrirCheia(m: ModuloLanding, origem: "botao" | "pilula" | "cartao" | "recarga" | "avancar", y?: number) {
+  if (!V2 || cheiaAberta) return;
+  const mudou = m !== moduloAtual;
+  marcarModulo(m);
+  if (!demoIniciada) iniciarDemo(origem);
+  else if (mudou) {
+    if (demoPronta) { try { frame.contentWindow?.postMessage({ tipo: "landing:modulo", m }, location.origin); } catch { /* noop */ } }
+    else trocarSrc(m);
+  }
+  yDaPagina = y ?? Math.round(window.scrollY || window.pageYOffset || 0);
+  // a rolagem é nossa enquanto a camada existe (o navegador restaurando o y da entrada de baixo brigava com o "levar ao cartão")
+  try { if (restauracaoAntes === null) restauracaoAntes = history.scrollRestoration; history.scrollRestoration = "manual"; } catch { /* noop */ }
+  if (origem !== "recarga") { try { history.pushState({ ...(estadoHist() ?? {}), [MARCA_CHEIA]: 1, y: yDaPagina, m }, ""); } catch { /* sem histórico: fecha só pelos botões */ } }
+  travarPagina(yDaPagina);
+  document.documentElement.setAttribute("data-demo-cheia", "");
+  celular.setAttribute("role", "dialog"); celular.setAttribute("aria-modal", "true"); celular.setAttribute("aria-label", "Demonstração do CORE");
+  cheiaAberta = true; cheiaDesde = agora(); cheiaVezes += 1;
+  quemAbriu = origem === "recarga" || origem === "avancar" ? null : (document.activeElement as HTMLElement | null);
+  atualizarRotulos();
+  evento("landing_demo_aberta", { modulo: m, via: "tela_cheia", origem, vez: cheiaVezes });
+  try { cheiaVoltar?.focus({ preventScroll: true }); } catch { /* noop */ }
+}
+
+/** Fecha JÁ (o histórico já voltou, ou não dá pra usar o histórico). */
+function fecharCheia(via: string) {
+  if (!cheiaAberta) return;
+  cheiaAberta = false;
+  fechandoVia = null;
+  if (reservaDoFechar !== null) { window.clearTimeout(reservaDoFechar); reservaDoFechar = null; }
+  document.documentElement.removeAttribute("data-demo-cheia");
+  celular.removeAttribute("aria-modal");
+  soltarPagina(yDaPagina);
+  evento("landing_demo_fechada", { ms: agora() - cheiaDesde, via, modulo: moduloAtual });
+  const depois = depoisDeFechar; depoisDeFechar = null;
+  if (depois) depois();
+  else if (quemAbriu && document.contains(quemAbriu)) { try { quemAbriu.focus({ preventScroll: true }); } catch { /* noop */ } }
+  quemAbriu = null;
+  // devolve a restauração de rolagem do navegador depois que a volta do histórico terminou
+  window.setTimeout(() => { if (!cheiaAberta && restauracaoAntes !== null) { try { history.scrollRestoration = restauracaoAntes; } catch { /* noop */ } restauracaoAntes = null; } }, 400);
+}
+
+/** Fechar pela seta / barra de baixo / app: volta 1 entrada no histórico (a que o abrir criou) e o popstate fecha. */
+function pedirFechar(via: string, depois?: () => void) {
+  if (!cheiaAberta || fechandoVia) return;
+  fechandoVia = via;
+  depoisDeFechar = depois ?? null;
+  if (estadoHist()?.[MARCA_CHEIA]) {
+    try { history.back(); } catch { fecharCheia(via); return; }
+    // reserva: um navegador que não devolve o popstate (ou demora) não prende ninguém na tela cheia
+    reservaDoFechar = window.setTimeout(() => { reservaDoFechar = null; if (cheiaAberta) fecharCheia(via); }, 700);
+  } else fecharCheia(via);
+}
+
+/** O Pix mudou de tela com a tela cheia aberta (pagou no banco e voltou com a demo aberta): fecha na hora, sem esperar o histórico. */
+let pularProximoPop = false;
+function fecharCheiaJa(via: string) {
+  if (!cheiaAberta) return;
+  if (estadoHist()?.[MARCA_CHEIA]) { pularProximoPop = true; try { history.back(); } catch { pularProximoPop = false; } }
+  fecharCheia(via);
+}
+
+window.addEventListener("popstate", (e: PopStateEvent) => {
+  if (!V2 || !document.contains(celular)) return; // !contains: uma página anterior deste mesmo documento (testes) não mexe na atual
+  const marca = !!(e.state && typeof e.state === "object" && (e.state as EstadoHist)[MARCA_CHEIA]);
+  if (pularProximoPop) { pularProximoPop = false; if (!marca) return; }
+  if (cheiaAberta && !marca) fecharCheia(fechandoVia ?? "voltar");
+  else if (!cheiaAberta && marca && ehModuloLanding((e.state as EstadoHist).m)) abrirCheia((e.state as EstadoHist).m as ModuloLanding, "avancar", Math.round(window.scrollY || 0));
+});
+document.addEventListener("keydown", (e) => { if (cheiaAberta && e.key === "Escape" && document.contains(celular)) pedirFechar("seta"); });
+cheiaVoltar?.addEventListener("click", () => pedirFechar("seta"));
+cheiaComprar?.addEventListener("click", () => {
+  evento("landing_cta", { onde: "demo_tela_cheia", fase: estado.fase });
+  pedirFechar("comprar", () => rolarAte($("oferta"), "start", false));
+});
+document.getElementById("lp2-demo-cartao")?.addEventListener("click", () => { evento("landing_cta", { onde: "testar_app_cartao" }); abrirCheia(moduloAtual, "cartao"); });
 
 /* ───────────────────────── 1. topo: a área ───────────────────────── */
 document.querySelectorAll<HTMLButtonElement>(".lp-area").forEach((b) => {
@@ -293,7 +425,9 @@ document.querySelectorAll<HTMLButtonElement>(".lp-area").forEach((b) => {
   });
 });
 document.querySelectorAll<HTMLButtonElement>(".lp-pilula[data-m]").forEach((b) => b.addEventListener("click", () => {
-  if (ehModuloLanding(b.dataset.m)) abrirModulo(b.dataset.m, "pilula");
+  if (!ehModuloLanding(b.dataset.m)) return;
+  if (V2) { evento("landing_demo_modulo", { modulo: b.dataset.m, via: "pilula" }); abrirCheia(b.dataset.m, "pilula"); return; } // v2: a pílula abre a tela cheia já no módulo
+  abrirModulo(b.dataset.m, "pilula");
 }));
 document.querySelectorAll<HTMLButtonElement>(".lp-mod[data-m]").forEach((b) => b.addEventListener("click", () => {
   if (!ehModuloLanding(b.dataset.m)) return;
@@ -368,7 +502,8 @@ const porRotulo = (b: Element | null, t: string) => {
   const n = b.firstChild;
   if (n && n.nodeType === Node.TEXT_NODE) n.textContent = b.querySelector("svg") ? `${t} ` : t; else b.prepend(`${t} `);
 };
-const fixoValeEl = (): HTMLElement | null => (V2 ? fixo.querySelector<HTMLElement>(".lp2-fixo-p span") : null);
+/** v2: a barra de baixo da tela cheia repete a barra fixa (preço/"Pix gerado · vale por" + o mesmo rótulo do botão) */
+const barrasDePreco = (): HTMLElement[] => (V2 ? [fixo, document.querySelector<HTMLElement>(".lp2-cheia-baixo")].filter((x): x is HTMLElement => !!x) : []);
 let rotulosDe = "";
 function atualizarRotulos() {
   if (!V2) return;
@@ -378,13 +513,15 @@ function atualizarRotulos() {
   rotulosDe = chave;
   porRotulo($("lp-cta-topo"), t);
   porRotulo(fixo.querySelector('button[data-so-lp="v2"]'), t);
+  porRotulo(document.getElementById("lp2-cheia-comprar"), t);
   porRotulo(document.querySelector('#fim button[data-so-lp="v2"]'), t);
   const fim = $("fim");
   fim.dataset.fase = jaTem ? "conta" : estado.fase;
   const fimP = fim.querySelector<HTMLElement>('p[data-so-lp="v2"]');
   if (fimP) fimP.textContent = jaTem || estado.fase === "conta" ? "Sua conta está pronta." : estado.fase === "pago" ? "Pagamento confirmado. Falta só o seu e-mail." : estado.fase === "qr" ? "Seu Pix está logo acima." : "Vitalício por R$ 27,90 · Pix na hora";
-  const fixoB = fixo.querySelector<HTMLElement>(".lp2-fixo-p b"); const fixoS = fixoValeEl();
-  if (fixoB && fixoS) {
+  for (const barra of barrasDePreco()) {
+    const fixoB = barra.querySelector<HTMLElement>(".lp2-fixo-p b"); const fixoS = barra.querySelector<HTMLElement>(".lp2-fixo-p span");
+    if (!fixoB || !fixoS) continue;
     if (estado.fase === "qr" && estado.pix) { fixoB.textContent = "Pix gerado"; fixoS.textContent = `vale por ${mmss(Math.max(0, venceEm(estado.pix) - Date.now()))}`; }
     else { fixoB.textContent = "R$ 27,90"; fixoS.innerHTML = "Vitalício<i> · Pix</i>"; }
   }
@@ -991,6 +1128,7 @@ function render() {
   const primeira = telaRenderizada === null;
   telaRenderizada = tela;
   if (primeira && tela === "oferta||||") return; // a página abrindo na oferta: nada a rolar
+  if (cheiaAberta) fecharCheiaJa("fase"); // a tela do cartão mudou (ex.: pagou no banco com a demo aberta) — a página precisa estar solta pra rolar
   rolarAte(card, "start", !primeira); // no arranque (Pix vivo / pago / conta): direto, sem a página "descendo" (r1 pix 4)
 }
 function renderDoCartao() {
@@ -1071,7 +1209,7 @@ function renderDoCartao() {
       const el = document.getElementById("lp-validade");
       const resta = venceEm(p) - Date.now();
       if (el) el.textContent = resta > 0 ? `Este código vale por ${mmss(resta)}` : "Este código venceu.";
-      const fv = fixoValeEl(); if (fv && resta > 0) fv.textContent = `vale por ${mmss(resta)}`;
+      if (resta > 0) for (const barra of barrasDePreco()) { const fv = barra.querySelector<HTMLElement>(".lp2-fixo-p span"); if (fv) fv.textContent = `vale por ${mmss(resta)}`; }
       if (resta <= 0) {
         window.clearInterval(relogio!);
         if (V2) { vencido = p; avisoOferta = avisoVenceu(!!(estado.emailPix || lerCompra()?.email)); try { ss(`landing-venceu-${p.orderId}`, "1"); } catch { /* noop */ } evento("landing_pix_venceu", { order_id: p.orderId, via: "relogio" }); }
@@ -1200,6 +1338,16 @@ if (estado.fase !== "oferta") {
   if (V2) window.addEventListener("load", () => rolarAte(card, "start", false), { once: true });
 }
 if (V2 && avisoOferta && estado.fase === "oferta" && !jaTem) { render(); conferirVencidoEmLoop(); } // o Pix venceu há pouco: o aviso fica, e a conferência segue
+
+/* v2 (30/10 noite): a aba recarregou com a demo em tela cheia aberta (o Instagram recarrega) → reabre no mesmo módulo, com a página
+ * parada no mesmo y por baixo. Com Pix vivo, pago, aviso de vencido ou "já tem" o cartão manda (y 0): a marca sai do histórico. */
+{
+  const h = V2 ? estadoHist() : null;
+  if (h?.[MARCA_CHEIA]) {
+    if (estado.fase === "oferta" && !jaTem && !avisoOferta && ehModuloLanding(h.m)) abrirCheia(h.m, "recarga", typeof h.y === "number" ? h.y : 0);
+    else { try { const resto: EstadoHist = { ...h }; delete resto[MARCA_CHEIA]; history.replaceState(resto, ""); } catch { /* noop */ } }
+  }
+}
 
 /* ───────────────────────── medição invisível (29/10) ───────────────────────── */
 /* qual dúvida abre: 1x por pergunta por visita */

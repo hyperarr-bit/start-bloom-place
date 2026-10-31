@@ -7,6 +7,7 @@ import { VoltaDaDemoProvider, type VoltaDaDemo } from "@/lib/volta-da-demo";
 import { NavegacaoDaDemo } from "@/pages/experimente/navegacao";
 import { CarregandoModulo } from "@/pages/experimente/modulos";
 import { desvioNaLanding, ehModuloLanding, moduloDaLanding, type MensagemDaDemo, type ModuloLanding } from "@/landing/regras";
+import { financasNoNumeroDaLanding } from "@/lib/preview-seeds-financas-landing";
 
 /**
  * A DEMO DENTRO DA LANDING NOVA — /organizar/demo?m=<módulo> (28/10). Só existe DENTRO do iframe da /organizar
@@ -21,6 +22,9 @@ import { desvioNaLanding, ehModuloLanding, moduloDaLanding, type MensagemDaDemo,
  *   → landing:oferta {destino}     algo que só existe com conta (login, /home, conquistas…): a página rola até o preço
  *   → landing:mexeu {modulo}       1º toque da pessoa em cada módulo
  * Os 16 módulos sob demanda (o mesmo lazy do /preview). Sempre no tema claro (a página é clara).
+ * 30/10 (landing v2, &lp=v2 na URL do iframe): Finanças com os gastos do mês acompanhando o dia — o "quanto posso gastar hoje"
+ * fecha nos R$ 146 que a página promete em qualquer dia do mês (lib/preview-seeds-financas-landing). Sem o parâmetro (o braço
+ * atual), as sementes de sempre.
  */
 const lazyModulo = (carregar: () => Promise<{ default?: unknown }>) =>
   lazy(async () => {
@@ -50,6 +54,9 @@ const MODULOS: Record<ModuloLanding, React.ComponentType> = {
 const dentroDaLanding = (): boolean => {
   try { return window.parent !== window && window.parent.location.origin === window.location.origin; } catch { return false; }
 };
+const paginaDeCimaEhV2 = (): boolean => {
+  try { return window.parent !== window && window.parent.document.documentElement.getAttribute("data-lp") === "v2"; } catch { return false; }
+};
 const avisar = (m: MensagemDaDemo) => {
   try { window.parent.postMessage(m, window.location.origin); } catch { /* sem a página, nada a avisar */ }
 };
@@ -68,6 +75,8 @@ export default function DemoDaLanding() {
   const [params] = useSearchParams();
   const [modulo, setModulo] = useState<ModuloLanding>(() => moduloDaLanding(params.get("m")));
   const naLanding = useMemo(dentroDaLanding, []);
+  // &lp=v2 na URL; ou a página de cima é o braço v2 (a guarda de rota volta pra /organizar/demo SEM a busca — o número não pode mudar)
+  const numeroDaLanding = useMemo(() => params.get("lp") === "v2" || paginaDeCimaEhV2(), [params]);
   const mexeu = useRef(new Set<string>());
 
   useLayoutEffect(() => {
@@ -121,7 +130,7 @@ export default function DemoDaLanding() {
     <VoltaDaDemoProvider value={volta}>
       <div className="min-h-[100dvh] bg-background [overflow-x:clip]" data-testid="landing-demo" data-modulo={modulo}>
         <DemoDoFunilProvider value={demoDoFunil}>
-          <PreviewUserDataProvider key={modulo} moduleKey={modulo} aoGravar={aoGravar}>
+          <PreviewUserDataProvider key={modulo} moduleKey={modulo} aoGravar={aoGravar} semente={numeroDaLanding ? financasNoNumeroDaLanding : undefined}>
             <NavegacaoDaDemo desviar={desviar}>
               <RouteErrorBoundary routeName={`landing-demo-${modulo}`}>
                 <Suspense fallback={<CarregandoModulo />}>

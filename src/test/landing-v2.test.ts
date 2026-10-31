@@ -316,14 +316,32 @@ describe("braço v2 · cartão, avaliações, como funciona, dúvidas, demo, fim
     expect(card.querySelector("#lp-pagar-txt")!.textContent).toBe("Pagar R$ 27,90 no Pix");
     expect(html().querySelector("#oferta .lp-garantia")!.getAttribute("data-so-lp")).toBe("atual");
   });
-  it("avaliações do v2: 4 textos reais das lojas (os mesmos da página de hoje), 'Design ótimo… sem ser complexas' em 1º, 'no Google Play'; sem nota nem quantidade", () => {
+  it("avaliações do v2 (30/10 noite, dono: 'faz as 2'): 4 textos reais das lojas, 'Design ótimo…' em 1º; cada uma com ★★★★★ e 'apelido · loja · mês/ano' — o apelido EXATO da loja; os 2 do Google Play com data-nome vazio (só loja · mês); sem nota média nem quantidade", () => {
     const d = html();
     const deHoje = [...d.querySelectorAll("#avaliacoes blockquote")].map((b) => b.textContent);
     const doV2 = [...d.querySelectorAll("#avaliacoes-v2 .lp-aval")];
     expect(doV2).toHaveLength(4);
     expect(doV2[0].querySelector("blockquote")!.textContent).toBe("“Design ótimo, interfaces completas sem ser complexas. Agradável de usar.”");
-    for (const a of doV2) { expect(deHoje).toContain(a.querySelector("blockquote")!.textContent); expect(a.querySelector("figcaption")!.textContent).toMatch(/^Avaliação (no Google Play|na App Store)$/); }
-    expect(d.querySelector("#avaliacoes-v2")!.textContent).not.toMatch(/\d[,.]\d|avaliações|★/);
+    const linhas = doV2.map((a) => ({
+      texto: a.querySelector("blockquote")!.textContent,
+      estrelas: a.querySelector(".lp2-estrelas")!.textContent,
+      rotulo: a.querySelector(".lp2-estrelas")!.getAttribute("aria-label"),
+      nome: a.querySelector(".lp2-aval-nome")!.getAttribute("data-nome"),
+      legenda: a.querySelector("figcaption")!.textContent,
+      icone: a.querySelector("figcaption svg path")!.getAttribute("d")!.slice(0, 6),
+    }));
+    for (const l of linhas) { expect(deHoje).toContain(l.texto); expect(l.estrelas).toBe("★★★★★"); expect(l.rotulo).toBe("5 de 5 estrelas"); }
+    expect(linhas.map((l) => [l.nome, l.legenda])).toEqual([
+      ["", "Google Play · set/2026"],
+      ["", "Google Play · ago/2026"],
+      ["camvbs", "App Store · out/2026"],
+      ["ywonvu", "App Store · set/2026"],
+    ]);
+    expect(linhas.map((l) => l.icone)).toEqual(["M3.6 2", "M3.6 2", "M16.4 ", "M16.4 "]); // o ícone da loja certa (Play × Apple)
+    // o nome vem do data-nome pelo CSS ("camvbs ·"); vazio = some (fica só "Google Play · set/2026")
+    expect(HTML).toContain('.lp2-aval-nome::after { content: attr(data-nome) " ·";');
+    expect(HTML).toContain('.lp2-aval-nome[data-nome=""] { display: none; }');
+    expect(d.querySelector("#avaliacoes-v2")!.textContent).not.toMatch(/\d[,.]\d|\d+ avaliações/);
   });
   it("como funciona (v2): 3 passos — Pix aqui na página · entre com o e-mail da compra (vale nos 2 braços do checkout; lojas em texto, sem link) · comece pelo dinheiro", () => {
     const d = html();
@@ -348,13 +366,30 @@ describe("braço v2 · cartão, avaliações, como funciona, dúvidas, demo, fim
     expect(gratis.querySelector("p")!.textContent).toBe("Não, mas dá pra mexer na demonstração logo abaixo, e você tem 7 dias de garantia: se não gostar, devolvemos 100% no Pix.");
     expect(gratis.querySelector('button.lp2-link[data-ir="demo"]')!.textContent).toBe("demonstração logo abaixo");
   });
-  it("a demo no v2 é opcional e compacta: 'Testar o app' em cima do print, o iframe só tem src no toque, o celular só cresce quando abre", () => {
+  it("a demo no v2 (30/10 noite, dono: 'a proporção ficou estranha'): na página um cartão no estilo do 'Por dentro' (celular em proporção real, corte reto) + 'Testar o app aqui' + pílulas; o iframe só tem src no toque; o .lp-celular vira a camada de TELA CHEIA (fixa, 100dvh, voltar em cima, preço + botão embaixo)", () => {
     const d = html();
-    expect(d.querySelector("#lp-demo-abrir")!.getAttribute("data-so-lp")).toBe("v2");
+    const cartao = d.querySelector("#lp2-demo-cartao")!;
+    expect(cartao.getAttribute("data-so-lp")).toBe("v2");
+    expect(cartao.classList.contains("lp2-foto")).toBe(true);
+    const img = cartao.querySelector(".lp2-fone .lp2-fone-tela img")!;
+    expect(img.getAttribute("data-src")).toBe("/landing/v3-home.webp"); // a da 1ª tela: 0 bytes a mais
+    expect(img.getAttribute("style")).toBe("aspect-ratio:720/1070"); // proporção real (nunca esticado)
+    expect(HTML).toMatch(/\.lp2-foto \.lp2-fone \{[^}]*border-bottom-left-radius: 0; border-bottom-right-radius: 0; \}/); // o corte reto dos painéis
+    const botao = d.querySelector("#lp-demo-abrir")!;
+    expect(botao.getAttribute("data-so-lp")).toBe("v2");
+    expect(botao.closest("#lp-celular")).toBeNull(); // fora da camada (na página)
+    expect(txt(botao)).toBe("Testar o app aqui");
+    expect([...d.querySelectorAll("#demo .lp-pilula[data-m]")].map((b) => b.getAttribute("data-m"))).toEqual(["financas", "rotina", "treino", "dieta", "saude"]);
     expect(d.querySelector("#lp-demo-frame")!.getAttribute("src")).toBeNull();
-    // r3 (visitante-frio 4): fechada, a caixa é um celular em RETRATO de 240 px (a Home de 720 px a 0,95 em @3x), cortado embaixo e sumindo no branco
-    expect(HTML).toContain('html[data-lp="v2"] .lp-celular:not([data-abrindo]):not([data-pronta]) { height: 220px; width: 240px; border-bottom: 0; border-radius: 34px 34px 0 0; box-shadow: none;');
-    expect(HTML).toMatch(/html\[data-lp="v2"\] \.lp-celular:not\(\[data-abrindo\]\):not\(\[data-pronta\]\) \.lp2-demo-abrir \{ top: 38%; \}/);
+    // a camada: o próprio .lp-celular (o iframe nunca muda de lugar no DOM — mover recarrega)
+    expect(HTML).toContain('html[data-lp="v2"] .lp-celular { position: fixed; z-index: 200; top: 0; left: 0; right: 0; width: 100%; height: 100vh; height: 100dvh;');
+    expect(HTML).toContain('html[data-lp="v2"][data-demo-cheia] .lp-celular { visibility: visible; transform: none;');
+    expect(d.querySelector("#lp-celular .lp2-cheia-topo #lp2-cheia-voltar")).not.toBeNull();
+    expect(txt(d.querySelector("#lp2-cheia-voltar"))).toBe("Voltar");
+    expect(txt(d.querySelector("#lp-celular .lp2-cheia-onde"))).toBe("Demonstração · Finanças");
+    expect(txt(d.querySelector("#lp-celular .lp2-cheia-baixo"))).toBe("R$ 27,90Vitalício · PixQuero organizar minha vida");
+    expect(HTML).toMatch(/\.lp2-cheia-topo \{[^}]*padding: env\(safe-area-inset-top\)/);
+    expect(HTML).toMatch(/\.lp2-cheia-baixo \{[^}]*calc\(10px \+ env\(safe-area-inset-bottom\)\)/);
     expect([...d.querySelectorAll('#demo [data-so-lp="v2"]')].map((e) => e.textContent)).toContain("Quer mexer antes de pagar?");
   });
   it("um verbo só no v2 — topo, fixo (com o preço ao lado, numa linha) e fim dizem 'Quero organizar minha vida'; o atual segue 'Quero organizar tudo'", () => {
@@ -383,7 +418,7 @@ describe("braço v2 · cartão, avaliações, como funciona, dúvidas, demo, fim
     const d = html();
     expect(d.querySelector('img[src*="/landing/v3-"]')).toBeNull();
     const imgs = [...d.querySelectorAll('img[data-src*="/landing/v3-"]')];
-    expect(imgs).toHaveLength(6);
+    expect(imgs).toHaveLength(7); // 30/10 noite: + a Home no cartão da demo (a mesma URL da 1ª tela: 0 bytes a mais)
     for (const i of imgs) { expect(i.closest('[data-so-lp="v2"]')).not.toBeNull(); expect(i.hasAttribute("src")).toBe(false); }
     const home = d.querySelector("#lp2-fone-home img")!;
     expect(home.hasAttribute("fetchpriority")).toBe(false);
@@ -398,7 +433,7 @@ describe("braço v2 · cartão, avaliações, como funciona, dúvidas, demo, fim
     const demoScript = d.querySelector("#lp-celular script")!;
     expect(demoScript.getAttribute("data-so-lp")).toBe("v2");
     expect(demoScript.textContent).toContain('di.src = "/landing/v3-home.webp"'); // r3 (visitante-frio 4 / prova-e-meio 1.5): a Home da 1ª tela, num celular em retrato
-    expect(HTML).toMatch(/\.lp-celular:not\(\[data-abrindo\]\):not\(\[data-pronta\]\) \{ height: 220px; width: 240px; border-bottom: 0; border-radius: 34px 34px 0 0;[^}]*mask-image/);
+    expect(HTML).toContain('html[data-lp="v2"] .lp-celular img { display: none; }'); // 30/10 noite: na tela cheia sem o print esticado (fundo branco + "Abrindo o app…")
     expect(d.querySelector("#lp-demo-img")!.getAttribute("src")).toBe("/landing/demo-financas.webp");
     expect(d.querySelector('img[src*="/landing/v2-"]')).toBeNull();
   });
@@ -429,11 +464,11 @@ const dispara = (achar: (o: IOFake) => boolean, entradas: Entrada[]) => { const 
  * só dispara quando o teste manda — senão a demo do braço atual começaria "perto" na hora e nada daria pra medir */
 const IO_DO_SETUP = (window as unknown as { IntersectionObserver: unknown }).IntersectionObserver;
 const trocarIO = (v: unknown) => { (window as unknown as { IntersectionObserver: unknown }).IntersectionObserver = v; (globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver = v; };
-async function abrirPagina(lp: "atual" | "v2" | null, checkout: "livre" | "email" = "livre") {
+async function abrirPagina(lp: "atual" | "v2" | null, checkout: "livre" | "email" = "livre", estadoDoHistorico: unknown = null) {
   await dormir(25); // o rAF (landing_html) da página anterior esvazia antes de zerar a lista de eventos
   vi.resetModules();
   localStorage.clear(); sessionStorage.clear(); apagarCookies();
-  window.history.replaceState(null, "", "/organizar");
+  window.history.replaceState(estadoDoHistorico, "", "/organizar"); // 30/10 noite: um estado = a aba recarregou com ele (a tela cheia da demo aberta)
   (window as unknown as { __eventosLanding?: Ev[] }).__eventosLanding = [];
   IOFake.inst = [];
   trocarIO(IOFake);
@@ -441,6 +476,7 @@ async function abrirPagina(lp: "atual" | "v2" | null, checkout: "livre" | "email
   document.documentElement.setAttribute("data-oferta", "sempre");
   document.documentElement.setAttribute("data-checkout", checkout);
   if (lp) document.documentElement.setAttribute("data-lp", lp); else document.documentElement.removeAttribute("data-lp");
+  document.documentElement.removeAttribute("data-demo-cheia"); document.body.removeAttribute("style"); // a tela cheia de um teste anterior
   document.body.innerHTML = corpo;
   await import("@/landing/landing");
 }
@@ -512,13 +548,13 @@ describe("nos DOIS braços: braco_lp em todo evento, pixel cedo, demo preguiços
     const celular = document.getElementById("lp-celular")!;
     expect(celular.hasAttribute("data-abrindo")).toBe(false);
     (document.getElementById("lp-demo-abrir") as HTMLButtonElement).click();
-    expect(frame().getAttribute("src")).toBe("/organizar/demo?m=financas");
+    expect(frame().getAttribute("src")).toBe("/organizar/demo?m=financas&lp=v2"); // &lp=v2: o número da demo nos R$ 146 da página
     expect(celular.hasAttribute("data-abrindo")).toBe(true);
-    expect(eventos().find((e) => e.nome === "landing_demo_aberta")).toMatchObject({ via: "botao" });
+    expect(eventos().find((e) => e.nome === "landing_demo_aberta")).toMatchObject({ via: "tela_cheia", origem: "botao" });
     expect(eventos().find((e) => e.nome === "landing_cta" && e.onde === "testar_app")).toBeTruthy();
     await abrirPagina("v2");
     (document.querySelector('.lp-pilula[data-m="treino"]') as HTMLButtonElement).click();
-    expect(frame().getAttribute("src")).toBe("/organizar/demo?m=treino");
+    expect(frame().getAttribute("src")).toBe("/organizar/demo?m=treino&lp=v2");
     expect(diag().demoVia).toBe("pilula");
   });
 
@@ -731,7 +767,7 @@ describe("crítica r1 · 7.1 / 8.1 / 8.2: rede e medição", () => {
   it("7.1 / r2 2.3 / r1 do v3: toda imagem do v2 é data-src no HTML (fora do v2 fica display:none e não baixa); só a da 1ª tela ganha src + high em tempo de parse no v2, com preload no <head> só no v2; o atual não injeta preload nenhum", () => {
     const d = document.createElement("div"); d.innerHTML = corpoDe(HTML);
     const imgs = [...d.querySelectorAll('[data-so-lp="v2"] img')];
-    expect(imgs.length).toBe(6);
+    expect(imgs.length).toBe(7);
     for (const i of imgs) { expect(i.hasAttribute("src")).toBe(false); expect(i.getAttribute("data-src")).toMatch(/^\/landing\/v3-/); expect(i.getAttribute("fetchpriority")).not.toBe("high"); }
     // r1 do v3: o preload da imagem da 1ª tela SÓ no v2 (o <img> vira eager no parse, então é consumido); no atual, nenhum
     expect(HTML).not.toMatch(/rel="preload" as="image"/);
@@ -1249,5 +1285,222 @@ describe("crítica r2 do v3 · aviso do vencido no topo do cartão, 'Copiado ✓
     expect(HTML).toContain('.lp2-disp span + span::before { content: "·";');
     expect(HTML).not.toContain('.lp2-disp span:not(:last-child)::after');
     expect(HTML).toMatch(/\.lp2-foto\.ambar \{ --corte: \.70;/);
+  });
+});
+
+/* ───────── 30/10 noite (dono no iPhone: "a proporção do app ficou estranha"): a demo em TELA CHEIA, sem sair da página ───────── */
+describe("v2 · a demo em tela cheia (voltar do celular, seta, comprar, recarga) + o número da demo", () => {
+  const html = document.documentElement;
+  const aberta = () => html.hasAttribute("data-demo-cheia");
+  const voltou = () => vi.waitFor(() => { if (aberta()) throw new Error("ainda aberta"); }, { timeout: 2000, interval: 10 });
+  const fechadas = () => eventos().filter((e) => e.nome === "landing_demo_fechada");
+  const abertas = () => eventos().filter((e) => e.nome === "landing_demo_aberta");
+  const clicar = (sel: string) => (document.querySelector(sel) as HTMLElement).click();
+  const fingirRolagem = (y: number) => { Object.defineProperty(window, "scrollY", { value: y, configurable: true }); };
+
+  it("abre pelo botão: a camada aparece, a página trava no y de antes (body fixed em −y), 1 entrada no histórico com a marca; a seta fecha por history.back() e devolve o y", async () => {
+    await abrirPagina("v2");
+    const rolagens: number[] = [];
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(((_x: number, y: number) => { rolagens.push(y); }) as typeof window.scrollTo);
+    fingirRolagem(3210);
+    const tamanho = history.length;
+    clicar("#lp-demo-abrir");
+    expect(aberta()).toBe(true);
+    expect(frame().getAttribute("src")).toBe("/organizar/demo?m=financas&lp=v2");
+    expect(history.length).toBe(tamanho + 1);
+    expect(history.state).toMatchObject({ lpDemoCheia: 1, y: 3210, m: "financas" });
+    expect(document.body.style.position).toBe("fixed");
+    expect(document.body.style.top).toBe("-3210px");
+    expect(document.getElementById("lp-celular")!.getAttribute("aria-modal")).toBe("true");
+    expect(abertas()).toEqual([expect.objectContaining({ via: "tela_cheia", origem: "botao", modulo: "financas", vez: 1 })]);
+    expect(document.activeElement?.id).toBe("lp2-cheia-voltar");
+    fingirRolagem(0); // com o body fixo a janela não rola
+    clicar("#lp2-cheia-voltar");
+    await voltou();
+    expect(history.state?.lpDemoCheia).toBeUndefined();
+    expect(document.body.style.position).toBe("");
+    expect(rolagens.at(-1)).toBe(3210); // a pessoa volta EXATAMENTE onde estava
+    expect(fechadas()).toEqual([expect.objectContaining({ via: "seta", modulo: "financas" })]);
+    expect(typeof fechadas()[0].ms).toBe("number");
+    scrollTo.mockRestore();
+  });
+
+  it("o voltar do celular (history.back() de fora) fecha com via 'voltar'; abrir/fechar 3× não empilha histórico nem eventos repetidos; o iframe carrega 1 vez só", async () => {
+    await abrirPagina("v2");
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    const tamanhos: number[] = [];
+    for (let i = 0; i < 3; i++) {
+      clicar("#lp-demo-abrir");
+      expect(aberta()).toBe(true);
+      tamanhos.push(history.length);
+      history.back(); // o gesto/botão de voltar do aparelho
+      await voltou();
+    }
+    expect(new Set(tamanhos).size).toBe(1); // a entrada da tela cheia é reaproveitada (pushState depois do back troca a "frente"): o histórico não cresce
+    expect(abertas().map((e) => e.vez)).toEqual([1, 2, 3]);
+    expect(fechadas().map((e) => e.via)).toEqual(["voltar", "voltar", "voltar"]);
+    expect(frame().getAttribute("src")).toBe("/organizar/demo?m=financas&lp=v2");
+    scrollTo.mockRestore();
+  });
+
+  it("a pílula abre a tela cheia JÁ no módulo (barra de cima com o nome); outra pílula depois troca o módulo da demo", async () => {
+    await abrirPagina("v2");
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    clicar('.lp-pilula[data-m="rotina"]');
+    expect(aberta()).toBe(true);
+    expect(frame().getAttribute("src")).toBe("/organizar/demo?m=rotina&lp=v2");
+    expect(document.getElementById("lp2-cheia-modulo")!.textContent).toBe("Rotina");
+    expect(abertas()[0]).toMatchObject({ origem: "pilula", modulo: "rotina" });
+    expect(eventos().find((e) => e.nome === "landing_demo_modulo")).toMatchObject({ modulo: "rotina", via: "pilula" });
+    clicar("#lp2-cheia-voltar"); await voltou();
+    clicar('.lp-pilula[data-m="treino"]');
+    expect(document.getElementById("lp2-cheia-modulo")!.textContent).toBe("Treino");
+    expect(history.state).toMatchObject({ lpDemoCheia: 1, m: "treino" });
+    clicar("#lp2-cheia-voltar"); await voltou();
+    scrollTo.mockRestore();
+  });
+
+  it("a barra de baixo ('Quero organizar minha vida'): landing_cta {onde: demo_tela_cheia}, fecha (via comprar) e leva ao cartão da oferta (sem rolagem suave)", async () => {
+    await abrirPagina("v2");
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    const rolou: Array<[string, unknown]> = [];
+    const antes = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element, o?: unknown) { rolou.push([this.id, o]); };
+    try {
+      clicar("#lp-demo-abrir");
+      expect(document.querySelector(".lp2-cheia-baixo .lp2-fixo-p")!.textContent).toBe("R$ 27,90Vitalício · Pix");
+      clicar("#lp2-cheia-comprar");
+      await voltou();
+      expect(eventos().find((e) => e.nome === "landing_cta" && e.onde === "demo_tela_cheia")).toMatchObject({ fase: "oferta" });
+      expect(fechadas()).toEqual([expect.objectContaining({ via: "comprar" })]);
+      expect(rolou.at(-1)).toEqual(["oferta", { behavior: "auto", block: "start" }]);
+    } finally { Element.prototype.scrollIntoView = antes; scrollTo.mockRestore(); }
+  });
+
+  it("a seta ← do próprio módulo (a demo avisa 'seta' e depois o destino) fecha UMA vez e devolve o y; algo que só existe com conta fecha e leva ao cartão", async () => {
+    await abrirPagina("v2");
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    clicar("#lp-demo-abrir");
+    const daDemo = (data: unknown) => window.dispatchEvent(new MessageEvent("message", { data, origin: location.origin, source: frame().contentWindow }));
+    daDemo({ tipo: "landing:oferta", destino: "seta" });
+    daDemo({ tipo: "landing:oferta", destino: "/organizar/oferta" });
+    await voltou();
+    expect(fechadas().map((e) => e.via)).toEqual(["seta_app"]);
+    clicar("#lp-demo-abrir");
+    daDemo({ tipo: "landing:oferta", destino: "/conquistas" });
+    await voltou();
+    expect(fechadas().map((e) => e.via)).toEqual(["seta_app", "oferta_app"]);
+    scrollTo.mockRestore();
+  });
+
+  it("recarregou com a tela cheia aberta (o Instagram recarrega a aba): reabre no mesmo módulo e trava no mesmo y, sem 2ª entrada; voltar fecha e devolve o y", async () => {
+    const rolagens: number[] = [];
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(((_x: number, y: number) => { rolagens.push(y); }) as typeof window.scrollTo);
+    history.pushState(null, "", "/organizar"); // a entrada de baixo (a página antes de abrir)
+    const tamanho = history.length;
+    await abrirPagina("v2", "livre", { lpDemoCheia: 1, y: 2800, m: "treino" });
+    expect(aberta()).toBe(true);
+    expect(history.length).toBe(tamanho);
+    expect(frame().getAttribute("src")).toBe("/organizar/demo?m=treino&lp=v2");
+    expect(document.body.style.top).toBe("-2800px");
+    expect(abertas()[0]).toMatchObject({ origem: "recarga", modulo: "treino" });
+    clicar("#lp2-cheia-voltar");
+    await voltou();
+    expect(rolagens.at(-1)).toBe(2800);
+    scrollTo.mockRestore();
+  });
+
+  it("recarregou com a marca da tela cheia MAS com Pix vivo: o cartão manda (não reabre a demo, o iframe não baixa) e a marca sai do histórico", async () => {
+    await abrirPagina("v2", "livre");
+    pagar();
+    await espera('[data-testid="landing-codigo"]');
+    const guardado = localStorage.getItem("landing-estado-v1")!;
+    await abrirPagina("v2", "livre", { lpDemoCheia: 1, y: 2800, m: "financas" });
+    localStorage.setItem("landing-estado-v1", guardado);
+    vi.resetModules();
+    (window as unknown as { __eventosLanding?: Ev[] }).__eventosLanding = [];
+    html.removeAttribute("data-demo-cheia"); document.body.removeAttribute("style");
+    document.body.innerHTML = corpo;
+    await import("@/landing/landing");
+    expect(aberta()).toBe(false);
+    expect(frame().getAttribute("src")).toBeNull();
+    expect(history.state?.lpDemoCheia).toBeUndefined();
+    expect(document.getElementById("lp-card")!.dataset.fase).toBe("qr");
+  });
+
+  it("o Pix mudou de tela com a demo aberta (pagou no banco e voltou com ela aberta): a camada fecha na hora (via 'fase') e a página solta pra rolar até o cartão", async () => {
+    await abrirPagina("v2");
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    pagar(); await espera('[data-testid="landing-codigo"]');
+    clicar("#lp-demo-abrir");
+    expect(aberta()).toBe(true);
+    // a barra de baixo segue a fase (como o botão fixo): "Voltar pro meu Pix" + "Pix gerado · vale por"
+    expect(txt(document.getElementById("lp2-cheia-comprar"))).toBe("Voltar pro meu Pix");
+    expect(document.querySelector(".lp2-cheia-baixo .lp2-fixo-p b")!.textContent).toBe("Pix gerado");
+    simular().pagar();
+    await vi.waitFor(() => { if (document.getElementById("lp-card")!.dataset.fase !== "pago") throw new Error("pago"); }, { timeout: 4000, interval: 40 });
+    expect(aberta()).toBe(false);
+    expect(document.body.style.position).toBe("");
+    expect(fechadas().map((e) => e.via)).toEqual(["fase"]);
+    await dormir(50);
+    expect(history.state?.lpDemoCheia).toBeUndefined();
+    scrollTo.mockRestore();
+  });
+
+  it("braço atual: nada disso existe — a pílula troca o módulo da caixa de hoje, sem camada, sem histórico; o iframe pede a URL de sempre", async () => {
+    await abrirPagina("atual");
+    const tamanho = history.length;
+    clicar('.lp-pilula[data-m="treino"]');
+    expect(aberta()).toBe(false);
+    expect(history.length).toBe(tamanho);
+    expect(document.body.style.position).toBe("");
+    expect(frame().getAttribute("src")).toBe("/organizar/demo?m=treino");
+    expect(abertas()[0]).toMatchObject({ via: "pilula" });
+  });
+});
+
+describe("o número da demo da landing v2 (lib/preview-seeds-financas-landing)", () => {
+  it("'quanto posso gastar hoje' = R$ 146 em TODO dia de meses de 28, 29, 30 e 31 dias, pela conta do app; gastos só até ontem, valores inteiros ≥ 1; freela só no começo do mês e redondo", async () => {
+    const { financasNoNumeroDaLanding } = await import("@/lib/preview-seeds-financas-landing");
+    const { getSeedsForModule } = await import("@/lib/preview-seeds");
+    const { computeDailyBudget, computeMonthlyOutflow, computeLooseBillsOutflow } = await import("@/lib/finance-totals");
+    const { somaParcelasDoMes } = await import("@/lib/finance-parcelas");
+    const sementes = getSeedsForModule("financas");
+    for (const [ano, mes] of [[2026, 1], [2028, 1], [2026, 8], [2026, 9]]) { // fev/26 (28), fev/28 (29), set/26 (30), out/26 (31)
+      const dias = new Date(ano, mes + 1, 0).getDate();
+      for (let dia = 1; dia <= dias; dia++) {
+        const agora = new Date(ano, mes, dia, 12);
+        const s = financasNoNumeroDaLanding(sementes, agora);
+        const renda = s["finance-incomes"].reduce((t: number, i: { value: number }) => t + i.value, 0);
+        const variaveis = s["finance-expenses"].reduce((t: number, e: { value: number }) => t + e.value, 0);
+        const fixos = s["finance-fixed-expenses"].reduce((t: number, e: { value: number }) => t + e.value, 0);
+        const saida = computeMonthlyOutflow(variaveis, fixos, somaParcelasDoMes(s["finance-installments"]), computeLooseBillsOutflow(s["finance-dueDays"], s["finance-fixed-expenses"]));
+        const conta = computeDailyBudget(renda, saida, s["finance-dueDays"], s["finance-fixed-expenses"], agora);
+        expect(Math.round(conta.perDay), `${dia}/${mes + 1}/${ano}`).toBe(146);
+        for (const e of s["finance-expenses"]) { expect(Number(e.date.slice(8))).toBeLessThan(dia); expect(Number.isInteger(e.value) && e.value >= 1).toBe(true); expect(e.date.slice(0, 7)).toBe(`${ano}-${String(mes + 1).padStart(2, "0")}`); }
+        const freela = s["finance-incomes"].find((i: { description: string }) => i.description === "Freela");
+        if (dia >= 15) expect(freela).toBeUndefined();
+        if (freela && dia > 1) expect(freela.value % 50).toBe(0);
+        // crédito só até o dia 20 (o fechamento do Nubank): depois iria pra fatura do mês seguinte
+        for (const e of s["finance-expenses"]) if (e.paymentMethod === "credito") expect(Number(e.date.slice(8))).toBeLessThanOrEqual(20);
+      }
+    }
+  });
+  it("o resto das sementes não muda (renda 6.200, fixos, parcela, metas…); sem Finanças nas sementes, devolve igual", async () => {
+    const { financasNoNumeroDaLanding } = await import("@/lib/preview-seeds-financas-landing");
+    const { getSeedsForModule } = await import("@/lib/preview-seeds");
+    const sementes = getSeedsForModule("financas");
+    const s = financasNoNumeroDaLanding(sementes, new Date(2026, 9, 30, 12));
+    expect(s["finance-incomes"]).toEqual(sementes["finance-incomes"]); // fim do mês: sem freela
+    for (const k of ["finance-fixed-expenses", "finance-installments", "finance-goals", "finance-dueDays", "finance-investments"]) expect(s[k]).toBe(sementes[k]);
+    const rotina = getSeedsForModule("rotina");
+    expect(financasNoNumeroDaLanding(rotina)).toBe(rotina);
+  });
+  it("a demo só usa as sementes da landing com &lp=v2 (ou com a página de cima no v2): o braço atual, o /preview, o /experimente e o /liberar seguem iguais", () => {
+    const fonte = readFileSync(resolve(raiz, "src/pages/organizar/DemoDaLanding.tsx"), "utf8");
+    expect(fonte).toMatch(/params\.get\("lp"\) === "v2" \|\| paginaDeCimaEhV2\(\)/);
+    expect(fonte).toMatch(/semente=\{numeroDaLanding \? financasNoNumeroDaLanding : undefined\}/);
+    const landing = readFileSync(resolve(raiz, "src/landing/landing.ts"), "utf8");
+    expect(landing).toContain("const urlDemo = (m: ModuloLanding) => (V2 ? `/organizar/demo?m=${m}&lp=v2` : `/organizar/demo?m=${m}`);");
   });
 });

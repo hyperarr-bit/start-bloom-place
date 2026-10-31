@@ -118,6 +118,16 @@ w.__landingDiag = diag;
 /* ───────────────────────── a URL do anúncio fica no heap (o Instagram zera o storage, a URL não) ───────────────────────── */
 const URL_DE_CHEGADA = location.href;
 const BUSCA = new URLSearchParams(location.search);
+/** 31/10 (dono testando no iPhone: "testei e não apareceu" — o celular lembrava a compra simulada de um teste antes e pulava
+ *  pra conta pronta): só no simulado, ?zerar=1 apaga a compra, o Pix vivo e o resto desta página no aparelho e recarrega
+ *  sem o parâmetro. Em produção não existe. */
+if (SIMULADO && BUSCA.get("zerar") === "1") {
+  try { esquecerCompra(); esquecerPixVivo(); } catch { /* noop */ }
+  try { localStorage.clear(); sessionStorage.clear(); } catch { /* noop */ }
+  try { for (const c of document.cookie.split(";")) { const n = c.split("=")[0].trim(); if (n) document.cookie = `${n}=; max-age=0; path=/`; } } catch { /* noop */ }
+  BUSCA.delete("zerar");
+  location.replace(`${location.pathname}${BUSCA.toString() ? `?${BUSCA}` : ""}${location.hash}`);
+}
 /** 31/10 (crítica r1 técnico MEDIA 4): só no simulado — ?simconta=ms atrasa a "conta pronta" (o finalizarConta de verdade
  *  leva 1–3 s), pra testar o caminho de produção do 2027 antecipado no navegador. Em produção não existe. */
 const SIM_CONTA_MS = SIMULADO ? Math.min(20_000, Math.max(0, Number(BUSCA.get("simconta")) || 0)) : 0;

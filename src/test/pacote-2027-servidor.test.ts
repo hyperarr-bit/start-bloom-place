@@ -43,9 +43,9 @@ function bancoFalso(opts: { falharUpsert?: boolean } = {}) {
 }
 
 describe("a oferta", () => {
-  it("u2027 = R$ 14,90 (31/10; era 19,90), mesma chave do app, fora do CONCESSAO (não é assinatura), nem plano nem upsell de acesso", () => {
-    expect(PRECOS_HOJE.u2027).toBe(1490);
-    expect(PRECO_2027_CENTAVOS).toBe(1490);
+  it("u2027 = R$ 19,90 (31/10; dono manteve 19,90), mesma chave do app, fora do CONCESSAO (não é assinatura), nem plano nem upsell de acesso", () => {
+    expect(PRECOS_HOJE.u2027).toBe(1990);
+    expect(PRECO_2027_CENTAVOS).toBe(1990);
     expect(CONCESSAO_HOJE.u2027).toBeUndefined();
     expect(DESCRICAO_HOJE.u2027).toBe("CORE seu 2027");
     expect(ehPlanoHoje("u2027")).toBe(false);

@@ -349,7 +349,7 @@ serve(async (req) => {
           return jsonResponse({ error: MENSAGEM_DOWNSELL_INDISPONIVEL, motivo: v.motivo }, 403);
         }
       }
-      /* 31/10 (landing /organizar, "Seu 2027" R$ 14,90 no pós-pago): com `compra` (o pedido do vitalício LN_*), o Pix é UM por
+      /* 31/10 (landing /organizar, "Seu 2027" R$ 19,90 no pós-pago): com `compra` (o pedido do vitalício LN_*), o Pix é UM por
        * compra e vale 24 h — o MESMO código vai pro e-mail de compra confirmada (_shared/pix-upsell.ts). O dono é a conta
        * FINAL (a dona da linha viva do vitalício: pix-vincular / e-mail de destino levam a linha), nunca a anônima. A sessão
        * tem que ser essa conta ou a anônima que pagou. `dono_igual: false` = a página não confirma sozinha (outro texto). */

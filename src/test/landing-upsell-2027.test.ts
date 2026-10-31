@@ -179,7 +179,7 @@ describe("chave LIGADA: oferta → Quero → QR → pago → Pronto → conta co
         const nao = document.getElementById("u27-nao")!;
         expect(nao.textContent).toBe("Agora não · ver minha conta");
         expect(nao.className).toBe("u27-sair"); // botão secundário (44 px no CSS), nos 2 braços
-        expect(oferta.querySelector('[data-testid="u2027-preco"]')!.textContent).toBe("R$ 14,90");
+        expect(oferta.querySelector('[data-testid="u2027-preco"]')!.textContent).toBe("R$ 19,90");
         expect(oferta.textContent).toContain("uma vez, sem mensalidade");
         expect(oferta.textContent).not.toMatch(/só hoje|últim|acaba|minutos/i); // sem pressão falsa
         expect(document.querySelector('[data-testid="landing-conta"]')).toBeNull(); // no LUGAR de "Sua conta está pronta"
@@ -286,7 +286,7 @@ describe("chave LIGADA: os caminhos de saída e de volta", () => {
 
   it("?r=u2027 do e-mail (outro navegador, chave da página até desligada) reabre o MESMO Pix com o texto de quem não confirma aqui", async () => {
     const vence = Date.now() + 20 * 3600e3;
-    const codigo = "00020101021226870014br.gov.bcb.pix2565qrcode.exemplo.com/pix/v2/EMAIL-2027-5204000053039865405" + "14.905802BR6304ABCD";
+    const codigo = "00020101021226870014br.gov.bcb.pix2565qrcode.exemplo.com/pix/v2/EMAIL-2027-5204000053039865405" + "19.905802BR6304ABCD";
     const url = `/organizar?r=u2027&compra=qr_vitalicio_77&pedido=qr_u27_77&pix=${encodeURIComponent(codigo)}&vence=${vence}&utm_source=email_compra`;
     await abrirPagina({ lp: "atual", u2027: false, url });
     const qr = await espera('[data-testid="u2027-qr"]');

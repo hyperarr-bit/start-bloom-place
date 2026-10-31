@@ -507,7 +507,8 @@ describe("a oferta do 2027", () => {
   it("/organizar com a chave off: a oferta da versão A (sem imagem, sem frase nova, sem CSS novo)", () => {
     const { caixa, u } = ofertaDaOrganizar();
     // crítica r1 (técnico BAIXA 9): o HTML inteiro travado = o da versão A (406d92e1), não só a ausência da imagem
-    expect(createHash("sha256").update(caixa.innerHTML).digest("hex")).toBe("2ebec32393055093c2fd526a289465f8f88c54896a8808e37c1bda6ddabdbe15");
+    // 31/10 tarde (dono: 2027 a R$ 19,90): o HTML travado da versão A, com o preço novo — trocando 19,90 por 14,90 volta ao MESMO hash
+    expect(createHash("sha256").update(caixa.innerHTML.replace(/19,90/g, "14,90")).digest("hex")).toBe("2ebec32393055093c2fd526a289465f8f88c54896a8808e37c1bda6ddabdbe15");
     expect(caixa.querySelector("[data-testid=u2027-planner]")).toBeNull();
     expect(caixa.innerHTML).toContain(`<p class="u27-desc">${DESC_U2027}</p>`);
     expect(document.getElementById("lp-u27-planner-css")).toBeNull();
@@ -531,7 +532,7 @@ describe("a oferta do 2027", () => {
     expect(document.getElementById("u27-zoom")).toBeNull();
     expect(caixa.textContent).not.toMatch(/PDF|já organizado|orçamento do ano/);
     expect(caixa.querySelector("#u27-quero")).not.toBeNull();
-    expect(caixa.textContent).toContain("R$ 14,90");
+    expect(caixa.textContent).toContain("R$ 19,90");
     expect(document.getElementById("lp-u27-planner-css")).not.toBeNull();
     u.parar();
   });
@@ -562,7 +563,7 @@ describe("a oferta do 2027", () => {
   it("Fluxo2027 (/hoje e /inicio): off = o caderno desenhado; on = as folhas do planner", () => {
     const r = render(<Fluxo2027 origem="hoje" compra="c-off" valorPago={27.9} versao="visual" onFim={vi.fn()} />);
     // crítica r1: o DOM inteiro da oferta off travado = o da versão A
-    expect(createHash("sha256").update(screen.getByTestId("u2027-oferta").outerHTML).digest("hex")).toBe("8861683e5cf83b137b470d0edab6d94b246b4a10c816dc7bb9213eb097d176cd");
+    expect(createHash("sha256").update(screen.getByTestId("u2027-oferta").outerHTML.replace(/19,90/g, "14,90")).digest("hex")).toBe("8861683e5cf83b137b470d0edab6d94b246b4a10c816dc7bb9213eb097d176cd");
     expect(screen.getByTestId("u2027-ilustra")).toBeTruthy();
     expect(screen.queryByTestId("u2027-planner")).toBeNull();
     r.unmount();

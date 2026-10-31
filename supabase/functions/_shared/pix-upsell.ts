@@ -63,7 +63,7 @@ export const mandaPurchaseMeta = (oferta: string | null | undefined): boolean =>
 
 /* ───────────────────────── preço ───────────────────────── */
 
-/** R$ 14,90 (31/10; era 19,90). A fonte é o PRECOS_HOJE (as 3 funções espalham o mapa). */
+/** R$ 19,90 (31/10 tarde, dono). A fonte é o PRECOS_HOJE (as 3 funções espalham o mapa). */
 export const PRECO_U2027_CENTAVOS = PRECOS_HOJE[OFERTA_2027];
 export const reais = (centavos: number): string => `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
 
@@ -372,7 +372,7 @@ export function htmlPronto2027(a: { email: string }): string {
       <td style="padding:0 8px 0 0;"><a href="https://apps.apple.com/br/app/id6806913181" style="display:inline-block;background:#16121c;color:#fff;text-decoration:none;font-size:13px;font-weight:700;padding:10px 14px;border-radius:10px;">&#63743; App Store</a></td>
       <td><a href="https://play.google.com/store/apps/details?id=br.com.coreaplicativo.app&referrer=utm_source%3Dweb%26utm_medium%3Demail%26utm_campaign%3Dweb_u2027_email" style="display:inline-block;background:#16121c;color:#fff;text-decoration:none;font-size:13px;font-weight:700;padding:10px 14px;border-radius:10px;">&#9654; Google Play</a></td>
     </tr></table>
-    <p style="font-size:12.5px;color:#8a838f;line-height:1.5;margin:16px 0 0;">Foi um pagamento separado de R$ 14,90, uma vez. No computador, é o mesmo CORE em coreaplicativo.com.br.</p>
+    <p style="font-size:12.5px;color:#8a838f;line-height:1.5;margin:16px 0 0;">Foi um pagamento separado de R$ 19,90, uma vez. No computador, é o mesmo CORE em coreaplicativo.com.br.</p>
   </div>
 </div></body></html>`;
 }

@@ -272,8 +272,8 @@ export function voltaDoLembrete(busca: URLSearchParams, agora: number = Date.now
 export function upsell2027DoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): boolean {
   return el.getAttribute("data-u2027") === "on";
 }
-/** R$ 14,90 — o MESMO PRECOS_HOJE.u2027 do servidor (supabase/functions/_shared/ofertas-hoje.ts; o teste confere). */
-export const VALOR_U2027 = 14.9;
+/** R$ 19,90 — o MESMO PRECOS_HOJE.u2027 do servidor (supabase/functions/_shared/ofertas-hoje.ts; o teste confere). */
+export const VALOR_U2027 = 19.9;
 export type EtapaU2027 = "oferta" | "qr" | "pronto" | "fim";
 export type PixU2027 = {
   orderId: string; qrCode: string; qrCodeBase64: string | null; expiresAt: string;

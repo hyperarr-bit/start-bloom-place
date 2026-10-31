@@ -36,7 +36,7 @@
                               desfaz). O braço vai em html[data-lp] e em todo evento landing_* (braco_lp). O braço do
                               e-mail (AB_CHECKOUT) continua sorteado por cima, nos dois.
         UPSELL_2027  "off"  → (31/10) nada muda. "on" = depois do pagamento e do e-mail, o cartão oferece "Seu 2027 organizado"
-                              (R$ 14,90, Pix de 24 h já gerado, uma vez) antes da conta pronta, nos DOIS braços do AB_LP
+                              (R$ 19,90, Pix de 24 h já gerado, uma vez) antes da conta pronta, nos DOIS braços do AB_LP
                               (src/landing/upsell-2027.ts). QA: ?u2027=on|off (fica neste navegador: localStorage + cookie;
                               ?u2027=auto desfaz). Ligada, vira html[data-u2027="on"]. Rollback: "off".
       A divisão 50/50 do /inicio (o mesmo link da campanha) mora no index.html (DIVISAO_INICIO_LANDING, "off").
@@ -49,7 +49,7 @@
         var AB_OFERTA = "off";
         var AB_CHECKOUT = "on"; // 29/10 (dono, depois da compra real pelo braço email): LIGADO. e-mail antes do Pix (braço "email") × checkout de hoje ("livre") — ver o comentário acima
         var AB_LP = "off"; // 30/10: braço "v2" (vitrine) construído e DESLIGADO — "on" liga o 50/50 contra a página de hoje ("atual")
-        var UPSELL_2027 = "off"; // 31/10: "Seu 2027" R$ 14,90 no pós-pago, construído e DESLIGADO — "on" liga nos dois braços (rollback: "off")
+        var UPSELL_2027 = "off"; // 31/10: "Seu 2027" R$ 19,90 no pós-pago, construído e DESLIGADO — "on" liga nos dois braços (rollback: "off")
         var d = document.documentElement, q = null, mem = {};
         try { q = new URLSearchParams(location.search); } catch (e0) {}
         var pega = function (k) { try { return q ? q.get(k) : null; } catch (e) { return null; } };

@@ -58,7 +58,7 @@
  * Pix (`ja_tem`) de quem já tem o CORE pra sempre. Quem nunca comprou vê a página IGUAL (nada muda no HTML nem no 1º render).
  * Pixel: PageView (no HTML) · ViewContent 1x na oferta · InitiateCheckout no Pix gerado · Purchase pelo pagamento.ts
  * (firePixPurchaseOnce, mesmo id da CAPI do servidor).
- * (31/10) "SEU 2027 ORGANIZADO" R$ 14,90 no pós-pago, NOS DOIS BRAÇOS (chave UPSELL_2027 no <head>, padrão "off" → html[data-u2027]
+ * (31/10) "SEU 2027 ORGANIZADO" R$ 19,90 no pós-pago, NOS DOIS BRAÇOS (chave UPSELL_2027 no <head>, padrão "off" → html[data-u2027]
  *   só existe ligada; QA ?u2027=on|off, ?u2027=auto desfaz): quando a conta final fica pronta, o cartão mostra a oferta NO LUGAR de
  *   "Sua conta está pronta" (nunca no "Você já tem o CORE"); "Agora não"/Continuar → a conta pronta de sempre, com as lojas. O módulo
  *   (./upsell-2027.ts) só baixa com a chave ligada ou pelo link do e-mail de compra confirmada (?r=u2027, que reabre o MESMO Pix).
@@ -1419,7 +1419,7 @@ function carregarU2027(): Promise<ModU2027> {
   }
   return carregandoU2027;
 }
-const CODIGO_SIMULADO_U27 = "00020101021226870014br.gov.bcb.pix2565qrcode.exemplo.com/pix/v2/SIMULACAO-SEM-COBRANCA-CORE-2027520400005303986540514.90" + "5802BR5904CORE6009SAO PAULO62070503***6304ABCD";
+const CODIGO_SIMULADO_U27 = "00020101021226870014br.gov.bcb.pix2565qrcode.exemplo.com/pix/v2/SIMULACAO-SEM-COBRANCA-CORE-2027520400005303986540519.90" + "5802BR5904CORE6009SAO PAULO62070503***6304ABCD";
 const apiU2027 = (): import("./upsell-2027").ApiU2027 => SIMULADO
   ? {
     simulado: true,

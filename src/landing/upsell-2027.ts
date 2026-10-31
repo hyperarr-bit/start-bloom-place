@@ -4,7 +4,7 @@
  * (#lp-pix), no mesmo padrão das fases da landing, com o PRÓPRIO <style> (o 1º <style> do landing.html não muda: o
  * braço "atual" é comparado linha a linha com a página de 30/10).
  *
- *   oferta   "✓ Pagamento confirmado" + "O CORE é seu pra sempre…" (a linha da landing) · "Seu 2027 organizado" · R$ 14,90 ·
+ *   oferta   "✓ Pagamento confirmado" + "O CORE é seu pra sempre…" (a linha da landing) · "Seu 2027 organizado" · R$ 19,90 ·
  *            uma vez, sem mensalidade · "Quero · copiar o Pix" · "Agora não · ver minha conta" (botão de 44 px nos 2 braços;
  *            → conta pronta, SEM o plano de 30 dias: 0 em 39). O Pix já está sendo gerado ao mostrar a oferta (pré-aquecido;
  *            o MESMO do e-mail, 24 h).

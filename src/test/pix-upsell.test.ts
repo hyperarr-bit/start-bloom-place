@@ -4,7 +4,7 @@
  *   · u2027/pv149 = 24 h; o vitalício, os LN_*, o w27 = 30 min (como sempre);
  *   · 1 Pix por chave: a 2ª chamada devolve o MESMO; a corrida página × e-mail dá 1 QR só; dono = a conta final;
  *   · META_PURCHASE_UPSELL = false: nos 3 caminhos o upsell só manda a UTMify;
- *   · preço 14,90; o bloco do e-mail só com a chave + LN_* + sem o pacote, depois dos 3 passos de "Como entrar".
+ *   · preço 19,90; o bloco do e-mail só com a chave + LN_* + sem o pacote, depois dos 3 passos de "Como entrar".
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -90,18 +90,18 @@ describe("a validade: upsell 24 h, o resto 30 min (o vitalício não muda)", () 
   });
 });
 
-describe("o preço: R$ 14,90 nos 3 lugares", () => {
-  it("servidor 1490 = página da landing 14,90 = /inicio e /hoje 14,90", () => {
-    expect(PRECOS_HOJE.u2027).toBe(1490);
-    expect(PRECO_U2027_CENTAVOS).toBe(1490);
-    expect(VALOR_U2027).toBe(14.9);
-    expect(VALOR_2027).toBe(14.9);
+describe("o preço: R$ 19,90 nos 3 lugares", () => {
+  it("servidor 1990 = página da landing 19,90 = /inicio e /hoje 19,90", () => {
+    expect(PRECOS_HOJE.u2027).toBe(1990);
+    expect(PRECO_U2027_CENTAVOS).toBe(1990);
+    expect(VALOR_U2027).toBe(19.9);
+    expect(VALOR_2027).toBe(19.9);
   });
 });
 
 describe("garantirPixUpsell: 1 Pix por chave", () => {
   const args = (criarQr: CriarQr, dono = "conta-final", agora = AGORA) => ({
-    chave: chaveU2027("qr_vitalicio_1"), dono, oferta: "u2027", valorCentavos: 1490, descricao: "CORE seu 2027", criarQr,
+    chave: chaveU2027("qr_vitalicio_1"), dono, oferta: "u2027", valorCentavos: 1990, descricao: "CORE seu 2027", criarQr,
     agora: () => agora, esperar: semEspera,
   });
 
@@ -114,9 +114,9 @@ describe("garantirPixUpsell: 1 Pix por chave", () => {
     expect(a).toMatchObject({ orderId: "qr_u27_1", novo: true, dono: "conta-final" });
     expect(a.qrCodeBase64).toMatch(/^data:image\/png;base64,/);
     expect(Date.parse(a.expiresAt) - AGORA).toBe(86_400_000);
-    expect(qr.chamadas[0]).toMatchObject({ valorCentavos: 1490, expiraSegundos: 86_400 });
+    expect(qr.chamadas[0]).toMatchObject({ valorCentavos: 1990, expiraSegundos: 86_400 });
     const ponte = t.analytics_events.find((l) => l.event_name === "pix_order_created")!;
-    expect(ponte).toMatchObject({ user_id: "conta-final", event_data: { order_id: "qr_u27_1", offer: "u2027", amount_cents: 1490 } });
+    expect(ponte).toMatchObject({ user_id: "conta-final", event_data: { order_id: "qr_u27_1", offer: "u2027", amount_cents: 1990 } });
     const b = await garantirPixUpsell(admin, args(qr.criar, "conta-final", AGORA + 3600e3));
     expect(b).toMatchObject({ orderId: "qr_u27_1", qrCode: a.qrCode, novo: false });
     expect(qr.chamadas).toHaveLength(1);
@@ -258,12 +258,12 @@ describe("B. o bloco do 2027 no e-mail de compra confirmada", () => {
     expect(html).not.toContain("já organizado");
     expect(html).not.toContain("orçamento do ano");
     expect(html).toContain("quanto gastar e guardar por mês");
-    expect(html).toContain("R$ 14,90, uma vez");
+    expect(html).toContain("R$ 19,90, uma vez");
     expect(html).toContain("Vale por 24 h.");
     expect(html).toContain("Pagou? A gente avisa por e-mail quando cair.");
     expect(html).toContain("Abrir o Pix");
     // a página pede o Pix da mesma compra → o MESMO código
-    const pagina = await garantirPixUpsell(admin, { chave: chaveU2027("qr_vit_1"), dono: "u1", oferta: "u2027", valorCentavos: 1490, descricao: "x", criarQr: qr.criar });
+    const pagina = await garantirPixUpsell(admin, { chave: chaveU2027("qr_vit_1"), dono: "u1", oferta: "u2027", valorCentavos: 1990, descricao: "x", criarQr: qr.criar });
     expect("qrCode" in pagina && html.includes(pagina.qrCode)).toBe(true);
     expect(qr.chamadas).toHaveLength(1);
   });
@@ -347,9 +347,9 @@ describe("crítica r1 (31/10): os consertos do dinheiro", () => {
   it("o 2º pagamento do 2027 na mesma conta (outro QR vivo) vira evento + chamado de devolução, 1x por pedido; o mesmo pedido em 2 caminhos não", async () => {
     const { admin, t } = bancoFalso({ user_data: [{ user_id: "u1", key: "core-pacote-2027", value: { comprado: true, pedido: "qr_u27_1" } }] });
     (t as Record<string, unknown[]>).support_tickets = [];
-    expect(await registrarDobro2027(admin, { userId: "u1", orderId: "qr_u27_1", amountCents: 1490 })).toBe(false);
-    expect(await registrarDobro2027(admin, { userId: "u1", orderId: "qr_u27_2", amountCents: 1490 })).toBe(true);
-    expect(await registrarDobro2027(admin, { userId: "u1", orderId: "qr_u27_2", amountCents: 1490 })).toBe(false);
+    expect(await registrarDobro2027(admin, { userId: "u1", orderId: "qr_u27_1", amountCents: 1990 })).toBe(false);
+    expect(await registrarDobro2027(admin, { userId: "u1", orderId: "qr_u27_2", amountCents: 1990 })).toBe(true);
+    expect(await registrarDobro2027(admin, { userId: "u1", orderId: "qr_u27_2", amountCents: 1990 })).toBe(false);
     expect(t.analytics_events.filter((l) => l.event_name === "u2027_pago_em_dobro")).toHaveLength(1);
     const tk = (t as Record<string, Array<Record<string, unknown>>>).support_tickets;
     expect(tk).toHaveLength(1);

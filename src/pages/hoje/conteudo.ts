@@ -135,7 +135,7 @@ export type OfertaHoje = "h279" | "h149" | "h279k" | "h149k" | "hv279" | "hv47" 
 
 /** O preço de cada oferta em REAIS (o servidor guarda em centavos: ofertas-hoje.ts PRECOS_HOJE). */
 export const VALOR_OFERTA: Record<OfertaHoje, number> = {
-  h279: 27.9, h149: 14.9, h279k: 37.8, h149k: 24.8, hv279: 27.9, hv47: 47, hv27: 27, hc199: 19.9, pv149: 14.9, pk99: 9.9, u2027: 14.9,
+  h279: 27.9, h149: 14.9, h279k: 37.8, h149k: 24.8, hv279: 27.9, hv47: 47, hv27: 27, hc199: 19.9, pv149: 14.9, pk99: 9.9, u2027: 19.9,
   OFB_up47: 47.9, OFB_down27: 27.9,
 };
 /** 20/10: o vitalício como PLANO do /hoje (OFERTA_HOJE = "vitalicio") — o mesmo produto/preço do /inicio (w27). */

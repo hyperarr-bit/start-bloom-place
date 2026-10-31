@@ -218,7 +218,7 @@ describe("a oferta em PÁGINA PRÓPRIA (versão B)", () => {
     expect(document.documentElement.style.overflow).toBe("hidden");
     expect(pag.querySelector("[data-testid=u2027-faixa]")!.textContent).toBe("Pagamento confirmado · o CORE é seu pra sempre");
     const t = pag.textContent!;
-    for (const s of ["Espera, tem mais uma coisa", "Seu 2027 organizado", "Você planeja em 5 minutos", "3 metas", "Por mês", "R$ 3.200", "12 revisões", "Cofrinho", "52 semanas", "O planner se preenche sozinho", "Baixe quando quiser", "mês em que você baixar", "Toque numa folha", "R$ 14,90", "Quero · copiar o Pix", "Agora não · ver minha conta"]) expect(t).toContain(s);
+    for (const s of ["Espera, tem mais uma coisa", "Seu 2027 organizado", "Você planeja em 5 minutos", "3 metas", "Por mês", "R$ 3.200", "12 revisões", "Cofrinho", "52 semanas", "O planner se preenche sozinho", "Baixe quando quiser", "mês em que você baixar", "Toque numa folha", "R$ 19,90", "Quero · copiar o Pix", "Agora não · ver minha conta"]) expect(t).toContain(s);
     expect(pag.querySelectorAll(".u27p-ex").length).toBe(3); // o app e as 2 folhas: todos marcados EXEMPLO
     expect(pag.querySelector('[data-folha="mes"] img')!.getAttribute("src")).toBe("/landing/planner-2027-core-mes.webp");
     // honestidade: ela acabou de comprar, a conta está vazia — nada de "já vem preenchido"

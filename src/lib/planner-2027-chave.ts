@@ -45,7 +45,31 @@ export type ModoU27Planner = "off" | "on";
 export const U27_PLANNER: ModoU27Planner = "off";
 export const u27PlannerLigado = (busca: string = buscaAtual()): boolean =>
   (forca<ModoU27Planner>("u27planner", "u27planner-force", ["on", "off"], busca) ?? U27_PLANNER) === "on";
-export const DESC_U2027_PLANNER = "Um planner 2027 pra imprimir, montado com as suas metas, o seu dinheiro e as suas datas. E 12 revisões do mês no app.";
+/** crítica r1 (compradora BAIXA 1): "pra imprimir" afastava quem não tem impressora */
+export const DESC_U2027_PLANNER = "Um planner 2027 pra imprimir ou guardar no celular, com as suas metas, o seu dinheiro e as suas datas. E 12 revisões do mês no app.";
 export const LEGENDA_U2027_PLANNER = "Exemplo. O seu sai com o que você planejar.";
+/** o "toque pra ver" sobre a imagem da oferta */
+export const ZOOM_U2027_PLANNER = "Toque pra ver uma folha";
+
+/**
+ * crítica r1 (compradora MEDIA 4): o app do iPhone roda o bundle da build da loja — o planner B (PLANNER_2027) só chega
+ * lá com uma build nova. Enquanto a build com o PLANNER_2027 "on" NÃO estiver na loja, isto fica false e a oferta diz que
+ * o planner com os dados dela sai pelo site. Virar true junto com a build (BUILD.md, "ordem de ligar").
+ */
+export const PLANNER_B_NO_APP_IPHONE = false;
+export const NOTA_U2027_PLANNER = PLANNER_B_NO_APP_IPHONE
+  ? "É separado do CORE que você já pagou. Fica no site e no app do iPhone."
+  : "É separado do CORE que você já pagou. Fica no site e no app do iPhone; o planner com os seus dados sai pelo site.";
+
+/** O "Pronto" com a versão B: o 4º item e o link que abre o Planejar direto (Pacote2027 lê ?planejar=1). */
+export const ITEM_PLANNER_U2027 = "Seu planner 2027, com os seus dados";
+export const CTA_PRONTO_U2027_PLANNER = "Planejar meu 2027 · 5 min";
+export const LINK_PLANEJAR_2027 = "/desenvolvimento?tab=2027&planejar=1";
+
 /** 2 folhas reais (capa + "Meu ano") com dados de exemplo, na direção do app: scripts/planner-2027-miniaturas.ts */
 export const imagemDoPlanner = (estilo: EstiloPlanner = estiloDoPlanner()) => `/landing/planner-2027-${estilo}.webp`;
+/** crítica r1 (compradora MEDIA 2): 640 px borrava no iPhone (DPR 3) — 1x/2x/3x */
+export const srcsetDoPlanner = (estilo: EstiloPlanner = estiloDoPlanner()) =>
+  `/landing/planner-2027-${estilo}.webp 1x, /landing/planner-2027-${estilo}@2x.webp 2x, /landing/planner-2027-${estilo}@3x.webp 3x`;
+/** a folha "Meu ano" sozinha, grande (abre no toque, legível) */
+export const folhaAnoDoPlanner = (estilo: EstiloPlanner = estiloDoPlanner()) => `/landing/planner-2027-${estilo}-ano.webp`;

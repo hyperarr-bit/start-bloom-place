@@ -32,10 +32,11 @@ import { Pacote2027 } from "@/components/pacote-2027/Pacote2027";
 import { CHAVE_PACOTE_2027, CHAVE_PLANO_2027, CHAVE_DICA_2027, novoPlano2027, type Plano2027 } from "@/lib/pacote-2027";
 import { htmlDoPlanner2027 } from "@/lib/pacote-2027-pdf";
 import {
-  EXEMPLO_DO_PLANNER, PLANNER_2027, PLANNER_ESTILO, TOTAL_DE_FOLHAS, estiloDoPlanner, folhasDoPlanner, htmlDoPlannerNovo, lerExtrasDoPlanner,
-  plannerNovoLigado, resumoDoPlanner, cssDoPlanner, type DadosDoPlanner,
+  CONTRASTE_DA_LINHA, EXEMPLO_DO_PLANNER, PLANNER_2027, PLANNER_ESTILO, TOTAL_DE_FOLHAS, estiloDoPlanner, folhasDoPlanner, htmlDoPlannerNovo, lerExtrasDoPlanner,
+  linhasDosTons, contraste, plannerNovoLigado, resumoDoPlanner, cssDoPlanner, type DadosDoPlanner,
 } from "@/lib/planner-2027";
-import { U27_PLANNER, imagemDoPlanner, u27PlannerLigado } from "@/lib/planner-2027-chave";
+import { PLANNER_B_NO_APP_IPHONE, U27_PLANNER, imagemDoPlanner, srcsetDoPlanner, u27PlannerLigado } from "@/lib/planner-2027-chave";
+import { modoDeEntrega } from "@/lib/planner-2027-baixar";
 import { DESC_U2027, criarUpsell2027 } from "@/landing/upsell-2027";
 import { Fluxo2027 } from "@/upsell-2027/Fluxo2027";
 
@@ -74,12 +75,18 @@ describe("as chaves (tudo desligado)", () => {
     const h = htmlDoPlanner2027(p, { marcadas: [1, 2], invertido: false }, new Date(2026, 9, 21));
     expect(createHash("sha256").update(h).digest("hex")).toBe("3b6097b2f88f2b7b6cc1b1d1acc50f13a9a7248036cc93f594c6fccf1c4f32d6");
   });
-  it("as 2 miniaturas da oferta existem (scripts/planner-2027-miniaturas.ts) e são leves", () => {
+  it("as miniaturas da oferta existem em 1x/2x/3x + a folha 'Meu ano' grande (scripts/planner-2027-miniaturas.ts) e são leves", () => {
     for (const e of ["core", "codex"]) {
-      const f = resolve(raiz, `public/landing/planner-2027-${e}.webp`);
-      expect(existsSync(f)).toBe(true);
-      expect(statSync(f).size).toBeLessThan(80 * 1024);
+      for (const [nome, teto] of [["", 80], ["@2x", 160], ["@3x", 240], ["-ano", 160]] as const) {
+        const f = resolve(raiz, `public/landing/planner-2027-${e}${nome}.webp`);
+        expect(existsSync(f)).toBe(true);
+        expect(statSync(f).size).toBeLessThan(teto * 1024);
+      }
     }
+    expect(srcsetDoPlanner("core")).toBe("/landing/planner-2027-core.webp 1x, /landing/planner-2027-core@2x.webp 2x, /landing/planner-2027-core@3x.webp 3x");
+  });
+  it("crítica r1: a oferta não promete o planner B no app do iPhone enquanto a build não estiver na loja", () => {
+    expect(PLANNER_B_NO_APP_IPHONE).toBe(false);
   });
 });
 
@@ -123,6 +130,31 @@ describe("o planner B: 12 folhas, 2 direções, os dados dela", () => {
     const escopado = cssDoPlanner("core", ".pl.pl-core");
     for (const regra of escopado.split("}").map((r) => r.trim()).filter(Boolean)) for (const sel of regra.split("{")[0].split(",")) expect(sel.trim().startsWith(".pl.pl-core")).toBe(true);
   });
+  it("crítica r1: linha de escrever com contraste ≥ 1,8 com o papel em TODO tom (as 2 direções) e 2 px", () => {
+    for (const e of ["core", "codex"] as const) for (const t of linhasDosTons(e)) expect(contraste(t.linha, t.papel)).toBeGreaterThanOrEqual(CONTRASTE_DA_LINHA);
+    expect(cssDoPlanner("core")).toContain("border-bottom:2px solid var(--w");
+    expect(cssDoPlanner("codex")).not.toMatch(/\.pl-sem i\{[^}]*opacity/);
+  });
+  it("crítica r1: trilhas de grid que encolhem (o texto longo corta com '…' em vez de estourar o painel e o calendário)", () => {
+    const css = cssDoPlanner("core");
+    for (const r of [".pl-metas{display:grid;grid-template-columns:minmax(0,1fr)", ".pl-datas{display:grid;grid-template-columns:minmax(0,1fr)", "grid-template-columns:repeat(3,minmax(0,1fr))", ".pl-mes{min-width:0}", ".pl-extra{margin-left:auto"]) expect(css).toContain(r);
+    // a régua de verdade (Chromium + WebKit, 80 letras em toda meta e data): scripts/planner-2027-medir.ts
+  });
+  it("crítica r1: 7+ datas → '+N no calendário' é a 6ª linha da lista (não o cabeçalho); contas fixas: 8 linhas, '8 de N'", () => {
+    const datas = Array.from({ length: 9 }, (_, i) => ({ id: `d${i}`, tipo: "checkup" as const, titulo: "Dentista", dia: `2027-0${i + 1}-10` }));
+    const contas = Array.from({ length: 12 }, (_, i) => ({ nome: `Conta ${i}`, valor: 10, dia: i + 1 }));
+    const f = folhasDoPlanner({ ...EXEMPLO_DO_PLANNER, plano: { ...EXEMPLO_DO_PLANNER.plano, datas }, contas }, "core");
+    expect(f[1]).toContain('<li class="mais">+4 no calendário</li>');
+    expect(f[1]).not.toContain('class="pl-extra">+');
+    expect(f[4]).toContain("8 de 12");
+    expect((f[4].match(/<tr><td>/g) ?? []).length).toBe(12 + 8);
+  });
+  it("crítica r1: a B tem a capa com os 4 módulos que entram e os 3 cards do dinheiro no tom do Finanças", () => {
+    const f = folhasDoPlanner(EXEMPLO_DO_PLANNER, "core");
+    expect((f[0].match(/class="pl-ico"/g) ?? []).length).toBe(4);
+    const cards = f[4].split('class="pl-cards"')[1].split("</div></div>")[0];
+    expect((cards.match(/--p:#fffbeb/g) ?? []).length).toBe(3);
+  });
   it("a impressão do site: A4 sem margem, 1 folha por página, fontes carregadas (Inter + Instrument Serif)", () => {
     const h = htmlDoPlannerNovo(EXEMPLO_DO_PLANNER, "codex", "https://www.coreaplicativo.com.br");
     expect(h).toContain("@page{size:A4;margin:0}");
@@ -131,6 +163,11 @@ describe("o planner B: 12 folhas, 2 direções, os dados dela", () => {
     expect(h).toContain("https://www.coreaplicativo.com.br/fonts/inter-latin.woff2");
     expect(h).not.toContain("googleapis");
     expect((h.match(/class="pg pl-folha/g) ?? []).length).toBe(12);
+    // crítica r1: no celular a janela tinha 591 px e nenhuma saída — barra Voltar/Imprimir (só na tela) e zoom que cabe
+    expect(h).toContain('data-testid="planner-barra-impressao"');
+    expect(h).toContain("← Voltar");
+    expect(h.split("@media print")[1]).toContain(".pl-barra-imp{display:none}");
+    expect(h).toContain("--z");
   });
   it("lê a Rotina e o Finanças: hábitos (formato antigo também), contas fixas SÓ do perfil ativo, por dia; lixo vira lista vazia", () => {
     const store: Record<string, unknown> = {
@@ -146,6 +183,7 @@ describe("o planner B: 12 folhas, 2 direções, os dados dela", () => {
     expect(r.habitos).toEqual(["Beber água", "Treinar"]);
     expect(r.contas.map((c) => c.nome)).toEqual(["Aluguel", "Internet", "Luz"]);
     expect(r.contas[2]).toEqual({ nome: "Luz", valor: 120, dia: null });
+    expect(lerExtrasDoPlanner(<T,>(k: string, f: T) => (k === "finance-fixed-expenses" ? [{ description: "x".repeat(55), value: 1 }] : f) as T).contas[0].nome).toHaveLength(55);
     expect(lerExtrasDoPlanner(<T,>() => ({ lixo: 1 }) as unknown as T)).toEqual({ habitos: [], contas: [] });
   });
 });
@@ -190,11 +228,11 @@ describe("o app: chave off = versão A", () => {
 describe("o app: chave on (QA ?planner27=on)", () => {
   beforeEach(() => { window.history.replaceState(null, "", "/?planner27=on"); });
 
-  it("conta preenchida: prévia das 12 folhas + o que entrou do Seu 2027, da Rotina e do Finanças; sem convite", () => {
+  it("conta preenchida: prévia das 12 folhas + o que entrou do Seu 2027, da Rotina e do Finanças; sem convite", async () => {
     montar(CONTA_CHEIA);
     expect(screen.getByTestId("pacote-2027-pdf").textContent).toBe("🖨️ Seu planner 2027");
     fireEvent.click(screen.getByTestId("pacote-2027-pdf"));
-    const b = screen.getByTestId("planner-b");
+    const b = await screen.findByTestId("planner-b");
     expect(b.getAttribute("data-estilo")).toBe("core");
     expect(screen.getAllByRole("img", { name: /^Folha \d+/ })).toHaveLength(12);
     const itens = screen.getByTestId("planner-b-itens").textContent!;
@@ -204,9 +242,10 @@ describe("o app: chave on (QA ?planner27=on)", () => {
     expect(document.getElementById("pl-css-core")).not.toBeNull();
   });
 
-  it("conta VAZIA: as folhas saem com linhas pra escrever + convite curto pra planejar (abre o Planejar)", () => {
+  it("conta VAZIA: as folhas saem com linhas pra escrever + convite curto pra planejar (abre o Planejar)", async () => {
     montar(CONTA_VAZIA);
     fireEvent.click(screen.getByTestId("pacote-2027-pdf"));
+    await screen.findByTestId("planner-b");
     expect(screen.getAllByRole("img", { name: /^Folha \d+/ })).toHaveLength(12);
     expect(screen.getByTestId("planner-b-itens").textContent).toContain("Metas: linhas pra escrever");
     expect(screen.getByTestId("planner-b").innerHTML).not.toMatch(sujeira);
@@ -220,7 +259,7 @@ describe("o app: chave on (QA ?planner27=on)", () => {
     const abrir = vi.spyOn(window, "open").mockReturnValue(janela as unknown as Window);
     montar(CONTA_CHEIA);
     fireEvent.click(screen.getByTestId("pacote-2027-pdf"));
-    fireEvent.click(screen.getByTestId("planner-b-baixar"));
+    fireEvent.click(await screen.findByTestId("planner-b-baixar"));
     expect(abrir).toHaveBeenCalledTimes(1);
     const html = String(janela.document.write.mock.calls[0][0]);
     expect(html).toContain('class="pl pl-codex"');
@@ -234,23 +273,101 @@ describe("o app: chave on (QA ?planner27=on)", () => {
     const criar = vi.spyOn(document, "createElement");
     montar(CONTA_CHEIA);
     fireEvent.click(screen.getByTestId("pacote-2027-pdf"));
-    expect(screen.getByTestId("planner-b-baixar").textContent).toContain("Salvar ou imprimir");
+    expect((await screen.findByTestId("planner-b-baixar")).textContent).toContain("Salvar ou imprimir");
     fireEvent.click(screen.getByTestId("planner-b-baixar"));
     await waitFor(() => expect(cap.share).toHaveBeenCalledTimes(1), { timeout: 4000 });
     expect(foto.gerarPng).toHaveBeenCalledTimes(12);
     const arg = (cap.share.mock.calls[0] as unknown as [{ files: string[] }])[0];
     expect(arg.files).toHaveLength(12);
-    expect(arg.files[0]).toMatch(/planner-2027-core-01\.png$/);
+    expect(arg.files[0]).toMatch(/\/planner-2027-01\.png$/); // crítica r1: o nome não diz a direção
     expect(criar.mock.calls.filter((c) => c[0] === "a")).toHaveLength(0);
     criar.mockRestore();
+  });
+
+  it("chave off: o módulo não baixa o planner B (import sob demanda) — com a chave on, só quando ela abre", async () => {
+    const fonte = (await import("node:fs")).readFileSync(resolve(raiz, "src/components/pacote-2027/Pacote2027.tsx"), "utf8");
+    expect(fonte).toMatch(/lazy\(\(\) => import\("\.\/PlannerB"\)\)/);
+    expect(fonte).not.toMatch(/from "@\/lib\/planner-2027"/);
+  });
+
+  it("crítica r1: o link do 'Pronto' (?planejar=1) abre o Planejar direto; ?planner=1 abre o planner", async () => {
+    window.history.replaceState(null, "", "/desenvolvimento?tab=2027&planejar=1&planner27=on");
+    const r = montar(CONTA_VAZIA);
+    await waitFor(() => expect(screen.queryByTestId("pacote-2027-boas-vindas")).toBeNull());
+    expect(screen.queryByTestId("pacote-2027-pdf")).toBeNull(); // está no Planejar
+    r.unmount();
+    window.history.replaceState(null, "", "/desenvolvimento?tab=2027&planner=1&planner27=on");
+    montar(CONTA_CHEIA);
+    expect(await screen.findByTestId("planner-b")).toBeTruthy();
+  });
+});
+
+describe("crítica r1: o site no CELULAR não depende do window.print", () => {
+  const UA = navigator.userAgent;
+  const usarUA = (u: string) => Object.defineProperty(navigator, "userAgent", { value: u, configurable: true });
+  const IPHONE_SAFARI = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+  const IPHONE_INSTAGRAM = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 360.0.0.0";
+  beforeEach(() => { window.history.replaceState(null, "", "/?planner27=on"); });
+  afterEach(() => {
+    usarUA(UA);
+    delete (navigator as unknown as Record<string, unknown>).canShare;
+    delete (navigator as unknown as Record<string, unknown>).share;
+  });
+
+  it("o modo de cada lugar: PC imprime; iPhone com Web Share compartilha; Instagram sem Web Share manda pro Safari; app = nativo", () => {
+    expect(modoDeEntrega()).toBe("imprimir");
+    usarUA(IPHONE_INSTAGRAM);
+    expect(modoDeEntrega()).toBe("safari");
+    Object.assign(navigator, { canShare: () => true });
+    expect(modoDeEntrega()).toBe("compartilhar");
+    nativo.v = true;
+    expect(modoDeEntrega()).toBe("nativo");
+  });
+
+  it("Safari do iPhone: 'Preparar as 12 folhas' → 2º toque 'Salvar as 12 folhas' → navigator.share com 12 PNG (sem janela, sem <a download>)", async () => {
+    usarUA(IPHONE_SAFARI);
+    const share = vi.fn(async () => {});
+    Object.assign(navigator, { canShare: () => true, share });
+    const abrir = vi.spyOn(window, "open");
+    const criar = vi.spyOn(document, "createElement");
+    montar(CONTA_CHEIA);
+    fireEvent.click(screen.getByTestId("pacote-2027-pdf"));
+    const b = await screen.findByTestId("planner-b-baixar");
+    expect(b.textContent).toContain("Preparar as 12 folhas");
+    fireEvent.click(b);
+    const de = await screen.findByTestId("planner-b-compartilhar", undefined, { timeout: 4000 });
+    expect(share).not.toHaveBeenCalled(); // o share só sai do 2º toque (gesto fresco)
+    fireEvent.click(de);
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    const arg = (share.mock.calls[0] as unknown as [{ files: File[] }])[0];
+    expect(arg.files).toHaveLength(12);
+    expect(arg.files[11].name).toBe("planner-2027-12.png");
+    expect(abrir).not.toHaveBeenCalled();
+    expect(criar.mock.calls.filter((c) => c[0] === "a")).toHaveLength(0);
+    abrir.mockRestore(); criar.mockRestore();
+  });
+
+  it("navegador do Instagram sem Web Share: 'Abra no Safari' + copiar o link do planner (nunca a janela de impressão)", async () => {
+    usarUA(IPHONE_INSTAGRAM);
+    const escrever = vi.fn(async () => {});
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: escrever }, configurable: true });
+    const abrir = vi.spyOn(window, "open");
+    montar(CONTA_CHEIA);
+    fireEvent.click(screen.getByTestId("pacote-2027-pdf"));
+    expect((await screen.findByTestId("planner-b-safari")).textContent).toContain("abra no Safari");
+    expect(screen.queryByTestId("planner-b-baixar")).toBeNull();
+    fireEvent.click(screen.getByTestId("planner-b-copiar-link"));
+    await waitFor(() => expect(escrever).toHaveBeenCalledWith(`${location.origin}/desenvolvimento?tab=2027&planner=1`));
+    expect(abrir).not.toHaveBeenCalled();
+    abrir.mockRestore();
   });
 });
 
 /* ───────────────────────── a oferta ───────────────────────── */
 
-function ofertaDaOrganizar() {
+function ofertaDaOrganizar(compra = "c1") {
   const caixa = document.createElement("div"), card = document.createElement("div");
-  const u = criarUpsell2027("c1", {
+  const u = criarUpsell2027(compra, {
     caixa, card, evento: () => {}, copiarNoToque: async () => ({ ok: true, via: "x" }), copiarTexto: async () => true, desenharQr: () => {}, email: () => null,
     linhaConfirmada: () => "O CORE é seu pra sempre.", aoTerminar: () => {}, aoMudar: () => {},
     api: { gerar: async () => ({ orderId: "o1", qrCode: "0002", qrCodeBase64: null, expiresAt: "2099-01-01T00:00:00Z", donoIgual: true }), conferir: async () => false, simulado: true },
@@ -263,6 +380,8 @@ describe("a oferta do 2027", () => {
   afterEach(() => { document.getElementById("lp-u27-planner-css")?.remove(); });
   it("/organizar com a chave off: a oferta da versão A (sem imagem, sem frase nova, sem CSS novo)", () => {
     const { caixa, u } = ofertaDaOrganizar();
+    // crítica r1 (técnico BAIXA 9): o HTML inteiro travado = o da versão A (406d92e1), não só a ausência da imagem
+    expect(createHash("sha256").update(caixa.innerHTML).digest("hex")).toBe("2ebec32393055093c2fd526a289465f8f88c54896a8808e37c1bda6ddabdbe15");
     expect(caixa.querySelector("[data-testid=u2027-planner]")).toBeNull();
     expect(caixa.innerHTML).toContain(`<p class="u27-desc">${DESC_U2027}</p>`);
     expect(document.getElementById("lp-u27-planner-css")).toBeNull();
@@ -274,15 +393,48 @@ describe("a oferta do 2027", () => {
     const fig = caixa.querySelector("[data-testid=u2027-planner]")!;
     expect(fig.querySelector("img")!.getAttribute("src")).toBe("/landing/planner-2027-codex.webp");
     expect(fig.textContent).toContain("Exemplo. O seu sai com o que você planejar.");
-    expect(caixa.textContent).toContain("Um planner 2027 pra imprimir, montado com as suas metas");
+    expect(caixa.textContent).toContain("Um planner 2027 pra imprimir ou guardar no celular, com as suas metas");
+    expect(fig.querySelector("img")!.getAttribute("srcset")).toContain("planner-2027-codex@3x.webp 3x");
+    expect(caixa.textContent).toContain("o planner com os seus dados sai pelo site");
+    // tocar na imagem abre a folha "Meu ano" grande; fecha no ×
+    (caixa.querySelector("#u27-zoom-abrir") as HTMLButtonElement).click();
+    const z = document.getElementById("u27-zoom")!;
+    expect(z.querySelector("img")!.getAttribute("src")).toBe("/landing/planner-2027-codex-ano.webp");
+    (z.querySelector("button") as HTMLButtonElement).click();
+    expect(document.getElementById("u27-zoom")).toBeNull();
     expect(caixa.textContent).not.toMatch(/PDF|já organizado|orçamento do ano/);
     expect(caixa.querySelector("#u27-quero")).not.toBeNull();
     expect(caixa.textContent).toContain("R$ 14,90");
     expect(document.getElementById("lp-u27-planner-css")).not.toBeNull();
     u.parar();
   });
+  it("/organizar 'Pronto': off = o da versão A (Continuar); on = 'Seu planner 2027, com os seus dados' + 'Planejar meu 2027' direto", async () => {
+    const pronto = async (url: string, compra: string) => {
+      window.history.replaceState(null, "", url);
+      const { caixa, u } = ofertaDaOrganizar(compra);
+      (caixa.querySelector("#u27-quero") as HTMLButtonElement).click();
+      await waitFor(() => expect(caixa.querySelector("#u27-ja-paguei")).not.toBeNull());
+      (caixa.querySelector("#u27-ja-paguei") as HTMLButtonElement).click();
+      await waitFor(() => expect(caixa.querySelector("[data-testid=u2027-pronto]")).not.toBeNull());
+      u.parar();
+      return caixa;
+    };
+    const off = await pronto("/organizar", "c-pronto-off");
+    expect(off.querySelector("#u27-planejar")).toBeNull();
+    expect(off.querySelector("#u27-continuar")!.textContent).toBe("Continuar");
+    expect(off.textContent).toContain("Planner 2027 pra imprimir");
+    localStorage.clear(); sessionStorage.clear();
+    const on = await pronto("/organizar?u27planner=on", "c-pronto-on");
+    expect(on.textContent).toContain("Seu planner 2027, com os seus dados");
+    const a = on.querySelector<HTMLButtonElement>("#u27-planejar")!;
+    expect(a.textContent).toBe("Planejar meu 2027 · 5 min");
+    expect(a.getAttribute("data-href")).toBe("/desenvolvimento?tab=2027&planejar=1");
+    expect(on.querySelector("#u27-continuar")).not.toBeNull();
+  });
   it("Fluxo2027 (/hoje e /inicio): off = o caderno desenhado; on = as folhas do planner", () => {
     const r = render(<Fluxo2027 origem="hoje" compra="c-off" valorPago={27.9} versao="visual" onFim={vi.fn()} />);
+    // crítica r1: o DOM inteiro da oferta off travado = o da versão A
+    expect(createHash("sha256").update(screen.getByTestId("u2027-oferta").outerHTML).digest("hex")).toBe("8861683e5cf83b137b470d0edab6d94b246b4a10c816dc7bb9213eb097d176cd");
     expect(screen.getByTestId("u2027-ilustra")).toBeTruthy();
     expect(screen.queryByTestId("u2027-planner")).toBeNull();
     r.unmount();
@@ -290,5 +442,9 @@ describe("a oferta do 2027", () => {
     render(<Fluxo2027 origem="hoje" compra="c-on" valorPago={27.9} versao="visual" onFim={vi.fn()} />);
     expect(screen.getByTestId("u2027-planner").querySelector("img")!.getAttribute("src")).toBe("/landing/planner-2027-core.webp");
     expect(screen.queryByTestId("u2027-ilustra")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Toque pra ver uma folha" }));
+    expect(screen.getByTestId("u2027-zoom").querySelector("img")!.getAttribute("src")).toBe("/landing/planner-2027-core-ano.webp");
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    expect(screen.queryByTestId("u2027-zoom")).toBeNull();
   });
 });

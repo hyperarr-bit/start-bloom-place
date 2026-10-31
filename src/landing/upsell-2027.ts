@@ -26,7 +26,10 @@
  */
 import { VALOR_U2027, reais, validadeU2027, type EstadoU2027, type PixU2027 } from "./regras";
 import { gravarEstadoU2027, lerEstadoU2027 } from "./u2027-estado";
-import { DESC_U2027_PLANNER, LEGENDA_U2027_PLANNER, estiloDoPlanner, imagemDoPlanner, u27PlannerLigado } from "@/lib/planner-2027-chave";
+import {
+  CTA_PRONTO_U2027_PLANNER, DESC_U2027_PLANNER, ITEM_PLANNER_U2027, LEGENDA_U2027_PLANNER, LINK_PLANEJAR_2027, NOTA_U2027_PLANNER, ZOOM_U2027_PLANNER,
+  estiloDoPlanner, folhaAnoDoPlanner, imagemDoPlanner, srcsetDoPlanner, u27PlannerLigado,
+} from "@/lib/planner-2027-chave";
 
 export type GeradoU2027 = (PixU2027 & { comEmail?: boolean }) | { jaTem2027: true } | { erro: string; onde: string };
 export type ApiU2027 = {
@@ -133,10 +136,33 @@ const CSS = `
 /* versão B: só entra com a chave U27_PLANNER ligada (desligada, o CSS da página é o da versão A, igual) */
 const CSS_PLANNER = `
 .u27-planner { margin: 12px 0 0; text-align: center; }
-.u27-planner img { display: block; width: 100%; max-width: 300px; height: auto; aspect-ratio: 640 / 460; margin: 0 auto; }
+.u27-planner button { display: block; width: 100%; max-width: 300px; margin: 0 auto; padding: 0; border: 0; background: none; cursor: zoom-in; -webkit-tap-highlight-color: transparent; }
+.u27-planner img { display: block; width: 100%; height: auto; aspect-ratio: 640 / 460; }
 .u27-planner figcaption { margin-top: 2px; font-size: 12.5px; color: var(--fraco, #9a95a0); }
+.u27-planner figcaption u { text-decoration: none; font-weight: 700; color: var(--tx, #1c1a1f); }
 .u27-planner + .u27-desc { margin-top: 10px; }
+.u27-zoom { position: fixed; inset: 0; z-index: 2147483000; background: rgba(20, 18, 24, .86); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 56px 16px 24px; overflow: auto; overscroll-behavior: contain; }
+.u27-zoom img { display: block; width: 100%; max-width: 560px; height: auto; border-radius: 10px; box-shadow: 0 18px 50px -12px rgba(0,0,0,.6); }
+.u27-zoom small { color: #fff; opacity: .8; font-size: 12.5px; letter-spacing: .04em; }
+.u27-zoom button { position: fixed; top: 10px; right: 10px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: #fff; color: #1c1a1f; font-size: 24px; line-height: 44px; cursor: pointer; }
 `;
+/** crítica r1 (compradora MEDIA 2): tocar na imagem abre a folha "Meu ano" grande (legível). Fecha no ×, no toque fora e no Esc. */
+function abrirZoomDoPlanner(aoFechar: () => void): void {
+  if (document.getElementById("u27-zoom")) return;
+  const z = document.createElement("div");
+  z.id = "u27-zoom";
+  z.className = "u27-zoom";
+  z.setAttribute("role", "dialog");
+  z.setAttribute("aria-modal", "true");
+  z.setAttribute("aria-label", "Exemplo de uma folha do planner: Meu ano");
+  z.innerHTML = `<button type="button" aria-label="Fechar">×</button><small>EXEMPLO · O SEU SAI COM O QUE VOCÊ PLANEJAR</small><img src="${folhaAnoDoPlanner()}" width="1080" height="1528" alt="A folha Meu ano do planner 2027, com metas, dinheiro, cofrinho, datas e hábitos de exemplo">`;
+  const fechar = () => { z.remove(); document.removeEventListener("keydown", tecla); aoFechar(); };
+  const tecla = (k: KeyboardEvent) => { if (k.key === "Escape") fechar(); };
+  z.addEventListener("click", (ev) => { if (ev.target === z || (ev.target as HTMLElement).tagName === "BUTTON") fechar(); });
+  document.addEventListener("keydown", tecla);
+  document.body.appendChild(z);
+  z.querySelector<HTMLButtonElement>("button")!.focus();
+}
 function garantirCssPlanner(): void {
   if (document.getElementById("lp-u27-planner-css")) return;
   const st = document.createElement("style");
@@ -196,7 +222,7 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
   const comPlanner = u27PlannerLigado();
   if (comPlanner) {
     garantirCssPlanner();
-    if (typeof Image !== "undefined") { const pre = new Image(); pre.src = imagemDoPlanner(); }
+    if (typeof Image !== "undefined") { const pre = new Image(); pre.srcset = srcsetDoPlanner(); pre.src = imagemDoPlanner(); }
   }
   /** crítica r2: voltou pelo cookie com o storage zerado (a sessão foi junto: esta aba não confere sozinha) */
   let retomada = false;
@@ -353,7 +379,7 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
         <div class="u27-kicker">Quer ir além?</div>
         <h3>${TITULO_U2027}</h3>
         ${comPlanner
-          ? `<figure class="u27-planner" data-testid="u2027-planner"><img src="${imagemDoPlanner()}" width="640" height="460" alt="Duas folhas do planner 2027: a capa e o ano numa página" decoding="async"><figcaption>${LEGENDA_U2027_PLANNER}</figcaption></figure>
+          ? `<figure class="u27-planner" data-testid="u2027-planner"><button type="button" id="u27-zoom-abrir" aria-label="${ZOOM_U2027_PLANNER}"><img src="${imagemDoPlanner()}" srcset="${srcsetDoPlanner()}" width="640" height="460" alt="Duas folhas do planner 2027: a capa e o ano numa página" decoding="async"></button><figcaption>${LEGENDA_U2027_PLANNER} <u>${ZOOM_U2027_PLANNER}</u></figcaption></figure>
         <p class="u27-desc">${DESC_U2027_PLANNER}</p>`
           : `<p class="u27-desc">${DESC_U2027}</p>`}
         <div class="u27-preco"><b data-testid="u2027-preco">${reais(VALOR_U2027)}</b><span>uma vez, sem mensalidade</span></div>
@@ -362,10 +388,12 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
           : '<button type="button" class="lp-cta" id="u27-quero">Quero · copiar o Pix</button>'}
         ${erro ? `<p class="lp-erro" role="alert">${esc(erro)}</p>` : ""}
         <button type="button" class="u27-sair" id="u27-nao">Agora não · ver minha conta</button>
-        <p class="u27-nota">${NOTA_U2027}</p>
+        <p class="u27-nota">${comPlanner ? NOTA_U2027_PLANNER : NOTA_U2027}</p>
       </div>`;
       c.querySelector<HTMLButtonElement>("#u27-quero")!.addEventListener("click", () => { void quero(); });
       c.querySelector<HTMLButtonElement>("#u27-nao")!.addEventListener("click", () => { ev("landing_u2027_nao", { de: "oferta" }); salvar({ etapa: "fim" }); });
+      const zoom = c.querySelector<HTMLButtonElement>("#u27-zoom-abrir");
+      zoom?.addEventListener("click", () => { ev("landing_u2027_zoom"); abrirZoomDoPlanner(() => zoom.focus()); });
       return true;
     }
     if (e.etapa === "qr" && e.pix) {
@@ -417,11 +445,16 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
       <div class="lp-pago u27 u27-pronto" data-testid="u2027-pronto">
         <div class="lp-pago-check">${ICO_CHECK}</div>
         <h3>Pronto, seu 2027 tá no seu CORE</h3>
-        <ul class="u27-lista">${ITENS_U2027.map((t) => `<li>${ICO_CHECK}<span>${t}</span></li>`).join("")}</ul>
+        <ul class="u27-lista">${(comPlanner ? [...ITENS_U2027.slice(0, 3), ITEM_PLANNER_U2027] : ITENS_U2027).map((t) => `<li>${ICO_CHECK}<span>${t}</span></li>`).join("")}</ul>
         <div class="u27-onde" data-testid="u2027-onde">${ONDE_U2027}${email ? ` Entre com <b>${esc(email)}</b>.` : ""}</div>
-        <div class="lp-form"><button type="button" class="lp-cta" id="u27-continuar">Continuar</button></div>
+        ${comPlanner
+          ? `<div class="lp-form"><button type="button" class="lp-cta" id="u27-planejar" data-testid="u2027-planejar" data-href="${LINK_PLANEJAR_2027}">${CTA_PRONTO_U2027_PLANNER}</button></div>
+        <div class="lp-links"><button type="button" class="lp-link" id="u27-continuar">Depois · ver minha conta</button></div>`
+          : '<div class="lp-form"><button type="button" class="lp-cta" id="u27-continuar">Continuar</button></div>'}
       </div>`;
       c.querySelector<HTMLButtonElement>("#u27-continuar")!.addEventListener("click", () => { ev("landing_u2027_continuar"); salvar({ etapa: "fim" }); });
+      // crítica r1 (compradora MEDIA 1): com a versão B, o "Pronto" leva direto ao Planejar (o planner sai com os dados dela)
+      c.querySelector<HTMLButtonElement>("#u27-planejar")?.addEventListener("click", () => { ev("landing_u2027_planejar"); location.href = LINK_PLANEJAR_2027; });
       return true;
     }
     // etapa qr sem Pix (não deveria): volta pra oferta

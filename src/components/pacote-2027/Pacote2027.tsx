@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Check, ChevronLeft, ChevronRight, Lock } from "lucide-react";
 import { toast } from "sonner";
@@ -13,8 +13,10 @@ import {
 import { htmlDoPlanner2027, imprimirPlanner2027 } from "@/lib/pacote-2027-pdf";
 import { Planejar2027 } from "./Planejar2027";
 import { useUserData } from "@/hooks/use-user-data";
-import { estiloDoPlanner, lerExtrasDoPlanner, plannerNovoLigado } from "@/lib/planner-2027";
-import { PlannerB } from "./PlannerB";
+import { estiloDoPlanner, plannerNovoLigado } from "@/lib/planner-2027-chave";
+/* crítica r1 (técnico BAIXA 5): o planner B (12 folhas + CSS + ícones) só baixa quando ela abre — com a chave off o
+ * módulo Desenvolvimento Pessoal fica do tamanho da versão A */
+const PlannerDoPacote = lazy(() => import("./PlannerB"));
 
 const ddmm = (d: Date) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR")}`;
@@ -35,6 +37,18 @@ export function Pacote2027() {
   const [planejando, setPlanejando] = useState(false);
   const [verTodos, setVerTodos] = useState(false);
   const contou = useRef(false);
+  /* crítica r1 (compradora MEDIA 1): o "Pronto" da oferta manda direto pra cá — ?planejar=1 abre o Planejar, ?planner=1
+   * (o link do "Abra no Safari") abre o planner. Só com a versão B; 1x por montagem. */
+  const linkFeito = useRef(false);
+  useEffect(() => {
+    if (!plannerB || !loaded || !pacote || linkFeito.current) return;
+    linkFeito.current = true;
+    let q: URLSearchParams;
+    try { q = new URLSearchParams(window.location.search); } catch { return; }
+    if (q.get("planejar") === "1") { if (!dicaVista) marcarDicaVista(); trackEvent("plano2027_aberto", { via: "link_pronto" }); setPlanejando(true); }
+    else if (q.get("planner") === "1") { if (!dicaVista) marcarDicaVista(); trackEvent("plano2027_planner_abrir", { via: "link" }); setVista("planner"); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plannerB, loaded, pacote]);
 
   useEffect(() => {
     if (!pacote || contou.current) return;
@@ -98,7 +112,11 @@ export function Pacote2027() {
 
   /* ── o planner da versão B ── */
   if (vista === "planner") {
-    return <PlannerB dados={{ plano, cofrinho, ...lerExtrasDoPlanner(get) }} estilo={estiloDoPlanner()} onVoltar={() => setVista("inicio")} onPlanejar={() => { setVista("inicio"); abrirPlanejar("planner_b"); }} />;
+    return (
+      <Suspense fallback={<div className="h-40 grid place-items-center text-[13px] text-muted-foreground" data-testid="planner-b-carregando">Montando o seu planner…</div>}>
+        <PlannerDoPacote plano={plano} cofrinho={cofrinho} get={get} estilo={estiloDoPlanner()} onVoltar={() => setVista("inicio")} onPlanejar={() => { setVista("inicio"); abrirPlanejar("planner_b"); }} />
+      </Suspense>
+    );
   }
 
   /* ── uma revisão do mês ── */

@@ -316,7 +316,7 @@ describe("braço v2 · cartão, avaliações, como funciona, dúvidas, demo, fim
     expect(card.querySelector("#lp-pagar-txt")!.textContent).toBe("Pagar R$ 27,90 no Pix");
     expect(html().querySelector("#oferta .lp-garantia")!.getAttribute("data-so-lp")).toBe("atual");
   });
-  it("avaliações do v2 (30/10 noite, dono: 'faz as 2'; r1 31/10: App Store primeiro): 4 textos reais das lojas, 'Muito bom…' em 1º; cada uma com ★★★★★ e 'apelido · loja · mês/ano' — o apelido EXATO da loja; os 2 do Google Play com data-nome vazio (só loja · mês); sem nota média nem quantidade", () => {
+  it("avaliações do v2 (30/10 noite, dono: 'faz as 2'; r1 31/10: App Store primeiro): 4 textos reais das lojas, 'Muito bom…' em 1º; cada uma com ★★★★★ e 'apelido · loja · mês/ano' — o apelido EXATO da loja; os 2 do Google Play com o nome que o dono conferiu na Play (31/10: Sabrina Feitosa, Elisa Medeiros); sem nota média nem quantidade", () => {
     const d = html();
     const deHoje = [...d.querySelectorAll("#avaliacoes blockquote")].map((b) => b.textContent);
     const doV2 = [...d.querySelectorAll("#avaliacoes-v2 .lp-aval")];
@@ -335,8 +335,8 @@ describe("braço v2 · cartão, avaliações, como funciona, dúvidas, demo, fim
     expect(linhas.map((l) => [l.nome, l.legenda])).toEqual([
       ["camvbs", "camvbs ·App Store · out/2026"],
       ["ywonvu", "ywonvu ·App Store · set/2026"],
-      ["", "Google Play · set/2026"],
-      ["", "Google Play · ago/2026"],
+      ["Sabrina Feitosa", "Sabrina Feitosa ·Google Play · set/2026"],
+      ["Elisa Medeiros", "Elisa Medeiros ·Google Play · ago/2026"],
     ]);
     expect(linhas.map((l) => l.icone)).toEqual(["M16.4 ", "M16.4 ", "M3.6 2", "M3.6 2"]); // o ícone da loja certa (Apple × Play)
     // r1 (persona 5): sem negrito preto no apelido (o mesmo peso e cor da loja); vazio = some (fica só "Google Play · set/2026")
@@ -1531,6 +1531,7 @@ describe("v2 · a demo em tela cheia (voltar do celular, seta, comprar, recarga)
       const spans = document.querySelectorAll<HTMLElement>("#avaliacoes-v2 .lp2-aval-nome");
       spans.forEach((s) => { s.textContent = ""; });
       spans[2].setAttribute("data-nome", "Mariana S."); // o dono preencheu o 1º do Google Play
+      spans[3].setAttribute("data-nome", ""); // e o 2º fica vazio (31/10: os 2 da Play têm nome no HTML; aqui testa o vazio)
     });
     const legendas = [...document.querySelectorAll("#avaliacoes-v2 figcaption")].map((f) => f.textContent);
     expect(legendas).toEqual(["camvbs ·App Store · out/2026", "ywonvu ·App Store · set/2026", "Mariana S. ·Google Play · set/2026", "Google Play · ago/2026"]); // r2 (persona 3): sem espaço no fim do apelido — o gap do figcaption separa (era espaço duplo)

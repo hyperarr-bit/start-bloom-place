@@ -43,8 +43,10 @@ export async function chamarAdminSuporte(body: Record<string, unknown>): Promise
 
 const ERRO_PIX: Record<string, string> = {
   email_invalido: "Esse e-mail parece errado. Confere o formato.",
-  destino_nao_encontrado: "Não achei uma conta com esse e-mail. Se a pessoa ainda não criou a conta, use Trocar email com o id da conta anônima. Se ela já tem conta, confere o e-mail. Daqui a gente não cria conta e não libera um acesso novo.",
+  destino_nao_encontrado: "Não achei essa conta de destino.",
   origem_nao_encontrada: "Não achei a conta do Pix.",
+  sem_prova_de_pagamento: "Não achei o Pix pago desse pedido. Sem a linha da assinatura, o chamado ou o registro do pagamento, não crio conta.",
+  sem_oferta: "O pagamento está marcado, mas não achei a oferta desse pedido. Não chutei vitalício.",
   origem_tem_email: "A conta do Pix já tem e-mail. Pra mudar o login, use Trocar email.",
   origem_sem_pix_ativo: "Essa conta não tem Pix ativo pra mover.",
   destino_ja_tem_assinatura: "A conta de destino já tem acesso próprio. Não movi o Pix.",
@@ -60,7 +62,12 @@ const ERRO_EMAIL: Record<string, string> = {
   email_invalido: "O e-mail novo parece errado. Confere o formato.",
   origem_invalida: "Informa o e-mail atual (com @) ou o id da conta.",
   origem_nao_encontrada: "Não achei essa conta.",
-  destino_ja_existe: "Esse e-mail já é de outra conta. Não troquei.",
+  destino_ja_existe: "Esse e-mail já é de outra conta. Embaixo dá pra ver as duas e resolver.",
+  casca_tem_acesso: "A conta que ia sair do caminho também tem acesso. Não mexi.",
+  confirmar: "Faltou confirmar a conta que sai do caminho.",
+  origem_sem_acesso: "A conta de origem não tem acesso pra mover.",
+  contas_invalidas: "As duas contas não servem.",
+  modo_invalido: "Não entendi o que fazer com as duas contas.",
   mesmo_email: "Esse já é o e-mail dessa conta.",
   assinatura_nao_atualizou: "O login já foi trocado, mas a assinatura não atualizou. Tenta de novo com o id da conta.",
   perfil_nao_atualizou: "O login já foi trocado, mas o perfil não atualizou. Tenta de novo com o id da conta.",
@@ -84,9 +91,19 @@ export function textoLiberarPix(r: Resposta, emailDigitado: string): { ok: boole
     const plan = planBruto === "lifetime" ? "vitalício" : planBruto;
     const valor = reaisDeCentavos(r.amount_cents);
     const meio = [plan, valor].filter(Boolean).join(", ");
+    const base = meio ? ` (${meio})` : "";
+    if (r.como === "restaurado") {
+      return { ok: true, texto: `A conta anônima não existia mais. Criei ${emailDigitado} sem mandar e-mail e regravei o Pix deste pedido${base}. Quando a pessoa entrar com esse e-mail, o acesso está nela.` };
+    }
+    if (r.como === "conta_criada") {
+      return { ok: true, texto: `Criei a conta ${emailDigitado} sem mandar e-mail e coloquei nela o Pix que já estava pago${base}. Ela entra com esse e-mail (código, sem senha) e o acesso vai junto.` };
+    }
+    if (r.como === "batizado") {
+      return { ok: true, texto: `O e-mail ${emailDigitado} entrou na conta que já tinha o Pix${base}. Nenhum e-mail foi enviado.` };
+    }
     return {
       ok: true,
-      texto: `Pix liberado na conta ${emailDigitado}${meio ? ` (${meio})` : ""}. A pessoa entra com esse e-mail e o acesso vai junto. Nenhum e-mail foi enviado.`,
+      texto: `Pix liberado na conta ${emailDigitado}${base}. A pessoa entra com esse e-mail e o acesso vai junto. Nenhum e-mail foi enviado.`,
     };
   }
   const code = String(r.error ?? "falhou");

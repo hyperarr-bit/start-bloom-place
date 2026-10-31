@@ -79,7 +79,7 @@ const QUESTIONS: Question[] = [
       // avulsas com valor (17/10) já estão no que saiu do mês; a reserva é só
       // a estimativa das contas sem valor anotado.
       const reserva = b.unpaidBillsEstimate > 0 ? `, e já separei ${fmt(b.unpaidBillsEstimate)} pras contas sem valor anotado` : "";
-      const dias = b.remainingDays === 1 ? "hoje é o último dia do mês" : `÷ ${b.remainingDays} dias, contando hoje`;
+      const dias = b.remainingDays === 1 ? "e hoje é o último dia do mês" : `÷ ${b.remainingDays} dias, contando hoje`;
       return `Você pode gastar até ${fmt(b.perDay)} hoje sem apertar o resto do mês.\n\nA conta: sobram ${fmt(b.availableReal)} livres (já sem os custos fixos, as contas do mês, as parcelas e o cartão${reserva}) ${dias}.`;
     },
   },

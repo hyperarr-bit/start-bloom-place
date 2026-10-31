@@ -7,7 +7,9 @@
  *   3. nada estoura a área do corpo; nenhum painel esmagado;
  *   4. letra ≥ 16 px no layout de 1240 (≈ 7,5 pt impresso);
  *   5. linha de escrever com contraste ≥ 1,8 com o papel do painel e 2 px;
- *   6. a impressão do site (Chromium, A4): 12 páginas.
+ *   6. a impressão do site (Chromium, A4): 12 páginas;
+ *   7. (crítica r2) nenhum painel com mais de 8% de papel liso embaixo (e mais de 1 linha de escrever); capa sem faixa
+ *      vazia acima de 30% da folha.
  *   npx vite-node scripts/planner-2027-medir.ts [pasta-dos-prints]
  * Com a pasta: grava cada folha (1240×1754) e "lado a lado" A codex | B core. Sai com código 1 se algo falhar.
  */
@@ -125,9 +127,37 @@ function medirNaPagina() {
     const vistas = Array.from(pa.children).filter((c) => c.getBoundingClientRect().right <= P.right + 1).length;
     if (vistas < 1) out.push(`pauta com ${vistas} linha(s) à vista`);
   });
+  // crítica r2 (visual MEDIA 1): painel que SOBRA — papel liso embaixo do último conteúdo à vista ≤ 8% do painel
+  const sobras: number[] = [];
+  folha.querySelectorAll<HTMLElement>(".pl-painel").forEach((p) => {
+    const P = p.getBoundingClientRect(), cs = getComputedStyle(p);
+    const chao = P.bottom - parseFloat(cs.paddingBottom) - parseFloat(cs.borderBottomWidth);
+    let fundo = P.top;
+    for (const f of Array.from(p.querySelectorAll<HTMLElement>("*"))) {
+      const r = f.getBoundingClientRect();
+      if (!r.width || !r.height || f.classList.contains("pl-pauta")) continue;
+      const pa = f.closest<HTMLElement>(".pl-pauta");
+      if (pa && r.right > pa.getBoundingClientRect().right + 1) continue; // a linha que não coube (escondida à direita)
+      if (r.bottom <= chao + 1) fundo = Math.max(fundo, r.bottom);
+    }
+    const sobra = (chao - fundo) / P.height;
+    sobras.push(+sobra.toFixed(3));
+    // (menos de 1 linha de escrever de sobra não conta: a pauta só mostra linhas inteiras)
+    if (sobra > 0.08 && chao - fundo > 48) out.push(`painel sobra ${Math.round(sobra * 100)}% (${Math.round(chao - fundo)}px) embaixo: ${p.querySelector("h3")?.textContent}`);
+  });
+  // crítica r2 (visual MEDIA 2): capa — a maior faixa vazia (entre blocos, de cima a baixo) ≤ 30% da folha
+  let faixaCapa = 0;
+  const capa = folha.querySelector<HTMLElement>(".pl-capa");
+  if (capa) {
+    const blocos = [...Array.from(capa.children), folha.querySelector(".pl-rod")!].map((c) => c.getBoundingClientRect()).filter((r) => r.height > 0).sort((a, b) => a.top - b.top);
+    let fim = F.top;
+    for (const r of blocos) { faixaCapa = Math.max(faixaCapa, r.top - fim); fim = Math.max(fim, r.bottom); }
+    faixaCapa = faixaCapa / F.height;
+    if (faixaCapa > 0.3) out.push(`capa com faixa vazia de ${Math.round(faixaCapa * 100)}%`);
+  }
   const rod = folha.querySelector<HTMLElement>(".pl-rod")!.getBoundingClientRect();
   const ultimo = corpo ? Math.max(...Array.from(corpo.children).map((c) => c.getBoundingClientRect().bottom)) : rod.top;
-  return { problemas: out, menorFonte, menorLinha: +menorLinha.toFixed(2), menorEspessura, sobraAntesDoRodape: Math.round(rod.top - ultimo) };
+  return { problemas: out, menorFonte, menorLinha: +menorLinha.toFixed(2), menorEspessura, sobraAntesDoRodape: Math.round(rod.top - ultimo), maiorSobraDePainel: Math.max(0, ...sobras), faixaCapa: +faixaCapa.toFixed(3) };
 }
 
 async function rodar(motor: string, b: Browser) {

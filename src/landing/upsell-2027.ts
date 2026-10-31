@@ -27,7 +27,7 @@
 import { VALOR_U2027, reais, validadeU2027, type EstadoU2027, type PixU2027 } from "./regras";
 import { gravarEstadoU2027, lerEstadoU2027 } from "./u2027-estado";
 import {
-  CTA_PRONTO_U2027_PLANNER, DESC_U2027_PLANNER, ITEM_PLANNER_U2027, LEGENDA_U2027_PLANNER, LINK_PLANEJAR_2027, NOTA_U2027_PLANNER, ZOOM_U2027_PLANNER,
+  CTA_PRONTO_U2027_PLANNER, DESC_U2027_PLANNER, ITEM_PLANNER_U2027, LEGENDA_U2027_PLANNER, LINK_PLANEJAR_2027, NOTA_U2027_PLANNER, ZOOM_U2027_PLANNER, portaDoLink,
   estiloDoPlanner, folhaAnoDoPlanner, imagemDoPlanner, srcsetDoPlanner, u27PlannerLigado,
 } from "@/lib/planner-2027-chave";
 
@@ -139,7 +139,7 @@ const CSS_PLANNER = `
 .u27-planner button { display: block; width: 100%; max-width: 300px; margin: 0 auto; padding: 0; border: 0; background: none; cursor: zoom-in; -webkit-tap-highlight-color: transparent; }
 .u27-planner img { display: block; width: 100%; height: auto; aspect-ratio: 640 / 460; }
 .u27-planner figcaption { margin-top: 2px; font-size: 12.5px; color: var(--fraco, #9a95a0); }
-.u27-planner figcaption u { text-decoration: none; font-weight: 700; color: var(--tx, #1c1a1f); }
+.u27-planner figcaption u { text-decoration: none; font-weight: 700; color: var(--tx, #1c1a1f); white-space: nowrap; }
 .u27-planner + .u27-desc { margin-top: 10px; }
 .u27-zoom { position: fixed; inset: 0; z-index: 2147483000; background: rgba(20, 18, 24, .86); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 56px 16px 24px; overflow: auto; overscroll-behavior: contain; }
 .u27-zoom img { display: block; width: 100%; max-width: 560px; height: auto; border-radius: 10px; box-shadow: 0 18px 50px -12px rgba(0,0,0,.6); }
@@ -448,13 +448,15 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
         <ul class="u27-lista">${(comPlanner ? [...ITENS_U2027.slice(0, 3), ITEM_PLANNER_U2027] : ITENS_U2027).map((t) => `<li>${ICO_CHECK}<span>${t}</span></li>`).join("")}</ul>
         <div class="u27-onde" data-testid="u2027-onde">${ONDE_U2027}${email ? ` Entre com <b>${esc(email)}</b>.` : ""}</div>
         ${comPlanner
-          ? `<div class="lp-form"><button type="button" class="lp-cta" id="u27-planejar" data-testid="u2027-planejar" data-href="${LINK_PLANEJAR_2027}">${CTA_PRONTO_U2027_PLANNER}</button></div>
+          ? `<div class="lp-form"><button type="button" class="lp-cta" id="u27-planejar" data-testid="u2027-planejar" data-href="${esc(portaDoLink(LINK_PLANEJAR_2027, email))}">${CTA_PRONTO_U2027_PLANNER}</button></div>
         <div class="lp-links"><button type="button" class="lp-link" id="u27-continuar">Depois · ver minha conta</button></div>`
           : '<div class="lp-form"><button type="button" class="lp-cta" id="u27-continuar">Continuar</button></div>'}
       </div>`;
       c.querySelector<HTMLButtonElement>("#u27-continuar")!.addEventListener("click", () => { ev("landing_u2027_continuar"); salvar({ etapa: "fim" }); });
       // crítica r1 (compradora MEDIA 1): com a versão B, o "Pronto" leva direto ao Planejar (o planner sai com os dados dela)
-      c.querySelector<HTMLButtonElement>("#u27-planejar")?.addEventListener("click", () => { ev("landing_u2027_planejar"); location.href = LINK_PLANEJAR_2027; });
+      // crítica r2 (compradora ALTA 2): pela porta /entrar (com sessão vai direto; sem ela, "Entrar sem senha" com o e-mail
+      // preenchido e volta pro Planejar) — nunca o /auth de senha
+      c.querySelector<HTMLButtonElement>("#u27-planejar")?.addEventListener("click", () => { ev("landing_u2027_planejar"); location.href = portaDoLink(LINK_PLANEJAR_2027, email); });
       return true;
     }
     // etapa qr sem Pix (não deveria): volta pra oferta

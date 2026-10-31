@@ -3,16 +3,19 @@
  * (modoDeEntrega):
  *   "nativo"       app (Capacitor): cada folha vira um PNG A4 (gerarPng, o mesmo das Conquistas) e todas vão juntas pela
  *                  folha nativa (compartilharImagens: Imprimir, Salvar imagens, Arquivos). Um toque só.
- *   "compartilhar" site no CELULAR com Web Share de arquivos (Safari do iPhone, Chrome do Android): os 12 PNG são
+ *   "compartilhar" site no IPHONE com Web Share de arquivos (Safari; o Chromium do Android para em 10 arquivos): os 12 PNG são
  *                  preparados primeiro e DEPOIS um 2º toque compartilha (o navigator.share exige gesto recente, e
  *                  preparar leva uns segundos). Crítica r1: o window.print no celular não é garantido.
  *   "safari"       navegador de dentro do Instagram/Facebook/TikTok SEM Web Share de arquivos: nem a impressão nem o
- *                  share funcionam de verdade → "Abra no Safari" + copiar o link (nunca uma janela gigante sem saída).
- *   "imprimir"     PC (e celular sem nenhum dos dois): a janela com as 12 folhas A4 e a impressão (→ "Salvar como PDF").
+ *                  share funcionam de verdade → as 12 folhas viram IMAGENS na tela ("toque e segure → Salvar") + copiar
+ *                  o link pela porta /entrar (crítica r2). Nunca uma janela gigante sem saída.
+ *   "imprimir"     PC, Chrome do Android (e celular sem nenhum dos dois): a janela com as 12 folhas A4 e a impressão
+ *                  (→ "Salvar como PDF").
  * Nada de <a download> (não funciona no WebView).
  */
 import { cssDoPlanner, folhasDoPlanner, htmlDoPlannerNovo, A4_PX, type DadosDoPlanner, type EstiloPlanner } from "@/lib/planner-2027";
 import { isNativeShell } from "@/lib/native-shell";
+import type { ResultadoCompartilhar } from "@/lib/compartilhar";
 
 /** Põe o CSS do planner no documento (1x por direção). A prévia e a foto usam o mesmo. */
 export function garantirCssDoPlanner(estilo: EstiloPlanner): void {
@@ -44,16 +47,21 @@ export function compartilhaArquivos(): boolean {
   } catch { return false; }
 }
 
+/** iOS (iPhone/iPad, inclusive o iPad que se diz Mac) */
+export const ehIos = (u = ua()) => /iPhone|iPad|iPod/i.test(u) || (/Macintosh/.test(u) && typeof navigator !== "undefined" && navigator.maxTouchPoints > 1);
+
+/**
+ * crítica r2 (técnico ALTA 1): o Chromium (Chrome, Samsung Internet, Edge do Android) limita o Web Share a 10 ARQUIVOS
+ * (navigator_share.cc, kMaxSharedFileCount) — e o canShare não confere a contagem: 12 folhas = NotAllowedError, sempre.
+ * Só o WebKit (iPhone) compartilha as 12. O Android vai pra impressão (o Chrome do Android tem "Salvar como PDF").
+ */
 export function modoDeEntrega(): ModoDeEntrega {
   if (isNativeShell()) return "nativo";
   if (!ehCelular()) return "imprimir";
-  if (compartilhaArquivos()) return "compartilhar";
+  if (ehIos() && compartilhaArquivos()) return "compartilhar";
   if (navegadorDeApp()) return "safari";
   return "imprimir";
 }
-
-/** iOS (iPhone/iPad, inclusive o iPad que se diz Mac) — muda só o texto da dica */
-export const ehIos = (u = ua()) => /iPhone|iPad|iPod/i.test(u) || (/Macintosh/.test(u) && typeof navigator !== "undefined" && navigator.maxTouchPoints > 1);
 
 /** Site: a janela de impressão. Abre a janela NO TOQUE (sem await antes: senão o bloqueador de pop-up segura). */
 export function imprimirPlannerNoSite(d: DadosDoPlanner, estilo: EstiloPlanner): boolean {
@@ -90,14 +98,20 @@ export async function gerarFolhasPng(d: DadosDoPlanner, estilo: EstiloPlanner, a
  * Prepara as 12 folhas E o módulo de compartilhar; devolve a função que compartilha (ou null se falhou). No site do
  * celular ela é chamada no 2º toque: nada de await antes do navigator.share (o Safari exige o gesto "fresco").
  */
-export async function prepararFolhas(d: DadosDoPlanner, estilo: EstiloPlanner, aoAvancar?: (n: number, total: number) => void) {
+export interface FolhasProntas {
+  /** os 12 PNG (o navegador do Instagram mostra como imagem: "toque e segure → Salvar") */
+  blobs: Blob[];
+  /** manda as 12 pela folha nativa / Web Share */
+  compartilhar: () => Promise<ResultadoCompartilhar>;
+}
+export async function prepararFolhas(d: DadosDoPlanner, estilo: EstiloPlanner, aoAvancar?: (n: number, total: number) => void): Promise<FolhasProntas | null> {
   const [blobs, { compartilharImagens }] = await Promise.all([gerarFolhasPng(d, estilo, aoAvancar), import("@/lib/compartilhar")]);
   if (!blobs) return null;
-  return () => compartilharImagens(blobs, blobs.map((_, i) => nomeDaFolha(i)), "Planner 2027", "planner_2027");
+  return { blobs, compartilhar: () => compartilharImagens(blobs, blobs.map((_, i) => nomeDaFolha(i)), "Planner 2027", "planner_2027") };
 }
 
 /** App: prepara e já manda (o share do Capacitor não pede gesto recente). */
 export async function salvarPlannerNoAparelho(d: DadosDoPlanner, estilo: EstiloPlanner, aoAvancar?: (n: number, total: number) => void) {
-  const compartilhar = await prepararFolhas(d, estilo, aoAvancar);
-  return compartilhar ? compartilhar() : ("failed" as const);
+  const prontas = await prepararFolhas(d, estilo, aoAvancar);
+  return prontas ? prontas.compartilhar() : ("failed" as const);
 }

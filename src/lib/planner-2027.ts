@@ -115,7 +115,11 @@ const PASTEL: Record<string, [string, string, string, string, string]> = {
   manteiga: ["#f6eccd", "#efdfae", "#776844", "#a08a45", "#d9c88f"],
   lavanda: ["#ebe5f0", "#ddd2e6", "#706278", "#8b6fa3", "#c9bad5"],
 };
-const PASTEL_DO_TOM: Record<string, keyof typeof PASTEL> = { metas: "lavanda", dinheiro: "manteiga", datas: "rosa", rotina: "salvia", cofrinho: "rosa", revisao: "lavanda", nota: "lavanda" };
+const PASTEL_DO_TOM: Record<string, keyof typeof PASTEL> = {
+  metas: "lavanda", dinheiro: "manteiga", datas: "rosa", rotina: "salvia", cofrinho: "rosa", revisao: "lavanda", nota: "lavanda",
+  // crítica r2 (visual BAIXA 8): as áreas que têm folha própria seguem a cor dela (Finanças = manteiga, como "Meu dinheiro")
+  financas: "manteiga", relacionamentos: "rosa", desenvolvimento: "lavanda",
+};
 const RODA_PASTEL: (keyof typeof PASTEL)[] = ["salvia", "rosa", "manteiga", "lavanda"];
 
 /* crítica r1 (visual ALTA 2): a linha de escrever e o contorno das bolinhas eram o tom 200 a 1,5 px (contraste 1,16–1,29 na
@@ -134,7 +138,7 @@ const cacheLinha = new Map<string, string>();
 function varsDoTom(tom: Tom, estilo: EstiloPlanner, i = 0): string {
   const [papel, tile, tx, forte, ln] = estilo === "core"
     ? COR_DO_MODULO[MODULO_DO_TOM[tom] ?? tom] ?? COR_DO_MODULO.desenvolvimento
-    : PASTEL[PASTEL_DO_TOM[tom] ?? RODA_PASTEL[i % 4]];
+    : PASTEL[PASTEL_DO_TOM[tom] ?? RODA_PASTEL[(i + 3) % 4]];
   const k = papel + tx + ln;
   if (!cacheLinha.has(k)) cacheLinha.set(k, linhaDe(papel, tx, ln));
   return `--p:${papel};--t:${tile};--x:${tx};--f:${forte};--l:${ln};--w:${cacheLinha.get(k)}`;
@@ -194,7 +198,7 @@ function fCapa(d: DadosDoPlanner, e: EstiloPlanner): string {
       <h1>${e === "codex" ? "Meu <em>2027.</em>" : "Meu <b>2027</b>."}</h1>
       <p class="pl-capa-sub">Metas, dinheiro, datas e rotina.<br/>Um ano inteiro num lugar só.</p>
       ${arte}
-      ${metas.length ? `<div class="pl-capa-metas"><small>ESTE ANO EU VOU</small>${metas.map((m) => `<b>${esc(m)}</b>`).join("")}</div>` : ""}
+      <div class="pl-capa-metas"><small>ESTE ANO EU VOU</small>${metas.slice(0, 3).map((m) => `<b>${esc(m)}</b>`).join("")}${linhas(Math.max(0, 3 - metas.length))}</div>
       <div class="pl-capa-dono"><small>ESTE PLANNER É DE</small><div class="pl-ln"></div></div>
     </div>`, "pl-f-capa");
 }
@@ -213,10 +217,12 @@ function fAno(d: DadosDoPlanner, e: EstiloPlanner): string {
   // crítica r1: o "+N no calendário" no cabeçalho cortava na meia coluna (core) — agora é a 6ª linha da lista
   const mais = p.datas.length > 6;
   const datas = [...p.datas].sort((a, b) => a.dia.localeCompare(b.dia)).slice(0, mais ? 5 : 6);
-  const pDatas = painel("datas", e, "Datas que importam", `<ul class="pl-datas">${datas.map((x) => `<li><b>${ddmm(x.dia)}</b><span class="pl-dico">${svgDoIcone(ICONE_DA_DATA[x.tipo], 20, 2)}</span><span class="pl-txt">${esc(x.titulo)}</span></li>`).join("")}${mais ? `<li class="mais">+${p.datas.length - 5} no calendário</li>` : ""}${Array.from({ length: Math.max(0, 6 - datas.length - (mais ? 1 : 0)) }, () => `<li class="vazia"><b>__/__</b><span class="pl-ln"></span></li>`).join("")}</ul>`, "", "pl-meia");
-  const hab = d.habitos.slice(0, 6);
+  const pDatas = painel("datas", e, "Datas que importam", `<ul class="pl-datas">${datas.map((x) => `<li><b>${ddmm(x.dia)}</b><span class="pl-dico">${svgDoIcone(ICONE_DA_DATA[x.tipo], 20, 2)}</span><span class="pl-txt">${esc(x.titulo)}</span></li>`).join("")}${mais ? `<li class="mais">+${p.datas.length - 5} no calendário</li>` : ""}${Array.from({ length: Math.max(0, 6 - datas.length - (mais ? 1 : 0)) }, () => `<li class="vazia"><b>__/__</b><span class="pl-ln"></span></li>`).join("")}</ul>`, "", "pl-meia pl-datas-p");
+  // crítica r2 (visual BAIXA 6): com 7+ hábitos, 5 + "+N na folha Rotina" (antes cortava 6 sem avisar)
+  const maisHab = d.habitos.length > 6;
+  const hab = d.habitos.slice(0, maisHab ? 5 : 6);
   const pHabitos = painel("rotina", e, "Pequenos hábitos", `<div class="pl-hab"><span class="pl-hab-cab">MEUS CUIDADOS</span>${DIAS_DA_SEMANA.map((x) => `<span class="pl-dia">${x}</span>`).join("")}
-      ${Array.from({ length: 6 }, (_, i) => `${nomeDoHabito(hab[i])}${DIAS_DA_SEMANA.map(() => "<i></i>").join("")}`).join("")}</div>`, "", "pl-meia");
+      ${Array.from({ length: maisHab ? 5 : 6 }, (_, i) => `${nomeDoHabito(hab[i])}${DIAS_DA_SEMANA.map(() => "<i></i>").join("")}`).join("")}${maisHab ? `<span class="pl-hab-mais">+${d.habitos.length - 5} na folha Rotina</span>` : ""}</div>`, "", "pl-meia");
   const pNota = painel("nota", e, "Uma frase pro meu 2027", preencher(8), "", "pl-meia pl-enche");
   return folha(2, `${cabecalho(e, "PLANNER 2027", "Meu", "ano", "2027 numa página", "metas", 2)}
     <div class="pl-corpo">${pMetas}<div class="pl-dupla pl-auto">${pDinheiro}${pCofrinho}</div><div class="pl-dupla pl-auto">${pDatas}${pHabitos}</div>${pNota}</div>`);
@@ -254,19 +260,24 @@ function fMetas(d: DadosDoPlanner, e: EstiloPlanner): string {
 
 function fDinheiro(d: DadosDoPlanner, e: EstiloPlanner): string {
   const p = d.plano;
+  // crítica r2 (técnico BAIXA 6): valor de 7 dígitos quebrava o "R$" numa linha separada — letra menor, numa linha só
+  const card = (v: number) => { const t = v > 0 ? brl(v) : ""; return `<b${t.length > 11 ? ' class="pl-longo"' : ""}>${v > 0 ? t : valorOuLinha(0)}</b>`; };
   const cards = `<div class="pl-cards">
-    <div style="${varsDoTom(e === "core" ? "dinheiro" : "rotina", e)}"><small>Posso gastar por mês</small><b>${valorOuLinha(p.gastarMes)}</b></div>
-    <div style="${varsDoTom(e === "core" ? "dinheiro" : "datas", e)}"><small>Quero guardar por mês</small><b>${valorOuLinha(p.guardarMes)}</b></div>
-    <div style="${varsDoTom("dinheiro", e)}"><small>Guardado no fim do ano</small><b>${p.guardarMes > 0 ? brl(p.guardarMes * 12) : valorOuLinha(0)}</b></div></div>`;
+    <div style="${varsDoTom(e === "core" ? "dinheiro" : "rotina", e)}"><small>Posso gastar por mês</small>${card(p.gastarMes)}</div>
+    <div style="${varsDoTom(e === "core" ? "dinheiro" : "datas", e)}"><small>Quero guardar por mês</small>${card(p.guardarMes)}</div>
+    <div style="${varsDoTom("dinheiro", e)}"><small>Guardado no fim do ano</small>${card(p.guardarMes > 0 ? p.guardarMes * 12 : 0)}</div></div>`;
   const tabela = painel("dinheiro", e, "Mês a mês", `<table class="pl-tab"><thead><tr><th>Mês</th><th>Posso gastar</th><th>Gastei</th><th>Quero guardar</th><th>Guardei</th></tr></thead><tbody>${
     MESES_2027.map((m) => `<tr><td>${m}</td><td>${p.gastarMes > 0 ? brl(p.gastarMes) : ""}</td><td></td><td>${p.guardarMes > 0 ? brl(p.guardarMes) : ""}</td><td></td></tr>`).join("")}</tbody></table>`);
   // crítica r1: a tabela de contas cresce até o rodapé (antes sobravam 25 mm de papel) com linhas vazias pra escrever
-  const contas = d.contas.slice(0, 8);
-  const vazias = Math.max(0, 8 - contas.length);
+  // crítica r2 (técnico BAIXA 5): com mais de 8, 7 contas + "+N no seu Finanças" (antes as do fim do mês sumiam sem aviso)
+  const maisContas = d.contas.length > 8;
+  const contas = d.contas.slice(0, maisContas ? 7 : 8);
+  const vazias = maisContas ? 0 : Math.max(0, 8 - contas.length);
   const pContas = painel("dinheiro", e, "Minhas contas fixas", `<div><table class="pl-tab pl-contas"><thead><tr><th>Dia</th><th>Conta</th><th>Valor</th><th>Paga</th></tr></thead><tbody>${
     contas.map((c) => `<tr><td>${c.dia ?? ""}</td><td>${esc(c.nome)}</td><td>${c.valor > 0 ? brl(c.valor) : ""}</td><td><span class="pl-caixa"></span></td></tr>`).join("")}${
-    Array.from({ length: vazias }, () => `<tr><td></td><td></td><td></td><td><span class="pl-caixa"></span></td></tr>`).join("")}</tbody></table></div>`,
-    d.contas.length ? `do seu Finanças${d.contas.length > contas.length ? ` · ${contas.length} de ${d.contas.length}` : ""}` : "", "pl-cheio");
+    Array.from({ length: vazias }, () => `<tr><td></td><td></td><td></td><td><span class="pl-caixa"></span></td></tr>`).join("")}${
+    maisContas ? `<tr class="pl-tr-mais"><td colspan="4">+${d.contas.length - contas.length} no seu Finanças</td></tr>` : ""}</tbody></table></div>`,
+    d.contas.length ? "do seu Finanças" : "", "pl-cheio");
   return folha(5, `${cabecalho(e, "PLANNER FINANCEIRO", "Meu", "dinheiro", "Quanto entra, quanto sai, quanto fica", "dinheiro", 5)}<div class="pl-corpo">${cards}${tabela}${pContas}</div>`);
 }
 
@@ -325,7 +336,8 @@ export const AREAS_B: { m: IconeDoPlanner; nome: string; pergunta: string }[] = 
 
 function fAreas(parte: number, e: EstiloPlanner): string {
   const quatro = AREAS_B.slice(parte * 4, parte * 4 + 4);
-  const blocos = quatro.map((a, i) => painel(a.m, e, a.nome, `<p class="pl-q">${esc(a.pergunta)}</p>${linhas(6)}<div class="pl-rotulo">Primeiro passo</div>${linhas(2)}
+  // crítica r2 (visual MEDIA 1): a pauta da pergunta enche o painel (antes sobravam 22–23 mm de papel liso embaixo)
+  const blocos = quatro.map((a, i) => painel(a.m, e, a.nome, `<p class="pl-q">${esc(a.pergunta)}</p>${preencher(14)}<div class="pl-rotulo">Primeiro passo</div>${linhas(2)}
       <div class="pl-chk"><span><span class="pl-caixa"></span>revisei em junho</span><span><span class="pl-caixa"></span>revisei em dezembro</span></div>`, "", "pl-area", parte * 4 + i)).join("");
   return folha(9 + parte, `${cabecalho(e, "PLANNER 2027", "As 16", "áreas", `${parte + 1} de 4 · ${quatro.map((a) => a.nome).join(", ")}`, quatro[0].m, 9 + parte)}<div class="pl-corpo pl-areas">${blocos}</div>`);
 }
@@ -407,13 +419,14 @@ function cssBase(estilo: EstiloPlanner): string {
 .pl-capa-flores svg:nth-child(1){right:20px;top:0}.pl-capa-flores svg:nth-child(2){right:330px;top:250px}.pl-capa-flores svg:nth-child(3){right:150px;top:340px}
 .pl-capa-metas{margin-top:40px;display:flex;flex-direction:column;gap:8px}
 .pl-capa-metas small,.pl-capa-dono small{font-size:16px;letter-spacing:2.4px;font-weight:700;color:var(--suave)}
+.pl-capa-metas .pl-ln{height:52px;border-bottom:2px solid var(--suave);opacity:.5}
 .pl-capa-metas b{font-size:32px;font-weight:${codex ? 550 : 750};overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .pl-capa-dono{margin-top:auto;max-width:640px}
 .pl-capa-dono{flex-shrink:0}.pl-capa-dono .pl-ln{height:56px;border-bottom:2px solid var(--suave);opacity:.5}
 /* meu ano */
 .pl-metas{display:grid;grid-template-columns:minmax(0,1fr);gap:6px}
 .pl-metas li{display:flex;align-items:center;gap:18px;font-size:27px;line-height:1.2;min-height:48px;min-width:0}
-.pl-metas li>span{width:44px;height:44px;border-radius:50%;background:var(--t);color:var(--f);display:grid;place-items:center;font-size:22px;font-weight:800;flex-shrink:0}
+.pl-metas li>span{width:44px;height:44px;border-radius:50%;background:var(--t);color:var(--${codex ? "x" : "f"});display:grid;place-items:center;font-size:22px;font-weight:800;flex-shrink:0}
 .pl-metas li b{flex:1;min-width:0;font-weight:${codex ? 550 : 700};${codex ? "" : "color:var(--tinta)"}}.pl-metas .pl-ln{flex:1}
 .pl-num{display:grid;gap:12px}
 .pl-num dt{font-size:19px;opacity:.85}.pl-num dd{font-size:35px;font-weight:${codex ? 600 : 800};letter-spacing:-1px;margin-top:2px}
@@ -428,11 +441,14 @@ function cssBase(estilo: EstiloPlanner): string {
 .pl-datas li b{width:76px;font-weight:700;flex-shrink:0}
 .pl-dico{color:var(--f);display:grid;place-items:center;flex-shrink:0}
 .pl-datas li .pl-ln{flex:1;height:30px}
+/* crítica r2: ao lado de hábitos de 2 linhas o painel das datas sobrava embaixo — as 6 linhas se espalham até o fundo */
+.pl-datas-p{display:flex;flex-direction:column}.pl-datas-p .pl-datas{flex:1;grid-auto-rows:1fr}.pl-datas-p .pl-datas li{height:auto;min-height:40px}
 .pl-hab{display:grid;grid-template-columns:minmax(0,1fr) repeat(7,26px);column-gap:6px;row-gap:4px;align-items:center}
 .pl-hab-cab,.pl-trilha-cab{font-size:16px;font-weight:700;letter-spacing:1.4px}
 .pl-dia{font-size:16px;font-weight:650;text-align:center}
 .pl-hab-nome{font-size:19px;line-height:1.2;min-height:34px;min-width:0;display:flex;align-items:center;padding-right:8px;${codex ? "" : "color:var(--tinta)"}}
 .pl-hab-nome .pl-ln{flex:1;height:30px;margin-right:4px}
+.pl-hab-mais{grid-column:1/-1;font-size:19px;font-weight:650;color:var(--f);line-height:34px}
 .pl-hab i,.pl-trilha i{justify-self:center;width:24px;height:24px;border-radius:50%;border:2px solid var(--w)}
 /* calendário */
 .pl-cal{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(4,1fr);gap:18px 34px}
@@ -455,13 +471,15 @@ function cssBase(estilo: EstiloPlanner): string {
 /* dinheiro */
 .pl-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
 .pl-cards>div{border-radius:26px;padding:24px 26px;background:var(--p);color:var(--x);${codex ? "" : "border:1.5px solid var(--l);"}}
-.pl-cards small{font-size:19px;display:block}.pl-cards b{display:block;margin-top:8px;font-size:38px;font-weight:${codex ? 600 : 800};letter-spacing:-1px}
+.pl-cards small{font-size:19px;display:block}.pl-cards b{display:block;margin-top:8px;font-size:38px;font-weight:${codex ? 600 : 800};letter-spacing:-1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl-cards b.pl-longo{font-size:28px}
 .pl-tab{width:100%;border-collapse:collapse;font-size:20px;color:var(--tinta);table-layout:fixed}
 .pl-tab th{font-size:16px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;text-align:left;color:var(--x);opacity:.85;padding:0 10px 10px}
 .pl-tab td{height:42px;padding:0 10px;border-top:2px solid var(--w);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pl-tab td:first-child{font-weight:650;color:var(--x)}
 .pl-contas th:first-child,.pl-contas td:first-child{width:90px}.pl-contas th:nth-child(3){width:190px}.pl-contas th:last-child{width:80px}
-.pl-contas td:first-child{color:var(--f)}
+.pl-contas td:first-child{color:var(--${codex ? "x" : "f"})}
+.pl-contas .pl-tr-mais td{font-size:18px;font-weight:650;color:var(--f)}
 /* rotina */
 .pl-trilha{display:grid;grid-template-columns:230px repeat(31,minmax(0,1fr));column-gap:3px;row-gap:12px;align-items:center}
 .pl-trilha .pl-dia{font-size:16px;letter-spacing:-.5px}
@@ -470,7 +488,8 @@ function cssBase(estilo: EstiloPlanner): string {
 /* cofrinho */
 .pl-cof{flex:1;display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:1fr;gap:14px}
 .pl-cof div{display:flex;flex-direction:column;justify-content:center;border-radius:18px;border:2px solid var(--w);background:#ffffff8c;text-align:center;padding:10px 4px;color:var(--tinta)}
-.pl-cof div.ok{background:var(--f);border-color:var(--f);color:#fff}
+.pl-cof div.ok{background:var(--${codex ? "f" : "x"});border-color:var(--${codex ? "f" : "x"});color:#fff}
+.pl-cof div.ok small{opacity:1}
 .pl-cof small{display:block;font-size:16px;opacity:.85}.pl-cof b{font-size:26px;font-weight:750}
 .pl-barra{margin-top:26px;height:16px;border-radius:99px;background:#ffffffa6;border:1.5px solid var(--l);overflow:hidden}
 .pl-barra i{display:block;height:100%;background:var(--f)}
@@ -481,7 +500,9 @@ function cssBase(estilo: EstiloPlanner): string {
 .pl-rev .pl-rotulo{font-size:16px;margin-top:8px;color:var(--x)}.pl-rev .pl-ln{height:34px}
 /* áreas */
 .pl-areas{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:1fr 1fr;gap:24px}
+.pl-area{display:flex;flex-direction:column}
 .pl-area .pl-q{font-size:21px;opacity:.9;margin-bottom:4px}
+.pl-area .pl-pauta{min-height:252px}
 .pl-area .pl-ln{height:42px}
 .pl-chk{display:flex;gap:26px;margin-top:16px;font-size:17px}.pl-chk>span{display:inline-flex;align-items:center;gap:8px}
 /* rodapé */

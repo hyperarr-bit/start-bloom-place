@@ -3,7 +3,7 @@ import { ArrowRight, Check, ChevronLeft, Copy, LoaderCircle, Printer, Share } fr
 import { toast } from "sonner";
 import { trackEvent } from "@/lib/analytics";
 import { plataformaApp } from "@/lib/native-shell";
-import { A4_PX, folhasDoPlanner, lerExtrasDoPlanner, resumoDoPlanner, type DadosDoPlanner, type EstiloPlanner } from "@/lib/planner-2027";
+import { A4_PX, ROTULOS_DAS_FOLHAS, TOTAL_DE_FOLHAS, folhasDoPlanner, lerExtrasDoPlanner, resumoDoPlanner, type DadosDoPlanner, type EstiloPlanner } from "@/lib/planner-2027";
 import { ehIos, garantirCssDoPlanner, imprimirPlannerNoSite, modoDeEntrega, prepararFolhas, type FolhasProntas, type ModoDeEntrega } from "@/lib/planner-2027-baixar";
 import { LINK_DO_PLANNER, portaDoLink } from "@/lib/planner-2027-chave";
 import type { Cofrinho2027, Plano2027 } from "@/lib/pacote-2027";
@@ -27,7 +27,7 @@ export function FolhaMini({ html, estilo, escala = ESCALA, rotulo }: { html: str
   );
 }
 
-const ROTULOS = ["Capa", "Meu ano", "Calendário", "Metas", "Dinheiro", "Rotina", "Cofrinho", "Revisões", "16 áreas", "16 áreas", "16 áreas", "16 áreas"];
+const ROTULOS = ROTULOS_DAS_FOLHAS;
 
 export { LINK_DO_PLANNER };
 
@@ -182,7 +182,7 @@ export function PlannerB({ dados, estilo, via, onVoltar, onPlanejar }: { dados: 
       <button type="button" onClick={onVoltar} className="text-[12px] font-bold text-muted-foreground inline-flex items-center gap-1"><ChevronLeft className="w-4 h-4" /><span>Seu 2027</span></button>
       <div>
         <h2 className="text-[24px] leading-tight font-black tracking-tight">Seu planner 2027</h2>
-        <p className="text-[13.5px] text-muted-foreground mt-1">12 folhas A4, montadas com o que você tem no CORE.</p>
+        <p className="text-[13.5px] text-muted-foreground mt-1">{TOTAL_DE_FOLHAS} folhas A4, montadas com o que você tem no CORE.</p>
       </div>
 
       <div className="-mx-4 px-4 flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 [scrollbar-width:none]" data-testid="planner-b-previa">
@@ -219,14 +219,14 @@ export function PlannerB({ dados, estilo, via, onVoltar, onPlanejar }: { dados: 
         <div>
           {prontas && modo === "compartilhar" ? (
             <button type="button" onClick={compartilharAgora} data-testid="planner-b-compartilhar" className={botao}>
-              <Share className="w-4 h-4" /><span>Salvar as 12 folhas</span>
+              <Share className="w-4 h-4" /><span>Salvar as {TOTAL_DE_FOLHAS} folhas</span>
             </button>
           ) : (
             <button type="button" onClick={() => void baixar()} disabled={modo === "compartilhar" && preparando} data-testid="planner-b-baixar" className={botao}>
               {preparando && modo !== "imprimir"
                 ? <><LoaderCircle className="w-4 h-4 animate-spin" /><span>Preparando {feitas} de {folhas.length}…</span></>
                 : nativo ? <><Share className="w-4 h-4" /><span>Salvar ou imprimir</span></>
-                : modo === "compartilhar" ? <><Share className="w-4 h-4" /><span>{falhouPreparar ? "Tentar de novo" : "Preparar as 12 folhas"}</span></>
+                : modo === "compartilhar" ? <><Share className="w-4 h-4" /><span>{falhouPreparar ? "Tentar de novo" : `Preparar as ${TOTAL_DE_FOLHAS} folhas`}</span></>
                 : <><Printer className="w-4 h-4" /><span>Imprimir ou salvar em PDF</span></>}
             </button>
           )}

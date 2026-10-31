@@ -1,13 +1,13 @@
 /**
- * A RÉGUA DO PLANNER 2027 (crítica r1, 31/10): o que jsdom não mede. Monta as 12 folhas (src/lib/planner-2027.ts) nas 2
+ * A RÉGUA DO PLANNER 2027 (crítica r1, 31/10): o que jsdom não mede. Monta as folhas (14 desde a v2) (src/lib/planner-2027.ts) nas 2
  * direções com contas de verdade — vazia, pouco, exemplo, LONGA (80 letras em toda meta e toda data, 2 datas por mês,
  * hábitos e contas de nome comprido) e 7 datas curtas — e confere no Chromium E no WebKit:
  *   1. nenhum texto passa da borda de dentro do painel (nem da folha);
  *   2. os 12 meses do calendário com as 7 colunas inteiras dentro do mês;
  *   3. nada estoura a área do corpo; nenhum painel esmagado;
- *   4. letra ≥ 16 px no layout de 1240 (≈ 7,5 pt impresso);
+ *   4. letra ≥ 18 px no layout de 1240 (≈ 8,6 pt impresso; v2 de 31/10, era 16);
  *   5. linha de escrever com contraste ≥ 1,8 com o papel do painel e 2 px;
- *   6. a impressão do site (Chromium, A4): 12 páginas;
+ *   6. a impressão do site (Chromium, A4): uma página por folha;
  *   7. (crítica r2) nenhum painel com mais de 8% de papel liso embaixo (e mais de 1 linha de escrever); capa sem faixa
  *      vazia acima de 30% da folha.
  *   npx vite-node scripts/planner-2027-medir.ts [pasta-dos-prints]
@@ -16,7 +16,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { chromium, webkit, type Browser } from "playwright-core";
-import { cssDoPlanner, folhasDoPlanner, htmlDoPlannerNovo, EXEMPLO_DO_PLANNER, A4_PX, type DadosDoPlanner, type EstiloPlanner } from "../src/lib/planner-2027";
+import { cssDoPlanner, folhasDoPlanner, htmlDoPlannerNovo, EXEMPLO_DO_PLANNER, A4_PX, TOTAL_DE_FOLHAS, type DadosDoPlanner, type EstiloPlanner } from "../src/lib/planner-2027";
 import { novoPlano2027 } from "../src/lib/pacote-2027";
 
 const raiz = path.resolve(__dirname, "..");
@@ -78,7 +78,7 @@ function medirNaPagina() {
     if (temTexto) {
       const fs = parseFloat(getComputedStyle(el).fontSize);
       menorFonte = Math.min(menorFonte, fs);
-      if (fs < 16) out.push(`letra ${fs}px: "${el.textContent!.trim().slice(0, 30)}"`);
+      if (fs < 18) out.push(`letra ${fs}px: "${el.textContent!.trim().slice(0, 30)}"`);
       const painel = el.closest<HTMLElement>(".pl-painel, .pl-cards > div");
       if (painel && !pauta(el)) {
         const P = painel.getBoundingClientRect(), cs = getComputedStyle(painel);
@@ -86,7 +86,9 @@ function medirNaPagina() {
         // o que vale é o que aparece: o fim visível do texto (a caixa, ou o pai que corta)
         if (r.right > dentro) out.push(`passa ${Math.round(r.right - dentro)}px do painel: "${el.textContent!.trim().slice(0, 30)}"`);
       }
-      if (r.right > F.right - 60 || r.left < F.left + 60) {
+      const pa = pauta(el);
+      const escondida = pa && r.left >= pa.getBoundingClientRect().right - 1; // a linha da pauta que não coube (fica à direita, cortada)
+      if (!escondida && (r.right > F.right - 60 || r.left < F.left + 60)) {
         if (!el.closest(".pl-capa-flores") && !el.closest(".pl-f-capa .pl-rod")) out.push(`fora da margem: "${el.textContent!.trim().slice(0, 30)}"`);
       }
     }
@@ -107,10 +109,10 @@ function medirNaPagina() {
     const M = mes.getBoundingClientRect();
     const cel = Array.from(mes.querySelectorAll<HTMLElement>(".pl-dias i, .pl-sem i")).map((i) => i.getBoundingClientRect());
     const xs = new Set(cel.map((q) => Math.round((q.left + q.right) / 2)));
-    if (xs.size !== 7) out.push(`mês "${mes.querySelector("h4")!.textContent}" com ${xs.size} colunas`);
-    if (cel.some((q) => q.right > M.right + 1)) out.push(`mês "${mes.querySelector("h4")!.textContent}" com dia fora`);
+    if (xs.size !== 7) out.push(`mês "${(mes.closest(".pl-painel")?.querySelector("h3") ?? mes.querySelector("h4"))?.textContent}" com ${xs.size} colunas`);
+    if (cel.some((q) => q.right > M.right + 1)) out.push(`mês "${(mes.closest(".pl-painel")?.querySelector("h3") ?? mes.querySelector("h4"))?.textContent}" com dia fora`);
     const painel = mes.closest(".pl-painel")!.getBoundingClientRect();
-    if (M.right > painel.right - 20) out.push(`mês "${mes.querySelector("h4")!.textContent}" passa do painel`);
+    if (M.right > painel.right - 20) out.push(`mês "${(mes.closest(".pl-painel")?.querySelector("h3") ?? mes.querySelector("h4"))?.textContent}" passa do painel`);
   });
   // corpo e painéis
   const corpo = folha.querySelector<HTMLElement>(".pl-corpo");
@@ -184,7 +186,7 @@ async function rodar(motor: string, b: Browser) {
 async function ladoALado(b: Browser) {
   const p = await b.newPage({ viewport: { width: 1240 * 2 + 120, height: 1754 + 150 } });
   for (const caso of ["exemplo", "vazio", "longo", "pouco"]) {
-    for (let i = 1; i <= 12; i++) {
+    for (let i = 1; i <= TOTAL_DE_FOLHAS; i++) {
       const n = String(i).padStart(2, "0");
       const img = (e: string) => `data:image/png;base64,${fs.readFileSync(path.join(OUT, "folhas", `${caso}-${e}-${n}.png`)).toString("base64")}`;
       await p.setContent(`<body style="margin:0;background:#d6d3d1;font:600 34px Inter,Arial;color:#262626"><div style="display:flex;gap:40px;padding:30px 40px">
@@ -207,7 +209,7 @@ async function pdf(b: Browser) {
     const buf = await p.pdf({ preferCSSPageSize: true, printBackground: true });
     const paginas = (buf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length;
     r[`${caso}-${estilo}`] = paginas;
-    if (paginas !== 12) problemas.push({ motor: "chromium", caso, estilo, folha: 0, o: `PDF com ${paginas} páginas` });
+    if (paginas !== TOTAL_DE_FOLHAS) problemas.push({ motor: "chromium", caso, estilo, folha: 0, o: `PDF com ${paginas} páginas` });
     if (OUT) { fs.mkdirSync(path.join(OUT, "pdf"), { recursive: true }); fs.writeFileSync(path.join(OUT, "pdf", `planner-2027-${caso}-${estilo}.pdf`), buf); }
   }
   await p.close();

@@ -84,7 +84,7 @@ export const ZOOM_U2027_PLANNER = "Toque pra ver uma folha";
  */
 export const PLANNER_B_NO_APP_IPHONE = false;
 /* crítica r2 (compradora MEDIA 3): "sai pelo site" confundia quem já está no site — agora diz o que ela recebe. */
-export const NOTA_U2027_PLANNER = "É separado do CORE que você já pagou. O planner sai em 12 folhas pra salvar no celular ou imprimir.";
+export const NOTA_U2027_PLANNER = "É separado do CORE que você já pagou. O planner sai em 14 folhas pra salvar no celular ou imprimir.";
 
 /** O "Pronto" com a versão B: o 4º item e o link que abre o Planejar direto (Pacote2027 lê ?planejar=1). */
 export const ITEM_PLANNER_U2027 = "Seu planner 2027, com os seus dados";

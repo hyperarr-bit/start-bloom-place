@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { liberarPix, trocarEmailAdmin } from "../_shared/admin-acoes-suporte.ts";
+import { liberarPix, resolverColisao, trocarEmailAdmin } from "../_shared/admin-acoes-suporte.ts";
 import { COLUNAS_DECISAO, decidirGrantPix, type LinhaAssinatura } from "../_shared/linha-pix.ts";
 
 /**
@@ -13,7 +13,10 @@ import { COLUNAS_DECISAO, decidirGrantPix, type LinhaAssinatura } from "../_shar
  *   para = e-mail novo. Auth (users + identity) + perfil + assinatura. Sem e-mail ao cliente.
  * POST { action: "transferir_pix", deUid, paraUid }
  *   ou { pedido | orderId | paymentId, email } ou { deUid, email, pedido? }
- *   → move o Pix já pago (transferirCompraPix). Não cria acesso. Sem e-mail ao cliente.
+ *   → o Pix já pago vai pra esse e-mail. Sem conta, cria uma (sem e-mail).
+ *     Sem a linha, regrava a oferta daquele pedido. Sem e-mail ao cliente.
+ * POST { action: "resolver_email", modo, quemFica, quemSai, email, confirmar }
+ *   → duas contas no mesmo e-mail: libera o e-mail ou move o acesso. Sem e-mail ao cliente.
  * POST { action: "status", email }           → uid/e-mail/assinatura (conferência)
  */
 
@@ -240,6 +243,21 @@ serve(async (req) => {
       const r = await trocarEmailAdmin(admin, {
         de: String(body.de ?? body.uid ?? ""),
         para: String(body.para ?? ""),
+        caller,
+      });
+      if (!r.ok) return json({ error: r.erro, ...(r.detalhe ?? {}) }, r.status);
+      return json({ ok: true, ...r.detalhe });
+    }
+
+    /* Duas contas no mesmo e-mail (30/10, caso do e-mail com typo + conta nova).
+     * confirmar = uid que sai do caminho. Não manda e-mail. */
+    if (action === "resolver_email") {
+      const r = await resolverColisao(admin, {
+        modo: String(body.modo ?? ""),
+        quemFica: String(body.quemFica ?? ""),
+        quemSai: String(body.quemSai ?? ""),
+        email: String(body.email ?? ""),
+        confirmar: String(body.confirmar ?? ""),
         caller,
       });
       if (!r.ok) return json({ error: r.erro, ...(r.detalhe ?? {}) }, r.status);

@@ -117,6 +117,31 @@ describe("formulários", () => {
     expect(chamar.mock.calls[1][0]).toMatchObject({ action: "trocar_email", de: "22222222-2222-4222-8222-222222222222", para: "nova@exemplo.com" });
     expect(await within(painel).findByRole("status")).toHaveTextContent(/trocado para nova@exemplo.com/);
     expect(within(painel).getByRole("status")).toHaveTextContent(/Nenhum e-mail foi enviado/);
+
+    chamar.mockResolvedValueOnce({
+      error: "destino_ja_existe",
+      contas: [
+        { uid: "59b7d1bf-74c8-4df5-9b29-64daef552686", email: "dasilvakarine228@gmail.con", temAcesso: true, chaves: 4, assinaturas: [{ status: "active", plan: "lifetime", billing_period: "lifetime", payment_method: "pix", amount_cents: 2790 }] },
+        { uid: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", email: "dasilvakarine228@gmail.com", temAcesso: false, chaves: 0, assinaturas: [] },
+      ],
+      recomendacao: { modo: "liberar_email", quemFica: "59b7d1bf-74c8-4df5-9b29-64daef552686", quemSai: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", motivo: "a_conta_do_email_esta_vazia" },
+    });
+    fireEvent.change(within(painel).getByLabelText("E-mail novo"), { target: { value: "dasilvakarine228@gmail.com" } });
+    fireEvent.click(within(painel).getByRole("button", { name: "Trocar email" }));
+    expect(await within(painel).findByText("59b7d1bf-74c8-4df5-9b29-64daef552686")).toBeInTheDocument();
+    expect(within(painel).getByText(/A conta do e-mail certo não tem acesso/)).toBeInTheDocument();
+    fireEvent.click(within(painel).getByRole("button", { name: "Liberar o e-mail pra conta que tem o acesso" }));
+    expect(chamar).toHaveBeenCalledTimes(3);
+    chamar.mockResolvedValueOnce({ ok: true });
+    fireEvent.click(within(painel).getByRole("button", { name: "Confirmar: liberar o e-mail" }));
+    await waitFor(() => expect(chamar).toHaveBeenCalledTimes(4));
+    expect(chamar.mock.calls[3][0]).toEqual({
+      action: "resolver_email", modo: "liberar_email",
+      quemFica: "59b7d1bf-74c8-4df5-9b29-64daef552686", quemSai: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+      email: "dasilvakarine228@gmail.com", confirmar: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    });
+    expect(await within(painel).findByRole("status")).toHaveTextContent(/ficou na conta que tem o acesso/);
+    expect(within(painel).getByRole("status")).toHaveTextContent(/Nenhum e-mail foi enviado/);
     expect(JSON.stringify(chamar.mock.calls)).not.toContain("liberar_vitalicio");
   });
 

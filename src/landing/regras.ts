@@ -160,7 +160,8 @@ export function estadoQueVolta(bruto: unknown, agora: number = Date.now()): Esta
   const base: EstadoLanding = { ...ESTADO_VAZIO, ...e, anteriores: Array.isArray(e.anteriores) ? e.anteriores : [] } as EstadoLanding;
   if (base.pago) return { ...base, fase: base.email ? "conta" : "pago" };
   if (base.pix && venceEm(base.pix) > agora) return { ...base, fase: "qr" };
-  return { ...ESTADO_VAZIO };
+  // r3 (oferta M2): o Pix venceu, o e-mail não — no braço "email" o campo volta preenchido e "Gerar outro Pix" gera de primeira
+  return { ...ESTADO_VAZIO, email: base.email ?? null, emailPix: base.emailPix ?? null };
 }
 
 export const EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;

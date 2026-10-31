@@ -399,7 +399,7 @@
          crescia o cartão, empurrava a página (a pessoa via só "Já paguei"). Sem âncora automática; o landing.ts rola até o cartão a cada troca de fase. */
       html[data-lp="v2"], html[data-lp="v2"] body, html[data-lp="v2"] main.lp { overflow-anchor: none; }
       html[data-lp="v2"] .lp-promo { order: -2; display: block; white-space: normal; height: auto; min-height: 34px; padding: 8px 12px 7px; line-height: 1.3; background: #d4328a; } /* fonte do sistema +15%: quebra como texto corrido (2 linhas), não por pedaços. r2: #d4328a = 4,54:1 com branco (o #d6338a da marca dá 4,47, 0,03 abaixo do AA em 12,5 px) — igual a olho; decisão de marca se quiser o #d6338a de volta */
-      html[data-lp="v2"] .lp-promo span { opacity: 1; } /* r2: o "· R$ 27,90 no Pix" sem o .95 (ficava abaixo do AA) */
+      html[data-lp="v2"] .lp-promo span { opacity: 1; white-space: nowrap; } /* r2: o "· R$ 27,90 no Pix" sem o .95 (ficava abaixo do AA). r3 (primeira-tela B1): nowrap só no pedaço do preço — com fonte grande ele desce inteiro pra 2ª linha, em vez de rasgar "R$ / 27,90" ou deixar "Pix" sozinho */
       html[data-lp="v2"] .lp-barra { display: none; } /* a faixa já carrega "CORE": sem barra de marca (46 px a mais pro celular da 1ª tela) */
       html[data-lp="v2"] #topo-v2 { order: 1; }
       html[data-lp="v2"] #dentro-v2 { order: 2; }
@@ -413,6 +413,7 @@
       .lp2-hero { background: var(--lp2-painel); padding: 12px 20px 0; overflow: hidden; }
       .lp2-topo .lp-h1 { font-size: 30px; line-height: 1.06; letter-spacing: -.025em; }
       html[data-lp="v2"][data-t="b"] .lp2-h1-a, html[data-lp="v2"]:not([data-t="b"]) .lp2-h1-b { display: none; }
+      html[data-lp="v2"][data-t="b"] .lp2-h3-a, html[data-lp="v2"]:not([data-t="b"]) .lp2-h3-b { display: none; } /* r3 (prova-e-meio 1.3): no braço B o h1 já diz "16 áreas da vida. / Em um só app." — o painel 1 não repete */
       /* 350 px = o que cabe da Home (de "Bom dia, Ana" até 8 px abaixo dos rótulos da 1ª fileira) num celular de 232 px */
       .lp2-hero-cel { height: 350px; margin-top: 8px; display: flex; justify-content: center; overflow: hidden; }
       .lp2-hero-cel .lp2-fone { --w: 232px; }
@@ -426,10 +427,11 @@
       .lp2-abaixo { padding: 6px 20px 0; }
       /* crítica r1: a linha das lojas é tocável (rola até "Sim, é um app de verdade" — a dúvida nº 1, sem sair da página); o "·" mora no item anterior (nunca órfão no começo
          da 2ª linha — pontuação fica no fim da linha). r2 (primeira-tela 4 / técnico 9.4): é um <button> de verdade (teclado, leitor de tela), sem cara de botão de propósito */
-      .lp2-onde { display: flex; justify-content: center; align-items: center; gap: 3px; flex-wrap: wrap; width: 100%; margin: 0; padding: 0; border: 0; background: none; list-style: none; font-size: 12px; font-weight: 600; color: var(--suave); cursor: pointer; } /* r2 (visitante-frio 2): 12 px + gap 3 → a linha cabe inteira a +15% em 390 (339 ≤ 350; em 12,5 dava 355 e quebrava); em 360 quebra a +15% com o "·" no fim da 1ª linha */
+      .lp2-onde { position: relative; display: flex; justify-content: center; align-items: center; gap: 3px; flex-wrap: wrap; width: 100%; margin: 0; padding: 0; border: 0; background: none; list-style: none; font-size: 12px; font-weight: 600; color: var(--suave); cursor: pointer; } /* r2 (visitante-frio 2): 12 px + gap 3 → a linha cabe inteira a +15% em 390 (339 ≤ 350; em 12,5 dava 355 e quebrava); em 360 quebra a +15% com o "·" no fim da 1ª linha */
       .lp2-onde span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
       .lp2-onde span:not(:last-child)::after { content: "·"; color: var(--fraco); font-weight: 400; margin-left: 2px; }
       .lp2-onde svg { width: 13px; height: 13px; fill: currentColor; flex-shrink: 0; }
+      .lp2-onde::before { content: ""; position: absolute; left: 0; right: 0; top: -10px; bottom: -10px; } /* r3 (primeira-tela B2 / técnico 9.1): a linha tem 15 px de alto; o alvo de toque passa a 35 px (−10/+10) sem mover nada — o que fica embaixo (celular, preço) não é tocável */
       .lp2-preco { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 6px; }
       .lp2-preco-v { font-size: 38px; font-weight: 850; letter-spacing: -.03em; line-height: 1; white-space: nowrap; }
       .lp2-preco-v small { font-size: .55em; font-weight: 800; letter-spacing: 0; }
@@ -438,7 +440,7 @@
       .lp2-preco-txt span { font-size: 13px; color: var(--suave); font-weight: 500; margin-top: 2px; }
       .lp2-topo .lp-cta { margin-top: 8px; min-height: 54px; white-space: nowrap; padding: 0 12px; font-size: 17.5px; font-weight: 800; border-radius: 14px; }
       .lp2-topo .lp-cta svg, html[data-lp="v2"] .lp-fim .lp-cta svg { width: 18px; height: 18px; }
-      .lp2-miuda { margin: 6px 0 0; text-align: center; font-size: 12px; color: var(--suave); font-weight: 500; line-height: 1.3; }
+      .lp2-miuda { margin: 6px 0 0; text-align: center; font-size: 13px; color: var(--suave); font-weight: 500; line-height: 1.3; }
       /* ── 2. "Por dentro": painéis no estilo das fotos de loja (fundo do módulo, título falado, celular ≥ 70% cortado pela borda) ── */
       .lp2-dentro { padding-top: 36px; }
       /* r2 (prova-e-meio MÉDIA 1.1): o painel NÃO tem altura fixa — a legenda cresce com a fonte do sistema (+15/+30%) e o celular desce junto.
@@ -451,9 +453,9 @@
       .lp2-foto h3 em { font-style: normal; }
       .lp2-foto figcaption p { margin: 6px 0 0; font-size: 14px; line-height: 1.35; color: rgba(0,0,0,.62); font-weight: 500; text-wrap: pretty; }
       .lp2-foto .lp2-fone { margin: 14px auto 0; padding-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-      .lp2-foto .lp2-fone-tela { max-height: calc(var(--w) * var(--corte)); border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+      .lp2-foto .lp2-fone-tela { height: calc(var(--w) * var(--corte)); border-bottom-left-radius: 0; border-bottom-right-radius: 0; } /* r3 (oferta M1 / pix M1 / visitante-frio M1): height, não max-height — no WebKit um <img> sem src (data-src) não reserva altura e os 3 painéis nasciam com 163/181/164 px; a página rolava até o cartão do Pix e, quando o src chegava, +786 px entravam acima dele. Com a altura em --w o painel nasce no tamanho final nos 2 motores */
       .lp2-foto.magenta { --corte: 1.185; background: var(--magenta-escuro); color: #fff; } /* a 4ª fileira (Relações, Detox, Pet, Viagens) inteira + 8 px */ .lp2-foto.magenta em { color: #ffd9a8; } .lp2-foto.magenta figcaption p { color: rgba(255,255,255,.8); }
-      .lp2-foto.ambar { --corte: .8; --zoom-y: .417; background: #f9e5bd; } .lp2-foto.ambar em { color: #9a5b00; } /* o card real começa a 133 px do topo do celular (.443 × --w): o zoom 8 px acima, cobrindo-o inteiro; embaixo, só os rótulos Receitas/Despesas (r2 1.8: painel 420 → ~385) */
+      .lp2-foto.ambar { --corte: .70; --zoom-y: .417; background: #f9e5bd; } .lp2-foto.ambar em { color: #9a5b00; } /* o card real começa a 133 px do topo do celular (.443 × --w): o zoom 8 px acima, cobrindo-o inteiro. r3 (prova-e-meio 1.1): --corte .70 = o corte 1 px abaixo do zoom, como o painel verde (os 30 px de topos de "Receitas/Despesas" cortados saíram; painel 385 → ~355) */
       .lp2-foto.verde { --corte: 1; --zoom-y: .75; background: #dcf2e4; } .lp2-foto.verde em { color: #1d7a45; } /* o corte é ~2 px abaixo do zoom: sem a tira de checkboxes (r2 1.2) */
       /* o card real recortado @3x e ~1,3× maior por cima do próprio card (regra do dono 22/10: zoom = card real nítido, flutuando).
          r1: 342 px = a largura da figura em 390 menos 8 (o recorte tem 1026 px → escala 1,0, título "QUANTO POSSO GASTAR HOJE" ≈ 13 px CSS) */
@@ -466,12 +468,13 @@
       html[data-lp="v2"] .lp-seguro { color: var(--suave); font-size: 12px; align-items: flex-start; } /* r1: 12 px (era a única linha < 12) e o cadeado fica na 1ª linha quando quebra */
       html[data-lp="v2"] .lp-seguro svg { margin-top: 2px; }
       html[data-lp="v2"] #lp-pagar-erro { margin: 10px 0 0; text-align: center; }
-      .lp2-aviso-topo { margin: 0 0 14px; text-align: center; } /* r2 (oferta 5 / pix 1): o aviso "Esse código venceu…" é a 1ª linha do cartão, antes do preço, e o botão vira "Gerar outro Pix" */
+      .lp2-aviso-topo { margin: 0 0 14px; text-align: center; }
+      .lp2-link { display: inline; margin: 0; padding: 0; border: 0; background: none; font: inherit; color: var(--magenta); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; } /* r3 (oferta B2): a dúvida "grátis" aponta a demonstração 1 tela abaixo */ /* r2 (oferta 5 / pix 1): o aviso "Esse código venceu…" é a 1ª linha do cartão, antes do preço, e o botão vira "Gerar outro Pix" */
       html[data-lp="v2"] .lp-aval figcaption svg { fill: currentColor; } /* r2 (prova-e-meio 1.3): ícone da loja na mesma cor cinza do texto (os SVGs do v2 não têm fill) */
       /* r1: as "pílulas" do passo 2 viram a mesma linha de texto da 1ª tela (App Store · Google Play · Computador) — cabe em 1 linha em 360 e 390 */
       .lp2-disp { gap: 0 4px; margin-top: 8px; font-size: 12.5px; font-weight: 600; color: var(--suave); }
       .lp2-disp span { display: inline-flex; align-items: center; gap: 4px; padding: 0; background: none; white-space: nowrap; }
-      .lp2-disp span:not(:last-child)::after { content: "·"; color: var(--fraco); font-weight: 400; margin-left: 4px; }
+      .lp2-disp span + span::before { content: "·"; color: var(--fraco); font-weight: 400; margin-right: 4px; } /* r3 (prova-e-meio 1.4): o "·" fica com a palavra seguinte — com fonte grande em 360 quebra "App Store · Google Play / · Computador", sem ponto solto no fim da linha */
       .lp2-disp svg { display: none; } /* só texto aqui (os ícones já estão na 1ª tela): cabe em 1 linha em 360 */
       /* ── 4. a tela do Pix (preenchida pelo landing.ts no v2): 3 passos, QR e código lado a lado, "Pagou? Volte aqui", tudo em 690 ── */
       html[data-lp="v2"] .lp-pix-valor b { white-space: nowrap; }
@@ -511,7 +514,7 @@
       html[data-lp="v2"] .lp-pago .lp-form .lp-erro { text-align: center; } /* r2 (pix 3): o erro do código centrado como o resto do cartão */
       /* ── 6. a demo vira opcional e compacta: print + "Testar o app"; o celular só cresce quando abre (iframe só no toque) ── */
       html[data-lp="v2"] .lp-celular { height: clamp(420px, 56svh, 520px); }
-      html[data-lp="v2"] .lp-celular:not([data-abrindo]):not([data-pronta]) { height: 220px; width: 300px; } /* r2 (prova-e-meio 1.4): 300 px = 900 px do v3-financas em @3x (escala 1,0; em 338 px ficava 1,13×); a demo aberta volta à largura toda */
+      html[data-lp="v2"] .lp-celular:not([data-abrindo]):not([data-pronta]) { height: 220px; width: 240px; border-bottom: 0; border-radius: 34px 34px 0 0; box-shadow: none; -webkit-mask-image: linear-gradient(#000 55%, transparent); mask-image: linear-gradient(#000 55%, transparent); } /* r3 (visitante-frio 4): celular em retrato (240 px: a Home de 720 px fica a 0,95 em @3x), cortado embaixo e sumindo no branco da seção — a mesma moldura dos outros celulares da página; a demo aberta volta à largura toda */
       html[data-lp="v2"] .lp-celular:not([data-abrindo]):not([data-pronta]) .lp2-demo-abrir { top: 38%; } /* r2: o botão cai sobre as abas, não sobre o título "QUANTO POSSO GASTAR HOJE" */
       html[data-lp="v2"] #demo:not(:has(.lp-celular[data-abrindo], .lp-celular[data-pronta])) .lp-pilulas { display: none; }
       html[data-lp="v2"] .lp-pilula-16 { display: none; } /* os 16 em HTML não existem no v3 (estão dentro do celular, no "Por dentro") */
@@ -535,7 +538,7 @@
       .lp2-fixo-p i { font-style: normal; }
       html[data-lp="v2"] .lp-fixo .lp-cta { margin: 0; flex: 1; min-width: 0; min-height: 48px; font-size: 15.5px; line-height: 1.15; padding: 0 10px; max-width: none; } /* r2 (oferta 1): sem nowrap — 1 linha até +15% (medido em 390 e 360); a +30% quebra em 2 linhas em vez de cortar "Quero organizar minha vic" */
       /* ≤ 374 (Android 360): o título em 27 px (com fonte +15% fica em 2 linhas); na barra fixa some só o "· Pix" — "Vitalício" fica (r1: é a palavra que mais vale); o preço da 1ª tela cai pra 34 px (r1: "Pagamento único no Pix" numa linha com +15%) */
-      @media (max-width: 374px) { .lp2-topo .lp-h1 { font-size: 27px; } .lp2-fixo-p i { display: none; } html[data-lp="v2"] .lp-fixo .lp-cta { font-size: 14.5px; } .lp2-preco-v { font-size: 34px; } }
+      @media (max-width: 374px) { .lp2-topo .lp-h1 { font-size: 27px; } .lp2-fixo-p i { display: none; } html[data-lp="v2"] .lp-fixo .lp-cta { font-size: 14.5px; } .lp2-preco-v { font-size: 34px; } .lp-preco-sub[data-so-lp="v2"] { font-size: 14px; } /* r3 (oferta B1): "Pagamento único. Nada é cobrado depois." em 1 linha também em 360 (286 ≤ 290 px; a 14,5 dava 296 e "depois." caía sozinho) */ }
       @media (min-width: 720px) {
         .lp2-topo .lp-h1 { font-size: 36px; }
         .lp2-foto .lp2-fone { --w: 316px; } /* tela 298 px: 3× = 894 ≤ 900 do print (0 upscale) */
@@ -560,7 +563,7 @@
       <!-- ═════════ 1. TOPO ═════════ -->
       <div class="lp-promo" role="note" data-so-lp="atual"><b data-so-oferta="sempre">🔥 ACESSO VITALÍCIO</b><b data-so-oferta="ano">🔥 OFERTA ESPECIAL</b> <span>· só hoje<b id="lp-promo-data"></b></span></div>
       <!-- 30/10 (v2): a faixa sem "só hoje, DD/MM" (a data mudava sozinha todo dia = promoção eterna; risco CDC art. 37 e política da Meta). Só o que é verdade. -->
-      <div class="lp-promo" role="note" data-so-lp="v2"><b>CORE · ACESSO VITALÍCIO</b> <span>· R$ 27,90 no Pix</span></div>
+      <div class="lp-promo" role="note" data-so-lp="v2"><b>CORE · ACESSO VITALÍCIO</b> <span>· R$ 27,90 no&nbsp;Pix</span></div>
       <script>
         // a data de hoje no fuso de Brasília ("· válida hoje, 28/10") — sem ela, fica só "válida hoje"
         try { var dd = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" }).format(new Date()); document.getElementById("lp-promo-data").textContent = ", " + dd; } catch (e) {}
@@ -613,7 +616,7 @@
           <button type="button" class="lp2-onde" aria-label="App Store, Google Play e computador: ver as telas do app" data-ir="dentro-v2"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.7c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9s-2-.9-3.3-.8C6.1 7 4.6 8 3.7 9.5c-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.3.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.8-1.1-2.9-4.2zM13.9 5.3c.7-.8 1.2-2 1-3.2-1 0-2.3.7-3 1.5-.6.7-1.2 1.9-1.1 3.1 1.2.1 2.3-.6 3.1-1.4z"/></svg>App Store</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 2.2 13.8 12 3.6 21.8c-.4-.2-.6-.6-.6-1.1V3.3c0-.5.2-.9.6-1.1zm11.7 11.3 2.8 2.8-10.4 6c-.6.3-1.2.3-1.7 0zM18.1 8.6l3.1 1.8c1 .6 1 1.6 0 2.2l-3.1 1.8L15.3 12zM5.8 1.9l10.3 6-2.8 2.8L5.8 2c.5-.3 1.2-.3 1.7 0z"/></svg>Google Play</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-7v2h3v2H7v-2h3v-2H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm1 2v9h16V6z"/></svg>Computador</span></button>
           <div class="lp2-preco">
             <span class="lp2-preco-v">R$ 27<small>,90</small></span>
-            <span class="lp2-preco-txt"><b>Vitalício</b><span>Pagamento único no Pix</span></span>
+            <span class="lp2-preco-txt"><b>Vitalício</b><span>Pagamento único no&nbsp;Pix</span></span>
           </div>
           <button type="button" class="lp-cta" id="lp-cta-topo" data-ir="oferta">Quero organizar minha vida <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
           <p class="lp2-miuda">Nada é cobrado depois · 7 dias de garantia</p>
@@ -637,14 +640,15 @@
         </div>
         <div class="lp-celular" id="lp-celular" data-modulo="financas">
           <img id="lp-demo-img" src="/landing/demo-financas.webp" alt="O módulo Finanças do CORE com dados de exemplo" width="360" height="640" loading="lazy" decoding="async" />
-          <!-- r1 (prova-e-meio 1.5 / técnico 7.3): no v2 o fundo do "Testar o app" é o print de Finanças já baixado pro painel 2 (900 px; o demo-financas.webp de 720 px ficava esticado 1,41× em @3x). r2 (1.4): a caixa fechada tem 300 px → 900/3 = escala 1,0 em @3x (em 338 px ficava 1,13×). Roda no parse, antes de o lazy pedir a imagem; o atual segue com a de hoje. -->
-          <script data-so-lp="v2">if (document.documentElement.getAttribute("data-lp") === "v2") { var di = document.getElementById("lp-demo-img"); di.src = "/landing/v3-financas.webp"; di.width = 900; di.height = 993; }</script>
+          <!-- r1 (prova-e-meio 1.5 / técnico 7.3): no v2 o fundo do "Testar o app" é um print já baixado (o demo-financas.webp de 720 px ficava esticado 1,41× em @3x). r3 (visitante-frio 4 / prova-e-meio 1.5): a Home da 1ª tela (v3-home, 0 bytes a mais) num celular em RETRATO de 240 px que some pra baixo — era a única janela da página em paisagem, e mostrava o card "R$ 146" pela 3ª vez. Roda no parse, antes de o lazy pedir a imagem; o atual segue com a de hoje. -->
+          <script data-so-lp="v2">if (document.documentElement.getAttribute("data-lp") === "v2") { var di = document.getElementById("lp-demo-img"); di.src = "/landing/v3-home.webp"; di.width = 720; di.height = 1070; }</script>
           <iframe id="lp-demo-frame" title="Demonstração do CORE" loading="eager" tabindex="-1"></iframe>
           <span class="lp-demo-carregando"><i class="lp-gira"></i>Abrindo o app…</span>
           <span class="lp2-demo-veu" data-so-lp="v2" aria-hidden="true"></span>
           <button type="button" class="lp2-demo-abrir" id="lp-demo-abrir" data-so-lp="v2"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Testar o app</button>
         </div>
-        <p class="lp-demo-nota">Nada do que você mexer aqui é salvo.</p>
+        <p class="lp-demo-nota" data-so-lp="atual">Nada do que você mexer aqui é salvo.</p>
+        <p class="lp-demo-nota" data-so-lp="v2">Dados de exemplo com a data de hoje · nada é salvo.</p>
       </section>
 
       <!-- ═════════ 3. OS 16 ═════════ -->
@@ -686,16 +690,16 @@
         <h2 class="lp-h2">Sim, é um app de verdade.</h2>
         <p class="lp-p">Telas reais do app, com dados de exemplo.</p>
         <figure class="lp2-foto magenta">
-          <figcaption><h3>16 áreas da vida<br /><em>em um só app.</em></h3><p>Use as que quiser e esconda o resto.</p></figcaption>
-          <div class="lp2-fone"><div class="lp2-fone-tela"><div class="lp2-fone-barra" aria-hidden="true"><span>9:41</span><svg viewBox="0 0 54 12"><g fill="#111"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="4.5" y="5" width="3" height="7" rx="1"/><rect x="9" y="3" width="3" height="9" rx="1"/><rect x="13.5" y="1" width="3" height="11" rx="1"/></g><path d="M26 4.2a7 7 0 0 1 8 0l-1 1.3a5.3 5.3 0 0 0-6 0zM27.6 6.6a4.4 4.4 0 0 1 4.8 0l-1 1.3a2.7 2.7 0 0 0-2.8 0zM30 9l1.2 1.6L30 12l-1.2-1.4z" fill="#111"/><rect x="37" y="1.5" width="14" height="9" rx="2.5" fill="none" stroke="#111" stroke-width="1.2"/><rect x="38.5" y="3" width="10" height="6" rx="1.2" fill="#111"/><rect x="52" y="4.5" width="1.5" height="3" rx=".6" fill="#111"/></svg></div><div class="lp2-fone-ilha" aria-hidden="true"></div><img data-src="/landing/v3-modulos.webp" alt="A Home do CORE rolada até os 16 módulos: Finanças, Rotina, Saúde, Treino, Dieta, Beleza, Dev. Pessoal, Casa, Biblioteca, Estudos, Mente, Carreira, Relações, Detox, Pet e Viagens" width="900" height="1045" loading="lazy" fetchpriority="low" decoding="async" /></div></div>
+          <figcaption><h3 class="lp2-h3-a">16 áreas da vida<br /><em>em um só app.</em></h3><h3 class="lp2-h3-b">Todas as 16,<br /><em>dentro do app.</em></h3><p>Use as que quiser e esconda o resto.</p></figcaption>
+          <div class="lp2-fone"><div class="lp2-fone-tela"><div class="lp2-fone-barra" aria-hidden="true"><span>9:41</span><svg viewBox="0 0 54 12"><g fill="#111"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="4.5" y="5" width="3" height="7" rx="1"/><rect x="9" y="3" width="3" height="9" rx="1"/><rect x="13.5" y="1" width="3" height="11" rx="1"/></g><path d="M26 4.2a7 7 0 0 1 8 0l-1 1.3a5.3 5.3 0 0 0-6 0zM27.6 6.6a4.4 4.4 0 0 1 4.8 0l-1 1.3a2.7 2.7 0 0 0-2.8 0zM30 9l1.2 1.6L30 12l-1.2-1.4z" fill="#111"/><rect x="37" y="1.5" width="14" height="9" rx="2.5" fill="none" stroke="#111" stroke-width="1.2"/><rect x="38.5" y="3" width="10" height="6" rx="1.2" fill="#111"/><rect x="52" y="4.5" width="1.5" height="3" rx=".6" fill="#111"/></svg></div><div class="lp2-fone-ilha" aria-hidden="true"></div><img data-src="/landing/v3-modulos.webp" alt="A Home do CORE rolada até os 16 módulos: Finanças, Rotina, Saúde, Treino, Dieta, Beleza, Dev. Pessoal, Casa, Biblioteca, Estudos, Mente, Carreira, Relações, Detox, Pet e Viagens" width="900" height="1045" style="aspect-ratio:900/1045" loading="lazy" fetchpriority="low" decoding="async" /></div></div>
         </figure>
         <figure class="lp2-foto ambar">
           <figcaption><h3>Saiba quanto<br /><em>pode gastar hoje.</em></h3><p>Anote o que entra e o que sai. O resto o CORE calcula.</p></figcaption>
-          <div class="lp2-fone"><div class="lp2-fone-tela"><div class="lp2-fone-barra" aria-hidden="true"><span>9:41</span><svg viewBox="0 0 54 12"><g fill="#111"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="4.5" y="5" width="3" height="7" rx="1"/><rect x="9" y="3" width="3" height="9" rx="1"/><rect x="13.5" y="1" width="3" height="11" rx="1"/></g><path d="M26 4.2a7 7 0 0 1 8 0l-1 1.3a5.3 5.3 0 0 0-6 0zM27.6 6.6a4.4 4.4 0 0 1 4.8 0l-1 1.3a2.7 2.7 0 0 0-2.8 0zM30 9l1.2 1.6L30 12l-1.2-1.4z" fill="#111"/><rect x="37" y="1.5" width="14" height="9" rx="2.5" fill="none" stroke="#111" stroke-width="1.2"/><rect x="38.5" y="3" width="10" height="6" rx="1.2" fill="#111"/><rect x="52" y="4.5" width="1.5" height="3" rx=".6" fill="#111"/></svg></div><div class="lp2-fone-ilha" aria-hidden="true"></div><img data-src="/landing/v3-financas.webp" alt="Finanças do CORE: quanto posso gastar hoje, R$ 146 por dia; receitas R$ 6.200, despesas R$ 3.718, saldo do mês +R$ 2.482, investimentos R$ 23.930" width="900" height="993" loading="lazy" fetchpriority="low" decoding="async" /></div><div class="lp2-zoom"><img data-src="/landing/v3-posso-gastar.webp" alt="O card de Finanças ampliado: Quanto posso gastar hoje, R$ 146 por dia" width="1026" height="280" loading="lazy" fetchpriority="low" decoding="async" /></div></div>
+          <div class="lp2-fone"><div class="lp2-fone-tela"><div class="lp2-fone-barra" aria-hidden="true"><span>9:41</span><svg viewBox="0 0 54 12"><g fill="#111"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="4.5" y="5" width="3" height="7" rx="1"/><rect x="9" y="3" width="3" height="9" rx="1"/><rect x="13.5" y="1" width="3" height="11" rx="1"/></g><path d="M26 4.2a7 7 0 0 1 8 0l-1 1.3a5.3 5.3 0 0 0-6 0zM27.6 6.6a4.4 4.4 0 0 1 4.8 0l-1 1.3a2.7 2.7 0 0 0-2.8 0zM30 9l1.2 1.6L30 12l-1.2-1.4z" fill="#111"/><rect x="37" y="1.5" width="14" height="9" rx="2.5" fill="none" stroke="#111" stroke-width="1.2"/><rect x="38.5" y="3" width="10" height="6" rx="1.2" fill="#111"/><rect x="52" y="4.5" width="1.5" height="3" rx=".6" fill="#111"/></svg></div><div class="lp2-fone-ilha" aria-hidden="true"></div><img data-src="/landing/v3-financas.webp" alt="Finanças do CORE: quanto posso gastar hoje, R$ 146 por dia; receitas R$ 6.200, despesas R$ 3.718, saldo do mês +R$ 2.482, investimentos R$ 23.930" width="900" height="993" style="aspect-ratio:900/993" loading="lazy" fetchpriority="low" decoding="async" /></div><div class="lp2-zoom"><img data-src="/landing/v3-posso-gastar.webp" alt="O card de Finanças ampliado: Quanto posso gastar hoje, R$ 146 por dia" width="1026" height="280" style="aspect-ratio:1026/280" fetchpriority="low" decoding="async" /></div></div>
         </figure>
         <figure class="lp2-foto verde">
           <figcaption><h3>Seus hábitos,<br /><em>dia após dia.</em></h3><p>Marque o que fez e veja a sequência crescer.</p></figcaption>
-          <div class="lp2-fone"><div class="lp2-fone-tela"><div class="lp2-fone-barra" aria-hidden="true"><span>9:41</span><svg viewBox="0 0 54 12"><g fill="#111"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="4.5" y="5" width="3" height="7" rx="1"/><rect x="9" y="3" width="3" height="9" rx="1"/><rect x="13.5" y="1" width="3" height="11" rx="1"/></g><path d="M26 4.2a7 7 0 0 1 8 0l-1 1.3a5.3 5.3 0 0 0-6 0zM27.6 6.6a4.4 4.4 0 0 1 4.8 0l-1 1.3a2.7 2.7 0 0 0-2.8 0zM30 9l1.2 1.6L30 12l-1.2-1.4z" fill="#111"/><rect x="37" y="1.5" width="14" height="9" rx="2.5" fill="none" stroke="#111" stroke-width="1.2"/><rect x="38.5" y="3" width="10" height="6" rx="1.2" fill="#111"/><rect x="52" y="4.5" width="1.5" height="3" rx=".6" fill="#111"/></svg></div><div class="lp2-fone-ilha" aria-hidden="true"></div><img data-src="/landing/v3-rotina.webp" alt="Rotina do CORE: a tabela de hábitos da semana (beber 2L de água, treinar, ler 30 min) com os dias marcados" width="900" height="1269" loading="lazy" fetchpriority="low" decoding="async" /></div><div class="lp2-zoom"><img data-src="/landing/v3-sequencia.webp" alt="A faixa de consistência da Rotina ampliada: 41 dias seguidos, com o mapa dos últimos dias" width="1050" height="252" loading="lazy" fetchpriority="low" decoding="async" /></div></div>
+          <div class="lp2-fone"><div class="lp2-fone-tela"><div class="lp2-fone-barra" aria-hidden="true"><span>9:41</span><svg viewBox="0 0 54 12"><g fill="#111"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="4.5" y="5" width="3" height="7" rx="1"/><rect x="9" y="3" width="3" height="9" rx="1"/><rect x="13.5" y="1" width="3" height="11" rx="1"/></g><path d="M26 4.2a7 7 0 0 1 8 0l-1 1.3a5.3 5.3 0 0 0-6 0zM27.6 6.6a4.4 4.4 0 0 1 4.8 0l-1 1.3a2.7 2.7 0 0 0-2.8 0zM30 9l1.2 1.6L30 12l-1.2-1.4z" fill="#111"/><rect x="37" y="1.5" width="14" height="9" rx="2.5" fill="none" stroke="#111" stroke-width="1.2"/><rect x="38.5" y="3" width="10" height="6" rx="1.2" fill="#111"/><rect x="52" y="4.5" width="1.5" height="3" rx=".6" fill="#111"/></svg></div><div class="lp2-fone-ilha" aria-hidden="true"></div><img data-src="/landing/v3-rotina.webp" alt="Rotina do CORE: a tabela de hábitos da semana (beber 2L de água, treinar, ler 30 min) com os dias marcados" width="900" height="1269" style="aspect-ratio:900/1269" loading="lazy" fetchpriority="low" decoding="async" /></div><div class="lp2-zoom"><img data-src="/landing/v3-sequencia.webp" alt="A faixa de consistência da Rotina ampliada: 41 dias seguidos, com o mapa dos últimos dias" width="1050" height="252" style="aspect-ratio:1050/252" fetchpriority="low" decoding="async" /></div></div>
         </figure>
       </section>
       <section class="lp-sec" id="antes" data-bloco="antes" data-so-lp="atual">
@@ -764,7 +768,7 @@
         <h2 class="lp-h2">Em 3 passos, hoje mesmo.</h2>
         <ol class="lp-passos">
           <li><span class="lp-num">1</span><div class="lp-passo"><b>Pague no Pix, aqui na página.</b><span>Leva 1 minuto. A tela confirma sozinha.</span></div></li>
-          <li><span class="lp-num">2</span><div class="lp-passo"><b>Entre no CORE com o e-mail da compra.</b><span>Os links aparecem logo depois do pagamento.</span>
+          <li><span class="lp-num">2</span><div class="lp-passo"><b>Entre no CORE com o seu e‑mail.</b><span>Os links aparecem logo depois do pagamento.</span>
             <!-- sem selo/link de loja antes do preço (dono 28/10): os selos ficam só no pós-compra -->
             <div class="lp-disp lp2-disp"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.7c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9s-2-.9-3.3-.8C6.1 7 4.6 8 3.7 9.5c-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.3.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.8-1.1-2.9-4.2zM13.9 5.3c.7-.8 1.2-2 1-3.2-1 0-2.3.7-3 1.5-.6.7-1.2 1.9-1.1 3.1 1.2.1 2.3-.6 3.1-1.4z"/></svg>App Store</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 2.2 13.8 12 3.6 21.8c-.4-.2-.6-.6-.6-1.1V3.3c0-.5.2-.9.6-1.1zm11.7 11.3 2.8 2.8-10.4 6c-.6.3-1.2.3-1.7 0zM18.1 8.6l3.1 1.8c1 .6 1 1.6 0 2.2l-3.1 1.8L15.3 12zM5.8 1.9l10.3 6-2.8 2.8L5.8 2c.5-.3 1.2-.3 1.7 0z"/></svg>Google Play</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-7v2h3v2H7v-2h3v-2H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm1 2v9h16V6z"/></svg>Computador</span></div></div></li>
           <!-- r2 (prova-e-meio 1.5): "Anote o que entra e o que sai" já é a legenda do painel de Finanças — aqui só o que é novo -->
@@ -789,7 +793,7 @@
               <h2 class="lp-preco-tit" data-so-oferta="sempre" data-so-lp="v2">Vitalício por <b>R$ 27<small>,90</small></b></h2>
               <p class="lp-preco-sub" data-so-oferta="ano">Pagamento único no Pix · menos de R$ 0,08 por dia</p>
               <p class="lp-preco-sub" data-so-oferta="sempre" data-so-lp="atual">Pagamento único no Pix · nunca mais paga</p>
-              <p class="lp-preco-sub" data-so-oferta="sempre" data-so-lp="v2">Pagamento único no Pix. Nada é cobrado depois.</p>
+              <p class="lp-preco-sub" data-so-oferta="sempre" data-so-lp="v2">Pagamento único. Nada é cobrado depois.</p>
               <ul class="lp-checks">
                 <li data-so-lp="atual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span>As <b>16 áreas</b> no celular e no computador</span></li>
                 <li data-so-lp="v2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span><b>App de verdade:</b> App Store, Google Play e computador, com a mesma conta.</span></li>
@@ -830,7 +834,7 @@
         <div class="lp-duvidas">
           <details><summary>É um app de verdade?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Sim. O CORE está na App Store e no Google Play, e também abre no computador. É a mesma conta em todos.</p></details>
           <details><summary>Renova sozinho? Tem mensalidade?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Não. Você paga R$ 27,90 uma vez no Pix e o CORE é seu. Nada é cobrado depois.</p></details>
-          <details><summary>Tem versão grátis?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Não, mas você tem 7 dias de garantia: se não gostar, devolvemos 100% no Pix. É só mandar um e-mail pra <a href="mailto:contato@coreaplicativo.com.br">contato@coreaplicativo.com.br</a>.</p></details>
+          <details><summary>Tem versão grátis?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Não, mas dá pra mexer na <button type="button" class="lp2-link" data-ir="demo">demonstração logo abaixo</button>, e você tem 7 dias de garantia: se não gostar, devolvemos 100% no Pix.</p></details>
           <details><summary>Funciona no computador?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Sim. Entre no site com o mesmo e-mail e está tudo lá, igual ao celular.</p></details>
           <details><summary>Como falo com vocês?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Pelo e-mail <a href="mailto:contato@coreaplicativo.com.br">contato@coreaplicativo.com.br</a>. A gente responde rápido.</p></details>
         </div>

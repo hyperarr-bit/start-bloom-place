@@ -37,7 +37,8 @@
  *   (30/10) todo evento leva braco_lp ("atual" | "v2" — AB_LP no <head>). landing_cta {onde:"topo"} = o botão da vitrine (v2);
  *           landing_demo_aberta {via: fundo|perto|botao|area|pilula|grade}; landing_erro {onde:"chunk_pagamento", tentativa}
  *   (30/10, crítica r1 do v3, só v2) landing_cta leva {fase}; landing_lojas_topo {} (toque em "App Store · Google Play · Computador"
- *           da 1ª tela → rola até "Sim, é um app de verdade"); landing_pix_venceu {order_id} (o relógio do QR chegou a zero);
+ *           da 1ª tela → rola até "Sim, é um app de verdade"); landing_pix_venceu {order_id, via: relogio|recarga} (o relógio do QR
+ *           chegou a zero / a pessoa voltou com o código já vencido — r3: 1× por pedido);
  *           landing_fita só com ≥ 60% por ≥ 500 ms (a rolagem suave do botão do topo não conta)
  * (30/10) NOS DOIS BRAÇOS, sem mudança visual: o pixel da Meta entra no 1º quadro + ocioso (≤ ~1,5 s; reserva 2,5 s) em vez de
  *   load + 800 ms (o PageView saía em 4–8 s num Android lento e a Meta contava "27% dos cliques não carregam"); o iframe da
@@ -62,10 +63,10 @@ import {
 
   EMAIL_OK, MODULO_DA_AREA, NOME_DO_MODULO, ROTULO_OFERTA, VALOR_OFERTA, URL_APP_STORE,
   bracoCheckoutDoHtml, bracoLpDoHtml, checarEmailAntes, sugestaoDeEmail, voltaDoLembrete,
-  bracoOfertaDoHtml, bracoTituloDoHtml, ehArea, ehModuloLanding, estadoQueVolta, mmss, ofertaEscolhida, reais, urlPlay, venceEm,
+  ESTADO_VAZIO, bracoOfertaDoHtml, bracoTituloDoHtml, ehArea, ehModuloLanding, estadoQueVolta, mmss, ofertaEscolhida, reais, urlPlay, venceEm,
   type Area, type EstadoLanding, type MensagemDaDemo, type ModuloLanding, type OfertaLanding, type PixLanding,
 } from "./regras";
-import { esquecerCompra, idDoAparelho, lerCompra, marcarCompra, type MarcaCompra } from "./marcador";
+import { esquecerCompra, esquecerPixVivo, gravarPixVivo, idDoAparelho, lerCompra, lerPixVivo, marcarCompra, type MarcaCompra } from "./marcador";
 import { carregarComRetry, limparMarcaDeRecarga } from "./carregar";
 
 // o Pix de verdade carrega sob demanda — declarado antes do observador dos blocos, que pode pré-aquecê-lo (com PIX_REAL).
@@ -309,22 +310,40 @@ document.querySelectorAll<HTMLAnchorElement>("a[data-loja]").forEach((a) => a.ad
 
 /* ───────────────────────── o estado da compra (guardado: o banco fecha/recarrega a aba) ───────────────────────── */
 const CHAVE_ESTADO = "landing-estado-v1";
+const ehOferta = (o: string): o is OfertaLanding => Object.prototype.hasOwnProperty.call(VALOR_OFERTA, o);
 let estadoHeap: EstadoLanding | null = null; // o Instagram zera o storage com a página viva
 /* crítica r1 (pix 3, v2): o código vencido não some em silêncio — o cartão avisa e o pedido vencido segue sendo conferido por uns
  * minutos (quem pagou no minuto 29 e voltou no 31 não pode ver a oferta de novo e pagar 2×). Também na recarga: um Pix que
  * venceu há < 10 min deixa o aviso. */
 let vencido: PixLanding | null = null;
 let avisoOferta: string | null = null;
-const AVISO_VENCEU = "Esse código venceu. Se você já pagou, o acesso chega no seu e-mail em instantes. Se não, é só gerar outro.";
+/* r3 (oferta M2 / pix 3): no braço livre o e-mail do QR é opcional — sem e-mail conhecido, o acesso NÃO chega em e-mail nenhum:
+ * é esta tela que vira "pago" e pede o e-mail. A frase só promete o e-mail quando ele existe. */
+const avisoVenceu = (emailConhecido: boolean) => emailConhecido
+  ? "Esse código venceu. Se você já pagou, o acesso chega no seu e-mail em instantes. Se não, é só gerar outro."
+  : "Esse código venceu. Se você já pagou, esta tela confirma sozinha em instantes. Se não, é só gerar outro.";
 const JANELA_VENCIDO_MS = 10 * 60_000;
 const lerEstado = (): EstadoLanding => {
   let bruto: unknown = estadoHeap;
   if (!bruto) { try { bruto = JSON.parse(localStorage.getItem(CHAVE_ESTADO) || "null"); } catch { bruto = null; } }
   if (V2) {
+    // r3 (pix 2): o localStorage sumiu (Instagram) mas o cookie do Pix vivo ficou → o mesmo QR reabre, sem um 2º Pix
+    if (!bruto) {
+      const c = lerPixVivo();
+      if (c && ehOferta(c.oferta)) {
+        const pix: PixLanding = { orderId: c.orderId, qrCode: c.qrCode, qrCodeBase64: null, expiresAt: c.expiresAt, criadoEm: Date.now(), oferta: c.oferta };
+        bruto = { ...ESTADO_VAZIO, fase: "qr", pix, salvoEm: Date.now() } as EstadoLanding;
+      }
+    }
     const e = bruto as Partial<EstadoLanding> | null;
     if (e && e.v === 1 && e.pix && !e.pago && typeof e.salvoEm === "number") {
       const fora = Date.now() - venceEm(e.pix);
-      if (fora > 0 && fora < JANELA_VENCIDO_MS) { vencido = e.pix; avisoOferta = AVISO_VENCEU; }
+      if (fora > 0 && fora < JANELA_VENCIDO_MS) {
+        vencido = e.pix; avisoOferta = avisoVenceu(!!(e.emailPix || lerCompra()?.email));
+        // r3 (oferta B3): quem volta com o código já morto também conta (1× por pedido nesta aba) — a régua vê quantos voltaram a um Pix vencido
+        const chave = `landing-venceu-${e.pix.orderId}`;
+        if (!ss(chave)) { ss(chave, "1"); evento("landing_pix_venceu", { order_id: e.pix.orderId, via: "recarga" }); }
+      }
     }
   }
   return estadoQueVolta(bruto);
@@ -410,7 +429,9 @@ if ("IntersectionObserver" in window) {
         if (en.isIntersecting) {
           if (!esperando.has(i)) esperando.set(i, window.setTimeout(() => {
             esperando.delete(i); vistas.add(i);
-            evento("landing_fita", { indice: i, legenda: [...(en.target.querySelector("h3")?.childNodes ?? [])].map((n) => n.textContent).join(" ").replace(/\s+/g, " ").trim().slice(0, 40) });
+            // r3 (prova-e-meio 1.3): o painel 1 tem 2 títulos (um por braço do AB_TITULO; o CSS esconde o outro) — a legenda é o visível
+            const h3 = en.target.querySelector(brTitulo === "b" ? "h3.lp2-h3-b, h3:not(.lp2-h3-a)" : "h3:not(.lp2-h3-b)");
+            evento("landing_fita", { indice: i, legenda: [...(h3?.childNodes ?? [])].map((n) => n.textContent).join(" ").replace(/\s+/g, " ").trim().slice(0, 40) });
             if (vistas.size === telas.length) fita.disconnect();
           }, 500));
         } else { const t = esperando.get(i); if (t !== undefined) { window.clearTimeout(t); esperando.delete(i); } }
@@ -436,8 +457,11 @@ if ("IntersectionObserver" in window) {
   // v2: o botão fixo entra ENQUANTO o botão do topo está fora da tela por cima — e sai quando ele volta (crítica r1: liga e desliga)
   const ctaTopo = V2 ? document.getElementById("lp-cta-topo") : null;
   if (ctaTopo) {
+    // r3 (primeira-tela B3): a barra também liga enquanto o botão ainda está ABAIXO da dobra (fonte do sistema +30%: o botão nasce
+    // em 720–774 numa tela de 690 — a 1ª tela ficava com preço e sem botão até rolar); desliga assim que ele entra na tela
+    const foraDaTela = (r: { top: number; bottom?: number }, alturaRaiz: number) => r.top < 0 || r.top >= alturaRaiz;
     new IntersectionObserver((ens) => {
-      for (const en of ens) topoSaiuPorCima = !en.isIntersecting && en.boundingClientRect.top < 0;
+      for (const en of ens) topoSaiuPorCima = !en.isIntersecting && foraDaTela(en.boundingClientRect, en.rootBounds?.height || window.innerHeight);
       atualizarFixo();
     }, { threshold: 0 }).observe(ctaTopo);
     // r2 (medição a +30%): com a fonte grande o botão do topo nasce ABAIXO da dobra; um salto de rolagem que pula o botão inteiro
@@ -450,7 +474,7 @@ if ("IntersectionObserver" in window) {
         conferindo = false;
         const b = ctaTopo.getBoundingClientRect();
         if (!b.height) return; // sem layout (jsdom): manda o observador
-        const saiu = b.bottom < 0;
+        const saiu = b.bottom < 0 || b.top >= window.innerHeight;
         if (saiu !== topoSaiuPorCima) { topoSaiuPorCima = saiu; atualizarFixo(); }
       });
     }, { passive: true });
@@ -471,8 +495,22 @@ const salvar = (novo: Partial<EstadoLanding>) => {
   estado = { ...estado, ...novo, salvoEm: Date.now() };
   estadoHeap = estado;
   try { localStorage.setItem(CHAVE_ESTADO, JSON.stringify(estado)); } catch { /* fica no heap */ }
+  if (V2) {
+    // r3 (pix 2): o Pix vivo também no cookie (até vencer); pago/vencido/oferta tiram o cookie
+    if (estado.fase === "qr" && estado.pix) gravarPixVivo({ orderId: estado.pix.orderId, qrCode: estado.pix.qrCode, expiresAt: new Date(venceEm(estado.pix)).toISOString(), oferta: estado.pix.oferta });
+    else if (estado.fase !== "gerando") esquecerPixVivo();
+  }
   render();
 };
+/* r3 (pix 2): o navegador do Instagram zera o localStorage com a página viva (~5 s depois da chegada). O heap segura a
+ * página, mas uma recarga depois disso voltava pra oferta. A cada volta pra aba (e a cada render do v2) a chave é re-semeada. */
+const reSemear = () => {
+  if (!V2 || (estado.fase !== "qr" && estado.fase !== "pago")) return; // só onde há dinheiro em jogo (a conta pronta já vive no marcador)
+  try { if (localStorage.getItem(CHAVE_ESTADO) === null) localStorage.setItem(CHAVE_ESTADO, JSON.stringify(estado)); } catch { /* sem storage */ }
+};
+document.addEventListener("visibilitychange", reSemear);
+window.addEventListener("pageshow", reSemear);
+window.addEventListener("pagehide", reSemear);
 
 const card = $("lp-card");
 const caixa = $("lp-pix");
@@ -947,6 +985,7 @@ let telaRenderizada: string | null = null;
 function render() {
   renderDoCartao();
   if (!V2) return;
+  reSemear();
   const tela = `${estado.fase}|${antes ? "codigo" : ""}|${erroPix ? "erro" : ""}|${jaTem ? "jatem" : ""}|${avisoOferta ? "venceu" : ""}`;
   if (tela === telaRenderizada) return;
   const primeira = telaRenderizada === null;
@@ -1035,7 +1074,7 @@ function renderDoCartao() {
       const fv = fixoValeEl(); if (fv && resta > 0) fv.textContent = `vale por ${mmss(resta)}`;
       if (resta <= 0) {
         window.clearInterval(relogio!);
-        if (V2) { vencido = p; avisoOferta = AVISO_VENCEU; evento("landing_pix_venceu", { order_id: p.orderId }); }
+        if (V2) { vencido = p; avisoOferta = avisoVenceu(!!(estado.emailPix || lerCompra()?.email)); try { ss(`landing-venceu-${p.orderId}`, "1"); } catch { /* noop */ } evento("landing_pix_venceu", { order_id: p.orderId, via: "relogio" }); }
         salvar({ fase: "oferta" });
         conferirVencidoEmLoop();
       }
@@ -1106,6 +1145,30 @@ function renderDoCartao() {
 const ehPraSempreTxt = () => (estado.pago && estado.pago.oferta !== "LN_ano279" ? (V2 ? "O CORE é seu pra sempre." : "Seu CORE é seu pra sempre.") : "Seu CORE está liberado por 1 ano.");
 
 $("lp-pagar").addEventListener("click", () => { void gerar(); });
+
+/* r3 (oferta M1 / pix M1 / visitante-frio M1 — WebKit, 70% do tráfego): toda abertura que leva ao cartão (Pix vivo, pago, conta,
+ * "já tem", código vencido com aviso) rolava até ele ANTES de os prints do "Por dentro" ganharem src; no WebKit um <img> sem src
+ * não reserva altura e, quando o src chegava, +786 px entravam ACIMA do cartão (cartão em 204/786 px). O CSS agora reserva a
+ * altura do celular (height, não max-height) e, por garantia, nos primeiros 6 s qualquer crescimento da página re-encosta o
+ * cartão no topo — até a pessoa tocar/rolar por conta própria. */
+const cartaoNoArranque = V2 && (estado.fase !== "oferta" || !!avisoOferta || !!lerCompra());
+if (cartaoNoArranque) {
+  // r1 (pix M2, v2): no Chromium a restauração de rolagem da recarga vencia o rolarAte e deixava o QR fora da tela. r3: também com
+  // o aviso do vencido e com o "já tem" (antes só com fase ≠ oferta)
+  try { history.scrollRestoration = "manual"; } catch { /* noop */ }
+  if (typeof ResizeObserver !== "undefined") {
+    let interagiu = false;
+    const marcar = () => { interagiu = true; };
+    for (const ev of ["touchstart", "wheel", "keydown", "pointerdown"]) window.addEventListener(ev, marcar, { passive: true, once: true });
+    const fim = Date.now() + 6000;
+    const ro = new ResizeObserver(() => {
+      if (interagiu || Date.now() > fim || (estado.fase === "oferta" && !avisoOferta && !jaTem)) { ro.disconnect(); return; }
+      if (Math.abs(card.getBoundingClientRect().top) > 1) rolarAte(card, "start", false);
+    });
+    ro.observe(document.body);
+    window.setTimeout(() => ro.disconnect(), 6500);
+  }
+}
 
 /* 29/10: o aparelho já comprou (cookie/localStorage) e a página voltou na oferta → "Você já tem o CORE" */
 if (estado.fase === "oferta") { const m = lerCompra(); if (m) { jaTem = m; mostrarJaTem("marcador"); } }

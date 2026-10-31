@@ -1,9 +1,10 @@
 import { useAuth } from "@/hooks/use-auth";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { isNativeShell } from "@/lib/native-shell";
 import { estadoTeste } from "@/lib/teste-gratis";
 import { missaoWebConvidada } from "@/lib/missao-web";
 import SalveSeuAcesso from "@/components/account/SalveSeuAcesso";
+import { ehLinkDoPlannerB, portaDoLink } from "@/lib/planner-2027-chave";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -13,6 +14,7 @@ interface ProtectedRouteProps {
 
 export const ProtectedRoute = ({ children, allowGuest = false }: ProtectedRouteProps) => {
   const { user, loading } = useAuth();
+  const { pathname, search } = useLocation();
 
   if (loading) {
     return <div className="min-h-screen bg-background" aria-hidden="true" />;
@@ -47,6 +49,10 @@ export const ProtectedRoute = ({ children, allowGuest = false }: ProtectedRouteP
     /* FUNIL DA MISSÃO NA WEB (protótipo 18/10, chave FUNIL_MISSAO off): a convidada que veio do /missao usa o app
      de verdade sem conta (guest:*), até pagar — lib/missao-web. */
     if (missaoWebConvidada()) return <>{children}</>;
+    /* PLANNER 2027 B (31/10, crítica r2): os links do planner (?tab=2027&planner=1 / &planejar=1) só existem com a versão B
+     * ligada. Sem sessão, vão pra porta /entrar (código por e-mail — a compradora da web não tem senha) e voltam pro
+     * planner depois de entrar. Qualquer outra rota segue no /auth de sempre. */
+    if (ehLinkDoPlannerB(pathname, search)) return <Navigate to={portaDoLink(pathname + search)} replace />;
     return <Navigate to="/auth" replace />;
   }
 

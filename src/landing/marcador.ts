@@ -83,6 +83,37 @@ export function esquecerCompra(): void {
   apagarLs(CHAVE_COMPRA);
 }
 
+/* ── r3 (pix-pos-compra 2): o Pix VIVO também mora num cookie curto (vale até o código vencer). O navegador do Instagram
+ * zera o localStorage com a página viva; se a pessoa recarregar depois disso, sem o cookie a página voltaria pra oferta
+ * e deixaria gerar (e pagar) um 2º Pix. Só o essencial pra reabrir o QR: pedido, código copia-e-cola, vencimento, oferta. ── */
+export const COOKIE_PIX = "core_ln_pix";
+export type PixNoCookie = { orderId: string; qrCode: string; expiresAt: string; oferta: string };
+const PEDIDO_OK = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** Guarda o Pix vivo no cookie (Max-Age = o que falta pra vencer). */
+export function gravarPixVivo(p: PixNoCookie, agora: number = Date.now()): void {
+  const vence = Date.parse(p.expiresAt);
+  const restaS = Math.floor((vence - agora) / 1000);
+  if (!Number.isFinite(restaS) || restaS <= 0 || !PEDIDO_OK.test(p.orderId) || !OFERTA_OK.test(p.oferta) || p.qrCode.length > 1200) return;
+  gravarCookie(COOKIE_PIX, JSON.stringify({ o: p.orderId, q: p.qrCode, v: p.expiresAt, f: p.oferta }), restaS);
+}
+
+/** O Pix vivo guardado no cookie (null se não há, venceu ou está estragado). */
+export function lerPixVivo(agora: number = Date.now()): PixNoCookie | null {
+  const c = lerCookie(COOKIE_PIX);
+  if (!c) return null;
+  try {
+    const b = JSON.parse(c) as { o?: unknown; q?: unknown; v?: unknown; f?: unknown };
+    if (typeof b.o !== "string" || typeof b.q !== "string" || typeof b.v !== "string" || typeof b.f !== "string") return null;
+    if (!PEDIDO_OK.test(b.o) || !OFERTA_OK.test(b.f) || !b.q || Date.parse(b.v) <= agora) return null;
+    return { orderId: b.o, qrCode: b.q, expiresAt: b.v, oferta: b.f };
+  } catch { return null; }
+}
+
+export function esquecerPixVivo(): void {
+  gravarCookie(COOKIE_PIX, "", 0);
+}
+
 const novoId = (): string => {
   try { return crypto.randomUUID(); } catch { return `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`; }
 };

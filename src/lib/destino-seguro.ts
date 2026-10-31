@@ -13,7 +13,9 @@
  */
 // 10/10: + /comece — a Porta iPhone volta pra tela "Pronto, salvo" depois do Google e do link do e-mail
 // 14/10: + /experimente — o funil-demo volta pra conta depois do Google/Apple (/experimente?passo=voltou)
-export const DESTINOS_PERMITIDOS = ["/planos", "/comece", "/experimente"];
+// 31/10: + /desenvolvimento — o planner 2027 B (links "Planejar meu 2027" e "Copiar o link") entra pela porta /entrar e
+//        volta pra aba 2027 (crítica r2 upsell-planner: o /auth de senha perdia o destino)
+export const DESTINOS_PERMITIDOS = ["/planos", "/comece", "/experimente", "/desenvolvimento"];
 const CHAVE = "core-auth-next";
 
 export function destinoSeguro(raw: string | null | undefined): string | null {

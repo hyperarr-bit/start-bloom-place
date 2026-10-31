@@ -5,6 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/lib/analytics";
 import { EMPRESA } from "@/lib/empresa";
 import { firePixPurchaseOnce, markPixPurchasePending } from "@/lib/purchase-tracking";
+/** 31/10: os Pix de upsell não mandam Purchase pra Meta (nem a CAPI do servidor, nem o pixel daqui) — o do vitalício é 1 por comprador. */
+const SEM_PURCHASE: ReadonlySet<string> = new Set(["u2027", "pv149"]);
 import { cookiesDaMeta } from "@/pages/venda/rastreio";
 import { EMAIL_OK, abrirSessaoParaPagar, salvarEmailDaCompra, sessaoViva } from "./conta";
 import { preco, type OfertaHoje } from "./conteudo";
@@ -123,7 +125,8 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
         return;
       }
       const novo: PixSalvo = { orderId: d.orderId, qrCode: d.qrCode, qrCodeBase64: d.qrCodeBase64 ?? null, expiresAt: d.expiresAt ?? null, criadoEm: Date.now(), oferta };
-      markPixPurchasePending({ offer: oferta, orderId: novo.orderId });
+      // 31/10 (recomendação, confirmar com o dono: _shared/pix-upsell.ts META_PURCHASE_UPSELL): o Pix de upsell (u2027/pv149) não manda Purchase
+      if (!SEM_PURCHASE.has(oferta)) markPixPurchasePending({ offer: oferta, orderId: novo.orderId });
       onPix(novo);
       trackEvent("hoje_pix_gerado", { order_id: novo.orderId, oferta, valor, ...ids() });
     } catch (e) {
@@ -163,7 +166,7 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
     });
     if ((data as { paid?: boolean } | null)?.paid && !pago.current) {
       pago.current = true;
-      void firePixPurchaseOnce("checkout");
+      if (!SEM_PURCHASE.has(alvo.oferta)) void firePixPurchaseOnce("checkout");
       onPagoRef.current(alvo);
       return true;
     }

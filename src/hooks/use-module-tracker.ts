@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, createContext, useContext } from "react
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { CHAVE_ULTIMO_MODULO } from "@/lib/diagnostico-suporte";
+import { emDemoDaVenda } from "@/lib/caminho-demo";
 
 // Context for child components to report active tab
 type TabReporter = (tabId: string) => void;
@@ -32,7 +33,8 @@ export const useModuleTracker = (moduleId: string) => {
   const currentTab = useRef<string | null>(null);
 
   const flush = useCallback(async () => {
-    if (!user) return;
+    // 31/10: a demo dentro da página de venda não conta como "entrou no app" (lib/caminho-demo ehDemoDaVenda)
+    if (!user || emDemoDaVenda()) return;
     const seconds = Math.round((Date.now() - enteredAt.current.getTime()) / 1000);
     if (seconds < 2) return;
 
@@ -52,7 +54,7 @@ export const useModuleTracker = (moduleId: string) => {
   const reportTab: TabReporter = useCallback((tabId: string) => {
     if (tabId === currentTab.current) return;
     // flush previous tab
-    if (user && currentTab.current !== null) {
+    if (user && currentTab.current !== null && !emDemoDaVenda()) {
       const seconds = Math.round((Date.now() - enteredAt.current.getTime()) / 1000);
       if (seconds >= 2) {
         /* 16/10: sem `.then` o construtor do Supabase NUNCA dispara a requisição

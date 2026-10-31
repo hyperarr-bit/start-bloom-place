@@ -144,7 +144,7 @@ describe("a chave (padrão OFF)", () => {
     expect(upsell2027Ligado("?up2027=on")).toBe(true);
     expect(upsell2027Ligado("")).toBe(true);
   });
-  it("o preço bate com o servidor (R$ 19,90 = 1990)", () => {
+  it("o preço bate com o servidor (R$ 19,90 = 1990; 31/10, dono manteve 19,90)", () => {
     expect(VALOR_OFERTA.u2027).toBe(19.9);
     expect(PRECOS_HOJE.u2027).toBe(1990);
   });
@@ -178,7 +178,8 @@ describe("/hoje com ?up2027=on", () => {
     expect(etapa()).toBe("u2027");
     expect(screen.getByTestId("u2027-oferta").getAttribute("data-versao")).toBe(VERSAO_OFERTA_2027);
     expect(screen.getByTestId("u2027-confirmado").textContent).toContain("Pagamento confirmado · R$ 27,90");
-    expect(texto()).toContain("Seu 2027 já organizado");
+    expect(texto()).toContain("Seu 2027 organizado");
+    expect(texto()).not.toMatch(/já organizado|hoje\.|orçamento do ano|PDF/);
     expect(screen.getByTestId("u2027-preco").textContent).toBe("R$ 19,90");
     expect(screen.getByTestId("u2027-nao").textContent).toBe("Agora não");
     expect(eventos("u2027_oferta_view")[0]).toMatchObject({ origem: "hoje", versao: VERSAO_OFERTA_2027 });
@@ -188,15 +189,19 @@ describe("/hoje com ?up2027=on", () => {
     await waitFor(() => expect(screen.getByTestId("hoje-copiar")).toBeTruthy());
     expect(invocacoes("asaas-pix", "create").map((b) => b.offer)).toEqual(["hv279", "u2027"]);
     expect(screen.getByTestId("hoje-pix-valor").textContent).toBe("R$ 19,90");
-    expect(texto()).toContain("Seu 2027 já organizado");
-    expect(markPixPurchasePending).toHaveBeenCalledWith({ offer: "u2027", orderId: "qr_2_u2027" });
+    expect(texto()).toContain("Seu 2027 organizado");
+    // 31/10: o Pix de upsell não marca Purchase (recomendação, confirmar com o dono: _shared/pix-upsell.ts META_PURCHASE_UPSELL)
+    expect(markPixPurchasePending).not.toHaveBeenCalledWith(expect.objectContaining({ offer: "u2027" }));
     expect(eventos("u2027_pix_gerado")[0]).toMatchObject({ order_id: "qr_2_u2027", valor: 19.9 });
 
     await pagarEConferir("u2027");
     await waitFor(() => expect(screen.getByTestId("u2027-pronto")).toBeTruthy());
     expect(eventos("u2027_pago")[0]).toMatchObject({ order_id: "qr_2_u2027", valor: 19.9, origem: "hoje" });
     expect(texto()).toContain("Pronto, seu 2027 tá no seu CORE");
-    expect(screen.getByTestId("u2027-onde").textContent).toContain("Dev. Pessoal → Seu 2027");
+    // crítica r2 (honestidade ALTA): o Android da loja não tem a aba — o mesmo texto da /organizar e do e-mail "Pronto"
+    expect(screen.getByTestId("u2027-onde").textContent).toContain("Desenvolvimento Pessoal, aba Seu 2027. Por enquanto, no site e no app do iPhone.");
+    expect(screen.getByTestId("u2027-onde").textContent).not.toContain("No app e no site");
+    expect(texto()).not.toContain("em PDF");
     expect(screen.getByTestId("selos-das-lojas")).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("u2027-continuar"));
@@ -244,11 +249,12 @@ describe("/hoje com ?up2027=on", () => {
 });
 
 describe("a versão curta da oferta", () => {
-  it("4 linhas (2 bônus) + preço + 'Aparece no app e no site'", () => {
+  it("4 linhas (2 bônus) + preço + 'no site e no app do iPhone' (crítica r2: o Android não tem a aba)", () => {
     render(<div className="fn u27"><div className="fn-corpo"><Fluxo2027 origem="hoje" compra="c1" valorPago={27.9} versao="curta" onFim={vi.fn()} /></div></div>);
     expect(screen.getByTestId("u2027-oferta").getAttribute("data-versao")).toBe("curta");
-    for (const s of ["Planejar 2027 em 5 minutos", "12 revisões do mês", "Cofrinho das 52 semanas", "Planner 2027 pra imprimir", "Aparece no app e no site, na hora"]) expect(texto()).toContain(s);
+    for (const s of ["Planejar 2027 em 5 minutos", "12 revisões do mês", "Cofrinho das 52 semanas", "Planner 2027 pra imprimir", "Por enquanto, no site e no app do iPhone"]) expect(texto()).toContain(s);
     expect((texto().match(/BÔNUS/g) ?? []).length).toBe(2);
+    expect(texto()).not.toMatch(/já organizado|montado no seu CORE hoje|orçamento do ano|PDF/i);
     expect(screen.getByTestId("u2027-preco").textContent).toBe("R$ 19,90");
     // nada de IA nem de promessa que o app não cumpre
     expect(texto().toLowerCase()).not.toMatch(/\bia\b|intelig[eê]ncia artificial|garant/);

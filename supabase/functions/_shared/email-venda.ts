@@ -115,7 +115,9 @@ export const URL_PLAY_EMAIL = "https://play.google.com/store/apps/details?id=br.
  * do vitalício, a maior parte dos reembolsos era "pensei que era da loja"). Entra o bloco "Seu CORE também no celular"
  * com os dois botões das lojas + "entre com este e-mail", e a linha do anual diz que nada é cobrado sozinho.
  */
-export function htmlVenda(args: { email: string; nome?: string | null; periodo: PeriodoVenda; fim?: string | null; hoje?: boolean }): string {
+/* 31/10 (`extra`): o bloco do "Seu 2027" (_shared/pix-upsell.ts blocoU2027, chave UPSELL_2027_EMAIL) — entra DEPOIS dos 3 passos
+ * de "Como entrar no app" (e do link do passo a passo) e antes de "No computador". Vazio = o e-mail de sempre, igual. */
+export function htmlVenda(args: { email: string; nome?: string | null; periodo: PeriodoVenda; fim?: string | null; hoje?: boolean; extra?: string }): string {
   const e = esc(args.email);
   const primeiro = esc(String(args.nome ?? "").trim().split(/\s+/)[0] || "");
   const ate = dataBr(args.fim);
@@ -143,7 +145,7 @@ export function htmlVenda(args: { email: string; nome?: string | null; periodo: 
       ${passo(3, `Digite <b>${e}</b> e toque em <b>“Entrar sem senha — receber código por e-mail”</b>. Use o código que chegar.`)}
     </table>
     <p style="font-size:13px;color:#5b5560;line-height:1.5;margin:4px 0 0;">Quer ver com fotos? <a href="https://coreaplicativo.com.br/como-entrar" style="color:#d22d80;font-weight:700;">Passo a passo</a></p>
-    <p style="font-size:12.5px;color:#8a838f;line-height:1.5;margin:16px 0 0;">No computador, é o mesmo CORE em coreaplicativo.com.br.</p>
+    ${args.extra ?? ""}<p style="font-size:12.5px;color:#8a838f;line-height:1.5;margin:16px 0 0;">No computador, é o mesmo CORE em coreaplicativo.com.br.</p>
   </div>
 </div></body></html>`;
 }

@@ -97,7 +97,7 @@ describe("servidor · quem já tem o CORE pra sempre", () => {
     const create = s.slice(s.indexOf('if (action === "create")'), s.indexOf('if (action === "check")'));
     const trava = create.indexOf("jaTemOCore(");
     expect(trava).toBeGreaterThan(0);
-    expect(trava).toBeLessThan(create.indexOf("/pix/qrCodes/static"));
+    expect(trava).toBeLessThan(create.indexOf("postarQrEstatico(")); // 31/10: o POST do QR mora em _shared/asaas-qr.ts
     expect(create).toMatch(/if \(ehOfertaLanding\(offer\)\)/);
     expect(create).toMatch(/jsonResponse\(\{ ja_tem: true, error: "ja_tem"/);
     // o e-mail opcional da tela do Pix também não vira destino de quem já tem

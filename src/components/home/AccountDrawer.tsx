@@ -27,6 +27,7 @@ import { FaixaDoRelogioSobFundoEscuro } from "@/components/app/faixaDoRelogio";
 import { useEscolhaDaHome } from "@/hooks/use-escolha-da-home";
 import { PainelEscolhaDaHome } from "@/components/home-nova/EscolhaDaHome";
 import type { EscolhaDaHome } from "@/lib/home-nova";
+import { AvisoPresente } from "@/presente/AvisoPresente";
 
 /* ───────────── 1.0.18: o MENU NOVO (lib/menu-novo) — 3 grupos, no desenho v1-menu ───────────── */
 
@@ -614,6 +615,10 @@ function MenuNovo({ isGuest, nome, email, iniciais, acoes, rotuloHome }: { isGue
           {voce.map((i) => <LinhaDoMenu key={i.id} item={i} />)}
         </ul>
       </section>
+
+      {/* 31/10: o aviso do presente (src/presente/AvisoPresente; chave PRESENTE_AVISO, off) — a página Você do site com a Home
+          clássica é ESTE menu do avatar; 1 linha fechável logo abaixo da conta/plano. Nunca na Home. */}
+      {!isGuest && <AvisoPresente estilo="menu" />}
 
       {/* (2) o app */}
       <section aria-label="App" data-testid="menu-grupo-app">

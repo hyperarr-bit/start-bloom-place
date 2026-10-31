@@ -26,6 +26,7 @@ import { isNativeShell } from "@/lib/native-shell";
 import { trackEvent, instalouVindoDoSite } from "@/lib/analytics";
 import { ENTRADA_APP } from "@/lib/rotas-web";
 import { RestaurarCompras } from "@/components/app/RestaurarCompras";
+import { ehLinkDoPlannerB } from "@/lib/planner-2027-chave";
 
 /** /entrar — duas plateias, a mesma tela.
  *
@@ -85,6 +86,15 @@ const Entrar = () => {
   // Quem veio pelo link não "comprou no tutorial": copy neutra, igual à do app.
   const neutro = app || !!next;
   const [email, setEmail] = useState(next && /\S+@\S+\.\S+/.test(emailDoLink) ? emailDoLink : "");
+  /* crítica r2 do upsell 2027 (compradora MEDIA 1): quem chega pelo "Planejar meu 2027" acabou de pagar por Pix e nunca
+   * criou senha. Com o link do 2027 B + o e-mail dela, a tela abre no CÓDIGO POR E-MAIL; a senha vira link secundário.
+   * Fora desse link (o único que existe com as chaves do 2027 ligadas), a tela fica igual. */
+  const codigoPrimeiro = (() => {
+    if (!next || !/\S+@\S+\.\S+/.test(emailDoLink)) return false;
+    try { const u = new URL(next, "https://x.invalid"); return ehLinkDoPlannerB(u.pathname, u.search); } catch { return false; }
+  })();
+  const [querSenha, setQuerSenha] = useState(false);
+  const soCodigo = codigoPrimeiro && !querSenha;
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -217,14 +227,19 @@ const Entrar = () => {
             className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-3 py-1 text-xs font-semibold"
           >
             {neutro ? <Sparkles className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-            {neutro ? "Bem-vindo de volta" : "Compra confirmada"}
+            {soCodigo ? "Sem senha" : neutro ? "Bem-vindo de volta" : "Compra confirmada"}
           </motion.div>
           <div className="space-y-1.5">
             <h1 className="text-[26px] leading-tight font-bold tracking-tight">
               {neutro ? "Entrar no seu CORE" : "Seu acesso está liberado 🎉"}
             </h1>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              {neutro ? (
+            <p className="text-sm text-muted-foreground leading-relaxed" data-testid={soCodigo ? "entrar-codigo-primeiro" : undefined}>
+              {soCodigo ? (
+                <>
+                  A gente manda um <strong className="text-foreground">código de 8 números</strong> pro{" "}
+                  <strong className="text-foreground break-words">{email}</strong>. Você digita aqui e pronto.
+                </>
+              ) : neutro ? (
                 <>
                   Use o <strong className="text-foreground">e-mail</strong> e a{" "}
                   <strong className="text-foreground">senha</strong> da sua conta CORE.
@@ -240,7 +255,17 @@ const Entrar = () => {
           </div>
         </div>
 
+        {soCodigo && (
+          <div className="space-y-3">
+            <EntrarComCodigo email={email} funil="entrar_2027" cheio rotulo="Mandar o código pro meu e-mail" onSession={() => { trackEvent("login_completed", { method: "codigo_email", source: "email_access", ...(next ? { next } : {}) }); navigate(destinoPos); }} />
+            <button type="button" onClick={() => setQuerSenha(true)} data-testid="entrar-com-senha" className="block w-full text-center text-[13px] text-muted-foreground underline underline-offset-2">
+              Prefiro entrar com senha
+            </button>
+          </div>
+        )}
+
         {/* Form */}
+        {!soCodigo && (<>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-3">
             <div className="space-y-1.5">
@@ -322,6 +347,7 @@ const Entrar = () => {
             <EntrarComCodigo email={email} funil="entrar" onSession={() => { trackEvent("login_completed", { method: "codigo_email", source: "email_access", ...(next ? { next } : {}) }); navigate(destinoPos); }} />
           </div>
         )}
+        </>)}
 
         {/* 1.0.18: a saída de quem tocou "Entrar" na welcome sem ter conta — ANTES da Apple/Google, que
             criariam uma conta nova e pulariam o quiz. Some quando a pessoa já tem sessão (tela acima). */}
@@ -407,8 +433,8 @@ const Entrar = () => {
           </>
         )}
 
-        {/* Socorro pra senha — ganha destaque depois do 1º erro */}
-        <div
+        {/* Socorro pra senha — ganha destaque depois do 1º erro (no código primeiro não tem senha nenhuma pra socorrer) */}
+        {!soCodigo && <div
           className={`rounded-xl border p-4 text-center space-y-1.5 transition-colors ${
             failedOnce
               ? "border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20"
@@ -422,7 +448,7 @@ const Entrar = () => {
           <Link to="/reset-password" className="text-sm text-primary font-semibold hover:underline">
             Redefinir senha em 1 minuto
           </Link>
-        </div>
+        </div>}
 
         {/* 10/10: "Restaurar compras" saiu da welcome do funil enxuto (FUNIL_CALAI)
             e mora aqui — quem reinstalou e procura a assinatura da loja acaba

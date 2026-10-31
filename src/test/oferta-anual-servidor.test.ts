@@ -108,7 +108,9 @@ describe("as 3 ofertas no servidor (uma fonte: _shared/ofertas-anual-inicio.ts)"
       expect(fonte(f)).toContain("CONCESSAO_HOJE");
     }
     // a marcação no Asaas: externalReference `<user>:<oferta>` e a descrição do mapa
-    expect(fonte("asaas-pix/index.ts")).toContain("externalReference: `${user.id}:${offer}`");
+    // 31/10: o POST do QR mora em _shared/asaas-qr.ts (externalReference = a.ref); o asaas-pix passa `${user.id}:${offer}`
+    expect(fonte("asaas-pix/index.ts")).toContain("ref: `${user.id}:${offer}`");
+    expect(fonte("_shared/asaas-qr.ts")).toContain("externalReference: a.ref");
     expect(fonte("asaas-pix/index.ts")).toContain("...DESCRICAO_HOJE");
     // o reconcile lê o linhaNova do CONCESSAO_HOJE
     expect(fonte("pix-reconcile/index.ts")).toContain("CONCESSAO_HOJE[o.offer]?.linhaNova === true");

@@ -440,6 +440,20 @@ if ("IntersectionObserver" in window) {
       for (const en of ens) topoSaiuPorCima = !en.isIntersecting && en.boundingClientRect.top < 0;
       atualizarFixo();
     }, { threshold: 0 }).observe(ctaTopo);
+    // r2 (medição a +30%): com a fonte grande o botão do topo nasce ABAIXO da dobra; um salto de rolagem que pula o botão inteiro
+    // (fora → fora) não gera entrada no observador e a barra nunca ligava. A rolagem confere a geometria (1x por quadro).
+    let conferindo = false;
+    window.addEventListener("scroll", () => {
+      if (conferindo) return;
+      conferindo = true;
+      window.requestAnimationFrame(() => {
+        conferindo = false;
+        const b = ctaTopo.getBoundingClientRect();
+        if (!b.height) return; // sem layout (jsdom): manda o observador
+        const saiu = b.bottom < 0;
+        if (saiu !== topoSaiuPorCima) { topoSaiuPorCima = saiu; atualizarFixo(); }
+      });
+    }, { passive: true });
   }
 }
 
@@ -447,7 +461,8 @@ if ("IntersectionObserver" in window) {
 const caixinha = $<HTMLInputElement>("lp-caixinha");
 const pagarTxt = $("lp-pagar-txt");
 const ofertaAtual = (): OfertaLanding => ofertaEscolhida(brOferta, !!caixinha?.checked);
-const atualizarBotao = () => { pagarTxt.textContent = `Pagar ${reais(VALOR_OFERTA[ofertaAtual()])} no Pix`; };
+// r2 (oferta 5 / pix 1, v2): com o aviso "Esse código venceu…" ligado, o botão diz o que o aviso manda fazer
+const atualizarBotao = () => { pagarTxt.textContent = V2 && avisoOferta ? `Gerar outro Pix · ${reais(VALOR_OFERTA[ofertaAtual()])}` : `Pagar ${reais(VALOR_OFERTA[ofertaAtual()])} no Pix`; };
 caixinha?.addEventListener("change", () => { atualizarBotao(); evento("landing_caixinha", { marcada: caixinha.checked }); });
 atualizarBotao();
 
@@ -473,6 +488,7 @@ let erroEmail: string | null = null;
 let aviso: string | null = null;
 let faseConta: "email" | "salvando" | "codigo" | "entrando" = "email";
 let emailDigitado = "";
+let codigoPago = ""; // r2 (pix 3): o código digitado depois de pagar (sobrevive ao re-render do erro)
 
 
 /* ── simulação (dev) ── */
@@ -484,7 +500,9 @@ function copiarNoToque(codigo: Promise<string>): Promise<{ ok: boolean; via: str
   try {
     const CI = (window as unknown as { ClipboardItem?: new (i: Record<string, Promise<Blob>>) => unknown }).ClipboardItem;
     if (CI && navigator.clipboard?.write) {
-      const item = new CI({ "text/plain": codigo.then((t) => new Blob([t], { type: "text/plain" })) });
+      const blob = codigo.then((t) => new Blob([t], { type: "text/plain" }));
+      void blob.catch(() => null); // r2 (visitante-frio 3): quando não há Pix ("já tem conta"), a promessa rejeita — o ClipboardItem não conta como handler e o console acusava "Error: sem pix"
+      const item = new CI({ "text/plain": blob });
       return navigator.clipboard.write([item as ClipboardItem]).then(() => ({ ok: true, via: "item" }), () => copiarTexto(codigo).then((ok) => ({ ok, via: "texto" })));
     }
   } catch { /* plano B */ }
@@ -572,7 +590,8 @@ async function gerar(comCodigo: string | null = null): Promise<void> {
     else {
       const ch = checarEmailAntes(campoAntes?.value ?? "");
       if ("motivo" in ch) {
-        mostrarErroAntes(ch.msg);
+        // r2 (oferta 4, v2): o rótulo do campo já diz "é por onde você entra no CORE" — o erro do vazio não repete a frase (1 linha)
+        mostrarErroAntes(V2 && ch.motivo === "vazio" ? "Falta o seu e-mail pra gerar o Pix." : ch.msg);
         evento("landing_email_antes_erro", { motivo: ch.motivo });
         try { campoAntes?.focus(); } catch { /* noop */ }
         return;
@@ -764,7 +783,7 @@ async function prontoComEmail(email: string, via: string) {
 async function criarConta(email: string) {
   const limpo = email.trim().toLowerCase();
   if (!EMAIL_OK.test(limpo)) { erroEmail = "Esse e-mail parece errado. Confere e tenta de novo."; render(); return; }
-  emailDigitado = limpo; erroEmail = null; faseConta = "salvando"; render();
+  emailDigitado = limpo; erroEmail = null; faseConta = "salvando"; codigoPago = ""; render();
   if (SIMULADO) {
     await espera(700);
     if (limpo.includes("+existe")) { faseConta = "codigo"; render(); return; }
@@ -811,7 +830,8 @@ let relogio: number | null = null;
  * como entrar (sem senha: código por e-mail — a pessoa nunca criou senha), 1º passo, contato. Usado na conta pronta E no "Você já tem o CORE"
  * (crítica r1 pix 9: quem voltava depois de comprar via o desenho antigo). ── */
 function miolContaV2(email: string): string {
-  const selos = `<div class="lp2-selos lp-selos"><a href="${URL_APP_STORE}" target="_blank" rel="noopener" data-loja="ios"><img src="/selos/app-store.svg" alt="Baixar na App Store" width="144" height="48" /></a><a href="${esc(urlPlay("landing"))}" target="_blank" rel="noopener" data-loja="android"><img src="/selos/google-play.png" alt="Disponível no Google Play" width="124" height="48" /></a></div>`;
+  // r2 (pix 6): sem target=_blank — dentro do navegador do Instagram (WKWebView) um _blank pode não abrir nada; a página já está em "conta" (nada a perder ao navegar na mesma aba)
+  const selos = `<div class="lp2-selos lp-selos"><a href="${URL_APP_STORE}" data-loja="ios"><img src="/selos/app-store.svg" alt="Baixar na App Store" width="144" height="48" /></a><a href="${esc(urlPlay("landing"))}" data-loja="android"><img src="/selos/google-play.png" alt="Disponível no Google Play" width="124" height="48" /></a></div>`;
   const site = `<div class="lp-form"><button type="button" class="${plataforma === "web" ? "lp-cta" : "lp2-btn2"}" id="lp-abrir">${plataforma === "web" ? `Abrir meu CORE ${ICO_SETA}` : "Ou abrir no site agora"}</button></div>`;
   return `
         ${email ? `<div class="lp2-email-caixa">${esc(email)}</div>` : ""}
@@ -857,6 +877,20 @@ const erroNoBotao = (msg: string | null) => {
   if (!el) return false;
   el.textContent = msg ?? ""; el.hidden = !msg;
   return true;
+};
+/** r2 (oferta 5 / pix 1, v2): o aviso "Esse código venceu…" é a 1ª linha do cartão (antes de "Vitalício por"), não o rodapé depois do CNPJ —
+ * quem volta do banco lê primeiro o que aconteceu. */
+const avisoNoTopo = (msg: string | null) => {
+  const corpo = card.querySelector(".lp-card-corpo");
+  if (!corpo) return;
+  let el = document.getElementById("lp2-aviso-topo");
+  if (!msg) { el?.remove(); return; }
+  if (!el) {
+    el = document.createElement("p");
+    el.id = "lp2-aviso-topo"; el.className = "lp-aviso lp2-aviso-topo"; el.setAttribute("role", "status"); el.dataset.testid = "landing-venceu";
+    corpo.prepend(el);
+  }
+  el.textContent = msg;
 };
 
 function mostrarJaTem(via: "marcador" | "servidor" | "email_pix", email: string | null = null) {
@@ -926,10 +960,9 @@ function renderDoCartao() {
   if (antes && estado.fase === "oferta") { renderCodigoAntes(antes); return; }
   card.dataset.fase = estado.fase === "erro" ? "oferta" : estado.fase;
   const f = estado.fase;
-  if (V2) erroNoBotao(f === "oferta" ? erroPix : null);
+  if (V2) { erroNoBotao(f === "oferta" ? erroPix : null); avisoNoTopo(f === "oferta" ? avisoOferta : null); atualizarBotao(); }
   if (f === "oferta") {
-    const erroAqui = erroPix && !(V2 && document.getElementById("lp-pagar-erro")) ? `<p class="lp-erro" role="alert">${esc(erroPix)}</p>` : "";
-    caixa.innerHTML = erroAqui + (V2 && avisoOferta ? `<p class="lp-aviso" role="status" data-testid="landing-venceu">${esc(avisoOferta)}</p>` : "");
+    caixa.innerHTML = erroPix && !(V2 && document.getElementById("lp-pagar-erro")) ? `<p class="lp-erro" role="alert">${esc(erroPix)}</p>` : "";
   } else if (f === "gerando") {
     caixa.innerHTML = `<div class="lp-pix-gerando" data-testid="landing-gerando"><span class="lp-pix-logo">${ICO_PIX}</span><b>Gerando o seu Pix…</b><div class="lp-progresso"><i></i></div><span>${V2 ? "Sem CPF. Leva 2 segundos." : "Sem CPF, sem cadastro. Leva 2 segundos."}</span></div>`;
   } else if (f === "qr" && estado.pix) {
@@ -973,9 +1006,15 @@ function renderDoCartao() {
     void desenharQr($("lp-qr"), p);
     $("lp-copiar").addEventListener("click", async () => {
       const ok = await copiarTexto(p.qrCode);
+      const antesJa = copiado;
       copiado = ok || copiado;
       evento("landing_pix_copiado", { ok, via: "botao", auto: false, order_id: p.orderId });
-      render();
+      if (copiado !== antesJa || !V2) render();
+      // r2 (visitante-frio 1, v2): quem toca em "Copiar de novo" é quem duvida que copiou — o botão responde "Copiado ✓" por 1,5 s (sem re-render)
+      if (V2 && ok) {
+        const rot = document.querySelector<HTMLElement>("#lp-copiar span");
+        if (rot) { const antes = rot.textContent; rot.textContent = "Copiado ✓"; window.setTimeout(() => { if (rot.isConnected && rot.textContent === "Copiado ✓") rot.textContent = antes; }, 1500); }
+      }
     });
     $("lp-ja-paguei").addEventListener("click", () => { void jaPaguei(); });
     // 29/10 (dono): no vitalício só existe 1 plano — o "Mudar o plano" só tirava a pessoa do Pix gerado; fica só no braço "ano" (caixinha)
@@ -984,7 +1023,10 @@ function renderDoCartao() {
     if (campo) {
       const btn = $<HTMLButtonElement>("lp-email-pix-ok");
       campo.addEventListener("input", () => { btn.disabled = !EMAIL_OK.test(campo.value.trim()); });
-      btn.addEventListener("click", () => { btn.disabled = true; btn.textContent = "…"; void salvarEmailPix(campo.value); });
+      const salvarDoCampo = () => { btn.disabled = true; btn.textContent = "…"; void salvarEmailPix(campo.value); };
+      btn.addEventListener("click", salvarDoCampo);
+      // r2 (pix 2): o "ir" do teclado também salva (a pessoa toca Enter e acha que salvou)
+      campo.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && EMAIL_OK.test(campo.value.trim())) { ev.preventDefault(); salvarDoCampo(); } });
     }
     relogio = window.setInterval(() => {
       const el = document.getElementById("lp-validade");
@@ -1008,8 +1050,8 @@ function renderDoCartao() {
         <p>${codigo ? `Esse e-mail já tem conta. Mandamos um código pra <b>${esc(emailDigitado)}</b>.` : V2 ? "Pagamento confirmado. O e-mail é por onde você entra no CORE, no celular e no computador." : "Agora só falta o seu e-mail pra criar sua conta."}</p>
         <div class="lp-form">
           ${codigo
-            ? `<label for="lp-codigo">Código de 6 números</label><input class="lp-campo grande" id="lp-codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" />
-               <button type="button" class="lp-cta" id="lp-entrar" disabled>${faseConta === "entrando" ? '<i class="lp-gira"></i>' : ""}Entrar e liberar meu CORE</button>`
+            ? `<label for="lp-codigo">Código de 6 números</label><input class="lp-campo grande" id="lp-codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" value="${esc(codigoPago)}" />
+               <button type="button" class="lp-cta" id="lp-entrar" ${codigoPago.trim().length >= 6 && faseConta !== "entrando" ? "" : "disabled"}>${faseConta === "entrando" ? '<i class="lp-gira"></i>' : ""}Entrar e liberar meu CORE</button>`
             : `<label for="lp-email">Seu e-mail</label><input class="lp-campo grande" id="lp-email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" placeholder="voce@email.com" value="${esc(emailDigitado)}" />
                <button type="button" class="lp-cta" id="lp-criar" ${EMAIL_OK.test(emailDigitado) && faseConta !== "salvando" ? "" : "disabled"}>${faseConta === "salvando" ? '<i class="lp-gira"></i>Criando sua conta…' : `${V2 ? "Liberar meu acesso" : "Criar minha conta"} ${ICO_SETA}`}</button>`}
           ${erroEmail ? `<p class="lp-erro" role="alert">${esc(erroEmail)}</p>` : ""}
@@ -1017,7 +1059,9 @@ function renderDoCartao() {
       </div>`;
     if (codigo) {
       const c = $<HTMLInputElement>("lp-codigo"); const b = $<HTMLButtonElement>("lp-entrar");
-      c.addEventListener("input", () => { b.disabled = c.value.trim().length < 6; });
+      // r2 (pix 3): o digitado sobrevive ao re-render do erro ("Código errado…"), como no código ANTES do Pix
+      c.addEventListener("input", () => { codigoPago = c.value.replace(/\D/g, "").slice(0, 6); b.disabled = codigoPago.length < 6; });
+      c.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !b.disabled) void entrarComCodigo(c.value); });
       b.addEventListener("click", () => { void entrarComCodigo(c.value); });
     } else {
       const e = $<HTMLInputElement>("lp-email"); const b = $<HTMLButtonElement>("lp-criar");

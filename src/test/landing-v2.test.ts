@@ -178,7 +178,10 @@ describe("braço v2 · a 1ª tela: uma frase, UM celular real, um preço, um bot
     const fones = topo.querySelectorAll(".lp2-fone");
     expect(fones).toHaveLength(1);
     const img = fones[0].querySelector("img")!;
-    expect(img.getAttribute("src")).toBe("/landing/v3-home.webp");
+    // r2 (técnico 9.1): sem src no HTML — o script inline do #topo-v2 põe o src SÓ no v2 (o preload do <head> é consumido: 1 pedido, 0 avisos no WebKit)
+    expect(img.hasAttribute("src")).toBe(false);
+    expect(img.getAttribute("data-src")).toBe("/landing/v3-home.webp");
+    expect(img.hasAttribute("loading")).toBe(false);
     expect(Number(img.getAttribute("width"))).toBeGreaterThanOrEqual(657);
     expect(img.getAttribute("alt")).toMatch(/Home do CORE/);
     expect(existsSync(resolve(raiz, "public/landing/v3-home.webp"))).toBe(true);
@@ -188,7 +191,12 @@ describe("braço v2 · a 1ª tela: uma frase, UM celular real, um preço, um bot
     // sem grade solta, sem card solto, sem sub, sem pílulas, sem vídeo, sem pergunta, sem âncora de preço (o "sem sentido" da v2)
     expect(topo.querySelector(".lp2-grade, .lp2-card, .lp-sub, .lp-pergunta, .lp-area, video, iframe")).toBeNull();
     expect(topo.textContent).not.toMatch(/97,90|App Store: R\$/);
-    const onde = [...topo.querySelectorAll(".lp2-onde li")];
+    // r2 (primeira-tela 4 / técnico 9.4): a linha das lojas é um <button> de verdade (teclado, leitor de tela), não um <ul> com cursor
+    const ondeBtn = topo.querySelector(".lp2-onde")!;
+    expect(ondeBtn.tagName).toBe("BUTTON");
+    expect(ondeBtn.getAttribute("type")).toBe("button");
+    expect(ondeBtn.getAttribute("aria-label")).toMatch(/ver as telas do app/i);
+    const onde = [...topo.querySelectorAll(".lp2-onde span")];
     expect(onde.map((l) => l.textContent)).toEqual(["App Store", "Google Play", "Computador"]);
     expect(new Set(onde.map((l) => l.querySelector("svg")!.innerHTML)).size).toBe(3);
     expect(topo.querySelector("a")).toBeNull(); // nenhum link pra fora antes do preço
@@ -199,8 +207,10 @@ describe("braço v2 · a 1ª tela: uma frase, UM celular real, um preço, um bot
     expect(HTML).toMatch(/\.lp2-topo \.lp-cta \{[^}]*white-space: nowrap/);
     expect(topo.querySelector(".lp2-miuda")!.textContent).toBe("Nada é cobrado depois · 7 dias de garantia"); // r1: "Paga 1 vez" já está em "Pagamento único no Pix" 60 px acima
     expect(topo.querySelector(".lp2-onde")!.getAttribute("data-ir")).toBe("dentro-v2"); // r1: a linha das lojas rola até "Sim, é um app de verdade"
-    expect(HTML).toContain('.lp2-onde li:not(:last-child)::after { content: "·"'); // o separador no li anterior (nunca órfão)
-    expect(HTML).toMatch(/\.lp2-preco-txt span \{[^}]*white-space: nowrap/);
+    expect(HTML).toContain('.lp2-onde span:not(:last-child)::after { content: "·"'); // o separador no item anterior (nunca órfão no começo da 2ª linha)
+    // r2 (primeira-tela 1): sem nowrap na legenda do preço (com +30% vazava pela borda e a página ganhava rolagem horizontal); min-width 0 deixa quebrar
+    expect(HTML).not.toMatch(/\.lp2-preco-txt span \{[^}]*white-space: nowrap/);
+    expect(HTML).toMatch(/\.lp2-preco-txt \{[^}]*min-width: 0/);
     const elementos = [topo.querySelector("h1.lp2-h1-a"), topo.querySelector(".lp2-fone"), topo.querySelector(".lp2-onde"), topo.querySelector(".lp2-preco"), cta, topo.querySelector(".lp2-miuda")];
     expect(elementos.every(Boolean)).toBe(true); // + a faixa = 7
   });
@@ -232,21 +242,30 @@ describe("braço v2 · 'Sim, é um app de verdade': 3 painéis empilhados no est
       "Anote o que entra e o que sai. O resto o CORE calcula.", // r1: "quanto pode gastar hoje" ficava 3× em 120 px
       "Marque o que fez e veja a sequência crescer.",
     ]);
-    const imgs = fotos.map((f) => f.querySelector(".lp2-fone img")!);
-    expect(imgs.map((i) => i.getAttribute("src"))).toEqual(["/landing/v3-modulos.webp", "/landing/v3-financas.webp", "/landing/v3-rotina.webp"]);
+    const imgs = fotos.map((f) => f.querySelector(".lp2-fone-tela img")!);
+    expect(imgs.map((i) => i.getAttribute("data-src"))).toEqual(["/landing/v3-modulos.webp", "/landing/v3-financas.webp", "/landing/v3-rotina.webp"]);
     for (const i of imgs) { expect(Number(i.getAttribute("width"))).toBeGreaterThanOrEqual(850); expect(i.getAttribute("alt")).toBeTruthy(); } // 3× dos 283 px CSS de tela
     const zoom = fotos[1].querySelector(".lp2-zoom img")!;
-    expect(zoom.getAttribute("src")).toBe("/landing/v3-posso-gastar.webp");
+    expect(zoom.getAttribute("data-src")).toBe("/landing/v3-posso-gastar.webp");
     expect(Number(zoom.getAttribute("width"))).toBeGreaterThanOrEqual(1026); // 3× dos 342 px CSS da figura (escala 1,0: título do card ≈ 13 px)
     expect(zoom.getAttribute("alt")).toMatch(/R\$ 146/);
     expect(HTML).toMatch(/\.lp2-zoom \{[^}]*width: 342px/);
     // r1 (prova-e-meio 1.1): o painel da Rotina mostra a faixa "41 dias seguidos" (o que a legenda promete) como zoom por cima da tabela
     const zoomVerde = fotos[2].querySelector(".lp2-zoom img")!;
-    expect(zoomVerde.getAttribute("src")).toBe("/landing/v3-sequencia.webp");
+    expect(zoomVerde.getAttribute("data-src")).toBe("/landing/v3-sequencia.webp");
     expect(zoomVerde.getAttribute("alt")).toMatch(/41 dias seguidos/);
     expect(Number(zoomVerde.getAttribute("width"))).toBeGreaterThanOrEqual(1026);
-    expect(HTML).toMatch(/\.lp2-foto\.verde \.lp2-zoom \{ top: \d+px/);
     expect(fotos[0].querySelector(".lp2-zoom")).toBeNull();
+    // r2 (prova-e-meio MÉDIA 1.1): o painel não tem altura fixa; o corte do print é no celular (max-height da tela em --w) e o zoom é FILHO do
+    // celular (top em --w) — com a fonte do sistema a +15/+30% a legenda cresce, o celular desce e o zoom acompanha o card
+    expect(fotos[1].querySelector(".lp2-fone > .lp2-zoom")).not.toBeNull();
+    expect(fotos[2].querySelector(".lp2-fone > .lp2-zoom")).not.toBeNull();
+    expect(HTML).not.toMatch(/\.lp2-foto(\.\w+)? \{[^}]*height: \d+px/);
+    expect(HTML).toMatch(/\.lp2-foto \.lp2-fone-tela \{ max-height: calc\(var\(--w\) \* var\(--corte\)\)/);
+    expect(HTML).toMatch(/\.lp2-zoom \{ position: absolute; top: calc\(var\(--w\) \* var\(--zoom-y\)\)/);
+    for (const c of ["magenta", "ambar", "verde"]) expect(HTML).toMatch(new RegExp(`\\.lp2-foto\\.${c} \\{ --corte: [\\d.]+;`));
+    expect(HTML).toMatch(/\.lp2-foto\.ambar \{[^}]*--zoom-y: [\d.]+;/);
+    expect(HTML).toMatch(/\.lp2-foto\.verde \{[^}]*--zoom-y: [\d.]+;/);
     for (const f of ["v3-modulos", "v3-financas", "v3-rotina", "v3-posso-gastar", "v3-sequencia"]) expect(existsSync(resolve(raiz, `public/landing/${f}.webp`))).toBe(true);
     expect(sec.querySelector(".lp2-fita, .lp2-tel")).toBeNull();
     expect(HTML).not.toMatch(/overflow-x: auto;[^}]*scroll-snap-type: x/);
@@ -269,8 +288,13 @@ describe("braço v2 · cartão, avaliações, como funciona, dúvidas, demo, fim
     const card = html().querySelector("#lp-card")!;
     card.querySelectorAll('[data-so-lp="atual"], [data-so-oferta="ano"]').forEach((el) => el.remove());
     const t = card.textContent!.replace(/\s+/g, " ");
-    expect(t).toContain("Acesso vitalício");
-    expect(t).not.toContain("sem renovação"); // r1: 5 jeitos de dizer "não renova" em 6 linhas → a faixa diz só "Acesso vitalício"
+    expect(t).toContain("CORE · as 16 áreas da vida"); // r2 (oferta 2): a faixa diz o que o cartão não diz (o "16" do anúncio); "Acesso vitalício" repetia o "Vitalício por" 3 linhas abaixo
+    expect(t).not.toContain("Acesso vitalício");
+    expect((t.match(/vitalício/gi) ?? []).length).toBe(1);
+    expect(t).not.toContain("sem renovação"); // r1: 5 jeitos de dizer "não renova" em 6 linhas
+    expect(t).toContain("CORE · CNPJ 55.041.112/0001-82"); // r2 (oferta 3): 1 linha (o "O Pix sai aqui mesmo" já está no botão)
+    expect(t).not.toContain("O Pix sai aqui mesmo");
+    expect(card.querySelector('.lp-seguro[data-so-lp="v2"]')).not.toBeNull();
     expect(t).toContain("Vitalício por R$ 27,90");
     expect(t).toContain("Pagamento único no Pix. Nada é cobrado depois.");
     const checks = [...card.querySelectorAll(".lp-checks li")].map((l) => l.textContent!.replace(/\s+/g, " ").trim());
@@ -301,6 +325,7 @@ describe("braço v2 · cartão, avaliações, como funciona, dúvidas, demo, fim
     const passos = [...d.querySelectorAll("#como-v2 .lp-passo > b")].map((b) => b.textContent);
     expect(passos).toEqual(["Pague no Pix, aqui na página.", "Entre no CORE com o e-mail da compra.", "Comece pelo dinheiro."]);
     expect(d.querySelector("#como-v2")!.textContent).toContain("Em 5 minutos você já vê quanto pode gastar hoje.");
+    expect(d.querySelector("#como-v2")!.textContent).not.toContain("Anote o que entra"); // r2 (prova-e-meio 1.5): já é a legenda do painel de Finanças
     expect(d.querySelector("#como-v2 a")).toBeNull();
     expect([...d.querySelectorAll("#como-v2 .lp2-disp span")].map((s) => s.textContent)).toEqual(["App Store", "Google Play", "Computador"]);
   });
@@ -318,7 +343,9 @@ describe("braço v2 · cartão, avaliações, como funciona, dúvidas, demo, fim
     const d = html();
     expect(d.querySelector("#lp-demo-abrir")!.getAttribute("data-so-lp")).toBe("v2");
     expect(d.querySelector("#lp-demo-frame")!.getAttribute("src")).toBeNull();
-    expect(HTML).toContain('html[data-lp="v2"] .lp-celular:not([data-abrindo]):not([data-pronta]) { height: 220px; }');
+    // r2 (prova-e-meio 1.4): fechada, a caixa tem 300 px (900 px do v3-financas em @3x = escala 1,0) e o botão cai sobre as abas, não sobre o título do card
+    expect(HTML).toContain('html[data-lp="v2"] .lp-celular:not([data-abrindo]):not([data-pronta]) { height: 220px; width: 300px; }');
+    expect(HTML).toMatch(/html\[data-lp="v2"\] \.lp-celular:not\(\[data-abrindo\]\):not\(\[data-pronta\]\) \.lp2-demo-abrir \{ top: 38%; \}/);
     expect([...d.querySelectorAll('#demo [data-so-lp="v2"]')].map((e) => e.textContent)).toContain("Quer mexer antes de pagar?");
   });
   it("um verbo só no v2 — topo, fixo (com o preço ao lado, numa linha) e fim dizem 'Quero organizar minha vida'; o atual segue 'Quero organizar tudo'", () => {
@@ -331,7 +358,10 @@ describe("braço v2 · cartão, avaliações, como funciona, dúvidas, demo, fim
     expect(txt(v2("#fim button"))).toBe("Quero organizar minha vida");
     expect(txt(v2("#fim h2"))).toBe("Sua vida organizada num app só.");
     expect(txt(v2("#fim p"))).toBe("Vitalício por R$ 27,90 · Pix na hora");
-    expect(HTML).toMatch(/html\[data-lp="v2"\] \.lp-fixo \.lp-cta \{[^}]*white-space: nowrap/);
+    // r2 (oferta 1): sem nowrap no botão fixo (com +30% cortava "Quero organizar minha vic" e dava rolagem horizontal no Chromium); min-width 0 + a barra com overflow hidden
+    expect(HTML).not.toMatch(/html\[data-lp="v2"\] \.lp-fixo \.lp-cta \{[^}]*white-space: nowrap/);
+    expect(HTML).toMatch(/html\[data-lp="v2"\] \.lp-fixo \.lp-cta \{[^}]*min-width: 0/);
+    expect(HTML).toMatch(/html\[data-lp="v2"\] \.lp-fixo \{[^}]*overflow: hidden/);
     expect(atual("#lp-fixo button")).toBe("Quero organizar tudo · R$ 27,90");
     expect(atual("#fim button")).toBe("Quero organizar tudo");
   });
@@ -340,16 +370,20 @@ describe("braço v2 · cartão, avaliações, como funciona, dúvidas, demo, fim
     d.querySelectorAll("#lp-pix").forEach((el) => el.remove());
     expect(d.querySelectorAll('a[href*="apps.apple.com"], a[href*="play.google.com"]')).toHaveLength(0);
   });
-  it("toda imagem do v3 mora dentro de [data-so-lp=v2] (o atual nunca a pede) e é lazy no HTML; a da 1ª tela vira eager + prioridade alta por um script inline SÓ no v2 (r1), as do 'Por dentro' são fetchpriority=low", () => {
+  it("toda imagem do v3 mora dentro de [data-so-lp=v2] SEM src no HTML (data-src: o atual nunca a pede); a da 1ª tela ganha src + prioridade alta por um script inline SÓ no v2; as do 'Por dentro' são lazy + fetchpriority=low e só ganham src depois do celular da 1ª tela (r2 técnico 9.1/9.2)", () => {
     const d = html();
-    const imgs = [...d.querySelectorAll('img[src*="/landing/v3-"]')];
+    expect(d.querySelector('img[src*="/landing/v3-"]')).toBeNull();
+    const imgs = [...d.querySelectorAll('img[data-src*="/landing/v3-"]')];
     expect(imgs).toHaveLength(6);
-    for (const i of imgs) { expect(i.closest('[data-so-lp="v2"]')).not.toBeNull(); expect(i.getAttribute("loading")).toBe("lazy"); }
+    for (const i of imgs) { expect(i.closest('[data-so-lp="v2"]')).not.toBeNull(); expect(i.hasAttribute("src")).toBe(false); }
     const home = d.querySelector("#lp2-fone-home img")!;
-    expect(home.hasAttribute("fetchpriority")).toBe(false); // no HTML segue lazy: o atual (display:none) nunca a pede
+    expect(home.hasAttribute("fetchpriority")).toBe(false);
+    expect(home.hasAttribute("loading")).toBe(false); // r2: o par preload + lazy→eager fazia o WebKit pedir 2× e avisar
     const script = d.querySelector("#topo-v2 script")!;
-    expect(script.textContent).toMatch(/getAttribute\("data-lp"\) === "v2"[\s\S]*loading = "eager"[\s\S]*fetchPriority = "high"/);
-    for (const i of imgs.filter((x) => x !== home)) expect(i.getAttribute("fetchpriority")).toBe("low");
+    expect(script.textContent).toMatch(/getAttribute\("data-lp"\) === "v2"[\s\S]*fetchPriority = "high"; fh\.src = fh\.getAttribute\("data-src"\)/);
+    expect(script.textContent).toMatch(/img\[data-src\]:not\(\[src\]\)/); // as outras ganham src depois do herói carregado + HTML lido (teto 3 s)
+    expect(script.textContent).toMatch(/setTimeout\(solta, 3000\)/);
+    for (const i of imgs.filter((x) => x !== home)) { expect(i.getAttribute("fetchpriority")).toBe("low"); expect(i.getAttribute("loading")).toBe("lazy"); }
     // r1 (7.3): no v2 o fundo do "Testar o app" é o print de Finanças já baixado (escala 0,94), trocado no parse; o atual segue com o de hoje
     const demoScript = d.querySelector("#lp-celular script")!;
     expect(demoScript.getAttribute("data-so-lp")).toBe("v2");
@@ -683,11 +717,11 @@ describe("crítica r1 · 4.1: o QR não pode sair da tela quando aparece (v2)", 
 });
 
 describe("crítica r1 · 7.1 / 8.1 / 8.2: rede e medição", () => {
-  it("7.1 / r2 2.3 / r1 do v3: toda imagem do v2 é loading=lazy no HTML (fora do v2 fica display:none e não baixa); só a da 1ª tela sobe pra eager/high em tempo de parse no v2, com preload no <head> só no v2; o atual não injeta preload nenhum", () => {
+  it("7.1 / r2 2.3 / r1 do v3: toda imagem do v2 é data-src no HTML (fora do v2 fica display:none e não baixa); só a da 1ª tela ganha src + high em tempo de parse no v2, com preload no <head> só no v2; o atual não injeta preload nenhum", () => {
     const d = document.createElement("div"); d.innerHTML = corpoDe(HTML);
     const imgs = [...d.querySelectorAll('[data-so-lp="v2"] img')];
     expect(imgs.length).toBe(6);
-    for (const i of imgs) { expect(i.getAttribute("loading")).toBe("lazy"); expect(i.getAttribute("fetchpriority")).not.toBe("high"); }
+    for (const i of imgs) { expect(i.hasAttribute("src")).toBe(false); expect(i.getAttribute("data-src")).toMatch(/^\/landing\/v3-/); expect(i.getAttribute("fetchpriority")).not.toBe("high"); }
     // r1 do v3: o preload da imagem da 1ª tela SÓ no v2 (o <img> vira eager no parse, então é consumido); no atual, nenhum
     expect(HTML).not.toMatch(/rel="preload" as="image"/);
     for (const u of ["/organizar", "/organizar?lp=atual"]) expect(rodar(comChaves("off", "off"), u).preloads).toEqual([]);
@@ -910,5 +944,113 @@ describe("crítica r2 · 2.4: uma página velha (de outro teste) não escreve na
     expect(listaVelha.map((e) => e.nome)).toContain("landing_demo_aberta"); // a velha recebeu o seu "fundo"
     expect(nomes()).not.toContain("landing_demo_aberta"); // a nova (v2) ficou limpa
     expect(frame().getAttribute("src")).toBeNull();
+  });
+});
+
+describe("crítica r2 do v3 · aviso do vencido no topo do cartão, 'Copiado ✓', Enter no e-mail do QR, código pós-pago mantido, selos sem _blank", () => {
+  it("v2 · Pix vencido: o aviso é a 1ª linha do cartão (antes de 'Vitalício por'), e o botão vira 'Gerar outro Pix · R$ 27,90' até gerar; depois volta a 'Pagar R$ 27,90 no Pix'", async () => {
+    await abrirPagina("v2", "livre");
+    pagar();
+    await espera('[data-testid="landing-codigo"]');
+    const guardado = JSON.parse(localStorage.getItem("landing-estado-v1")!);
+    guardado.pix.criadoEm = Date.now() - 32 * 60_000; // venceu há 2 min
+    localStorage.setItem("landing-estado-v1", JSON.stringify(guardado));
+    vi.resetModules();
+    (window as unknown as { __eventosLanding?: Ev[] }).__eventosLanding = [];
+    IOFake.inst = [];
+    document.body.innerHTML = corpo;
+    await import("@/landing/landing");
+    const corpoCard = document.querySelector("#lp-card .lp-card-corpo")!;
+    const aviso = document.querySelector('[data-testid="landing-venceu"]')!;
+    expect(corpoCard.firstElementChild).toBe(aviso); // antes de "Vitalício por", não depois do CNPJ
+    expect(aviso.className).toContain("lp2-aviso-topo");
+    expect(document.getElementById("lp-pix")!.querySelector('[data-testid="landing-venceu"]')).toBeNull();
+    expect(document.getElementById("lp-pagar-txt")!.textContent).toBe("Gerar outro Pix · R$ 27,90");
+    pagar();
+    await espera('[data-testid="landing-codigo"]');
+    expect(document.querySelector('[data-testid="landing-venceu"]')).toBeNull();
+    expect(document.getElementById("lp-pagar-txt")!.textContent).toBe("Pagar R$ 27,90 no Pix");
+  });
+
+  it("v2 · 'Copiar de novo' responde 'Copiado ✓' por 1,5 s (sem re-render do cartão) e volta ao rótulo", async () => {
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    try {
+      await abrirPagina("v2", "livre");
+      pagar();
+      await espera('[data-testid="landing-codigo"]');
+      const btn = document.getElementById("lp-copiar")!;
+      const rotulo = btn.querySelector("span")!;
+      const antes = rotulo.textContent;
+      btn.click();
+      await vi.waitFor(() => { if (rotulo.textContent !== "Copiado ✓" && document.querySelector("#lp-copiar span")?.textContent !== "Copiado ✓") throw new Error("sem Copiado"); });
+      expect(writeText).toHaveBeenCalled();
+      expect(eventos().filter((e) => e.nome === "landing_pix_copiado" && e.via === "botao")).toHaveLength(1);
+      await dormir(1700);
+      const depois = document.querySelector("#lp-copiar span")!.textContent;
+      expect(depois === antes || depois === "Copiar de novo").toBe(true);
+      expect(document.querySelector('[data-testid="landing-codigo"]')).not.toBeNull();
+    } finally { Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true }); }
+  });
+
+  it("v2 · Enter no e-mail opcional da tela do QR salva (como o toque em 'Salvar')", async () => {
+    await abrirPagina("v2", "livre");
+    pagar();
+    await espera('[data-testid="landing-codigo"]');
+    digitar("lp-email-pix", "ana@exemplo.com");
+    const campo = document.getElementById("lp-email-pix") as HTMLInputElement;
+    campo.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    await vi.waitFor(() => { if (!document.querySelector(".lp-email-opc .lp-ok-linha")) throw new Error("não salvou"); });
+    expect(document.querySelector(".lp-email-opc .lp-ok-linha")!.textContent).toContain("ana@exemplo.com");
+    expect(eventos().find((e) => e.nome === "landing_email_pix")).toMatchObject({ ok: true });
+  });
+
+  it("v2 · código errado depois de pagar: o digitado fica no campo e o botão continua habilitado (como no código antes do Pix)", async () => {
+    await abrirPagina("v2", "livre");
+    pagar();
+    await espera('[data-testid="landing-codigo"]');
+    simular().pagar();
+    await espera('[data-testid="landing-pago"]');
+    digitar("lp-email", "ana+existe@exemplo.com");
+    (document.getElementById("lp-criar") as HTMLButtonElement).click();
+    await espera("#lp-codigo");
+    expect((document.getElementById("lp-entrar") as HTMLButtonElement).disabled).toBe(true);
+    digitar("lp-codigo", "000000");
+    expect((document.getElementById("lp-entrar") as HTMLButtonElement).disabled).toBe(false);
+    (document.getElementById("lp-entrar") as HTMLButtonElement).click();
+    await vi.waitFor(() => { if (!document.querySelector('[data-testid="landing-pago"] .lp-erro')) throw new Error("sem erro"); });
+    expect(document.querySelector('[data-testid="landing-pago"] .lp-erro')!.textContent).toContain("Código errado");
+    expect((document.getElementById("lp-codigo") as HTMLInputElement).value).toBe("000000");
+    expect((document.getElementById("lp-entrar") as HTMLButtonElement).disabled).toBe(false);
+    expect(HTML).toContain('html[data-lp="v2"] .lp-pago .lp-form .lp-erro { text-align: center; }');
+    digitar("lp-codigo", "123456");
+    (document.getElementById("lp-entrar") as HTMLButtonElement).click();
+    await espera('[data-testid="landing-conta"]');
+  });
+
+  it("v2 · os selos das lojas do pós-compra abrem na mesma aba (sem target=_blank: dentro do navegador do Instagram um _blank pode não abrir nada); o atual segue como hoje", async () => {
+    await abrirPagina("v2", "livre");
+    pagar();
+    await espera('[data-testid="landing-codigo"]');
+    simular().pagar();
+    await espera('[data-testid="landing-pago"]');
+    digitar("lp-email", "ana@exemplo.com");
+    (document.getElementById("lp-criar") as HTMLButtonElement).click();
+    const conta = await espera('[data-testid="landing-conta"]');
+    const selos = [...conta.querySelectorAll(".lp2-selos a[data-loja]")];
+    expect(selos).toHaveLength(2);
+    for (const a of selos) expect(a.hasAttribute("target")).toBe(false);
+    expect(readFileSync(resolve(raiz, "src/landing/landing.ts"), "utf8")).toMatch(/<div class="lp-loja-bloco">[\s\S]*target="_blank"/); // o atual continua com _blank
+  });
+
+  it("v2 · braço email: pagar sem e-mail dá um erro de 1 linha que não repete o rótulo ('Falta o seu e-mail pra gerar o Pix.'); o atual mantém a frase de hoje", async () => {
+    await abrirPagina("v2", "email");
+    pagar();
+    await dormir(50);
+    expect(document.getElementById("lp-email-antes-erro")!.textContent).toBe("Falta o seu e-mail pra gerar o Pix.");
+    await abrirPagina("atual", "email");
+    pagar();
+    await dormir(50);
+    expect(document.getElementById("lp-email-antes-erro")!.textContent).toBe("Coloque seu e-mail: é por onde você entra no CORE.");
   });
 });

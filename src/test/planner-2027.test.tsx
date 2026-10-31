@@ -52,10 +52,14 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); localStorage.clear(); window.hi
 /* ───────────────────────── as chaves ───────────────────────── */
 
 describe("as chaves (tudo desligado)", () => {
-  it("PLANNER_2027 e U27_PLANNER saem 'off'; a direção é o teste A/B ('ab', 31/10 — planner-2027-ab.test.tsx)", () => {
-    expect(PLANNER_2027).toBe("off");
-    expect(U27_PLANNER).toBe("off");
+  it("31/10 ~18h: PLANNER_2027 e U27_PLANNER LIGADOS no código (a suíte desliga pelo global do setup); a direção é o teste A/B ('ab')", () => {
+    expect(PLANNER_2027).toBe("on");
+    expect(U27_PLANNER).toBe("on");
     expect(PLANNER_ESTILO).toBe("ab");
+    const g = globalThis as Record<string, unknown>;
+    const antes = [g.__PLANNER_2027__, g.__U27_PLANNER__];
+    delete g.__PLANNER_2027__; delete g.__U27_PLANNER__;
+    try { expect(plannerNovoLigado("")).toBe(true); } finally { g.__PLANNER_2027__ = antes[0]; g.__U27_PLANNER__ = antes[1]; }
     expect(plannerNovoLigado("")).toBe(false);
     expect(u27PlannerLigado("")).toBe(false);
     expect(estiloDoPlanner("")).toBe("codex"); // "ab" sem e-mail nem reserva (só QA): o padrão do sorteio

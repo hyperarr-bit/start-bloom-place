@@ -12,7 +12,7 @@ export type EstiloPlanner = EstiloDoBraco;
 /** "ab" = cada compradora cai em "codex" ou "core" (50%), pelo e-mail; "core"/"codex" = todo mundo no mesmo (como antes). */
 export type ModoEstilo = EstiloPlanner | "ab";
 /** A versão B do planner no app. "off" = a versão A (rollback). */
-export const PLANNER_2027: ModoPlanner = "off";
+export const PLANNER_2027: ModoPlanner = "on"; // 31/10 ~18h (dono: "pode subir"): ligado no site (rollback "off")
 /**
  * A direção de cara. 31/10 (pedido do dono): "ab" = teste dos 2 desenhos, meio a meio, pelo e-mail da compradora (a oferta
  * e o app calculam o mesmo braço sem dividir armazenamento). Desligar o teste = "core" ou "codex" (todo mundo no mesmo).
@@ -37,10 +37,15 @@ export function forca<T extends string>(param: string, chave: string, validos: r
   }
 }
 const buscaAtual = () => (typeof window === "undefined" ? "" : window.location.search);
+/** 31/10 (ligado no site): a suíte descreve as chaves DESLIGADAS — src/test/setup.ts põe `__PLANNER_2027__`/`__U27_PLANNER__`
+ *  = "off" (como o `__WEB_HOME_NOVA__`); o teste que quer a chave ligada apaga o global. Fora dos testes o global não existe. */
+const daSuite = <T extends string>(nome: string, validos: readonly T[]): T | null => {
+  try { const g = (globalThis as Record<string, unknown>)[nome]; return typeof g === "string" && (validos as readonly string[]).includes(g) ? (g as T) : null; } catch { return null; }
+};
 
 /** A versão B está ligada neste aparelho? (a chave, ou o QA) */
 export const plannerNovoLigado = (busca: string = buscaAtual()): boolean =>
-  (forca<ModoPlanner>(PARAM_QA_PLANNER, CHAVE_FORCA_PLANNER, ["on", "off"], busca) ?? PLANNER_2027) === "on";
+  (forca<ModoPlanner>(PARAM_QA_PLANNER, CHAVE_FORCA_PLANNER, ["on", "off"], busca) ?? daSuite<ModoPlanner>("__PLANNER_2027__", ["on", "off"]) ?? PLANNER_2027) === "on";
 
 /** De onde veio o braço: "forca" (QA: ?planner-estilo= / a chave guardada) · "fixo" (PLANNER_ESTILO core/codex) · o sorteio. */
 export type ViaDoBraco = "forca" | "fixo" | ViaDoSorteio;
@@ -64,13 +69,13 @@ export const estiloDoPlanner = (busca: string = buscaAtual(), quem: { email?: st
 /* ── a OFERTA do 2027 com as folhas do planner (a /organizar e o Fluxo2027 do /hoje e /inicio) ── */
 export type ModoU27Planner = "off" | "on";
 /** "off" (padrão) = a oferta da versão A, igual. QA: ?u27planner=on|off|auto. */
-export const U27_PLANNER: ModoU27Planner = "off";
+export const U27_PLANNER: ModoU27Planner = "on"; // 31/10 ~18h (dono: "pode subir"): ligado (rollback "off")
 /**
  * crítica r2 (compradora MEDIA 4 / técnico MEDIA 3): a oferta B promete "com os seus dados" — só pode valer se a ENTREGA B
  * (PLANNER_2027) também estiver ligada. Ligar só a U27_PLANNER não faz nada (a oferta fica na A). QA: ?u27planner=on&planner27=on.
  */
 export const u27PlannerLigado = (busca: string = buscaAtual()): boolean =>
-  (forca<ModoU27Planner>("u27planner", "u27planner-force", ["on", "off"], busca) ?? U27_PLANNER) === "on" && plannerNovoLigado(busca);
+  (forca<ModoU27Planner>("u27planner", "u27planner-force", ["on", "off"], busca) ?? daSuite<ModoU27Planner>("__U27_PLANNER__", ["on", "off"]) ?? U27_PLANNER) === "on" && plannerNovoLigado(busca);
 /** crítica r1 (compradora BAIXA 1): "pra imprimir" afastava quem não tem impressora */
 export const DESC_U2027_PLANNER = "Um planner 2027 pra imprimir ou guardar no celular, com as suas metas, o seu dinheiro e as suas datas. E 12 revisões do mês no app.";
 export const LEGENDA_U2027_PLANNER = "Exemplo. O seu sai com o que você planejar.";

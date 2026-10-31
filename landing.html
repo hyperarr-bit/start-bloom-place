@@ -49,7 +49,7 @@
         var AB_OFERTA = "off";
         var AB_CHECKOUT = "on"; // 29/10 (dono, depois da compra real pelo braço email): LIGADO. e-mail antes do Pix (braço "email") × checkout de hoje ("livre") — ver o comentário acima
         var AB_LP = "off"; // 30/10: braço "v2" (vitrine) construído e DESLIGADO — "on" liga o 50/50 contra a página de hoje ("atual")
-        var UPSELL_2027 = "off"; // 31/10: "Seu 2027" R$ 19,90 no pós-pago, construído e DESLIGADO — "on" liga nos dois braços (rollback: "off")
+        var UPSELL_2027 = "on"; // 31/10 ~18h (dono: "pode subir", sem compra de teste): LIGADO — "Seu 2027" R$ 19,90 no pós-pago, nos dois braços (rollback: "off")
         var d = document.documentElement, q = null, mem = {};
         try { q = new URLSearchParams(location.search); } catch (e0) {}
         var pega = function (k) { try { return q ? q.get(k) : null; } catch (e) { return null; } };

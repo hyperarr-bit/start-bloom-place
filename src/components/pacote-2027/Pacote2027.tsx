@@ -103,7 +103,7 @@ export function Pacote2027() {
           <ol className="mt-3 space-y-2 text-[13px]">
             <li className="flex gap-2.5"><b className="w-6 h-6 rounded-full bg-foreground text-background grid place-items-center text-[11px] shrink-0">1</b><span><b>Planejar 2027</b>: 3 metas, dinheiro do mês e as datas. 5 minutos.</span></li>
             <li className="flex gap-2.5"><b className="w-6 h-6 rounded-full bg-foreground text-background grid place-items-center text-[11px] shrink-0">2</b><span><b>Revisão no dia 1</b> de cada mês, com o roteiro pronto.</span></li>
-            <li className="flex gap-2.5"><b className="w-6 h-6 rounded-full bg-foreground text-background grid place-items-center text-[11px] shrink-0">3</b><span><b>Cofrinho das 52 semanas</b> e o <b>planner pra imprimir</b>.</span></li>
+            <li className="flex gap-2.5"><b className="w-6 h-6 rounded-full bg-foreground text-background grid place-items-center text-[11px] shrink-0">3</b><span><b>Cofrinho das 52 semanas</b> e o <b>{plannerB ? "planner que se preenche com o que você anota" : "planner pra imprimir"}</b>.</span></li>
           </ol>
           <button type="button" onClick={() => abrirPlanejar("boas_vindas")} data-testid="pacote-2027-comecar"
             className="mt-4 w-full h-12 rounded-full bg-foreground text-background text-[14.5px] font-extrabold inline-flex items-center justify-center gap-1.5 active:scale-[0.98]">

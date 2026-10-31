@@ -5,11 +5,14 @@
  * → public/landing/planner-2027-{core,codex}.webp (640×460, fundo transparente) + @2x/@3x (crítica r1: 640 px borrava no
  *   iPhone, DPR 3) + planner-2027-{core,codex}-ano.webp (a folha "Meu ano" sozinha, 1080 px: abre no toque, legível).
  * Rode de novo sempre que o desenho das folhas mudar (o teste planner-2027 confere que os arquivos existem).
+ * 31/10 (upsell-tela-cheia): + "Meu mês" e "Minha semana" PREENCHIDAS (EXEMPLO_PREENCHIDO) pra página da oferta:
+ *   planner-2027-{estilo}-{mes,semana}.webp (310 px de largura, 1x) e @2x, e -grande.webp (1080 px, abre no toque).
+ *   Só essas: `npx vite-node scripts/planner-2027-miniaturas.ts preenchidas`.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright-core";
-import { cssDoPlanner, folhasDoPlanner, EXEMPLO_DO_PLANNER, A4_PX, type EstiloPlanner } from "../src/lib/planner-2027";
+import { cssDoPlanner, folhasDoPlanner, EXEMPLO_DO_PLANNER, EXEMPLO_PREENCHIDO, A4_PX, type EstiloPlanner } from "../src/lib/planner-2027";
 
 const raiz = path.resolve(__dirname, "..");
 const b64 = (f: string) => fs.readFileSync(path.join(raiz, "public/fonts", f)).toString("base64");
@@ -19,6 +22,7 @@ const L = 640, H = 460;
 
 async function main() {
   const b = await chromium.launch();
+  const soPreenchidas = process.argv.includes("preenchidas");
   for (const estilo of ["core", "codex"] as EstiloPlanner[]) {
     const [capa, ano] = folhasDoPlanner(EXEMPLO_DO_PLANNER, estilo);
     const folha = (html: string, alt: number, giro: number, x: number, y: number, z: number) => {
@@ -49,6 +53,16 @@ async function main() {
       console.log(destino, Math.round(fs.statSync(destino).size / 1024), "KB");
       await page.close();
     };
+    // 31/10: as 2 folhas preenchidas (a página da oferta: lado a lado, ~170 px cada no celular → 310/620 px)
+    const cheias = folhasDoPlanner(EXEMPLO_PREENCHIDO, estilo);
+    for (const [nome, html] of [["mes", cheias[5]], ["semana", cheias[6]]] as const) {
+      const so = (larg: number) => { const k = larg / A4_PX.largura; return `<div style="width:${larg}px;height:${Math.round(A4_PX.altura * k)}px;overflow:hidden"><div class="pl pl-${estilo}" style="width:${A4_PX.largura}px;height:${A4_PX.altura}px;transform:scale(${k});transform-origin:0 0">${html}</div></div>`; };
+      const alt = (larg: number) => Math.round(A4_PX.altura * (larg / A4_PX.largura));
+      await gravar(so(310), 310, alt(310), 2, `planner-2027-${estilo}-${nome}.webp`, 0.84);
+      await gravar(so(310), 310, alt(310), 3, `planner-2027-${estilo}-${nome}@2x.webp`, 0.78);
+      await gravar(so(1080), 1080, alt(1080), 1, `planner-2027-${estilo}-${nome}-grande.webp`, 0.82);
+    }
+    if (soPreenchidas) continue;
     const duas = `<div style="position:relative;width:${L}px;height:${H}px">${folha(capa, 372, -6, 46, 52, 1)}${folha(ano, 420, 3.5, 300, 18, 2)}</div>`;
     await gravar(duas, L, H, 1, `planner-2027-${estilo}.webp`, 0.86);
     await gravar(duas, L, H, 2, `planner-2027-${estilo}@2x.webp`, 0.8);

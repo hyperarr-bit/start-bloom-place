@@ -3,7 +3,7 @@ import { ArrowRight, Check, ChevronLeft, Copy, LoaderCircle, Printer, Share } fr
 import { toast } from "sonner";
 import { trackEvent } from "@/lib/analytics";
 import { plataformaApp } from "@/lib/native-shell";
-import { A4_PX, ROTULOS_DAS_FOLHAS, TOTAL_DE_FOLHAS, folhasDoPlanner, lerExtrasDoPlanner, resumoDoPlanner, type DadosDoPlanner, type EstiloPlanner } from "@/lib/planner-2027";
+import { A4_PX, ROTULOS_DAS_FOLHAS, TOTAL_DE_FOLHAS, folhasDoPlanner, lerExtrasDoPlanner, lerMesESemanaDoPlanner, resumoDoPlanner, type DadosDoPlanner, type EstiloPlanner } from "@/lib/planner-2027";
 import { ehIos, garantirCssDoPlanner, imprimirPlannerNoSite, modoDeEntrega, prepararFolhas, type FolhasProntas, type ModoDeEntrega } from "@/lib/planner-2027-baixar";
 import { LINK_DO_PLANNER, portaDoLink } from "@/lib/planner-2027-chave";
 import type { Cofrinho2027, Plano2027 } from "@/lib/pacote-2027";
@@ -79,7 +79,7 @@ export function PlannerB({ dados, estilo, via, onVoltar, onPlanejar }: { dados: 
 
   useEffect(() => { garantirCssDoPlanner(estilo); }, [estilo]);
   useEffect(() => {
-    trackEvent("plano2027_planner_view", { estilo, nativo, modo, metas: r.metas, datas: r.datas, habitos: r.habitos, contas: r.contas, pouco: r.pouco, ...doBraco });
+    trackEvent("plano2027_planner_view", { estilo, nativo, modo, metas: r.metas, datas: r.datas, habitos: r.habitos, contas: r.contas, mes: r.mes, semana: r.semana, pouco: r.pouco, ...doBraco });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -125,6 +125,9 @@ export function PlannerB({ dados, estilo, via, onVoltar, onPlanejar }: { dados: 
     { ok: r.datas > 0, texto: r.datas ? `${r.datas === 1 ? "1 data marcada" : `${r.datas} datas marcadas`} no calendário` : "Calendário pra marcar" },
     { ok: r.habitos > 0, texto: r.habitos ? `${r.habitos === 1 ? "1 hábito" : `${r.habitos} hábitos`} da sua Rotina` : "Hábitos: linhas pra escrever" },
     { ok: r.contas > 0, texto: r.contas ? `${r.contas === 1 ? "1 conta fixa" : `${r.contas} contas fixas`} do Finanças` : "Contas fixas: linhas pra escrever" },
+    // 31/10 (upsell-tela-cheia): as folhas que se preenchem sozinhas com o mês e a semana de agora
+    { ok: r.mes, texto: r.mes && dados.mes ? `Meu mês: ${dados.mes.rotulo.toLowerCase()}, do seu Finanças` : "Meu mês: se preenche quando você anotar no Finanças" },
+    { ok: r.semana, texto: r.semana && dados.semana ? `Minha semana: ${dados.semana.rotulo}, da sua Rotina` : "Minha semana: se preenche quando você usar a Rotina" },
   ];
 
   const falhou = () => toast.error("Não deu pra preparar as folhas. Tenta de novo.");
@@ -182,7 +185,7 @@ export function PlannerB({ dados, estilo, via, onVoltar, onPlanejar }: { dados: 
       <button type="button" onClick={onVoltar} className="text-[12px] font-bold text-muted-foreground inline-flex items-center gap-1"><ChevronLeft className="w-4 h-4" /><span>Seu 2027</span></button>
       <div>
         <h2 className="text-[24px] leading-tight font-black tracking-tight">Seu planner 2027</h2>
-        <p className="text-[13.5px] text-muted-foreground mt-1">{TOTAL_DE_FOLHAS} folhas A4, montadas com o que você tem no CORE.</p>
+        <p className="text-[13.5px] text-muted-foreground mt-1">{TOTAL_DE_FOLHAS} folhas A4 com o que você anota no CORE. Baixe quando quiser: sai sempre atualizado.</p>
       </div>
 
       <div className="-mx-4 px-4 flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2 [scrollbar-width:none]" data-testid="planner-b-previa">
@@ -200,7 +203,7 @@ export function PlannerB({ dados, estilo, via, onVoltar, onPlanejar }: { dados: 
           {imagens ? (
             <>
               <p className="text-[14px] font-extrabold leading-snug" data-testid="planner-b-segure">Toque e segure uma folha pra salvar</p>
-              <p className="text-[12.5px] text-muted-foreground mt-1">São 12: deslize pro lado. Ou abra no {ios ? "Safari" : "navegador"} e salve todas juntas.</p>
+              <p className="text-[12.5px] text-muted-foreground mt-1">São {TOTAL_DE_FOLHAS}: deslize pro lado. Ou abra no {ios ? "Safari" : "navegador"} e salve todas juntas.</p>
             </>
           ) : preparando ? (
             <p className="text-[13.5px] font-bold inline-flex items-center gap-2"><LoaderCircle className="w-4 h-4 animate-spin" /><span>Preparando {feitas} de {folhas.length}…</span></p>
@@ -259,6 +262,7 @@ export function PlannerB({ dados, estilo, via, onVoltar, onPlanejar }: { dados: 
 export default function PlannerDoPacote({ plano, cofrinho, get, estilo, via, onVoltar, onPlanejar }: {
   plano: Plano2027; cofrinho: Cofrinho2027; get: <T>(k: string, f: T) => T; estilo: EstiloPlanner; via?: string; onVoltar: () => void; onPlanejar: () => void;
 }) {
-  const dados = useMemo<DadosDoPlanner>(() => ({ plano, cofrinho, ...lerExtrasDoPlanner(get) }), [plano, cofrinho, get]);
+  // 31/10: "Meu mês" e "Minha semana" com o mês e a semana de AGORA — lido a cada abertura (o planner sai sempre atualizado)
+  const dados = useMemo<DadosDoPlanner>(() => ({ plano, cofrinho, ...lerExtrasDoPlanner(get), ...lerMesESemanaDoPlanner(get) }), [plano, cofrinho, get]);
   return <PlannerB dados={dados} estilo={estilo} via={via} onVoltar={onVoltar} onPlanejar={onPlanejar} />;
 }

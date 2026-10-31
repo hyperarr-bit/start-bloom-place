@@ -483,3 +483,27 @@ describe("o laço de conferência do QR (3 s → 30 s → para em 30 min; só co
     u.parar();
   });
 });
+
+/* 31/10 (upsell-tela-cheia, o "glitch" do dono): com o e-mail já dado, o QR pago vai DIRETO pra oferta — o cartão "pago"
+ * ("Pronto! Falta o seu e-mail" / "Pagamento confirmado" com barrinha) não aparece em nenhum momento. */
+describe("chave LIGADA: QR pago → oferta sem piscar o cartão de confirmação", () => {
+  for (const lp of ["atual", "v2"] as const) {
+    it(`${lp} · email: nenhuma mutação mostra landing-pago / u2027-carregando`, async () => {
+      await abrirPagina({ lp, checkout: "email", u2027: true });
+      const viu = new Set<string>();
+      const mo = new MutationObserver(() => {
+        for (const t of ["landing-pago", "u2027-carregando", "landing-preparando-conta"]) if (document.querySelector(`[data-testid="${t}"]`)) viu.add(t);
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
+      try {
+        digitar("lp-email-antes", "maria@email.com");
+        clicar("#lp-pagar");
+        await espera('[data-testid="landing-codigo"]');
+        simular().pagar();
+        await espera('[data-testid="u2027-oferta"]');
+        await dormir(300);
+        expect([...viu]).toEqual([]);
+      } finally { mo.disconnect(); }
+    });
+  }
+});

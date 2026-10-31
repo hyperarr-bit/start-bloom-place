@@ -120,7 +120,7 @@ function oferta(compra: string, email: string | null) {
   u.render();
   return { caixa, u, eventos };
 }
-const LIGADA = "/organizar?u27planner=on&planner27=on";
+const LIGADA = "/organizar?u27planner=on&planner27=on&u27pagina=off";
 
 describe("a oferta da /organizar", () => {
   it("chaves off: nenhum evento ganha braco_planner (e nada de imagem)", async () => {

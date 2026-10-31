@@ -1002,6 +1002,7 @@ function pago(p: PixLanding) {
   evento("landing_pix_pago", { oferta: p.oferta, valor: VALOR_OFERTA[p.oferta], order_id: p.orderId, simulado: SIMULADO });
   marcarCompra({ oferta: p.oferta, email: estado.emailPix }); // 29/10: sobrevive ao localStorage zerado (cookie)
   if (U2027) void carregarU2027().catch(() => null); // 31/10: o módulo do 2027 chega antes da conta pronta (sem tela em branco)
+  u27Antes = U2027 && !!estado.emailPix; // 31/10 (o "glitch"): com o e-mail já dado, a oferta entra direto (sem o cartão "pago")
   salvar({ fase: "pago", pago: p, anteriores: [] });
   rolarAte(card, "start");
   // deu o e-mail na tela do QR (ou pagou logada): segue sozinho pra conta
@@ -1055,6 +1056,7 @@ async function prontoComEmail(email: string, via: string) {
   evento("landing_email", { via });
   marcarCompra({ oferta: p.oferta, email });
   salvar({ fase: "conta", email });
+  avisarContaU27?.(); // 31/10: o Pix do 2027 (pré-aquecido na oferta antecipada) pode ser gerado agora
 }
 
 async function criarConta(email: string) {
@@ -1252,6 +1254,7 @@ function renderDoCartao() {
     caixa.innerHTML = `<div class="lp-pix-gerando" data-testid="landing-gerando"><span class="lp-pix-logo">${ICO_PIX}</span><b>Gerando o seu Pix…</b><div class="lp-progresso"><i></i></div><span>${V2 ? "Sem CPF. Leva 2 segundos." : "Sem CPF, sem cadastro. Leva 2 segundos."}</span></div>`;
   } else if (f === "qr" && estado.pix) {
     const p = estado.pix;
+    if (U2027) void carregarU2027().catch(() => null); // 31/10 (o "glitch"): o módulo do 2027 já chega com o QR na tela
     // 30/10 (v2): 3 passos curtos no lugar da caixa verde + "Pagou? Volte aqui" (quem volta do banco paga 81%; quem não
     // paga sai ~4 s depois do QR — lp-web/funil §3c) + a garantia perto do código. O braço atual segue IGUAL.
     const passosV2 = V2 ? `
@@ -1325,6 +1328,9 @@ function renderDoCartao() {
         conferirVencidoEmLoop();
       }
     }, 1000);
+  } else if (f === "pago" && u27Antes && estado.emailPix) {
+    // 31/10: a oferta antecipada saiu ("Agora não") antes de a conta ficar pronta — o e-mail já foi dado: só espera a conta
+    caixa.innerHTML = `<div class="lp-pago" data-testid="landing-preparando-conta"><div class="lp-pix-gerando"><b>Preparando sua conta…</b><div class="lp-progresso"><i></i></div></div></div>`;
   } else if (f === "pago") {
     const codigo = faseConta === "codigo" || faseConta === "entrando";
     // v3 (v2, braço livre): "Pronto! Falta o seu e-mail." — o e-mail é por onde a pessoa entra no app da loja (2 em 94 pagaram sem e-mail e não entraram)
@@ -1418,10 +1424,21 @@ const apiU2027 = (): import("./upsell-2027").ApiU2027 => SIMULADO
     gerar: (compra) => pg(false).then((m) => m.gerarPixU2027(compra)),
     conferir: (pix: PixU2027) => pg(false).then((m) => m.conferirPixU2027(pix)),
   };
+/**
+ * 31/10 (upsell-tela-cheia, o "glitch" que o dono viu no celular): pagou com o e-mail já dado (braço "email" do checkout, ou
+ * o e-mail salvo na tela do QR) → a fase "pago" pintava o cartão "Pronto! Falta o seu e-mail / Pagamento confirmado" por um
+ * instante (o finalizarConta + o módulo do 2027) e SÓ DEPOIS a oferta entrava: parecia que pulou. Agora, com o 2027 ligado
+ * e o e-mail conhecido, a oferta toma o cartão JÁ no pago; o Pix do 2027 espera a conta final (contaPronta) por dentro.
+ */
+let u27Antes = false;
+let avisarContaU27: (() => void) | null = null;
+const contaProntaU27 = new Promise<void>((ok) => { avisarContaU27 = ok; });
+/** só a oferta ANTECIPADA (no pago, conta ainda sendo finalizada) espera; o link do e-mail, a retomada e a conta pronta, não */
+const esperarContaU27 = (): Promise<void> => (u27Antes && estado.fase === "pago" ? contaProntaU27 : Promise.resolve());
 /** A compra que o 2027 está oferecendo agora (null = nada do 2027 nesta tela). */
 function u2027DaTela(): string | null {
   if (u27Volta && VOLTA_U2027) return VOLTA_U2027.compra;
-  if (U2027 && estado.fase === "conta" && estado.pago && !jaTem) return estado.pago.orderId;
+  if (U2027 && (estado.fase === "conta" || (estado.fase === "pago" && u27Antes)) && estado.pago && !jaTem) return estado.pago.orderId;
   // crítica r2 (dinheiro 1): o Instagram zerou o localStorage com o QR do 2027 aberto — o estado do vitalício morreu (e o marcador
   // virou "já tem"), mas o cookie do 2027 diz qual compra é: o MESMO QR (ou o "Pronto") volta, nunca "Você já tem o CORE" sem ele
   if (U2027 && !estado.pago && u27Retomada) return u27Retomada.compra;
@@ -1450,8 +1467,15 @@ function u2027Toma(): boolean {
   // "Agora não" / Continuar desta compra (outra visita): direto a conta pronta, sem baixar nada
   if (!u27Volta && !(u27 && u27Compra === compra) && lerEstadoU2027(compra).etapa === "fim") return false;
   if (!modU2027) {
-    card.dataset.fase = "conta";
-    caixa.innerHTML = `<div class="lp-pago" data-testid="u2027-carregando"><div class="lp-pix-gerando"><b>Pagamento confirmado</b><div class="lp-progresso"><i></i></div></div></div>`;
+    // 31/10 (o "glitch"): no pago antecipado o cartão fica como está (o QR) até o módulo chegar — ele já vem baixando desde
+    // que o QR apareceu; nada de "Pagamento confirmado" com barrinha piscando antes da oferta
+    const carregando = () => {
+      card.dataset.fase = "conta";
+      caixa.innerHTML = `<div class="lp-pago" data-testid="u2027-carregando"><div class="lp-pix-gerando"><b>Pagamento confirmado</b><div class="lp-progresso"><i></i></div></div></div>`;
+    };
+    if (!(estado.fase === "pago" && u27Antes)) carregando();
+    // rede lenta: o QR parado depois do "Já paguei" parece que nada aconteceu — passou de 1,2 s, mostra que confirmou
+    else window.setTimeout(() => { if (!modU2027 && estado.fase === "pago" && u27Antes) carregando(); }, 1200);
     void carregarU2027().then(() => render(), () => render());
     return true;
   }
@@ -1466,6 +1490,8 @@ function u2027Toma(): boolean {
       valorPago: () => (estado.pago ? VALOR_OFERTA[estado.pago.oferta] ?? null : null),
       aoTerminar: () => { saidaDoLinkU2027(); u27Volta = false; render(); rolarAte(card, "start"); },
       aoMudar: () => { atualizarFixo(); rolarAte(card, "start"); },
+      contaPronta: esperarContaU27,
+      faixaConfirmada: () => (estado.pago ? (estado.pago.oferta !== "LN_ano279" ? "o CORE é seu pra sempre" : "o CORE é seu por 1 ano") : "o seu CORE já está pago"),
     });
     if (u27Volta && VOLTA_U2027) u27.voltaDoEmail(VOLTA_U2027.pix);
     else if (u27Retomada && u27Retomada.compra === compra) u27.retomar();

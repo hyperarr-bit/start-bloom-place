@@ -83,6 +83,14 @@ export const ZOOM_U2027_PLANNER = "Toque pra ver uma folha";
  * ordem de ligar, BUILD.md). Desde a crítica r2 a nota da oferta não fala de site × app: só o que ela recebe.
  */
 export const PLANNER_B_NO_APP_IPHONE = false;
+/**
+ * 31/10 (upsell-tela-cheia): o mesmo pro Android. A build 131 da Play não tem nem a aba Seu 2027; a próxima build (com
+ * PLANNER_2027 "on") tem o planner que se preenche sozinho, pela folha nativa (Filesystem + Share). Vira true quando ela
+ * estiver na loja.
+ */
+export const PLANNER_B_NO_APP_ANDROID = false;
+/** o planner que se preenche sozinho já está nos 2 apps das lojas? (a oferta só diz "no app" quando os 2 têm) */
+export const plannerBNosApps = (): boolean => PLANNER_B_NO_APP_IPHONE && PLANNER_B_NO_APP_ANDROID;
 /* crítica r2 (compradora MEDIA 3): "sai pelo site" confundia quem já está no site — agora diz o que ela recebe. */
 export const NOTA_U2027_PLANNER = "É separado do CORE que você já pagou. O planner sai em 14 folhas pra salvar no celular ou imprimir.";
 
@@ -117,3 +125,26 @@ export const srcsetDoPlanner = (estilo: EstiloPlanner = estiloDoPlanner()) =>
   `/landing/planner-2027-${estilo}.webp 1x, /landing/planner-2027-${estilo}@2x.webp 2x, /landing/planner-2027-${estilo}@3x.webp 3x`;
 /** a folha "Meu ano" sozinha, grande (abre no toque, legível) */
 export const folhaAnoDoPlanner = (estilo: EstiloPlanner = estiloDoPlanner()) => `/landing/planner-2027-${estilo}-ano.webp`;
+
+
+/* ── 31/10 (upsell-tela-cheia): a oferta B vira PÁGINA PRÓPRIA em tela cheia ── */
+export type ModoU27Pagina = "off" | "on";
+/**
+ * "on" (padrão) = com a versão B ligada (U27_PLANNER + PLANNER_2027), a oferta é uma página em tela cheia ("espera, tem mais
+ * uma coisa"): faixa "✓ Pagamento confirmado", o 2027 montado como fica no app, o planner que se preenche sozinho e a barra
+ * fixa com Quero / Agora não. "off" = o cartão B de antes (dentro do cartão do Pix). Sem a versão B, nada muda (a A segue).
+ * QA: ?u27pagina=on|off|auto.
+ */
+export const U27_PAGINA: ModoU27Pagina = "on";
+export const u27PaginaLigada = (busca: string = buscaAtual()): boolean =>
+  u27PlannerLigado(busca) && (forca<ModoU27Pagina>("u27pagina", "u27pagina-force", ["on", "off"], busca) ?? U27_PAGINA) === "on";
+/** as folhas "Meu mês" e "Minha semana" PREENCHIDAS com o exemplo (scripts/planner-2027-miniaturas.ts) — sempre com "EXEMPLO" na tela */
+export type FolhaPreenchida = "mes" | "semana";
+export const imagemPreenchida = (estilo: EstiloPlanner, folha: FolhaPreenchida) => `/landing/planner-2027-${estilo}-${folha}.webp`;
+export const srcsetPreenchida = (estilo: EstiloPlanner, folha: FolhaPreenchida) =>
+  `/landing/planner-2027-${estilo}-${folha}.webp 1x, /landing/planner-2027-${estilo}-${folha}@2x.webp 2x`;
+/** a folha grande (abre no toque) */
+export const imagemPreenchidaGrande = (estilo: EstiloPlanner, folha: FolhaPreenchida) => `/landing/planner-2027-${estilo}-${folha}-grande.webp`;
+/** a promessa (honesta: ela ACABOU de comprar, a conta está vazia — o planner se preenche com o que ela ANOTAR) */
+export const PROMESSA_PLANNER = "O planner se preenche sozinho";
+export const PROMESSA_PLANNER_DESC = "O que você anota no CORE vira planner: o mês do Finanças e a semana da Rotina. Baixe quando quiser, sai sempre atualizado.";

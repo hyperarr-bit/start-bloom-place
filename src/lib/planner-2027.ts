@@ -22,6 +22,8 @@ import {
 import { doPerfil, PERFIL_PESSOAL } from "@/lib/finance-perfil";
 import { nomesDosHabitos } from "@/lib/rotina-habitos";
 import { svgDoIcone, type IconeDoPlanner } from "@/lib/planner-2027-icones";
+import type { MesDoPlanner, SemanaDoPlanner } from "@/lib/planner-2027-preenchido";
+export { lerMesDoPlanner, lerSemanaDoPlanner, lerMesESemanaDoPlanner, type MesDoPlanner, type SemanaDoPlanner } from "@/lib/planner-2027-preenchido";
 
 /* ───────────────────────── as chaves (src/lib/planner-2027-chave.ts: a landing lê sem baixar o planner) ───────────────────────── */
 export {
@@ -40,6 +42,12 @@ export interface DadosDoPlanner {
   habitos: string[];
   /** as contas fixas do Finanças (perfil ativo), na ordem do dia de vencimento */
   contas: ContaFixa[];
+  /**
+   * 31/10 (upsell-tela-cheia): o mês ATUAL do Finanças e a semana ATUAL da Rotina (./planner-2027-preenchido.ts). Com dado,
+   * "Meu mês" e "Minha semana" saem PREENCHIDAS; sem (null/ausente), o modelo com linhas de sempre.
+   */
+  mes?: MesDoPlanner | null;
+  semana?: SemanaDoPlanner | null;
 }
 type Get = <T>(k: string, f: T) => T;
 
@@ -66,7 +74,11 @@ export function lerExtrasDoPlanner(get: Get): Pick<DadosDoPlanner, "habitos" | "
 /** O resumo do que entrou dos dados dela (a prévia do app mostra; o "pouco" chama pra planejar). */
 export function resumoDoPlanner(d: DadosDoPlanner) {
   const metas = metasPreenchidas(d.plano).length;
-  const r = { metas, dinheiro: d.plano.gastarMes > 0 || d.plano.guardarMes > 0, datas: d.plano.datas.length, habitos: d.habitos.length, contas: d.contas.length, cofrinho: d.cofrinho.marcadas.length };
+  const r = {
+    metas, dinheiro: d.plano.gastarMes > 0 || d.plano.guardarMes > 0, datas: d.plano.datas.length, habitos: d.habitos.length, contas: d.contas.length, cofrinho: d.cofrinho.marcadas.length,
+    /** 31/10: "Meu mês" e "Minha semana" saem preenchidas */
+    mes: !!d.mes, semana: !!d.semana,
+  };
   return { ...r, pouco: !d.plano.salvoEm && metas === 0 && !r.dinheiro && r.datas === 0 };
 }
 
@@ -277,6 +289,7 @@ function fMetas(d: DadosDoPlanner, e: EstiloPlanner): string {
 const CATEGORIAS = ["Moradia", "Mercado", "Transporte", "Saúde", "Lazer", "Outros"];
 const MAX_CONTAS = 6;
 function fMeuMes(d: DadosDoPlanner, e: EstiloPlanner): string {
+  if (d.mes) return fMeuMesCheio(d, d.mes, e);
   const p = d.plano;
   const cards = cartoes(e, [
     { rotulo: "Receitas", valor: 0 },
@@ -307,6 +320,7 @@ function fMeuMes(d: DadosDoPlanner, e: EstiloPlanner): string {
  * Uma nota pra mim), com os hábitos dela. Modelo pra imprimir 1 por semana (antes: grade de 31 dias com bolinha de 22 px). */
 const MAX_HABITOS = 6;
 function fSemana(d: DadosDoPlanner, e: EstiloPlanner): string {
+  if (d.semana) return fSemanaCheia(d.semana, e);
   const mais = d.habitos.length > MAX_HABITOS;
   const hab = d.habitos.slice(0, mais ? MAX_HABITOS - 1 : MAX_HABITOS);
   const n = mais ? MAX_HABITOS - 1 : Math.max(5, hab.length);
@@ -319,6 +333,89 @@ function fSemana(d: DadosDoPlanner, e: EstiloPlanner): string {
   const pNota = painel("nota", e, "Uma nota pra mim", preencher(8), "", "pl-enche");
   return folha(7, `${cabecalho(e, "PLANNER SEMANAL", "Minha", "semana", `De <span class="pl-ln pl-curta"></span> a <span class="pl-ln pl-curta"></span> · uma folha por semana`, "rotina", 7)}
     <div class="pl-corpo">${pHab}${pAgenda}<div class="pl-dupla">${pImporta}${pNota}</div></div>`);
+}
+
+/* ───────────── 31/10 (upsell-tela-cheia): "Meu mês" e "Minha semana" PREENCHIDAS com o mês/semana atuais ─────────────
+ * O mesmo layout do modelo (as mesmas caixas, cores e escala): onde ela tem dado, sai o dado; o resto continua linha pra
+ * escrever. Nada de "R$ 0": valor zero vira linha. Lista maior que o espaço = as que cabem + "+N no seu Finanças/Rotina". */
+const MAX_RECEITAS = 6;
+const MAX_GASTOS = 6;
+const MAX_IMPORTA = 3;
+const MAX_ORC = 6;
+const reais = (v: number) => (v < 0 ? `−${brl(-v)}` : brl(v));
+const dd = (n: number | null) => (n ? String(n).padStart(2, "0") : "__");
+const ICO_OK = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+
+function cartoesCheios(e: EstiloPlanner, itens: { rotulo: string; valor: number | null; nota?: string }[], tons: Tom[]): string {
+  return `<div class="pl-cards">${itens.map((c, i) => {
+    const t = c.valor !== null && c.valor !== 0 ? reais(c.valor) : "";
+    return `<div style="${varsDoTom(e === "core" ? "dinheiro" : tons[i], e)}"><small>${c.rotulo}</small><b${t.length > 11 ? ' class="pl-longo"' : ""}>${t || RS_LINHA}</b>${c.nota ? `<span class="pl-card-nota">${c.nota}</span>` : ""}</div>`;
+  }).join("")}</div>`;
+}
+/** as linhas preenchidas (até `max`; passou = max−1 + "+N") e as vazias até completar */
+function linhasCheias(itens: LinhaDoMesP[], max: number, onde: string, vazia: string): string {
+  const mais = itens.length > max;
+  const vis = mais ? itens.slice(itens.length - (max - 1)) : itens; // as mais recentes
+  const cheias = vis.map((l) => `<div class="pl-lv pl-lv-f"><span class="pl-lv-d">${dd(l.dia)}</span><span class="pl-txt">${esc(l.nome)}</span><b>${brl(l.valor)}</b></div>`).join("");
+  return cheias + (mais ? `<div class="pl-lv-mais">+${itens.length - vis.length} no seu ${onde}</div>` : "") + vazia.repeat(Math.max(0, max - vis.length - (mais ? 1 : 0)));
+}
+type LinhaDoMesP = MesDoPlanner["receitas"][number];
+
+function fMeuMesCheio(d: DadosDoPlanner, m: MesDoPlanner, e: EstiloPlanner): string {
+  const p = d.plano;
+  const saldo = m.totalReceitas > 0 ? Math.round((m.totalReceitas - m.totalDespesas) * 100) / 100 : null;
+  const cards = cartoesCheios(e, [
+    { rotulo: "Receitas", valor: m.totalReceitas || null },
+    { rotulo: "Despesas", valor: m.totalDespesas || null, nota: p.gastarMes > 0 ? `posso gastar ${brl(p.gastarMes)}` : "" },
+    { rotulo: "Saldo do mês", valor: saldo, nota: p.guardarMes > 0 ? `quero guardar ${brl(p.guardarMes)}` : "" },
+  ], ["entrada", "saida", "vencimento"]);
+  const cab = (...c: string[]) => `<div class="pl-lv pl-lv-cab">${c.map((x) => `<span>${x}</span>`).join("")}</div>`;
+  const linhaValor = `<div class="pl-lv"><span class="pl-ln"></span><span class="pl-ln"></span><span class="pl-rs">R$</span><span class="pl-ln"></span></div>`;
+  const total = (rot: string, v = 0) => `<span>${rot}</span><b>${v > 0 ? brl(v) : RS_LINHA}</b>`;
+  const pReceitas = bloco("entrada", e, "Receitas", m.receitas.length ? "do seu Finanças" : "No mês",
+    `<div class="pl-pauta pl-pauta-f">${cab("Dia", "De onde", "", "Valor")}${linhasCheias(m.receitas, MAX_RECEITAS, "Finanças", linhaValor)}</div>`, total("Total do mês", m.totalReceitas));
+  const pGastos = bloco("saida", e, "Gastos", m.gastos.length ? "do seu Finanças" : "No mês",
+    `<div class="pl-pauta pl-pauta-f">${cab("Dia", "Com o quê", "", "Valor")}${linhasCheias(m.gastos, MAX_GASTOS, "Finanças", linhaValor)}</div>`, total("Total dos gastos", m.totalGastos));
+  const orc = m.orcamento.slice(0, MAX_ORC);
+  const limiteDoMes = p.gastarMes > 0 ? p.gastarMes : Math.round(m.orcamento.reduce((s, o) => s + o.limite, 0) * 100) / 100;
+  const pOrc = bloco("orcamento", e, "Orçamento", "Gastei · Limite", `<div class="pl-orc">${
+    orc.map((o) => `<div class="pl-orc-f${o.limite > 0 && o.gastei > o.limite ? " passou" : ""}"><span class="pl-txt">${esc(o.nome)}</span><b>${o.gastei > 0 ? brl(o.gastei) : "—"}</b><b>${o.limite > 0 ? brl(o.limite) : '<span class="pl-ln"></span>'}</b></div>`).join("")}${
+    CATEGORIAS.slice(0, Math.max(0, MAX_ORC - orc.length)).map(() => `<div><span class="pl-ln"></span><span class="pl-ln"></span><span class="pl-ln"></span></div>`).join("")}</div>`,
+    total("Limite do mês", limiteDoMes));
+  const v = [...m.vencimentos].sort((a, b) => Number(a.paga) - Number(b.paga) || (a.dia ?? 99) - (b.dia ?? 99)); // pendências primeiro (o Codex)
+  const mais = v.length > MAX_CONTAS;
+  const contas = v.slice(0, mais ? MAX_CONTAS - 1 : MAX_CONTAS);
+  const soma = Math.round(v.reduce((s, c) => s + c.valor, 0) * 100) / 100;
+  const pagas = v.filter((c) => c.paga).length;
+  const pVenc = bloco("vencimento", e, "Vencimentos", v.length ? `${pagas} de ${v.length} pagas` : "Contas do mês", `<div class="pl-venc">${
+    contas.map((c) => `<div><span class="pl-caixa${c.paga ? " ok" : ""}">${c.paga ? ICO_OK : ""}</span><span class="pl-vn"><b class="pl-txt">${esc(c.nome)}</b><small>${c.dia ? `Dia ${c.dia}` : "Dia __"}</small></span><b class="pl-vv">${c.valor > 0 ? brl(c.valor) : RS_LINHA}</b></div>`).join("")}${
+    mais ? `<div class="pl-venc-mais">+${v.length - contas.length} no seu Finanças</div>` : ""}${
+    Array.from({ length: mais ? 0 : MAX_CONTAS - contas.length }, () => `<div class="vazia"><span class="pl-caixa"></span><span class="pl-ln"></span><small>Dia __</small></div>`).join("")}</div>`,
+    total(v.length ? "Total das contas" : "Total", soma));
+  return folha(6, `${cabecalho(e, "PLANNER FINANCEIRO", "Meu", "mês", `${esc(m.rotulo)} · do seu Finanças`, "dinheiro", 6)}
+    <div class="pl-corpo">${cards}<div class="pl-dupla">${pReceitas}${pGastos}</div><div class="pl-dupla pl-auto">${pOrc}${pVenc}</div></div>`, "pl-f-mes pl-cheia");
+}
+
+function fSemanaCheia(s: SemanaDoPlanner, e: EstiloPlanner): string {
+  const mais = s.habitos.length > MAX_HABITOS;
+  const hab = s.habitos.slice(0, mais ? MAX_HABITOS - 1 : MAX_HABITOS);
+  const n = mais ? MAX_HABITOS - 1 : Math.max(5, hab.length);
+  const pHab = painel("rotina", e, "Pequenos hábitos", `<div class="pl-hab"><span class="pl-hab-cab">MEUS CUIDADOS</span>${DIAS_DA_SEMANA.map((x) => `<span class="pl-dia">${x}</span>`).join("")}
+      ${Array.from({ length: n }, (_, i) => `${nomeDoHabito(hab[i]?.nome)}${Array.from({ length: 7 }, (_, k) => (hab[i]?.feitos[k] ? `<i class="ok">${ICO_OK}</i>` : "<i></i>")).join("")}`).join("")}${mais ? `<span class="pl-hab-mais">+${s.habitos.length - hab.length} na sua Rotina</span>` : ""}</div>`,
+    s.habitos.length ? "da sua Rotina" : "");
+  const cabDias = DIAS_DA_AGENDA.map((x, i) => `<span class="pl-ag-dia">${x}<b>${s.dias[i] ?? ""}</b></span>`).join("");
+  const pAgenda = s.agenda.length
+    ? painel("agenda", e, "Minha agenda", `<div class="pl-agenda pl-agenda-f"><span></span>${cabDias}
+      ${s.agenda.map((h) => `<span class="pl-ag-hora">${esc(h.hora)}</span>${h.celulas.map((c) => (c ? `<i class="cheia"><span class="pl-3l">${esc(c)}</span></i>` : "<i></i>")).join("")}`).join("")}</div>`, "da sua Rotina")
+    : painel("agenda", e, "Minha agenda", `<div class="pl-agenda"><span></span>${cabDias}
+      ${["Manhã", "Tarde", "Noite"].map((t) => `<span class="pl-ag-hora">${t}</span>${"<i></i>".repeat(7)}`).join("")}</div>`);
+  const tarefa = `<div class="pl-tarefa"><span class="pl-caixa"></span><div class="pl-ln"></div></div>`;
+  const maisImp = s.importa.length > MAX_IMPORTA;
+  const imp = s.importa.slice(0, maisImp ? MAX_IMPORTA - 1 : MAX_IMPORTA);
+  const pImporta = painel("importa", e, "O que importa", `<div class="pl-pauta">${imp.map((t) => `<div class="pl-tarefa pl-tarefa-f"><span class="pl-caixa"></span><span class="pl-txt">${esc(t)}</span></div>`).join("")}${maisImp ? `<div class="pl-lv-mais">+${s.importa.length - imp.length} na sua Rotina</div>` : ""}${tarefa.repeat(Math.max(0, 8 - s.importa.length))}</div>`, s.importa.length ? "da sua Rotina" : "", "pl-enche");
+  const pNota = painel("nota", e, "Uma nota pra mim", preencher(8), "", "pl-enche");
+  return folha(7, `${cabecalho(e, "PLANNER SEMANAL", "Minha", "semana", `${esc(s.rotulo)} · da sua Rotina`, "rotina", 7)}
+    <div class="pl-corpo">${pHab}${pAgenda}<div class="pl-dupla">${pImporta}${pNota}</div></div>`, "pl-cheia");
 }
 
 function fCofrinho(d: DadosDoPlanner, e: EstiloPlanner): string {
@@ -562,6 +659,24 @@ function cssBase(estilo: EstiloPlanner): string {
 .pl-area .pl-q{font-size:25px;line-height:1.3;opacity:.95}
 .pl-area .pl-ln{height:52px}
 .pl-chk{display:flex;gap:24px;margin-top:18px;font-size:20px}.pl-chk>span{display:inline-flex;align-items:center;gap:10px}
+/* 31/10: folhas preenchidas (Meu mês / Minha semana com os dados dela) */
+.pl-lv-f{grid-template-columns:62px minmax(0,1fr) auto;align-items:center;height:54px;border-bottom:2px solid var(--w);font-size:24px;${tintaCore}}
+.pl-lv-f .pl-lv-d{font-weight:700;color:var(--f)}
+.pl-lv-f>b{font-weight:${codex ? 600 : 700};white-space:nowrap;padding-left:8px}
+.pl-lv-mais{height:54px;line-height:54px;font-size:22px;font-weight:650;color:var(--f)}
+.pl-orc>div.pl-orc-f{grid-template-columns:minmax(0,1fr) auto auto;column-gap:18px;align-items:center;border-bottom:2px solid var(--w)}
+.pl-orc-f>span:first-child{padding-bottom:0!important;font-size:24px!important}
+.pl-orc-f>b{font-size:23px;font-weight:${codex ? 550 : 700};white-space:nowrap;min-width:110px;text-align:right;${tintaCore}}
+.pl-orc-f>b .pl-ln{height:40px}
+.pl-orc-f.passou>b:nth-child(2){color:var(--f)}
+.pl-caixa.ok{display:inline-grid;place-items:center}
+.pl-hab i.ok{display:grid;place-items:center;background:var(--f);border-color:var(--f)}
+.pl-ag-dia b{display:block;font-size:30px;line-height:1.1;margin-top:2px;letter-spacing:0;font-weight:${codex ? 600 : 800};${tintaCore}}
+.pl-agenda.pl-agenda-f i{height:76px}
+.pl-pauta-f>.pl-lv-f,.pl-pauta-f>.pl-lv-mais{height:46px;line-height:46px}.pl-pauta-f .pl-ln{height:46px}
+.pl-agenda-f i.cheia{display:flex;align-items:center;padding:6px 8px;background:var(--t);border-color:var(--t);font-style:normal;font-size:18px;line-height:1.2;font-weight:600;${tintaCore}}
+.pl-3l{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;overflow-wrap:anywhere;min-width:0}
+.pl-tarefa.pl-tarefa-f{align-items:center;height:54px;border-bottom:2px solid var(--w)}.pl-tarefa.pl-tarefa-f .pl-caixa{margin-bottom:0}.pl-tarefa-f .pl-txt{flex:1;font-size:25px;${tintaCore}}
 /* rodapé */
 .pl-rod{flex:0 0 auto;display:flex;justify-content:space-between;align-items:center;font-size:19px;color:var(--suave)}
 .pl-rod>span:first-child{${codex ? "font-family:'Instrument Serif',Georgia,serif;font-style:italic;font-size:30px;color:#626d55" : "font-weight:650"}}
@@ -617,4 +732,48 @@ export const EXEMPLO_DO_PLANNER: DadosDoPlanner = {
     { nome: "Aluguel", valor: 1450, dia: 5 }, { nome: "Academia", valor: 149, dia: 10 }, { nome: "Internet", valor: 99.9, dia: 15 },
     { nome: "Celular", valor: 59.9, dia: 20 }, { nome: "Streaming", valor: 39.9, dia: 28 },
   ],
+};
+
+/**
+ * 31/10 (upsell-tela-cheia): o exemplo com "Meu mês" e "Minha semana" PREENCHIDAS (a oferta mostra, marcado EXEMPLO:
+ * scripts/planner-2027-miniaturas.ts → planner-2027-{estilo}-preenchido*.webp). Janeiro de 2027: o 1º mês do planner.
+ */
+export const EXEMPLO_PREENCHIDO: DadosDoPlanner = {
+  ...EXEMPLO_DO_PLANNER,
+  mes: {
+    rotulo: "Janeiro de 2027",
+    receitas: [{ dia: 5, nome: "Salário", valor: 4800 }, { dia: 12, nome: "Freela de design", valor: 650 }, { dia: 20, nome: "Venda no brechó", valor: 120 }],
+    gastos: [
+      { dia: 3, nome: "Mercado do mês", valor: 612.4 }, { dia: 6, nome: "Farmácia", valor: 48.9 }, { dia: 8, nome: "Uber", valor: 32.5 },
+      { dia: 10, nome: "Almoço com a Bia", valor: 74 }, { dia: 14, nome: "Padaria", valor: 26.8 }, { dia: 17, nome: "Presente da mãe", valor: 120 },
+      { dia: 19, nome: "Cinema", valor: 58 }, { dia: 22, nome: "Feira", valor: 64.3 },
+    ],
+    totalReceitas: 5570, totalGastos: 1036.9, totalDespesas: 2835.6,
+    orcamento: [
+      { nome: "Mercado", gastei: 703.5, limite: 900 }, { nome: "Restaurante", gastei: 74, limite: 250 }, { nome: "Transporte", gastei: 32.5, limite: 200 },
+      { nome: "Lazer", gastei: 58, limite: 150 }, { nome: "Presente", gastei: 120, limite: 100 }, { nome: "Farmácia", gastei: 48.9, limite: 120 },
+    ],
+    vencimentos: [
+      { nome: "Aluguel", dia: 5, valor: 1450, paga: true }, { nome: "Academia", dia: 10, valor: 149, paga: true }, { nome: "Internet", dia: 15, valor: 99.9, paga: true },
+      { nome: "Celular", dia: 20, valor: 59.9, paga: false }, { nome: "Streaming", dia: 28, valor: 39.9, paga: false },
+    ],
+  },
+  semana: {
+    rotulo: "4 de jan a 10 de jan",
+    dias: [4, 5, 6, 7, 8, 9, 10],
+    habitos: [
+      { nome: "Água ao acordar", feitos: [true, true, true, true, false, false, false] },
+      { nome: "Mover o corpo", feitos: [true, false, true, false, false, false, false] },
+      { nome: "Ler 10 páginas", feitos: [true, true, false, true, false, false, false] },
+      { nome: "Pausa sem tela", feitos: [false, true, true, false, false, false, false] },
+      { nome: "Dormir mais cedo", feitos: [true, false, false, true, false, false, false] },
+    ],
+    agenda: [
+      { hora: "7:00", celulas: ["Caminhada", "Café sem pressa", "Caminhada", "Alongar", "Caminhada", "Feira", ""] },
+      { hora: "9:00", celulas: ["Projeto da semana", "Trabalho com foco", "Projeto da semana", "Trabalho com foco", "Fechar entregas", "", "Família"] },
+      { hora: "18:00", celulas: ["Pilates", "", "Pilates", "Café com a Bia", "", "Cinema", ""] },
+      { hora: "21:00", celulas: ["Livro", "Livro", "", "Livro", "", "", "Preparar a semana"] },
+    ],
+    importa: ["Pagar o celular até dia 20", "Ligar pra mãe", "Marcar o check-up"],
+  },
 };

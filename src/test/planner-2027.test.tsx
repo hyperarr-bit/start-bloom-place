@@ -514,7 +514,7 @@ describe("a oferta do 2027", () => {
     u.parar();
   });
   it("/organizar com ?u27planner=on: as 2 folhas reais (na direção do app) acima da frase nova; o preço e o botão continuam", () => {
-    window.history.replaceState(null, "", "/organizar?u27planner=on&planner27=on&planner-estilo=codex");
+    window.history.replaceState(null, "", "/organizar?u27planner=on&planner27=on&planner-estilo=codex&u27pagina=off");
     const { caixa, u } = ofertaDaOrganizar();
     const fig = caixa.querySelector("[data-testid=u2027-planner]")!;
     expect(fig.querySelector("img")!.getAttribute("src")).toBe("/landing/planner-2027-codex.webp");
@@ -551,7 +551,7 @@ describe("a oferta do 2027", () => {
     expect(off.querySelector("#u27-continuar")!.textContent).toBe("Continuar");
     expect(off.textContent).toContain("Planner 2027 pra imprimir");
     localStorage.clear(); sessionStorage.clear();
-    const on = await pronto("/organizar?u27planner=on&planner27=on", "c-pronto-on");
+    const on = await pronto("/organizar?u27planner=on&planner27=on&u27pagina=off", "c-pronto-on");
     expect(on.textContent).toContain("Seu planner 2027, com os seus dados");
     const a = on.querySelector<HTMLButtonElement>("#u27-planejar")!;
     expect(a.textContent).toBe("Planejar meu 2027 · 5 min");

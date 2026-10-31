@@ -294,7 +294,7 @@ if (!V2) {
 }
 document.getElementById("lp-demo-abrir")?.addEventListener("click", () => {
   evento("landing_cta", { onde: "testar_app" });
-  if (V2) abrirCheia(moduloAtual, "botao"); else iniciarDemo("botao");
+  if (V2) abrirCheia("financas", "botao"); else iniciarDemo("botao"); // o botão diz "Testar Finanças": abre Finanças mesmo depois de uma pílula
 });
 
 /*
@@ -407,7 +407,7 @@ function abrirCheia(m: ModuloLanding, origem: "botao" | "pilula" | "cartao" | "r
   }
   yDaPagina = y ?? Math.round(window.scrollY || window.pageYOffset || 0);
   // a rolagem é nossa enquanto a camada existe (o navegador restaurando o y da entrada de baixo brigava com o "levar ao cartão")
-  try { if (restauracaoAntes === null) restauracaoAntes = history.scrollRestoration; history.scrollRestoration = "manual"; } catch { /* noop */ }
+  try { if (restauracaoAntes === null) restauracaoAntes = origem === "avancar" ? "auto" : history.scrollRestoration; history.scrollRestoration = "manual"; } /* "avancar": a entrada marcada já vem em "manual" — devolver "auto" pra recarga voltar no mesmo y */ catch { /* noop */ }
   // r2 (técnico MÉDIA): no "avançar" do navegador a entrada com a marca JÁ existe (é ela que voltou) — empilhar outra duplicava o
   // histórico (a seta voltava pra uma entrada ainda marcada: recarregar reabria a demo sozinha e sair pedia 2 "voltar"). Lá só
   // atualiza o y na própria entrada. Na recarga a entrada também já existe.
@@ -509,7 +509,7 @@ cheiaComprar?.addEventListener("click", () => {
   evento("landing_cta", { onde: "demo_tela_cheia", fase: estado.fase });
   pedirFechar("comprar", () => rolarAte($("oferta"), "start", false));
 });
-document.getElementById("lp2-demo-cartao")?.addEventListener("click", () => { evento("landing_cta", { onde: "testar_app_cartao" }); abrirCheia(moduloAtual, "cartao"); });
+document.getElementById("lp2-demo-cartao")?.addEventListener("click", () => { evento("landing_cta", { onde: "testar_app_cartao" }); abrirCheia("financas", "cartao"); });
 
 /* ───────────────────────── 1. topo: a área ───────────────────────── */
 document.querySelectorAll<HTMLButtonElement>(".lp-area").forEach((b) => {

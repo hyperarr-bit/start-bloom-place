@@ -38,6 +38,25 @@ interface State {
 // morta que um F5 resolveria.
 const isChunkError = (error: Error | null) => !!error && ehErroDeChunk(`${error.name} ${error.message}`);
 
+// 31/10 (crítica r2 da demo em tela cheia da landing): recarregar a /organizar com a demo carregando faz o documento do iframe,
+// que já está morrendo, lançar "Importing a module script failed" — virava route_error {chunk: true} falso e passava pelo
+// recarregarPorChunkNovo. Depois do pagehide/beforeunload, erro da demo da landing é do descarte, não da pessoa: sai calado.
+// Só nas rotas landing-demo* (o resto do app segue igual); o pageshow (volta do bfcache) desfaz.
+let paginaSaindo = false;
+if (typeof window !== "undefined") {
+  // a própria janela e, dentro do iframe da landing, a página de cima (mesma origem): a recarga começa LÁ
+  const janelas: Window[] = [window];
+  try { if (window.parent && window.parent !== window && window.parent.location.origin === window.location.origin) janelas.push(window.parent); } catch { /* outra origem */ }
+  for (const w of janelas) {
+    try {
+      w.addEventListener("pagehide", () => { paginaSaindo = true; });
+      w.addEventListener("beforeunload", () => { paginaSaindo = true; });
+      w.addEventListener("pageshow", () => { paginaSaindo = false; });
+    } catch { /* noop */ }
+  }
+}
+const erroDoDescarte = (routeName?: string) => paginaSaindo && !!routeName && routeName.startsWith("landing-demo");
+
 /**
  * ErrorBoundary por rota: contém crashes em uma única página
  * para que o app inteiro não fique em tela branca.
@@ -53,6 +72,7 @@ export class RouteErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
+    if (erroDoDescarte(this.props.routeName)) return;
     // eslint-disable-next-line no-console
     console.error(`[RouteErrorBoundary:${this.props.routeName ?? "?"}]`, error, info);
 

@@ -299,7 +299,7 @@ document.getElementById("lp-demo-abrir")?.addEventListener("click", () => {
 
 /*
  * ───────── v2 · A DEMO EM TELA CHEIA (30/10 noite, dono no iPhone: "a proporção do app ficou estranha") ─────────
- * Na página fica um cartão (celular em proporção real + "Testar o app aqui" + pílulas). O toque abre o app de verdade POR CIMA da
+ * Na página fica um cartão (celular em proporção real + "Testar Finanças aqui" + pílulas Rotina/Treino). O toque abre o app de verdade POR CIMA da
  * página: o próprio .lp-celular vira uma camada fixa de 100dvh (o iframe nunca muda de lugar no DOM — mover um iframe o recarrega),
  * com "← Voltar" + o módulo em cima e "R$ 27,90 · Vitalício · Pix | Quero organizar minha vida" embaixo.
  *   · abrir = history.pushState (mesma URL) + trava a página por baixo (body fixed em −y: sem pulo no WebKit, sem rolar por trás);
@@ -312,9 +312,12 @@ document.getElementById("lp-demo-abrir")?.addEventListener("click", () => {
  *          landing_demo_fechada {ms, via: seta|voltar|comprar|seta_app|oferta_app|fase, modulo} · landing_cta {onde: "demo_tela_cheia", fase}
  */
 const MARCA_CHEIA = "lpDemoCheia";
-/** r1 (persona 1): o print real do módulo que vai abrir, na tela cheia, até a demo pintar (Finanças e Rotina = os do "Por dentro",
- *  já no cache: algo do app na tela no mesmo quadro do toque; Treino = o print do braço atual, baixa no toque; Dieta/Saúde = branco). */
-const PRINT_V2: Partial<Record<ModuloLanding, string>> = { financas: "/landing/v3-financas.webp", rotina: "/landing/v3-rotina.webp", treino: "/landing/demo-treino.webp" };
+/** r2 (persona MÉDIA 1): enquanto a demo carrega, a tela cheia mostra SÓ o que não muda — o cabeçalho do módulo (nome + abas),
+ *  recortado da própria demo &lp=v2 (sem a seta ←, sem o mês) — e esqueletos cinza no lugar dos cards. O print inteiro de antes
+ *  (v3-financas) era de outro dia: saldo, despesas, "17 dias" e a ordem dos cards trocavam na frente da pessoa.
+ *  ~10 KB cada; baixam quando o cartão da demo chega perto da tela (nunca o iframe). Módulo sem recorte = só os esqueletos. */
+const CABECALHO_V2: Partial<Record<ModuloLanding, string>> = { financas: "/landing/v3-cheia-financas.webp", rotina: "/landing/v3-cheia-rotina.webp", treino: "/landing/v3-cheia-treino.webp" };
+const cabecalhoImg = document.querySelector<HTMLImageElement>("#lp-celular .lp2-cheia-cab");
 const pilulas = document.querySelector<HTMLElement>("#demo .lp-pilulas");
 if (V2) {
   // r1 (técnico 4): no v2 as pílulas abrem a tela cheia (não são abas): grupo de botões, sem "escolhida"
@@ -322,11 +325,19 @@ if (V2) {
   pilulas?.querySelectorAll(".lp-pilula").forEach((b) => b.removeAttribute("aria-pressed"));
   // r1 (técnico 1): fechada, a camada (e o iframe vivo dentro dela) fica fora do teclado e do leitor de tela
   celular.setAttribute("inert", "");
-  // r1 (persona 6): o apelido da avaliação é texto da página ("camvbs · "), vindo do data-nome; vazio = some
+  // r1 (persona 6): o apelido da avaliação é texto da página ("camvbs ·"), vindo do data-nome; vazio = some.
+  // r2 (persona BAIXA 3): sem o espaço do fim — o gap do figcaption já separa (antes: espaço duplo entre "·" e a loja)
   document.querySelectorAll<HTMLElement>("#avaliacoes-v2 .lp2-aval-nome").forEach((el) => {
     const n = (el.getAttribute("data-nome") ?? "").trim();
-    el.textContent = n ? `${n} · ` : "";
+    el.textContent = n ? `${n} ·` : "";
   });
+  // r2: os recortes do cabeçalho baixam quando o cartão da demo chega perto (≤ 800 px) — no toque já estão no cache
+  const cartaoDemo = document.getElementById("lp2-demo-cartao");
+  const baixarCabecalhos = () => { for (const u of Object.values(CABECALHO_V2)) { try { const i = new Image(); i.decoding = "async"; i.src = u!; } catch { /* noop */ } } };
+  if (cartaoDemo && "IntersectionObserver" in window) {
+    const perto = new IntersectionObserver((ens) => { if (ens.some((e) => e.isIntersecting)) { perto.disconnect(); baixarCabecalhos(); } }, { rootMargin: "800px 0px" });
+    perto.observe(cartaoDemo);
+  }
 }
 /** a altura das 2 barras da tela cheia (safe-area e fonte do sistema mudam): o print encosta embaixo da de cima, o "Abrindo…" acima da de baixo */
 const medirBarras = () => {
@@ -337,14 +348,26 @@ const medirBarras = () => {
 };
 if (V2) window.addEventListener("resize", () => { if (cheiaAberta) medirBarras(); }, { passive: true });
 function mostrarPrint(m: ModuloLanding) {
-  if (demoPronta) return;
-  const p = PRINT_V2[m];
-  if (!p) { celular.removeAttribute("data-tem-print"); img.removeAttribute("src"); return; }
-  if (img.getAttribute("src") !== p) img.src = p;
-  img.alt = `O módulo ${NOME_DO_MODULO[m]} do CORE com dados de exemplo`;
-  img.removeAttribute("width"); img.removeAttribute("height");
+  if (demoPronta || !cabecalhoImg) return;
+  const p = CABECALHO_V2[m];
+  if (!p) { celular.removeAttribute("data-tem-print"); cabecalhoImg.removeAttribute("src"); return; }
+  if (cabecalhoImg.getAttribute("src") !== p) cabecalhoImg.src = p;
   celular.setAttribute("data-tem-print", "");
 }
+/* r2 (técnico BAIXA 1): aberta, a camada é a ÚNICA coisa da página no teclado — no WebKit o aria-modal não segura o Tab e o foco
+ * ia pros <summary> das dúvidas por baixo. Os irmãos de cada ancestral da camada (até o body) ganham inert; ao fechar, só os que
+ * NÓS marcamos perdem (quem já era inert continua). */
+let inertesDaCheia: Element[] = [];
+function isolarCamada() {
+  soltarCamada();
+  for (let el: Element | null = celular; el && el !== document.body && el.parentElement; el = el.parentElement) {
+    for (const irmao of Array.from(el.parentElement.children)) {
+      if (irmao === el || irmao.hasAttribute("inert") || irmao.tagName === "SCRIPT" || irmao.tagName === "STYLE") continue;
+      irmao.setAttribute("inert", ""); inertesDaCheia.push(irmao);
+    }
+  }
+}
+function soltarCamada() { for (const el of inertesDaCheia) el.removeAttribute("inert"); inertesDaCheia = []; }
 type EstadoHist = { [MARCA_CHEIA]?: 1; y?: number; m?: string } & Record<string, unknown>;
 const estadoHist = (): EstadoHist | null => { try { const e = history.state; return e && typeof e === "object" ? (e as EstadoHist) : null; } catch { return null; } };
 let cheiaAberta = false;
@@ -385,9 +408,15 @@ function abrirCheia(m: ModuloLanding, origem: "botao" | "pilula" | "cartao" | "r
   yDaPagina = y ?? Math.round(window.scrollY || window.pageYOffset || 0);
   // a rolagem é nossa enquanto a camada existe (o navegador restaurando o y da entrada de baixo brigava com o "levar ao cartão")
   try { if (restauracaoAntes === null) restauracaoAntes = history.scrollRestoration; history.scrollRestoration = "manual"; } catch { /* noop */ }
-  if (origem !== "recarga") { try { history.pushState({ ...(estadoHist() ?? {}), [MARCA_CHEIA]: 1, y: yDaPagina, m }, ""); } catch { /* sem histórico: fecha só pelos botões */ } }
+  // r2 (técnico MÉDIA): no "avançar" do navegador a entrada com a marca JÁ existe (é ela que voltou) — empilhar outra duplicava o
+  // histórico (a seta voltava pra uma entrada ainda marcada: recarregar reabria a demo sozinha e sair pedia 2 "voltar"). Lá só
+  // atualiza o y na própria entrada. Na recarga a entrada também já existe.
+  const novoEstado = { ...(estadoHist() ?? {}), [MARCA_CHEIA]: 1, y: yDaPagina, m };
+  if (origem === "avancar") { try { history.replaceState(novoEstado, ""); } catch { /* noop */ } }
+  else if (origem !== "recarga") { try { history.pushState(novoEstado, ""); } catch { /* sem histórico: fecha só pelos botões */ } }
   travarPagina(yDaPagina);
   celular.removeAttribute("inert");
+  isolarCamada();
   document.documentElement.setAttribute("data-demo-cheia", "");
   medirBarras();
   celular.setAttribute("role", "dialog"); celular.setAttribute("aria-modal", "true"); celular.setAttribute("aria-label", "Demonstração do CORE");
@@ -409,6 +438,7 @@ function fecharCheia(via: string) {
   // r1 (técnico 1): o foco não fica no iframe escondido (no WebKit o toque não foca o botão: quemAbriu era o body)
   const focoDentro = !!document.activeElement && document.activeElement !== document.body && celular.contains(document.activeElement);
   celular.setAttribute("inert", "");
+  soltarCamada();
   soltarPagina(yDaPagina);
   evento("landing_demo_fechada", { ms: agora() - cheiaDesde, via, modulo: moduloAtual });
   const depois = depoisDeFechar; depoisDeFechar = null;

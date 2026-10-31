@@ -333,8 +333,8 @@ describe("braço v2 · cartão, avaliações, como funciona, dúvidas, demo, fim
     for (const l of linhas) { expect(deHoje).toContain(l.texto); expect(l.estrelas).toBe("★★★★★"); expect(l.rotulo).toBe("5 de 5 estrelas"); }
     // r1 (persona 6): o apelido é TEXTO da página, já no HTML (sem JS também aparece)
     expect(linhas.map((l) => [l.nome, l.legenda])).toEqual([
-      ["camvbs", "camvbs · App Store · out/2026"],
-      ["ywonvu", "ywonvu · App Store · set/2026"],
+      ["camvbs", "camvbs ·App Store · out/2026"],
+      ["ywonvu", "ywonvu ·App Store · set/2026"],
       ["", "Google Play · set/2026"],
       ["", "Google Play · ago/2026"],
     ]);
@@ -379,8 +379,10 @@ describe("braço v2 · cartão, avaliações, como funciona, dúvidas, demo, fim
     const botao = d.querySelector("#lp-demo-abrir")!;
     expect(botao.getAttribute("data-so-lp")).toBe("v2");
     expect(botao.closest("#lp-celular")).toBeNull(); // fora da camada (na página)
-    expect(txt(botao)).toBe("Testar o app aqui");
-    expect([...d.querySelectorAll("#demo .lp-pilula[data-m]")].map((b) => b.getAttribute("data-m"))).toEqual(["financas", "rotina", "treino", "dieta", "saude"]);
+    expect(txt(botao)).toBe("Testar Finanças aqui"); // r2 (persona 5): o cartão é a Home e o toque abre Finanças — o botão diz onde abre
+    expect([...d.querySelectorAll("#demo .lp-pilula[data-m]")].map((b) => b.getAttribute("data-m"))).toEqual(["financas", "rotina", "treino", "dieta", "saude"]); // o HTML é do atual também
+    // r2 (persona 4/5): no v2 ficam só Rotina e Treino (Finanças = o botão; Dieta cortada e Saúde fora da tela, sem recorte do cabeçalho)
+    expect(HTML).toContain('html[data-lp="v2"] .lp-pilula[data-m="financas"], html[data-lp="v2"] .lp-pilula[data-m="dieta"], html[data-lp="v2"] .lp-pilula[data-m="saude"] { display: none; }');
     expect(d.querySelector("#lp-demo-frame")!.getAttribute("src")).toBeNull();
     // a camada: o próprio .lp-celular (o iframe nunca muda de lugar no DOM — mover recarrega)
     expect(HTML).toContain('html[data-lp="v2"] .lp-celular { position: fixed; z-index: 200; top: 0; left: 0; right: 0; width: 100%; height: 100vh; height: 100dvh;');
@@ -434,7 +436,14 @@ describe("braço v2 · cartão, avaliações, como funciona, dúvidas, demo, fim
     const demoScript = d.querySelector("#lp-celular script")!;
     expect(demoScript.getAttribute("data-so-lp")).toBe("v2");
     expect(demoScript.textContent).toContain('document.getElementById("lp-demo-img").removeAttribute("src")'); // r1 da tela cheia (31/10): no v2 o print do módulo entra só no toque (o da camada)
-    expect(HTML).toContain('html[data-lp="v2"] .lp-celular img { display: none; }'); // 30/10 noite: na tela cheia sem o print esticado (fundo branco + "Abrindo o app…")
+    expect(HTML).toContain('html[data-lp="v2"] .lp-celular img#lp-demo-img { display: none; }'); // na tela cheia nunca o print do atual (esticado)
+    // r2 da tela cheia (persona MÉDIA 1): o carregamento é o cabeçalho recortado + esqueletos — dentro de [data-so-lp=v2], sem src no HTML
+    const esq = d.querySelector("#lp-celular .lp2-cheia-esq")!;
+    expect(esq.getAttribute("data-so-lp")).toBe("v2");
+    expect(esq.getAttribute("aria-hidden")).toBe("true");
+    expect(esq.querySelector("img.lp2-cheia-cab")!.hasAttribute("src")).toBe(false);
+    expect(esq.querySelectorAll(".lp2-cheia-cards i")).toHaveLength(6);
+    for (const m of ["financas", "rotina", "treino"]) expect(existsSync(resolve(raiz, `public/landing/v3-cheia-${m}.webp`))).toBe(true);
     expect(d.querySelector("#lp-demo-img")!.getAttribute("src")).toBe("/landing/demo-financas.webp");
     expect(d.querySelector('img[src*="/landing/v2-"]')).toBeNull();
   });
@@ -768,8 +777,9 @@ describe("crítica r1 · 4.1: o QR não pode sair da tela quando aparece (v2)", 
 describe("crítica r1 · 7.1 / 8.1 / 8.2: rede e medição", () => {
   it("7.1 / r2 2.3 / r1 do v3: toda imagem do v2 é data-src no HTML (fora do v2 fica display:none e não baixa); só a da 1ª tela ganha src + high em tempo de parse no v2, com preload no <head> só no v2; o atual não injeta preload nenhum", () => {
     const d = document.createElement("div"); d.innerHTML = corpoDe(HTML);
-    const imgs = [...d.querySelectorAll('[data-so-lp="v2"] img')];
+    const imgs = [...d.querySelectorAll('[data-so-lp="v2"] img:not(.lp2-cheia-cab)')];
     expect(imgs.length).toBe(7);
+    expect(d.querySelector(".lp2-cheia-cab")!.hasAttribute("src")).toBe(false); // r2 da tela cheia: o cabeçalho recortado ganha src pelo landing.ts (perto do cartão / no toque)
     for (const i of imgs) { expect(i.hasAttribute("src")).toBe(false); expect(i.getAttribute("data-src")).toMatch(/^\/landing\/v3-/); expect(i.getAttribute("fetchpriority")).not.toBe("high"); }
     // r1 do v3: o preload da imagem da 1ª tela SÓ no v2 (o <img> vira eager no parse, então é consumido); no atual, nenhum
     expect(HTML).not.toMatch(/rel="preload" as="image"/);
@@ -1450,25 +1460,30 @@ describe("v2 · a demo em tela cheia (voltar do celular, seta, comprar, recarga)
   });
 
   /* ── r1 da tela cheia (31/10) ── */
-  it("r1 · ao abrir, o PRINT do módulo que vai abrir aparece na hora (Finanças/Rotina = os do 'Por dentro'; Dieta = sem print, o branco), abaixo da barra de cima e na largura toda; some quando a demo pinta", async () => {
+  it("r2 · ao abrir, SÓ o que não muda: o cabeçalho do módulo recortado da própria demo (Finanças/Rotina/Treino; Dieta = só os esqueletos) + esqueletos no lugar dos cards; nada de print com número de outro dia", async () => {
     await abrirPagina("v2");
     const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
     const cel = document.getElementById("lp-celular")!;
-    const img = document.getElementById("lp-demo-img") as HTMLImageElement;
+    const cab = document.querySelector("#lp-celular .lp2-cheia-cab") as HTMLImageElement;
+    const doAtual = document.getElementById("lp-demo-img") as HTMLImageElement;
     expect(cel.hasAttribute("data-tem-print")).toBe(false);
     clicar("#lp-demo-abrir");
     expect(cel.hasAttribute("data-tem-print")).toBe(true);
-    expect(img.getAttribute("src")).toBe("/landing/v3-financas.webp"); // o mesmo URL do painel do "Por dentro": cache
-    expect(img.hasAttribute("width")).toBe(false); // a proporção é a do print (height auto), nunca a 360×640 do atual
-    expect(img.alt).toMatch(/Finanças/);
+    expect(cel.hasAttribute("data-abrindo")).toBe(true); // os esqueletos aparecem (CSS) até a demo pintar
+    expect(cab.getAttribute("src")).toBe("/landing/v3-cheia-financas.webp");
+    expect(doAtual.getAttribute("src") ?? "").not.toMatch(/v3-/); // o print inteiro (v3-financas, outro dia) não entra mais na camada
     clicar("#lp2-cheia-voltar"); await voltou();
     clicar('.lp-pilula[data-m="rotina"]');
-    expect(img.getAttribute("src")).toBe("/landing/v3-rotina.webp");
+    expect(cab.getAttribute("src")).toBe("/landing/v3-cheia-rotina.webp");
     clicar("#lp2-cheia-voltar"); await voltou();
-    clicar('.lp-pilula[data-m="dieta"]');
+    clicar('.lp-pilula[data-m="treino"]');
+    expect(cab.getAttribute("src")).toBe("/landing/v3-cheia-treino.webp");
+    clicar("#lp2-cheia-voltar"); await voltou();
+    clicar('.lp-pilula[data-m="dieta"]'); // escondida no v2, mas o caminho existe (recarga/avançar com m=dieta)
     expect(cel.hasAttribute("data-tem-print")).toBe(false);
     clicar("#lp2-cheia-voltar"); await voltou();
-    expect(HTML).toContain('html[data-lp="v2"] .lp-celular[data-tem-print] img { display: block; top: var(--lp2-topo-h, 48px); bottom: auto; inset-inline: 0; height: auto; object-fit: fill; }');
+    expect(HTML).toContain('html[data-lp="v2"] .lp-celular[data-abrindo] .lp2-cheia-esq { display: block; position: absolute; z-index: 1; top: var(--lp2-topo-h, 48px);');
+    expect(HTML).toContain('html[data-lp="v2"] .lp-celular[data-pronta] .lp2-cheia-esq { opacity: 0; pointer-events: none; }');
     expect(HTML).toContain('html[data-lp="v2"] .lp2-cheia-topo, html[data-lp="v2"] .lp2-cheia-baixo { position: relative; z-index: 3; }');
     expect(HTML).toContain('html[data-lp="v2"] .lp-celular { overscroll-behavior: contain; }');
     scrollTo.mockRestore();
@@ -1518,7 +1533,8 @@ describe("v2 · a demo em tela cheia (voltar do celular, seta, comprar, recarga)
       spans[2].setAttribute("data-nome", "Mariana S."); // o dono preencheu o 1º do Google Play
     });
     const legendas = [...document.querySelectorAll("#avaliacoes-v2 figcaption")].map((f) => f.textContent);
-    expect(legendas).toEqual(["camvbs · App Store · out/2026", "ywonvu · App Store · set/2026", "Mariana S. · Google Play · set/2026", "Google Play · ago/2026"]);
+    expect(legendas).toEqual(["camvbs ·App Store · out/2026", "ywonvu ·App Store · set/2026", "Mariana S. ·Google Play · set/2026", "Google Play · ago/2026"]); // r2 (persona 3): sem espaço no fim do apelido — o gap do figcaption separa (era espaço duplo)
+    expect(document.querySelector("#avaliacoes-v2 .lp2-aval-nome")!.textContent).toBe("camvbs ·");
   });
 
   it("r1 · a demo aberta pelo v2 esconde a seta ← do cabeçalho do módulo (a barra '← Voltar' da página é a única saída) e contém o overscroll; o atual não muda", () => {
@@ -1536,6 +1552,64 @@ describe("v2 · a demo em tela cheia (voltar do celular, seta, comprar, recarga)
       expect(primeiro, m).toMatch(/^<(button|Button)\b/);
       expect(depois.slice(div, div + 900), m).toMatch(/voltarDoModulo/);
     }
+  });
+
+  /* ── r2 da tela cheia (31/10) ── */
+  it("r2 · o 'avançar' do navegador reabre SEM empilhar outra entrada: abrir → voltar → avançar → '← Voltar' deixa o histórico do tamanho de antes da reabertura e sem a marca (recarregar não reabre)", async () => {
+    await abrirPagina("v2");
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    history.pushState(null, "", "/organizar"); // a entrada da página
+    const tamanho = history.length;
+    clicar("#lp-demo-abrir");
+    expect(history.length).toBe(tamanho + 1);
+    history.back(); await voltou();
+    history.forward();
+    await vi.waitFor(() => { if (!aberta()) throw new Error("ainda fechada"); }, { timeout: 2000, interval: 10 });
+    expect(abertas().at(-1)).toMatchObject({ origem: "avancar" });
+    expect(history.length).toBe(tamanho + 1); // antes: tamanho + 2 (pushState em cima da entrada que já tinha a marca)
+    expect(history.state).toMatchObject({ lpDemoCheia: 1, m: "financas" });
+    clicar("#lp2-cheia-voltar"); await voltou();
+    await vi.waitFor(() => { if (history.state?.lpDemoCheia) throw new Error("ainda marcada"); }, { timeout: 2000, interval: 10 });
+    expect(history.length).toBe(tamanho + 1);
+    expect(fechadas().map((e) => e.via)).toEqual(["voltar", "seta"]);
+    scrollTo.mockRestore();
+  });
+
+  it("r2 · aberta, a camada é a única coisa no teclado: os irmãos de cada ancestral (o resto do #demo, as outras seções, a barra fixa) ganham inert; ao fechar, só os que a camada marcou perdem", async () => {
+    await abrirPagina("v2");
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    const jaInerte = document.getElementById("como-v2")!; jaInerte.setAttribute("inert", ""); // inert de outra origem: fica
+    clicar("#lp-demo-abrir");
+    for (const id of ["lp2-demo-cartao", "lp-demo-abrir", "oferta", "duvidas-v2", "avaliacoes-v2", "lp-fixo"]) expect(document.getElementById(id)!.hasAttribute("inert"), id).toBe(true);
+    expect(document.querySelector("#demo .lp-pilulas")!.hasAttribute("inert")).toBe(true);
+    expect(document.getElementById("lp-celular")!.hasAttribute("inert")).toBe(false);
+    expect(document.getElementById("demo")!.hasAttribute("inert")).toBe(false);
+    expect(document.getElementById("lp")!.hasAttribute("inert")).toBe(false);
+    clicar("#lp2-cheia-voltar"); await voltou();
+    for (const id of ["lp2-demo-cartao", "lp-demo-abrir", "oferta", "duvidas-v2", "avaliacoes-v2", "lp-fixo"]) expect(document.getElementById(id)!.hasAttribute("inert"), id).toBe(false);
+    expect(jaInerte.hasAttribute("inert")).toBe(true);
+    expect(document.getElementById("lp-celular")!.hasAttribute("inert")).toBe(true);
+    // a barra de baixo (comprar) solta a página ANTES de rolar até o cartão
+    clicar("#lp-demo-abrir");
+    clicar("#lp2-cheia-comprar"); await voltou();
+    expect(document.getElementById("oferta")!.hasAttribute("inert")).toBe(false);
+    scrollTo.mockRestore();
+  });
+
+  it("r2 · o cabeçalho recortado baixa quando o cartão da demo chega perto (nunca o iframe); antes disso, nada", async () => {
+    const pedidos: string[] = [];
+    const ImagemReal = window.Image;
+    class ImagemEspia { decoding = ""; set src(u: string) { pedidos.push(u); } }
+    (window as unknown as { Image: unknown }).Image = ImagemEspia;
+    try {
+      await abrirPagina("v2");
+      expect(pedidos).toEqual([]);
+      const io = IOFake.inst.find((o) => o.alvos.some((a) => a.id === "lp2-demo-cartao"))!;
+      expect(io.opts.rootMargin).toBe("800px 0px");
+      dispara((o) => o === io, [{ isIntersecting: true, target: document.getElementById("lp2-demo-cartao")! } as unknown as Entrada]);
+      expect(pedidos).toEqual(["/landing/v3-cheia-financas.webp", "/landing/v3-cheia-rotina.webp", "/landing/v3-cheia-treino.webp"]);
+      expect(frame().getAttribute("src")).toBeNull();
+    } finally { (window as unknown as { Image: unknown }).Image = ImagemReal; }
   });
 
   it("braço atual: nada disso existe — a pílula troca o módulo da caixa de hoje, sem camada, sem histórico; o iframe pede a URL de sempre", async () => {
@@ -1574,6 +1648,10 @@ describe("o número da demo da landing v2 (lib/preview-seeds-financas-landing)",
         if (freela && dia > 1) expect(freela.value % 50).toBe(0);
         // crédito só até o dia 20 (o fechamento do Nubank): depois iria pra fatura do mês seguinte
         for (const e of s["finance-expenses"]) if (e.paymentMethod === "credito") expect(Number(e.date.slice(8))).toBeLessThanOrEqual(20);
+        // r2 da tela cheia (persona 7): nada de "Uber −R$ 6" — cada lançamento ≥ 60% do mês normal (o menor do mês normal é R$ 28 → ≥ R$ 17),
+        // e do dia 3 em diante pelo menos 2 lançamentos (sai lançamento pequeno em vez de encolher todos)
+        for (const e of s["finance-expenses"]) expect(e.value, `${e.description} ${dia}/${mes + 1}`).toBeGreaterThanOrEqual(17);
+        if (dia >= 3) expect(s["finance-expenses"].length, `${dia}/${mes + 1}`).toBeGreaterThanOrEqual(2);
       }
     }
   });

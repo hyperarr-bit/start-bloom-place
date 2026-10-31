@@ -3,16 +3,18 @@
  *
  * Por que existe (lp-web/ticket/RELATORIO.md): o "Seu 2027" teve 52 pessoas vendo → 20 "Quero" → 3 pagas. Quem matou a
  * venda foi o 2º Pix gerado do zero (15% pagos contra ~50% do Pix principal) e o código que morria em 30 min. Aqui:
- *   · os Pix de upsell (`u2027`, `pv149`) valem 24 h (`expiraSegundos`); o resto continua em 30 min (o vitalício, os
- *     LN_*, o w27 — nada muda pra eles);
+ *   · os Pix de upsell DOS CAMINHOS NOVOS (este `garantirPixUpsell`: a /organizar, o e-mail de compra e o dia 3) valem
+ *     24 h (`expiraSegundos`). O create antigo do asaas-pix (o /hoje e o /inicio, no ar) segue em 30 min pra TODA oferta,
+ *     inclusive u2027/pv149 (crítica r1: o PixHoje mostrava "vale por 1439:59") — o vitalício, os LN_*, o w27 não mudam;
  *   · UM Pix por chave (`garantirPixUpsell`): a página (pré-aquecido ao mostrar a oferta) e o e-mail de compra
  *     confirmada recebem O MESMO código — `u2027:<pedido do vitalício>`. A chave é reservada ANTES de criar o QR
  *     (corrida página × e-mail = 1 QR só) e o registro `pix_order_created` sai com `user_id = dono` (a conta FINAL),
  *     que é o elo que o check, o webhook e o reconcile usam pra creditar o pacote;
- *   · nenhum Pix de upsell manda Purchase pra Meta (`META_PURCHASE_UPSELL = false`, decisão do dono pela recomendação
- *     do relatório): o Purchase do vitalício continua 1 por comprador e a leitura "Meta = banco" não infla. Só a UTMify
- *     recebe (pra receita aparecer no painel). Voltar atrás = trocar pra `true` (o event_id seria o id do QR do
- *     upsell, diferente do do vitalício);
+ *   · nenhum Pix de upsell manda Purchase pra Meta (`META_PURCHASE_UPSELL = false`, RECOMENDAÇÃO do relatório — ainda
+ *     NÃO confirmada pelo dono, que só respondeu "Faz" à ordem 2027 → presente; a pergunta está no BUILD.md): o Purchase do
+ *     vitalício continua 1 por comprador e a leitura "Meta = banco" não infla. Só a UTMify recebe (pra receita aparecer
+ *     no painel), nos 3 caminhos (o reconcile também, desde a crítica r1). Voltar atrás = trocar pra `true` (o event_id
+ *     seria o id do QR do upsell, diferente do do vitalício). Vale também pro /hoje e o /inicio (no ar);
  *   · o bloco do 2027 no e-mail de compra confirmada (`blocoU2027`, secret `UPSELL_2027_EMAIL=on`) e o e-mail curto
  *     "Pronto, seu 2027 tá no seu CORE" (1 por pedido).
  *
@@ -39,9 +41,22 @@ export const expiraSegundos = (oferta: string | null | undefined): number => (eh
 /** Pix guardado com menos que isso de validade não é reaproveitado (a pessoa precisa de tempo pra pagar). */
 export const REUSO_MIN_MS = 2 * 3600e3;
 
+/**
+ * O pix-reconcile consulta este pedido de upsell AGORA? (crítica r1: o Pix pré-aquecido nasce pra todo comprador que VÊ a
+ * oferta e vale 24 h — consultar cada um a cada 15 min por 48 h eram 192 consultas na Asaas por pedido, na cota do
+ * checkout do vitalício). Nas 2 primeiras horas, sempre (a hora em que quem quis paga); depois, 1 vez por hora (a
+ * passada cujo bloco de 15 min é múltiplo de 4). Pedido sem `upsell_chave` (o /hoje, o /inicio): sempre, como antes.
+ */
+export function consultarUpsellAgora(criadoEm: string, temChave: boolean, agora: number = Date.now()): boolean {
+  if (!temChave) return true;
+  const t = Date.parse(criadoEm);
+  if (!Number.isFinite(t) || agora - t <= 2 * 3600e3) return true;
+  return Math.floor(agora / 900e3) % 4 === 0;
+}
+
 /* ───────────────────────── pixel ───────────────────────── */
 
-/** DECISÃO DO DONO (31/10, recomendação do relatório): o upsell NÃO manda Purchase pra Meta. */
+/** RECOMENDAÇÃO (31/10, relatório do upsell): o upsell NÃO manda Purchase pra Meta. CONFIRMAR COM O DONO antes do deploy. */
 export const META_PURCHASE_UPSELL = false;
 /** Esta oferta manda Purchase pra Meta quando é confirmada? (o vitalício e os planos sempre; os upsells, pela chave) */
 export const mandaPurchaseMeta = (oferta: string | null | undefined): boolean => !ehPixUpsell(oferta) || META_PURCHASE_UPSELL;
@@ -183,6 +198,48 @@ export async function compraDoUpsell(admin: ClienteMin, compra: string): Promise
 /** A sessão pode pedir o 2027 desta compra? (é a dona da linha, ou a anônima que pagou e teve a compra levada) */
 export const sessaoPodePedir = (c: Extract<CompraDoUpsell, { ok: true }>, sessao: string): boolean => c.dono === sessao || c.pagador === sessao;
 
+/**
+ * A conta que recebe o 2027 NA HORA DO PAGAMENTO (crítica r1): o QR guarda o dono do momento em que foi criado, mas a
+ * linha do vitalício pode ter ido pra outra conta depois (pix-vincular / e-mail de destino). Pedido com `compra` (os
+ * caminhos novos) → a dona ATUAL da linha viva; sem `compra` (o /hoje, o /inicio) ou sem linha → quem está no registro.
+ */
+export async function donoNaHora(admin: ClienteMin, a: { registrado: string; compra?: unknown }): Promise<string> {
+  if (typeof a.compra !== "string" || !a.compra) return a.registrado;
+  try {
+    const c = await compraDoUpsell(admin, a.compra);
+    return c.ok ? c.dono : a.registrado;
+  } catch { return a.registrado; }
+}
+
+/**
+ * O 2027 pago DE NOVO por quem já tinha (2 QRs vivos da mesma compra: o do e-mail e um refeito; raro). O pagamento não
+ * muda nada na conta — vira evento `u2027_pago_em_dobro` + chamado no /admin → Suporte (1x por pedido), pro suporte
+ * devolver pela Asaas. Só quando o pacote da conta veio de OUTRO pedido (o mesmo pedido confirmado por 2 caminhos não conta).
+ */
+export const chaveDobro2027 = (orderId: string): string => `u2027-dobro:${orderId}`;
+export async function registrarDobro2027(admin: ClienteMin, a: { userId: string; orderId: string; amountCents: number | null }): Promise<boolean> {
+  try {
+    const { data } = await admin.from("user_data").select("value").eq("user_id", a.userId).eq("key", "core-pacote-2027").maybeSingle();
+    const anterior = (data as { value?: { pedido?: unknown } } | null)?.value?.pedido;
+    if (typeof anterior !== "string" || !anterior || anterior === a.orderId) return false;
+    const { error } = await admin.from("webhook_events").insert({ id: chaveDobro2027(a.orderId), source: "upsell", event: "u2027_dobro" });
+    if (error) return false;
+    await admin.from("analytics_events").insert({
+      user_id: a.userId, event_name: "u2027_pago_em_dobro", event_data: { order_id: a.orderId, pedido_anterior: anterior, amount_cents: a.amountCents },
+    }).then(() => {}, () => {});
+    await admin.from("support_tickets").insert({
+      user_id: a.userId, source: "pix_em_dobro", status: "open",
+      message: [
+        `Seu 2027 pago em dobro · ${reais(a.amountCents ?? PRECO_U2027_CENTAVOS)}`,
+        "A conta já tinha o Seu 2027; este pagamento não mudou nada na conta. Devolver pela Asaas.",
+        `Pedido a devolver: ${a.orderId}`,
+        `Pedido que já valia: ${anterior}`,
+      ].join("\n"),
+    }).then(() => {}, () => {});
+    return true;
+  } catch { return false; }
+}
+
 /* ───────────────────────── B. o bloco no e-mail de compra confirmada ───────────────────────── */
 
 /** O secret do servidor: "on" liga o bloco do 2027 no e-mail de compra confirmada. Sem o secret, off. */
@@ -201,17 +258,40 @@ export function linkU2027(a: { compra: string; pix: Pick<PixUpsell, "orderId" | 
   return `${a.site ?? SITE}/organizar?${q.toString()}`;
 }
 
+/**
+ * A validade escrita a partir do `expiresAt` de verdade (o código pode ser reaproveitado com menos de 24 h — o reuso aceita
+ * a partir de 2 h): "Vale por 24 h." (23 h ou mais) ou "Vale até hoje, 18h." / "Vale até amanhã, 9h30." (Brasília).
+ */
+export function validadeNoEmail(expiresAt: string, agora: number = Date.now()): string {
+  const fim = Date.parse(expiresAt);
+  if (!Number.isFinite(fim) || fim - agora >= 23 * 3600e3) return "Vale por 24 h.";
+  const d = new Date(fim - 3 * 3600e3);
+  const hoje = new Date(agora - 3 * 3600e3);
+  const mesmoDia = d.getUTCFullYear() === hoje.getUTCFullYear() && d.getUTCMonth() === hoje.getUTCMonth() && d.getUTCDate() === hoje.getUTCDate();
+  const mm = d.getUTCMinutes();
+  return `Vale até ${mesmoDia ? "hoje" : "amanhã"}, ${d.getUTCHours()}h${mm ? String(mm).padStart(2, "0") : ""}.`;
+}
+
+/** Onde o pacote fica (crítica r1: o Android da loja ainda NÃO tem a aba — só o site e o iPhone 1.0.20+). */
+export const ONDE_U2027_HTML = "no módulo <b>Desenvolvimento Pessoal</b>, aba <b>Seu 2027</b>. Por enquanto, no site (coreaplicativo.com.br) e no app do iPhone";
+
 /** O HTML do bloco (puro). Curto: a pergunta, o preço, o código pra copiar, o botão e a validade. */
-export function htmlBlocoU2027(a: { compra: string; pix: Pick<PixUpsell, "orderId" | "qrCode" | "expiresAt">; site?: string }): string {
+export function htmlBlocoU2027(a: { compra: string; pix: Pick<PixUpsell, "orderId" | "qrCode" | "expiresAt">; site?: string; agora?: number }): string {
   const link = linkU2027(a);
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0 4px;background:#fff7fb;border:1px solid #f3d6e6;border-radius:14px;" data-bloco="u2027"><tr><td style="padding:16px 16px 14px;">
-      <div style="font-size:15px;font-weight:800;color:#16121c;margin:0 0 4px;">Quer o seu 2027 já organizado?</div>
-      <div style="font-size:13.5px;line-height:1.45;color:#5b5560;margin:0 0 10px;">3 metas, orçamento do ano, 12 revisões do mês e o cofrinho de 52 semanas. <b style="color:#16121c;">${reais(PRECO_U2027_CENTAVOS)}, uma vez</b>, sem mensalidade.</div>
+      <div style="font-size:15px;font-weight:800;color:#16121c;margin:0 0 4px;">Quer o seu 2027 organizado?</div>
+      <div style="font-size:13.5px;line-height:1.45;color:#5b5560;margin:0 0 10px;">3 metas, quanto gastar e guardar por mês, 12 revisões do mês e o cofrinho de 52 semanas. <b style="color:#16121c;">${reais(PRECO_U2027_CENTAVOS)}, uma vez</b>, sem mensalidade.</div>
       <div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:#8a838f;text-transform:uppercase;margin:0 0 6px;">Pix copia e cola</div>
       <div style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;line-height:1.4;color:#16121c;background:#fff;border:1px dashed #e2c3d4;border-radius:8px;padding:10px;word-break:break-all;-webkit-user-select:all;user-select:all;">${esc(a.pix.qrCode)}</div>
       <table role="presentation" cellpadding="0" cellspacing="0" style="margin:12px 0 0;"><tr><td><a href="${esc(link)}" style="display:inline-block;background:#d22d80;color:#fff;text-decoration:none;font-size:14px;font-weight:800;padding:11px 18px;border-radius:999px;">Abrir o Pix</a></td></tr></table>
-      <div style="font-size:12px;line-height:1.45;color:#8a838f;margin:10px 0 0;">Vale por 24 h. É separado do CORE que você já pagou.</div>
+      <div style="font-size:12px;line-height:1.45;color:#8a838f;margin:10px 0 0;">${validadeNoEmail(a.pix.expiresAt, a.agora)} Pagou? A gente avisa por e-mail quando cair. É separado do CORE que você já pagou.</div>
     </td></tr></table>`;
+}
+
+/** A marca "o bloco do 2027 desta compra foi montado num e-mail" (a página só diz "o código também foi pro seu e-mail" com ela). */
+export const chaveBlocoNoEmail = (compra: string): string => `u2027-email-bloco:${compra}`;
+export async function blocoFoiProEmail(admin: ClienteMin, compra: string): Promise<boolean> {
+  try { return (await lerLinha(admin, chaveBlocoNoEmail(compra))).existe; } catch { return false; }
 }
 
 /**
@@ -231,6 +311,9 @@ export async function blocoU2027(admin: ClienteMin, a: {
       extraPedido: { origem: "email_compra", compra: a.compra },
     });
     if ("erro" in pix) return "";
+    // a marca da página ("o código também foi pro seu e-mail"): gravada quando o bloco sai montado pro e-mail. Se o envio
+    // em si falhar, a marca fica (raro: o Resend fora) — aceito, ver BUILD.md (crítica r1, honestidade 5)
+    await admin.from("webhook_events").insert({ id: chaveBlocoNoEmail(a.compra), source: "upsell", event: "u2027_bloco" }).then(() => {}, () => {});
     return htmlBlocoU2027({ compra: a.compra, pix, site: a.site });
   } catch { return ""; }
 }
@@ -251,7 +334,7 @@ export function htmlPronto2027(a: { email: string }): string {
     <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 8px;">
       ${item("Planejar 2027 em 5 minutos")}${item("12 revisões do mês")}${item("Cofrinho das 52 semanas")}${item("Planner 2027 pra imprimir")}
     </table>
-    <p style="font-size:15px;line-height:1.5;margin:0 0 6px;color:#5b5560;">Onde fica: <b style="color:#16121c;">Dev. Pessoal → Seu 2027</b>, no app e no site.</p>
+    <p style="font-size:15px;line-height:1.5;margin:0 0 6px;color:#5b5560;">Onde fica: ${ONDE_U2027_HTML.replace(/<b>/g, '<b style="color:#16121c;">')}.</p>
     <p style="font-size:15px;line-height:1.5;margin:0 0 16px;color:#5b5560;">Entre com <b style="color:#16121c;">${e}</b>.</p>
     <table role="presentation" cellpadding="0" cellspacing="0"><tr>
       <td style="padding:0 8px 0 0;"><a href="https://apps.apple.com/br/app/id6806913181" style="display:inline-block;background:#16121c;color:#fff;text-decoration:none;font-size:13px;font-weight:700;padding:10px 14px;border-radius:10px;">&#63743; App Store</a></td>

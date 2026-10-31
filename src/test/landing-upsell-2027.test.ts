@@ -12,6 +12,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { estadoU2027QueVolta, upsell2027DoHtml, validadeU2027, voltaDoEmailU2027 } from "@/landing/regras";
 import { doCookie, paraCookie } from "@/landing/u2027-estado";
+import { LACO_U2027, criarUpsell2027, type ApiU2027 } from "@/landing/upsell-2027";
 
 const raiz = resolve(__dirname, "../..");
 const HTML = readFileSync(resolve(raiz, "landing.html"), "utf8");
@@ -86,6 +87,10 @@ describe("as regras puras", () => {
     const e = { v: 1 as const, compra: "c1", etapa: "qr" as const, pix: { orderId: "qr_u27", qrCode: "00020126580014br.gov.bcb.pix~x", qrCodeBase64: null, expiresAt: "2026-11-01T12:00:00.000Z", donoIgual: false }, salvoEm: 1 };
     expect(doCookie(paraCookie(e))).toMatchObject({ compra: "c1", etapa: "qr", pix: { orderId: "qr_u27", qrCode: e.pix.qrCode, expiresAt: e.pix.expiresAt, donoIgual: false } });
     expect(doCookie("c1~zzz~")).toBeNull();
+    // crítica r1: "Código copiado" atravessa a recarga do banco (cookie com "c" no campo do dono)
+    expect(paraCookie({ ...e, copiado: true })).toContain("~0c~");
+    expect(doCookie(paraCookie({ ...e, copiado: true }))).toMatchObject({ copiado: true, pix: { donoIgual: false } });
+    expect(doCookie(paraCookie(e))!.copiado).toBeUndefined();
   });
   it("a validade em palavras (24 h, nunca contagem regressiva de pressão)", () => {
     expect(validadeU2027(24 * 3600e3)).toBe("Vale por 24 horas.");
@@ -165,8 +170,15 @@ describe("chave LIGADA: oferta → Quero → QR → pago → Pronto → conta co
         await pagarVitalicio(checkout);
         const oferta = await espera('[data-testid="u2027-oferta"]');
         expect(oferta.textContent).toContain("Pagamento confirmado");
-        expect(oferta.querySelector("h3")!.textContent).toBe("Seu 2027 já organizado");
-        expect(oferta.textContent).toContain("3 metas, orçamento do ano, 12 revisões do mês e o cofrinho de 52 semanas.");
+        // crítica r1: a 1ª linha diz o que ela já tem; o título sem "já"; sem "orçamento do ano"; sem "no app" (o Android não tem)
+        expect(oferta.querySelector('[data-testid="u2027-linha"]')!.textContent).toMatch(/^(O|Seu) CORE é seu pra sempre\. O acesso também vai pro seu e-mail\.$/);
+        expect(oferta.querySelector("h3")!.textContent).toBe("Seu 2027 organizado");
+        expect(oferta.textContent).toContain("3 metas, quanto gastar e guardar por mês, 12 revisões do mês e o cofrinho de 52 semanas.");
+        expect(oferta.textContent).toContain("Por enquanto fica no site e no app do iPhone.");
+        expect(oferta.textContent).not.toMatch(/no app e no site|Fica no app/);
+        const nao = document.getElementById("u27-nao")!;
+        expect(nao.textContent).toBe("Agora não · ver minha conta");
+        expect(nao.className).toBe("u27-sair"); // botão secundário (44 px no CSS), nos 2 braços
         expect(oferta.querySelector('[data-testid="u2027-preco"]')!.textContent).toBe("R$ 14,90");
         expect(oferta.textContent).toContain("uma vez, sem mensalidade");
         expect(oferta.textContent).not.toMatch(/só hoje|últim|acaba|minutos/i); // sem pressão falsa
@@ -188,7 +200,8 @@ describe("chave LIGADA: oferta → Quero → QR → pago → Pronto → conta co
         const pronto = await espera('[data-testid="u2027-pronto"]');
         expect(pronto.querySelector("h3")!.textContent).toBe("Pronto, seu 2027 tá no seu CORE");
         expect([...pronto.querySelectorAll(".u27-lista li")].map((l) => l.textContent)).toEqual(["Planejar 2027 em 5 minutos", "12 revisões do mês", "Cofrinho das 52 semanas", "Planner 2027 pra imprimir"]);
-        expect(pronto.querySelector('[data-testid="u2027-onde"]')!.textContent).toContain("Dev. Pessoal → Seu 2027");
+        expect(pronto.querySelector('[data-testid="u2027-onde"]')!.textContent).toContain("Fica no módulo Desenvolvimento Pessoal, aba Seu 2027. Por enquanto, no site e no app do iPhone.");
+        expect(pronto.textContent).not.toContain("Dev. Pessoal");
         expect(pronto.textContent).toContain("maria@email.com");
         clicar("#u27-continuar");
         const conta = await espera('[data-testid="landing-conta"]');
@@ -215,7 +228,7 @@ describe("chave LIGADA: os caminhos de saída e de volta", () => {
     await abrirPagina({ lp: "v2", u2027: true });
     await pagarVitalicio("livre");
     await espera('[data-testid="u2027-oferta"]');
-    expect(document.getElementById("u27-nao")!.textContent).toBe("Agora não");
+    expect(document.getElementById("u27-nao")!.textContent).toBe("Agora não · ver minha conta");
     clicar("#u27-nao");
     const conta = await espera('[data-testid="landing-conta"]');
     expect(conta.textContent).not.toMatch(/30 dias|9,90/);
@@ -278,7 +291,53 @@ describe("chave LIGADA: os caminhos de saída e de volta", () => {
     expect(eventos().find((e) => e.nome === "landing_u2027_volta_email")).toMatchObject({ restaurado: "link", order_id: "qr_vitalicio_77" });
     expect(document.getElementById("lp-card")!.dataset.fase).toBe("conta"); // a oferta do vitalício some atrás do Pix do 2027
     clicar("#u27-sair");
-    await vi.waitFor(() => expect(document.querySelector('[data-testid="u2027-qr"]')).toBeNull());
+    // crítica r1 (ALTA): quem já pagou NUNCA cai na venda do vitalício ao sair — "Você já tem o CORE" + lojas, sem "Não fui eu"
+    const jaTem = await espera('[data-testid="landing-ja-tem"]');
+    expect(jaTem.querySelector('a[href*="apps.apple.com"]')).not.toBeNull();
+    expect(jaTem.querySelector('a[href*="play.google.com"]')).not.toBeNull();
+    expect(document.getElementById("lp-nao-fui-eu")).toBeNull();
+    expect(document.getElementById("lp-card")!.dataset.fase).toBe("conta");
+    expect(document.getElementById("lp-card")!.hasAttribute("data-u27-link")).toBe(true); // a faixa "OFERTA ESPECIAL · HOJE" some
+    expect(eventos().find((e) => e.nome === "landing_ja_tem")).toMatchObject({ via: "link_u2027" });
+    // a recarga pelo mesmo link fica na conta (não reabre o QR nem a venda)
+    await abrirPagina({ lp: "atual", u2027: false, url, limpar: false });
+    await espera('[data-testid="landing-ja-tem"]');
+    await dormir(150);
+    expect(document.querySelector('[data-testid="u2027-qr"]')).toBeNull();
+    expect(document.getElementById("lp-card")!.dataset.fase).toBe("conta");
+  });
+
+  for (const lp of ["atual", "v2"] as const) {
+    it(`${lp}: link do e-mail VENCIDO num navegador sem sessão → "Esse código venceu" (sem "Quero") → "Ver minha conta" = já tem o CORE`, async () => {
+      const url = `/organizar?r=u2027&compra=qr_vitalicio_78&pedido=qr_u27_78&pix=${encodeURIComponent("000201" + "x".repeat(40))}&vence=${Date.now() - 1000}`;
+      await abrirPagina({ lp, u2027: false, url, antes: () => { (window as unknown as { __landingSimularU2027: unknown }).__landingSimularU2027 = { semSessao: true }; } });
+      (window as unknown as { __landingSimularU2027: unknown }).__landingSimularU2027 = { semSessao: true };
+      await espera('[data-testid="u2027-conferindo"]', 2000).catch(() => null); // não pisca um "Quero" antes de saber
+      const v = await espera('[data-testid="u2027-venceu"]');
+      expect(v.querySelector("h3")!.textContent).toBe("Esse código venceu");
+      expect(document.getElementById("u27-quero")).toBeNull();
+      expect(v.textContent).toContain("O CORE que você pagou continua seu");
+      expect(nomes()).toContain("landing_u2027_venceu");
+      expect(nomes()).not.toContain("landing_u2027_view");
+      clicar("#u27-conta");
+      await espera('[data-testid="landing-ja-tem"]');
+      expect(pix().textContent).not.toMatch(/R\$ 27,90|Pagar/);
+    });
+  }
+
+  it("voltar do banco (recarga) depois de copiar mantém \"Código copiado\" (ela já colou)", async () => {
+    await abrirPagina({ lp: "v2", u2027: true });
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: vi.fn(async () => {}) }, configurable: true });
+    try {
+      await pagarVitalicio("livre");
+      await espera('[data-testid="u2027-oferta"]');
+      clicar("#u27-quero");
+      expect((await espera('[data-testid="u2027-copiado"]')).textContent).toContain("Código copiado.");
+      await abrirPagina({ lp: "v2", u2027: true, limpar: false, antes: () => { localStorage.removeItem("landing-u2027-v1"); } });
+      const c = await espera('[data-testid="u2027-copiado"]');
+      expect(c.textContent).toContain("Código copiado.");
+      expect(document.querySelector('[data-testid="u2027-volte"]')!.textContent).toContain("Pagou? Volte aqui.");
+    } finally { Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true }); }
   });
 
   it("quem já tem o CORE (marcador do aparelho) vê \"Você já tem o CORE\" — nunca a oferta do 2027", async () => {
@@ -287,5 +346,78 @@ describe("chave LIGADA: os caminhos de saída e de volta", () => {
     await dormir(150);
     expect(document.querySelector('[data-testid^="u2027-"]')).toBeNull();
     expect(nomes().some((n) => n.startsWith("landing_u2027"))).toBe(false);
+  });
+});
+
+/* crítica r1 (dinheiro-pix MÉDIA 4): o laço da tela do QR — o módulo direto, com a API "real" (não simulada) e relógio falso */
+describe("o laço de conferência do QR (3 s → 30 s → para em 30 min; só com a aba à vista; nunca pra outra conta / e-mail)", () => {
+  const PIX = (donoIgual: boolean) => ({ orderId: "qr_u27_laco", qrCode: "000201" + "y".repeat(40), qrCodeBase64: null, expiresAt: new Date(Date.now() + 24 * 3600e3).toISOString(), donoIgual, comEmail: false });
+  let n = 0;
+  function montar(donoIgual = true) {
+    n++;
+    localStorage.clear(); apagarCookies();
+    document.body.innerHTML = '<div id="card"><div id="caixa"></div></div>';
+    const conferir = vi.fn(async () => false);
+    const api: ApiU2027 = { simulado: false, gerar: vi.fn(async () => PIX(donoIgual)), conferir };
+    const u = criarUpsell2027(`compra_laco_${n}`, {
+      caixa: document.getElementById("caixa")!, card: document.getElementById("card")!, api, evento: () => {},
+      copiarNoToque: async (p) => { await p; return { ok: true, via: "teste" }; }, copiarTexto: async () => true, desenharQr: () => {},
+      email: () => null, linhaConfirmada: () => "O CORE é seu pra sempre.", aoTerminar: () => {}, aoMudar: () => {},
+    });
+    return { u, conferir };
+  }
+  const visivel = (v: "visible" | "hidden") => { Object.defineProperty(document, "visibilityState", { value: v, configurable: true }); document.dispatchEvent(new Event("visibilitychange")); };
+  afterEach(() => { vi.useRealTimers(); visivel("visible"); });
+
+  it("3 s nos 10 primeiros minutos, 30 s até 30 min, depois para (a volta da aba ainda confere)", async () => {
+    vi.useFakeTimers();
+    const { u, conferir } = montar();
+    u.render();
+    (document.getElementById("u27-quero") as HTMLButtonElement).click();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(u.etapa()).toBe("qr");
+    await vi.advanceTimersByTimeAsync(LACO_U2027.viraLentoMs);
+    const rapido = conferir.mock.calls.length;
+    expect(rapido).toBeGreaterThanOrEqual(195);
+    expect(rapido).toBeLessThanOrEqual(201);
+    await vi.advanceTimersByTimeAsync(LACO_U2027.paraMs - LACO_U2027.viraLentoMs);
+    const lento = conferir.mock.calls.length - rapido;
+    expect(lento).toBeGreaterThanOrEqual(39);
+    expect(lento).toBeLessThanOrEqual(41);
+    const n = conferir.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(60 * 60e3);
+    expect(conferir.mock.calls.length).toBe(n); // parou (era até 24 h a cada 3 s)
+    visivel("hidden"); visivel("visible");
+    await vi.advanceTimersByTimeAsync(10);
+    expect(conferir.mock.calls.length).toBe(n + 1); // a volta do banco confere 1x
+    u.parar();
+  });
+  it("com a aba escondida não consulta; ao voltar, confere e o laço volta", async () => {
+    vi.useFakeTimers();
+    const { u, conferir } = montar();
+    u.render();
+    (document.getElementById("u27-quero") as HTMLButtonElement).click();
+    await vi.advanceTimersByTimeAsync(50);
+    visivel("hidden");
+    const n = conferir.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(5 * 60e3);
+    expect(conferir.mock.calls.length).toBe(n);
+    visivel("visible");
+    await vi.advanceTimersByTimeAsync(3100);
+    expect(conferir.mock.calls.length).toBeGreaterThanOrEqual(n + 2);
+    u.parar();
+  });
+  it("Pix de outra conta (a página não confirma sozinha): nenhum laço e nenhuma conferência na volta", async () => {
+    vi.useFakeTimers();
+    const { u, conferir } = montar(false);
+    u.render();
+    (document.getElementById("u27-quero") as HTMLButtonElement).click();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(u.etapa()).toBe("qr");
+    await vi.advanceTimersByTimeAsync(10 * 60e3);
+    visivel("hidden"); visivel("visible");
+    await vi.advanceTimersByTimeAsync(10);
+    expect(conferir).not.toHaveBeenCalled();
+    u.parar();
   });
 });

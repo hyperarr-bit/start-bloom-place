@@ -14,6 +14,7 @@ import { join } from "node:path";
 import {
   ENTROU_DEPOIS_MS, JANELA_DIA3, TOKEN_VALIDO_MS, assuntoDia3, chaveEnvioDia3, chaveTokenDia3, dia3Ligado, donoDoToken, ehVitalicioWeb, estadoDia3,
   gerarToken, horaDeMandar, htmlDia3, linkDarPresente, motivoDia3, nomeDia3, previewDia3, tokenDoDono, tokenValido, varrerPresenteDia3,
+  chaveRecusaOfertas, linkSairDia3, sairDia3,
 } from "../../supabase/functions/_shared/presente-dia3";
 import { EXPIRA_UPSELL_S, type CriarQr } from "../../supabase/functions/_shared/pix-upsell";
 import type { RespostaDia3 } from "../../supabase/functions/_shared/presente-dia3";
@@ -193,6 +194,29 @@ describe("a passada do cron (varrerPresenteDia3)", () => {
   it("'entrou no app' só conta uso 30 min ou mais depois da compra", () => {
     expect(ENTROU_DEPOIS_MS).toBe(30 * 60e3);
   });
+
+  it("crítica r1: o rodapé tem 'Não quero ofertas por e-mail'; o link grava a recusa pelo token e o cron não manda mais", async () => {
+    const { admin, t } = cenario();
+    const env = envioFalso();
+    await varrerPresenteDia3(admin, { agora: AGORA, conta, enviar: env.enviar, gerar: tokenFixo });
+    const html = env.enviados[0].html;
+    const sair = html.match(/href="([^"]*sair=1[^"]*)"[^>]*>Não quero ofertas por e-mail</);
+    expect(sair).not.toBeNull();
+    const tk = new URL(sair![1].replace(/&amp;/g, "&")).searchParams.get("t")!;
+    expect(await sairDia3(admin, { t: tk, agora: AGORA })).toEqual({ ok: true });
+    expect(await sairDia3(admin, { t: tk, agora: AGORA })).toEqual({ ok: true }); // idempotente
+    expect(t.webhook_events.some((w) => w.id === chaveRecusaOfertas("ana"))).toBe(true);
+    expect(t.analytics_events.filter((e) => e.event_name === "ofertas_email_recusou")).toHaveLength(1);
+    expect(await sairDia3(admin, { t: "lixo", agora: AGORA })).toEqual({ ok: false });
+    // outra conta que recusou antes de receber: o cron pula
+    const b = cenario();
+    b.t.webhook_events.push({ id: chaveRecusaOfertas("ana"), source: "presente", event: "{}" });
+    const env2 = envioFalso();
+    const r = await varrerPresenteDia3(b.admin, { agora: AGORA, conta, enviar: env2.enviar, gerar: tokenFixo });
+    expect(env2.enviados).toHaveLength(0);
+    expect(r.recusou).toBe(1);
+    expect(linkSairDia3({ t: "C".repeat(32) })).toBe(`https://www.coreaplicativo.com.br/presente/dar?t=${"C".repeat(32)}&sair=1&utm_source=email_dia3&utm_medium=email`);
+  });
 });
 
 describe("o texto do e-mail", () => {
@@ -203,6 +227,7 @@ describe("o texto do e-mail", () => {
     expect(texto).toMatch(/Leve alguém junto/);
     expect(texto).toMatch(/pra quem você quer bem/);
     expect(texto).toMatch(/R\$ 14,90, uma vez\./);
+    expect(texto).toMatch(/Preço de presente, só pra quem já tem o CORE\./); // crítica r1: "paguei o dobro?"
     expect(texto).toMatch(/Sem mensalidade/);
     expect(texto).toMatch(/Dar de presente/);
     expect(texto).not.toMatch(/só hoje|hoje só|últim[oa]s? (hora|dia|chance)|acaba|expira em|corre/i);

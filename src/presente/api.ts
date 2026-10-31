@@ -71,6 +71,12 @@ export async function nomeDia3(t: string, pedido: string, nome: string): Promise
   return d?.ok === true;
 }
 
+/** "Não quero ofertas por e-mail" (o rodapé do e-mail do dia 3, crítica r1): grava a recusa pelo token. */
+export async function sairDia3(t: string): Promise<boolean> {
+  const d = await chamar({ action: "dia3_sair", t });
+  return d?.ok === true;
+}
+
 /** Com login (o aviso da página Você): o token da própria conta. null = sem acesso pra sempre ou erro. */
 export async function tokenDia3(): Promise<string | null> {
   const d = await chamar({ action: "dia3_token" });

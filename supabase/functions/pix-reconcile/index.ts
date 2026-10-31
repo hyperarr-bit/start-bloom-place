@@ -8,7 +8,8 @@ import { valorCobre } from "../_shared/trava-grant.ts";
 import { nomeDoProduto } from "../_shared/email-venda.ts";
 import { CONCESSAO_HOJE, PRECOS_HOJE, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
 import { encaminharParaDestino, lerDestino } from "../_shared/destino-hoje.ts";
-import { avisarPronto2027, blocoLigado, blocoU2027, mandaPurchaseMeta, SECRET_U2027_EMAIL } from "../_shared/pix-upsell.ts";
+import { avisarPronto2027, blocoLigado, blocoU2027, consultarUpsellAgora, donoNaHora, mandaPurchaseMeta, SECRET_U2027_EMAIL } from "../_shared/pix-upsell.ts";
+import { utmifyUpsell } from "../_shared/utmify-upsell.ts";
 import { criarQrAsaas } from "../_shared/asaas-qr.ts";
 import { fetchNosPixels } from "../_shared/meta-pixels.ts";
 import { ehOfertaLanding } from "../_shared/ofertas-landing.ts";
@@ -98,7 +99,7 @@ type Veredito = { pago: boolean; status: string; valorReais?: unknown };
 
 /** 21/10 (upsell "Seu 2027", u2027): o Purchase 19,90 — o mesmo formato do Purchase da varredura (event_id = pedido,
  *  event_time = criação do QR, sinais do pix_order_created). */
-type Pedido2027 = { uid: string; orderId: string; criadoEm: string; amountCents: number | null; fbp: string | null; fbc: string | null; ip: string | null; ua: string | null; sourceUrl: string | null };
+type Pedido2027 = { uid: string; orderId: string; criadoEm: string; amountCents: number | null; fbp: string | null; fbc: string | null; ip: string | null; ua: string | null; sourceUrl: string | null; compra?: string | null; upsellChave?: string | null };
 async function capi2027(o: Pedido2027, email: string | null, cents: number): Promise<string> {
   if (!Deno.env.get("META_PIXEL_ID") || !Deno.env.get("META_CAPI_TOKEN")) return "skipped_no_secrets";
   try {
@@ -348,7 +349,7 @@ serve(async (req) => {
     let adiantadosFora = 0;
     let ofertasDesconhecidas = 0;
     /** 21/10: os pedidos de PRESENTE (pv149) — passada própria no fim (viram código, não linha de quem pagou). */
-    type PedidoExtra = { uid: string; orderId: string; criadoEm: string; amountCents: number | null; fbp: string | null; fbc: string | null; ip: string | null; ua: string | null; sourceUrl: string | null; area?: unknown };
+    type PedidoExtra = { uid: string; orderId: string; criadoEm: string; amountCents: number | null; fbp: string | null; fbc: string | null; ip: string | null; ua: string | null; sourceUrl: string | null; area?: unknown; upsellChave?: string | null };
     const pedidosPresente: PedidoExtra[] = [];
     /** 21/10: o downsell do plano de 30 dias (pk99) — passada própria no fim (grava o kit, não linha de assinatura). */
     const pedidosPlano30: PedidoExtra[] = [];
@@ -367,6 +368,7 @@ serve(async (req) => {
         pedidos2027.push({
           uid, orderId: oid, criadoEm: String(q.created_at), amountCents: Number(q.event_data?.amount_cents) || null,
           fbp: q.event_data?.fbp ?? null, fbc: q.event_data?.fbc ?? null, ip: q.event_data?.client_ip ?? null, ua: q.event_data?.user_agent ?? null, sourceUrl: q.event_data?.source_url ?? null,
+          compra: typeof q.event_data?.compra === "string" ? q.event_data.compra : null, upsellChave: typeof q.event_data?.upsell_chave === "string" ? q.event_data.upsell_chave : null,
         });
         continue;
       }
@@ -377,7 +379,7 @@ serve(async (req) => {
         (ehOfertaPresente(ofertaCrua) ? pedidosPresente : pedidosPlano30).push({
           uid, orderId: oid, criadoEm: String(q.created_at), amountCents: Number(q.event_data?.amount_cents) || null,
           fbp: q.event_data?.fbp ?? null, fbc: q.event_data?.fbc ?? null, ip: q.event_data?.client_ip ?? null, ua: q.event_data?.user_agent ?? null, sourceUrl: q.event_data?.source_url ?? null,
-          area: q.event_data?.area ?? null,
+          area: q.event_data?.area ?? null, upsellChave: typeof q.event_data?.upsell_chave === "string" ? q.event_data.upsell_chave : null,
         });
         continue;
       }
@@ -423,6 +425,7 @@ serve(async (req) => {
     }
 
     let sondadas = 0;
+    let upsellAdiados = 0;
     const creditados: Array<Record<string, unknown>> = [];
     const falhas: Array<Record<string, unknown>> = [];
 
@@ -434,6 +437,8 @@ serve(async (req) => {
       const jaTemPacote = new Set(((comPacote ?? []) as Array<{ user_id: string }>).map((r) => r.user_id));
       for (const o of pedidos2027) {
         if (jaTemPacote.has(o.uid)) continue;
+        // crítica r1: o Pix pré-aquecido (24 h) de quem só VIU a oferta — depois das 2 primeiras horas, 1 consulta por hora
+        if (!consultarUpsellAgora(o.criadoEm, !!o.upsellChave)) { upsellAdiados++; continue; }
         sondadas++;
         let v: Veredito;
         try { v = await statusAsaas(asaasKey, o.orderId); } catch (e) { falhas.push({ orderId: o.orderId, erro: String(e).slice(0, 120) }); continue; }
@@ -442,19 +447,24 @@ serve(async (req) => {
         if (!valorCobre(v.valorReais, cents)) { falhas.push({ orderId: o.orderId, erro: "valor_menor" }); continue; }
         if (dryRun) { creditados.push({ uid: o.uid, orderId: o.orderId, offer: "u2027", pacote2027: true, dryRun: true }); continue; }
         let capi = "ja_enviado";
+        // crítica r1: a conta que recebe = a dona ATUAL da linha do vitalício (pedido com `compra`, os caminhos novos)
+        const dono27 = await donoNaHora(admin, { registrado: o.uid, compra: o.compra });
         const p27 = await confirmarPacote2027(admin, {
-          userId: o.uid, orderId: o.orderId, origem: "upsell",
+          userId: dono27, orderId: o.orderId, origem: "upsell",
           enviarCompra: async () => {
-            // 31/10: upsell não manda Purchase pra Meta (_shared/pix-upsell.ts META_PURCHASE_UPSELL) — a UTMify do reconcile
-            // não existe pra u2027 (nunca existiu); a receita aparece pelo check/webhook
-            if (!mandaPurchaseMeta("u2027")) { capi = "upsell_sem_meta"; return; }
-            const { data: au } = await admin.auth.admin.getUserById(o.uid);
+            const { data: au } = await admin.auth.admin.getUserById(dono27);
+            // 31/10: upsell não manda Purchase pra Meta (_shared/pix-upsell.ts META_PURCHASE_UPSELL). Crítica r1: a trava `capi`
+            // fica tomada aqui, então o check/webhook não mandam mais nada — a UTMify sai daqui (senão a venda some do painel)
+            if (!mandaPurchaseMeta("u2027")) {
+              capi = await utmifyUpsell(admin, { token: Deno.env.get("UTMIFY_API_TOKEN"), userId: dono27, email: au?.user?.email ?? null, orderId: o.orderId, offer: "u2027", amountCents: cents });
+              return;
+            }
             capi = await capi2027(o, au?.user?.email ?? null, cents);
           },
         });
         if (p27.r === "falhou") { falhas.push({ orderId: o.orderId, erro: "pacote2027_gravar" }); continue; }
         { // 31/10: "Pronto, seu 2027 tá no seu CORE" — 1 por pedido (a mesma trava do check e do webhook)
-          const { data: au } = await admin.auth.admin.getUserById(o.uid);
+          const { data: au } = await admin.auth.admin.getUserById(dono27);
           await avisarPronto2027(admin, { orderId: o.orderId, para: au?.user?.email ?? null, enviar: enviarResend });
         }
         jaTemPacote.add(o.uid);
@@ -617,6 +627,7 @@ serve(async (req) => {
       const feitos = new Set(((jaFeitos ?? []) as Array<{ pedido: string }>).map((r) => r.pedido));
       for (const o of pedidosPresente) {
         if (feitos.has(o.orderId)) continue;
+        if (!consultarUpsellAgora(o.criadoEm, !!o.upsellChave)) { upsellAdiados++; continue; } // crítica r1: o Pix do dia 3 (24 h)
         sondadas++;
         let v: Veredito;
         try { v = await statusAsaas(asaasKey, o.orderId); } catch (e) { falhas.push({ orderId: o.orderId, erro: String(e).slice(0, 120) }); continue; }
@@ -630,7 +641,11 @@ serve(async (req) => {
         const email = au?.user?.email ?? null;
         let capi = "ja_enviado";
         // 31/10: upsell não manda Purchase pra Meta (_shared/pix-upsell.ts META_PURCHASE_UPSELL)
-        if (await reservar(admin, chaveCapiPresente(o.orderId), "capi")) capi = mandaPurchaseMeta("pv149") ? await capiPresente(o, email, cents) : "upsell_sem_meta";
+        // crítica r1: sem Meta, a UTMify sai daqui (a trava `capi` fica tomada; o check/webhook não mandariam mais)
+        if (await reservar(admin, chaveCapiPresente(o.orderId), "capi")) {
+          capi = mandaPurchaseMeta("pv149") ? await capiPresente(o, email, cents)
+            : await utmifyUpsell(admin, { token: Deno.env.get("UTMIFY_API_TOKEN"), userId: o.uid, email, orderId: o.orderId, offer: "pv149", amountCents: cents });
+        }
         if (email) {
           const from = Deno.env.get("WELCOME_EMAIL_FROM") || Deno.env.get("RECOVERY_EMAIL_FROM") || "onboarding@resend.dev";
           await mandarLinkPorEmail(admin, { orderId: o.orderId, codigo: p.codigo, para: email, de: from, enviar: enviarCorpoResend });
@@ -674,7 +689,7 @@ serve(async (req) => {
       }
     }
 
-    logStep("Fim", { janelaHoras: hours, usuarios: porUser.size, sondadas, adiantadosFora, ofertasDesconhecidas, creditados: creditados.length, presentes: presentes.length, planos30: planos30.length, falhas: falhas.length });
+    logStep("Fim", { janelaHoras: hours, usuarios: porUser.size, sondadas, upsellAdiados, adiantadosFora, ofertasDesconhecidas, creditados: creditados.length, presentes: presentes.length, planos30: planos30.length, falhas: falhas.length });
     /* 29/10 (landing /organizar): Pix da landing PAGO e a conta ainda sem e-mail 10 min depois → chamado "Pix pago sem
      * e-mail · R$ X · horário · nome do pagador" no /admin → Suporte (1x por pedido; o nome vem do que o asaas-webhook
      * guardou, ou da Asaas agora). Nada de nome/e-mail no log. */
@@ -691,7 +706,7 @@ serve(async (req) => {
       } catch (e) { logStep("Landing: varredura de pago sem e-mail falhou", { e: String(e).slice(0, 120) }); }
     }
 
-    return jsonResponse({ ok: true, dryRun, janelaHoras: hours, sondadas, adiantadosFora, ofertasDesconhecidas, creditados, presentes, planos30, falhas, alertasSemEmail });
+    return jsonResponse({ ok: true, dryRun, janelaHoras: hours, sondadas, upsellAdiados, adiantadosFora, ofertasDesconhecidas, creditados, presentes, planos30, falhas, alertasSemEmail });
   } catch (e) {
     logStep("ERRO", { e: String(e).slice(0, 200) });
     return jsonResponse({ error: String(e).slice(0, 200) }, 500);

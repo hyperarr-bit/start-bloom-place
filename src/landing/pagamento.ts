@@ -171,16 +171,28 @@ export async function entrarAntesDoPix(email: string, codigo: string): Promise<E
 
 export type GeradoU2027 = (PixU2027 & { comEmail: boolean }) | { jaTem2027: true } | { erro: string; onde: string };
 
+/** O `motivo` de uma resposta não-2xx da função (o invoke devolve o corpo dentro do erro). */
+async function motivoDoErro(error: unknown): Promise<string | null> {
+  try {
+    const ctx = (error as { context?: { json?: () => Promise<unknown>; clone?: () => { json: () => Promise<unknown> } } } | null)?.context;
+    const corpo = (ctx?.clone ? await ctx.clone().json() : await ctx?.json?.()) as { motivo?: unknown } | null | undefined;
+    return typeof corpo?.motivo === "string" ? corpo.motivo : null;
+  } catch { return null; }
+}
+
 /**
  * O Pix do 2027 desta compra (o MESMO do e-mail de compra confirmada: o servidor guarda 1 por compra, 24 h). NUNCA marca
- * Purchase (markPixPurchasePending): o upsell não manda Purchase pra Meta (decisão do dono, _shared/pix-upsell.ts).
+ * Purchase (markPixPurchasePending): o upsell não manda Purchase pra Meta (recomendação do relatório, _shared/pix-upsell.ts).
+ * Crítica r1: sem sessão (o link do e-mail aberto em outro navegador) a função responde 401 — nem chama: `onde: "sem_sessao"`;
+ * a sessão é de outra conta → `onde: "outra_conta"`. A página troca o "Quero" por "Esse código venceu" nesses dois casos.
  */
 export async function gerarPixU2027(compra: string): Promise<GeradoU2027> {
   try {
-    await sessaoViva();
+    if (!(await sessaoViva())) return { erro: "Esse código venceu.", onde: "sem_sessao" };
     const { data, error } = await supabase.functions.invoke("asaas-pix", { body: { action: "create", offer: "u2027", compra } });
     const d = data as { orderId?: string; qrCode?: string; qrCodeBase64?: string | null; expiresAt?: string | null; dono_igual?: boolean; no_email?: boolean; ja_tem_2027?: boolean; error?: string } | null;
     if (d?.ja_tem_2027) return { jaTem2027: true };
+    if (error && (await motivoDoErro(error)) === "outra_conta") return { erro: "Esse código venceu.", onde: "outra_conta" };
     if (error || !d?.orderId || !d?.qrCode) return { erro: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.", onde: String(error?.message || d?.error || "sem_qr").slice(0, 160) };
     return {
       orderId: d.orderId, qrCode: d.qrCode, qrCodeBase64: d.qrCodeBase64 ?? null,

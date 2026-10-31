@@ -282,7 +282,11 @@ export type PixU2027 = {
   /** reaberto pelo link do e-mail de compra confirmada (talvez em outro navegador) */
   doEmail?: boolean;
 };
-export type EstadoU2027 = { v: 1; compra: string; etapa: EtapaU2027; pix: PixU2027 | null; salvoEm: number };
+export type EstadoU2027 = {
+  v: 1; compra: string; etapa: EtapaU2027; pix: PixU2027 | null; salvoEm: number;
+  /** o código DESTE pix já foi copiado (crítica r1: a volta do banco recarrega a aba e trocava "Código copiado" por "Copie o código") */
+  copiado?: boolean;
+};
 export const TTL_U2027_MS = 2 * 24 * 3600e3;
 export const novoEstadoU2027 = (compra: string, agora: number = Date.now()): EstadoU2027 => ({ v: 1, compra, etapa: "oferta", pix: null, salvoEm: agora });
 
@@ -293,7 +297,7 @@ export function estadoU2027QueVolta(bruto: unknown, compra: string, agora: numbe
   const etapa: EtapaU2027 = e.etapa === "qr" || e.etapa === "pronto" || e.etapa === "fim" ? e.etapa : "oferta";
   const pix = e.pix && typeof e.pix.orderId === "string" && typeof e.pix.qrCode === "string" && typeof e.pix.expiresAt === "string" ? e.pix : null;
   if (etapa === "qr" && (!pix || Date.parse(pix.expiresAt) <= agora)) return { ...novoEstadoU2027(compra, agora) };
-  return { v: 1, compra, etapa, pix, salvoEm: e.salvoEm };
+  return { v: 1, compra, etapa, pix, salvoEm: e.salvoEm, ...(pix && e.copiado === true ? { copiado: true } : {}) };
 }
 
 /** "Vale por 24 horas." / "Vale por mais 5 h." / "Vale por mais 12 min." / "Este código venceu." */

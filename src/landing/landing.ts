@@ -103,8 +103,8 @@ type Janela = Window & {
   __landing?: { t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; divisao?: string | null };
   __eventosLanding?: Record<string, unknown>[];
   __landingSimular?: { pagar: () => void; pagarU2027?: () => void };
-  /** 31/10 (dev/testes): o Pix simulado do 2027 falha / sai pra outra conta */
-  __landingSimularU2027?: { falhar?: boolean; outraConta?: boolean };
+  /** 31/10 (dev/testes): o Pix simulado do 2027 falha / sai pra outra conta / sem sessão (o link do e-mail noutro navegador) */
+  __landingSimularU2027?: { falhar?: boolean; outraConta?: boolean; semSessao?: boolean };
   /** 30/10: diagnóstico de tempo (medição de desempenho; nada vai pro banco por aqui) */
   __landingDiag?: { terceirosEm: number | null; demoEm: number | null; demoVia: string | null };
   fbq?: (...a: unknown[]) => void;
@@ -574,6 +574,8 @@ const lerEstado = (): EstadoLanding => {
 let estado: EstadoLanding = lerEstado();
 /* 29/10: "Você já tem o CORE" no lugar da oferta (marcador do aparelho, ou o servidor disse `ja_tem`) */
 let jaTem: MarcaCompra | null = null;
+/** o "já tem" veio da saída do 2027 pelo link do e-mail (o "Não fui eu que comprei" não aparece: ela abriu o e-mail da compra) */
+let jaTemDoLink = false;
 // comprou antes do marcador existir (o estado do Pix ainda guarda a compra): marca agora
 if (estado.pago) { try { if (!lerCompra()) marcarCompra({ oferta: estado.pago.oferta, email: estado.email ?? estado.emailPix }); } catch { /* noop */ } }
 
@@ -585,7 +587,9 @@ let topoSaiuPorCima = false;
 const naTela = new Set<string>();
 /* ── v2 (crítica r1, oferta M2 / pix M1): depois do Pix gerado ou pago a página não pode continuar "vendendo" — o botão do topo, o
  * fixo e o fim mudam de rótulo conforme a fase; com conta pronta (ou "já tem") o fixo some. ── */
-const rotuloCta = (): string => (jaTem || estado.fase === "conta") ? "Ver minha conta" : estado.fase === "pago" ? "Liberar meu acesso" : estado.fase === "qr" ? "Voltar pro meu Pix" : "Quero organizar minha vida";
+/** a página está mostrando a conta (ou o 2027 de quem já pagou, inclusive pelo link do e-mail): nada de "vender" o vitalício */
+const contaNaTela = (): boolean => !!jaTem || estado.fase === "conta" || (u27Volta && u27Tela);
+const rotuloCta = (): string => contaNaTela() ? "Ver minha conta" : estado.fase === "pago" ? "Liberar meu acesso" : estado.fase === "qr" ? "Voltar pro meu Pix" : "Quero organizar minha vida";
 const porRotulo = (b: Element | null, t: string) => {
   if (!b) return;
   const n = b.firstChild;
@@ -605,9 +609,9 @@ function atualizarRotulos() {
   porRotulo(document.getElementById("lp2-cheia-comprar"), t);
   porRotulo(document.querySelector('#fim button[data-so-lp="v2"]'), t);
   const fim = $("fim");
-  fim.dataset.fase = jaTem ? "conta" : estado.fase;
+  fim.dataset.fase = contaNaTela() ? "conta" : estado.fase;
   const fimP = fim.querySelector<HTMLElement>('p[data-so-lp="v2"]');
-  if (fimP) fimP.textContent = jaTem || estado.fase === "conta" ? "Sua conta está pronta." : estado.fase === "pago" ? "Pagamento confirmado. Falta só o seu e-mail." : estado.fase === "qr" ? "Seu Pix está logo acima." : "Vitalício por R$ 27,90 · Pix na hora";
+  if (fimP) fimP.textContent = contaNaTela() ? "Sua conta está pronta." : estado.fase === "pago" ? "Pagamento confirmado. Falta só o seu e-mail." : estado.fase === "qr" ? "Seu Pix está logo acima." : "Vitalício por R$ 27,90 · Pix na hora";
   for (const barra of barrasDePreco()) {
     const fixoB = barra.querySelector<HTMLElement>(".lp2-fixo-p b"); const fixoS = barra.querySelector<HTMLElement>(".lp2-fixo-p span");
     if (!fixoB || !fixoS) continue;
@@ -1114,6 +1118,8 @@ function miolContaV2(email: string): string {
 /** 29/10: o cartão "Você já tem o CORE" (a mesma cara da "Sua conta está pronta") no lugar da oferta. */
 function renderJaTem(m: MarcaCompra) {
   card.dataset.fase = "conta";
+  // crítica r1: quem saiu do 2027 pelo link do e-mail não lê "OFERTA ESPECIAL · HOJE" em cima do "Você já tem o CORE"
+  if (jaTemDoLink) card.setAttribute("data-u27-link", ""); else card.removeAttribute("data-u27-link");
   const email = m.email ?? "";
   if (V2) {
     caixa.innerHTML = `
@@ -1122,7 +1128,7 @@ function renderJaTem(m: MarcaCompra) {
         <h3>Você já tem o CORE</h3>
         <p>${email ? `Seu CORE já está liberado. ${plataforma === "web" ? "Entre com este e-mail, aqui ou no app:" : "Baixe o app e entre com este e-mail:"}` : "Seu CORE já está liberado. Entre com o e-mail que você usou na compra."}</p>
         ${miolContaV2(email)}
-        <div class="lp-links"><button type="button" class="lp-link" id="lp-nao-fui-eu">Não fui eu que comprei</button></div>
+        ${jaTemDoLink ? "" : '<div class="lp-links"><button type="button" class="lp-link" id="lp-nao-fui-eu">Não fui eu que comprei</button></div>'}
       </div>`;
   } else caixa.innerHTML = `
       <div class="lp-pago" data-testid="landing-ja-tem">
@@ -1135,11 +1141,11 @@ function renderJaTem(m: MarcaCompra) {
           <p>Baixe na App Store ou Google Play e entre com ${email ? `este e-mail: <strong>${esc(email)}</strong>` : "o mesmo e-mail"}</p>
           <div class="lp-selos"><a href="${URL_APP_STORE}" target="_blank" rel="noopener" data-loja="ios"><img src="/selos/app-store.svg" alt="Baixar na App Store" width="120" height="40" /></a><a href="${esc(urlPlay("landing"))}" target="_blank" rel="noopener" data-loja="android"><img src="/selos/google-play.png" alt="Disponível no Google Play" width="103" height="40" /></a></div>
         </div>
-        <div class="lp-links"><button type="button" class="lp-link" id="lp-nao-fui-eu">Não fui eu que comprei</button></div>
+        ${jaTemDoLink ? "" : '<div class="lp-links"><button type="button" class="lp-link" id="lp-nao-fui-eu">Não fui eu que comprei</button></div>'}
       </div>`;
   $("lp-abrir").addEventListener("click", () => { evento("landing_abrir_core", { via: "ja_tem" }); location.href = "/home"; });
   caixa.querySelectorAll<HTMLAnchorElement>("a[data-loja]").forEach((a) => a.addEventListener("click", () => evento("landing_loja", { loja: a.dataset.loja, onde: "ja_tem" })));
-  $("lp-nao-fui-eu").addEventListener("click", () => { evento("landing_ja_tem_nao_fui_eu", {}); esquecerCompra(); jaTem = null; render(); });
+  document.getElementById("lp-nao-fui-eu")?.addEventListener("click", () => { evento("landing_ja_tem_nao_fui_eu", {}); esquecerCompra(); jaTem = null; render(); });
   atualizarFixo();
 }
 /** r1 (pix 7, v2): o erro de gerar o Pix fica colado no botão de pagar (#lp-pagar-erro), não solto abaixo do CNPJ */
@@ -1397,7 +1403,9 @@ const CODIGO_SIMULADO_U27 = "00020101021226870014br.gov.bcb.pix2565qrcode.exempl
 const apiU2027 = (): import("./upsell-2027").ApiU2027 => SIMULADO
   ? {
     simulado: true,
-    gerar: (compra) => espera(600).then(() => (w.__landingSimularU2027?.falhar
+    gerar: (compra) => espera(600).then(() => (w.__landingSimularU2027?.semSessao
+      ? { erro: "Esse código venceu.", onde: "sem_sessao" }
+      : w.__landingSimularU2027?.falhar
       ? { erro: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.", onde: "simulado" }
       : { orderId: `simulado-u27-${compra.slice(-8)}`, qrCode: CODIGO_SIMULADO_U27, qrCodeBase64: null, expiresAt: new Date(Date.now() + 24 * 3600e3).toISOString(), donoIgual: !w.__landingSimularU2027?.outraConta, comEmail: true })),
     conferir: async () => false,
@@ -1430,13 +1438,28 @@ function u2027Toma(): boolean {
     u27 = modU2027.criarUpsell2027(compra, {
       caixa, card, api: apiU2027(), evento, copiarNoToque, copiarTexto: (c) => copiarTexto(c), desenharQr: (alvo, p) => desenharQr(alvo, p),
       email: () => estado.email ?? estado.emailPix ?? lerCompra()?.email ?? null,
-      aoTerminar: () => { u27Volta = false; render(); rolarAte(card, "start"); },
+      linhaConfirmada: () => (estado.pago ? `${ehPraSempreTxt()} O acesso também vai pro seu e-mail.` : "Seu CORE já está pago. O acesso está no e-mail da compra."),
+      aoTerminar: () => { saidaDoLinkU2027(); u27Volta = false; render(); rolarAte(card, "start"); },
       aoMudar: () => { atualizarFixo(); rolarAte(card, "start"); },
     });
     if (u27Volta && VOLTA_U2027) u27.voltaDoEmail(VOLTA_U2027.pix);
   }
-  if (!u27.ativo()) { u27Volta = false; return false; }
+  if (!u27.ativo()) { saidaDoLinkU2027(); u27Volta = false; return false; }
   return u27.render();
+}
+/**
+ * Crítica r1 (ALTA): saiu do 2027 que chegou pelo LINK DO E-MAIL (Continuar / Agora não / Ver minha conta) num navegador sem a
+ * compra (Mail → Safari) → "Você já tem o CORE" (lojas + "entre com o e-mail da compra"), NUNCA o cartão de venda do vitalício
+ * ("Só hoje · R$ 27,90 · Pagar"). Grava o marcador de compra: a recarga e as próximas visitas também ficam na conta.
+ */
+function saidaDoLinkU2027(): void {
+  if (!u27Volta || !VOLTA_U2027 || estado.pago) return;
+  jaTemDoLink = true;
+  if (jaTem) return;
+  marcarCompra({});
+  jaTem = lerCompra() ?? { em: Date.now(), oferta: null, email: null };
+  jaTemDoLink = true;
+  evento("landing_ja_tem", { via: "link_u2027" });
 }
 
 /* r3 (oferta M1 / pix M1 / visitante-frio M1 — WebKit, 70% do tráfego): toda abertura que leva ao cartão (Pix vivo, pago, conta,

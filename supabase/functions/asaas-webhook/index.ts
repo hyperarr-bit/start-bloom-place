@@ -11,7 +11,7 @@ import { encaminharParaDestino } from "../_shared/destino-hoje.ts";
 import { fetchNosPixels } from "../_shared/meta-pixels.ts";
 import { ehOfertaLanding } from "../_shared/ofertas-landing.ts";
 import { guardarNomeDoPagador, nomeDoPagadorAsaas } from "../_shared/landing-travas.ts";
-import { avisarPronto2027, blocoLigado, blocoU2027, mandaPurchaseMeta, SECRET_U2027_EMAIL } from "../_shared/pix-upsell.ts";
+import { avisarPronto2027, blocoLigado, blocoU2027, donoNaHora, mandaPurchaseMeta, registrarDobro2027, SECRET_U2027_EMAIL } from "../_shared/pix-upsell.ts";
 import { criarQrAsaas } from "../_shared/asaas-qr.ts";
 import {
   PRECOS_PLANO30, PRECOS_PRESENTE, chaveCapiPlano30, chaveCapiPresente, ehOfertaPlano30, ehOfertaPresente, garantirPresente, liberarKitDoBump, liberarPlano30, mandarLinkPorEmail, reservar,
@@ -312,19 +312,23 @@ serve(async (req) => {
     /* 21/10 (upsell "Seu 2027", u2027): pagou e fechou a aba antes do check → o pacote vai pra conta de quem pagou aqui +
      * Purchase 19,90 1x por pedido (IP/UA do pedido; a trava é a mesma do check e do reconcile). Não é assinatura. */
     if (eh2027(offer) && valorCobre(pago.value, PRECOS_CENTAVOS[offer])) {
+      // crítica r1 (31/10): a conta que recebe = a dona ATUAL da linha do vitalício (pedido com `compra`, os caminhos novos)
+      const dono27 = await donoNaHora(admin, { registrado: userId, compra: (regData as Record<string, unknown>).compra });
       const p27 = await confirmarPacote2027(admin, {
-        userId, orderId: qrCodeId, origem: "upsell",
+        userId: dono27, orderId: qrCodeId, origem: "upsell",
         enviarCompra: async () => {
-          const { data: uc } = await admin.auth.admin.getUserById(userId!);
+          const { data: uc } = await admin.auth.admin.getUserById(dono27);
           const em = uc?.user?.email ?? null;
-          await sendToUtmify(admin, { userId: userId!, email: em, orderId: qrCodeId, offer, amountCents: PRECOS_CENTAVOS[offer], name: null });
+          await sendToUtmify(admin, { userId: dono27, email: em, orderId: qrCodeId, offer, amountCents: PRECOS_CENTAVOS[offer], name: null });
           // 31/10: upsell não manda Purchase pra Meta (_shared/pix-upsell.ts META_PURCHASE_UPSELL) — só a UTMify
-          if (mandaPurchaseMeta(offer)) await sendMetaCapi(admin, { userId: userId!, email: em, orderId: qrCodeId, offer, amountCents: PRECOS_CENTAVOS[offer], fbp: regData.fbp ?? null, fbc: regData.fbc ?? null, sourceUrl: regData.source_url ?? null, ...ipUaDoPedido(regData) });
+          if (mandaPurchaseMeta(offer)) await sendMetaCapi(admin, { userId: dono27, email: em, orderId: qrCodeId, offer, amountCents: PRECOS_CENTAVOS[offer], fbp: regData.fbp ?? null, fbc: regData.fbc ?? null, sourceUrl: regData.source_url ?? null, ...ipUaDoPedido(regData) });
         },
       });
       if (p27.r === "falhou") return jsonResponse({ received: true, granted: false, pacote2027: true, error: "gravar" });
+      // crítica r1: o 2º pagamento do 2027 na mesma conta (outro QR vivo da mesma compra) vira chamado de devolução
+      if (p27.r === "ja_tinha") await registrarDobro2027(admin, { userId: dono27, orderId: qrCodeId, amountCents: PRECOS_CENTAVOS[offer] });
       // 31/10: "Pronto, seu 2027 tá no seu CORE" — 1 por pedido (quem pagou no banco e não voltou pra página também sabe)
-      const { data: ucp } = await admin.auth.admin.getUserById(userId);
+      const { data: ucp } = await admin.auth.admin.getUserById(dono27);
       await avisarPronto2027(admin, { orderId: qrCodeId, para: ucp?.user?.email ?? null, enviar: enviarResend });
       return jsonResponse({ received: true, granted: true, pacote2027: true });
     }

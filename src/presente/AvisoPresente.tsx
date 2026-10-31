@@ -5,9 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
-import { plataformaApp } from "@/lib/native-shell";
 import {
-  CHAVE_AVISO_PRESENTE, SITE_AVISO, VALOR_AVISO, avisoEscondido, avisoLigadoAqui, compraQueLiberaAviso, gravarMarcaDoAparelho, lerMarcaDoAparelho,
+  CHAVE_AVISO_PRESENTE, SUB_AVISO, avisoEscondido, avisoLigadoAqui, compraQueLiberaAviso, gravarMarcaDoAparelho, lerMarcaDoAparelho,
   type LinhaDoAviso, type MarcaAviso,
 } from "@/lib/presente-aviso";
 import { tokenDia3 } from "./api";
@@ -77,10 +76,8 @@ export function AvisoPresente({ estilo }: { estilo: "classico" | "e" | "menu" })
     setAbrindo(false);
     if (!t) { setErro(true); return; }
     esconder("toque");
-    const q = `t=${encodeURIComponent(t)}&utm_source=app_voce&utm_medium=aviso`;
-    // Android (só com "web+android"): o Pix nunca roda dentro do app da loja — abre o site no navegador
-    if (plataformaApp() === "android") window.open(`${SITE_AVISO}/presente/dar?${q}`, "_blank", "noopener");
-    else navigate(`/presente/dar?${q}`);
+    // só no site (avisoLigadoAqui): o Pix nunca roda dentro do app da loja
+    navigate(`/presente/dar?t=${encodeURIComponent(t)}&utm_source=app_voce&utm_medium=aviso`);
   };
 
   const fechar = () => { trackEvent("presente_aviso_fechar", { estilo }); esconder("fechar"); };
@@ -92,7 +89,7 @@ export function AvisoPresente({ estilo }: { estilo: "classico" | "e" | "menu" })
         <span className="text-[18px] leading-none shrink-0" aria-hidden>🎁</span>
         <span className="flex-1 min-w-0">
           <span className="block text-sm font-medium">Leve alguém junto</span>
-          <span className="block text-[12px] leading-snug text-muted-foreground">{erro ? "Não abriu agora. Toque pra tentar de novo." : `O CORE pra sempre · ${VALOR_AVISO}`}</span>
+          <span className="block text-[12px] leading-snug text-muted-foreground">{erro ? "Não abriu agora. Toque pra tentar de novo." : SUB_AVISO}</span>
         </span>
         <ChevronRight className="w-4 h-4 text-muted-foreground/60 shrink-0" aria-hidden />
       </button>

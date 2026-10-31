@@ -19,7 +19,8 @@ import { ehOfertaLanding } from "../_shared/ofertas-landing.ts";
 import { EMAIL_OK as EMAIL_LANDING_OK, jaTemOCore, temVitalicioAtivo } from "../_shared/landing-travas.ts";
 import { chaveQr } from "../_shared/lembrete-pix-landing.ts";
 import {
-  avisarPronto2027, blocoLigado, blocoU2027, chaveU2027, compraDoUpsell, expiraSegundos, garantirPixUpsell, mandaPurchaseMeta, SECRET_U2027_EMAIL, sessaoPodePedir,
+  avisarPronto2027, blocoFoiProEmail, blocoLigado, blocoU2027, chaveU2027, compraDoUpsell, donoNaHora, EXPIRA_PADRAO_S, garantirPixUpsell, mandaPurchaseMeta,
+  registrarDobro2027, SECRET_U2027_EMAIL, sessaoPodePedir,
 } from "../_shared/pix-upsell.ts";
 import { ASAAS_API, asaasHeaders, criarQrAsaas, obterChavePix, postarQrEstatico } from "../_shared/asaas-qr.ts";
 
@@ -34,8 +35,9 @@ import { ASAAS_API, asaasHeaders, criarQrAsaas, obterChavePix, postarQrEstatico 
  * Por isso usamos QR CODE ESTÁTICO (/v3/pix/qrCodes/static): é o ÚNICO
  * caminho 100% sem CPF, e ainda por cima aceita expiração em SEGUNDOS
  * (expirationSeconds: 1800 = 30 min exatos, coisa que o dinâmico não faz).
- * 31/10: os Pix de UPSELL (u2027, pv149) valem 24 h (_shared/pix-upsell.ts expiraSegundos); o vitalício, os LN_* e o
- * resto seguem em 30 min. O QR em si mora em _shared/asaas-qr.ts (o e-mail e o cron também geram, sem sessão).
+ * 31/10: os Pix de UPSELL dos caminhos NOVOS (u2027 com `compra` da /organizar; o e-mail e o dia 3 geram fora daqui) valem
+ * 24 h (_shared/pix-upsell.ts garantirPixUpsell). Este create antigo segue em 30 min pra TODA oferta (o /hoje e o /inicio
+ * no ar, inclusive u2027/pv149 — crítica r1: o PixHoje mostraria "vale por 1439:59"). O QR em si mora em _shared/asaas-qr.ts (o e-mail e o cron também geram, sem sessão).
  *
  * Contrato de request/response IDÊNTICO ao abacate-pix/pagarme-pix — o
  * PixCheckout só troca o nome da função.
@@ -361,6 +363,8 @@ serve(async (req) => {
           chave: chaveU2027(compra), dono: c.dono, oferta: offer, valorCentavos: amount, descricao: DESCRICAO_PIX[offer] ?? "CORE seu 2027",
           criarQr: criarQrAsaas(apiKey, logStep), extraPedido: { origem: "landing", compra },
         });
+        // crítica r1: "o código também foi pro seu e-mail" só quando o bloco desta compra saiu montado num e-mail (a marca)
+        const noEmail = blocoLigado(Deno.env.get(SECRET_U2027_EMAIL)) && await blocoFoiProEmail(supabaseAdmin, compra);
         if ("erro" in pix) {
           logStep("Seu 2027: Pix não gerado", { motivo: pix.erro });
           return jsonResponse({ error: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.", motivo: pix.erro }, 502);
@@ -368,7 +372,7 @@ serve(async (req) => {
         logStep("Seu 2027: Pix pronto", { novo: pix.novo, dono_igual: c.dono === user.id });
         return jsonResponse({
           orderId: pix.orderId, amount: (amount / 100).toFixed(2), qrCode: pix.qrCode, qrCodeBase64: pix.qrCodeBase64, expiresAt: pix.expiresAt,
-          dono_igual: c.dono === user.id, no_email: blocoLigado(Deno.env.get(SECRET_U2027_EMAIL)),
+          dono_igual: c.dono === user.id, no_email: noEmail,
         });
       }
       /* 21/10: o presente (pv149) é upsell de quem JÁ é pra sempre (acabou de pagar o vitalício). Sem isso, o vitalício
@@ -414,9 +418,9 @@ serve(async (req) => {
         }, 503);
       }
 
-      // 31/10: a validade por oferta (upsell 24 h; o resto 30 min, como sempre) — _shared/pix-upsell.ts
+      // 30 min pra toda oferta deste create (as 24 h do upsell são só do garantirPixUpsell — crítica r1)
       const res = await postarQrEstatico(apiKey, chave, {
-        descricao: DESCRICAO_PIX[offer] ?? "CORE vitalicio", valorCentavos: amount, expiraSegundos: expiraSegundos(offer), ref: `${user.id}:${offer}`,
+        descricao: DESCRICAO_PIX[offer] ?? "CORE vitalicio", valorCentavos: amount, expiraSegundos: EXPIRA_PADRAO_S, ref: `${user.id}:${offer}`,
       });
       // deno-lint-ignore no-explicit-any
       const out = res.out as Record<string, any>;
@@ -481,6 +485,12 @@ serve(async (req) => {
     if (action === "check") {
       const id = String(body.id ?? "");
       if (!id) return jsonResponse({ error: "id_required" }, 400);
+      /* crítica r1 (31/10): a tela do 2027 confere sozinha — quem não é o dono do pedido não gasta uma consulta na Asaas (a
+       * mesma cota do checkout do vitalício) só pra ouvir MISMATCH. Só pro u2027 declarado (o resto segue a ordem de sempre). */
+      if (eh2027(String(body.offer ?? ""))) {
+        const reg0 = await registroDoPedido(supabaseAdmin, id, logStep);
+        if (!reg0?.[0] || reg0[0].user_id !== user.id) return jsonResponse({ paid: false, status: "MISMATCH" });
+      }
       const r = await buscarPagamento(apiKey, id);
       /* segurança 21/10: saiu o `probeOnly` — devolvia o corpo cru da Asaas (pagamentos, externalReference com o
        * user_id de quem gerou) de QUALQUER id pra qualquer sessão; a sonda de QA mora no pix-reconcile (com token). */
@@ -594,8 +604,10 @@ serve(async (req) => {
       /* 21/10 (upsell "Seu 2027", u2027): não é assinatura — grava o pacote (`core-pacote-2027`) na conta de QUEM PAGOU +
        * Purchase 19,90 1x por pedido (trava própria). Não gravou → PENDING (a página confere de novo; webhook/reconcile são a rede). */
       if (eh2027(offer)) {
+        // crítica r1: a conta que recebe = a dona ATUAL da linha do vitalício (a compra pode ter mudado de conta depois do QR)
+        const dono27 = await donoNaHora(supabaseAdmin, { registrado: user.id, compra: (reg?.[0]?.event_data as Record<string, unknown> | undefined)?.compra });
         const p27 = await confirmarPacote2027(supabaseAdmin, {
-          userId: user.id, orderId: id, origem: "upsell",
+          userId: dono27, orderId: id, origem: "upsell",
           enviarCompra: async () => {
             await sendToUtmify(supabaseAdmin, { userId: user.id, email: user.email ?? null, orderId: id, offer, amountCents: PRECOS_CENTAVOS[offer], name: null });
             // 31/10: upsell não manda Purchase pra Meta (_shared/pix-upsell.ts META_PURCHASE_UPSELL) — só a UTMify
@@ -606,8 +618,10 @@ serve(async (req) => {
           },
         });
         if (p27.r === "falhou") { logStep("Seu 2027 pago mas o pacote não gravou — tenta de novo", { id }); return jsonResponse({ paid: false, status: "PENDING" }); }
+        if (p27.r === "ja_tinha") await registrarDobro2027(supabaseAdmin, { userId: dono27, orderId: id, amountCents: PRECOS_CENTAVOS[offer] });
         // 31/10: o e-mail curto "Pronto, seu 2027 tá no seu CORE" (1 por pedido; o mesmo do webhook e do reconcile)
-        await avisarPronto2027(supabaseAdmin, { orderId: id, para: user.email, enviar: enviarResend });
+        const emailDono = dono27 === user.id ? user.email : (await supabaseAdmin.auth.admin.getUserById(dono27)).data?.user?.email ?? null;
+        await avisarPronto2027(supabaseAdmin, { orderId: id, para: emailDono, enviar: enviarResend });
         logStep("Seu 2027 pago — pacote na conta", { id, r: p27.r });
         return jsonResponse({ paid: true, status: "PAID", pacote2027: true });
       }

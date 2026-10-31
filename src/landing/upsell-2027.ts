@@ -4,14 +4,21 @@
  * (#lp-pix), no mesmo padrão das fases da landing, com o PRÓPRIO <style> (o 1º <style> do landing.html não muda: o
  * braço "atual" é comparado linha a linha com a página de 30/10).
  *
- *   oferta   "✓ Pagamento confirmado" · "Seu 2027 já organizado" · R$ 14,90 · uma vez, sem mensalidade ·
- *            "Quero · copiar o Pix" · "Agora não" (→ conta pronta, SEM o plano de 30 dias: 0 em 39).
- *            O Pix já está sendo gerado ao mostrar a oferta (pré-aquecido; o MESMO do e-mail, 24 h).
+ *   oferta   "✓ Pagamento confirmado" + "O CORE é seu pra sempre…" (a linha da landing) · "Seu 2027 organizado" · R$ 14,90 ·
+ *            uma vez, sem mensalidade · "Quero · copiar o Pix" · "Agora não · ver minha conta" (botão de 44 px nos 2 braços;
+ *            → conta pronta, SEM o plano de 30 dias: 0 em 39). O Pix já está sendo gerado ao mostrar a oferta (pré-aquecido;
+ *            o MESMO do e-mail, 24 h).
  *   qr       o toque copia o código (ClipboardItem com a promessa do Pix pré-aquecido) → QR + código + "Pagou? Volte aqui.
- *            Esta tela confirma sozinha." · confere a cada 3 s e na volta da aba (asaas-pix check, SEM pixel).
+ *            Esta tela confirma sozinha." · confere a cada 3 s nos 10 primeiros minutos, depois a cada 30 s, só com a aba
+ *            à vista, e para em 30 min (fica a volta da aba + "Já paguei"); sem laço quando o dono é outra conta ou veio
+ *            do e-mail (crítica r1: a cota da Asaas é a mesma do checkout do vitalício). "Código copiado" fica guardado
+ *            (a volta do banco recarrega a aba).
+ *   venceu   o link do e-mail com o Pix vencido, num navegador que não consegue gerar outro (sem sessão / outra conta):
+ *            "Esse código venceu" + "Ver minha conta" — nunca um "Quero" que só dá erro (crítica r1).
  *   pronto   "Pronto, seu 2027 tá no seu CORE" · os 4 ✓ · onde fica · Continuar → conta pronta (com as lojas).
- *   fim      a landing mostra a conta pronta de sempre.
- * Sem Purchase pra Meta em nenhum passo (decisão do dono: _shared/pix-upsell.ts META_PURCHASE_UPSELL).
+ *   fim      a landing mostra a conta pronta de sempre (pelo link do e-mail sem compra neste navegador: "Você já tem o CORE").
+ * Sem Purchase pra Meta em nenhum passo (recomendação do relatório, ainda a confirmar com o dono: _shared/pix-upsell.ts).
+ * Onde fica (crítica r1): só no site e no app do iPhone — o Android da loja ainda não tem a aba Seu 2027.
  *
  * Eventos (todos com braco_lp/braco_checkout pelo `evento` da landing + order_id = a compra do vitalício):
  *   landing_u2027_view · _quero · _nao {de} · _pix_pronto {ms, ok, motivo?} · _copiado {ok, via} · _pago · _continuar ·
@@ -37,6 +44,8 @@ export type CtxU2027 = {
   desenharQr: (alvo: HTMLElement, p: { qrCode: string; qrCodeBase64: string | null }) => void | Promise<void>;
   /** a conta final já tem e-mail (o "Pronto" e o "foi pro seu e-mail" dependem disso) */
   email: () => string | null;
+  /** a linha sob "Pagamento confirmado" (o que ela já tem: "O CORE é seu pra sempre…") */
+  linhaConfirmada: () => string;
   /** terminou (Agora não / Continuar): a landing volta pra conta pronta */
   aoTerminar: () => void;
   /** a tela do cartão mudou (a landing rola até o cartão) */
@@ -49,11 +58,18 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 
 /** O que veio — SÓ o que o app faz de verdade (src/lib/pacote-2027.ts; os mesmos 4 do Fluxo2027). */
 export const ITENS_U2027 = ["Planejar 2027 em 5 minutos", "12 revisões do mês", "Cofrinho das 52 semanas", "Planner 2027 pra imprimir"] as const;
+/** Os textos que a crítica r1 mediu (honestidade: sem "já organizado", sem "orçamento do ano", sem "no app" pro Android). */
+export const TITULO_U2027 = "Seu 2027 organizado";
+export const DESC_U2027 = "3 metas, quanto gastar e guardar por mês, 12 revisões do mês e o cofrinho de 52 semanas.";
+export const NOTA_U2027 = "É separado do CORE que você já pagou. Por enquanto fica no site e no app do iPhone.";
+export const ONDE_U2027 = "Fica no módulo <b>Desenvolvimento Pessoal</b>, aba <b>Seu 2027</b>. Por enquanto, no site e no app do iPhone.";
+/** O laço de conferência (crítica r1): rápido nos 10 primeiros minutos, devagar até 30 min, depois só na volta / "Já paguei". */
+export const LACO_U2027 = { rapidoMs: 3000, lentoMs: 30_000, viraLentoMs: 10 * 60e3, paraMs: 30 * 60e3 } as const;
 
 /* o estilo próprio (1x por página). Escopado em .u27 — nada vaza pro resto da landing. */
 const CSS = `
 /* a faixa do cartão do vitalício ("OFERTA ESPECIAL · HOJE" no atual) não fica em cima do 2027: nada de "hoje" no upsell */
-.lp-card[data-u27] .lp-card-faixa { display: none; }
+.lp-card[data-u27] .lp-card-faixa, .lp-card[data-u27-link] .lp-card-faixa { display: none; }
 .u27 { text-align: left; animation: u27-surge .25s ease-out both; }
 @keyframes u27-surge { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .u27-ok { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 750; color: #14532d; }
@@ -69,6 +85,10 @@ const CSS = `
 .u27-preco b { font-size: 30px; font-weight: 850; letter-spacing: -.03em; }
 .u27-preco span { font-size: 14px; font-weight: 650; color: var(--suave, #6b6670); }
 .u27 .lp-links { margin-top: 10px; }
+.u27 button.lp-link { min-height: 44px; padding: 10px 8px; }
+.u27-linha { margin: 6px 0 0 28px; font-size: 14px; line-height: 1.4; color: var(--suave, #6b6670); }
+.u27-sair { display: block; width: 100%; min-height: 44px; margin-top: 10px; padding: 10px 14px; border: 1.5px solid var(--borda, #ebe8ee); border-radius: 999px; background: transparent; color: var(--tx, #1c1a1f); font-size: 15px; font-weight: 700; }
+.u27-sair:active { background: var(--papel, #f7f5f8); }
 .u27-nota { margin: 12px 0 0; font-size: 12.5px; line-height: 1.4; color: var(--fraco, #9a95a0); text-align: center; }
 .u27-copiado { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 14px; background: var(--verde-suave, #ecfdf3); color: #14532d; font-size: 14px; line-height: 1.35; }
 .u27-copiado svg { width: 22px; height: 22px; flex-shrink: 0; padding: 4px; border-radius: 50%; background: var(--verde, #16a34a); color: #fff; }
@@ -133,6 +153,16 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
   let relogio: number | null = null;
   let vistaOferta = false;
   let conferindo = false;
+  /** chegou pelo link do e-mail (voltaDoEmail) */
+  let veioDoLink = false;
+  /** o link do e-mail veio sem Pix vivo: a oferta espera a 1ª tentativa de gerar (pra não piscar um "Quero" que não gera) */
+  let esperandoLink = false;
+  /** este navegador não consegue gerar outro Pix (sem sessão / outra conta) e o do e-mail venceu */
+  let venceu = false;
+  /** quando o QR apareceu nesta aba (o laço rápido/lento conta daqui) */
+  let qrDesde = 0;
+  const fora = () => e.pix?.donoIgual === false || !!e.pix?.doEmail;
+  const semComoGerar = (r: GeradoU2027) => "erro" in r && (r.onde === "sem_sessao" || r.onde === "outra_conta");
   const base = () => ({ order_id: compra, pedido_u2027: e.pix?.orderId ?? null });
   const ev = (nome: string, d: Record<string, unknown> = {}) => ctx.evento(nome, { ...base(), ...d });
 
@@ -154,8 +184,11 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
     void p.then((r) => {
       const ok = "qrCode" in r;
       ev("landing_u2027_pix_pronto", { ms: Date.now() - tPre, ok, ...(ok ? {} : { motivo: "jaTem2027" in r ? "ja_tem" : r.onde }) });
-      if ("qrCode" in r) { comEmail = !!r.comEmail; if (!e.pix || e.pix.orderId !== r.orderId) { e = { ...e, pix: { orderId: r.orderId, qrCode: r.qrCode, qrCodeBase64: r.qrCodeBase64, expiresAt: r.expiresAt, donoIgual: r.donoIgual } }; gravarEstadoU2027(e); } }
+      if ("qrCode" in r) { comEmail = !!r.comEmail; if (!e.pix || e.pix.orderId !== r.orderId) { e = { ...e, pix: { orderId: r.orderId, qrCode: r.qrCode, qrCodeBase64: r.qrCodeBase64, expiresAt: r.expiresAt, donoIgual: r.donoIgual }, copiado: false }; gravarEstadoU2027(e); } }
+      else if (veioDoLink && semComoGerar(r)) { venceu = true; ev("landing_u2027_venceu", { motivo: (r as { onde: string }).onde }); }
       else { promessa = null; } // falhou: o toque em "Quero" tenta de novo (lá mesmo)
+      if (esperandoLink) { esperandoLink = false; if (e.etapa === "oferta") render(); }
+      else if (venceu && e.etapa === "oferta") render();
     });
   }
 
@@ -171,6 +204,7 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
     const r = await p;
     gerando = false;
     if ("jaTem2027" in r) { void copia.catch(() => null); salvar({ etapa: "pronto" }); return; }
+    if (veioDoLink && semComoGerar(r)) { void copia.catch(() => null); venceu = true; render(); return; }
     if ("erro" in r) {
       void copia.catch(() => null);
       erro = r.erro; promessa = null;
@@ -180,7 +214,8 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
     const c = await copia;
     copiado = c.ok;
     ev("landing_u2027_copiado", { ok: c.ok, via: c.via, auto: true });
-    salvar({ etapa: "qr", pix: { orderId: r.orderId, qrCode: r.qrCode, qrCodeBase64: r.qrCodeBase64, expiresAt: r.expiresAt, donoIgual: r.donoIgual } });
+    qrDesde = Date.now();
+    salvar({ etapa: "qr", pix: { orderId: r.orderId, qrCode: r.qrCode, qrCodeBase64: r.qrCodeBase64, expiresAt: r.expiresAt, donoIgual: r.donoIgual }, copiado: c.ok });
     conferirEmLoop();
   }
 
@@ -197,17 +232,30 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
     try { if (await ctx.api.conferir(e.pix)) { pago(); return true; } } catch { /* tenta de novo */ } finally { conferindo = false; }
     return false;
   }
+  /** O laço (crítica r1): 3 s nos 10 primeiros minutos, 30 s até 30 min, só com a aba à vista; nada quando o dono é outra
+   *  conta ou veio do e-mail (essa tela não confirma sozinha: o servidor diria MISMATCH). */
   function conferirEmLoop() {
-    if (loop) window.clearTimeout(loop);
-    if (ctx.api.simulado) return;
-    const passo = async () => {
-      if (e.etapa !== "qr") return;
-      await conferirUmaVez();
-      if (e.etapa === "qr") loop = window.setTimeout(passo, 3000);
+    if (loop) { window.clearTimeout(loop); loop = null; }
+    if (ctx.api.simulado || e.etapa !== "qr" || fora()) return;
+    if (!qrDesde) qrDesde = Date.now();
+    const proximo = () => {
+      const passou = Date.now() - qrDesde;
+      if (passou > LACO_U2027.paraMs || document.visibilityState === "hidden") return; // a volta da aba religa
+      loop = window.setTimeout(passo, passou < LACO_U2027.viraLentoMs ? LACO_U2027.rapidoMs : LACO_U2027.lentoMs);
     };
-    loop = window.setTimeout(passo, 3000);
+    const passo = async () => {
+      loop = null;
+      if (e.etapa !== "qr" || document.visibilityState === "hidden" || Date.now() - qrDesde > LACO_U2027.paraMs) return;
+      await conferirUmaVez();
+      if (e.etapa === "qr") proximo();
+    };
+    proximo();
   }
-  const aoVoltar = () => { if (document.visibilityState === "visible" && e.etapa === "qr") void conferirUmaVez(); };
+  const aoVoltar = () => {
+    if (document.visibilityState !== "visible" || e.etapa !== "qr" || fora()) return;
+    void conferirUmaVez();
+    if (!loop) conferirEmLoop();
+  };
   document.addEventListener("visibilitychange", aoVoltar);
   window.addEventListener("pageshow", aoVoltar);
 
@@ -234,23 +282,41 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
     ctx.card.dataset.fase = "conta"; // o CSS esconde a oferta do vitalício (qualquer fase ≠ "oferta")
     ctx.card.setAttribute("data-u27", "");
     const c = ctx.caixa;
+    const topoPago = `<div class="u27-ok">${ICO_CHECK}<span>Pagamento confirmado</span></div><p class="u27-linha" data-testid="u2027-linha">${esc(ctx.linhaConfirmada())}</p>`;
+    if (e.etapa === "oferta" && venceu) {
+      c.innerHTML = `
+      <div class="u27" data-testid="u2027-venceu">
+        ${topoPago}
+        <div class="u27-sep"></div>
+        <h3>Esse código venceu</h3>
+        <p class="u27-desc">O Pix do Seu 2027 valia 24 horas. O CORE que você pagou continua seu, do mesmo jeito.</p>
+        <div class="lp-form"><button type="button" class="lp-cta" id="u27-conta">Ver minha conta</button></div>
+      </div>`;
+      c.querySelector<HTMLButtonElement>("#u27-conta")!.addEventListener("click", () => { ev("landing_u2027_nao", { de: "venceu" }); salvar({ etapa: "fim" }); });
+      return true;
+    }
+    if (e.etapa === "oferta" && esperandoLink) {
+      preaquecer();
+      c.innerHTML = `<div class="u27" data-testid="u2027-conferindo">${topoPago}<div class="u27-gerando"><i></i>Abrindo o seu Pix…</div></div>`;
+      return true;
+    }
     if (e.etapa === "oferta") {
       if (!vistaOferta) { vistaOferta = true; ev("landing_u2027_view"); }
       preaquecer();
       c.innerHTML = `
       <div class="u27" data-testid="u2027-oferta">
-        <div class="u27-ok">${ICO_CHECK}<span>Pagamento confirmado</span></div>
+        ${topoPago}
         <div class="u27-sep"></div>
         <div class="u27-kicker">Quer ir além?</div>
-        <h3>Seu 2027 já organizado</h3>
-        <p class="u27-desc">3 metas, orçamento do ano, 12 revisões do mês e o cofrinho de 52 semanas.</p>
+        <h3>${TITULO_U2027}</h3>
+        <p class="u27-desc">${DESC_U2027}</p>
         <div class="u27-preco"><b data-testid="u2027-preco">${reais(VALOR_U2027)}</b><span>uma vez, sem mensalidade</span></div>
         ${gerando
           ? '<button type="button" class="lp-cta" id="u27-quero" disabled><i class="lp-gira"></i>Gerando o Pix…</button>'
           : '<button type="button" class="lp-cta" id="u27-quero">Quero · copiar o Pix</button>'}
         ${erro ? `<p class="lp-erro" role="alert">${esc(erro)}</p>` : ""}
-        <div class="lp-links"><button type="button" class="lp-link" id="u27-nao">Agora não</button></div>
-        <p class="u27-nota">É separado do CORE que você já pagou. Fica no app e no site.</p>
+        <button type="button" class="u27-sair" id="u27-nao">Agora não · ver minha conta</button>
+        <p class="u27-nota">${NOTA_U2027}</p>
       </div>`;
       c.querySelector<HTMLButtonElement>("#u27-quero")!.addEventListener("click", () => { void quero(); });
       c.querySelector<HTMLButtonElement>("#u27-nao")!.addEventListener("click", () => { ev("landing_u2027_nao", { de: "oferta" }); salvar({ etapa: "fim" }); });
@@ -258,6 +324,7 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
     }
     if (e.etapa === "qr" && e.pix) {
       const p = e.pix;
+      if (e.copiado && copiado === null) copiado = true; // a volta do banco: ela já copiou (e colou)
       const fora = p.donoIgual === false || !!p.doEmail;
       const resta = () => Date.parse(p.expiresAt) - Date.now();
       c.innerHTML = `
@@ -277,7 +344,7 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
       c.querySelector<HTMLButtonElement>("#u27-copiar")!.addEventListener("click", async () => {
         const ok = await ctx.copiarTexto(p.qrCode);
         ev("landing_u2027_copiado", { ok, via: "botao", auto: false });
-        if (ok && !copiado) { copiado = true; render(); return; }
+        if (ok && !copiado) { copiado = true; e = { ...e, copiado: true }; gravarEstadoU2027(e); render(); return; }
         const rot = c.querySelector<HTMLElement>("#u27-copiar span");
         if (ok && rot) { rot.textContent = "Copiado ✓"; window.setTimeout(() => { if (rot.isConnected) rot.textContent = "Copiar de novo"; }, 1500); }
       });
@@ -299,7 +366,7 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
         <div class="lp-pago-check">${ICO_CHECK}</div>
         <h3>Pronto, seu 2027 tá no seu CORE</h3>
         <ul class="u27-lista">${ITENS_U2027.map((t) => `<li>${ICO_CHECK}<span>${t}</span></li>`).join("")}</ul>
-        <div class="u27-onde" data-testid="u2027-onde">No app e no site: <b>Dev. Pessoal → Seu 2027</b>.${email ? ` Entre com <b>${esc(email)}</b>.` : ""}</div>
+        <div class="u27-onde" data-testid="u2027-onde">${ONDE_U2027}${email ? ` Entre com <b>${esc(email)}</b>.` : ""}</div>
         <div class="lp-form"><button type="button" class="lp-cta" id="u27-continuar">Continuar</button></div>
       </div>`;
       c.querySelector<HTMLButtonElement>("#u27-continuar")!.addEventListener("click", () => { ev("landing_u2027_continuar"); salvar({ etapa: "fim" }); });
@@ -311,11 +378,14 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
   }
 
   function voltaDoEmail(pix: PixU2027 | null) {
+    veioDoLink = true;
     let restaurado = "oferta";
-    if (e.etapa === "pronto") restaurado = "pronto";
+    // crítica r1: depois de "Continuar"/"Agora não" pelo link, a recarga fica na conta (não reabre o QR)
+    if (e.etapa === "fim") restaurado = "fim";
+    else if (e.etapa === "pronto") restaurado = "pronto";
     else if (e.pix && pix && e.pix.orderId === pix.orderId && e.etapa === "qr") restaurado = "aba";
-    else if (pix) { restaurado = "link"; e = { ...e, etapa: "qr", pix: { ...pix, donoIgual: e.pix?.orderId === pix.orderId ? e.pix.donoIgual : false } }; gravarEstadoU2027(e); copiado = null; }
-    else { e = { ...e, etapa: "oferta", pix: null }; gravarEstadoU2027(e); }
+    else if (pix) { restaurado = "link"; const mesmo = e.pix?.orderId === pix.orderId; e = { ...e, etapa: "qr", pix: { ...pix, donoIgual: mesmo ? e.pix!.donoIgual : false }, copiado: mesmo && e.copiado === true }; gravarEstadoU2027(e); copiado = null; }
+    else { e = { ...e, etapa: "oferta", pix: null }; gravarEstadoU2027(e); esperandoLink = true; }
     ev("landing_u2027_volta_email", { restaurado });
   }
 

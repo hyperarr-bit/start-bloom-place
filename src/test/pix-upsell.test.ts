@@ -12,6 +12,7 @@ import { join } from "node:path";
 import {
   EXPIRA_PADRAO_S, EXPIRA_UPSELL_S, META_PURCHASE_UPSELL, PRECO_U2027_CENTAVOS, REUSO_MIN_MS, avisarPronto2027, blocoLigado, blocoU2027,
   chavePixUpsell, chaveU2027, compraDoUpsell, expiraSegundos, garantirPixUpsell, htmlBlocoU2027, htmlPronto2027, linkU2027, mandaPurchaseMeta, sessaoPodePedir,
+  blocoFoiProEmail, chaveBlocoNoEmail, consultarUpsellAgora, donoNaHora, registrarDobro2027, validadeNoEmail,
   type CriarQr,
 } from "../../supabase/functions/_shared/pix-upsell";
 import { PRECOS_HOJE } from "../../supabase/functions/_shared/ofertas-hoje";
@@ -77,10 +78,11 @@ describe("a validade: upsell 24 h, o resto 30 min (o vitalício não muda)", () 
     for (const o of ["u2027", "pv149"]) expect(expiraSegundos(o)).toBe(86_400);
     for (const o of ["LN_sempre279", "LN_ano279", "LN_anosempre478", "w27", "lifetime", "h279", "hv47", "pk99", "", null]) expect(expiraSegundos(o as string)).toBe(1800);
   });
-  it("o asaas-pix usa expiraSegundos(offer) no create (o 1800 fixo saiu) e o QR vem do _shared/asaas-qr.ts", () => {
+  it("crítica r1: o create ANTIGO do asaas-pix (o /hoje e o /inicio, no ar) segue em 30 min pra TODA oferta — as 24 h são só do garantirPixUpsell", () => {
     const s = readFileSync(join(__dirname, "../../supabase/functions/asaas-pix/index.ts"), "utf8");
     expect(s).not.toMatch(/EXPIRA_SEGUNDOS/);
-    expect(s).toMatch(/expiraSegundos: expiraSegundos\(offer\)/);
+    expect(s).not.toMatch(/expiraSegundos\(offer\)/);
+    expect(s).toMatch(/expiraSegundos: EXPIRA_PADRAO_S, ref: `\$\{user\.id\}:\$\{offer\}`/);
     expect(s).toMatch(/from "\.\.\/_shared\/asaas-qr\.ts"/);
     const qr = readFileSync(join(__dirname, "../../supabase/functions/_shared/asaas-qr.ts"), "utf8");
     expect(qr).toMatch(/expirationSeconds: a\.expiraSegundos/);
@@ -214,8 +216,9 @@ describe("pixel: o upsell NÃO manda Purchase pra Meta (decisão do dono) — s�
     const whP = wh.slice(wh.indexOf("if (ehOfertaPresente(offer) && valorCobre"), wh.indexOf("/* 21/10 (downsell do presente, pk99)"));
     expect(whP).toMatch(/if \(mandaPurchaseMeta\(offer\)\) await sendMetaCapi/);
     const rc = fonte("pix-reconcile");
-    expect(rc).toMatch(/if \(!mandaPurchaseMeta\("u2027"\)\) \{ capi = "upsell_sem_meta"; return; \}/);
-    expect(rc).toMatch(/capi = mandaPurchaseMeta\("pv149"\) \? await capiPresente/);
+    // crítica r1: sem Meta, o reconcile manda a UTMify (a trava `capi` dele fica tomada; senão a venda some do painel)
+    expect(rc).toMatch(/if \(!mandaPurchaseMeta\("u2027"\)\) \{\s*capi = await utmifyUpsell\(admin, \{[^}]*offer: "u2027"/);
+    expect(rc).toMatch(/capi = mandaPurchaseMeta\("pv149"\) \? await capiPresente\(o, email, cents\)\s*: await utmifyUpsell\(admin, \{[^}]*offer: "pv149"/);
   });
   it("o e-mail \"Pronto\" sai 1x por pedido nos 3 caminhos (trava u2027-email:<pedido>; solta se o envio falhar)", async () => {
     const { admin, t } = bancoFalso();
@@ -232,7 +235,10 @@ describe("pixel: o upsell NÃO manda Purchase pra Meta (decisão do dono) — s�
     for (const f of ["asaas-pix", "asaas-webhook", "pix-reconcile"]) expect(readFileSync(join(__dirname, `../../supabase/functions/${f}/index.ts`), "utf8")).toMatch(/avisarPronto2027\(/);
     const h = htmlPronto2027({ email: "maria@email.com" });
     expect(h).toContain("Pronto, seu 2027 tá no seu CORE.");
-    expect(h).toContain("Dev. Pessoal → Seu 2027");
+    expect(h).not.toContain("Dev. Pessoal");
+    expect(h).toContain("módulo <b style=\"color:#16121c;\">Desenvolvimento Pessoal</b>, aba <b style=\"color:#16121c;\">Seu 2027</b>");
+    expect(h).toContain("no site (coreaplicativo.com.br) e no app do iPhone"); // crítica r1: o Android da loja ainda não tem a aba
+    expect(h).not.toMatch(/no app e no site/);
     expect(h).toMatch(/App Store[\s\S]*Google Play/);
   });
 });
@@ -248,9 +254,13 @@ describe("B. o bloco do 2027 no e-mail de compra confirmada", () => {
     expect(await blocoU2027(admin, { ligado: false, compra: "qr_vit_1", dono: "u1", offer: "LN_sempre279", criarQr: qr.criar })).toBe("");
     expect(qr.chamadas).toHaveLength(0);
     const html = await blocoU2027(admin, { ligado: true, compra: "qr_vit_1", dono: "u1", offer: "LN_sempre279", criarQr: qr.criar });
-    expect(html).toContain("Quer o seu 2027 já organizado?");
+    expect(html).toContain("Quer o seu 2027 organizado?");
+    expect(html).not.toContain("já organizado");
+    expect(html).not.toContain("orçamento do ano");
+    expect(html).toContain("quanto gastar e guardar por mês");
     expect(html).toContain("R$ 14,90, uma vez");
     expect(html).toContain("Vale por 24 h.");
+    expect(html).toContain("Pagou? A gente avisa por e-mail quando cair.");
     expect(html).toContain("Abrir o Pix");
     // a página pede o Pix da mesma compra → o MESMO código
     const pagina = await garantirPixUpsell(admin, { chave: chaveU2027("qr_vit_1"), dono: "u1", oferta: "u2027", valorCentavos: 1490, descricao: "x", criarQr: qr.criar });
@@ -296,5 +306,75 @@ describe("B. o bloco do 2027 no e-mail de compra confirmada", () => {
     expect(dest).toMatch(/const extra = args\.extra \? await args\.extra\(para\)/);
     const rc = readFileSync(join(__dirname, "../../supabase/functions/pix-reconcile/index.ts"), "utf8");
     expect(rc).toMatch(/extra: \(dono\) => blocoU2027\(admin/);
+  });
+});
+
+describe("crítica r1 (31/10): os consertos do dinheiro", () => {
+  it("a validade do e-mail sai do expiresAt de verdade (o reuso aceita a partir de 2 h)", () => {
+    const agora = Date.parse("2026-10-31T15:00:00Z"); // 12h de Brasília
+    expect(validadeNoEmail(new Date(agora + 24 * 3600e3).toISOString(), agora)).toBe("Vale por 24 h.");
+    expect(validadeNoEmail(new Date(agora + 23.5 * 3600e3).toISOString(), agora)).toBe("Vale por 24 h.");
+    expect(validadeNoEmail(new Date(agora + 6 * 3600e3).toISOString(), agora)).toBe("Vale até hoje, 18h.");
+    expect(validadeNoEmail(new Date(agora + 21.5 * 3600e3).toISOString(), agora)).toBe("Vale até amanhã, 9h30.");
+    const pix = { orderId: "qr_u27_1", qrCode: "000201abc", expiresAt: new Date(agora + 3 * 3600e3).toISOString() };
+    const html = htmlBlocoU2027({ compra: "qr_vit_1", pix, agora });
+    expect(html).toContain("Vale até hoje, 15h.");
+    expect(html).not.toContain("Vale por 24 h.");
+  });
+  it("'o código também foi pro seu e-mail' só com a marca do bloco montado (u2027-email-bloco:<compra>)", async () => {
+    const { admin, t } = bancoFalso();
+    const qr = qrFalso();
+    expect(await blocoFoiProEmail(admin, "qr_vit_1")).toBe(false);
+    await blocoU2027(admin, { ligado: false, compra: "qr_vit_1", dono: "u1", offer: "LN_sempre279", criarQr: qr.criar });
+    expect(await blocoFoiProEmail(admin, "qr_vit_1")).toBe(false);
+    await blocoU2027(admin, { ligado: true, compra: "qr_vit_1", dono: "u1", offer: "LN_sempre279", criarQr: qr.criar });
+    expect(t.webhook_events.some((l) => l.id === chaveBlocoNoEmail("qr_vit_1"))).toBe(true);
+    expect(await blocoFoiProEmail(admin, "qr_vit_1")).toBe(true);
+    const pix = readFileSync(join(__dirname, "../../supabase/functions/asaas-pix/index.ts"), "utf8");
+    expect(pix).toMatch(/const noEmail = blocoLigado\(Deno\.env\.get\(SECRET_U2027_EMAIL\)\) && await blocoFoiProEmail\(supabaseAdmin, compra\)/);
+    expect(pix).toMatch(/no_email: noEmail/);
+  });
+  it("o crédito vai pra dona ATUAL da linha do vitalício (a compra mudou de conta depois do QR); sem `compra` = quem está no registro", async () => {
+    const { admin } = bancoFalso({
+      analytics_events: [{ event_name: "pix_order_created", user_id: "anonima", event_data: { order_id: "qr_vit_1", offer: "LN_sempre279" } }],
+      subscriptions: [{ user_id: "conta-nova", status: "active", abacatepay_billing_id: "qr_vit_1" }],
+    });
+    expect(await donoNaHora(admin, { registrado: "conta-velha", compra: "qr_vit_1" })).toBe("conta-nova");
+    expect(await donoNaHora(admin, { registrado: "conta-velha", compra: undefined })).toBe("conta-velha");
+    expect(await donoNaHora(admin, { registrado: "conta-velha", compra: "qr_sem_linha" })).toBe("conta-velha");
+    for (const f of ["asaas-pix", "asaas-webhook", "pix-reconcile"]) expect(readFileSync(join(__dirname, `../../supabase/functions/${f}/index.ts`), "utf8")).toMatch(/donoNaHora\(/);
+  });
+  it("o 2º pagamento do 2027 na mesma conta (outro QR vivo) vira evento + chamado de devolução, 1x por pedido; o mesmo pedido em 2 caminhos não", async () => {
+    const { admin, t } = bancoFalso({ user_data: [{ user_id: "u1", key: "core-pacote-2027", value: { comprado: true, pedido: "qr_u27_1" } }] });
+    (t as Record<string, unknown[]>).support_tickets = [];
+    expect(await registrarDobro2027(admin, { userId: "u1", orderId: "qr_u27_1", amountCents: 1490 })).toBe(false);
+    expect(await registrarDobro2027(admin, { userId: "u1", orderId: "qr_u27_2", amountCents: 1490 })).toBe(true);
+    expect(await registrarDobro2027(admin, { userId: "u1", orderId: "qr_u27_2", amountCents: 1490 })).toBe(false);
+    expect(t.analytics_events.filter((l) => l.event_name === "u2027_pago_em_dobro")).toHaveLength(1);
+    const tk = (t as Record<string, Array<Record<string, unknown>>>).support_tickets;
+    expect(tk).toHaveLength(1);
+    expect(String(tk[0].message)).toContain("Pedido a devolver: qr_u27_2");
+    for (const f of ["asaas-pix", "asaas-webhook"]) expect(readFileSync(join(__dirname, `../../supabase/functions/${f}/index.ts`), "utf8")).toMatch(/if \(p27\.r === "ja_tinha"\) await registrarDobro2027\(/);
+  });
+  it("o reconcile: Pix de upsell pré-aquecido (com upsell_chave) é consultado sempre nas 2 primeiras horas, depois 1x por hora", () => {
+    const criado = "2026-10-31T12:00:00Z";
+    const t0 = Date.parse(criado);
+    expect(consultarUpsellAgora(criado, false, t0 + 30 * 3600e3)).toBe(true); // /hoje, /inicio: como antes
+    expect(consultarUpsellAgora(criado, true, t0 + 3600e3)).toBe(true);
+    const depois = Array.from({ length: 16 }, (_, i) => consultarUpsellAgora(criado, true, t0 + 3 * 3600e3 + i * 900e3));
+    expect(depois.filter(Boolean)).toHaveLength(4); // 4 horas, 4 consultas (era 16)
+    const rc = readFileSync(join(__dirname, "../../supabase/functions/pix-reconcile/index.ts"), "utf8");
+    expect(rc.match(/consultarUpsellAgora\(o\.criadoEm, !!o\.upsellChave\)/g)!.length).toBe(2); // u2027 e pv149
+  });
+  it("o check do u2027 confere o dono ANTES da Asaas (quem não é dono não gasta consulta)", () => {
+    const pix = readFileSync(join(__dirname, "../../supabase/functions/asaas-pix/index.ts"), "utf8");
+    const i = pix.indexOf('if (action === "check")');
+    const trecho = pix.slice(i, pix.indexOf("const r = await buscarPagamento(apiKey, id);", i));
+    expect(trecho).toMatch(/if \(eh2027\(String\(body\.offer \?\? ""\)\)\) \{[\s\S]*reg0\[0\]\.user_id !== user\.id\) return jsonResponse\(\{ paid: false, status: "MISMATCH" \}\)/);
+  });
+  it("a recomendação do pixel está escrita como recomendação (o dono ainda não confirmou)", () => {
+    const s = readFileSync(join(__dirname, "../../supabase/functions/_shared/pix-upsell.ts"), "utf8");
+    expect(s).not.toMatch(/DECISÃO DO DONO/);
+    expect(s).toMatch(/CONFIRMAR COM O DONO/);
   });
 });

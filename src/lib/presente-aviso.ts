@@ -9,14 +9,14 @@
  * Quando some: no × ou no toque (pra sempre: `core-presente-aviso-v1` na conta + no aparelho), ou sozinho 7 dias depois
  * da 1ª vez que apareceu. Sem gênero, sem brinde, sem prazo falso.
  *
- * Chave PRESENTE_AVISO: "off" (padrão) | "web" | "web+android". Rollback = "off". QA: ?presente-aviso=on|off (guardado
- * neste aparelho em `presente-aviso-force`; ?presente-aviso=auto volta pra chave). O iPhone NUNCA mostra (só numa build
- * nova e com o link externo da Apple BR); o Android fica fora até conferir a regra de pagamentos da Play — e, ligado,
- * abre o site no navegador (o Pix nunca roda dentro do app da loja).
+ * Chave PRESENTE_AVISO: "off" (padrão) | "web". Rollback = "off". QA: ?presente-aviso=on|off (guardado neste aparelho em
+ * `presente-aviso-force`; ?presente-aviso=auto volta pra chave). Só o SITE mostra: o iPhone NUNCA (só numa build nova e
+ * com o link externo da Apple BR) e o Android da loja também não (crítica r1: o modo "web+android" saiu — abrir o Pix no
+ * navegador a partir do app da Play bate na regra de pagamentos da Play; volta só depois de conferir a regra), nem com o QA.
  */
 import { plataformaApp, type PlataformaApp } from "@/lib/native-shell";
 
-export type ModoAvisoPresente = "off" | "web" | "web+android";
+export type ModoAvisoPresente = "off" | "web";
 export const PRESENTE_AVISO: ModoAvisoPresente = "off";
 
 export const PARAM_QA_AVISO = "presente-aviso";
@@ -26,6 +26,8 @@ export const CHAVE_AVISO_PRESENTE = "core-presente-aviso-v1";
 export const DIAS_PRA_AVISO = 3;
 export const DIAS_VISIVEL = 7;
 export const VALOR_AVISO = "R$ 14,90";
+/** A 2ª linha do aviso (crítica r1: "O CORE pra sempre · R$ 14,90" logo abaixo de "Meu plano" parecia cobrança do plano dela). */
+export const SUB_AVISO = `De presente pra alguém · ${VALOR_AVISO}`;
 export const SITE_AVISO = "https://www.coreaplicativo.com.br";
 
 const DIA = 86_400_000;
@@ -46,16 +48,14 @@ export function forcaDoAviso(busca: string = typeof window === "undefined" ? "" 
   }
 }
 
-/** O aviso pode aparecer NESTA plataforma? (iPhone nunca; Android só com "web+android"; QA "on" liga web/Android) */
+/** O aviso pode aparecer NESTA plataforma? (só o site: iPhone e Android da loja nunca, nem com o QA) */
 export function avisoLigadoAqui(a: { modo?: ModoAvisoPresente; plataforma?: PlataformaApp; forca?: "on" | "off" | null } = {}): boolean {
   const plataforma = a.plataforma ?? plataformaApp();
-  if (plataforma === "ios") return false;
+  if (plataforma !== "web") return false;
   const forca = a.forca === undefined ? forcaDoAviso() : a.forca;
   if (forca === "off") return false;
   if (forca === "on") return true;
-  const modo = a.modo ?? PRESENTE_AVISO;
-  if (modo === "off") return false;
-  return plataforma === "web" || modo === "web+android";
+  return (a.modo ?? PRESENTE_AVISO) === "web";
 }
 
 export type LinhaDoAviso = { status?: string | null; payment_method?: string | null; billing_period?: string | null; plan?: string | null; amount_cents?: number | null; created_at?: string | null };

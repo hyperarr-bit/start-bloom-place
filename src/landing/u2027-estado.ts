@@ -18,10 +18,11 @@ let heap: EstadoU2027 | null = null;
 
 const etapas: readonly EtapaU2027[] = ["oferta", "qr", "pronto", "fim"];
 
-/** compra~etapa~pedido~vence~dono~código (o código Pix só tem ASCII imprimível; "~" não aparece em BR Code) */
+/** compra~etapa~pedido~vence~dono~código (o código Pix só tem ASCII imprimível; "~" não aparece em BR Code). O campo dono
+ *  leva um "c" no fim quando o código já foi copiado ("1c"/"0c"; crítica r1). */
 export function paraCookie(e: EstadoU2027): string {
   const p = e.pix;
-  return [e.compra, e.etapa, p?.orderId ?? "", p ? Date.parse(p.expiresAt) : "", p ? (p.donoIgual ? "1" : "0") : "", p?.qrCode ?? ""].join("~");
+  return [e.compra, e.etapa, p?.orderId ?? "", p ? Date.parse(p.expiresAt) : "", p ? `${p.donoIgual ? "1" : "0"}${e.copiado ? "c" : ""}` : "", p?.qrCode ?? ""].join("~");
 }
 export function doCookie(v: string | null, agora: number = Date.now()): EstadoU2027 | null {
   if (!v) return null;
@@ -30,9 +31,9 @@ export function doCookie(v: string | null, agora: number = Date.now()): EstadoU2
   if (!compra || !etapas.includes(etapa as EtapaU2027)) return null;
   const venceMs = Number(vence);
   const pix: PixU2027 | null = pedido && codigo && Number.isFinite(venceMs) && venceMs > 0
-    ? { orderId: pedido, qrCode: codigo, qrCodeBase64: null, expiresAt: new Date(venceMs).toISOString(), donoIgual: dono === "1" }
+    ? { orderId: pedido, qrCode: codigo, qrCodeBase64: null, expiresAt: new Date(venceMs).toISOString(), donoIgual: (dono ?? "").startsWith("1") }
     : null;
-  return { v: 1, compra, etapa: etapa as EtapaU2027, pix, salvoEm: agora };
+  return { v: 1, compra, etapa: etapa as EtapaU2027, pix, salvoEm: agora, ...(pix && (dono ?? "").endsWith("c") ? { copiado: true } : {}) };
 }
 
 /** O estado do 2027 desta compra (heap → localStorage → cookie; nada = a oferta). */

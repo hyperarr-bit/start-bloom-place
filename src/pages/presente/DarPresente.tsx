@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/use-auth";
 import type { EstadoPresente } from "@/lib/presente";
 import { IlustraPresente } from "@/presente/IlustraPresente";
 import { TelaCartao } from "@/presente/FluxoPresente";
-import { copiarTexto, estadoDia3, nomeDia3, tokenDia3, type PixDia3 } from "@/presente/api";
+import { copiarTexto, estadoDia3, nomeDia3, sairDia3, tokenDia3, type PixDia3 } from "@/presente/api";
 import "@/pages/hoje/funil-hoje.css";
 import "@/presente/presente.css";
 
@@ -25,11 +25,21 @@ import "@/presente/presente.css";
  *          /presente/<código> + "Enviar no WhatsApp" (o TelaCartao de 21/10) → "Pronto" abre o CORE.
  *   Sem token e logado (conta com o CORE pra sempre) → pede o token da conta. Sem os dois → "Abra pelo link do e-mail".
  *
+ * Crítica r1: "Preço de presente, só pra quem já tem o CORE" (quem pagou R$ 27,90 pensava "paguei o dobro?"); o "Código
+ * copiado" volta igual depois da recarga do banco (marca no aparelho por pedido); ?sair=1 (o rodapé do e-mail) grava
+ * "Não quero ofertas por e-mail" e não gera Pix nenhum.
+ *
  * Eventos: presente_d3_view {origem} · presente_d3_copiar {ok} · presente_d3_pago · presente_d3_erro {motivo}
  * (+ os do cartão com origem "dia3": presente_whatsapp, presente_link_copiado). Nenhum Purchase (decisão do dono:
  * upsell não manda Purchase pra Meta; o servidor manda só a UTMify).
  */
-type Fase = "carregando" | "pix" | "pago" | "sem_link" | "token" | "sem_acesso" | "erro";
+type Fase = "carregando" | "pix" | "pago" | "sem_link" | "token" | "sem_acesso" | "erro" | "saiu";
+
+/** O "Código copiado" sobrevive à recarga do banco (o Instagram/Safari recarregam a aba na volta). Por pedido. */
+const CHAVE_COPIADO = "presente-d3-copiado";
+const lerCopiado = (pedido: string): boolean => { try { return localStorage.getItem(CHAVE_COPIADO) === pedido; } catch { return false; } };
+const gravarCopiado = (pedido: string) => { try { localStorage.setItem(CHAVE_COPIADO, pedido); } catch { /* fica na memória */ } };
+const querSair = (): boolean => { try { return new URLSearchParams(window.location.search).get("sair") === "1"; } catch { return false; } };
 
 const CONFERE_MS = 4000;
 const valeAte = (iso: string): string => {
@@ -82,7 +92,7 @@ export function DarPresente() {
       setFase("pago");
       return;
     }
-    if (r.pix) { setPix(r.pix); setFase("pix"); }
+    if (r.pix) { setPix(r.pix); if (lerCopiado(r.pix.orderId)) setCopiado(true); setFase("pix"); }
     else if (viaGerar) setFase("erro");
   }, []);
 
@@ -111,6 +121,10 @@ export function DarPresente() {
   const viu = useRef(false);
   useEffect(() => {
     if (!t) return;
+    if (querSair()) { // o rodapé do e-mail: só grava a recusa (nenhum Pix)
+      void sairDia3(t).then((ok) => { trackEvent("presente_d3_sair", { ok }); setFase(ok ? "saiu" : "token"); });
+      return;
+    }
     if (!viu.current) { viu.current = true; trackEvent("presente_d3_view", { origem: origem.current }); }
     void gerar();
   }, [t, gerar]);
@@ -143,6 +157,7 @@ export function DarPresente() {
     if (!pix) return;
     const ok = await copiarTexto(pix.qrCode);
     setCopiado(true); // o código fica visível embaixo pra copiar na mão se o navegador negar
+    gravarCopiado(pix.orderId);
     trackEvent("presente_d3_copiar", { ok, origem: origem.current });
   };
 
@@ -171,6 +186,7 @@ export function DarPresente() {
           <div className="pv-cena pv-cena-pequena"><IlustraPresente size={112} /></div>
           <h1 className="pv-titulo">Leve alguém <em>junto</em></h1>
           <p className="pv-sub">Dê o CORE pra sempre pra quem você quer bem. <b>R$ 14,90, uma vez.</b> Sem mensalidade.</p>
+          <p className="dp-preco" data-testid="dar-preco-presente">Preço de presente, só pra quem já tem o CORE.</p>
           {copiado ? (
             <div className="dp-volte" data-testid="dar-volte" role="status">
               <b>Código copiado.</b> Cole no app do banco: Pix → Copia e Cola.
@@ -212,6 +228,7 @@ export function DarPresente() {
     );
   } else {
     const textos: Record<Exclude<Fase, "carregando" | "pix" | "pago">, { titulo: string; texto: string; botao: string; acao: () => void }> = {
+      saiu: { titulo: "Pronto, sem ofertas por e-mail", texto: "Não mandamos mais ofertas pra você. Os e-mails da sua conta continuam chegando.", botao: "Abrir o CORE", acao: () => navigate(ENTRADA_APP) },
       sem_link: { titulo: "Abra pelo link do e-mail", texto: "Ou entre no CORE e toque em “Leve alguém junto”, na página Você.", botao: "Entrar no CORE", acao: () => navigate("/entrar") },
       token: { titulo: "Esse link não vale mais", texto: "Entre no CORE e toque em “Leve alguém junto”, na página Você.", botao: "Entrar no CORE", acao: () => navigate("/entrar") },
       sem_acesso: { titulo: "O presente é pra quem tem o CORE pra sempre", texto: "Dúvidas: contato@coreaplicativo.com.br", botao: "Abrir o CORE", acao: () => navigate(ENTRADA_APP) },
@@ -240,6 +257,7 @@ export function DarPresente() {
 
 /* Só desta página (o presente.css e o funil-hoje.css não mudam). */
 const CSS_DAR = `
+.dp-preco { margin: 6px 0 0; font-size: 13.5px; line-height: 1.4; color: #6b6575; text-align: center; }
 .dp-volte { margin-top: 18px; padding: 14px 16px; border-radius: 18px; background: #fff; box-shadow: 0 1px 2px rgba(22,18,28,.05), 0 10px 30px rgba(22,18,28,.09); font-size: 14.5px; line-height: 1.45; color: #3b3542; text-align: center; }
 .dp-volte b { color: #15803d; }
 .dp-volte span { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; font-weight: 700; color: #16121c; }

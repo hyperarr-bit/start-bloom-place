@@ -1,6 +1,7 @@
 /**
  * O AVISO DO PRESENTE NO APP (31/10, src/lib/presente-aviso.ts + src/presente/AvisoPresente.tsx).
- *   · chave PRESENTE_AVISO "off" por padrão; QA ?presente-aviso=on|off|auto; iPhone NUNCA; Android só com "web+android";
+ *   · chave PRESENTE_AVISO "off" por padrão; QA ?presente-aviso=on|off|auto; só o SITE: iPhone e Android da loja NUNCA (crítica r1:
+ *     o modo "web+android" saiu — a regra de pagamentos da Play), nem com o QA; a 2ª linha não parece cobrança do plano;
  *   · só vitalício pago na web, 3 dias ou mais depois da compra;
  *   · × e toque escondem pra sempre (conta + aparelho); some sozinho 7 dias depois da 1ª vez;
  *   · mora na página Você (as 2 caras), nunca na Home; a chave da conta está nas listas do aparelho.
@@ -32,7 +33,7 @@ vi.mock("@/lib/native-shell", () => ({ plataformaApp: () => plataforma.v, isNati
 
 import { trackEvent } from "@/lib/analytics";
 import {
-  CHAVE_AVISO_PRESENTE, CHAVE_FORCA_AVISO, PRESENTE_AVISO, avisoEscondido, avisoLigadoAqui, compraQueLiberaAviso, forcaDoAviso,
+  CHAVE_AVISO_PRESENTE, CHAVE_FORCA_AVISO, PRESENTE_AVISO, SUB_AVISO, avisoEscondido, avisoLigadoAqui, compraQueLiberaAviso, forcaDoAviso,
 } from "@/lib/presente-aviso";
 import { AvisoPresente } from "@/presente/AvisoPresente";
 import { CHAVES_DO_APARELHO, ehChaveDoAparelho } from "@/lib/chaves-do-aparelho";
@@ -53,13 +54,15 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("a chave", () => {
-  it("padrão OFF; QA on/off/auto; iPhone nunca; Android só com web+android", () => {
+  it("padrão OFF; QA on/off/auto; só o site — iPhone e Android nunca, nem com o QA (crítica r1)", () => {
     expect(PRESENTE_AVISO).toBe("off");
     expect(avisoLigadoAqui({ modo: "off", plataforma: "web", forca: null })).toBe(false);
     expect(avisoLigadoAqui({ modo: "web", plataforma: "web", forca: null })).toBe(true);
     expect(avisoLigadoAqui({ modo: "web", plataforma: "android", forca: null })).toBe(false);
-    expect(avisoLigadoAqui({ modo: "web+android", plataforma: "android", forca: null })).toBe(true);
-    for (const modo of ["off", "web", "web+android"] as const) expect(avisoLigadoAqui({ modo, plataforma: "ios", forca: "on" })).toBe(false);
+    for (const modo of ["off", "web"] as const) for (const p of ["ios", "android"] as const) expect(avisoLigadoAqui({ modo, plataforma: p, forca: "on" })).toBe(false);
+    const fonte = readFileSync(join(__dirname, "../lib/presente-aviso.ts"), "utf8");
+    expect(fonte).toMatch(/export type ModoAvisoPresente = "off" \| "web";/);
+    expect(SUB_AVISO).toBe("De presente pra alguém · R$ 14,90");
     expect(avisoLigadoAqui({ modo: "off", plataforma: "web", forca: "on" })).toBe(true);
     expect(avisoLigadoAqui({ modo: "web", plataforma: "web", forca: "off" })).toBe(false);
     window.history.replaceState({}, "", "/voce");

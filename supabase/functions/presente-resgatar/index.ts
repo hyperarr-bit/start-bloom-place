@@ -4,7 +4,7 @@ import {
   assuntoPresenteRecebido, contaDoComprador, corpoResend, decidirResgate, htmlPresenteRecebido, linkDoPresente,
   mandarLinkPorEmail, nomeNoCartao, normalizarCodigo, presentePorCodigo, presentePorPedido, resgatarPresente, temPraSempre, type LinhaMin, type Presente,
 } from "../_shared/presente.ts";
-import { estadoDia3, nomeDia3, pagamentoNaAsaas, tokenDoDono } from "../_shared/presente-dia3.ts";
+import { estadoDia3, nomeDia3, pagamentoNaAsaas, sairDia3, tokenDoDono } from "../_shared/presente-dia3.ts";
 import { criarQrAsaas } from "../_shared/asaas-qr.ts";
 
 /**
@@ -25,6 +25,7 @@ import { criarQrAsaas } from "../_shared/asaas-qr.ts";
  *   dia3      { t, pedido?, gerar?, conferir? }  SEM login → o Pix de presente da conta do token (gerado agora com `gerar`, 24 h,
  *                                  1 por conta) ou { pago, codigo, de } pro cartão do WhatsApp
  *   dia3_nome { t, pedido, nome }  SEM login → o nome no cartão (só o comprador, só antes do resgate)
+ *   dia3_sair { t }                SEM login → "Não quero ofertas por e-mail" (o cron do dia 3 confere a recusa)
  *   dia3_token {}                  com login → o token da PRÓPRIA conta (o aviso da página Você abre /presente/dar?t=…)
  * NUNCA usa liberar_vitalicio (duplicaria a venda): a linha nasce com o pedido do presente e o valor dele, 1 vez.
  */
@@ -75,6 +76,8 @@ serve(async (req) => {
       return json(r as unknown as Record<string, unknown>);
     }
     if (acao === "dia3_nome") return json(await nomeDia3(admin, { t: body.t, pedido: body.pedido, nome: body.nome }));
+    // crítica r1: "Não quero ofertas por e-mail" (o link do rodapé do e-mail do dia 3) — grava a recusa pelo token
+    if (acao === "dia3_sair") return json(await sairDia3(admin, { t: body.t }));
 
     // daqui pra baixo: com login
     const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");

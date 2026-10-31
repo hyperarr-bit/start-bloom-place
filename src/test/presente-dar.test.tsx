@@ -21,12 +21,14 @@ vi.mock("@/lib/purchase-tracking", () => purchase);
 const estadoDia3 = vi.fn();
 const nomeDia3 = vi.fn(async () => true);
 const tokenDia3 = vi.fn();
+const sairDia3 = vi.fn(async () => true);
 const copiarTexto = vi.fn(async () => true);
 vi.mock("@/presente/api", async (orig) => ({
   ...(await orig<typeof import("@/presente/api")>()),
   estadoDia3: (...a: unknown[]) => estadoDia3(...a),
   nomeDia3: (...a: unknown[]) => nomeDia3(...(a as [])),
   tokenDia3: () => tokenDia3(),
+  sairDia3: (...a: unknown[]) => sairDia3(...(a as [])),
   copiarTexto: (...a: unknown[]) => copiarTexto(...(a as [])),
   meuPresente: vi.fn(async () => null),
   gravarNomeDoPresente: vi.fn(async () => true),
@@ -53,7 +55,8 @@ const montar = (busca: string) => {
 
 beforeEach(() => {
   authState.user = null; authState.loading = false;
-  estadoDia3.mockReset(); tokenDia3.mockReset(); copiarTexto.mockClear(); nomeDia3.mockClear();
+  estadoDia3.mockReset(); tokenDia3.mockReset(); copiarTexto.mockClear(); nomeDia3.mockClear(); sairDia3.mockClear();
+  try { localStorage.clear(); } catch { /* noop */ }
   vi.mocked(trackEvent).mockClear(); purchase.firePixPurchaseOnce.mockClear(); purchase.markPixPurchasePending.mockClear();
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); });
@@ -169,5 +172,30 @@ describe("o texto da página", () => {
     expect(texto).not.toMatch(/só hoje|última chance|acaba em|\d\d:\d\d/i);
     expect(texto).not.toMatch(/\b(ele|ela|amiga|amigo|namorad[oa])\b/i);
     expect(texto).toMatch(/R\$ 14,90, uma vez\./);
+  });
+});
+
+describe("crítica r1", () => {
+  it("explica o preço: 'Preço de presente, só pra quem já tem o CORE'", async () => {
+    estadoDia3.mockResolvedValueOnce({ ok: true, pago: false, pix: PIX });
+    montar(`?t=${TOKEN}`);
+    expect((await screen.findByTestId("dar-preco-presente")).textContent).toBe("Preço de presente, só pra quem já tem o CORE.");
+  });
+  it("voltar do banco (recarga) depois de copiar mantém 'Código copiado' + 'Pagou? Volte aqui'", async () => {
+    estadoDia3.mockResolvedValue({ ok: true, pago: false, pix: PIX });
+    const r = montar(`?t=${TOKEN}`);
+    fireEvent.click(await screen.findByTestId("dar-copiar"));
+    await screen.findByTestId("dar-volte");
+    r.unmount();
+    montar(`?t=${TOKEN}`);
+    const volte = await screen.findByTestId("dar-volte");
+    expect(volte.textContent).toContain("Código copiado.");
+    expect(volte.textContent).toContain("Pagou? Volte aqui.");
+  });
+  it("?sair=1 (o rodapé do e-mail) grava a recusa e NÃO gera Pix", async () => {
+    montar(`?t=${TOKEN}&sair=1`);
+    expect((await screen.findByTestId("dar-saiu")).textContent).toContain("Pronto, sem ofertas por e-mail");
+    expect(sairDia3).toHaveBeenCalledWith(TOKEN);
+    expect(estadoDia3).not.toHaveBeenCalled();
   });
 });

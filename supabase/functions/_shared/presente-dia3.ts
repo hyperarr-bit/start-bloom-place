@@ -159,12 +159,30 @@ export function linkDarPresente(a: { t: string; site?: string; origem?: string }
   const q = new URLSearchParams({ t: a.t, utm_source: a.origem ?? "email_dia3", utm_medium: "email", utm_campaign: "presente_dia3" });
   return `${a.site ?? SITE}/presente/dar?${q.toString()}`;
 }
+/** "Não quero ofertas por e-mail" (crítica r1): a mesma página, com `sair=1` — grava a recusa pelo token (sem login). */
+export function linkSairDia3(a: { t: string; site?: string }): string {
+  const q = new URLSearchParams({ t: a.t, sair: "1", utm_source: "email_dia3", utm_medium: "email" });
+  return `${a.site ?? SITE}/presente/dar?${q.toString()}`;
+}
+
+/** A recusa de ofertas por e-mail desta conta (o cron do dia 3 confere antes de mandar). */
+export const chaveRecusaOfertas = (uid: string): string => `ofertas-email-nao:${uid}`;
+/** Grava a recusa pelo token do link (idempotente). Nunca lança. */
+export async function sairDia3(admin: ClienteMin, a: { t: unknown; agora?: number }): Promise<{ ok: boolean }> {
+  try {
+    const dono = await donoDoToken(admin, a.t, a.agora ?? Date.now());
+    if (!dono) return { ok: false };
+    const { error } = await admin.from("webhook_events").insert({ id: chaveRecusaOfertas(dono), source: "presente", event: JSON.stringify({ em: a.agora ?? Date.now(), via: "email_dia3" }) });
+    if (!error) await admin.from("analytics_events").insert({ user_id: dono, event_name: "ofertas_email_recusou", event_data: { via: "email_dia3" } }).then(() => {}, () => {});
+    return { ok: true };
+  } catch { return { ok: false }; }
+}
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 export const assuntoDia3 = (): string => "Leve alguém junto";
 
 /** O e-mail do dia 3 (curto, sem gênero, sem "só hoje", sem brinde). */
-export function htmlDia3(a: { link: string; nome?: string | null }): string {
+export function htmlDia3(a: { link: string; nome?: string | null; sair?: string | null }): string {
   const oi = a.nome ? `${esc(a.nome)}, ` : "";
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f3f2f7;font-family:-apple-system,Segoe UI,Roboto,Inter,sans-serif;color:#16121c;">
 <div style="max-width:520px;margin:0 auto;padding:28px 20px;">
@@ -172,22 +190,22 @@ export function htmlDia3(a: { link: string; nome?: string | null }): string {
     <div style="font-size:12px;font-weight:800;letter-spacing:.08em;color:#d6338a;text-transform:uppercase;">De presente</div>
     <h1 style="font-size:24px;line-height:1.2;margin:10px 0 8px;">Leve alguém junto 💛</h1>
     <p style="font-size:15.5px;line-height:1.5;margin:0 0 6px;color:#3b3542;">${oi}dê o CORE pra sempre pra quem você quer bem.</p>
-    <p style="font-size:15.5px;line-height:1.5;margin:0 0 18px;color:#3b3542;"><b style="color:#16121c;">R$ 14,90, uma vez.</b> Sem mensalidade.</p>
+    <p style="font-size:15.5px;line-height:1.5;margin:0 0 18px;color:#3b3542;"><b style="color:#16121c;">R$ 14,90, uma vez.</b> Sem mensalidade.<br><span style="font-size:14px;color:#6b6575;">Preço de presente, só pra quem já tem o CORE.</span></p>
     <a href="${esc(a.link)}" style="display:block;background:#16121c;color:#fff;text-decoration:none;font-size:16px;font-weight:800;padding:15px 24px;border-radius:999px;text-align:center;">Dar de presente</a>
     <p style="font-size:13px;line-height:1.5;margin:14px 0 0;color:#6b6575;">Você paga no Pix e recebe um link pra mandar no WhatsApp. Quem abrir cria a conta e ganha o CORE pra sempre.</p>
     <p style="font-size:14px;line-height:1.5;margin:20px 0 0;color:#5b5560;">Um abraço,<br>Equipe CORE</p>
   </div>
-  <p style="font-size:11px;color:#8a838f;text-align:center;margin:14px 0 0;">Você recebeu este e-mail porque tem o CORE pra sempre. É uma mensagem só, não vamos repetir.</p>
+  <p style="font-size:11px;color:#8a838f;text-align:center;margin:14px 0 0;">Você recebeu este e-mail porque tem o CORE pra sempre. É uma mensagem só, não vamos repetir.${a.sair ? `<br><a href="${esc(a.sair)}" style="color:#8a838f;text-decoration:underline;">Não quero ofertas por e-mail</a>` : ""}</p>
 </div></body></html>`;
 }
 export const previewDia3 = (site: string = SITE): { assunto: string; html: string } =>
-  ({ assunto: assuntoDia3(), html: htmlDia3({ link: linkDarPresente({ t: "PREVIEWxxxxxxxxxxxxxxxxxxxxxxxxx", site, origem: "email_dia3_preview" }), nome: "João" }) });
+  ({ assunto: assuntoDia3(), html: htmlDia3({ link: linkDarPresente({ t: "PREVIEWxxxxxxxxxxxxxxxxxxxxxxxxx", site, origem: "email_dia3_preview" }), nome: "João", sair: linkSairDia3({ t: "PREVIEWxxxxxxxxxxxxxxxxxxxxxxxxx", site }) }) });
 
 /* ───────────────────────── a passada do cron ───────────────────────── */
 
 export type ResultadoDia3 = {
   candidatos: number; enviados: number; foraDoHorario: number; naoEntrou: number; jaComprou: number; jaAvisados: number;
-  semEmail: number; testes: number; falhas: number;
+  semEmail: number; testes: number; falhas: number; recusou: number;
 };
 
 const primeiroNome = (n?: string | null) => String(n ?? "").trim().split(/\s+/)[0] || "";
@@ -203,7 +221,7 @@ export async function varrerPresenteDia3(admin: ClienteMin, deps: {
   gerar?: () => string; max?: number;
 }): Promise<ResultadoDia3> {
   const agora = deps.agora ?? Date.now();
-  const r: ResultadoDia3 = { candidatos: 0, enviados: 0, foraDoHorario: 0, naoEntrou: 0, jaComprou: 0, jaAvisados: 0, semEmail: 0, testes: 0, falhas: 0 };
+  const r: ResultadoDia3 = { candidatos: 0, enviados: 0, foraDoHorario: 0, naoEntrou: 0, jaComprou: 0, jaAvisados: 0, semEmail: 0, testes: 0, falhas: 0, recusou: 0 };
   if (!horaDeMandar(agora)) { r.foraDoHorario = 1; return r; }
   const { data, error } = await admin.from("subscriptions")
     .select("user_id, created_at, status, payment_method, billing_period, plan, amount_cents")
@@ -222,6 +240,7 @@ export async function varrerPresenteDia3(admin: ClienteMin, deps: {
     try {
       const jaAvisado = !!(await lerLinhaExiste(admin, chaveEnvioDia3(uid)));
       if (jaAvisado) { r.jaAvisados++; continue; }
+      if (await lerLinhaExiste(admin, chaveRecusaOfertas(uid))) { r.recusou++; continue; } // o link do rodapé: não quer ofertas
       const { data: pres } = await admin.from("presentes").select("codigo").eq("comprador_id", uid).limit(1);
       const jaComprouPresente = Array.isArray(pres) && pres.length > 0;
       if (jaComprouPresente) { r.jaComprou++; continue; }
@@ -238,7 +257,7 @@ export async function varrerPresenteDia3(admin: ClienteMin, deps: {
       const t = await tokenDoDono(admin, uid, { agora, gerar: deps.gerar });
       if (!t) { await soltar(admin, chaveEnvioDia3(uid)); r.falhas++; continue; }
       const link = linkDarPresente({ t, site: deps.site });
-      const foi = await deps.enviar(c.email!, assuntoDia3(), htmlDia3({ link, nome: primeiroNome(c.nome) || null }), { presente: "d3" }).catch(() => false);
+      const foi = await deps.enviar(c.email!, assuntoDia3(), htmlDia3({ link, nome: primeiroNome(c.nome) || null, sair: linkSairDia3({ t, site: deps.site }) }), { presente: "d3" }).catch(() => false);
       if (!foi) { await soltar(admin, chaveEnvioDia3(uid)); r.falhas++; continue; }
       await admin.from("analytics_events").insert({ user_id: uid, event_name: "presente_d3_email_enviado", event_data: { compra_em: linha.created_at ?? null } })
         .then(() => {}, () => {});

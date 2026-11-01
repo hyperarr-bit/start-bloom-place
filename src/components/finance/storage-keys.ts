@@ -5,7 +5,7 @@ import { doPerfil, perfilAtivoLocal } from "@/lib/finance-perfil";
 // (`u:{userId}:{key}`) to prevent cross-account leakage on shared browsers.
 // The helpers below accept a `userId` argument to build the right key.
 
-const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+export const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
 export const getCurrentMonthName = () => monthNames[new Date().getMonth()];
 export const getCurrentYear = () => new Date().getFullYear();

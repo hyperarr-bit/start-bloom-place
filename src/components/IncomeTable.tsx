@@ -33,9 +33,13 @@ interface IncomeTableProps {
   incomes: Income[];
   setIncomes: (incomes: Income[]) => void;
   prefillExample?: boolean;
+  /** Só a tela do mês corrente passa (01/11, chamado): receita com data de um
+   *  mês que ainda não chegou vai pra planilha DAQUELE mês em vez de somar
+   *  agora. Devolve o nome do mês onde guardou, ou null se a data não é futura. */
+  guardarEmOutroMes?: (receita: Income) => string | null;
 }
 
-export const IncomeTable = ({ incomes, setIncomes, prefillExample = false }: IncomeTableProps) => {
+export const IncomeTable = ({ incomes, setIncomes, prefillExample = false, guardarEmOutroMes }: IncomeTableProps) => {
   const [newIncome, setNewIncome] = useState(
     prefillExample && incomes.length === 0
       ? { description: "Salário", value: "3000", date: "" }
@@ -52,15 +56,15 @@ export const IncomeTable = ({ incomes, setIncomes, prefillExample = false }: Inc
   const addIncome = () => {
     const erro = erroDaReceita(newIncome.description, newIncome.value);
     if (erro) { toast.error(erro); return; }
-    setIncomes([
-      ...incomes,
-      {
-        id: Date.now().toString(),
-        description: newIncome.description.trim(),
-        value: numeroBR(newIncome.value),
-        date: newIncome.date || localDayKey(),
-      },
-    ]);
+    const nova = {
+      id: Date.now().toString(),
+      description: newIncome.description.trim(),
+      value: numeroBR(newIncome.value),
+      date: newIncome.date || localDayKey(),
+    };
+    const guardadaEm = guardarEmOutroMes?.(nova) ?? null;
+    if (guardadaEm) toast.success(`Receita guardada em ${guardadaEm}: entra no painel no dia 1º`);
+    else setIncomes([...incomes, nova]);
     setNewIncome({ description: "", value: "", date: "" });
   };
 
@@ -97,12 +101,21 @@ export const IncomeTable = ({ incomes, setIncomes, prefillExample = false }: Inc
     // mesma régua do "adicionar": a edição também deixava gravar negativo
     const erro = erroDaReceita(rascunho.description, rascunho.value);
     if (erro) { toast.error(erro); return; }
-    setIncomes(incomes.map((i) => i.id !== editandoId ? i : {
-      ...i,
+    const original = incomes.find((i) => i.id === editandoId);
+    const editada = original && {
+      ...original,
       description: rascunho.description.trim(),
       value: valor,
-      date: rascunho.date || i.date,
-    }));
+      date: rascunho.date || original.date,
+    };
+    // data trocada pra um mês futuro = a receita muda de planilha (mesma regra do adicionar)
+    const guardadaEm = editada && editada.date !== original.date ? guardarEmOutroMes?.(editada) ?? null : null;
+    if (guardadaEm) {
+      setIncomes(incomes.filter((i) => i.id !== editandoId));
+      toast.success(`Receita guardada em ${guardadaEm}: entra no painel no dia 1º`);
+    } else {
+      setIncomes(incomes.map((i) => i.id !== editandoId || !editada ? i : editada));
+    }
     setEditandoId(null);
   };
 

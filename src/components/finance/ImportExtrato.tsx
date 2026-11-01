@@ -103,7 +103,10 @@ export const ImportExtrato = ({ expenses, incomes, setExpenses, setIncomes }: Pr
     const reader = new FileReader();
     reader.onload = (e) => {
       setBusy(false);
-      const parsed = parseExtrato((e.target?.result as string) || "");
+      const texto = (e.target?.result as string) || "";
+      const parsed = parseExtrato(texto);
+      // CSV da fatura do Nubank (cabeçalho em inglês date,title,amount): já marca "Fatura do cartão"
+      if (/^\uFEFF?\s*"?date"?\s*,\s*"?title"?\s*,\s*"?amount"?/i.test(texto)) setOrigem("cartao");
       if (parsed.length === 0) {
         toast.error("Não achei lançamentos nesse arquivo. Exporta como OFX ou CSV no app do banco.");
         return;
@@ -114,7 +117,8 @@ export const ImportExtrato = ({ expenses, incomes, setExpenses, setIncomes }: Pr
       );
       const review = parsed.map((tx, i) => {
         const duplicate = existingKeys.has(`${tx.date}|${Math.abs(tx.amount).toFixed(2)}`);
-        const suggested = tx.amount < 0 ? suggestCategory(tx.description, learned) : "";
+        // sugere pra toda linha: na fatura a compra pode vir positiva (ver valorDe)
+        const suggested = suggestCategory(tx.description, learned);
         return {
           ...tx,
           key: `${i}-${tx.date}-${tx.amount}`,
@@ -132,7 +136,7 @@ export const ImportExtrato = ({ expenses, incomes, setExpenses, setIncomes }: Pr
 
   const doImport = () => {
     if (!rows) return;
-    const included = rows.filter((r) => r.include);
+    const included = rows.filter(entra).map((r) => ({ ...r, amount: valorDe(r) }));
     const outgoing = included.filter((r) => r.amount < 0);
     const incoming = included.filter((r) => r.amount > 0);
 
@@ -188,6 +192,18 @@ export const ImportExtrato = ({ expenses, incomes, setExpenses, setIncomes }: Pr
         (learnedCount > 0 ? ` · ${learnedCount} regra${learnedCount > 1 ? "s" : ""} aprendida${learnedCount > 1 ? "s" : ""}` : "") +
         " · dá pra desfazer no botão ao lado de Importar",
     );
+    /* Lançamento de mês que já passou não fica na tela do mês: a virada guarda no mês dele assim
+       que o app reabre — pra quem importou, "sumiu tudo" (01/11, fatura de outubro importada em
+       novembro). Avisa onde ele mora. */
+    const hojeMes = new Date().toISOString().slice(0, 7);
+    const passados = included.filter((r) => r.date.slice(0, 7) < hojeMes).length;
+    if (passados > 0) {
+      toast.info(
+        `${passados} lançamento${passados !== 1 ? "s" : ""} de meses anteriores ${passados !== 1 ? "ficam guardados" : "fica guardado"} no mês ${passados !== 1 ? "deles" : "dele"}: veja no ORÇAMENTO MENSAL` +
+          (origem === "cartao" ? ". Pra compra da fatura contar no mês do vencimento, cadastre o fechamento do cartão" : ""),
+        { duration: 9000 },
+      );
+    }
     setRows(null);
 
     /*
@@ -210,7 +226,15 @@ export const ImportExtrato = ({ expenses, incomes, setExpenses, setIncomes }: Pr
   };
 
   const fmtBR = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
-  const includedCount = rows?.filter((r) => r.include).length ?? 0;
+  /* FATURA DE CARTÃO (01/11, chamado): o CSV da fatura do Nubank traz a COMPRA positiva e o
+     pagamento da fatura negativo — ao contrário do extrato de conta e do OFX. Lido como conta,
+     a fatura virava "dinheiro a receber". Na fatura, se a maioria vem positiva, o sinal vira; e o
+     que sobra como entrada (pagamento da fatura, estorno) não é receita: fica de fora. */
+  const inverter = origem === "cartao" && !!rows && rows.filter((r) => r.amount > 0).length > rows.length / 2;
+  const valorDe = (r: ParsedTx) => (inverter ? -r.amount : r.amount);
+  const foraDaFatura = (r: ParsedTx) => origem === "cartao" && valorDe(r) > 0;
+  const entra = (r: ReviewRow) => r.include && !foraDaFatura(r);
+  const includedCount = rows?.filter(entra).length ?? 0;
 
   return (
     <>
@@ -258,11 +282,12 @@ export const ImportExtrato = ({ expenses, incomes, setExpenses, setIncomes }: Pr
               <div
                 key={r.key}
                 className={`flex items-center gap-2.5 rounded-xl border p-2.5 ${
-                  r.include ? "border-border bg-card" : "border-border/50 bg-muted/30 opacity-60"
+                  entra(r) ? "border-border bg-card" : "border-border/50 bg-muted/30 opacity-60"
                 }`}
               >
                 <Checkbox
-                  checked={r.include}
+                  checked={entra(r)}
+                  disabled={foraDaFatura(r)}
                   onCheckedChange={(v) =>
                     setRows(rows.map((x, i) => (i === idx ? { ...x, include: !!v } : x)))
                   }
@@ -274,7 +299,7 @@ export const ImportExtrato = ({ expenses, incomes, setExpenses, setIncomes }: Pr
                     {r.duplicate && <span className="ml-1.5 text-amber-500 font-semibold">· já existe</span>}
                   </p>
                 </div>
-                {r.amount < 0 ? (
+                {valorDe(r) < 0 ? (
                   <select
                     value={r.category}
                     onChange={(e) =>
@@ -286,11 +311,13 @@ export const ImportExtrato = ({ expenses, incomes, setExpenses, setIncomes }: Pr
                       <option key={c.value} value={c.value}>{c.label}</option>
                     ))}
                   </select>
+                ) : foraDaFatura(r) ? (
+                  <span className="text-[10px] font-semibold text-muted-foreground shrink-0 text-right leading-tight">pagamento<br />fica de fora</span>
                 ) : (
                   <span className="text-[10px] font-bold uppercase text-emerald-500 shrink-0">receita</span>
                 )}
-                <span className={`text-[13px] font-bold tabular-nums shrink-0 ${r.amount < 0 ? "text-red-400" : "text-emerald-500"}`}>
-                  {r.amount < 0 ? "-" : "+"}R$ {Math.abs(r.amount).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <span className={`text-[13px] font-bold tabular-nums shrink-0 ${valorDe(r) < 0 ? "text-red-400" : "text-emerald-500"}`}>
+                  {valorDe(r) < 0 ? "-" : "+"}R$ {Math.abs(r.amount).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
             ))}

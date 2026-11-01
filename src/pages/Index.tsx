@@ -66,6 +66,7 @@ import { TotalPorCartao } from "@/components/finance/TotalPorCartao";
 import { usePainelLimpo } from "@/hooks/use-painel-limpo";
 import { useFinanceCards } from "@/lib/finance-cards";
 import { chaveArquivada } from "@/lib/virada-do-mes";
+import { guardarReceitaNoMes } from "@/lib/finance-receita-futura";
 import { mesCorrenteId } from "@/lib/virada-contas";
 import { useVersaoDaVirada } from "@/hooks/use-virada-do-mes";
 import { SeletorDePerfil } from "@/components/finance/SeletorDePerfil";
@@ -239,6 +240,8 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   };
 
   const [incomes, setIncomes] = usarListaDoPerfil(incomesTodos, setIncomesTodos, perfilValido);
+  // receita com data de mês futuro vai pra planilha daquele mês (01/11, lib/finance-receita-futura)
+  const guardarReceitaFutura = (receita: any) => guardarReceitaNoMes(receita, new Date(), getUserData, setUserData, perfilValido);
   const [expenses, setExpenses] = usarListaDoPerfil(expensesTodos, setExpensesTodos, perfilValido);
   const [fixedExpenses, setFixedExpenses] = usarListaDoPerfil(fixedExpensesTodos, setFixedExpensesTodos, perfilValido);
   const [installments, setInstallments] = usarListaDoPerfil(installmentsAvancados as any[], setInstallmentsTodos, perfilValido);
@@ -783,7 +786,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                     <TrackedCard cardKey="incomes" tab="financeiro">
                       {/* id: alvo do "Anotar minha renda" do QUANTO POSSO GASTAR HOJE compacto (1.0.22) */}
                       <div id="fin-receitas" className="scroll-mt-20">
-                      <IncomeTable incomes={incomes} setIncomes={setIncomes} prefillExample={getUserData<string>("spotlight-done-financas", "") !== "true" && incomes.length === 0} />
+                      <IncomeTable incomes={incomes} setIncomes={setIncomes} guardarEmOutroMes={guardarReceitaFutura} prefillExample={getUserData<string>("spotlight-done-financas", "") !== "true" && incomes.length === 0} />
                       </div>
                     </TrackedCard>
                   </div>

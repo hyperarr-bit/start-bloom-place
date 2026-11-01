@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { localDayKey } from "@/lib/utils";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import { useAuth } from "@/hooks/use-auth";
@@ -195,7 +196,7 @@ export const ImportExtrato = ({ expenses, incomes, setExpenses, setIncomes }: Pr
     /* Lançamento de mês que já passou não fica na tela do mês: a virada guarda no mês dele assim
        que o app reabre — pra quem importou, "sumiu tudo" (01/11, fatura de outubro importada em
        novembro). Avisa onde ele mora. */
-    const hojeMes = new Date().toISOString().slice(0, 7);
+    const hojeMes = localDayKey().slice(0, 7);
     const passados = included.filter((r) => r.date.slice(0, 7) < hojeMes).length;
     if (passados > 0) {
       toast.info(

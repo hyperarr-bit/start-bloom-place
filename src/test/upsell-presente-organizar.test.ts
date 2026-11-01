@@ -112,7 +112,7 @@ describe("as regras puras", () => {
   });
 });
 
-describe("a chave no <head> do landing.html (UPSELL_POS, padrão \"2027\")", () => {
+describe("a chave no <head> do landing.html (UPSELL_POS; ligada em \"presente\" 01/11, rollback \"2027\")", () => {
   const cabeca = HTML.match(/<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
   /** o <head> SEM o bloco novo (o que está no ar desde 31/10) — pra provar que com "2027" a saída é a mesma */
   const cabecaAntes = cabeca
@@ -131,14 +131,15 @@ describe("a chave no <head> do landing.html (UPSELL_POS, padrão \"2027\")", () 
     };
     const ls = { getItem: (k: string) => (k in store ? store[k] : null), setItem: (k: string, v: string) => { store[k] = v; }, removeItem: (k: string) => { delete store[k]; } };
     const win: Record<string, unknown> = { localStorage: ls, crypto: { randomUUID: () => "id-aparelho-123" } };
-    const f = pos ? fonte.replace(/var UPSELL_POS = "(2027|presente)"/, `var UPSELL_POS = "${pos}"`) : fonte;
+    // 01/11 tarde: o código LIGOU ("presente"); estes testes descrevem a chave — sem `pos`, roda como "2027" (o rollback)
+    const f = fonte.replace(/var UPSELL_POS = "(2027|presente)"/, `var UPSELL_POS = "${pos ?? "2027"}"`);
     new Function("location", "document", "window", "localStorage", "URLSearchParams", "Math", f)(
       { search: u.search, hash: "", pathname: u.pathname, hostname: "www.coreaplicativo.com.br", protocol: "https:", replace: vi.fn() }, doc, win, ls, URLSearchParams, Math,
     );
     return { attrs, store, jar, mem: win.__landing as Record<string, unknown> };
   }
-  it("no código: UPSELL_POS = \"2027\" (pronto e DESLIGADO), junto do UPSELL_2027", () => {
-    expect(HTML).toMatch(/var UPSELL_POS = "2027";/);
+  it("no código: UPSELL_POS = \"presente\" (LIGADO 01/11 tarde), junto do UPSELL_2027", () => {
+    expect(HTML).toMatch(/var UPSELL_POS = "presente";/);
     expect(cabeca.indexOf("var UPSELL_POS")).toBeLessThan(cabeca.indexOf("var UPSELL_2027"));
     expect(cabecaAntes).not.toContain("upsell"); // a régua de comparação é mesmo o <head> sem o bloco novo
   });

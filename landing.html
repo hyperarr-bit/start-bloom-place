@@ -56,7 +56,7 @@
         var AB_OFERTA = "off";
         var AB_CHECKOUT = "email"; // 31/10 noite (dono: "fixa sobe"): TODO MUNDO no e-mail antes do Pix. A/B 29–31/10: email 74 vendas / 1.410 sessões (5,25%) × livre 62 / 1.414 (4,38%); 0 × 3 pagaram sem e-mail. "on" = volta o 50/50 · "off" = todo mundo no livre
         var AB_LP = "off"; // 30/10: braço "v2" (vitrine) construído e DESLIGADO — "on" liga o 50/50 contra a página de hoje ("atual")
-        var UPSELL_POS = "2027"; // 01/11: "presente" troca o 2027 pelo "Leve alguém junto" R$ 14,90 no pós-pago (pronto e DESLIGADO; rollback: "2027")
+        var UPSELL_POS = "presente"; // 01/11 tarde (dono: "muda pra aquele outro up"): LIGADO o presente "Leve alguém junto" R$ 14,90 no pós-pago no lugar do 2027 (2027: 89 viram, 1 pagou). Rollback: "2027"
         var UPSELL_2027 = "on"; // 31/10 ~18h (dono: "pode subir", sem compra de teste): LIGADO — "Seu 2027" R$ 19,90 no pós-pago, nos dois braços (rollback: "off")
         var d = document.documentElement, q = null, mem = {};
         try { q = new URLSearchParams(location.search); } catch (e0) {}

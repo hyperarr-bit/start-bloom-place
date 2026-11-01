@@ -56,21 +56,8 @@ export const VERSAO_PLANO30: VersaoPlano30 = "visual";
 
 /* ───────────────────────── o link e a mensagem ───────────────────────── */
 
-export const SITE = "https://www.coreaplicativo.com.br";
-export const linkDoPresente = (codigo: string): string => `${SITE}/presente/${codigo}`;
-/** O link curto que aparece no cartão (sem https://www.). */
-export const linkCurto = (codigo: string): string => `coreaplicativo.com.br/presente/${codigo}`;
-
-/** A mensagem do WhatsApp — sem "ele/ela": serve pra amigo, amiga, namorado, namorada. */
-export function mensagemDoPresente(codigo: string, de: string | null): string {
-  const quem = (de ?? "").trim();
-  // crítica r2 (honestidade): sem nome, "Ganhei pra você" soava sorteio/coisa grátis
-  return `${quem ? `${quem} te deu o CORE pra sempre 💛` : "Um presente pra você: o CORE pra sempre 💛"}\nAbre aqui pra ativar o seu: ${linkDoPresente(codigo)}`;
-}
-export const urlWhatsApp = (texto: string): string => `https://wa.me/?text=${encodeURIComponent(texto)}`;
-
-/** O nome no cartão (o mesmo limite do servidor: 40 letras, sem tag). */
-export const nomeLimpo = (v: string): string => v.replace(/[<>{}\\]/g, "").replace(/\s+/g, " ").trimStart().slice(0, 40);
+/* 01/11: o link e a mensagem moram em ./presente-link.ts (sem dependências: a /organizar usa sem baixar o resto daqui) */
+export { SITE, linkDoPresente, linkCurto, mensagemDoPresente, urlWhatsApp, nomeLimpo } from "@/lib/presente-link";
 /** 1º nome pra pré-preencher o cartão. */
 export const primeiroNome = (v: string | null | undefined): string => String(v ?? "").trim().split(/\s+/)[0] ?? "";
 

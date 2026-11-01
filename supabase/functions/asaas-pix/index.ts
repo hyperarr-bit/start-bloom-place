@@ -15,12 +15,12 @@ import {
   areaPlano30, liberarKitDoBump, liberarPlano30, mandarLinkPorEmail, reservar, temPraSempre,
 } from "../_shared/presente.ts";
 import { MENSAGEM_DOWNSELL_INDISPONIVEL, ehDownsell, podePedirDownsell } from "../_shared/elegibilidade-downsell.ts";
-import { ehOfertaLanding } from "../_shared/ofertas-landing.ts";
+import { ehOfertaLanding, ehPraSempreLanding } from "../_shared/ofertas-landing.ts";
 import { EMAIL_OK as EMAIL_LANDING_OK, jaTemOCore, temVitalicioAtivo } from "../_shared/landing-travas.ts";
 import { chaveQr } from "../_shared/lembrete-pix-landing.ts";
 import {
-  avisarPronto2027, blocoFoiProEmail, blocoLigado, blocoU2027, chaveU2027, compraDoUpsell, donoNaHora, EXPIRA_PADRAO_S, garantirPixUpsell, mandaPurchaseMeta,
-  ehDobro2027, registrarDobro2027, SECRET_U2027_EMAIL, sessaoPodePedir,
+  avisarPronto2027, blocoFoiProEmail, blocoLigado, blocoU2027, chavePresenteLanding, chaveU2027, compraDoUpsell, donoNaHora, EXPIRA_PADRAO_S, garantirPixUpsell, mandaPurchaseMeta,
+  ehDobro2027, presentePagoDaChave, registrarDobro2027, SECRET_U2027_EMAIL, sessaoPodePedir,
 } from "../_shared/pix-upsell.ts";
 import { ASAAS_API, asaasHeaders, criarQrAsaas, obterChavePix, postarQrEstatico } from "../_shared/asaas-qr.ts";
 
@@ -375,6 +375,34 @@ serve(async (req) => {
           dono_igual: c.dono === user.id, no_email: noEmail,
         });
       }
+      /* 01/11 (landing /organizar, UPSELL_POS = "presente"): o PRESENTE no lugar do 2027 no pós-pago. Com `compra` (o pedido
+       * do vitalício LN_*), o Pix é UM por compra e vale 24 h (_shared/pix-upsell.ts chavePresenteLanding), dono = a conta FINAL
+       * (a dona da linha viva), como o 2027. Só pra compra PRA SEMPRE (o LN_ano279 é de 1 ano: nada de presente). Já pagou um
+       * presente por esta chave (perdeu a aba e voltou) → { presente_pago, codigo }: a página vai direto pro cartão. */
+      if (ehOfertaPresente(offer) && typeof body.compra === "string" && body.compra) {
+        const compra = String(body.compra).slice(0, 80);
+        const c = await compraDoUpsell(supabaseAdmin, compra);
+        if (!c.ok) return jsonResponse({ error: "Não achei a sua compra. Tenta de novo em alguns segundos.", motivo: c.motivo }, c.motivo === "sem_linha" ? 409 : 403);
+        if (!sessaoPodePedir(c, user.id)) return jsonResponse({ error: "Essa compra é de outra conta.", motivo: "outra_conta" }, 403);
+        if (!ehPraSempreLanding(c.oferta) || !temPraSempre(await linhasDaConta(supabaseAdmin, c.dono))) {
+          return jsonResponse({ error: "O presente é pra quem já tem o CORE pra sempre.", motivo: "sem_acesso" }, 403);
+        }
+        const ja = await presentePagoDaChave(supabaseAdmin, chavePresenteLanding(compra), c.dono);
+        if (ja) return jsonResponse({ presente_pago: true, pedido: ja.pedido, codigo: ja.codigo, de: ja.de, dono_igual: c.dono === user.id });
+        const pix = await garantirPixUpsell(supabaseAdmin, {
+          chave: chavePresenteLanding(compra), dono: c.dono, oferta: offer, valorCentavos: amount, descricao: DESCRICAO_PIX[offer] ?? "CORE de presente",
+          criarQr: criarQrAsaas(apiKey, logStep), extraPedido: { origem: "landing", compra },
+        });
+        if ("erro" in pix) {
+          logStep("Presente (landing): Pix não gerado", { motivo: pix.erro });
+          return jsonResponse({ error: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.", motivo: pix.erro }, 502);
+        }
+        logStep("Presente (landing): Pix pronto", { novo: pix.novo, dono_igual: c.dono === user.id });
+        return jsonResponse({
+          orderId: pix.orderId, amount: (amount / 100).toFixed(2), qrCode: pix.qrCode, qrCodeBase64: pix.qrCodeBase64, expiresAt: pix.expiresAt,
+          dono_igual: c.dono === user.id,
+        });
+      }
       /* 21/10: o presente (pv149) é upsell de quem JÁ é pra sempre (acabou de pagar o vitalício). Sem isso, o vitalício
        * sairia por R$ 14,90 pra qualquer um (paga o "presente" e resgata numa 2ª conta). A compra pode ter sido levada
        * pro e-mail de destino da tela do Pix (/hoje): aí vale o acesso daquela conta. */
@@ -490,6 +518,11 @@ serve(async (req) => {
       if (eh2027(String(body.offer ?? ""))) {
         const reg0 = await registroDoPedido(supabaseAdmin, id, logStep);
         if (!reg0?.[0] || reg0[0].user_id !== user.id) return jsonResponse({ paid: false, status: "MISMATCH" });
+      }
+      /* 01/11: o mesmo pro presente da /organizar (o pedido com `compra` — o /hoje e o /inicio seguem a ordem de sempre) */
+      if (ehOfertaPresente(String(body.offer ?? "")) && typeof body.compra === "string" && !!body.compra) {
+        const regP = await registroDoPedido(supabaseAdmin, id, logStep);
+        if (!regP?.[0] || regP[0].user_id !== user.id) return jsonResponse({ paid: false, status: "MISMATCH" });
       }
       const r = await buscarPagamento(apiKey, id);
       /* segurança 21/10: saiu o `probeOnly` — devolvia o corpo cru da Asaas (pagamentos, externalReference com o

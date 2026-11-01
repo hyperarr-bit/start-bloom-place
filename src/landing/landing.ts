@@ -67,11 +67,12 @@
 import {
 
   EMAIL_OK, MODULO_DA_AREA, NOME_DO_MODULO, ROTULO_OFERTA, VALOR_OFERTA, URL_APP_STORE,
-  bracoCheckoutDoHtml, bracoLpDoHtml, checarEmailAntes, sugestaoDeEmail, voltaDoLembrete, upsell2027DoHtml, voltaDoEmailU2027,
+  bracoCheckoutDoHtml, bracoLpDoHtml, checarEmailAntes, sugestaoDeEmail, voltaDoLembrete, upsell2027DoHtml, voltaDoEmailU2027, upsellPosDoHtml, ehPraSempreOferta,
   ESTADO_VAZIO, bracoOfertaDoHtml, bracoTituloDoHtml, ehArea, ehModuloLanding, estadoQueVolta, mmss, ofertaEscolhida, reais, urlPlay, venceEm,
   type Area, type EstadoLanding, type MensagemDaDemo, type ModuloLanding, type OfertaLanding, type PixLanding, type PixU2027,
 } from "./regras";
 import { lerEstadoU2027, lerU2027Guardado } from "./u2027-estado";
+import { lerEstadoPresenteLp } from "./presente-estado";
 import { esquecerCompra, esquecerPixVivo, gravarPixVivo, idDoAparelho, lerCompra, lerPixVivo, marcarCompra, type MarcaCompra } from "./marcador";
 import { carregarComRetry, limparMarcaDeRecarga } from "./carregar";
 
@@ -150,6 +151,16 @@ let u27Volta = false;
 let u27Tela = false;
 /** crítica r2 (dinheiro 1): o 2027 guardado no cookie (QR vivo / "Pronto") quando o estado do vitalício sumiu desta aba */
 let u27Retomada: import("./regras").EstadoU2027 | null = null;
+/**
+ * 01/11: QUAL oferta o pós-pago mostra — chave UPSELL_POS no <head> (html[data-upsell-pos]): "2027" (padrão: tudo acima, igual)
+ * | "presente" ("Leve alguém junto" R$ 14,90, ./upsell-presente.ts, no MESMO lugar e na mesma página própria). Uma oferta só:
+ * com "presente" o módulo do 2027 nem baixa (salvo o link do e-mail de compra ?r=u2027 e a retomada de um QR do 2027 já aberto,
+ * que são do 2027 por natureza). O instância fica em `u27` (a mesma interface), pra o resto da landing não mudar.
+ */
+const POS_PRESENTE = U2027 && upsellPosDoHtml() === "presente";
+type ModPresente = typeof import("./upsell-presente");
+let modPresente: ModPresente | null = null;
+let carregandoPresente: Promise<ModPresente> | null = null;
 
 /* ───────────────────────── sessão + eventos ───────────────────────── */
 const novoId = () => { try { return crypto.randomUUID(); } catch { return `l${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`; } };
@@ -1017,7 +1028,7 @@ function pago(p: PixLanding) {
   vencido = null; avisoOferta = null;
   evento("landing_pix_pago", { oferta: p.oferta, valor: VALOR_OFERTA[p.oferta], order_id: p.orderId, simulado: SIMULADO });
   marcarCompra({ oferta: p.oferta, email: estado.emailPix }); // 29/10: sobrevive ao localStorage zerado (cookie)
-  if (U2027) void carregarU2027().catch(() => null); // 31/10: o módulo do 2027 chega antes da conta pronta (sem tela em branco)
+  if (U2027) void carregarPos().catch(() => null); // 31/10: o módulo do 2027 (01/11: ou do presente) chega antes da conta pronta (sem tela em branco)
   u27Antes = U2027 && !!estado.emailPix; // 31/10 (o "glitch"): com o e-mail já dado, a oferta entra direto (sem o cartão "pago")
   salvar({ fase: "pago", pago: p, anteriores: [] });
   rolarAte(card, "start");
@@ -1069,7 +1080,7 @@ async function prontoComEmail(email: string, via: string) {
   }
   // 31/10: a conta FINAL está pronta (a sessão já é a dela — código do e-mail + pix-vincular já passaram): o 2027 aparece no
   // render da "conta" e o Pix dele é pré-aquecido ali (./upsell-2027.ts) — depois do e-mail, nunca antes
-  if (U2027) { try { await carregarU2027(); } catch { /* sem o módulo: a conta pronta de sempre */ } }
+  if (U2027) { try { await carregarPos(); } catch { /* sem o módulo: a conta pronta de sempre */ } }
   evento("landing_email", { via });
   marcarCompra({ oferta: p.oferta, email });
   salvar({ fase: "conta", email });
@@ -1271,7 +1282,8 @@ function renderDoCartao() {
     caixa.innerHTML = `<div class="lp-pix-gerando" data-testid="landing-gerando"><span class="lp-pix-logo">${ICO_PIX}</span><b>Gerando o seu Pix…</b><div class="lp-progresso"><i></i></div><span>${V2 ? "Sem CPF. Leva 2 segundos." : "Sem CPF, sem cadastro. Leva 2 segundos."}</span></div>`;
   } else if (f === "qr" && estado.pix) {
     const p = estado.pix;
-    if (U2027) void carregarU2027().then((m) => m.preaquecerFolhasU27(estado.emailPix ?? estado.email ?? null, p.orderId)).catch(() => null); // 31/10 (o "glitch"): o módulo do 2027 já chega com o QR na tela (r2: e as folhas da página)
+    if (U2027 && presenteNaTela()) void carregarPresente().catch(() => null); // 01/11: o módulo do presente já chega com o QR na tela
+    else if (U2027) void carregarU2027().then((m) => m.preaquecerFolhasU27(estado.emailPix ?? estado.email ?? null, p.orderId)).catch(() => null); // 31/10 (o "glitch"): o módulo do 2027 já chega com o QR na tela (r2: e as folhas da página)
     // 30/10 (v2): 3 passos curtos no lugar da caixa verde + "Pagou? Volte aqui" (quem volta do banco paga 81%; quem não
     // paga sai ~4 s depois do QR — lp-web/funil §3c) + a garantia perto do código. O braço atual segue IGUAL.
     const passosV2 = V2 ? `
@@ -1429,6 +1441,72 @@ function carregarU2027(): Promise<ModU2027> {
   }
   return carregandoU2027;
 }
+/** 01/11: o presente toma o lugar do 2027 NESTA tela? (a chave; o link do e-mail do 2027 e a retomada de um QR do 2027 seguem no 2027) */
+function presenteNaTela(): boolean {
+  return POS_PRESENTE && !(u27Volta && VOLTA_U2027) && !u27Retomada;
+}
+function carregarPresente(): Promise<ModPresente> {
+  if (modPresente) return Promise.resolve(modPresente);
+  if (!carregandoPresente) {
+    carregandoPresente = carregarComRetry(() => import("./upsell-presente"), { recarregar: false })
+      .then((m) => { modPresente = m; return m; })
+      .catch((e) => { carregandoPresente = null; u27Falhou = true; evento("landing_erro", { onde: "chunk_presente", msg: String(e).slice(0, 120) }); throw e; });
+  }
+  return carregandoPresente;
+}
+/** o módulo da oferta desta tela (com UPSELL_POS "2027", o carregarU2027 de sempre) */
+const carregarPos = (): Promise<unknown> => (presenteNaTela() ? carregarPresente() : carregarU2027());
+const CODIGO_SIMULADO_PRESENTE = "00020101021226870014br.gov.bcb.pix2565qrcode.exemplo.com/pix/v2/SIMULACAO-SEM-COBRANCA-CORE-PRESENTE5204000053039865405" + "14.905802BR5904CORE6009SAO PAULO62070503***6304ABCD";
+const apiPresente = (): import("./upsell-presente").ApiPresente => SIMULADO
+  ? {
+    simulado: true,
+    gerar: (compra) => espera(600).then(() => (w.__landingSimularU2027?.falhar
+      ? { erro: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.", onde: "simulado" }
+      : { orderId: `simulado-pv-${compra.slice(-8)}`, qrCode: CODIGO_SIMULADO_PRESENTE, qrCodeBase64: null, expiresAt: new Date(Date.now() + 24 * 3600e3).toISOString(), donoIgual: !w.__landingSimularU2027?.outraConta })),
+    conferir: async () => ({ pago: false, codigo: null }),
+    buscar: (pedido) => espera(500).then(() => ({ codigo: `SMPX${pedido.toUpperCase().replace(/[^A-HJKMNP-Z2-9]/g, "").slice(-4).padStart(4, "X")}`, de: null })),
+    gravarNome: async () => true,
+  }
+  : {
+    simulado: false,
+    gerar: (compra) => pg(false).then((m) => m.gerarPixPresente(compra)),
+    conferir: (pix: PixU2027) => pg(false).then((m) => m.conferirPixPresente(pix, u27Compra ?? "")),
+    buscar: (pedido) => pg(false).then((m) => m.buscarPresenteLp(pedido)).catch(() => null),
+    gravarNome: (pedido, nome) => pg(false).then((m) => m.nomePresenteLp(pedido, nome)).catch(() => false),
+  };
+/**
+ * 01/11: o PRESENTE toma o cartão (no lugar do 2027). Nunca pra quem não comprou o CORE pra sempre (o LN_ano279 é de 1 ano) —
+ * aí é a conta pronta de sempre, sem oferta nenhuma. O resto (carregando sem piscar, a página própria) é o mesmo do 2027.
+ */
+function presenteToma(compra: string): boolean {
+  if (!estado.pago || estado.pago.orderId !== compra || !ehPraSempreOferta(estado.pago.oferta)) return false;
+  if (!(u27 && u27Compra === compra) && lerEstadoPresenteLp(compra).etapa === "fim") return false;
+  if (!modPresente) {
+    const carregando = () => {
+      card.dataset.fase = "conta";
+      caixa.innerHTML = `<div class="lp-pago" data-testid="presente-carregando"><div class="lp-pix-gerando"><b>Pagamento confirmado</b><div class="lp-progresso"><i></i></div></div></div>`;
+    };
+    if (!(estado.fase === "pago" && u27Antes) || u27AntesDaRecarga) carregando();
+    else window.setTimeout(() => { if (!modPresente && estado.fase === "pago" && u27Antes) carregando(); }, 400);
+    void carregarPresente().then(() => render(), () => render());
+    return true;
+  }
+  if (!u27 || u27Compra !== compra) {
+    u27?.parar();
+    u27Compra = compra;
+    u27 = modPresente.criarUpsellPresente(compra, {
+      caixa, card, api: apiPresente(), evento, copiarNoToque, copiarTexto: (c) => copiarTexto(c), desenharQr: (alvo, p) => desenharQr(alvo, p),
+      email: () => estado.email ?? estado.emailPix ?? lerCompra()?.email ?? null,
+      valorPago: () => (estado.pago ? VALOR_OFERTA[estado.pago.oferta] ?? null : null),
+      aoTerminar: () => { render(); rolarAte(card, "start"); },
+      aoMudar: () => { atualizarFixo(); rolarAte(card, "start"); },
+      contaPronta: esperarContaU27,
+      faixaConfirmada: () => "o CORE é seu pra sempre",
+    });
+  }
+  if (!u27.ativo()) return false;
+  return u27.render();
+}
 const CODIGO_SIMULADO_U27 = "00020101021226870014br.gov.bcb.pix2565qrcode.exemplo.com/pix/v2/SIMULACAO-SEM-COBRANCA-CORE-2027520400005303986540519.90" + "5802BR5904CORE6009SAO PAULO62070503***6304ABCD";
 const apiU2027 = (): import("./upsell-2027").ApiU2027 => SIMULADO
   ? {
@@ -1487,6 +1565,7 @@ function paginaDoU2027(): void {
 function u2027Toma(): boolean {
   const compra = u2027DaTela();
   if (!compra || u27Falhou) return false;
+  if (presenteNaTela()) return presenteToma(compra); // 01/11: UPSELL_POS = "presente" (com "2027", nada muda daqui pra baixo)
   // "Agora não" / Continuar desta compra (outra visita): direto a conta pronta, sem baixar nada
   if (!u27Volta && !(u27 && u27Compra === compra) && lerEstadoU2027(compra).etapa === "fim") return false;
   if (!modU2027) {
@@ -1605,7 +1684,7 @@ if (VOLTA_U2027) {
     render();
     window.setTimeout(() => rolarAte(card, "start", false), 60);
   }
-} else if (U2027 && (estado.fase === "pago" || estado.fase === "conta")) void carregarU2027().catch(() => null);
+} else if (U2027 && (estado.fase === "pago" || estado.fase === "conta")) void carregarPos().catch(() => null);
 
 /* voltou com Pix aberto (o banco recarregou a aba) / já pago: a tela certa */
 if (estado.fase === "qr") { copiado = null; conferirEmLoop(); }

@@ -24,6 +24,7 @@ import { cookiesDaMeta } from "@/pages/venda/rastreio";
 import { EMAIL_OK, abrirSessaoParaPagar, emailAtual, gravarAtribuicao, pedirBoasVindas, salvarEmailDaCompra, sessaoViva, trazerCompraParaConta } from "@/pages/hoje/conta";
 import { definirEmailDaCompra, guardarCompraAnonima, limparBatismo, vincularCompraAnonima } from "@/lib/sessao-anonima";
 import type { OfertaLanding, PixLanding, PixU2027 } from "./regras";
+import { gravarNomeDoPresente, meuPresente } from "@/presente/api";
 
 /** 29/10: o servidor recusou o Pix porque esta pessoa JÁ tem o CORE pra sempre (a página mostra "Você já tem o CORE"). */
 export type JaTem = { jaTem: true; via: string };
@@ -208,4 +209,52 @@ export async function conferirPixU2027(pix: PixU2027): Promise<boolean> {
   if (!(await sessaoViva())) return false;
   const { data } = await supabase.functions.invoke("asaas-pix", { body: { action: "check", id: pix.orderId, offer: "u2027" } });
   return !!(data as { paid?: boolean } | null)?.paid;
+}
+
+/* ───────────────────────── 01/11: o PRESENTE no pós-pago (./upsell-presente.ts, UPSELL_POS = "presente") ───────────────────────── */
+
+export type GeradoPresenteLp =
+  | (PixU2027 & { comEmail?: boolean })
+  | { presentePago: true; pedido: string; codigo: string; de: string | null }
+  | { erro: string; onde: string };
+
+/**
+ * O Pix do presente desta compra (pv149, R$ 14,90, 24 h, UM por compra — asaas-pix com `compra`, o dono é a conta FINAL como
+ * no 2027). NUNCA marca Purchase (upsell não manda Purchase pra Meta). Sem sessão: `sem_sessao`; outra conta: `outra_conta`;
+ * compra que não é pra sempre: `sem_acesso`. Já pago (perdeu a aba e voltou): `presentePago` com o código do cartão.
+ */
+export async function gerarPixPresente(compra: string): Promise<GeradoPresenteLp> {
+  try {
+    if (!(await sessaoViva())) return { erro: "Não consegui abrir o Pix agora.", onde: "sem_sessao" };
+    const { data, error } = await supabase.functions.invoke("asaas-pix", { body: { action: "create", offer: "pv149", compra } });
+    const d = data as { orderId?: string; qrCode?: string; qrCodeBase64?: string | null; expiresAt?: string | null; dono_igual?: boolean; presente_pago?: boolean; pedido?: string; codigo?: string; de?: string | null; error?: string } | null;
+    if (d?.presente_pago && typeof d.codigo === "string" && typeof d.pedido === "string") return { presentePago: true, pedido: d.pedido, codigo: d.codigo, de: d.de ?? null };
+    if (error) {
+      const m = await motivoDoErro(error);
+      if (m === "outra_conta" || m === "sem_acesso") return { erro: "Não consegui abrir o Pix agora.", onde: m };
+    }
+    if (error || !d?.orderId || !d?.qrCode) return { erro: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.", onde: String(error?.message || d?.error || "sem_qr").slice(0, 160) };
+    return {
+      orderId: d.orderId, qrCode: d.qrCode, qrCodeBase64: d.qrCodeBase64 ?? null,
+      expiresAt: d.expiresAt ?? new Date(Date.now() + 24 * 3600e3).toISOString(), donoIgual: d.dono_igual !== false,
+    };
+  } catch (e) {
+    return { erro: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.", onde: String(e).slice(0, 120) };
+  }
+}
+
+/** Uma conferência do Pix do presente (o check cria o código, 1 por pedido, e manda o link pro e-mail da conta). Sem pixel. */
+export async function conferirPixPresente(pix: PixU2027, compra: string): Promise<{ pago: boolean; codigo: string | null }> {
+  if (!(await sessaoViva())) return { pago: false, codigo: null };
+  const { data } = await supabase.functions.invoke("asaas-pix", { body: { action: "check", id: pix.orderId, offer: "pv149", compra } });
+  const d = data as { paid?: boolean; codigo?: string } | null;
+  return { pago: !!d?.paid, codigo: typeof d?.codigo === "string" ? d.codigo : null };
+}
+
+/** O código do presente pago (a recarga do cartão) e o nome no cartão — a MESMA função presente-resgatar da /presente/dar. */
+export async function buscarPresenteLp(pedido: string): Promise<{ codigo: string; de: string | null } | null> {
+  return meuPresente(pedido);
+}
+export async function nomePresenteLp(pedido: string, nome: string): Promise<boolean> {
+  return gravarNomeDoPresente(pedido, nome);
 }

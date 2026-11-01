@@ -40,6 +40,12 @@
                               (R$ 19,90, Pix de 24 h já gerado, uma vez) antes da conta pronta, nos DOIS braços do AB_LP
                               (src/landing/upsell-2027.ts). QA: ?u2027=on|off (fica neste navegador: localStorage + cookie;
                               ?u2027=auto desfaz). Ligada, vira html[data-u2027="on"]. Rollback: "off".
+        UPSELL_POS   "2027" → (01/11) QUAL oferta o pós-pago mostra (só com o UPSELL_2027 ligado). "2027" = o "Seu 2027" de
+                              hoje, IDÊNTICO. "presente" = no MESMO lugar e na mesma página própria, "Leve alguém junto" R$ 14,90
+                              (o CORE pra sempre de presente, Pix pv149 de 24 h → cartão do WhatsApp → conta pronta;
+                              src/landing/upsell-presente.ts). Nunca as duas. QA: ?upsell=presente|2027 (fica neste navegador:
+                              localStorage + cookie; ?upsell=auto desfaz). Com "presente" vira html[data-upsell-pos="presente"].
+                              Rollback: "2027".
       A divisão 50/50 do /inicio (o mesmo link da campanha) mora no index.html (DIVISAO_INICIO_LANDING, "off").
     -->
     <script>
@@ -50,6 +56,7 @@
         var AB_OFERTA = "off";
         var AB_CHECKOUT = "email"; // 31/10 noite (dono: "fixa sobe"): TODO MUNDO no e-mail antes do Pix. A/B 29–31/10: email 74 vendas / 1.410 sessões (5,25%) × livre 62 / 1.414 (4,38%); 0 × 3 pagaram sem e-mail. "on" = volta o 50/50 · "off" = todo mundo no livre
         var AB_LP = "off"; // 30/10: braço "v2" (vitrine) construído e DESLIGADO — "on" liga o 50/50 contra a página de hoje ("atual")
+        var UPSELL_POS = "2027"; // 01/11: "presente" troca o 2027 pelo "Leve alguém junto" R$ 14,90 no pós-pago (pronto e DESLIGADO; rollback: "2027")
         var UPSELL_2027 = "on"; // 31/10 ~18h (dono: "pode subir", sem compra de teste): LIGADO — "Seu 2027" R$ 19,90 no pós-pago, nos dois braços (rollback: "off")
         var d = document.documentElement, q = null, mem = {};
         try { q = new URLSearchParams(location.search); } catch (e0) {}
@@ -159,6 +166,16 @@
         if (u27 !== "on" && u27 !== "off") u27 = UPSELL_2027 === "on" ? "on" : "off";
         if (u27 === "on") d.setAttribute("data-u2027", "on");
         mem.u2027 = u27; mem.ab_u2027 = UPSELL_2027;
+        // 01/11: QUAL oferta no pós-pago ("2027" | "presente"). ?upsell=presente|2027 força (localStorage + cookie); ?upsell=auto desfaz
+        var pp = pega("upsell"), ckp = null;
+        try { var csp = String(document.cookie || "").split(";"); for (var ip = 0; ip < csp.length; ip++) { var jp = csp[ip].indexOf("="); if (jp > 0 && csp[ip].slice(0, jp).trim() === "landing_upsell_force") ckp = csp[ip].slice(jp + 1).trim(); } } catch (ep0) {}
+        if (pp === "presente" || pp === "2027" || pp === "auto") {
+          grava("landing-upsell-force", pp === "auto" ? null : pp);
+          try { document.cookie = "landing_upsell_force=" + (pp === "auto" ? "; Max-Age=0" : pp + "; Max-Age=2592000") + "; Path=/; SameSite=Lax"; } catch (ep1) {}
+        }
+        var pos = (pp === "presente" || pp === "2027") ? pp : pp === "auto" ? null : (le("landing-upsell-force") || ckp);
+        if (pos !== "presente" && pos !== "2027") pos = UPSELL_POS === "presente" ? "presente" : "2027";
+        if (pos === "presente") d.setAttribute("data-upsell-pos", "presente");
         mem.t = t; mem.oferta = o; mem.ab_titulo = AB_TITULO; mem.ab_oferta = AB_OFERTA;
         mem.divisao = pega("ld") === "1" ? "inicio" : null;
         d.setAttribute("data-t", t);

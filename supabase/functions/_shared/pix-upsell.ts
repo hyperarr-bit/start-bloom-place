@@ -22,7 +22,7 @@
  * (src/test/pix-upsell.test.ts). O QR de verdade mora em ./asaas-qr.ts.
  */
 import { OFERTA_2027, PRECOS_HOJE, eh2027 } from "./ofertas-hoje.ts";
-import { ehOfertaPresente } from "./presente.ts";
+import { ehOfertaPresente, presentePorPedido } from "./presente.ts";
 import { ehOfertaLanding } from "./ofertas-landing.ts";
 import { registroDoPedido } from "./registro-pedido.ts";
 
@@ -74,6 +74,11 @@ export const chavePixUpsell = (chave: string): string => `up-qr:${chave}`;
 export const chaveU2027 = (compra: string): string => `u2027:${compra}`;
 /** A chave do presente do dia 3 (o e-mail e a página /presente/dar). */
 export const chavePresenteDia3 = (userId: string): string => `pv149-d3:${userId}`;
+/**
+ * 01/11: a chave do presente NO PÓS-PAGO da /organizar (UPSELL_POS = "presente" no landing.html): 1 Pix por compra do
+ * vitalício, 24 h — separada da do dia 3 (o cron do dia 3 já pula quem comprou um presente: `ja_comprou`).
+ */
+export const chavePresenteLanding = (compra: string): string => `pv149-lp:${compra}`;
 
 export type PixUpsell = { orderId: string; qrCode: string; qrCodeBase64: string | null; expiresAt: string; dono: string; oferta: string; novo: boolean };
 export type QrCriado = { id: string; payload: string; encodedImage?: string | null; expirationDate?: string | null };
@@ -174,6 +179,24 @@ export async function garantirPixUpsell(admin: ClienteMin, a: {
   } catch {
     return { erro: "reserva" };
   }
+}
+
+/**
+ * 01/11 (presente na /organizar): o presente DESTA chave já foi pago? O QR guardado (ou um dos anteriores, ainda pagáveis)
+ * virou um código na tabela presentes, do mesmo dono → { pedido, codigo, de }. A página volta direto pro cartão do WhatsApp
+ * (nunca um 2º Pix de presente pra quem já pagou e perdeu a aba). Nunca lança: falha = null (a página segue pro Pix).
+ */
+export async function presentePagoDaChave(admin: ClienteMin, chave: string, dono: string): Promise<{ pedido: string; codigo: string; de: string | null } | null> {
+  try {
+    const g = lerGuardado((await lerLinha(admin, chavePixUpsell(chave))).event);
+    if (!g || g.dono !== dono) return null;
+    const pedidos = [g.orderId, ...(Array.isArray(g.anteriores) ? g.anteriores.filter((x) => typeof x === "string") : [])].slice(0, MAX_ANTERIORES + 1);
+    for (const pedido of pedidos) {
+      const p = await presentePorPedido(admin, pedido);
+      if (p && p.comprador_id === dono) return { pedido, codigo: p.codigo, de: p.de_nome ?? null };
+    }
+    return null;
+  } catch { return null; }
 }
 
 /* ───────────────────────── a compra do vitalício → o dono do 2027 ───────────────────────── */

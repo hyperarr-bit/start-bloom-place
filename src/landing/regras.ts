@@ -330,3 +330,48 @@ export function voltaDoEmailU2027(busca: URLSearchParams, agora: number = Date.n
     : null;
   return { compra, pix };
 }
+
+/* ───────────────────────── 01/11: QUAL oferta o pós-pago mostra (chave UPSELL_POS no <head>) ───────────────────────── */
+
+/**
+ * UPSELL_POS no <head> do landing.html: "2027" (padrão = o "Seu 2027 organizado" de 31/10, igual) | "presente" (o "Leve
+ * alguém junto" R$ 14,90 no MESMO lugar, na mesma página própria). Só vale com o pós-pago ligado (UPSELL_2027 / data-u2027).
+ * Com "presente" o <head> põe html[data-upsell-pos="presente"]; com "2027" o atributo NÃO existe (a página fica idêntica).
+ * QA: ?upsell=presente|2027 (fica neste navegador: localStorage + cookie); ?upsell=auto desfaz.
+ */
+export type UpsellPos = "2027" | "presente";
+export function upsellPosDoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): UpsellPos {
+  return el.getAttribute("data-upsell-pos") === "presente" ? "presente" : "2027";
+}
+/** O presente só pra quem comprou o CORE PRA SEMPRE (o LN_ano279 é de 1 ano). O mesmo ehPraSempreLanding do servidor. */
+export const ehPraSempreOferta = (o: OfertaLanding | null | undefined): boolean => o === "LN_sempre279" || o === "LN_anosempre478";
+/** R$ 14,90 — o MESMO PRECO_PRESENTE_CENTAVOS do servidor (supabase/functions/_shared/presente.ts; o teste confere). */
+export const VALOR_PRESENTE_LP = 14.9;
+export type EtapaPresenteLp = "oferta" | "qr" | "cartao" | "fim";
+export type EstadoPresenteLp = {
+  v: 1; compra: string; etapa: EtapaPresenteLp; pix: PixU2027 | null; salvoEm: number;
+  /** o código DESTE pix já foi copiado (a volta do banco recarrega a aba) */
+  copiado?: boolean;
+  /** o pedido pago (o Pix do presente) e o código /presente/<código> */
+  pedido?: string | null; codigo?: string | null; de?: string | null;
+};
+export const TTL_PRESENTE_LP_MS = 2 * 24 * 3600e3;
+export const novoEstadoPresenteLp = (compra: string, agora: number = Date.now()): EstadoPresenteLp => ({ v: 1, compra, etapa: "oferta", pix: null, salvoEm: agora });
+/** O estado guardado volta pra ESTA compra? (outra compra/velho/corrompido = a oferta; QR vencido = a oferta de novo) */
+export function estadoPresenteLpQueVolta(bruto: unknown, compra: string, agora: number = Date.now()): EstadoPresenteLp {
+  const e = bruto as Partial<EstadoPresenteLp> | null;
+  if (!e || e.v !== 1 || e.compra !== compra || typeof e.salvoEm !== "number" || agora - e.salvoEm > TTL_PRESENTE_LP_MS) return novoEstadoPresenteLp(compra, agora);
+  const etapa: EtapaPresenteLp = e.etapa === "qr" || e.etapa === "cartao" || e.etapa === "fim" ? e.etapa : "oferta";
+  const pix = e.pix && typeof e.pix.orderId === "string" && typeof e.pix.qrCode === "string" && typeof e.pix.expiresAt === "string" ? e.pix : null;
+  if (etapa === "qr" && (!pix || Date.parse(pix.expiresAt) <= agora)) return novoEstadoPresenteLp(compra, agora);
+  const pedido = typeof e.pedido === "string" && e.pedido ? e.pedido : null;
+  // o cartão sem o pedido pago não tem como achar o código: volta pra oferta (nunca um cartão vazio)
+  if (etapa === "cartao" && !pedido) return novoEstadoPresenteLp(compra, agora);
+  return {
+    v: 1, compra, etapa, pix, salvoEm: e.salvoEm,
+    ...(pix && e.copiado === true ? { copiado: true } : {}),
+    ...(pedido ? { pedido } : {}),
+    ...(typeof e.codigo === "string" && e.codigo ? { codigo: e.codigo } : {}),
+    ...(typeof e.de === "string" && e.de ? { de: e.de } : {}),
+  };
+}

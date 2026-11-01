@@ -29,6 +29,7 @@
                               de pagar), pelo landing_device_id (cookie + localStorage — o mesmo id do src/landing/marcador.ts;
                               a conta é a bracoCheckoutDoAparelho do src/landing/regras.ts). Forçar: ?checkout=livre|email
                               (fica neste navegador). O braço vai em html[data-checkout] e em todo evento landing_*.
+                              "email" (31/10) = todo mundo no braço "email" (sem sorteio, sem id de aparelho por causa disto).
         AB_LP        "off"  → (30/10) todo mundo no braço "atual" (a página de hoje, IDÊNTICA). "on" = 50/50 estável por
                               aparelho (o MESMO landing_device_id do AB_CHECKOUT, com outra conta — os dois sorteios são
                               independentes) entre "atual" e "v2" (vitrine: prints reais + preço e botão na 1ª tela,
@@ -47,7 +48,7 @@
         var AB_TITULO = "off";
         var BRACOS_TITULO = ["a", "b", "c"];
         var AB_OFERTA = "off";
-        var AB_CHECKOUT = "on"; // 29/10 (dono, depois da compra real pelo braço email): LIGADO. e-mail antes do Pix (braço "email") × checkout de hoje ("livre") — ver o comentário acima
+        var AB_CHECKOUT = "email"; // 31/10 noite (dono: "fixa sobe"): TODO MUNDO no e-mail antes do Pix. A/B 29–31/10: email 74 vendas / 1.410 sessões (5,25%) × livre 62 / 1.414 (4,38%); 0 × 3 pagaram sem e-mail. "on" = volta o 50/50 · "off" = todo mundo no livre
         var AB_LP = "off"; // 30/10: braço "v2" (vitrine) construído e DESLIGADO — "on" liga o 50/50 contra a página de hoje ("atual")
         var UPSELL_2027 = "on"; // 31/10 ~18h (dono: "pode subir", sem compra de teste): LIGADO — "Seu 2027" R$ 19,90 no pós-pago, nos dois braços (rollback: "off")
         var d = document.documentElement, q = null, mem = {};
@@ -122,6 +123,7 @@
         if (c !== "livre" && c !== "email") {
           c = "livre";
           if (AB_CHECKOUT === "on") c = hash(pegaId()) % 2 === 0 ? "livre" : "email";
+          if (AB_CHECKOUT === "email") c = "email";
         }
         d.setAttribute("data-checkout", c);
         mem.checkout = c; mem.ab_checkout = AB_CHECKOUT;

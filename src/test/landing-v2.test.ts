@@ -32,7 +32,7 @@ const MAIN = readFileSync(resolve(__dirname, "fixtures/landing-atual-30-10.html"
 /* ───────── o script do <head>, rodado num ambiente falso (com cookie) ───────── */
 const scriptDaCabeca = HTML.match(/<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
 const comChaves = (lp: "on" | "off", checkout: "on" | "off") =>
-  scriptDaCabeca.replace(/var AB_LP = "(on|off)"/, `var AB_LP = "${lp}"`).replace(/var AB_CHECKOUT = "(on|off)"/, `var AB_CHECKOUT = "${checkout}"`);
+  scriptDaCabeca.replace(/var AB_LP = "(on|off)"/, `var AB_LP = "${lp}"`).replace(/var AB_CHECKOUT = "(on|off|email)"/, `var AB_CHECKOUT = "${checkout}"`);
 
 function rodar(fonte: string, url: string, store: Record<string, string> = {}, cookie: { v: string } = { v: "" }) {
   const u = new URL(url, "https://www.coreaplicativo.com.br");
@@ -156,7 +156,8 @@ describe("braço atual = a página de hoje (origin/main 30/10), sem tirar nem p�
     expect(HTML).toContain('html:not([data-lp="v2"]) [data-so-lp="v2"], html[data-lp="v2"] [data-so-lp="atual"] { display: none !important; }');
   });
   it("as chaves de hoje seguem como no origin/main (AB_CHECKOUT on; título/oferta off)", () => {
-    for (const k of ["AB_CHECKOUT", "AB_TITULO", "AB_OFERTA", "LANDING_NOVA"]) {
+    expect(HTML).toMatch(/var AB_CHECKOUT = "email";/); // 31/10 noite (dono: "fixa sobe"): o A/B do checkout acabou, todo mundo no e-mail
+    for (const k of ["AB_TITULO", "AB_OFERTA", "LANDING_NOVA"]) {
       const re = new RegExp(`var ${k} = "(on|off)"`);
       expect(HTML.match(re)![1]).toBe(MAIN.match(re)![1]);
     }

@@ -139,7 +139,7 @@ describe("a chave no <head> do landing.html (UPSELL_2027, padrão off)", () => {
     expect(rodar("/organizar", store, cookie).attrs["data-u2027"]).toBe("on");
     expect(cookie.v).toBe("landing_u2027_force=on");
     expect(rodar("/organizar", {}, cookie).attrs["data-u2027"]).toBe("on"); // sem o localStorage, o cookie segura
-    expect(cookie.m!.landing_device_id).toBeDefined(); // o id do aparelho (AB_CHECKOUT on) convive com a força
+    expect(cookie.m!.landing_device_id).toBeUndefined(); // 31/10 noite: AB_CHECKOUT "email" fixo e AB_LP off = nenhum sorteio, nenhum id de aparelho
     expect(rodar("/organizar?u2027=off", store, cookie, "on").attrs["data-u2027"]).toBeUndefined();
     expect(rodar("/organizar?u2027=auto", store, cookie).attrs["data-u2027"]).toBeUndefined();
     expect(store["landing-u2027-force"]).toBeUndefined();

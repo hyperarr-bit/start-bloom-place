@@ -1147,6 +1147,20 @@ function miolContaV2(email: string): string {
         <div class="lp2-passo1"><b>1º passo:</b> anote o que entra e o que sai. O CORE mostra quanto você pode gastar hoje.</div>
         <p class="lp2-duvida-contato">Dúvida? contato@coreaplicativo.com.br</p>`;
 }
+/* 01/11 (dono: "o pessoal não lê… ela não clica em entrar"): o pós-compra dizia "entre com este e-mail" mas nunca QUAL
+ * botão tocar no app — e o botão grande da 1ª tela do app é "Começar", que cria conta nova vazia. Das compradoras de
+ * 25–31/10, 24% sumiram depois dos primeiros 15 min. Aqui o rodapé do app desenhado: errado apagado, certo circulado. */
+function comoEntrarNoApp(email: string): string {
+  return `<div class="lp-ce" data-testid="landing-como-entrar-app">
+            <span class="lp-ce-tit">No app, toque aqui 👇</span>
+            <div class="lp-ce-app" role="img" aria-label="No app, toque em Já tenho conta? Entrar, e não em Começar">
+              <div class="lp-ce-comecar">Começar<span class="lp-ce-nao">✕ não é aqui</span></div>
+              <div class="lp-ce-entrar">Já tenho conta? <span>Entrar</span></div>
+              <div class="lp-ce-sim">✓ é aqui</div>
+            </div>
+            <p>Depois digite ${email ? `<strong>${esc(email)}</strong>` : "o e-mail da compra"} e o código de 8 números que chega nele. Sem senha, sem pagar de novo.</p>
+          </div>`;
+}
 /** 29/10: o cartão "Você já tem o CORE" (a mesma cara da "Sua conta está pronta") no lugar da oferta. */
 function renderJaTem(m: MarcaCompra) {
   card.dataset.fase = "conta";
@@ -1172,6 +1186,7 @@ function renderJaTem(m: MarcaCompra) {
           <b>Seu CORE também no celular</b>
           <p>Baixe na App Store ou Google Play e entre com ${email ? `este e-mail: <strong>${esc(email)}</strong>` : "o mesmo e-mail"}</p>
           <div class="lp-selos"><a href="${URL_APP_STORE}" target="_blank" rel="noopener" data-loja="ios"><img src="/selos/app-store.svg" alt="Baixar na App Store" width="120" height="40" /></a><a href="${esc(urlPlay("landing"))}" target="_blank" rel="noopener" data-loja="android"><img src="/selos/google-play.png" alt="Disponível no Google Play" width="103" height="40" /></a></div>
+          ${comoEntrarNoApp(email)}
         </div>
         ${jaTemDoLink ? "" : '<div class="lp-links"><button type="button" class="lp-link" id="lp-nao-fui-eu">Não fui eu que comprei</button></div>'}
       </div>`;
@@ -1420,6 +1435,7 @@ function renderDoCartao() {
           <b>Seu CORE também no celular</b>
           <p>Baixe na App Store ou Google Play e entre com este e-mail: <strong>${esc(email)}</strong></p>
           <div class="lp-selos"><a href="${URL_APP_STORE}" target="_blank" rel="noopener" data-loja="ios"><img src="/selos/app-store.svg" alt="Baixar na App Store" width="120" height="40" /></a><a href="${esc(urlPlay("landing"))}" target="_blank" rel="noopener" data-loja="android"><img src="/selos/google-play.png" alt="Disponível no Google Play" width="103" height="40" /></a></div>
+          ${comoEntrarNoApp(email)}
         </div>
       </div>`;
     $("lp-abrir").addEventListener("click", () => { evento("landing_abrir_core", {}); location.href = "/home"; });

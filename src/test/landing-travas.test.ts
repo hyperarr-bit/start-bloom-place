@@ -323,6 +323,7 @@ describe("a página · já comprou", () => {
     expect(card.textContent).toContain("Você já tem o CORE");
     expect(card.textContent).toContain("Abrir meu CORE");
     expect(card.querySelector('a[href*="apps.apple.com"]')).not.toBeNull();
+    expect(card.querySelector('[data-testid="landing-como-entrar-app"]')?.textContent).toContain("Já tenho conta? Entrar");
     expect(card.querySelector('a[href*="play.google.com"]')).not.toBeNull();
     expect(document.getElementById("lp-card")!.getAttribute("data-fase")).toBe("conta"); // o CSS esconde a oferta
     expect(eventos()).toEqual(expect.arrayContaining([expect.objectContaining({ nome: "landing_ja_tem", via: "marcador" })]));

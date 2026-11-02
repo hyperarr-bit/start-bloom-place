@@ -90,7 +90,7 @@ describe("na tela", () => {
     montar(n);
     await waitFor(() => expect(aviso()).not.toBeNull());
     expect(screen.getByText("Sua retrospectiva de outubro ganhou cara nova")).toBeTruthy();
-    expect(screen.getByText("Em cards, pronta pra postar nos Stories")).toBeTruthy();
+    expect(screen.queryByText(/postar nos Stories/)).toBeNull(); // 01/11: dono pediu pra tirar a linha
     expect(screen.getByText("Seu outubro,")).toBeTruthy();
     expect(n.ler<{ resposta: string }>(CHAVE_RETRO_AVISO)?.resposta).toBe("visto");
     expect(localStorage.getItem(CHAVE_RETRO_AVISO_APARELHO)).toBe("u1");

@@ -186,9 +186,9 @@ export const MonthlySheet = ({ month, year, onClose }: MonthlySheetProps) => {
             tabela, que caía no `pagoEm` (vazio pra fixo com Dia) e mostrava setembro
             inteiro como não pago. Passa o balde do próprio mês: corrente, passado ou
             futuro, a conta lida/gravada é sempre a da chave deste mês.
-            01/11 (chamados f58d1b35, 9a7cf88d, 982febff, f175076b): fora do mês atual o
-            fixo gravado aqui vale só para este mês — a frase da tabela diz isso. */}
-        <FixedExpensesTable expenses={fixedExpenses} setExpenses={setFixedExpenses} dueDays={dueDays as any[]} setDueDays={setDueDays as (d: any[]) => void} mes={mesId} projetados={fixosProjetados} soDoMes={isCurrent ? undefined : month} />
+            01/11: a frase "vale só para {mês}" (prop soDoMes) ficou DESLIGADA — o dono achou que
+            complicava a planilha. Pra ligar, passar soDoMes={isCurrent ? undefined : month}. */}
+        <FixedExpensesTable expenses={fixedExpenses} setExpenses={setFixedExpenses} dueDays={dueDays as any[]} setDueDays={setDueDays as (d: any[]) => void} mes={mesId} projetados={fixosProjetados} />
       </div>
       <div className="min-w-0">
         <ExpenseTable expenses={expenses} setExpenses={setExpenses} mes={mesId} />

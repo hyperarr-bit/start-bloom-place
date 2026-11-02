@@ -785,7 +785,8 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                     totalExpenses={monthlyOutflow}
                     totalDebts={totalDoCardDividas}
                     totalInvestments={totalInvestments}
-                    partesDasDividas={{ parcelas: totalDebts, pessoas: devoAPessoas }}
+                    /* 01/11: a linha "Parcelas · Pessoas" embaixo do total ficou DESLIGADA (dono: alongava o card).
+                       Pra ligar: partesDasDividas={{ parcelas: totalDebts, pessoas: devoAPessoas }} */
                   />
                 </TrackedCard>
                 <div className="grid lg:grid-cols-[1fr_280px] gap-4 min-w-0">

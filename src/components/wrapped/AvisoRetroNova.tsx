@@ -120,7 +120,6 @@ export function AvisoRetroNova({ bloqueado = false, agora: agoraFixo }: { bloque
             <Alca arrasto={arrasto} className="mb-1" />
             <AberturaMiniatura />
             <h3 className="mt-5 text-[21px] leading-tight font-bold tracking-tight">Sua retrospectiva de outubro ganhou cara nova</h3>
-            <p className="mt-1.5 text-[14.5px] leading-snug text-muted-foreground">Em cards, pronta pra postar nos Stories</p>
             <button type="button" onClick={() => responder("abrir")} data-testid="retro-aviso-ver" data-track="retro-aviso:ver"
               className="w-full h-12 mt-5 rounded-2xl bg-foreground text-background text-[15px] font-bold">Ver agora</button>
             <button type="button" onClick={() => responder("fechar")} data-testid="retro-aviso-agora-nao" data-track="retro-aviso:agora-nao"

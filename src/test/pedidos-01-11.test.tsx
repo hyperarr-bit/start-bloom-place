@@ -233,3 +233,21 @@ describe("7. ver dicas de novo", () => {
     expect(screen.queryByTestId("abas-ver-dicas-de-novo")).toBeNull();
   });
 });
+
+/* 01/11 (dono: "não é mais fácil repetir todos os meses?"): fixo cadastrado na planilha de um mês futuro
+   também aparece previsto nos meses seguintes — o mais recente vence no mesmo perfil + descrição. */
+describe("fixos em cadeia nos meses futuros", () => {
+  it("o balde corrente + a planilha de novembro aparecem em dezembro; o de novembro vence o de mesmo nome", async () => {
+    const { juntarFixosEmCadeia, projetarFixos } = await import("@/components/FixedExpensesTable");
+    const corrente = [{ id: "a", description: "Aluguel", value: 1200 }, { id: "n", description: "Netflix", value: 40 }] as any[];
+    const novembro = [{ id: "b", description: "aluguel ", value: 1350 }, { id: "c", description: "Academia", value: 99 }] as any[];
+    const dezembroReal = [{ id: "d", description: "Netflix", value: 45 }] as any[];
+    const previstos = projetarFixos(juntarFixosEmCadeia([corrente, novembro]), dezembroReal);
+    expect(previstos.map((f: any) => [f.description.trim(), f.value])).toEqual([["aluguel", 1350], ["Academia", 99]]);
+  });
+  it("perfis diferentes não se misturam; lista vazia ou estranha não quebra", async () => {
+    const { juntarFixosEmCadeia } = await import("@/components/FixedExpensesTable");
+    const r = juntarFixosEmCadeia([[{ id: "1", description: "Aluguel", value: 1, perfil: "empresa" } as any], [{ id: "2", description: "Aluguel", value: 2 } as any], null as any, [null as any]]);
+    expect(r).toHaveLength(2);
+  });
+});

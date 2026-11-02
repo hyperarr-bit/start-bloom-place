@@ -70,6 +70,17 @@ interface FixedExpensesTableProps {
  * casamento da adoção (virada-do-mes): o que a pessoa materializar aqui vence
  * quando o mês chegar, e nada duplica.
  */
+/** 01/11 (dono: "repetir todos os meses"; chamados f58d1b35, 9a7cf88d, 982febff, f175076b): o fixo cadastrado
+ *  na planilha de um mês FUTURO também é previsto nos meses seguintes. Junta, em ordem, o balde corrente e as
+ *  planilhas dos meses futuros anteriores ao que está aberto; o mais recente vence no mesmo perfil+descrição.
+ *  Só leitura — nada é gravado (quando o mês chega, a adoção da virada leva o fixo pro balde de vez). */
+export const juntarFixosEmCadeia = (listas: FixedExpense[][]): FixedExpense[] => {
+  const chave = (f: FixedExpense) => `${String((f as { perfil?: string }).perfil ?? "")}|${String(f.description ?? "").trim().toLowerCase()}`;
+  const porChave = new Map<string, FixedExpense>();
+  for (const lista of listas) for (const f of Array.isArray(lista) ? lista : []) if (f && typeof f === "object") porChave.set(chave(f), f);
+  return [...porChave.values()];
+};
+
 export const projetarFixos = (correntes: FixedExpense[], reais: FixedExpense[]): FixedExpense[] => {
   const chave = (f: FixedExpense) => `${String((f as { perfil?: string }).perfil ?? "")}|${String(f.description ?? "").trim().toLowerCase()}`;
   const temReal = new Set((Array.isArray(reais) ? reais : []).map(chave));

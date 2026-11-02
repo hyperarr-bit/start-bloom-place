@@ -194,6 +194,27 @@ export function bracoCheckoutDoAparelho(id: string): BracoCheckout {
 
 /** "atual" = a página de hoje (IDÊNTICA); "v2" = vitrine (prints reais + preço e botão na 1ª tela, oferta cedo, demo no toque). */
 export type BracoLp = "atual" | "v2";
+/** 02/11: o braço da TELA DO PIX (AB_PIX no <head>): "b" = "Recibo da marca" (conceito 3 + enxertos dos juízes, novidades-guardadas/2026-11-02/pix-b). */
+export type BracoPix = "atual" | "b";
+export function bracoPixDoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): BracoPix {
+  return el.getAttribute("data-pix") === "b" ? "b" : "atual";
+}
+/** A conta do <head> (bit 8 do djb2-xor de "pix:" + id — independente do checkout (bit 0) e da página (bit 16)), pros testes. */
+export function bracoPixDoAparelho(id: string): BracoPix {
+  let h = 5381;
+  const s = "pix:" + id;
+  for (let k = 0; k < s.length; k++) h = ((h * 33) ^ s.charCodeAt(k)) >>> 0;
+  return ((h >>> 8) & 1) === 0 ? "atual" : "b";
+}
+/** 02/11: a pergunta de 1 toque "O que te travou?" no estado "voltou" do braço b (chave PIX_MOTIVO no <head>, padrão off). */
+export function motivoPixDoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): boolean {
+  return el.getAttribute("data-pix-motivo") === "on";
+}
+/** Quem recebe o Pix no extrato do banco (QR estático do Asaas = a razão social da conta) e o CNPJ que o Mercado Pago imprime.
+ *  Iguais a EMPRESA.razaoSocial / EMPRESA.cnpj (lib/empresa) — copiados aqui pra não puxar o native-shell pro bundle da
+ *  página; um teste confere que são iguais. */
+export const NOME_NO_BANCO = "NATALIA DE JESUS E SILVA SANTOS LTDA";
+export const CNPJ_NO_BANCO = "55.041.112/0001-82";
 export function bracoLpDoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): BracoLp {
   return el.getAttribute("data-lp") === "v2" ? "v2" : "atual";
 }

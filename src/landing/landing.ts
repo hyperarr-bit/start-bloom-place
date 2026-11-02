@@ -63,11 +63,19 @@
  *   "Sua conta está pronta" (nunca no "Você já tem o CORE"); "Agora não"/Continuar → a conta pronta de sempre, com as lojas. O módulo
  *   (./upsell-2027.ts) só baixa com a chave ligada ou pelo link do e-mail de compra confirmada (?r=u2027, que reabre o MESMO Pix).
  *   Com a chave desligada e sem ?r=u2027, nada aqui roda (o braço atual fica igual). Sem pixel no upsell.
+ * (02/11) A/B DA TELA DO PIX (AB_PIX no <head> → html[data-pix="atual"|"b"]; todo evento leva braco_pix). Braço "b" = "Recibo da
+ *   marca" (htmlPixB; só a fase `qr`): marca + nº do pedido, preço, passo acima do botão, pílula de status, recibo (No banco aparece /
+ *   Garantia / Acesso), QR dobrado, estado "voltou do banco" (landing_pix_volta_vista {order_id, via}; chips landing_pix_motivo
+ *   {order_id, motivo} só com PIX_MOTIVO) e "Conferindo com o banco…" (2,5 min). O braço "atual" é a tela de hoje, byte a byte.
+ *   MEDIÇÃO nos DOIS braços: landing_pix_saiu {s_na_tela, vez, order_id} (aba escondeu com QR sem pagar) · landing_voltou ganha
+ *   {order_id, via: aba|recarga} (a volta por recarga era invisível) · landing_pix_ja_paguei {order_id, resultado: pago|nao} ·
+ *   landing_pix_copiar_manual {order_id, ok} (o toque, separado do auto) · landing_pix_rolou {order_id} (1× por pedido, ≥ 40 px) ·
+ *   landing_pix_abandono {s_total, saidas, order_id} (pagehide com QR sem pagar) · landing_pix_qr_aberto {order_id} (só b).
  */
 import {
 
   EMAIL_OK, MODULO_DA_AREA, NOME_DO_MODULO, ROTULO_OFERTA, VALOR_OFERTA, URL_APP_STORE,
-  bracoCheckoutDoHtml, bracoLpDoHtml, checarEmailAntes, sugestaoDeEmail, voltaDoLembrete, upsell2027DoHtml, voltaDoEmailU2027, upsellPosDoHtml, ehPraSempreOferta,
+  bracoCheckoutDoHtml, bracoLpDoHtml, bracoPixDoHtml, motivoPixDoHtml, NOME_NO_BANCO, CNPJ_NO_BANCO, checarEmailAntes, sugestaoDeEmail, voltaDoLembrete, upsell2027DoHtml, voltaDoEmailU2027, upsellPosDoHtml, ehPraSempreOferta,
   ESTADO_VAZIO, bracoOfertaDoHtml, bracoTituloDoHtml, ehArea, ehModuloLanding, estadoQueVolta, mmss, ofertaEscolhida, reais, urlPlay, venceEm,
   type Area, type EstadoLanding, type MensagemDaDemo, type ModuloLanding, type OfertaLanding, type PixLanding, type PixU2027,
 } from "./regras";
@@ -101,9 +109,12 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 const agora = () => Math.round(performance.now());
 type Janela = Window & {
   __landingSimularJaTem?: boolean;
-  __landing?: { t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; divisao?: string | null };
+  __landing?: { t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null };
   __eventosLanding?: Record<string, unknown>[];
-  __landingSimular?: { pagar: () => void; pagarU2027?: () => void };
+  /** 02/11 (dev/testes): voltou() = "voltei do banco" (≥ 5 s fora) sem trocar de aba; vencer() = o QR vence em 1,5 s */
+  __landingSimular?: { pagar: () => void; pagarU2027?: () => void; voltou?: () => void; vencer?: () => void };
+  /** 02/11 (dev/testes): o "Já paguei" simulado NÃO confirma (o caminho do Asaas atrasado / de quem não pagou) */
+  __landingSimularPixNaoCaiu?: boolean;
   /** 31/10 (dev/testes): o Pix simulado do 2027 falha / sai pra outra conta / sem sessão (o link do e-mail noutro navegador) */
   __landingSimularU2027?: { falhar?: boolean; outraConta?: boolean; semSessao?: boolean };
   /** 30/10: diagnóstico de tempo (medição de desempenho; nada vai pro banco por aqui) */
@@ -137,6 +148,9 @@ const brOferta = bracoOfertaDoHtml();
 const brCheckout = bracoCheckoutDoHtml(); // 29/10: "livre" (o de hoje) | "email" (e-mail antes do Pix)
 const brLp = bracoLpDoHtml(); // 30/10: "atual" (a página de hoje) | "v2" (vitrine)
 const V2 = brLp === "v2";
+const brPix = bracoPixDoHtml(); // 02/11: "atual" (a tela do Pix de hoje) | "b" ("Recibo da marca" — AB_PIX no <head>)
+const PIXB = brPix === "b";
+const PIX_MOTIVO = motivoPixDoHtml(); // 02/11: chips "O que te travou?" no estado "voltou" do b (PIX_MOTIVO, padrão off)
 const U2027 = upsell2027DoHtml(); // 31/10: o "Seu 2027" no pós-pago (chave UPSELL_2027 / ?u2027=on)
 const VOLTA_U2027 = voltaDoEmailU2027(BUSCA); // 31/10: chegou pelo bloco do 2027 no e-mail de compra confirmada
 type ModU2027 = typeof import("./upsell-2027");
@@ -183,7 +197,7 @@ for (const k of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm
 if (BUSCA.get("fbclid")) atrib.tem_fbclid = "1";
 
 export function evento(nome: string, dados: Record<string, unknown> = {}): void {
-  const corpo = { ...dados, landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
+  const corpo = { ...dados, landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, braco_pix: brPix, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
   listaDeEventos.push({ nome, ...corpo });
   if (!PRODUCAO) return;
   try {
@@ -203,7 +217,7 @@ requestAnimationFrame(() => {
   let ttfb: number | null = null;
   try { const n = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined; if (n) ttfb = Math.round(n.responseStart); } catch { /* noop */ }
   const m = w.__landing ?? {};
-  evento("landing_html", { tela1_ms: agora(), ttfb_ms: ttfb, t_forcado: !!m.t_forcado, oferta_forcada: !!m.oferta_forcada, checkout_forcado: !!m.checkout_forcado, lp_forcado: !!m.lp_forcado, divisao: m.divisao ?? null });
+  evento("landing_html", { tela1_ms: agora(), ttfb_ms: ttfb, t_forcado: !!m.t_forcado, oferta_forcada: !!m.oferta_forcada, checkout_forcado: !!m.checkout_forcado, lp_forcado: !!m.lp_forcado, pix_forcado: !!m.pix_forcado, divisao: m.divisao ?? null });
 });
 
 /*
@@ -787,6 +801,66 @@ let faseConta: "email" | "salvando" | "codigo" | "entrando" = "email";
 let emailDigitado = "";
 let codigoPago = ""; // r2 (pix 3): o código digitado depois de pagar (sobrevive ao re-render do erro)
 
+/* ───────────────────────── 02/11: a MEDIÇÃO da tela do Pix, NOS DOIS BRAÇOS (AB_PIX) ─────────────────────────
+ * A perda está em quem gera o Pix, abre o banco e volta sem pagar (27% de quem gera, 29/10–02/11). Pra saber POR QUE um braço
+ * ganha (e não só se ganhou), cada pedido conta: quantas vezes saiu pro banco e quanto tempo ficou na tela antes (landing_pix_saiu),
+ * a volta (landing_voltou — também por recarga, que antes era invisível), o toque em "Já paguei" e se já estava pago
+ * (landing_pix_ja_paguei), a cópia pelo botão separada da automática (landing_pix_copiar_manual), se rolou a tela procurando algo
+ * (landing_pix_rolou), e a saída de vez com o QR na tela (landing_pix_abandono, no pagehide — o evento() já é keepalive).
+ * Nada disso muda o visual do braço atual. Nenhum evento leva e-mail, uid ou token. */
+const CHAVE_SAIU = "landing-pix-saiu-v1";
+let qrDesde = 0; // desde quando o QR está na tela (ou desde a última volta)
+let qrDesde0 = 0; // desde quando o QR deste pedido apareceu NESTA página (pro s_total do abandono)
+let pedidoNaTela: string | null = null;
+let saidas = 0; // quantas vezes este pedido já saiu da tela
+let saiuRegistrado = false; // o hidden e o pagehide disparam juntos: 1 saída por vez
+const rolouPedidos = new Set<string>();
+let rolouBase: number | null = null;
+const qrAbertoPedidos = new Set<string>(); // o QR dobrado está aberto (b)
+const qrAbertoAvisado = new Set<string>(); // landing_pix_qr_aberto já saiu pra este pedido (1×)
+/** o QR deste pedido acabou de entrar na tela (gerado agora, ou a página abriu com ele vivo) */
+function marcarQrNaTela(orderId: string) {
+  const agoraMs = Date.now();
+  if (pedidoNaTela !== orderId) { pedidoNaTela = orderId; saidas = 0; qrDesde0 = agoraMs; }
+  qrDesde = agoraMs; saiuRegistrado = false;
+  // a rolagem programada até o cartão ainda pode estar correndo: a linha de base da "rolou" só vale depois dela
+  rolouBase = null;
+  window.setTimeout(() => { if (pedidoNaTela === orderId && estado.fase === "qr") rolouBase = window.scrollY; }, 800);
+}
+/** a aba escondeu (foi pro banco, pro Instagram…) com o QR na tela e sem pagar */
+function registrarSaida() {
+  if (estado.fase !== "qr" || !estado.pix || saiuRegistrado) return;
+  saiuRegistrado = true;
+  if (pedidoNaTela !== estado.pix.orderId) marcarQrNaTela(estado.pix.orderId);
+  saidas += 1;
+  evento("landing_pix_saiu", { s_na_tela: Math.round((Date.now() - qrDesde) / 1000), vez: saidas, order_id: estado.pix.orderId });
+  // pra enxergar a volta por RECARGA (o Instagram recarrega a aba): a marca sobrevive no sessionStorage e no localStorage
+  const marca = JSON.stringify({ order: estado.pix.orderId, em: Date.now(), saidas });
+  ss(CHAVE_SAIU, marca);
+  try { localStorage.setItem(CHAVE_SAIU, marca); } catch { /* noop */ }
+}
+function lerSaida(): { order: string; em: number; saidas: number } | null {
+  let bruto: string | null = ss(CHAVE_SAIU);
+  if (!bruto) { try { bruto = localStorage.getItem(CHAVE_SAIU); } catch { bruto = null; } }
+  try { const m = bruto ? JSON.parse(bruto) : null; return m && typeof m.order === "string" && typeof m.em === "number" ? m : null; } catch { return null; }
+}
+function esquecerSaida() { try { sessionStorage.removeItem(CHAVE_SAIU); } catch { /* noop */ } try { localStorage.removeItem(CHAVE_SAIU); } catch { /* noop */ } }
+window.addEventListener("scroll", () => {
+  if (rolouBase === null || estado.fase !== "qr" || !estado.pix || rolouPedidos.has(estado.pix.orderId)) return;
+  if (Math.abs(window.scrollY - rolouBase) < 40) return;
+  rolouPedidos.add(estado.pix.orderId);
+  evento("landing_pix_rolou", { order_id: estado.pix.orderId });
+}, { passive: true });
+
+/* ── 02/11: o estado do braço b (só visual; a conferência, o relógio e o "Já paguei" são os mesmos) ── */
+/** a pessoa voltou do banco (≥ 5 s fora, ou por recarga) com este pedido ainda sem pagar: o cartão mostra o bloco "De volta?" */
+let voltaVista: string | null = null;
+/** tocou "Já paguei" e o banco ainda não confirmou: "Conferindo com o banco…" por até 2,5 min, depois volta a "Esperando o Pix" com o aviso */
+let conferindoDesde: number | null = null;
+let conferindoTimer: number | null = null;
+const CONFERINDO_MS = 150_000;
+let motivoDado: string | null = null;
+
 
 /* ── simulação (dev) ── */
 const CODIGO_SIMULADO = "00020101021226870014br.gov.bcb.pix2565qrcode.exemplo.com/pix/v2/SIMULACAO-SEM-COBRANCA-CORE52040000530398654052790" + "5802BR5904CORE6009SAO PAULO62070503***6304ABCD";
@@ -898,6 +972,7 @@ async function gerar(comCodigo: string | null = null): Promise<void> {
     }
   }
   erroPix = null; copiado = null; avisoOferta = null;
+  voltaVista = null; motivoDado = null; sairDoConferindo(); // 02/11 (b): um Pix novo começa limpo
   const anteriores = estado.pix && venceEm(estado.pix) > Date.now() ? [...estado.anteriores, estado.pix] : estado.anteriores;
   let t0 = Date.now();
   if (antes && comCodigo !== null) { antes = { ...antes, fase: "entrando", erro: null }; render(); }
@@ -953,6 +1028,7 @@ async function gerar(comCodigo: string | null = null): Promise<void> {
   const c = await copia;
   copiado = c.ok;
   salvar({ fase: "qr", pix: r, ...(emailAntes ? { emailPix: emailAntes } : {}) });
+  marcarQrNaTela(r.orderId); esquecerSaida();
   evento("landing_pix_gerado", { oferta, valor: VALOR_OFERTA[oferta], order_id: r.orderId, simulado: SIMULADO, email_antes: !!emailAntes });
   evento("landing_pix_copiado", { ok: c.ok, via: c.via, auto: true, order_id: r.orderId });
   pixel("InitiateCheckout", { value: VALOR_OFERTA[oferta], currency: "BRL", content_name: oferta }, `ic-${r.orderId}`);
@@ -1026,6 +1102,7 @@ function pago(p: PixLanding) {
   if (loop) window.clearTimeout(loop);
   if (loopVencido) window.clearTimeout(loopVencido);
   vencido = null; avisoOferta = null;
+  sairDoConferindo(); voltaVista = null; esquecerSaida(); // 02/11 (b)
   evento("landing_pix_pago", { oferta: p.oferta, valor: VALOR_OFERTA[p.oferta], order_id: p.orderId, simulado: SIMULADO });
   marcarCompra({ oferta: p.oferta, email: estado.emailPix }); // 29/10: sobrevive ao localStorage zerado (cookie)
   if (U2027) void carregarPos().catch(() => null); // 31/10: o módulo do 2027 (01/11: ou do presente) chega antes da conta pronta (sem tela em branco)
@@ -1041,16 +1118,34 @@ w.__landingSimular = {
   pagarU2027: () => { if (SIMULADO) u27?.simularPago(); }, // 31/10: o Pix do 2027 simulado
 };
 
+/** 02/11 (b): sai do "Conferindo com o banco…" (pagou, venceu, Pix novo, ou os 2,5 min acabaram) */
+function sairDoConferindo() {
+  conferindoDesde = null;
+  if (conferindoTimer) { window.clearTimeout(conferindoTimer); conferindoTimer = null; }
+}
+const avisoNaoChegou = () => (estado.pix?.doEmail
+  ? "Se você já pagou, o acesso chega no seu e-mail em instantes."
+  : "Ainda não chegou. Confere no app do banco — quando cair, esta tela muda sozinha.");
 async function jaPaguei() {
   evento("landing_cta", { onde: "ja_paguei" });
-  if (SIMULADO) { await espera(600); if (estado.pix) pago(estado.pix); return; }
-  const ok = await conferirUmaVez();
-  if (!ok) {
-    aviso = estado.pix?.doEmail
-      ? "Se você já pagou, o acesso chega no seu e-mail em instantes."
-      : "Ainda não chegou. Confere no app do banco — quando cair, esta tela muda sozinha.";
+  const pedido = estado.pix?.orderId ?? null;
+  let ok: boolean;
+  if (SIMULADO) { await espera(600); ok = !w.__landingSimularPixNaoCaiu; if (ok && estado.pix) pago(estado.pix); }
+  else ok = await conferirUmaVez();
+  // 02/11 (medição, nos 2 braços): quantos "Já paguei" estavam mesmo pagos (a página não sabia) × quantos não (landing_cta fica: os painéis dependem dele)
+  evento("landing_pix_ja_paguei", { order_id: pedido, resultado: ok ? "pago" : "nao" });
+  if (ok) return;
+  if (PIXB && estado.fase === "qr") {
+    // b: "Conferindo com o banco… pode fechar esta página" (10% das confirmações levam 10+ min); depois de 2,5 min sem pago, o aviso de hoje
+    aviso = null;
+    sairDoConferindo();
+    conferindoDesde = Date.now();
+    conferindoTimer = window.setTimeout(() => { if (conferindoDesde === null || estado.fase !== "qr") return; sairDoConferindo(); aviso = avisoNaoChegou(); render(); }, CONFERINDO_MS);
     render();
+    return;
   }
+  aviso = avisoNaoChegou();
+  render();
 }
 
 async function salvarEmailPix(email: string) {
@@ -1267,6 +1362,67 @@ function renderCodigoAntes(a: NonNullable<typeof antes>) {
  * overflow-anchor: none) empurrava a página ~580 px quando o QR aparecia — a pessoa via "Já paguei" sem QR. Com a âncora
  * desligada, a rolagem explícita garante o QR/passos/Copiar no topo da tela. No atual nada muda (o DOM já está na ordem visual).
  */
+/* ───────────────────────── 02/11: a tela do Pix do braço b — "Recibo da marca" ─────────────────────────
+ * Conceito 3 (novidades-guardadas/2026-11-02/pix-b/conceito-3) + os enxertos dos 4 juízes: o passo vira o título ACIMA do botão;
+ * "confirma sozinha" na pílula (com a variante doEmail); rótulo "No banco aparece" com o nome + "É o nome da nossa empresa · CNPJ"
+ * (o mesmo CNPJ que o Mercado Pago imprime); "cobra 1 vez só" junto do preço (o Inter mostra "Pagamento recorrente" em laranja);
+ * "recorrente"/"Asaas" SÓ no estado "voltou" (dito frio vira aviso de golpe); "De volta? Se ficou alguma dúvida:" (nunca "não pagou":
+ * 10% das confirmações levam 10+ min); chips por chave própria; "Ver QR code" ↔ "Esconder QR"; "Conferindo com o banco…" com saída
+ * em 2,5 min; magenta só no ponto da pílula. A fase `pago` é a de hoje nos 2 braços. Ids de hoje mantidos: #lp-copiar, #lp-ja-paguei,
+ * #lp-validade, #lp-qr, [data-testid=landing-codigo], #lp-email-pix/#lp-email-pix-ok, #lp-mudar. */
+const ICO_CHECK_B = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+const pedidoCurto = (orderId: string) => orderId.replace(/[^A-Za-z0-9]/g, "").slice(-6).toUpperCase();
+const estadoPixB = (p: PixLanding): "qr" | "voltou" | "conferindo" => (conferindoDesde !== null ? "conferindo" : voltaVista === p.orderId ? "voltou" : "qr");
+function htmlPixB(p: PixLanding): string {
+  const est = estadoPixB(p);
+  const emailConhecido = estado.emailPix ?? null;
+  const promete = brCheckout === "email" || !!p.doEmail; // hoje (checkout "email") todo mundo cai aqui
+  const rotulo = p.oferta === "LN_ano279" ? ROTULO_OFERTA[p.oferta] : "CORE pra sempre · cobra 1 vez só";
+  const passo = est === "qr" ? `<div class="lp-pixb-passo" data-testid="landing-pixb-passo"><b>${copiado ? "Código Pix copiado." : "Copie o código Pix."}</b><span>Abra o banco → Pix → Copia e Cola.</span></div>` : "";
+  const volta = est === "voltou" ? `
+      <div class="lp-pixb-volta" data-testid="landing-pixb-volta">
+        <h4>De volta? Se ficou alguma dúvida:</h4>
+        <ul>
+          <li>${ICO_CHECK_B}<span><b>${esc(NOME_NO_BANCO)}</b> é o nome da nossa empresa · CNPJ ${CNPJ_NO_BANCO}</span></li>
+          <li>${ICO_CHECK_B}<span><b>Cobra 1 vez só</b> — mesmo se o banco escrever “recorrente” ou “Asaas”.</span></li>
+          <li>${ICO_CHECK_B}<span><b>7 dias de garantia</b> · devolvemos 100% no Pix.</span></li>
+        </ul>
+        ${PIX_MOTIVO ? (motivoDado
+          ? `<p class="lp-pixb-chips" data-testid="landing-pixb-motivo-ok"><span>Anotado. Obrigada!</span></p>`
+          : `<div class="lp-pixb-chips" data-testid="landing-pixb-chips"><span>O que te travou?</span><button type="button" data-motivo="nome">O nome no banco</button><button type="button" data-motivo="valor">O valor</button><button type="button" data-motivo="depois">Deixo pra depois</button><button type="button" data-motivo="outro">Outra coisa</button></div>`) : ""}
+        <a href="mailto:contato@coreaplicativo.com.br" id="lp-pixb-falar">Falar com a gente</a>
+      </div>` : "";
+  // a pílula em 2 linhas de propósito (em 390 "Esperando o Pix · confirma sozinha · vale por 29:59" não cabe numa): status + validade em cima,
+  // "confirma sozinha" embaixo — a frase que segura quem sai pro banco (juízes: a única das 3 telas que não dizia isso), com a variante doEmail
+  const statusTxt = est === "conferindo" ? "Conferindo com o banco…" : "Esperando o Pix";
+  const statusSub = est === "conferindo" ? "" : `<small>${p.doEmail ? "Quando o Pix cair, o acesso chega no seu e-mail." : "Confirma sozinha. Pode fechar e voltar."}</small>`;
+  const conf = est === "conferindo"
+    ? `<p class="lp-pixb-conf" data-testid="landing-pixb-conferindo"><b>Às vezes o banco leva alguns minutos.</b> Pode fechar esta página: ${emailConhecido ? `o acesso chega em <b>${esc(emailConhecido)}</b>` : promete ? "o acesso chega no seu e-mail" : "esta tela confirma sozinha"} assim que o Pix cair.</p>`
+    : "";
+  const acesso = emailConhecido
+    ? `<dd data-testid="landing-email-garantido">${esc(emailConhecido)}</dd>`
+    : promete
+    ? `<dd data-testid="landing-email-garantido">no seu e-mail</dd>`
+    : `<dd><label for="lp-email-pix" class="lp-pixb-rotulo-campo">Seu e-mail, se quiser · pra entrar no app depois</label><div class="lp-linha"><input class="lp-campo" id="lp-email-pix" type="email" inputmode="email" autocomplete="email" autocapitalize="none" placeholder="voce@email.com" /><button type="button" class="lp-mini" id="lp-email-pix-ok" disabled>Salvar</button></div>${erroEmail ? `<p class="lp-erro" role="alert">${esc(erroEmail)}</p>` : ""}</dd>`;
+  return `
+      <div class="lp-pixb" data-testid="landing-pixb" data-estado="${est}">
+        <div class="lp-pixb-topo"><span class="lp-pixb-marca">CORE</span><span class="lp-pixb-pedido">Pedido ${esc(pedidoCurto(p.orderId))}</span></div>
+        <div class="lp-pixb-valor"><b>${reais(VALOR_OFERTA[p.oferta])}</b><span>${esc(rotulo)}</span></div>
+        ${passo}${volta}
+        <button type="button" class="lp-pixb-cta" id="lp-copiar">${ICO_COPIAR}<span>Copiar código Pix</span></button>
+        <div class="lp-pixb-status${est === "conferindo" ? " conferindo" : ""}" data-testid="landing-pixb-status"><span class="lado"><i class="pt"></i><span>${statusTxt}</span></span><span class="vale" id="lp-validade">vale por ${mmss(venceEm(p) - Date.now())}</span>${statusSub}</div>
+        ${conf}
+        ${aviso ? `<p class="lp-aviso" role="status">${esc(aviso)}</p>` : ""}
+        <div class="lp-pixb-qr${qrAbertoPedidos.has(p.orderId) ? " aberto" : ""}" id="lp-qr-dobrado"><div class="lp-qr" id="lp-qr"></div><div class="lp-codigo" data-testid="landing-codigo">${esc(p.qrCode)}</div></div>
+        <dl class="lp-pixb-linhas">
+          ${est === "voltou" ? "" : `<div class="lp-pixb-l" data-testid="landing-pixb-banco"><dt>No banco aparece</dt><dd>${esc(NOME_NO_BANCO)}<small>É o nome da nossa empresa <span>· CNPJ ${CNPJ_NO_BANCO}</span></small></dd></div>
+          <div class="lp-pixb-l"><dt>Garantia</dt><dd>7 dias · devolvemos 100% no Pix</dd></div>`}
+          <div class="lp-pixb-l"><dt>Acesso</dt>${acesso}</div>
+        </dl>
+        <div class="lp-links"><button type="button" class="lp-link" id="lp-ver-qr">${qrAbertoPedidos.has(p.orderId) ? "Esconder QR" : "Ver QR code"}</button><button type="button" class="lp-link" id="lp-ja-paguei"${est === "conferindo" ? " disabled" : ""}>${est === "conferindo" ? "Conferindo…" : "Já paguei"}</button>${brOferta === "ano" ? `<button type="button" class="lp-link" id="lp-mudar">Mudar o plano</button>` : ""}</div>
+      </div>`;
+}
+
 let telaRenderizada: string | null = null;
 function render() {
   renderDoCartao();
@@ -1317,7 +1473,7 @@ function renderDoCartao() {
       : `<div class="lp-qr-linha"><div class="lp-qr" id="lp-qr"></div><div class="lp-qr-dica">${copiado ? "Ou leia o <b>QR code</b> com a câmera do banco, em outro aparelho." : "<b>Copie o código</b> e cole no app do banco em Pix → Copia e Cola. Ou leia o QR code."}</div></div>
       <div class="lp-codigo" data-testid="landing-codigo">${esc(p.qrCode)}</div>
       <button type="button" class="lp-copiar${copiado ? "" : " cheio"}" id="lp-copiar">${ICO_COPIAR}<span>${copiado ? "Copiar de novo" : "Copiar código Pix"}</span></button>`;
-    caixa.innerHTML = `
+    caixa.innerHTML = PIXB ? htmlPixB(p) : `
       <div class="lp-pix-valor"><b>${reais(VALOR_OFERTA[p.oferta])}</b><span>${esc(V2 && p.oferta === "LN_sempre279" ? "Vitalício · pagamento único" : ROTULO_OFERTA[p.oferta])}</span></div>
       ${copiado && !V2 ? `<div class="lp-copiado" data-testid="landing-copiado">${ICO_CHECK}<span><b>Código Pix copiado</b>Agora abra o app do seu banco: Pix → Copia e Cola.</span></div>` : ""}
       ${passosV2}
@@ -1341,9 +1497,10 @@ function renderDoCartao() {
       const antesJa = copiado;
       copiado = ok || copiado;
       evento("landing_pix_copiado", { ok, via: "botao", auto: false, order_id: p.orderId });
-      if (copiado !== antesJa || !V2) render();
+      evento("landing_pix_copiar_manual", { ok, order_id: p.orderId }); // 02/11 (medição, nos 2 braços): o toque, separado do auto:true
+      if (copiado !== antesJa || !(V2 || PIXB)) render();
       // r2 (visitante-frio 1, v2): quem toca em "Copiar de novo" é quem duvida que copiou — o botão responde "Copiado ✓" por 1,5 s (sem re-render)
-      if (V2 && ok) {
+      if ((V2 || PIXB) && ok) {
         const rot = document.querySelector<HTMLElement>("#lp-copiar span");
         if (rot) { const antes = rot.textContent; rot.textContent = "Copiado ✓"; window.setTimeout(() => { if (rot.isConnected && rot.textContent === "Copiado ✓") rot.textContent = antes; }, 1500); }
       }
@@ -1355,6 +1512,22 @@ function renderDoCartao() {
     });
     // 29/10 (dono): no vitalício só existe 1 plano — o "Mudar o plano" só tirava a pessoa do Pix gerado; fica só no braço "ano" (caixinha)
     document.getElementById("lp-mudar")?.addEventListener("click", () => { evento("landing_cta", { onde: "mudar_plano" }); aviso = null; salvar({ fase: "oferta" }); });
+    if (PIXB) {
+      // b: o QR + código dobrados em "Ver QR code" (quem lê em outro aparelho acha); 1 evento por pedido na 1ª abertura — os ~9% que pagam sem voltar não podem cair
+      document.getElementById("lp-ver-qr")?.addEventListener("click", (ev) => {
+        const caixaQr = document.getElementById("lp-qr-dobrado"); const b = ev.currentTarget as HTMLButtonElement;
+        if (!caixaQr) return;
+        const abriu = caixaQr.classList.toggle("aberto");
+        b.textContent = abriu ? "Esconder QR" : "Ver QR code";
+        if (abriu) qrAbertoPedidos.add(p.orderId); else qrAbertoPedidos.delete(p.orderId);
+        if (abriu && !qrAbertoAvisado.has(p.orderId)) { qrAbertoAvisado.add(p.orderId); evento("landing_pix_qr_aberto", { order_id: p.orderId }); }
+      });
+      document.querySelectorAll<HTMLButtonElement>(".lp-pixb-chips button[data-motivo]").forEach((b) => b.addEventListener("click", () => {
+        motivoDado = b.dataset.motivo ?? "outro";
+        evento("landing_pix_motivo", { order_id: p.orderId, motivo: motivoDado });
+        render();
+      }));
+    }
     const campo = document.getElementById("lp-email-pix") as HTMLInputElement | null;
     if (campo) {
       const btn = $<HTMLButtonElement>("lp-email-pix-ok");
@@ -1367,10 +1540,11 @@ function renderDoCartao() {
     relogio = window.setInterval(() => {
       const el = document.getElementById("lp-validade");
       const resta = venceEm(p) - Date.now();
-      if (el) el.textContent = resta > 0 ? `Este código vale por ${mmss(resta)}` : "Este código venceu.";
+      if (el) el.textContent = PIXB ? (resta > 0 ? `vale por ${mmss(resta)}` : "venceu") : resta > 0 ? `Este código vale por ${mmss(resta)}` : "Este código venceu.";
       if (resta > 0) for (const barra of barrasDePreco()) { const fv = barra.querySelector<HTMLElement>(".lp2-fixo-p span"); if (fv) fv.textContent = `vale por ${mmss(resta)}`; }
       if (resta <= 0) {
         window.clearInterval(relogio!);
+        sairDoConferindo(); voltaVista = null; esquecerSaida(); // 02/11 (b)
         if (V2) { vencido = p; avisoOferta = avisoVenceu(!!(estado.emailPix || lerCompra()?.email)); try { ss(`landing-venceu-${p.orderId}`, "1"); } catch { /* noop */ } evento("landing_pix_venceu", { order_id: p.orderId, via: "relogio" }); }
         salvar({ fase: "oferta" });
         conferirVencidoEmLoop();
@@ -1703,7 +1877,7 @@ if (VOLTA_U2027) {
 } else if (U2027 && (estado.fase === "pago" || estado.fase === "conta")) void carregarPos().catch(() => null);
 
 /* voltou com Pix aberto (o banco recarregou a aba) / já pago: a tela certa */
-if (estado.fase === "qr") { copiado = null; conferirEmLoop(); }
+if (estado.fase === "qr") { copiado = null; conferirEmLoop(); if (estado.pix) marcarQrNaTela(estado.pix.orderId); }
 /* 31/10 (crítica r1 técnico BAIXA 5, só com o 2027 ligado): recarregou no meio da conta sendo finalizada, com o e-mail já
  * dado — a oferta antecipada volta e a conta termina sozinha (antes: o cartão pedia o e-mail de novo, campo vazio) */
 if (U2027 && estado.fase === "pago" && estado.pago && estado.emailPix && !VOLTA_U2027) {
@@ -1743,14 +1917,48 @@ document.querySelectorAll<HTMLDetailsElement>("details").forEach((d) => d.addEve
 /* a volta pra aba (foi ao banco, ao Instagram…): ≥5 s fora */
 let saiuEm: number | null = document.visibilityState === "hidden" ? Date.now() : null;
 const faseAgora = () => (jaTem && estado.fase === "oferta" ? "ja_tem" : estado.fase);
+/** 02/11 (b): a pessoa voltou do banco com este pedido ainda sem pagar → o cartão mostra "De volta? Se ficou alguma dúvida:" */
+const voltaNoB = (via: "aba" | "recarga") => {
+  if (!PIXB || estado.fase !== "qr" || !estado.pix || conferindoDesde !== null) return;
+  if (voltaVista === estado.pix.orderId) return; // já está na tela (2ª volta): nada a repetir
+  voltaVista = estado.pix.orderId;
+  evento("landing_pix_volta_vista", { order_id: estado.pix.orderId, via });
+  render();
+};
 const voltou = () => {
   if (saiuEm === null) return;
   const fora = Date.now() - saiuEm;
   saiuEm = null;
-  if (fora >= 5000) evento("landing_voltou", { fase: faseAgora(), ausente_s: Math.round(fora / 1000), com_pix: estado.fase === "qr", order_id: estado.fase === "qr" ? estado.pix?.orderId ?? null : null });
+  if (fora < 5000) return;
+  evento("landing_voltou", { fase: faseAgora(), ausente_s: Math.round(fora / 1000), com_pix: estado.fase === "qr", order_id: estado.fase === "qr" ? estado.pix?.orderId ?? null : null, via: "aba" });
+  voltaNoB("aba");
 };
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "hidden") saiuEm = Date.now(); else voltou();
+  if (document.visibilityState === "hidden") { saiuEm = Date.now(); registrarSaida(); }
+  else { voltou(); saiuRegistrado = false; qrDesde = Date.now(); if (estado.fase === "qr") esquecerSaida(); }
 });
-window.addEventListener("pagehide", () => { saiuEm = Date.now(); });
-window.addEventListener("pageshow", (e) => { if ((e as PageTransitionEvent).persisted) voltou(); });
+window.addEventListener("pagehide", () => {
+  saiuEm = Date.now();
+  registrarSaida();
+  // 02/11 (medição, nos 2 braços): saiu de vez com o QR na tela e sem pagar — o evento() manda com keepalive
+  if (estado.fase === "qr" && estado.pix) evento("landing_pix_abandono", { s_total: Math.round((Date.now() - qrDesde0) / 1000), saidas, order_id: estado.pix.orderId });
+});
+window.addEventListener("pageshow", (e) => { if ((e as PageTransitionEvent).persisted) { voltou(); saiuRegistrado = false; qrDesde = Date.now(); } });
+/* 02/11 (medição, nos 2 braços): a volta por RECARGA — o Instagram recarrega a aba na volta do banco e o visibilitychange não vê;
+ * antes essa pessoa caía em "nunca voltou". A marca gravada na saída (sessionStorage + localStorage) diz que era o mesmo pedido. */
+{
+  const m = estado.fase === "qr" && estado.pix ? lerSaida() : null;
+  if (m && estado.pix && m.order === estado.pix.orderId) {
+    esquecerSaida();
+    saidas = Math.max(saidas, Number(m.saidas) || 0);
+    const fora = Date.now() - m.em;
+    if (fora >= 5000) {
+      evento("landing_voltou", { fase: "qr", ausente_s: Math.round(fora / 1000), com_pix: true, order_id: estado.pix.orderId, via: "recarga" });
+      voltaNoB("recarga");
+    }
+  }
+}
+if (SIMULADO && w.__landingSimular) {
+  w.__landingSimular.voltou = () => { saiuEm = Date.now() - 8000; voltou(); };
+  w.__landingSimular.vencer = () => { if (estado.pix && estado.fase === "qr") salvar({ pix: { ...estado.pix, expiresAt: new Date(Date.now() + 1500).toISOString() } }); };
+}

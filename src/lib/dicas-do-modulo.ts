@@ -269,6 +269,7 @@ export function irParaDica(moduloId: string, d: Dica, n: number): void {
   }
   const inicio = Date.now();
   const procurar = () => {
+    if (typeof document === "undefined") return; // a página/ambiente já foi embora (o temporizador sobreviveu)
     const el = acharAlvo(d);
     if (el && visivel(el)) { acender(el, d.acao ?? "mostrar", d.focoDepois); return; }
     if (Date.now() - inicio < PROCURA_MS) window.setTimeout(procurar, 120);

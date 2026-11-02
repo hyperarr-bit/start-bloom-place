@@ -7,8 +7,7 @@ import { trackEvent } from "@/lib/analytics";
 import { construirRetroMes, type Leitor } from "@/lib/retrospectiva";
 import { RETRO_OUTUBRO } from "@/lib/retro-outubro";
 import {
-  CHAVE_RETRO_AVISO, CHAVE_RETRO_NOVA_ABERTA, ESPERA_AVISO_RETRO_MS, deveMostrarAvisoRetro, janelaDoAvisoRetro, marcarAvisoRetroNoAparelho,
-} from "@/lib/retro-aviso";
+  CHAVE_RETRO_AVISO, CHAVE_RETRO_NOVA_ABERTA, ESPERA_AVISO_RETRO_MS, deveMostrarAvisoRetro, janelaDoAvisoRetro, marcarAvisoRetroNoAparelho, marcarAvisoRetroNestaAbertura, _zerarMarcaAvisoRetroNestaAbertura } from "@/lib/retro-aviso";
 import { conviteApareceuNestaAbertura, telaOcupadaParaConvite } from "@/components/home-nova/EscolhaDaHome";
 import { Alca, CLASSE_FUNDO_FOLHA, FaixaDoRelogioSobFolha, propsDaFolha, useFolhaArrastavel } from "@/components/home-nova/e/folha-arrasto";
 
@@ -31,7 +30,7 @@ const INTER = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
 
 let avisoNestaAbertura = false;
 /** Só testes. */
-export const _zerarAvisoRetroNestaAbertura = (): void => { avisoNestaAbertura = false; };
+export const _zerarAvisoRetroNestaAbertura = (): void => { avisoNestaAbertura = false; _zerarMarcaAvisoRetroNestaAbertura(); };
 
 const telaOcupada = (): boolean =>
   telaOcupadaParaConvite() || (typeof document !== "undefined" && !!document.querySelector("[data-convite-home]"));
@@ -88,6 +87,7 @@ export function AvisoRetroNova({ bloqueado = false, agora: agoraFixo }: { bloque
       if (avisoNestaAbertura || conviteApareceuNestaAbertura()) return;
       if (telaOcupada()) { if (++tentativas < TENTATIVAS) t = setTimeout(tentar, ESPERA_AVISO_RETRO_MS); return; }
       avisoNestaAbertura = true;
+      marcarAvisoRetroNestaAbertura(); // o convite da Home nova cede a vez nesta abertura
       marcarAvisoRetroNoAparelho(uid);
       setRef.current(CHAVE_RETRO_AVISO, { em: new Date().toISOString(), resposta: "visto" }, { system: true });
       trackEvent("retro_aviso_visto", { month: MES });

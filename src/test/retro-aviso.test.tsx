@@ -196,3 +196,15 @@ describe("na tela", () => {
     expect(n.ler<{ resposta: string }>(CHAVE_RETRO_AVISO)?.resposta).toBe("abrir");
   });
 });
+
+/* 02/11 (revisor de bugs): o convite da Home nova cede a vez quando o aviso da retrospectiva já foi a folha desta abertura. */
+describe("1 folha por abertura nos dois sentidos", () => {
+  it("depois do aviso nesta abertura, a marca fica ligada pro convite ler", async () => {
+    const m = await import("@/lib/retro-aviso");
+    m._zerarMarcaAvisoRetroNestaAbertura();
+    expect(m.avisoRetroApareceuNestaAbertura()).toBe(false);
+    m.marcarAvisoRetroNestaAbertura();
+    expect(m.avisoRetroApareceuNestaAbertura()).toBe(true);
+    m._zerarMarcaAvisoRetroNestaAbertura();
+  });
+});

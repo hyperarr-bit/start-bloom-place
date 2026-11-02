@@ -115,7 +115,6 @@ const SleepCard = () => {
      gravava — todo mundo ficava em 8h. O "Meta: 8h ✎" abaixo grava na MESMA chave da conta. */
   const [sleepGoalBruto, setSleepGoal] = usePersistedState<number>("core-saude-sleep-goal", 8);
   const sleepGoal = Math.min(12, Math.max(4, Number(sleepGoalBruto) || 8));
-  const [editandoMeta, setEditandoMeta] = useState(false);
   const [val, setVal] = useState(String(sleepLog[today] || ""));
 
   const sleepToday = sleepLog[today] || 0;
@@ -137,29 +136,21 @@ const SleepCard = () => {
       <div className="flex items-center gap-2 mb-3">
         <Moon className="w-4 h-4 text-[hsl(var(--saude-blue))]" />
         <span className="text-xs font-bold uppercase tracking-wider">Sono</span>
-        {editandoMeta ? (
+        {/* 02/11 (revisor): um toque só. O seletor nativo fica invisível POR CIMA do "Meta: 8h ✎" — no iPhone o
+            foco automático de um <select> não abre a roda; tocar no próprio select abre. */}
+        <label className="ml-auto relative h-8 inline-flex items-center text-[11px] text-muted-foreground hover:text-foreground cursor-pointer">
+          Meta: {formatarHoras(sleepGoal)} ✎
           <select
-            autoFocus
             aria-label="Meta de sono"
             value={String(sleepGoal)}
-            onChange={(e) => { setSleepGoal(Number(e.target.value)); setEditandoMeta(false); }}
-            onBlur={() => setEditandoMeta(false)}
-            className="ml-auto text-xs h-8 rounded-md border border-border bg-background px-1.5"
+            onChange={(e) => setSleepGoal(Number(e.target.value))}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           >
             {OPCOES_META_SONO.map((h) => (
               <option key={h} value={String(h)}>{formatarHoras(h)}</option>
             ))}
           </select>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setEditandoMeta(true)}
-            // h-8 = a altura do seletor: abrir não empurra o card
-            className="ml-auto h-8 inline-flex items-center text-[11px] text-muted-foreground hover:text-foreground"
-          >
-            Meta: {formatarHoras(sleepGoal)} ✎
-          </button>
-        )}
+        </label>
       </div>
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">

@@ -24,10 +24,11 @@ import { WrappedBanner } from "@/components/wrapped/WrappedBanner";
 beforeEach(() => { navegar.mockClear(); });
 
 describe("banner da retrospectiva em Finanças", () => {
-  it("nova ligada: leva pra página da retrospectiva (nova), não abre a antiga", () => {
+  it("nova ligada: a faixa tem a cara nova e leva pra página da retrospectiva (nova), não abre a antiga", () => {
     ativa.v = true;
     render(<WrappedBanner />);
-    fireEvent.click(screen.getByText(/Sua retrospectiva de outubro tá pronta/));
+    expect(screen.getByTestId("wrapped-banner").getAttribute("data-estilo")).toBe("novo");
+    fireEvent.click(screen.getByText(/do seu jeito/));
     expect(navegar).toHaveBeenCalledWith("/retrospectiva?mes=Outubro&origem=banner");
     expect(screen.queryByTestId("antiga")).toBeNull();
   });

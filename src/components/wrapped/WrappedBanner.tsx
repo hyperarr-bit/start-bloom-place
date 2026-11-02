@@ -1,6 +1,7 @@
 import { lazy, Suspense, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { retroOutubroAtiva } from "@/lib/retro-outubro";
+import { CartaoRetroNova } from "./CartaoRetroNova";
 import { motion } from "framer-motion";
 import { ChevronRight, X } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -45,6 +46,16 @@ export const WrappedBanner = () => {
 
   if (!retro || dismissedMonth === retro.mes) return null;
 
+  // 02/11: com a nova ligada pro mês, a faixa ganha a cara dela e leva pra página da retrospectiva
+  if (retroOutubroAtiva(retro.ano, retro.mesIdx)) {
+    return (
+      <CartaoRetroNova variante="banner" mes={retro.mes} ano={retro.ano} mesIdx={retro.mesIdx}
+        // o wrapped_open sai da página (origem=banner) — contar aqui também dobrava (revisor 02/11)
+        onAbrir={() => navigate(`/retrospectiva?mes=${encodeURIComponent(retro.mes)}&origem=banner`)}
+        onFechar={() => { trackEvent("wrapped_dismiss", { month: retro.mes }); setDismissedMonth(retro.mes); }} />
+    );
+  }
+
   return (
     <>
       <motion.div
@@ -59,13 +70,7 @@ export const WrappedBanner = () => {
         <Espiral n={3} passo={24} topo={8} esquerda={12} w={10} h={18} caixa={24} />
         <div className="relative flex items-center gap-2" style={{ padding: "11px 10px 11px 30px" }}>
           <button
-            onClick={() => {
-              trackEvent("wrapped_open", { month: retro.mes, origem: "banner", tema: lerTema(get<unknown>(CHAVE_DO_TEMA, null)) });
-              // 02/11: com a retrospectiva nova ligada pro mês, o banner leva pra página dela (a mesma do cartão da Home,
-              // que grava a marca da nova) — antes ele abria direto a antiga (MonthlyWrapped), o único caminho que sobrava.
-              if (retroOutubroAtiva(retro.ano, retro.mesIdx)) { navigate(`/retrospectiva?mes=${encodeURIComponent(retro.mes)}&origem=banner`); return; }
-              setOpen(true);
-            }}
+            onClick={() => { trackEvent("wrapped_open", { month: retro.mes, origem: "banner", tema: lerTema(get<unknown>(CHAVE_DO_TEMA, null)) }); setOpen(true); }}
             className="flex items-center gap-3 flex-1 min-w-0 text-left active:scale-[0.99] transition-transform"
           >
             <span className="flex-1 leading-tight min-w-0">

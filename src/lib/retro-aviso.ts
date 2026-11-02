@@ -75,3 +75,12 @@ export function deveMostrarAvisoRetro(e: EntradaAvisoRetro): boolean {
   if (e.avisoNaConta != null || avisoRetroVistoNoAparelho(e.userId)) return false;
   return true;
 }
+
+/* 02/11 (revisor de bugs): "1 folha por abertura" nos DOIS sentidos. O aviso já cedia ao convite da Home nova; o
+   convite não cedia ao aviso — com a tela ocupada no começo, o aviso abria e, ao fechar, o convite vinha em seguida.
+   A marca mora aqui (lib) pra o EscolhaDaHome ler sem importar o componente do aviso. */
+let avisoRetroNestaAbertura = false;
+export const avisoRetroApareceuNestaAbertura = (): boolean => avisoRetroNestaAbertura;
+export const marcarAvisoRetroNestaAbertura = (): void => { avisoRetroNestaAbertura = true; };
+/** Só testes. */
+export const _zerarMarcaAvisoRetroNestaAbertura = (): void => { avisoRetroNestaAbertura = false; };

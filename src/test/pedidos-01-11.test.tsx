@@ -120,7 +120,7 @@ describe("3. meta de sono", () => {
     const { unmount } = montar(<Saude />, store);
     expect(screen.getByText("Faltam 0,5h para a meta")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Meta: 8h ✎" }));
+    expect(screen.getByText("Meta: 8h ✎")).toBeInTheDocument(); // 02/11: o seletor nativo fica por cima do texto (1 toque)
     const escolha = screen.getByLabelText("Meta de sono") as HTMLSelectElement;
     const opcoes = Array.from(escolha.options).map((o) => o.value);
     expect(opcoes[0]).toBe("5");
@@ -134,7 +134,7 @@ describe("3. meta de sono", () => {
 
     // remonta: a meta lida é a gravada
     montar(<Saude />, store);
-    expect(screen.getByRole("button", { name: "Meta: 7h ✎" })).toBeInTheDocument();
+    expect(screen.getByText("Meta: 7h ✎")).toBeInTheDocument();
   });
 });
 

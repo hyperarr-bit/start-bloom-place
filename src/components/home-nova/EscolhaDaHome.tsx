@@ -7,6 +7,7 @@ import { useEscolhaDaHome } from "@/hooks/use-escolha-da-home";
 import { trackEvent } from "@/lib/analytics";
 import { momentoRuimRecente } from "@/lib/momento-ruim";
 import { localDayKey } from "@/lib/utils";
+import { avisoRetroApareceuNestaAbertura } from "@/lib/retro-aviso";
 import {
   CHAVE_HOME_CONVITE, ESPERA_CONVITE_MS, deveConvidarHomeNova, escolhaConhecida, marcarConviteNoAparelho, type EscolhaDaHome,
 } from "@/lib/home-nova";
@@ -170,7 +171,7 @@ export function ConviteHomeNova({ bloqueado = false, ligada = false }: { bloquea
     let tentativas = 0;
     let t: ReturnType<typeof setTimeout>;
     const tentar = () => {
-      if (conviteNestaAbertura) return;
+      if (conviteNestaAbertura || avisoRetroApareceuNestaAbertura()) return; // 02/11: o aviso da retrospectiva já foi a folha desta abertura
       if (telaOcupadaParaConvite()) { if (++tentativas < TENTATIVAS_CONVITE) t = setTimeout(tentar, ESPERA_CONVITE_MS); return; }
       conviteNestaAbertura = true;
       marcarConviteNoAparelho(uid);

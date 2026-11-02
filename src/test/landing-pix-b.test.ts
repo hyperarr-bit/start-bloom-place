@@ -231,7 +231,7 @@ describe("braço b · 'Recibo da marca' (fase qr)", () => {
     expect(b.getAttribute("data-estado")).toBe("qr");
     expect(txt(b.querySelector(".lp-pixb-marca"))).toBe("CORE");
     expect(txt(b.querySelector(".lp-pixb-pedido"))).toBe(`Pedido ${pedido.replace(/[^A-Za-z0-9]/g, "").slice(-6).toUpperCase()}`);
-    expect(txt(b.querySelector(".lp-pixb-valor"))).toBe("R$ 27,90 CORE pra sempre · cobra 1 vez só");
+    expect(txt(b.querySelector(".lp-pixb-valor"))).toBe("R$ 27,90 Acesso vitalício · cobra 1 vez só");
     // o passo é o título, antes do botão (juiz visual/cliente fria: a 1ª coisa depois do preço é o que fazer, não "aguardando")
     const passo = b.querySelector('[data-testid="landing-pixb-passo"]')!, copiar = document.getElementById("lp-copiar")!, status = b.querySelector('[data-testid="landing-pixb-status"]')!;
     expect(txt(passo)).toBe("Código Pix copiado. Abra o banco → Pix → Copia e Cola.");
@@ -356,7 +356,7 @@ describe("braço b · 'Recibo da marca' (fase qr)", () => {
     await espera('[data-testid="landing-pago"], [data-testid="landing-conta"]');
   });
 
-  it("voltou do banco sem pagar (≥ 5 s fora): 1ª linha pra quem pagou ('Pagou? Confirma em instantes.'), 2ª pra quem não ('O código continua copiado'); botão de CONTORNO; o recibo INTEIRO (nome no banco + a linha do 'Asaas'/'recorrente' SÓ aqui, garantia, acesso); 'Falar com a gente' nos links; nada dobrado; 'Já paguei' continua; sem chips por padrão", async () => {
+  it("voltou do banco sem pagar (≥ 5 s fora): 1ª linha pra quem pagou ('Pagou? Confirma em instantes.'), 2ª pra quem não ('O código continua copiado'); botão de CONTORNO; o recibo INTEIRO (nome no banco, garantia, acesso — sem 'Asaas'/'recorrente'); 'Falar com a gente' nos links; nada dobrado; 'Já paguei' continua; sem chips por padrão", async () => {
     await abrir("b");
     relogioAndavel();
     const pedido = await gerarPix();
@@ -386,8 +386,8 @@ describe("braço b · 'Recibo da marca' (fase qr)", () => {
     expect(b.querySelector('[data-testid="landing-pixb-volta"]')).toBeNull();
     expect(Array.from(b.querySelectorAll(".lp-pixb-l dt")).map(txt)).toEqual(["No banco aparece", "Garantia", "Acesso"]);
     const linhas = Array.from(b.querySelectorAll(".lp-pixb-l")).map(txt);
-    // "Asaas" (Mercado Pago) e "recorrente" (Inter) respondidos SÓ aqui, depois que ela viu a tela do banco (visual M3)
-    expect(linhas[0]).toBe(`No banco aparece ${NOME_NO_BANCO} Nossa empresa · CNPJ ${CNPJ_NO_BANCO} “Asaas” (Mercado Pago) e “recorrente” (Inter) são só o jeito deles mostrar. Cobra 1 vez só.`);
+    // dono 02/11: sem a linha do "Asaas"/"recorrente" (nem aqui)
+    expect(linhas[0]).toBe(`No banco aparece ${NOME_NO_BANCO} Nossa empresa · CNPJ ${CNPJ_NO_BANCO}`);
     expect(linhas[1]).toBe("Garantia 7 dias · devolvemos 100% no Pix");
     expect(linhas[2]).toBe("Acesso maria@exemplo.com");
     expect(b.textContent).not.toMatch(/não pagou/i);

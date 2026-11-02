@@ -1393,7 +1393,7 @@ function renderCodigoAntes(a: NonNullable<typeof antes>) {
  * Conceito 3 (novidades-guardadas/2026-11-02/pix-b/conceito-3) + os enxertos dos 4 juízes: o passo vira o título ACIMA do botão;
  * "confirma sozinha" na pílula (com a variante doEmail); rótulo "No banco aparece" com o nome + "É o nome da nossa empresa · CNPJ"
  * (o mesmo CNPJ que o Mercado Pago imprime); "cobra 1 vez só" junto do preço (o Inter mostra "Pagamento recorrente" em laranja);
- * "recorrente"/"Asaas" SÓ no estado "voltou" (dito frio vira aviso de golpe); "De volta? Se ficou alguma dúvida:" (nunca "não pagou":
+ * sem explicar "Asaas"/"recorrente" (dono 02/11: "não precisa dessa mensagem"); "Acesso vitalício" no rótulo (dono 02/11); "De volta? Se ficou alguma dúvida:" (nunca "não pagou":
  * 10% das confirmações levam 10+ min); chips por chave própria; "Ver QR code" ↔ "Esconder QR"; "Conferindo com o banco…" com saída
  * em 2,5 min; magenta só no ponto da pílula. A fase `pago` é a de hoje nos 2 braços. Ids de hoje mantidos: #lp-copiar, #lp-ja-paguei,
  * #lp-validade, #lp-qr, [data-testid=landing-codigo], #lp-email-pix/#lp-email-pix-ok, #lp-mudar. */
@@ -1404,15 +1404,13 @@ function htmlPixB(p: PixLanding): string {
   const est = estadoPixB(p);
   const emailConhecido = estado.emailPix ?? null;
   const promete = brCheckout === "email" || !!p.doEmail; // hoje (checkout "email") todo mundo cai aqui
-  const rotulo = p.oferta === "LN_ano279" ? ROTULO_OFERTA[p.oferta] : "CORE pra sempre · cobra 1 vez só";
+  const rotulo = p.oferta === "LN_ano279" ? ROTULO_OFERTA[p.oferta] : "Acesso vitalício · cobra 1 vez só";
   /* r2 (persona A1/M1/M2, visual A1/M2): os 3 estados mudam SÓ o passo, o botão e a pílula — o recibo (No banco aparece / Garantia /
    * Acesso) fica INTEIRO nos 3, porque é ele que responde a quem voltou do banco sem pagar (38% das voltas), o alvo deste braço.
    *   qr          "Código Pix copiado." + botão PRETO + "Esperando o Pix · vale por".
    *   voltou      1ª linha pra quem pagou ("Pagou? Confirma em instantes." — por recarga: "De volta? Se já pagou…"), 2ª pra quem não
    *               ("O código continua copiado, se precisar." — nunca "não pagou": 10% das confirmações levam 10+ min); botão de CONTORNO
-   *               (quem acabou de voltar não recebe "copiar de novo" como ação principal); sob o nome do banco, a linha que responde ao
-   *               Mercado Pago ("Asaas") e ao Inter ("recorrente") — só aqui, depois que ela VIU a tela do banco (dito frio vira alarme);
-   *               "Falar com a gente" na linha dos links; chips do PIX_MOTIVO logo abaixo da pílula.
+   *               (quem acabou de voltar não recebe "copiar de novo" como ação principal); "Falar com a gente" na linha dos links; chips do PIX_MOTIVO logo abaixo da pílula.
    *   conferindo  passo "Conferindo com o banco…", SEM botão (quem precisar copiar abre o QR), pílula "Pode fechar esta página" + o e-mail
    *               (1× só), sem "vale por" (a validade não interessa a quem já pagou). */
   const passo = est === "voltou"
@@ -1433,9 +1431,6 @@ function htmlPixB(p: PixLanding): string {
   const chips = est === "voltou" && PIX_MOTIVO ? (motivoDado
     ? `<p class="lp-pixb-chips" data-testid="landing-pixb-motivo-ok"><span>Anotado. Obrigada!</span></p>`
     : `<div class="lp-pixb-chips" data-testid="landing-pixb-chips"><span>O que te travou?</span><button type="button" data-motivo="nome">O nome no banco</button><button type="button" data-motivo="valor">O valor</button><button type="button" data-motivo="depois">Deixo pra depois</button><button type="button" data-motivo="outro">Outra coisa</button></div>`) : "";
-  const bancoMais = est === "voltou"
-    ? `<small class="lp-pixb-mais" data-testid="landing-pixb-banco-mais">“Asaas” (Mercado Pago) e “recorrente” (Inter) são só o jeito deles mostrar. Cobra 1 vez só.</small>`
-    : "";
   const acesso = emailConhecido
     ? `<dd data-testid="landing-email-garantido">${esc(emailConhecido)}</dd>`
     : promete
@@ -1452,7 +1447,7 @@ function htmlPixB(p: PixLanding): string {
         ${aviso ? `<p class="lp-aviso" role="status">${esc(aviso)}</p>` : ""}
         <div class="lp-pixb-qr${qrAbertoPedidos.has(p.orderId) ? " aberto" : ""}" id="lp-qr-dobrado"><div class="lp-qr" id="lp-qr"></div><div class="lp-codigo" data-testid="landing-codigo">${esc(p.qrCode)}</div></div>
         <dl class="lp-pixb-linhas">
-          <div class="lp-pixb-l" data-testid="landing-pixb-banco"><dt>No banco aparece</dt><dd>${esc(NOME_NO_BANCO)}<small><span>Nossa empresa · CNPJ ${CNPJ_NO_BANCO}</span></small>${bancoMais}</dd></div>
+          <div class="lp-pixb-l" data-testid="landing-pixb-banco"><dt>No banco aparece</dt><dd>${esc(NOME_NO_BANCO)}<small><span>Nossa empresa · CNPJ ${CNPJ_NO_BANCO}</span></small></dd></div>
           <div class="lp-pixb-l"><dt>Garantia</dt><dd>7 dias · devolvemos 100% no Pix</dd></div>
           <div class="lp-pixb-l"><dt>Acesso</dt>${acesso}</div>
         </dl>

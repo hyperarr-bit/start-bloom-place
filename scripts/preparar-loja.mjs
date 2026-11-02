@@ -47,7 +47,10 @@ const ASSETS = LOJA.assets;
 
 // Peso morto: só a web alcança essas telas (a landing page e o funil /plano,
 // que dentro do app redirecionam pro /inicio pela trava de rota do App.tsx).
-const MORTO = ["v3-hero.mp4", "v3-hero-poster.jpg", "videos", "hero-phones.png", "hero-phones.webp", "images"];
+const MORTO = ["v3-hero.mp4", "v3-hero-poster.jpg", "videos", "hero-phones.png", "hero-phones.webp", "images",
+  // 02/11 (revisor da 1.0.23): a página de venda (/organizar, com pixel e Pix) e o painel de vendas do dono entraram
+  // no build como entradas próprias (vite.config) e iam de carona pro binário — nenhuma rota do app chega neles.
+  "landing.html", "vendas.html", "landing", "vendas"];
 
 // Rastreadores de anúncio que moram no index.html da WEB e vinham de carona
 // pro binário (o Capacitor copia a pasta public inteira).
@@ -271,6 +274,16 @@ for (const alvo of MORTO) {
   if (!existsSync(p)) continue;
   console.log(`  − ${alvo} (${mb(tamanho(p))})`);
   rmSync(p, { recursive: true, force: true });
+}
+// os chunks de ENTRADA da página de venda e do painel (só eles: os compartilhados também servem o app)
+for (const f of readdirSync(join(ASSETS, "assets"))) {
+  if (!/^(landing|vendas)-[\w-]+\.(js|css)$/.test(f)) continue;
+  console.log(`  − assets/${f}`);
+  rmSync(join(ASSETS, "assets", f), { force: true });
+}
+if (["landing.html", "vendas.html"].some((f) => existsSync(join(ASSETS, f)))) {
+  console.error("\n✗ TRAVA: a página de venda/painel continua no bundle do app");
+  process.exit(1);
 }
 console.log(`\n✓ assets do app: ${mb(antes)} → ${mb(tamanho(ASSETS))}`);
 if (alvoIOS) {

@@ -46,8 +46,9 @@ export const WrappedBanner = () => {
 
   if (!retro || dismissedMonth === retro.mes) return null;
 
-  // 02/11: com a nova ligada pro mês, a faixa ganha a cara dela e leva pra página da retrospectiva
-  if (retroOutubroAtiva(retro.ano, retro.mesIdx)) {
+  // 02/11: com a nova ligada pro mês, a faixa ganha a cara dela e leva pra página da retrospectiva.
+  // Na DEMO sem conta (/preview, funis) a página é protegida e mandaria pro login: lá fica a de sempre, que abre ali mesmo.
+  if (user?.id && retroOutubroAtiva(retro.ano, retro.mesIdx)) {
     return (
       <CartaoRetroNova variante="banner" mes={retro.mes} ano={retro.ano} mesIdx={retro.mesIdx}
         // o wrapped_open sai da página (origem=banner) — contar aqui também dobrava (revisor 02/11)

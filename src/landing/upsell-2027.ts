@@ -416,7 +416,8 @@ export function criarUpsell2027(compra: string, ctx: CtxU2027): Upsell2027 {
     promessa = p;
     void p.then((r) => {
       const ok = "qrCode" in r;
-      ev("landing_u2027_pix_pronto", { ms: Date.now() - tPre, ok, ...(ok ? {} : { motivo: "jaTem2027" in r ? "ja_tem" : r.onde }) });
+      // 02/11 r2 (visual M7, medição): order_id junto — a receita do 2027 entra no "R$ por visita" por braço pelo mesmo join das subscriptions
+      ev("landing_u2027_pix_pronto", { ms: Date.now() - tPre, ok, ...("qrCode" in r ? { order_id: r.orderId } : { motivo: "jaTem2027" in r ? "ja_tem" : r.onde }) });
       if ("qrCode" in r) {
         comEmail = !!r.comEmail;
         if (!e.pix || e.pix.orderId !== r.orderId) { e = { ...e, pix: { orderId: r.orderId, qrCode: r.qrCode, qrCodeBase64: r.qrCodeBase64, expiresAt: r.expiresAt, donoIgual: r.donoIgual }, copiado: false, comEmail }; gravarEstadoU2027(e); }

@@ -87,15 +87,19 @@ export function esquecerCompra(): void {
  * zera o localStorage com a página viva; se a pessoa recarregar depois disso, sem o cookie a página voltaria pra oferta
  * e deixaria gerar (e pagar) um 2º Pix. Só o essencial pra reabrir o QR: pedido, código copia-e-cola, vencimento, oferta. ── */
 export const COOKIE_PIX = "core_ln_pix";
-export type PixNoCookie = { orderId: string; qrCode: string; expiresAt: string; oferta: string };
+/** `email`: o e-mail dado ANTES do Pix (02/11 r2 — técnico ALTA 1 / persona M2: com o storage zerado a sessão some e a página
+ *  não confirma mais sozinha; o e-mail é por onde o acesso chega — e a linha "Acesso" continua mostrando ele). */
+export type PixNoCookie = { orderId: string; qrCode: string; expiresAt: string; oferta: string; email?: string | null };
 const PEDIDO_OK = /^[A-Za-z0-9_-]{1,64}$/;
+const EMAIL_COOKIE_OK = /^[^\s@;,"]{1,120}@[^\s@;,"]{1,120}\.[^\s@;,"]{2,24}$/;
 
 /** Guarda o Pix vivo no cookie (Max-Age = o que falta pra vencer). */
 export function gravarPixVivo(p: PixNoCookie, agora: number = Date.now()): void {
   const vence = Date.parse(p.expiresAt);
   const restaS = Math.floor((vence - agora) / 1000);
   if (!Number.isFinite(restaS) || restaS <= 0 || !PEDIDO_OK.test(p.orderId) || !OFERTA_OK.test(p.oferta) || p.qrCode.length > 1200) return;
-  gravarCookie(COOKIE_PIX, JSON.stringify({ o: p.orderId, q: p.qrCode, v: p.expiresAt, f: p.oferta }), restaS);
+  const email = p.email && EMAIL_COOKIE_OK.test(p.email) ? p.email : null;
+  gravarCookie(COOKIE_PIX, JSON.stringify({ o: p.orderId, q: p.qrCode, v: p.expiresAt, f: p.oferta, ...(email ? { e: email } : {}) }), restaS);
 }
 
 /** O Pix vivo guardado no cookie (null se não há, venceu ou está estragado). */
@@ -103,11 +107,20 @@ export function lerPixVivo(agora: number = Date.now()): PixNoCookie | null {
   const c = lerCookie(COOKIE_PIX);
   if (!c) return null;
   try {
-    const b = JSON.parse(c) as { o?: unknown; q?: unknown; v?: unknown; f?: unknown };
+    const b = JSON.parse(c) as { o?: unknown; q?: unknown; v?: unknown; f?: unknown; e?: unknown };
     if (typeof b.o !== "string" || typeof b.q !== "string" || typeof b.v !== "string" || typeof b.f !== "string") return null;
     if (!PEDIDO_OK.test(b.o) || !OFERTA_OK.test(b.f) || !b.q || Date.parse(b.v) <= agora) return null;
-    return { orderId: b.o, qrCode: b.q, expiresAt: b.v, oferta: b.f };
+    const email = typeof b.e === "string" && EMAIL_COOKIE_OK.test(b.e) ? b.e : null;
+    return { orderId: b.o, qrCode: b.q, expiresAt: b.v, oferta: b.f, email };
   } catch { return null; }
+}
+
+/** A sessão do Supabase mora no localStorage (`sb-<ref>-auth-token`): sem ela, o `check` do Pix nem é chamado (pagamento.ts). */
+export function temSessaoNoStorage(): boolean {
+  try {
+    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && /^sb-.*-auth-token$/.test(k)) return true; }
+  } catch { /* sem storage */ }
+  return false;
 }
 
 export function esquecerPixVivo(): void {

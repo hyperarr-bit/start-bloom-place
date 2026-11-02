@@ -316,12 +316,13 @@
       .lp-pixb-passo span { display: block; margin-top: 3px; font-size: 15px; font-weight: 500; color: var(--tx); }
       button.lp-pixb-cta { width: 100%; min-height: 52px; margin-top: 12px; border-radius: 16px; border: 0; background: var(--grafite); color: #fff; font-size: 17px; font-weight: 750; letter-spacing: -.01em; display: inline-flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 8px 20px -6px rgba(0,0,0,.35); }
       button.lp-pixb-cta svg { width: 19px; height: 19px; }
+      button.lp-pixb-cta.contorno { background: #fff; color: var(--grafite); border: 1.5px solid var(--grafite); box-shadow: none; }
       .lp-pixb-status { margin-top: 12px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 10px; min-height: 36px; padding: 8px 12px; border-radius: 12px; background: var(--papel); font-size: 13.5px; font-weight: 700; line-height: 1.3; }
       .lp-pixb-status .lado { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
       .lp-pixb-status > small { flex-basis: 100%; margin-top: 3px; padding-left: 16px; font-size: 12.5px; font-weight: 500; color: var(--suave); }
       .lp-pixb-status .pt { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; background: var(--magenta); animation: lp-pixb-respira 2.4s ease-in-out infinite; }
       @keyframes lp-pixb-respira { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
-      .lp-pixb-status .vale { flex-shrink: 0; font-size: 12.5px; font-weight: 600; color: var(--fraco); font-variant-numeric: tabular-nums; }
+      .lp-pixb-status .vale { flex-shrink: 0; font-size: 12.5px; font-weight: 600; color: var(--suave); font-variant-numeric: tabular-nums; }
       .lp-pixb-status.conferindo .pt { background: var(--grafite); }
       .lp-pixb-conf { margin: 10px 2px 0; font-size: 13.5px; line-height: 1.45; color: var(--suave); }
       .lp-pixb-conf b { color: var(--tx); font-weight: 700; }
@@ -331,29 +332,18 @@
       .lp-pixb-qr .lp-codigo { max-height: none; }
       .lp-pixb-linhas { margin: 12px 0 0; border-top: 1px solid var(--borda); }
       .lp-pixb-l { padding: 6px 0; border-bottom: 1px solid var(--borda); }
-      .lp-pixb-l dt { margin: 0; font-size: 12.5px; font-weight: 600; color: var(--fraco); }
+      .lp-pixb-l dt { margin: 0; font-size: 12.5px; font-weight: 600; color: var(--suave); }
       .lp-pixb-l dd { margin: 2px 0 0; font-size: 14px; font-weight: 650; color: var(--tx); line-height: 1.35; letter-spacing: -.01em; overflow-wrap: anywhere; }
       .lp-pixb-l dd small { display: block; margin-top: 2px; font-size: 12px; font-weight: 500; color: var(--suave); letter-spacing: 0; }
       .lp-pixb-l dd small span { white-space: nowrap; }
+      .lp-pixb-l dd small.lp-pixb-mais { margin-top: 4px; }
       .lp-pixb-l .lp-linha { margin-top: 6px; }
       .lp-pixb-rotulo-campo { display: block; margin-top: 2px; font-size: 12.5px; font-weight: 500; color: var(--suave); }
-      .lp-pixb-volta { margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: var(--papel); }
-      .lp-pixb-volta h4 { margin: 0; font-size: 16px; font-weight: 800; letter-spacing: -.015em; }
-      .lp-pixb-volta ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
-      .lp-pixb-volta li { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; line-height: 1.4; color: var(--suave); }
-      .lp-pixb-volta li svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 2px; color: var(--verde); }
-      .lp-pixb-volta li b { color: var(--tx); font-weight: 700; }
       .lp-pixb-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
       .lp-pixb-chips span { width: 100%; font-size: 12.5px; font-weight: 600; color: var(--suave); }
       .lp-pixb-chips button { padding: 8px 12px; border-radius: 999px; border: 1.5px solid var(--borda); background: #fff; color: var(--tx); font-size: 13px; font-weight: 650; }
-      .lp-pixb-volta a { display: inline-block; margin-top: 10px; color: var(--magenta-escuro); font-size: 13.5px; font-weight: 700; text-decoration: none; }
-      .lp-pixb-duvida { margin-top: 10px; }
-      .lp-pixb-duvida summary { list-style: none; cursor: pointer; padding: 6px 2px; font-size: 13.5px; font-weight: 600; color: var(--suave); display: flex; align-items: center; gap: 6px; }
-      .lp-pixb-duvida summary::-webkit-details-marker { display: none; }
-      .lp-pixb-duvida summary span { color: var(--magenta-escuro); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
-      .lp-pixb-duvida[open] summary span { text-decoration: none; }
-      .lp-pixb-duvida .lp-pixb-volta { margin-top: 4px; }
-      .lp-pixb .lp-links { margin-top: 12px; gap: 22px; }
+      .lp-pixb .lp-links { margin-top: 12px; gap: 2px 22px; flex-wrap: wrap; }
+      .lp-pixb .lp-links a.lp-link { padding: 6px 2px; color: var(--magenta-escuro); font-size: 13.5px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
       .lp-pixb .lp-links button:disabled { opacity: .55; text-decoration: none; }
       .lp-ponto { width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; background: #f59e0b; flex-shrink: 0; box-shadow: 0 0 0 0 rgba(245,158,11,.5); animation: lp-onda 1.6s ease-out infinite; }
       @keyframes lp-onda { 0% { box-shadow: 0 0 0 0 rgba(245,158,11,.5); } 100% { box-shadow: 0 0 0 10px rgba(245,158,11,0); } }

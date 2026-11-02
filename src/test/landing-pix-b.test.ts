@@ -328,16 +328,24 @@ describe("braço b · 'Recibo da marca' (fase qr)", () => {
     const b = document.querySelector('[data-testid="landing-pixb"]')!;
     expect(b.getAttribute("data-estado")).toBe("conferindo");
     expect(dos("landing_pix_ja_paguei")[0]).toMatchObject({ order_id: pedido, resultado: "nao" });
-    expect(txt(b.querySelector('[data-testid="landing-pixb-status"]'))).toMatch(/^Conferindo com o banco… vale por 29:5\d$/);
-    expect(txt(b.querySelector('[data-testid="landing-pixb-conferindo"]'))).toBe("Às vezes o banco leva alguns minutos. Pode fechar esta página: o acesso chega em maria@exemplo.com assim que o Pix cair.");
+    // r2 (persona M1 / visual M2): quem disse "já paguei" não recebe o botão preto "Copiar de novo" nem o "vale por" — o passo vira o status,
+    // a pílula diz que pode fechar e por onde o acesso chega (o e-mail), o recibo fica inteiro
+    expect(txt(b.querySelector('[data-testid="landing-pixb-passo"]'))).toBe("Conferindo com o banco… Às vezes leva alguns minutos.");
+    expect(document.getElementById("lp-copiar")).toBeNull();
+    expect(document.getElementById("lp-validade")).toBeNull();
+    expect(txt(b.querySelector('[data-testid="landing-pixb-status"]'))).toBe("Pode fechar esta página O acesso chega em maria@exemplo.com assim que o Pix cair.");
+    expect(txt(b.querySelector('[data-testid="landing-pixb-conferindo"]'))).toBe("O acesso chega em maria@exemplo.com assim que o Pix cair.");
+    expect(Array.from(b.querySelectorAll(".lp-pixb-l dt")).map(txt)).toEqual(["No banco aparece", "Garantia", "Acesso"]);
     expect((document.getElementById("lp-ja-paguei") as HTMLButtonElement).disabled).toBe(true);
     expect(txt(document.getElementById("lp-ja-paguei"))).toBe("Conferindo…");
-    expect(document.querySelector('[data-testid="landing-pixb-passo"]')).toBeNull(); // quem diz que pagou não precisa do passo
+    expect(document.getElementById("lp-ver-qr")).not.toBeNull(); // quem precisar copiar abre o QR
     expect(document.querySelector(".lp-aviso")).toBeNull();
     await vi.advanceTimersByTimeAsync(150_500);
     const b2 = document.querySelector('[data-testid="landing-pixb"]')!;
     expect(b2.getAttribute("data-estado")).toBe("qr");
     expect(txt(b2.querySelector(".lp-aviso"))).toBe("Ainda não chegou. Confere no app do banco — quando cair, esta tela muda sozinha.");
+    expect(txt(document.getElementById("lp-copiar"))).toBe("Copiar de novo");
+    expect(txt(document.getElementById("lp-validade"))).toMatch(/^vale por 2[67]:\d\d$/);
     expect((document.getElementById("lp-ja-paguei") as HTMLButtonElement).disabled).toBe(false);
     // o pagamento cai durante o "conferindo": sai pro pago normal
     vi.useRealTimers();
@@ -348,14 +356,14 @@ describe("braço b · 'Recibo da marca' (fase qr)", () => {
     await espera('[data-testid="landing-pago"], [data-testid="landing-conta"]');
   });
 
-  it("voltou do banco sem pagar (≥ 5 s fora): título 'Pagou? Confirma em instantes.' (quem volta em geral pagou), ordem passo → botão → pílula, e a dúvida DOBRADA depois da pílula ('Ficou alguma dúvida? Ver': nome + CNPJ, cobra 1 vez só, garantia, 'Falar com a gente'; sem recorrente/Asaas); a linha do banco sai do recibo; 'Já paguei' continua; sem chips por padrão", async () => {
+  it("voltou do banco sem pagar (≥ 5 s fora): 1ª linha pra quem pagou ('Pagou? Confirma em instantes.'), 2ª pra quem não ('O código continua copiado'); botão de CONTORNO; o recibo INTEIRO (nome no banco + a linha do 'Asaas'/'recorrente' SÓ aqui, garantia, acesso); 'Falar com a gente' nos links; nada dobrado; 'Já paguei' continua; sem chips por padrão", async () => {
     await abrir("b");
     relogioAndavel();
     const pedido = await gerarPix();
     andar(3000);
     visivel("hidden");
     expect(dos("landing_pix_saiu")).toHaveLength(1);
-    expect(dos("landing_pix_saiu")[0]).toMatchObject({ vez: 1, order_id: pedido, braco_pix: "b" });
+    expect(dos("landing_pix_saiu")[0]).toMatchObject({ vez: 1, via: "aba", order_id: pedido, braco_pix: "b" });
     expect(Number(dos("landing_pix_saiu")[0].s_na_tela)).toBeGreaterThanOrEqual(2);
     andar(90_000);
     visivel("visible");
@@ -364,40 +372,37 @@ describe("braço b · 'Recibo da marca' (fase qr)", () => {
     expect(dos("landing_pix_volta_vista")[0]).toMatchObject({ order_id: pedido, via: "aba" });
     const b = document.querySelector('[data-testid="landing-pixb"]')!;
     expect(b.getAttribute("data-estado")).toBe("voltou");
-    // r1 (persona/visual): a 1ª linha fala com quem pagou; nada de "recorrente"/"Asaas" nem "não pagou" (10% das confirmações levam 10+ min)
+    // r2 (persona A1/M1, visual A1/M2): a 1ª linha fala com quem pagou, a 2ª com quem não; nada de "não pagou" (10% das confirmações levam 10+ min)
     const passo = b.querySelector('[data-testid="landing-pixb-passo"]')!, copiar = document.getElementById("lp-copiar")!, status = b.querySelector('[data-testid="landing-pixb-status"]')!;
-    expect(txt(passo)).toBe("Pagou? Confirma em instantes. Às vezes o banco leva alguns minutos.");
+    expect(txt(passo)).toBe("Pagou? Confirma em instantes. O código continua copiado, se precisar.");
     expect(txt(status)).toMatch(/^Esperando o Pix vale por 28:2\d Confirma sozinha\. Pode ir ao banco e voltar\.$/); // 93 s depois
     expect(antesDe(passo, copiar) && antesDe(copiar, status)).toBe(true);
-    const duvida = b.querySelector('[data-testid="landing-pixb-duvida"]') as HTMLDetailsElement;
-    expect(duvida.open).toBe(false);
-    expect(txt(duvida.querySelector("summary"))).toBe("Ficou alguma dúvida? Ver");
-    expect(antesDe(status, duvida)).toBe(true); // depois da pílula, não antes do botão
-    const volta = b.querySelector('[data-testid="landing-pixb-volta"]')!;
-    expect(volta.querySelector("h4")).toBeNull();
-    expect(b.textContent).not.toMatch(/não pagou|recorrente|Asaas/i);
-    const itens = Array.from(volta.querySelectorAll("li")).map(txt);
-    expect(itens).toEqual([
-      `${NOME_NO_BANCO} é o nome da nossa empresa · CNPJ ${CNPJ_NO_BANCO}`,
-      "Cobra 1 vez só. Nada mensal, nada depois.",
-      "7 dias de garantia · devolvemos 100% no Pix.",
-    ]);
-    // abrir a dúvida: 1 evento por pedido; o aberto sobrevive ao re-render (relógio/aviso)
-    duvida.open = true; duvida.dispatchEvent(new Event("toggle"));
-    expect(dos("landing_pix_duvida_aberta")).toHaveLength(1);
-    expect(dos("landing_pix_duvida_aberta")[0]).toMatchObject({ order_id: pedido, braco_pix: "b" });
-    duvida.open = false; duvida.dispatchEvent(new Event("toggle")); duvida.open = true; duvida.dispatchEvent(new Event("toggle"));
-    expect(dos("landing_pix_duvida_aberta")).toHaveLength(1);
-    expect((volta.querySelector("#lp-pixb-falar") as HTMLAnchorElement).getAttribute("href")).toBe("mailto:contato@coreaplicativo.com.br");
-    expect(volta.querySelector('[data-testid="landing-pixb-chips"]')).toBeNull();
-    expect(b.querySelector('[data-testid="landing-pixb-banco"]')).toBeNull();
-    expect(Array.from(b.querySelectorAll(".lp-pixb-l dt")).map(txt)).toEqual(["Acesso"]); // nome e garantia já estão no bloco: o recibo não repete
+    // o botão deixa de ser o preto: contorno (como o .lp-copiar de hoje), "Copiar de novo"
+    expect(copiar.classList.contains("contorno")).toBe(true);
+    expect(txt(copiar)).toBe("Copiar de novo");
+    // o recibo fica INTEIRO — é o que responde a quem voltou do banco sem pagar; nada atrás de "Ver"
+    expect(b.querySelector("details")).toBeNull();
+    expect(b.querySelector('[data-testid="landing-pixb-duvida"]')).toBeNull();
+    expect(b.querySelector('[data-testid="landing-pixb-volta"]')).toBeNull();
+    expect(Array.from(b.querySelectorAll(".lp-pixb-l dt")).map(txt)).toEqual(["No banco aparece", "Garantia", "Acesso"]);
+    const linhas = Array.from(b.querySelectorAll(".lp-pixb-l")).map(txt);
+    // "Asaas" (Mercado Pago) e "recorrente" (Inter) respondidos SÓ aqui, depois que ela viu a tela do banco (visual M3)
+    expect(linhas[0]).toBe(`No banco aparece ${NOME_NO_BANCO} Nossa empresa · CNPJ ${CNPJ_NO_BANCO} “Asaas” (Mercado Pago) e “recorrente” (Inter) são só o jeito deles mostrar. Cobra 1 vez só.`);
+    expect(linhas[1]).toBe("Garantia 7 dias · devolvemos 100% no Pix");
+    expect(linhas[2]).toBe("Acesso maria@exemplo.com");
+    expect(b.textContent).not.toMatch(/não pagou/i);
+    // "Falar com a gente" na linha dos links (a caixa certa: contato@), sem crescer o cartão
+    const falar = b.querySelector("#lp-pixb-falar") as HTMLAnchorElement;
+    expect(falar.closest(".lp-links")).not.toBeNull();
+    expect(falar.getAttribute("href")).toBe("mailto:contato@coreaplicativo.com.br");
+    expect(Array.from(b.querySelectorAll(".lp-links .lp-link")).map(txt)).toEqual(["Ver QR code", "Já paguei", "Falar com a gente"]);
+    expect(b.querySelector('[data-testid="landing-pixb-chips"]')).toBeNull();
     expect(txt(document.getElementById("lp-ja-paguei"))).toBe("Já paguei");
     expect((document.getElementById("lp-ja-paguei") as HTMLButtonElement).disabled).toBe(false);
     expect(document.getElementById("lp-ver-qr")).not.toBeNull();
-    // 2ª ida e volta: vez 2, o bloco não se repete, nada quebra
+    // 2ª ida e volta: vez 2, o estado não se repete, nada quebra
     andar(2000); visivel("hidden"); andar(30_000); visivel("visible");
-    expect(dos("landing_pix_saiu").at(-1)).toMatchObject({ vez: 2 });
+    expect(dos("landing_pix_saiu").at(-1)).toMatchObject({ vez: 2, via: "aba" });
     expect(dos("landing_voltou")).toHaveLength(2);
     expect(dos("landing_pix_volta_vista")).toHaveLength(1);
     // < 5 s fora não conta como ida ao banco
@@ -411,12 +416,13 @@ describe("braço b · 'Recibo da marca' (fase qr)", () => {
     const pedido = await gerarPix();
     simular().voltou();
     const chips = document.querySelector('[data-testid="landing-pixb-chips"]')!;
+    expect(chips.previousElementSibling).toBe(document.querySelector('[data-testid="landing-pixb-status"]')); // r2 (persona B8): logo abaixo da pílula, antes do recibo
     expect(Array.from(chips.querySelectorAll("button")).map(txt)).toEqual(["O nome no banco", "O valor", "Deixo pra depois", "Outra coisa"]);
     (chips.querySelector('button[data-motivo="nome"]') as HTMLButtonElement).click();
     expect(dos("landing_pix_motivo")[0]).toMatchObject({ order_id: pedido, motivo: "nome", braco_pix: "b" });
     expect(document.querySelector('[data-testid="landing-pixb-chips"]')).toBeNull();
     expect(txt(document.querySelector('[data-testid="landing-pixb-motivo-ok"]'))).toBe("Anotado. Obrigada!");
-    expect(document.querySelector('[data-testid="landing-pixb-volta"]')).not.toBeNull();
+    expect(document.querySelector('[data-testid="landing-pixb"]')!.getAttribute("data-estado")).toBe("voltou");
   });
 
   it("a volta por RECARGA (o Instagram recarrega a aba): landing_voltou {via: recarga} com o tempo fora, e o b mostra o bloco", async () => {
@@ -434,7 +440,12 @@ describe("braço b · 'Recibo da marca' (fase qr)", () => {
     expect(dos("landing_voltou")[0]).toMatchObject({ via: "recarga", com_pix: true, order_id: pedido, fase: "qr", braco_pix: "b" });
     expect(Number(dos("landing_voltou")[0].ausente_s)).toBeGreaterThanOrEqual(80);
     expect(dos("landing_pix_volta_vista")[0]).toMatchObject({ via: "recarga" });
-    expect(document.querySelector('[data-testid="landing-pixb-volta"]')).not.toBeNull();
+    const b = document.querySelector('[data-testid="landing-pixb"]')!;
+    expect(b.getAttribute("data-estado")).toBe("voltou");
+    // r2 (persona M2): a página nova sabe que o código já foi copiado (marca da saída) — o título reconhece a volta e o botão é "Copiar de novo"
+    expect(txt(b.querySelector('[data-testid="landing-pixb-passo"]'))).toBe("De volta? Se já pagou, confirma em instantes. O código continua copiado, se precisar.");
+    expect(txt(document.getElementById("lp-copiar"))).toBe("Copiar de novo");
+    expect(document.getElementById("lp-copiar")!.classList.contains("contorno")).toBe(true);
     expect(localStorage.getItem("landing-pix-saiu-v1")).toBeNull(); // a marca é de 1 uso
     // a 2ª saída desta página conta a partir da 1ª (vez 2)
     visivel("hidden");
@@ -490,7 +501,7 @@ describe("braço b · 'Recibo da marca' (fase qr)", () => {
     (window as unknown as { __landingSimularPixNaoCaiu: boolean }).__landingSimularPixNaoCaiu = true;
     (document.getElementById("lp-ja-paguei") as HTMLButtonElement).click();
     await vi.waitFor(() => { expect(document.querySelector('[data-testid="landing-pixb"]')!.getAttribute("data-estado")).toBe("conferindo"); });
-    expect(txt(document.querySelector('[data-testid="landing-pixb-conferindo"]'))).toBe("Às vezes o banco leva alguns minutos. Pode fechar esta página: o acesso chega no seu e-mail assim que o Pix cair.");
+    expect(txt(document.querySelector('[data-testid="landing-pixb-conferindo"]'))).toBe("O acesso chega no seu e-mail assim que o Pix cair.");
   });
 
   it("página v2 + b: o cartão do Pix é o do b (sem os 3 passos do v2), e pagar segue pro pós-pago do v2", async () => {
@@ -508,12 +519,12 @@ describe("braço b · 'Recibo da marca' (fase qr)", () => {
     await abrir("b");
     await gerarPix();
     simular().voltou();
-    expect(document.querySelector('[data-testid="landing-pixb-volta"]')).not.toBeNull();
+    expect(document.querySelector('[data-testid="landing-pixb"]')!.getAttribute("data-estado")).toBe("voltou");
     simular().vencer();
     await vi.waitFor(() => { expect(document.getElementById("lp-card")!.dataset.fase).toBe("oferta"); }, { timeout: 5000 });
     await gerarPix();
     expect(document.querySelector('[data-testid="landing-pixb"]')!.getAttribute("data-estado")).toBe("qr");
-    expect(document.querySelector('[data-testid="landing-pixb-volta"]')).toBeNull();
+    expect(document.getElementById("lp-pixb-falar")).toBeNull();
     expect(dos("landing_pix_gerado")).toHaveLength(2);
   });
 });
@@ -571,7 +582,7 @@ describe("a medição nos DOIS braços (sem mudar o visual do atual)", () => {
     expect(dos("landing_pix_ja_paguei").at(-1)).toMatchObject({ resultado: "pago" });
   });
 
-  it("landing_pix_rolou 1× por pedido (≥ 40 px depois da rolagem programada), nos 2 braços", async () => {
+  it("landing_pix_rolou 1× por pedido (≥ 40 px depois da rolagem programada E de um toque/roda real), nos 2 braços", async () => {
     for (const pix of ["atual", "b"] as const) {
       await abrir(pix);
       const pedido = await gerarPix();
@@ -579,9 +590,13 @@ describe("a medição nos DOIS braços (sem mudar o visual do atual)", () => {
       window.dispatchEvent(new Event("scroll"));
       expect(dos("landing_pix_rolou")).toHaveLength(0); // antes da linha de base (800 ms) não conta
       await dormir(900);
+      Object.defineProperty(window, "scrollY", { value: 120, configurable: true });
+      window.dispatchEvent(new Event("scroll"));
+      expect(dos("landing_pix_rolou")).toHaveLength(0); // r2 (persona M3): scrollY mexeu SEM toque (barra do Instagram, teclado, rolagem suave) não conta
+      window.dispatchEvent(new Event("touchstart"));
       Object.defineProperty(window, "scrollY", { value: 20, configurable: true });
       window.dispatchEvent(new Event("scroll"));
-      expect(dos("landing_pix_rolou")).toHaveLength(0);
+      expect(dos("landing_pix_rolou")).toHaveLength(0); // < 40 px
       Object.defineProperty(window, "scrollY", { value: 120, configurable: true });
       window.dispatchEvent(new Event("scroll"));
       window.dispatchEvent(new Event("scroll"));
@@ -591,7 +606,7 @@ describe("a medição nos DOIS braços (sem mudar o visual do atual)", () => {
     }
   });
 
-  it("pagehide com o QR na tela e sem pagar: landing_pix_abandono {s_total, saidas, order_id} (+ a saída conta 1×, não 2); depois de pago, nada", async () => {
+  it("pagehide com o QR na tela e sem pagar: landing_pix_abandono {s_total, saidas, idas_banco, order_id} — a saída FINAL não é ida ao banco (saidas = as anteriores; idas_banco = voltas de ≥ 5 s); pagehide sem esconder antes = saiu {via: pagehide}; depois de pago, nada", async () => {
     for (const pix of ["atual", "b"] as const) {
       await abrir(pix);
       relogioAndavel();
@@ -601,16 +616,23 @@ describe("a medição nos DOIS braços (sem mudar o visual do atual)", () => {
       visivel("hidden");
       window.dispatchEvent(new Event("pagehide"));
       expect(dos("landing_pix_saiu")).toHaveLength(2); // o hidden e o pagehide da mesma saída = 1 saída
+      expect(dos("landing_pix_saiu").map((e) => e.via)).toEqual(["aba", "aba"]);
       const ab = dos("landing_pix_abandono");
       expect(ab).toHaveLength(1);
-      expect(ab[0]).toMatchObject({ saidas: 2, order_id: pedido, braco_pix: pix });
+      // r2 (técnico M2): antes vinha saidas:2 (contava a própria saída final); agora 1 ida ao banco antes + 1 volta de ≥ 5 s
+      expect(ab[0]).toMatchObject({ saidas: 1, idas_banco: 1, order_id: pedido, braco_pix: pix });
       expect(Number(ab[0].s_total)).toBeGreaterThanOrEqual(30);
       visivel("visible");
+      // pagehide SEM esconder antes (navegou/recarregou com a aba visível): o saiu vai com via:"pagehide" e não vira "ida ao banco"
+      window.dispatchEvent(new Event("pagehide"));
+      expect(dos("landing_pix_saiu")).toHaveLength(3);
+      expect(dos("landing_pix_saiu")[2]).toMatchObject({ via: "pagehide", vez: 3, order_id: pedido });
+      expect(dos("landing_pix_abandono")[1]).toMatchObject({ saidas: 2, idas_banco: 1 });
       simular().pagar();
       await espera('[data-testid="landing-pago"], [data-testid="landing-conta"]');
       window.dispatchEvent(new Event("pagehide"));
-      expect(dos("landing_pix_abandono")).toHaveLength(1);
-      expect(dos("landing_pix_saiu")).toHaveLength(2);
+      expect(dos("landing_pix_abandono")).toHaveLength(2);
+      expect(dos("landing_pix_saiu")).toHaveLength(3);
     }
   });
 
@@ -633,7 +655,7 @@ describe("a medição nos DOIS braços (sem mudar o visual do atual)", () => {
       andar(40_000);
       visivel("hidden");
       window.dispatchEvent(new Event("pagehide"));
-      expect(dos("landing_pix_abandono")[0]).toMatchObject({ order_id: pedido, saidas: 1 });
+      expect(dos("landing_pix_abandono")[0]).toMatchObject({ order_id: pedido, saidas: 0, idas_banco: 0 }); // r2: a saída final não é ida ao banco
       andar(60_000);
       await abrir(pix, { manterStorage: true });
       relogioAndavel();
@@ -645,7 +667,7 @@ describe("a medição nos DOIS braços (sem mudar o visual do atual)", () => {
       visivel("hidden");
       window.dispatchEvent(new Event("pagehide"));
       const ab = dos("landing_pix_abandono").at(-1)!;
-      expect(ab).toMatchObject({ order_id: pedido, saidas: 2 });
+      expect(ab).toMatchObject({ order_id: pedido, saidas: 1, idas_banco: 1 }); // a 1ª saída (da marca) + a volta por recarga; a saída final de novo fora
       expect(Number(ab.s_total)).toBeGreaterThanOrEqual(110); // 40 + 60 + 10: não recomeçou na recarga
     }
   });
@@ -665,13 +687,50 @@ describe("a medição nos DOIS braços (sem mudar o visual do atual)", () => {
       relogioAndavel();
       await espera('[data-testid="landing-codigo"]');
       expect(document.getElementById("lp-card")!.dataset.fase).toBe("qr"); // não voltou pra oferta (sem 2º Pix)
+      expect(dos("landing_pix_restaurado")[0]).toMatchObject({ order_id: pedido, sem_sessao: true, com_email: true, braco_pix: pix });
       expect(dos("landing_voltou")[0]).toMatchObject({ via: "recarga", order_id: pedido, com_pix: true, braco_pix: pix, ausente_s: 70 });
       expect(document.cookie).not.toMatch(/core_ln_saiu=/); // a marca é de 1 uso
-      if (pix === "b") expect(document.querySelector('[data-testid="landing-pixb"]')!.getAttribute("data-estado")).toBe("voltou");
+      // r2 (técnico ALTA 1 / persona M2): a SESSÃO foi junto com o storage — a página não promete mais "confirma sozinha" (modo do lembrete:
+      // o acesso chega no e-mail, que o cookie do Pix vivo guardou e a linha "Acesso" ainda mostra)
+      expect(document.querySelector('[data-testid="landing-email-garantido"]')!.textContent).toContain("maria@exemplo.com");
+      if (pix === "b") {
+        const b = document.querySelector('[data-testid="landing-pixb"]')!;
+        expect(b.getAttribute("data-estado")).toBe("voltou");
+        expect(txt(b.querySelector('[data-testid="landing-pixb-status"]'))).toMatch(/Quando o Pix cair, o acesso chega no seu e-mail\.$/);
+        expect(txt(b.querySelector('[data-testid="landing-pixb-passo"]'))).toMatch(/^De volta\? Se já pagou, confirma em instantes\./);
+        expect(b.textContent).not.toContain("Confirma sozinha");
+      } else {
+        expect(txt(document.querySelector(".lp-esperando"))).toBe("Esperando o pagamento Quando o pagamento cair, o acesso chega no seu e-mail.");
+        expect(document.body.textContent).not.toContain("Esta tela confirma sozinha");
+      }
+      // "Já paguei" sem o banco confirmar: fala do e-mail, nunca "esta tela muda sozinha"
+      (window as unknown as { __landingSimularPixNaoCaiu: boolean }).__landingSimularPixNaoCaiu = true;
+      (document.getElementById("lp-ja-paguei") as HTMLButtonElement).click();
+      await vi.waitFor(() => { expect(dos("landing_pix_ja_paguei")).toHaveLength(1); });
+      if (pix === "atual") expect(txt(document.querySelector(".lp-aviso"))).toBe("Se você já pagou, o acesso chega no seu e-mail em instantes.");
+      else expect(txt(document.querySelector('[data-testid="landing-pixb-conferindo"]'))).toBe("O acesso chega em maria@exemplo.com assim que o Pix cair.");
       simular().pagar();
       await espera('[data-testid="landing-pago"], [data-testid="landing-conta"]');
       expect(document.cookie).not.toMatch(/core_ln_pix=/);
     }
+  });
+
+  it("r2 (técnico): a sessão sobreviveu no localStorage (só o estado do Pix sumiu) → o QR restaurado segue 'confirma sozinha' (sem doEmail); o e-mail vem do cookie; o cookie não leva e-mail estranho", async () => {
+    await abrir("b");
+    relogioAndavel();
+    const pedido = await gerarPix("maria@exemplo.com");
+    expect(decodeURIComponent(document.cookie)).toContain('"e":"maria@exemplo.com"');
+    andar(3000); visivel("hidden");
+    localStorage.clear(); sessionStorage.clear();
+    localStorage.setItem("sb-itoylenzvahbscgjgtqf-auth-token", "{}"); // a sessão (de mentira) ficou
+    andar(20_000);
+    await abrir("b", { manterStorage: true });
+    relogioAndavel();
+    await espera('[data-testid="landing-pixb"]');
+    expect(dos("landing_pix_restaurado")[0]).toMatchObject({ order_id: pedido, sem_sessao: false, com_email: true });
+    expect(txt(document.querySelector('[data-testid="landing-pixb-status"]'))).toMatch(/Confirma sozinha\. Pode ir ao banco e voltar\.$/);
+    expect(txt(document.querySelector('[data-testid="landing-email-garantido"]'))).toBe("maria@exemplo.com");
+    for (const e of eventos()) expect(JSON.stringify(e)).not.toMatch(/maria@exemplo/);
   });
 
   it("r1 (persona): o aviso 'Ainda não chegou…' do 'Já paguei' não sobrevive até a conta pronta, nos 2 braços", async () => {

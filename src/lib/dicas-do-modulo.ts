@@ -201,6 +201,9 @@ export const EVENTO_ABRIR_ABA = "dicas:abrir-aba";
 export const EVENTO_ORGANIZAR_ABAS = "dicas:organizar-abas";
 export type DetalheAbrirAba = { modulo: string; aba: string };
 export type DetalheOrganizar = { modulo: string };
+/** 01/11 (chamado 00f3064c): "Ver dicas de novo" na folha Organizar abas apagou a marca — o cartão aberto na tela volta. */
+export const EVENTO_DICAS_DE_NOVO = "dicas:de-novo";
+export type DetalheDicasDeNovo = { modulo: string };
 
 /** Atributo (não classe: o React reescreve `className` quando o alvo muda de estado, ex. o dia selecionado). */
 export const ATRIBUTO_ACESO = "data-dica-aceso";

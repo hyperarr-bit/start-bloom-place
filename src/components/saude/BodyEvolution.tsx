@@ -21,6 +21,11 @@ interface Measurement {
   pernaD: string;
   pernaE: string;
   peito: string;
+  /* 01/11 (chamados 08e0f4c8, b9a4d90f): medidas novas. Opcionais — medida gravada antes
+     não tem esses campos e aparece com "—" na tabela. */
+  gluteo?: string;
+  panturrilha?: string;
+  posteriorCoxa?: string;
   /** o "⚖️ Peso" da Home grava { date, weight, id } nesta mesma chave */
   weight?: number | string;
   id?: string;
@@ -37,6 +42,9 @@ const fields: { key: CampoMedida; label: string; unit: string }[] = [
   { key: "pernaD", label: "PERNA D", unit: "cm" },
   { key: "pernaE", label: "PERNA E", unit: "cm" },
   { key: "peito", label: "PEITO", unit: "cm" },
+  { key: "gluteo", label: "GLÚTEO/QUADRIL", unit: "cm" },
+  { key: "panturrilha", label: "PANTURRILHA", unit: "cm" },
+  { key: "posteriorCoxa", label: "POSTERIOR DA COXA", unit: "cm" },
 ];
 
 /** "80,5" ou "80.5" → 80.5 · vazio → null · lixo ("abc") → NaN (26/09, varredura) */
@@ -87,7 +95,7 @@ export const BodyEvolution = () => {
   const [showForm, setShowForm] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
   const [compareIdx, setCompareIdx] = useState<[number, number]>([0, 1]);
-  const [newM, setNewM] = useState<Measurement>({ date: today, peso: "", bf: "", cintura: "", bracoD: "", bracoE: "", pernaD: "", pernaE: "", peito: "" });
+  const [newM, setNewM] = useState<Measurement>({ date: today, peso: "", bf: "", cintura: "", bracoD: "", bracoE: "", pernaD: "", pernaE: "", peito: "", gluteo: "", panturrilha: "", posteriorCoxa: "" });
   const [sentimentNote, setSentimentNote] = useState(sentimentLog[today]?.note || "");
   const [sentimentItems, setSentimentItems] = useState<string[]>(sentimentLog[today]?.items || []);
   const [newSentimentItem, setNewSentimentItem] = useState("");
@@ -109,7 +117,7 @@ export const BodyEvolution = () => {
     const nova: Measurement = { ...newM, date: newM.date || today };
     fields.forEach(f => { nova[f.key] = String(newM[f.key] ?? "").trim(); });
     setMeasurements(prev => [...prev, nova]);
-    setNewM({ date: today, peso: "", bf: "", cintura: "", bracoD: "", bracoE: "", pernaD: "", pernaE: "", peito: "" });
+    setNewM({ date: today, peso: "", bf: "", cintura: "", bracoD: "", bracoE: "", pernaD: "", pernaE: "", peito: "", gluteo: "", panturrilha: "", posteriorCoxa: "" });
     setShowForm(false);
   };
 
@@ -273,7 +281,7 @@ export const BodyEvolution = () => {
                 <Input type="date" value={newM.date} onChange={e => setNewM({ ...newM, date: e.target.value })} className="col-span-2 text-xs h-9 appearance-none [&::-webkit-date-and-time-value]:text-left" />
                 {fields.map(f => (
                   <div key={f.key} className="relative">
-                    <Input value={newM[f.key]} inputMode="decimal" onChange={e => setNewM({ ...newM, [f.key]: e.target.value })} placeholder={f.label} className="text-xs h-9 pr-8" />
+                    <Input value={newM[f.key] ?? ""} inputMode="decimal" onChange={e => setNewM({ ...newM, [f.key]: e.target.value })} placeholder={f.label} className="text-xs h-9 pr-8" />
                     <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">{f.unit}</span>
                   </div>
                 ))}

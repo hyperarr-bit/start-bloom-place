@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronRight, Lightbulb } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { useDemoDoFunil } from "@/lib/demo-do-funil";
 import { fileiraDeDemo } from "@/components/ui/abas-ocultaveis";
-import { dicasDoModulo, irParaDica, modoDasDicas, type Dica } from "@/lib/dicas-do-modulo";
+import { EVENTO_DICAS_DE_NOVO, dicasDoModulo, irParaDica, modoDasDicas, type Dica, type DetalheDicasDeNovo } from "@/lib/dicas-do-modulo";
 
 interface ModuleTipProps {
   moduleId: string;
@@ -56,6 +56,18 @@ export const ModuleTip = ({ moduleId, tips, tema = "app" }: ModuleTipProps) => {
    * montagem, reabrir direto no módulo trazia o cartão fechado de volta. */
   const [fechadaAgora, setFechadaAgora] = useState(false);
   const visible = loaded && !fechadaAgora && !get<string>(storageKey, "");
+  /* 01/11 (chamado 00f3064c): "Ver dicas de novo" (folha Organizar abas) apaga a marca e avisa — o cartão fechado
+   * nesta mesma visita volta sem precisar sair do módulo. */
+  const [, setReaberta] = useState(0);
+  useEffect(() => {
+    const deNovo = (e: Event) => {
+      if ((e as CustomEvent<DetalheDicasDeNovo>).detail?.modulo !== moduleId) return;
+      setFechadaAgora(false);
+      setReaberta((n) => n + 1); // relê a marca já apagada, mesmo que o cartão não tenha sido fechado nesta visita
+    };
+    window.addEventListener(EVENTO_DICAS_DE_NOVO, deNovo);
+    return () => window.removeEventListener(EVENTO_DICAS_DE_NOVO, deNovo);
+  }, [moduleId]);
 
   const daLista = dicasDoModulo(moduleId);
   const dicas: readonly Dica[] = daLista.length ? daLista : (tips ?? []).map((texto) => ({ texto }));

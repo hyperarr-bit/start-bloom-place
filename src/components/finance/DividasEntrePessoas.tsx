@@ -42,7 +42,7 @@ import { Plus, Trash2, ArrowDownLeft, ArrowUpRight, HandCoins, ChevronDown, Chec
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { usarListaDoPerfil, etiquetar, nomeDoPerfil, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
+import { usarListaDoPerfil, doPerfil, etiquetar, nomeDoPerfil, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
 
 /** Positivo aumenta a dívida; negativo abate (pagamento / devolução). */
 export interface LancamentoDivida {
@@ -109,6 +109,14 @@ const novoId = () => `${Date.now().toString(36)}${Math.random().toString(36).sli
 
 export const saldoDaDivida = (d: DividaPessoal) =>
   (d.lancamentos || []).reduce((s, l) => s + (Number.isFinite(l.valor) ? l.valor : 0), 0);
+
+/* 01/11 (card DÍVIDAS): o que a pessoa ainda DEVE a outras pessoas, no perfil da tela. Só leitura,
+   só pro card DÍVIDAS — continua fora do saldo do mês e do "quanto posso gastar". Dívida quitada
+   (saldo 0 ou negativo) não conta; o que me devem também não. */
+export const totalQueDevoAPessoas = (dividas: DividaPessoal[] | null | undefined, perfil: string = PERFIL_PESSOAL) =>
+  doPerfil(Array.isArray(dividas) ? dividas : [], perfil)
+    .filter((d) => d?.direcao === "devo")
+    .reduce((s, d) => s + Math.max(0, saldoDaDivida(d)), 0);
 
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

@@ -56,7 +56,8 @@ const desfazerUltimo = () => {
 
 const HOJE = localDayKey();
 const ddmm = (key: string) => `${key.slice(8, 10)}/${key.slice(5, 7)}`;
-const vazia = { peso: "", bf: "", cintura: "", bracoD: "", bracoE: "", pernaD: "", pernaE: "", peito: "" };
+// 01/11 (chamados 08e0f4c8, b9a4d90f): glúteo, panturrilha e posterior da coxa — medida nova grava os 3 vazios também
+const vazia = { peso: "", bf: "", cintura: "", bracoD: "", bracoE: "", pernaD: "", pernaE: "", peito: "", gluteo: "", panturrilha: "", posteriorCoxa: "" };
 
 beforeEach(() => {
   toastMock.mockClear();

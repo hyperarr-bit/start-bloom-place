@@ -19,6 +19,7 @@ import { FeriadoETarefasDoDia, InterruptorFeriados, useMarcasDoMes } from "@/com
 import { CHAVE_COMPROMISSOS, ocorrencias, type Compromisso } from "@/lib/compromissos";
 import { parseLocalDay } from "@/lib/utils";
 import { pedirAvaliacaoSePuder } from "@/lib/avaliacao";
+import { toast } from "sonner";
 import { sequenciaAtual } from "@/lib/reagendar";
 import { 
   ArrowLeft, Plus, X, Trash2, AlertTriangle, Play, Pause, RotateCcw, 
@@ -621,6 +622,17 @@ const Rituals = () => {
 };
 
 
+/* 01/11 (chamado f6de589e): no celular não existe "mouse em cima" — tocar no quadradinho do mapa
+   de 16 semanas mostra este texto num aviso curto: "Seg 13/10: Água · Leitura" ou "…: nenhum hábito".
+   Dia marcado sem nome de hábito (log antigo, de antes do log por hábito) = "hábito feito". */
+const DIAS_CURTOS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+export const textoDoDiaNoMapa = (data: Date, habitos: string[] | undefined, nivel: number): string => {
+  const dia = `${DIAS_CURTOS[data.getDay()]} ${String(data.getDate()).padStart(2, "0")}/${String(data.getMonth() + 1).padStart(2, "0")}`;
+  const nomes = Array.isArray(habitos) ? habitos.filter((h) => typeof h === "string" && h.trim()) : [];
+  if (nomes.length > 0) return `${dia}: ${nomes.join(" · ")}`;
+  return `${dia}: ${nivel > 0 ? "hábito feito" : "nenhum hábito"}`;
+};
+
 // ============= HABIT HEATMAP (GitHub Style) =============
 // v67 (pedido da review ★4 da Monik, 19/08): "a consistência não mostra os
 // dados separados por hábito". O DESIGN NÃO MUDA (ordem do dono): o card abre
@@ -704,10 +716,14 @@ const HabitHeatmap = ({ habitsChecked, habits, days: dayNames, habitLog, streakL
           {weeks.map((week, wi) => (
             <div key={wi} className="flex flex-col gap-[3px]">
               {week.map(day => (
-                <div
+                <button
+                  type="button"
                   key={day.key}
                   className={`w-3 h-3 rounded-sm ${getColor(day.level)} transition-colors`}
                   title={`${day.key}: ${day.level > 0 ? "✅" : "—"}`}
+                  aria-label={textoDoDiaNoMapa(day.date, habitLog[day.key], day.level)}
+                  // 01/11 (chamado f6de589e): o toque mostra o dia (o title só aparecia com mouse)
+                  onClick={() => toast(textoDoDiaNoMapa(day.date, habitLog[day.key], day.level), { id: "mapa-habitos", duration: 2500 })}
                 />
               ))}
             </div>
@@ -773,7 +789,8 @@ const MonthlyPlanning = () => {
     [compromissos, currentYear, currentMonth, totalDays],
   );
   // 28/10: feriados nacionais (se ligados) e dias com tarefa marcada — components/rotina/DiaDoMes
-  const { feriados, diasComTarefa } = useMarcasDoMes(currentYear, currentMonth);
+  // 01/11 (chamado 2541a7c9): + dias passados com tarefa feita (ponto cinza)
+  const { feriados, diasComTarefa, diasComFeita } = useMarcasDoMes(currentYear, currentMonth);
   const abrirDia = (dia: string) => {
     const d = parseLocalDay(dia);
     setCurrentYear(d.getFullYear());
@@ -836,6 +853,7 @@ const MonthlyPlanning = () => {
               const isSelected = selectedDay === dayKey;
               const feriado = feriados.get(dayKey);
               const temTarefa = diasComTarefa.has(dayKey);
+              const temFeita = diasComFeita.has(dayKey);
               return (
                 <button
                   key={dayNum}
@@ -852,12 +870,13 @@ const MonthlyPlanning = () => {
                   `}
                 >
                   {dayNum}
-                  {(hasNote || diasComCompromisso.has(dayKey) || feriado || temTarefa) && (
+                  {(hasNote || diasComCompromisso.has(dayKey) || feriado || temTarefa || temFeita) && (
                     <div className="absolute bottom-0.5 flex gap-0.5">
                       {feriado && <div className="w-1 h-1 rounded-full bg-rose-500" data-testid="ponto-feriado" />}
                       {hasNote && <div className="w-1 h-1 rounded-full bg-teal-500" />}
                       {diasComCompromisso.has(dayKey) && <div className="w-1 h-1 rounded-full bg-sky-500" data-testid="ponto-compromisso" />}
                       {temTarefa && <div className="w-1 h-1 rounded-full bg-amber-500" data-testid="ponto-tarefa" />}
+                      {temFeita && <div className="w-1 h-1 rounded-full bg-muted-foreground/50" data-testid="ponto-feita" title="Teve tarefa feita" />}
                     </div>
                   )}
                 </button>

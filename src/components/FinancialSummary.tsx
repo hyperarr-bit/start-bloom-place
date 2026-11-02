@@ -5,6 +5,9 @@ interface FinancialSummaryProps {
   totalExpenses: number;
   totalDebts: number;
   totalInvestments: number;
+  /** 01/11: as duas partes do card DÍVIDAS (parcelas que faltam + o que devo a pessoas).
+   *  A linha de baixo só aparece quando as duas são maiores que zero. */
+  partesDasDividas?: { parcelas: number; pessoas: number };
 }
 
 export const FinancialSummary = ({ 
@@ -12,7 +15,10 @@ export const FinancialSummary = ({
   totalExpenses, 
   totalDebts, 
   totalInvestments,
+  partesDasDividas,
 }: FinancialSummaryProps) => {
+  const brl = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const mostrarPartes = !!partesDasDividas && partesDasDividas.parcelas > 0 && partesDasDividas.pessoas > 0;
   const cards = [
     {
       title: "RECEITAS",
@@ -70,8 +76,13 @@ export const FinancialSummary = ({
             </div>
           </div>
           <p className={`text-xs ${card.textColor} opacity-80`}>
-            {card.label} - R$ {card.value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {card.label} - R$ {brl(card.value)}
           </p>
+          {card.title === "DÍVIDAS" && mostrarPartes && (
+            <p className={`text-[10px] ${card.textColor} opacity-70 mt-0.5`}>
+              Parcelas R$ {brl(partesDasDividas!.parcelas)} · Pessoas R$ {brl(partesDasDividas!.pessoas)}
+            </p>
+          )}
         </div>
       ))}
     </div>

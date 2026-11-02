@@ -185,8 +185,10 @@ export const MonthlySheet = ({ month, year, onClose }: MonthlySheetProps) => {
             com os ✓ dentro. A planilha do mês passado só não ENTREGAVA esse balde à
             tabela, que caía no `pagoEm` (vazio pra fixo com Dia) e mostrava setembro
             inteiro como não pago. Passa o balde do próprio mês: corrente, passado ou
-            futuro, a conta lida/gravada é sempre a da chave deste mês. */}
-        <FixedExpensesTable expenses={fixedExpenses} setExpenses={setFixedExpenses} dueDays={dueDays as any[]} setDueDays={setDueDays as (d: any[]) => void} mes={mesId} projetados={fixosProjetados} />
+            futuro, a conta lida/gravada é sempre a da chave deste mês.
+            01/11 (chamados f58d1b35, 9a7cf88d, 982febff, f175076b): fora do mês atual o
+            fixo gravado aqui vale só para este mês — a frase da tabela diz isso. */}
+        <FixedExpensesTable expenses={fixedExpenses} setExpenses={setFixedExpenses} dueDays={dueDays as any[]} setDueDays={setDueDays as (d: any[]) => void} mes={mesId} projetados={fixosProjetados} soDoMes={isCurrent ? undefined : month} />
       </div>
       <div className="min-w-0">
         <ExpenseTable expenses={expenses} setExpenses={setExpenses} mes={mesId} />

@@ -105,10 +105,17 @@ const Saude = () => {
 };
 
 /* ---------- Sleep Card ---------- */
+/** 01/11: de 5 a 12 h, de meia em meia hora. */
+const OPCOES_META_SONO = Array.from({ length: 15 }, (_, i) => 5 + i * 0.5);
+const formatarHoras = (h: number) => `${String(h).replace(".", ",")}h`;
 const SleepCard = () => {
   const today = todayStr();
   const [sleepLog, setSleepLog] = usePersistedState<Record<string, number>>("core-saude-sleep", {});
-  const [sleepGoal] = usePersistedState<number>("core-saude-sleep-goal", 8);
+  /* 01/11 (meta de sono): a meta sempre foi lida daqui (card, série e insígnias de sono), mas nada
+     gravava — todo mundo ficava em 8h. O "Meta: 8h ✎" abaixo grava na MESMA chave da conta. */
+  const [sleepGoalBruto, setSleepGoal] = usePersistedState<number>("core-saude-sleep-goal", 8);
+  const sleepGoal = Math.min(12, Math.max(4, Number(sleepGoalBruto) || 8));
+  const [editandoMeta, setEditandoMeta] = useState(false);
   const [val, setVal] = useState(String(sleepLog[today] || ""));
 
   const sleepToday = sleepLog[today] || 0;
@@ -130,6 +137,28 @@ const SleepCard = () => {
       <div className="flex items-center gap-2 mb-3">
         <Moon className="w-4 h-4 text-[hsl(var(--saude-blue))]" />
         <span className="text-xs font-bold uppercase tracking-wider">Sono</span>
+        {editandoMeta ? (
+          <select
+            autoFocus
+            aria-label="Meta de sono"
+            value={String(sleepGoal)}
+            onChange={(e) => { setSleepGoal(Number(e.target.value)); setEditandoMeta(false); }}
+            onBlur={() => setEditandoMeta(false)}
+            className="ml-auto text-xs h-7 rounded-md border border-border bg-background px-1.5"
+          >
+            {OPCOES_META_SONO.map((h) => (
+              <option key={h} value={String(h)}>{formatarHoras(h)}</option>
+            ))}
+          </select>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditandoMeta(true)}
+            className="ml-auto text-[11px] text-muted-foreground hover:text-foreground"
+          >
+            Meta: {formatarHoras(sleepGoal)} ✎
+          </button>
+        )}
       </div>
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">

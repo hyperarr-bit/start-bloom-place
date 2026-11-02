@@ -159,3 +159,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .v-funil-r { font-size: 13px; color: var(--tinta-2); }
 .v-retorno-caixa { text-align: right; }
 .v-retorno.v-cor-neutro { color: var(--tinta-2); background: var(--fundo); }
+
+/* 02/11 — aba Dias */
+.v-dia { cursor: pointer; }
+.v-dia header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.v-dia .v-titulo .v-sub { display: inline; font-weight: 500; margin-left: 4px; }
+.v-dia-vendido { font-size: 22px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.v-lista-dia { border: 0; margin: 10px -4px 0; background: transparent; }
+.v-lista-dia li { grid-template-columns: auto 1fr auto; padding: 8px 4px; }
+.v-lista-dia .v-plano { font-size: 13px; }
+.v-dia-detalhe { margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--linha); }

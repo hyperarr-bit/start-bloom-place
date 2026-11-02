@@ -56,11 +56,11 @@ describe("/vendas: acesso", () => {
     expect(h.invocacoes).toEqual([]);
   });
 
-  it("admin: 4 abas, vendas de hoje, instrução de instalar fora da Tela de Início; troca de aba busca a aba", async () => {
+  it("admin: 5 abas (02/11: + Dias; Vendas virou Hoje), vendas de hoje, instrução de instalar fora da Tela de Início; troca de aba busca a aba", async () => {
     h.sessao = { user: { id: "u-dono" } }; h.admin = true;
     render(<VendasApp />);
     expect(await screen.findByText("Vendas de hoje")).toBeInTheDocument();
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Vendas", "Turmas", "Campanhas", "Web"]);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Hoje", "Dias", "Turmas", "Campanhas", "Web"]);
     expect(screen.getAllByText("R$ 97,90").length).toBeGreaterThan(0);
     expect(screen.getByText(/Adicionar à Tela de Início/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Turmas" }));

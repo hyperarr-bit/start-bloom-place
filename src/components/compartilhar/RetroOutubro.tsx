@@ -4,6 +4,7 @@ import { Clapperboard, Download, Loader2, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { suporteVideo } from "@/components/conquistas/video/suporte";
+import { RETRO_OUTUBRO } from "@/lib/retro-outubro";
 import type { Leitor } from "@/lib/retrospectiva";
 import { CardDeCompartilhar } from "./cards";
 import { postarCardImagem, postarCardVideo, prepararCapas } from "./postar";
@@ -32,14 +33,18 @@ const AnimacaoDoCard = lazy(() => import("./AnimacaoDoCard"));
 interface Props {
   ler: Leitor;
   onClose: () => void;
-  /** Sem nada pra mostrar (nenhum módulo, nenhum dia): quem chama decide (a retrospectiva antiga). */
-  semDados: ReactNode;
+  /**
+   * 30/10: NÃO é mais mostrado — sem nenhum registro no mês, a tela é a
+   * acolhedora do Codex ("Seu mês não cabe só aqui."). Fica na assinatura pra
+   * quem chama não mudar.
+   */
+  semDados?: ReactNode;
   /** Só testes/dev: o relógio. */
   agora?: Date;
 }
 
 const MES = "outubro";
-const ROTULOS: Record<CardDaRetro["id"], string> = { abertura: "Abertura", financas: "Finanças", treino: "Treino", rotina: "Rotina", agua: "Água", leitura: "Leitura", metas: "Metas", resumo: "Meu outubro" };
+const ROTULOS: Record<CardDaRetro["id"], string> = { abertura: "Abertura", financas: "Finanças", treino: "Treino", rotina: "Rotina", agua: "Água", leitura: "Leitura", metas: "Metas", resumo: "Meu outubro", fechamento: "Até novembro" };
 
 const CardEscalado = memo(({ elemento, largura, w, h }: { elemento: ReactElement; largura: number; w: number; h: number }) => {
   const s = largura / w;
@@ -54,7 +59,43 @@ CardEscalado.displayName = "CardEscalado";
 const temReais = (d: DadosCard) => d.tipo === "azul" && d.meses.some((m) => (m.saldo ?? 0) > 0);
 const temTextos = (d: DadosCard) => d.tipo === "metas" && (d.textos ?? []).some(Boolean);
 
-export const RetroOutubro = ({ ler, onClose, semDados, agora }: Props) => {
+/** Sem nenhum registro no mês: o card acolhedor do Codex, parado, só com o Fechar (nada pra compartilhar). */
+const TelaSemRegistros = ({ onClose }: { onClose: () => void }) => {
+  const palco = useRef<HTMLDivElement>(null);
+  const [caixa, setCaixa] = useState({ w: 340, h: 600 });
+  useLayoutEffect(() => {
+    const el = palco.current;
+    if (el && el.clientWidth > 0 && el.clientHeight > 0) setCaixa({ w: el.clientWidth - 32, h: el.clientHeight - 8 });
+  }, []);
+  useEffect(() => { trackEvent("wrapped_cards", { mes: MES, month: capitalizar(MES), cards: "vazio", n: 0, pouco_dado: true, financas: "sem" }); }, []);
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", tecla);
+    return () => window.removeEventListener("keydown", tecla);
+  }, [onClose]);
+  const { w: W, h: H } = FORMATOS.stories;
+  const largura = Math.max(150, Math.floor(Math.min(caixa.w, (caixa.h * W) / H)));
+  return (
+    <div role="dialog" aria-modal="true" aria-label={`Retrospectiva de ${MES}`} data-testid="retro-outubro" data-card-atual="vazio" className="fixed inset-0 z-[400] flex flex-col text-white" style={{ background: "#0e0e11" }}>
+      <header className="shrink-0 pt-[max(0.5rem,env(safe-area-inset-top))] px-3">
+        <div className="h-[48px] flex items-center gap-2">
+          <span className="text-[13px] font-extrabold tracking-wide pl-1">Seu {MES}</span>
+          <button type="button" onClick={onClose} aria-label="Fechar" className="ml-auto w-10 h-10 grid place-items-center rounded-full hover:bg-white/10" data-testid="retro-fechar"><X className="w-5 h-5" /></button>
+        </div>
+      </header>
+      <div ref={palco} className="flex-1 min-h-0 grid place-items-center px-4" data-testid="retro-palco">
+        <div className="relative rounded-[18px] overflow-hidden" style={{ boxShadow: "0 24px 60px -24px rgba(0,0,0,.8)" }}>
+          <CardEscalado elemento={<CardDeCompartilhar dados={{ tipo: "retro-vazio", ano: RETRO_OUTUBRO.ano, mesIdx: RETRO_OUTUBRO.mesIdx }} formato="stories" />} largura={largura} w={W} h={H} />
+        </div>
+      </div>
+      <footer className="shrink-0 px-4 pt-3 pb-[calc(0.9rem+env(safe-area-inset-bottom))]">
+        <button type="button" onClick={onClose} className="w-full h-12 rounded-xl bg-white text-black font-extrabold text-[14px]" data-testid="retro-vazio-ok">Começar novembro</button>
+      </footer>
+    </div>
+  );
+};
+
+export const RetroOutubro = ({ ler, onClose, agora }: Props) => {
   const reduzir = useReducedMotion();
   const retro = useMemo(() => montarRetroOutubro(ler, { agora }), [ler, agora]);
   const [i, setI] = useState(0);
@@ -135,7 +176,7 @@ export const RetroOutubro = ({ ler, onClose, semDados, agora }: Props) => {
     return () => ro.disconnect();
   }, [retro]);
 
-  if (!retro || !atual) return <>{semDados}</>;
+  if (!retro || !atual) return <TelaSemRegistros onClose={onClose} />;
 
   const base = atual.id === "leitura" && capas ? capas : atual.dados;
   const dados = comEscolhas(base, { valores, textosDasMetas });

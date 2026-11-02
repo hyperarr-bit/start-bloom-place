@@ -133,6 +133,8 @@ export const telaOcupadaParaConvite = (): boolean => {
 
 /** Uma vez por abertura do app, no máximo (a marca na conta/aparelho cobre as próximas). */
 let conviteNestaAbertura = false;
+/** O convite já apareceu nesta abertura? (o aviso da retrospectiva — wrapped/AvisoRetroNova — cede a vez: 1 folha por abertura) */
+export const conviteApareceuNestaAbertura = (): boolean => conviteNestaAbertura;
 /** Só testes. */
 export const _zerarConviteNestaAbertura = (): void => { conviteNestaAbertura = false; };
 /** Quantas vezes o convite olha a tela de novo (a cada ESPERA_CONVITE_MS) antes de desistir nesta abertura. */

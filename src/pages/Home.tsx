@@ -39,6 +39,7 @@ import { useTheme, palettes, type ThemePalette } from "@/hooks/use-theme";
 import { CHAVE_COR_ANTES_HOME_NOVA, origemJaTentada } from "@/lib/home-nova";
 import { contaCarregadaDeVerdade, decidirOrigemDaConta, lerEscolhaDaConta } from "@/components/home-nova/OrigemDaConta";
 import { ConviteHomeNova } from "@/components/home-nova/EscolhaDaHome";
+import { AvisoRetroNova } from "@/components/wrapped/AvisoRetroNova";
 import { contarUso } from "@/lib/medicao-total";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ATRIBUTO_RAIZ } from "@/lib/nav-abas";
@@ -525,6 +526,8 @@ const HomePage = () => {
 
       {/* 1.0.22 (dono 28/10): "Tem uma Home nova" — folha de baixo, 1x por conta, nunca card no topo (EscolhaDaHome) */}
       <ConviteHomeNova bloqueado={mostrarTour || editingWidgets || showWidgetPicker} ligada={homeNova.ligada} />
+      {/* 01/11 (dono): "Sua retrospectiva de outubro ganhou cara nova" — folha de baixo, 1x por conta, até 10/11 (lib/retro-aviso) */}
+      <AvisoRetroNova bloqueado={mostrarTour || editingWidgets || showWidgetPicker} />
 
       <WidgetPicker
         open={showWidgetPicker}

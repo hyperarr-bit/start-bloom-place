@@ -14,6 +14,7 @@ import { PersonalizarPendenciasE } from "./PersonalizarPendenciasE";
 import { DailyNudge } from "@/components/onboarding/DailyNudge";
 import { CardSeuDia } from "@/components/missao-doses/CardSeuDia";
 import { RetrospectivaNaHome } from "@/components/wrapped/RetrospectivaNaHome";
+import { AvisoRetroNova } from "@/components/wrapped/AvisoRetroNova";
 import { LojasCard } from "@/components/LojasCard";
 import { CHAVE_PENDENCIAS_PREFS, PREFS_PADRAO, type PendenciasPrefs } from "@/lib/home-pendencias";
 import { CHAVE_COMPROMISSOS, type Compromisso } from "@/lib/compromissos";
@@ -237,6 +238,8 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
         <EscolherWidgetsE aberta={picker} onFechar={() => setPicker(false)} ativos={widgetsE.ativos} onToggle={widgetsE.alternar} />
         <FolhaPendencias aberta={folhaPendencias} onFechar={() => setFolhaPendencias(false)} pendencias={listaDePendencias} onAcao={abrirAcao} onPersonalizar={() => setPrefsAbertas(true)} novato={novatoNaLista.novato} />
         <PersonalizarPendenciasE open={prefsAbertas} onOpenChange={setPrefsAbertas} prefs={prefs} onChange={(p) => set(CHAVE_PENDENCIAS_PREFS, p)} porModulo={lifeData.pendenciasPorModulo} visiveis={novatoNaLista.permitidos} />
+        {/* 01/11 (dono): "Sua retrospectiva de outubro ganhou cara nova" — 1x por conta, até 10/11, só com a Home livre (lib/retro-aviso) */}
+        <AvisoRetroNova bloqueado={folhaMais || folhaScore || folhaSequencia || folhaPendencias || picker || organizar || prefsAbertas || celebrando} />
       </div>
     </>
   );

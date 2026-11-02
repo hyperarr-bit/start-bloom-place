@@ -136,6 +136,10 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-construiu-braco", // 29/10: o braço do resumo dos 3 dias por conta ({hash da conta: a|b}), estável — não troca de braço
   "core-presente-aviso-v1", // 31/10: o aviso do presente na página Você ({ vistoEm, fechado }, lib/presente-aviso) — espelho da mesma chave da conta, não pisca de volta
   "core-festas-calma", // 1.0.21: as festas de conquista já mostradas HOJE nos 3 primeiros dias da conta ({ dia, n }, lib/festas-calma)
+  // 01/11: o aviso "Sua retrospectiva de outubro ganhou cara nova" (lib/retro-aviso) — as contas (uids, até 5) que já viram o aviso
+  // e que já abriram a retrospectiva NOVA neste aparelho; espelhos das chaves da conta retro-outubro-aviso-visto / retro-outubro-nova-aberta
+  "core-retro-outubro-aviso-aparelho",
+  "core-retro-outubro-nova-aparelho",
 ]);
 
 /** Famílias de chaves do aparelho (prefixo + id). */

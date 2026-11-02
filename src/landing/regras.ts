@@ -25,6 +25,11 @@ export const ROTULO_OFERTA: Record<OfertaLanding, string> = {
   LN_anosempre478: "CORE pra sempre · pagamento único",
   LN_sempre279: "CORE pra sempre · pagamento único",
 };
+
+/** Quem recebe o Pix no extrato do banco (QR estático do Asaas = a razão social da conta). Igual a EMPRESA.razaoSocial
+ *  (lib/empresa) — copiado aqui pra não puxar o native-shell pro bundle da página; um teste confere que são iguais. */
+export const NOME_NO_BANCO = "NATALIA DE JESUS E SILVA SANTOS LTDA";
+
 export const PRECO_CAIXINHA = 19.9;
 
 /** Qual oferta o botão de pagar gera: braço "ano" (com ou sem a caixinha) ou braço "sempre" (sem caixinha). */

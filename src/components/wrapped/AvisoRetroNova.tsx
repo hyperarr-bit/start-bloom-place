@@ -42,7 +42,7 @@ const AberturaMiniatura = () => (
     aria-hidden
     data-testid="retro-aviso-abertura"
     className="relative w-full overflow-hidden text-left"
-    style={{ height: 150, borderRadius: 18, background: "linear-gradient(172deg, #2c2b31 0%, #232228 55%, #1d1c21 100%)", fontFamily: INTER, WebkitFontSmoothing: "antialiased" }}
+    style={{ height: 150, borderRadius: 18, background: "linear-gradient(172deg, #2c2b31 0%, #232228 55%, #1d1c21 100%)", boxShadow: "inset 0 0 0 1px rgba(255,255,255,.09)", fontFamily: INTER, WebkitFontSmoothing: "antialiased" }}
   >
     <div className="absolute flex items-center justify-between" style={{ left: 18, right: 18, top: 16, color: "#d6d0d8", fontSize: 10.5, letterSpacing: ".1em", fontWeight: 800 }}>
       <span>RETROSPECTIVA</span>

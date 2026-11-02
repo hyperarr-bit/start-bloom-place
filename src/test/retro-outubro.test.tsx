@@ -206,11 +206,18 @@ describe("6. o Treino tem cor própria", () => {
 });
 
 describe("7. a chave retro_outubro e a data", () => {
-  it("padrão: desligada no app e na web — outubro segue a retrospectiva de sempre", () => {
-    expect(RETRO_OUTUBRO_APP).toBe("off");
-    expect(RETRO_OUTUBRO_WEB).toBe("off");
+  it("padrão (01/11, dono: 'a nova na próxima versão, Android, iOS e web'): ligada no app e na web, só a partir de 01/11", () => {
+    expect(RETRO_OUTUBRO_APP).toBe("on");
+    expect(RETRO_OUTUBRO_WEB).toBe("on");
+    expect(retroOutubroLigada()).toBe(true);
+    expect(retroOutubroAtiva(2026, 9, NOV)).toBe(true);
+    expect(retroOutubroAtiva(2026, 9, new Date(2026, 9, 31, 23, 59))).toBe(false); // outubro ainda não acabou
+    expect(retroOutubroAtiva(2026, 8, NOV)).toBe(false); // setembro segue o de sempre
+  });
+  it("rollback pela RevenueCat no app: retro_outubro 'off' desliga mesmo com a constante ligada", () => {
+    nativo.v = true;
+    registrarRetroOutubroRemoto({ current: { metadata: { retro_outubro: "off" } }, all: {} });
     expect(retroOutubroLigada()).toBe(false);
-    expect(retroOutubroAtiva(2026, 9, NOV)).toBe(false);
   });
   it("ligada pelo RevenueCat: só a partir de 01/11 no relógio do aparelho, e só pra outubro de 2026", () => {
     registrarRetroOutubroRemoto({ current: { metadata: { retro_outubro: "on" } }, all: {} });
@@ -228,10 +235,12 @@ describe("7. a chave retro_outubro e a data", () => {
     guardarForcaRetroOutubro("?retro=outubro");
     expect(retroOutubroAtiva(2026, 9, new Date(2026, 9, 23))).toBe(true);
     guardarForcaRetroOutubro("?retro=auto");
-    expect(retroOutubroAtiva(2026, 9, new Date(2026, 9, 23))).toBe(false);
+    expect(retroOutubroAtiva(2026, 9, new Date(2026, 9, 23))).toBe(false); // sem força, a data volta a valer
+    guardarForcaRetroOutubro("?retro=off");
+    expect(retroOutubroLigada()).toBe(false); // QA na web desliga
     nativo.v = true;
-    try { localStorage.setItem(CHAVE_FORCA_RETRO_OUTUBRO, "on"); } catch { /* */ }
-    expect(retroOutubroLigada()).toBe(false);
+    try { localStorage.setItem(CHAVE_FORCA_RETRO_OUTUBRO, "off"); } catch { /* */ }
+    expect(retroOutubroLigada()).toBe(true); // no app a força é ignorada: vale a constante
   });
 });
 

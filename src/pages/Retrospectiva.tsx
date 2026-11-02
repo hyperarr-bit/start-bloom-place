@@ -9,6 +9,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import { construirRetroMes, lerDadosDaVida, nomeDaPessoa, type Leitor, type RetroMes } from "@/lib/retrospectiva";
 import { MonthlyWrapped } from "@/components/wrapped/MonthlyWrapped";
+import { CHAVE_RETRO_NOVA_ABERTA, marcarRetroNovaNoAparelho } from "@/lib/retro-aviso";
 import { CHAVE_DO_TEMA, lerTema, perfilEmFrase, type TemaDaRetro } from "@/components/wrapped/temas";
 import { foilCss } from "@/components/wrapped/prancheta";
 import { Espiral, Fita, P3, creme, kicker, linho, relevo, serif, vinheta } from "@/components/wrapped/pecas-planner";
@@ -76,6 +77,23 @@ const jaBuscadas = new Set<string>();
 
 /** Quanto esperar pelo mês pedido antes de desistir e mostrar a lista. */
 const ESPERA_MAXIMA_MS = 8000;
+
+/**
+ * (01/11) A retrospectiva de outubro abriu no visual NOVO: marca na conta (e no aparelho) — o aviso
+ * "ganhou cara nova" da Home (wrapped/AvisoRetroNova, lib/retro-aviso) não aparece mais pra esta conta.
+ */
+const MarcaRetroNovaAberta = () => {
+  const { user } = useAuth();
+  const { get, set } = useUserData();
+  const uid = user?.id ?? null;
+  const jaTem = get<unknown>(CHAVE_RETRO_NOVA_ABERTA, null) != null;
+  useEffect(() => {
+    if (!uid) return;
+    marcarRetroNovaNoAparelho(uid);
+    if (!jaTem) set(CHAVE_RETRO_NOVA_ABERTA, { em: new Date().toISOString() }, { system: true });
+  }, [uid, jaTem, set]);
+  return null;
+};
 
 const Retrospectiva = () => {
   const { user } = useAuth();
@@ -188,6 +206,7 @@ const Retrospectiva = () => {
   if (qaOutubro) {
     return (
       <Suspense fallback={<div className="fixed inset-0 z-[400]" style={{ background: "#0e0e11" }} />}>
+        <MarcaRetroNovaAberta />
         <RetroOutubro
           ler={lerRetro}
           onClose={() => setQaOutubro(false)}
@@ -214,6 +233,7 @@ const Retrospectiva = () => {
     if (retroOutubroAtiva(aberto.ano, aberto.mesIdx)) {
       return (
         <Suspense fallback={<div className="fixed inset-0 z-[400]" style={{ background: "#0e0e11" }} />}>
+          <MarcaRetroNovaAberta />
           <RetroOutubro ler={lerRetro} onClose={fechar} semDados={antiga} />
         </Suspense>
       );

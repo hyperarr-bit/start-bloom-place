@@ -144,7 +144,7 @@ const SleepCard = () => {
             value={String(sleepGoal)}
             onChange={(e) => { setSleepGoal(Number(e.target.value)); setEditandoMeta(false); }}
             onBlur={() => setEditandoMeta(false)}
-            className="ml-auto text-xs h-7 rounded-md border border-border bg-background px-1.5"
+            className="ml-auto text-xs h-8 rounded-md border border-border bg-background px-1.5"
           >
             {OPCOES_META_SONO.map((h) => (
               <option key={h} value={String(h)}>{formatarHoras(h)}</option>
@@ -154,7 +154,8 @@ const SleepCard = () => {
           <button
             type="button"
             onClick={() => setEditandoMeta(true)}
-            className="ml-auto text-[11px] text-muted-foreground hover:text-foreground"
+            // h-8 = a altura do seletor: abrir não empurra o card
+            className="ml-auto h-8 inline-flex items-center text-[11px] text-muted-foreground hover:text-foreground"
           >
             Meta: {formatarHoras(sleepGoal)} ✎
           </button>

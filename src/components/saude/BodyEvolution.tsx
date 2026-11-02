@@ -33,7 +33,8 @@ interface Measurement {
 
 type CampoMedida = Exclude<keyof Measurement, "date" | "weight" | "id">;
 
-const fields: { key: CampoMedida; label: string; unit: string }[] = [
+/** `curto`: o que cabe dentro do campo no celular (o nome inteiro fica na tabela). `largo`: o campo ocupa a linha toda. */
+const fields: { key: CampoMedida; label: string; unit: string; curto?: string; largo?: boolean }[] = [
   { key: "peso", label: "PESO", unit: "kg" },
   { key: "bf", label: "BF%", unit: "%" },
   { key: "cintura", label: "CINTURA", unit: "cm" },
@@ -42,9 +43,9 @@ const fields: { key: CampoMedida; label: string; unit: string }[] = [
   { key: "pernaD", label: "PERNA D", unit: "cm" },
   { key: "pernaE", label: "PERNA E", unit: "cm" },
   { key: "peito", label: "PEITO", unit: "cm" },
-  { key: "gluteo", label: "GLÚTEO/QUADRIL", unit: "cm" },
-  { key: "panturrilha", label: "PANTURRILHA", unit: "cm" },
-  { key: "posteriorCoxa", label: "POSTERIOR DA COXA", unit: "cm" },
+  { key: "gluteo", label: "GLÚTEO/QUADRIL", unit: "cm", curto: "GLÚTEO" },
+  { key: "panturrilha", label: "PANTURRILHA", unit: "cm", curto: "PANTURR." },
+  { key: "posteriorCoxa", label: "POSTERIOR DA COXA", unit: "cm", largo: true },
 ];
 
 /** "80,5" ou "80.5" → 80.5 · vazio → null · lixo ("abc") → NaN (26/09, varredura) */
@@ -280,8 +281,8 @@ export const BodyEvolution = () => {
               <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-muted">
                 <Input type="date" value={newM.date} onChange={e => setNewM({ ...newM, date: e.target.value })} className="col-span-2 text-xs h-9 appearance-none [&::-webkit-date-and-time-value]:text-left" />
                 {fields.map(f => (
-                  <div key={f.key} className="relative">
-                    <Input value={newM[f.key] ?? ""} inputMode="decimal" onChange={e => setNewM({ ...newM, [f.key]: e.target.value })} placeholder={f.label} className="text-xs h-9 pr-8" />
+                  <div key={f.key} className={`relative ${f.largo ? "col-span-2" : ""}`}>
+                    <Input value={newM[f.key] ?? ""} inputMode="decimal" onChange={e => setNewM({ ...newM, [f.key]: e.target.value })} placeholder={f.curto ?? f.label} aria-label={f.label} className="text-xs h-9 pr-8" />
                     <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">{f.unit}</span>
                   </div>
                 ))}

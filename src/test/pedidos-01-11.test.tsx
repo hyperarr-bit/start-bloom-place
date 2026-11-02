@@ -147,8 +147,8 @@ describe("4. medidas novas", () => {
     expect(screen.getByText("GLÚTEO/QUADRIL")).toBeInTheDocument(); // linha nova com "—" pra medida antiga
 
     fireEvent.click(screen.getByRole("button", { name: /Registrar Medidas/ }));
-    fireEvent.change(screen.getByPlaceholderText("GLÚTEO/QUADRIL"), { target: { value: "102,5" } });
-    fireEvent.change(screen.getByPlaceholderText("PANTURRILHA"), { target: { value: "38" } });
+    fireEvent.change(screen.getByPlaceholderText("GLÚTEO"), { target: { value: "102,5" } });
+    fireEvent.change(screen.getByPlaceholderText("PANTURR."), { target: { value: "38" } });
     fireEvent.change(screen.getByPlaceholderText("POSTERIOR DA COXA"), { target: { value: "55" } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar Medidas" }));
 

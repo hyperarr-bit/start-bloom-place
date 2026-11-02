@@ -845,8 +845,8 @@ function marcarQrNaTela(orderId: string) {
  *  escondido antes (recarga/navegação): manda o evento mas NÃO conta como ida ao banco (02/11 r2, técnico M2) */
 function registrarSaida(via: "aba" | "pagehide") {
   if (estado.fase !== "qr" || !estado.pix || saiuRegistrado) return;
-  saiuRegistrado = true;
-  if (pedidoNaTela !== estado.pix.orderId) marcarQrNaTela(estado.pix.orderId);
+  if (pedidoNaTela !== estado.pix.orderId) marcarQrNaTela(estado.pix.orderId); // (zera saiuRegistrado — por isso a marca vem DEPOIS)
+  saiuRegistrado = true; // crítico de completude 02/11: antes vinha antes do marcarQrNaTela e o pagehide da mesma saída mandava um 2º landing_pix_saiu
   if (via === "aba") saidas += 1;
   evento("landing_pix_saiu", { s_na_tela: Math.round((Date.now() - qrDesde) / 1000), vez: via === "aba" ? saidas : saidas + 1, via, order_id: estado.pix.orderId });
   // pra enxergar a volta por RECARGA (o Instagram recarrega a aba): a marca sobrevive no sessionStorage e no localStorage (+ cookie)

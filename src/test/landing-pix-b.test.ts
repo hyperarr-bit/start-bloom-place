@@ -216,7 +216,8 @@ describe("nos DOIS braços: braco_pix em todo evento; o atual é a tela de hoje"
       expect(txt(document.getElementById("lp-ja-paguei"))).toBe("Já paguei");
       expect(document.querySelector(".lp-pixb")).toBeNull();
       expect(document.getElementById("lp-ver-qr")).toBeNull();
-      expect(document.body.textContent).not.toContain(NOME_NO_BANCO);
+      // 02/11: o A é a tela enxuta (pix-enxuta-02-11) — o nome no banco vai ao lado do QR, sem o recibo do b
+      expect(document.querySelector(".lp-qr-nome")?.textContent).toBe(`No banco, o CORE aparece como ${NOME_NO_BANCO}.`);
       expect(document.body.textContent).not.toContain("No banco aparece");
     }
   });

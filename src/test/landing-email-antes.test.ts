@@ -20,7 +20,7 @@ const raiz = resolve(__dirname, "../..");
 const HTML = readFileSync(resolve(raiz, "landing.html"), "utf8");
 
 /* ───────── o script do <head>, rodado num ambiente falso (com cookie) ───────── */
-const scriptDaCabeca = HTML.match(/<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
+const scriptDaCabeca = HTML.match(/<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/)![1].replace(/var AB_PIX = "(on|off|b)"/, 'var AB_PIX = "off"'); // 03/11: o AB_PIX (ligado no código) cria o id do aparelho — aqui os sorteios antigos são testados sozinhos
 // 29/10: a chave foi LIGADA no código; o caminho "off" (rollback) segue testado trocando a linha
 const ligado = scriptDaCabeca.replace(/var AB_CHECKOUT = "(on|off|email)"/, 'var AB_CHECKOUT = "on"');
 const desligado = scriptDaCabeca.replace(/var AB_CHECKOUT = "(on|off|email)"/, 'var AB_CHECKOUT = "off"');

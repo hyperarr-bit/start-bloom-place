@@ -48,8 +48,8 @@ function rodar(fonte: string, url: string, store: Record<string, string> = {}, c
 }
 
 describe("o sorteio da tela do Pix (AB_PIX, head do landing.html)", () => {
-  it("vem DESLIGADO no código (todo mundo no atual) e os chips também", () => {
-    expect(HTML).toMatch(/var AB_PIX = "off";/);
+  it("no código: AB_PIX LIGADO (50/50 desde 03/11, dono) e os chips desligados; com a chave off todo mundo fica no atual", () => {
+    expect(HTML).toMatch(/var AB_PIX = "on";/);
     expect(HTML).toMatch(/var PIX_MOTIVO = "off";/);
     const r = rodar(comPix("off"), "/organizar");
     expect(r.attrs["data-pix"]).toBe("atual");

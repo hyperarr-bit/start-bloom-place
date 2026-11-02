@@ -105,7 +105,7 @@ describe("as regras puras", () => {
 });
 
 describe("a chave no <head> do landing.html (UPSELL_2027, padrão off)", () => {
-  const cabeca = HTML.match(/<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
+  const cabeca = HTML.match(/<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/)![1].replace(/var AB_PIX = "(on|off|b)"/, 'var AB_PIX = "off"'); // 03/11: o AB_PIX ligado cria o id do aparelho — aqui só a chave do 2027
   type Pote = { v: string; m?: Record<string, string> };
   function rodar(url: string, store: Record<string, string> = {}, cookie: Pote = { v: "" }, chave: "on" | "off" = "off") {
     cookie.m ??= {};

@@ -30,7 +30,7 @@ const HTML = readFileSync(resolve(raiz, "landing.html"), "utf8");
 const MAIN = readFileSync(resolve(__dirname, "fixtures/landing-atual-30-10.html"), "utf8");
 
 /* ───────── o script do <head>, rodado num ambiente falso (com cookie) ───────── */
-const scriptDaCabeca = HTML.match(/<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
+const scriptDaCabeca = HTML.match(/<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/)![1].replace(/var AB_PIX = "(on|off|b)"/, 'var AB_PIX = "off"'); // 03/11: o AB_PIX (ligado no código) cria o id do aparelho — aqui os sorteios antigos são testados sozinhos
 const comChaves = (lp: "on" | "off", checkout: "on" | "off") =>
   scriptDaCabeca.replace(/var AB_LP = "(on|off)"/, `var AB_LP = "${lp}"`).replace(/var AB_CHECKOUT = "(on|off|email)"/, `var AB_CHECKOUT = "${checkout}"`);
 

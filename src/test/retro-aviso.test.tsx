@@ -22,7 +22,7 @@ vi.mock("@/lib/analytics", async (orig) => ({
 }));
 const auth = vi.hoisted(() => ({ user: { id: "u1", created_at: "2026-08-01T12:00:00Z", user_metadata: {} }, loading: false, isSubscribed: true }));
 vi.mock("@/hooks/use-auth", async (orig) => ({ ...(await orig<typeof import("@/hooks/use-auth")>()), useAuth: () => auth, useAuthOpcional: () => auth }));
-vi.mock("@/lib/retro-aviso", async (orig) => ({ ...(await orig<typeof import("@/lib/retro-aviso")>()), ESPERA_AVISO_RETRO_MS: 20 }));
+vi.mock("@/lib/retro-aviso", async (orig) => ({ ...(await orig<typeof import("@/lib/retro-aviso")>()), ESPERA_AVISO_RETRO_MS: 20, PRIMEIRA_TENTATIVA_AVISO_RETRO_MS: 20 }));
 vi.mock("@/components/conquistas/video/suporte", () => ({ suporteVideo: async () => null }));
 
 import { AvisoRetroNova, _zerarAvisoRetroNestaAbertura } from "@/components/wrapped/AvisoRetroNova";
@@ -150,7 +150,7 @@ describe("na tela", () => {
     expect(aviso()).toBeNull();
   });
 
-  it("com outra folha aberta não aparece (e não gasta o 'visto')", async () => {
+  it("com outra folha aberta não aparece NESTA abertura (desiste, não gasta o 'visto' e volta na próxima)", async () => {
     const outra = document.createElement("div");
     outra.setAttribute("role", "dialog");
     outra.setAttribute("data-teste-camada", "");
@@ -161,7 +161,9 @@ describe("na tela", () => {
     expect(aviso()).toBeNull();
     expect(n.ler(CHAVE_RETRO_AVISO)).toBeUndefined();
     outra.remove();
-    await waitFor(() => expect(aviso()).not.toBeNull()); // a tela liberou: aparece
+    await esperar();
+    expect(aviso()).toBeNull(); // 02/11: a folha desta abertura já foi a outra — nada de um popup atrás do outro
+    expect(n.ler(CHAVE_RETRO_AVISO)).toBeUndefined();
   });
 
   it("com o convite da Home nova na tela, ou a Home ocupada (tour, widgets, folhas), não aparece", async () => {

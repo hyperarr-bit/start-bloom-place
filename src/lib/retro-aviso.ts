@@ -33,6 +33,8 @@ export const CHAVE_RETRO_NOVA_APARELHO = "core-retro-outubro-nova-aparelho";
 export const ULTIMO_DIA_AVISO_RETRO = "2026-11-10";
 /** Quanto o aviso espera a Home assentar antes de olhar a tela (depois do convite da Home nova, que espera 2,5 s e tem a vez). */
 export const ESPERA_AVISO_RETRO_MS = 3000;
+/** 02/11: a 1ª tentativa do aviso — depois de a loja costumar responder (a tela de cobrança recusada chega em ~0,5–4 s). */
+export const PRIMEIRA_TENTATIVA_AVISO_RETRO_MS = 6000;
 
 const ls = {
   get: (k: string): string | null => { try { return localStorage.getItem(k); } catch { return null; } },

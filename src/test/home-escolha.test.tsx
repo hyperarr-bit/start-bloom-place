@@ -232,7 +232,7 @@ describe("o convite na Home clássica (site)", () => {
     expect(screen.queryByTestId("home-convite")).toBeNull();
   });
 
-  it("nunca por cima de outra camada: com uma folha aberta ele espera; a folha sai, ele aparece", async () => {
+  it("nunca por cima nem logo depois de outra camada: com uma folha aberta ele desiste desta abertura e volta na próxima", async () => {
     const outra = document.createElement("div");
     outra.setAttribute("role", "dialog"); outra.setAttribute("data-teste-camada", "");
     document.body.appendChild(outra);
@@ -242,6 +242,11 @@ describe("o convite na Home clássica (site)", () => {
     expect(screen.queryByTestId("home-convite")).toBeNull();
     expect(n.ler(CHAVE_HOME_CONVITE)).toBeUndefined(); // não conta como visto
     outra.remove();
+    await respirar(2900);
+    expect(screen.queryByTestId("home-convite")).toBeNull(); // 02/11: não abre logo depois (um popup atrás do outro)
+    expect(n.ler(CHAVE_HOME_CONVITE)).toBeUndefined();
+    cleanup();
+    await abrir(n); // próxima abertura, tela livre: aparece
     await waitFor(() => expect(screen.getByTestId("home-convite")).toBeTruthy(), ESPERA);
   });
 

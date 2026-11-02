@@ -7,8 +7,9 @@ import { trackEvent } from "@/lib/analytics";
 import { construirRetroMes, type Leitor } from "@/lib/retrospectiva";
 import { RETRO_OUTUBRO } from "@/lib/retro-outubro";
 import {
-  CHAVE_RETRO_AVISO, CHAVE_RETRO_NOVA_ABERTA, ESPERA_AVISO_RETRO_MS, deveMostrarAvisoRetro, janelaDoAvisoRetro, marcarAvisoRetroNoAparelho, marcarAvisoRetroNestaAbertura, _zerarMarcaAvisoRetroNestaAbertura } from "@/lib/retro-aviso";
-import { conviteApareceuNestaAbertura, telaOcupadaParaConvite } from "@/components/home-nova/EscolhaDaHome";
+  CHAVE_RETRO_AVISO, CHAVE_RETRO_NOVA_ABERTA, ESPERA_AVISO_RETRO_MS, deveMostrarAvisoRetro, janelaDoAvisoRetro, marcarAvisoRetroNoAparelho, marcarAvisoRetroNestaAbertura, _zerarMarcaAvisoRetroNestaAbertura, PRIMEIRA_TENTATIVA_AVISO_RETRO_MS } from "@/lib/retro-aviso";
+import { conviteApareceuNestaAbertura, outraCamadaNaTela, tecladoNaTela } from "@/components/home-nova/EscolhaDaHome";
+import { conflitoVistoAgora, telaVistaAgora } from "@/lib/cobranca-recusada";
 import { Alca, CLASSE_FUNDO_FOLHA, FaixaDoRelogioSobFolha, propsDaFolha, useFolhaArrastavel } from "@/components/home-nova/e/folha-arrasto";
 
 /**
@@ -32,8 +33,11 @@ let avisoNestaAbertura = false;
 /** Só testes. */
 export const _zerarAvisoRetroNestaAbertura = (): void => { avisoNestaAbertura = false; _zerarMarcaAvisoRetroNestaAbertura(); };
 
-const telaOcupada = (): boolean =>
-  telaOcupadaParaConvite() || (typeof document !== "undefined" && !!document.querySelector("[data-convite-home]"));
+/** 02/11 (revisão pesada): outra folha na tela, o convite, ou a tela/aviso de cobrança recusada já vista nesta abertura
+ *  = a folha desta abertura já foi outra → o aviso desiste (volta na próxima). Só o teclado faz esperar. */
+const outraFolhaNestaAbertura = (): boolean =>
+  outraCamadaNaTela() || (typeof document !== "undefined" && !!document.querySelector("[data-convite-home]")) || telaVistaAgora() || conflitoVistoAgora();
+
 
 /** A abertura da retrospectiva nova em miniatura (um objeto: igual no claro e no escuro). */
 const AberturaMiniatura = () => (
@@ -85,7 +89,8 @@ export function AvisoRetroNova({ bloqueado = false, agora: agoraFixo }: { bloque
     let t: ReturnType<typeof setTimeout>;
     const tentar = () => {
       if (avisoNestaAbertura || conviteApareceuNestaAbertura()) return;
-      if (telaOcupada()) { if (++tentativas < TENTATIVAS) t = setTimeout(tentar, ESPERA_AVISO_RETRO_MS); return; }
+      if (outraFolhaNestaAbertura()) return;
+      if (tecladoNaTela()) { if (++tentativas < TENTATIVAS) t = setTimeout(tentar, ESPERA_AVISO_RETRO_MS); return; }
       avisoNestaAbertura = true;
       marcarAvisoRetroNestaAbertura(); // o convite da Home nova cede a vez nesta abertura
       marcarAvisoRetroNoAparelho(uid);
@@ -93,7 +98,7 @@ export function AvisoRetroNova({ bloqueado = false, agora: agoraFixo }: { bloque
       trackEvent("retro_aviso_visto", { month: MES });
       setAberta(true);
     };
-    t = setTimeout(tentar, ESPERA_AVISO_RETRO_MS);
+    t = setTimeout(tentar, PRIMEIRA_TENTATIVA_AVISO_RETRO_MS);
     return () => clearTimeout(t);
   }, [pode, bloqueado, aberta, uid]);
 

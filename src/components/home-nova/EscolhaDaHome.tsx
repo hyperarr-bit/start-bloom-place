@@ -123,10 +123,18 @@ export function PainelEscolhaDaHome({ atual, onEscolher }: { atual: EscolhaDaHom
 /* ------------------------------------------------------------------ o convite (1x por conta) */
 
 /** Alguma camada já está na tela? (o mesmo critério da festa das conquistas — components/conquistas/Momentos — sem importar ela) */
-export const telaOcupadaParaConvite = (): boolean => {
+export const telaOcupadaParaConvite = (): boolean => tecladoNaTela() || outraCamadaNaTela();
+/** Campo com teclado em foco: espera (a pessoa está digitando; a folha vem quando ela terminar). */
+export const tecladoNaTela = (): boolean => {
   if (typeof document === "undefined") return true;
   const el = document.activeElement as HTMLElement | null;
-  if (el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable)) return true;
+  return !!el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
+};
+/** Outra folha/festa/guia/bloqueio na tela. 02/11 (revisão pesada antes da 1.0.23): com uma delas na tela, o convite e o
+ *  aviso da retrospectiva DESISTEM desta abertura (sem gravar nada) — antes esperavam ela fechar e abriam logo em seguida
+ *  ("um popup atrás do outro"). Voltam na próxima abertura. */
+export const outraCamadaNaTela = (): boolean => {
+  if (typeof document === "undefined") return true;
   const raiz = document.documentElement;
   return !!document.querySelector('[role="dialog"]:not([data-convite-home]), [role="alertdialog"], [data-camada-guia], [data-momento], [data-testid="celebracao-100"], [data-aviso-menu-novo], [data-vaul-drawer][data-state="open"], [data-daily-nudge]')
     || raiz.hasAttribute("data-missao-doses-faixa") || raiz.dataset.missaoDose === "1";
@@ -172,7 +180,8 @@ export function ConviteHomeNova({ bloqueado = false, ligada = false }: { bloquea
     let t: ReturnType<typeof setTimeout>;
     const tentar = () => {
       if (conviteNestaAbertura || avisoRetroApareceuNestaAbertura()) return; // 02/11: o aviso da retrospectiva já foi a folha desta abertura
-      if (telaOcupadaParaConvite()) { if (++tentativas < TENTATIVAS_CONVITE) t = setTimeout(tentar, ESPERA_CONVITE_MS); return; }
+      if (outraCamadaNaTela()) return; // 02/11: outra folha já é a desta abertura — o convite volta na próxima
+      if (tecladoNaTela()) { if (++tentativas < TENTATIVAS_CONVITE) t = setTimeout(tentar, ESPERA_CONVITE_MS); return; }
       conviteNestaAbertura = true;
       marcarConviteNoAparelho(uid);
       setRef.current(CHAVE_HOME_CONVITE, { em: new Date().toISOString(), resposta: "visto" }, { system: true });

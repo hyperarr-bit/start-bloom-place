@@ -81,7 +81,7 @@ import {
 } from "./regras";
 import { lerEstadoU2027, lerU2027Guardado } from "./u2027-estado";
 import { lerEstadoPresenteLp } from "./presente-estado";
-import { esquecerCompra, esquecerPixVivo, gravarPixVivo, idDoAparelho, lerCompra, lerPixVivo, marcarCompra, type MarcaCompra } from "./marcador";
+import { esquecerCompra, esquecerPixVivo, gravarCookie, gravarPixVivo, idDoAparelho, lerCompra, lerCookie, lerPixVivo, marcarCompra, type MarcaCompra } from "./marcador";
 import { carregarComRetry, limparMarcaDeRecarga } from "./carregar";
 
 // o Pix de verdade carrega sob demanda — declarado antes do observador dos blocos, que pode pré-aquecê-lo (com PIX_REAL).
@@ -190,6 +190,7 @@ const KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi
 const ua = navigator.userAgent || "";
 const plataforma = /iPhone|iPad|iPod/i.test(ua) ? "ios" : /Android/i.test(ua) ? "android" : "web";
 const inApp = /FBAN|FBAV|FB_IAB|FBIOS|Instagram/i.test(ua);
+const pixForcado = !!w.__landing?.pix_forcado; // 02/11 r1: ?pix=b do dono/QA fica no aparelho — todo evento diz, não só o landing_html (a análise exclui)
 const atrib: Record<string, string> = {};
 for (const k of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "c_id", "as_id", "ad_id", "pl"]) {
   const v = BUSCA.get(k); if (v) atrib[k] = v.slice(0, 200);
@@ -197,7 +198,7 @@ for (const k of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm
 if (BUSCA.get("fbclid")) atrib.tem_fbclid = "1";
 
 export function evento(nome: string, dados: Record<string, unknown> = {}): void {
-  const corpo = { ...dados, landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, braco_pix: brPix, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
+  const corpo = { ...dados, landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, braco_pix: brPix, pix_forcado: pixForcado, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
   listaDeEventos.push({ nome, ...corpo });
   if (!PRODUCAO) return;
   try {
@@ -592,15 +593,17 @@ const JANELA_VENCIDO_MS = 10 * 60_000;
 const lerEstado = (): EstadoLanding => {
   let bruto: unknown = estadoHeap;
   if (!bruto) { try { bruto = JSON.parse(localStorage.getItem(CHAVE_ESTADO) || "null"); } catch { bruto = null; } }
-  if (V2) {
-    // r3 (pix 2): o localStorage sumiu (Instagram) mas o cookie do Pix vivo ficou → o mesmo QR reabre, sem um 2º Pix
-    if (!bruto) {
-      const c = lerPixVivo();
-      if (c && ehOferta(c.oferta)) {
-        const pix: PixLanding = { orderId: c.orderId, qrCode: c.qrCode, qrCodeBase64: null, expiresAt: c.expiresAt, criadoEm: Date.now(), oferta: c.oferta };
-        bruto = { ...ESTADO_VAZIO, fase: "qr", pix, salvoEm: Date.now() } as EstadoLanding;
-      }
+  // r3 (pix 2): o localStorage sumiu (Instagram) mas o cookie do Pix vivo ficou → o mesmo QR reabre, sem um 2º Pix.
+  // 02/11 r1 (técnico, AB_PIX): nos DOIS braços da tela do Pix (era só no v2) — a volta do banco por recarga com o storage zerado
+  // caía na oferta e deixava gerar (e pagar) um 2º Pix; o visual do atual não muda.
+  if (!bruto) {
+    const c = lerPixVivo();
+    if (c && ehOferta(c.oferta)) {
+      const pix: PixLanding = { orderId: c.orderId, qrCode: c.qrCode, qrCodeBase64: null, expiresAt: c.expiresAt, criadoEm: Date.now(), oferta: c.oferta };
+      bruto = { ...ESTADO_VAZIO, fase: "qr", pix, salvoEm: Date.now() } as EstadoLanding;
     }
+  }
+  if (V2) {
     const e = bruto as Partial<EstadoLanding> | null;
     if (e && e.v === 1 && e.pix && !e.pago && typeof e.salvoEm === "number") {
       const fora = Date.now() - venceEm(e.pix);
@@ -768,11 +771,9 @@ const salvar = (novo: Partial<EstadoLanding>) => {
   estado = { ...estado, ...novo, salvoEm: Date.now() };
   estadoHeap = estado;
   try { localStorage.setItem(CHAVE_ESTADO, JSON.stringify(estado)); } catch { /* fica no heap */ }
-  if (V2) {
-    // r3 (pix 2): o Pix vivo também no cookie (até vencer); pago/vencido/oferta tiram o cookie
-    if (estado.fase === "qr" && estado.pix) gravarPixVivo({ orderId: estado.pix.orderId, qrCode: estado.pix.qrCode, expiresAt: new Date(venceEm(estado.pix)).toISOString(), oferta: estado.pix.oferta });
-    else if (estado.fase !== "gerando") esquecerPixVivo();
-  }
+  // r3 (pix 2): o Pix vivo também no cookie (até vencer); pago/vencido/oferta tiram o cookie. 02/11 r1: nos 2 braços (era só no v2)
+  if (estado.fase === "qr" && estado.pix) gravarPixVivo({ orderId: estado.pix.orderId, qrCode: estado.pix.qrCode, expiresAt: new Date(venceEm(estado.pix)).toISOString(), oferta: estado.pix.oferta });
+  else if (estado.fase !== "gerando") esquecerPixVivo();
   render();
 };
 /* r3 (pix 2): o navegador do Instagram zera o localStorage com a página viva (~5 s depois da chegada). O heap segura a
@@ -809,6 +810,7 @@ let codigoPago = ""; // r2 (pix 3): o código digitado depois de pagar (sobreviv
  * (landing_pix_rolou), e a saída de vez com o QR na tela (landing_pix_abandono, no pagehide — o evento() já é keepalive).
  * Nada disso muda o visual do braço atual. Nenhum evento leva e-mail, uid ou token. */
 const CHAVE_SAIU = "landing-pix-saiu-v1";
+const COOKIE_SAIU = "core_ln_saiu"; // 02/11 r1 (técnico): o Instagram zera localStorage E sessionStorage na volta do banco — a marca também num cookie curto (30 min)
 let qrDesde = 0; // desde quando o QR está na tela (ou desde a última volta)
 let qrDesde0 = 0; // desde quando o QR deste pedido apareceu NESTA página (pro s_total do abandono)
 let pedidoNaTela: string | null = null;
@@ -818,6 +820,8 @@ const rolouPedidos = new Set<string>();
 let rolouBase: number | null = null;
 const qrAbertoPedidos = new Set<string>(); // o QR dobrado está aberto (b)
 const qrAbertoAvisado = new Set<string>(); // landing_pix_qr_aberto já saiu pra este pedido (1×)
+const duvidaAberta = new Set<string>(); // b, estado "voltou": "Ficou alguma dúvida? Ver" aberto (sobrevive ao re-render do relógio/aviso)
+const duvidaAvisada = new Set<string>(); // landing_pix_duvida_aberta já saiu pra este pedido (1×)
 /** o QR deste pedido acabou de entrar na tela (gerado agora, ou a página abriu com ele vivo) */
 function marcarQrNaTela(orderId: string) {
   const agoraMs = Date.now();
@@ -835,16 +839,18 @@ function registrarSaida() {
   saidas += 1;
   evento("landing_pix_saiu", { s_na_tela: Math.round((Date.now() - qrDesde) / 1000), vez: saidas, order_id: estado.pix.orderId });
   // pra enxergar a volta por RECARGA (o Instagram recarrega a aba): a marca sobrevive no sessionStorage e no localStorage
-  const marca = JSON.stringify({ order: estado.pix.orderId, em: Date.now(), saidas });
+  const marca = JSON.stringify({ order: estado.pix.orderId, em: Date.now(), saidas, desde: qrDesde0 });
   ss(CHAVE_SAIU, marca);
   try { localStorage.setItem(CHAVE_SAIU, marca); } catch { /* noop */ }
+  gravarCookie(COOKIE_SAIU, marca, 30 * 60);
 }
-function lerSaida(): { order: string; em: number; saidas: number } | null {
+function lerSaida(): { order: string; em: number; saidas: number; desde?: number } | null {
   let bruto: string | null = ss(CHAVE_SAIU);
   if (!bruto) { try { bruto = localStorage.getItem(CHAVE_SAIU); } catch { bruto = null; } }
+  if (!bruto) bruto = lerCookie(COOKIE_SAIU);
   try { const m = bruto ? JSON.parse(bruto) : null; return m && typeof m.order === "string" && typeof m.em === "number" ? m : null; } catch { return null; }
 }
-function esquecerSaida() { try { sessionStorage.removeItem(CHAVE_SAIU); } catch { /* noop */ } try { localStorage.removeItem(CHAVE_SAIU); } catch { /* noop */ } }
+function esquecerSaida() { try { sessionStorage.removeItem(CHAVE_SAIU); } catch { /* noop */ } try { localStorage.removeItem(CHAVE_SAIU); } catch { /* noop */ } gravarCookie(COOKIE_SAIU, "", 0); }
 window.addEventListener("scroll", () => {
   if (rolouBase === null || estado.fase !== "qr" || !estado.pix || rolouPedidos.has(estado.pix.orderId)) return;
   if (Math.abs(window.scrollY - rolouBase) < 40) return;
@@ -1052,19 +1058,25 @@ if (brCheckout === "email" && campoAntes) {
 /* confirmação: a cada 3 s + na volta da aba (o banco) — reveza com os QRs anteriores ainda vivos */
 let loop: number | null = null;
 let vez = 0;
-let conferindo = false;
-async function conferirUmaVez(): Promise<boolean> {
-  if (!estado.pix || estado.fase !== "qr" || conferindo) return false;
-  if (SIMULADO) return false; // simulado: só o "Já paguei" (ou __landingSimular.pagar) confirma
-  conferindo = true;
-  try {
-    const vivos = estado.anteriores.filter((a) => venceEm(a) > Date.now());
-    const fila: PixLanding[] = vivos.length ? vivos.flatMap((v) => [estado.pix!, v]) : [estado.pix];
-    const alvo = fila[vez++ % fila.length];
-    const m = await pg();
-    if (await m.conferirPix(alvo, URL_DE_CHEGADA)) { pago(alvo); return true; }
-  } catch { /* tenta de novo */ } finally { conferindo = false; }
-  return false;
+let conferindoPromessa: Promise<boolean> | null = null;
+/** 02/11 r1 (técnico): com uma conferência em voo (o loop de 3 s), o "Já paguei" ESPERA a resposta dela em vez de receber `false` na hora
+ * (a corrida mandava resultado:"nao" pra quem já estava pago e, no b, jogava a pessoa no "Conferindo com o banco…" sem precisar) */
+function conferirUmaVez(): Promise<boolean> {
+  if (!estado.pix || estado.fase !== "qr") return Promise.resolve(false);
+  if (conferindoPromessa) return conferindoPromessa;
+  if (SIMULADO) return Promise.resolve(false); // simulado: só o "Já paguei" (ou __landingSimular.pagar) confirma
+  const alvoPix = estado.pix;
+  conferindoPromessa = (async () => {
+    try {
+      const vivos = estado.anteriores.filter((a) => venceEm(a) > Date.now());
+      const fila: PixLanding[] = vivos.length ? vivos.flatMap((v) => [alvoPix, v]) : [alvoPix];
+      const alvo = fila[vez++ % fila.length];
+      const m = await pg();
+      if (await m.conferirPix(alvo, URL_DE_CHEGADA)) { pago(alvo); return true; }
+    } catch { /* tenta de novo */ } finally { conferindoPromessa = null; }
+    return false;
+  })();
+  return conferindoPromessa;
 }
 function conferirEmLoop() {
   if (loop) window.clearTimeout(loop);
@@ -1102,6 +1114,7 @@ function pago(p: PixLanding) {
   if (loop) window.clearTimeout(loop);
   if (loopVencido) window.clearTimeout(loopVencido);
   vencido = null; avisoOferta = null;
+  aviso = null; // 02/11 r1 (persona): "Ainda não chegou. Confere no app do banco…" sobrevivia até "Sua conta está pronta" (nos 2 braços)
   sairDoConferindo(); voltaVista = null; esquecerSaida(); // 02/11 (b)
   evento("landing_pix_pago", { oferta: p.oferta, valor: VALOR_OFERTA[p.oferta], order_id: p.orderId, simulado: SIMULADO });
   marcarCompra({ oferta: p.oferta, email: estado.emailPix }); // 29/10: sobrevive ao localStorage zerado (cookie)
@@ -1378,24 +1391,28 @@ function htmlPixB(p: PixLanding): string {
   const emailConhecido = estado.emailPix ?? null;
   const promete = brCheckout === "email" || !!p.doEmail; // hoje (checkout "email") todo mundo cai aqui
   const rotulo = p.oferta === "LN_ano279" ? ROTULO_OFERTA[p.oferta] : "CORE pra sempre · cobra 1 vez só";
-  const passo = est === "qr" ? `<div class="lp-pixb-passo" data-testid="landing-pixb-passo"><b>${copiado ? "Código Pix copiado." : "Copie o código Pix."}</b><span>Abra o banco → Pix → Copia e Cola.</span></div>` : "";
+  // r1 (persona + visual): quem volta do banco em geral JÁ PAGOU (144 de 218) — a 1ª linha fala com ela ("Pagou? Confirma em instantes."),
+  // a ordem passo → botão → pílula não muda, e a dúvida fica DOBRADA numa linha depois da pílula (cartão ≤ 560 px; sem "recorrente"/"Asaas")
+  const passo = est === "voltou"
+    ? `<div class="lp-pixb-passo" data-testid="landing-pixb-passo"><b>Pagou? Confirma em instantes.</b><span>Às vezes o banco leva alguns minutos.</span></div>`
+    : est === "qr" ? `<div class="lp-pixb-passo" data-testid="landing-pixb-passo"><b>${copiado ? "Código Pix copiado." : "Copie o código Pix."}</b><span>Abra o banco → Pix → Copia e Cola.</span></div>` : "";
   const volta = est === "voltou" ? `
+      <details class="lp-pixb-duvida" id="lp-pixb-duvida" data-testid="landing-pixb-duvida"${duvidaAberta.has(p.orderId) ? " open" : ""}><summary>Ficou alguma dúvida? <span>Ver</span></summary>
       <div class="lp-pixb-volta" data-testid="landing-pixb-volta">
-        <h4>De volta? Se ficou alguma dúvida:</h4>
         <ul>
           <li>${ICO_CHECK_B}<span><b>${esc(NOME_NO_BANCO)}</b> é o nome da nossa empresa · CNPJ ${CNPJ_NO_BANCO}</span></li>
-          <li>${ICO_CHECK_B}<span><b>Cobra 1 vez só</b> — mesmo se o banco escrever “recorrente” ou “Asaas”.</span></li>
+          <li>${ICO_CHECK_B}<span><b>Cobra 1 vez só.</b> Nada mensal, nada depois.</span></li>
           <li>${ICO_CHECK_B}<span><b>7 dias de garantia</b> · devolvemos 100% no Pix.</span></li>
         </ul>
         ${PIX_MOTIVO ? (motivoDado
           ? `<p class="lp-pixb-chips" data-testid="landing-pixb-motivo-ok"><span>Anotado. Obrigada!</span></p>`
           : `<div class="lp-pixb-chips" data-testid="landing-pixb-chips"><span>O que te travou?</span><button type="button" data-motivo="nome">O nome no banco</button><button type="button" data-motivo="valor">O valor</button><button type="button" data-motivo="depois">Deixo pra depois</button><button type="button" data-motivo="outro">Outra coisa</button></div>`) : ""}
         <a href="mailto:contato@coreaplicativo.com.br" id="lp-pixb-falar">Falar com a gente</a>
-      </div>` : "";
+      </div></details>` : "";
   // a pílula em 2 linhas de propósito (em 390 "Esperando o Pix · confirma sozinha · vale por 29:59" não cabe numa): status + validade em cima,
   // "confirma sozinha" embaixo — a frase que segura quem sai pro banco (juízes: a única das 3 telas que não dizia isso), com a variante doEmail
   const statusTxt = est === "conferindo" ? "Conferindo com o banco…" : "Esperando o Pix";
-  const statusSub = est === "conferindo" ? "" : `<small>${p.doEmail ? "Quando o Pix cair, o acesso chega no seu e-mail." : "Confirma sozinha. Pode fechar e voltar."}</small>`;
+  const statusSub = est === "conferindo" ? "" : `<small>${p.doEmail ? "Quando o Pix cair, o acesso chega no seu e-mail." : "Confirma sozinha. Pode ir ao banco e voltar."}</small>`; // r1: "pode fechar" só no conferindo (o Instagram zera o storage ao fechar)
   const conf = est === "conferindo"
     ? `<p class="lp-pixb-conf" data-testid="landing-pixb-conferindo"><b>Às vezes o banco leva alguns minutos.</b> Pode fechar esta página: ${emailConhecido ? `o acesso chega em <b>${esc(emailConhecido)}</b>` : promete ? "o acesso chega no seu e-mail" : "esta tela confirma sozinha"} assim que o Pix cair.</p>`
     : "";
@@ -1408,14 +1425,15 @@ function htmlPixB(p: PixLanding): string {
       <div class="lp-pixb" data-testid="landing-pixb" data-estado="${est}">
         <div class="lp-pixb-topo"><span class="lp-pixb-marca">CORE</span><span class="lp-pixb-pedido">Pedido ${esc(pedidoCurto(p.orderId))}</span></div>
         <div class="lp-pixb-valor"><b>${reais(VALOR_OFERTA[p.oferta])}</b><span>${esc(rotulo)}</span></div>
-        ${passo}${volta}
-        <button type="button" class="lp-pixb-cta" id="lp-copiar">${ICO_COPIAR}<span>Copiar código Pix</span></button>
+        ${passo}
+        <button type="button" class="lp-pixb-cta" id="lp-copiar">${ICO_COPIAR}<span>${copiado ? "Copiar de novo" : "Copiar código Pix"}</span></button>
         <div class="lp-pixb-status${est === "conferindo" ? " conferindo" : ""}" data-testid="landing-pixb-status"><span class="lado"><i class="pt"></i><span>${statusTxt}</span></span><span class="vale" id="lp-validade">vale por ${mmss(venceEm(p) - Date.now())}</span>${statusSub}</div>
         ${conf}
         ${aviso ? `<p class="lp-aviso" role="status">${esc(aviso)}</p>` : ""}
+        ${volta}
         <div class="lp-pixb-qr${qrAbertoPedidos.has(p.orderId) ? " aberto" : ""}" id="lp-qr-dobrado"><div class="lp-qr" id="lp-qr"></div><div class="lp-codigo" data-testid="landing-codigo">${esc(p.qrCode)}</div></div>
         <dl class="lp-pixb-linhas">
-          ${est === "voltou" ? "" : `<div class="lp-pixb-l" data-testid="landing-pixb-banco"><dt>No banco aparece</dt><dd>${esc(NOME_NO_BANCO)}<small>É o nome da nossa empresa <span>· CNPJ ${CNPJ_NO_BANCO}</span></small></dd></div>
+          ${est === "voltou" ? "" : `<div class="lp-pixb-l" data-testid="landing-pixb-banco"><dt>No banco aparece</dt><dd>${esc(NOME_NO_BANCO)}<small><span>Nossa empresa · CNPJ ${CNPJ_NO_BANCO}</span></small></dd></div>
           <div class="lp-pixb-l"><dt>Garantia</dt><dd>7 dias · devolvemos 100% no Pix</dd></div>`}
           <div class="lp-pixb-l"><dt>Acesso</dt>${acesso}</div>
         </dl>
@@ -1513,6 +1531,11 @@ function renderDoCartao() {
     // 29/10 (dono): no vitalício só existe 1 plano — o "Mudar o plano" só tirava a pessoa do Pix gerado; fica só no braço "ano" (caixinha)
     document.getElementById("lp-mudar")?.addEventListener("click", () => { evento("landing_cta", { onde: "mudar_plano" }); aviso = null; salvar({ fase: "oferta" }); });
     if (PIXB) {
+      // r1: "Ficou alguma dúvida? Ver" (estado voltou) — 1 evento por pedido na 1ª abertura; o aberto/fechado sobrevive ao re-render
+      document.getElementById("lp-pixb-duvida")?.addEventListener("toggle", (ev) => {
+        const d = ev.currentTarget as HTMLDetailsElement;
+        if (d.open) { if (!duvidaAvisada.has(p.orderId)) { duvidaAvisada.add(p.orderId); evento("landing_pix_duvida_aberta", { order_id: p.orderId }); } duvidaAberta.add(p.orderId); } else duvidaAberta.delete(p.orderId);
+      });
       // b: o QR + código dobrados em "Ver QR code" (quem lê em outro aparelho acha); 1 evento por pedido na 1ª abertura — os ~9% que pagam sem voltar não podem cair
       document.getElementById("lp-ver-qr")?.addEventListener("click", (ev) => {
         const caixaQr = document.getElementById("lp-qr-dobrado"); const b = ev.currentTarget as HTMLButtonElement;
@@ -1538,6 +1561,7 @@ function renderDoCartao() {
       campo.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && EMAIL_OK.test(campo.value.trim())) { ev.preventDefault(); salvarDoCampo(); } });
     }
     relogio = window.setInterval(() => {
+      if (!caixa.isConnected) { window.clearInterval(relogio!); return; } // a página foi trocada por baixo (só nos testes): o relógio velho cala
       const el = document.getElementById("lp-validade");
       const resta = venceEm(p) - Date.now();
       if (el) el.textContent = PIXB ? (resta > 0 ? `vale por ${mmss(resta)}` : "venceu") : resta > 0 ? `Este código vale por ${mmss(resta)}` : "Este código venceu.";
@@ -1951,7 +1975,11 @@ window.addEventListener("pageshow", (e) => { if ((e as PageTransitionEvent).pers
   if (m && estado.pix && m.order === estado.pix.orderId) {
     esquecerSaida();
     saidas = Math.max(saidas, Number(m.saidas) || 0);
+    if (typeof m.desde === "number" && m.desde > 0 && m.desde < qrDesde0) qrDesde0 = m.desde; // o s_total do abandono continua de onde parou
     const fora = Date.now() - m.em;
+    // r1 (técnico/visual): a página velha mandou landing_pix_abandono no pagehide da recarga — este evento o desmente (a análise também
+    // pode ler "abandono = último evento do pedido, sem landing_voltou/landing_pix_pago/subscription depois")
+    evento("landing_pix_abandono_cancelado", { order_id: estado.pix.orderId, ausente_s: Math.round(fora / 1000) });
     if (fora >= 5000) {
       evento("landing_voltou", { fase: "qr", ausente_s: Math.round(fora / 1000), com_pix: true, order_id: estado.pix.orderId, via: "recarga" });
       voltaNoB("recarga");

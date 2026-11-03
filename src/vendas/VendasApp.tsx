@@ -35,7 +35,7 @@ type RespWeb = { dia: string; hoje: PeriodoWeb; semana: PeriodoWeb; dias: Array<
 type DiaResumo = {
   dia: string; vendido: number; vendas: number; porOrigem: Record<Origem, { n: number; valor: number }>;
   site: { vendas: number; bruto: number; liquido: number; gasto: number; gastoComImposto: number; imposto: number; lucro: number; retorno: number | null; cor: Cor };
-  iphone: { testes: number; pagaram: number; situacao: string; liquido: number; gasto: number; gastoComImposto: number; imposto: number; lucro: number; parcial: boolean };
+  iphone: { turma: string | null; testes: number; pagaram: number; situacao: string; liquido: number; gasto: number; gastoComImposto: number; imposto: number; lucro: number; parcial: boolean };
   android: { vendas: number; liquido: number; imposto: number; lucro: number };
   lucro: number;
 };
@@ -382,7 +382,7 @@ function AbaDias({ d }: { d: RespDias }) {
               </li>
               <li>
                 <span className="v-tag v-chip-apple">iPhone</span>
-                <span className="v-plano">turma: {x.iphone.testes} testes · {x.iphone.pagaram} pagaram{x.iphone.parcial ? " (ainda cobrando)" : ""}</span>
+                <span className="v-plano">turma {x.iphone.turma ? ddmm(x.iphone.turma) : ""}: {x.iphone.testes} testes · {x.iphone.pagaram} pagaram{x.iphone.parcial ? " (cobrando hoje)" : ""}</span>
                 <span className={`v-valor v-cor-${corLucro(x.iphone.lucro, x.iphone.parcial)}`}>{sinal(x.iphone.lucro)}</span>
               </li>
               {x.android.vendas > 0 && (
@@ -398,15 +398,15 @@ function AbaDias({ d }: { d: RespDias }) {
                 <Dado n={brl(x.site.bruto, 0)} r="site · vendido" />
                 <Dado n={brl(x.site.gasto, 0)} r="site · anúncio (Meta)" />
                 <Dado n={vezes(x.site.retorno)} r="site · retorno líquido" cor={x.site.cor} />
-                <Dado n={brl(x.iphone.liquido, 0)} r="iPhone · líquido da turma" />
-                <Dado n={brl(x.iphone.gasto, 0)} r="iPhone · anúncio (Meta)" />
+                <Dado n={brl(x.iphone.liquido, 0)} r={`iPhone · turma ${x.iphone.turma ? ddmm(x.iphone.turma) : ""}`} />
+                <Dado n={brl(x.iphone.gasto, 0)} r={`iPhone · anúncio de ${x.iphone.turma ? ddmm(x.iphone.turma) : ""}`} />
                 <Dado n={brl(x.site.imposto + x.iphone.imposto + x.android.imposto, 0)} r="imposto 15,5%" />
               </div>
             )}
           </article>
         );
       })}
-      <p className="v-nota">Vendido = tudo que entrou no dia (Pix do site + Apple + Google Play, como no “Hoje”). Lucro = líquido − anúncio com o imposto da Meta (+12,15%) − 15,5% de imposto. Site = vendas e anúncio do próprio dia. iPhone = a turma que começou no dia (cobra em 3 dias) contra o anúncio de app do dia; “parcial” = ainda cobrando. Toque num dia pra ver os detalhes.{d.semEstadoRC ? ` ${d.semEstadoRC} sem resposta do RevenueCat.` : ""}</p>
+      <p className="v-nota">Vendido = tudo que entrou no dia (Pix do site + Apple + Google Play, como no “Hoje”). Lucro = líquido − anúncio com o imposto da Meta (+12,15%) − 15,5% de imposto. Site = vendas e anúncio do próprio dia. iPhone = a turma COBRADA no dia (começou 3 dias antes), com o anúncio de app do dia em que ela começou; “parcial” = a cobrança ainda está caindo hoje. Toque num dia pra ver os detalhes.{d.semEstadoRC ? ` ${d.semEstadoRC} sem resposta do RevenueCat.` : ""}</p>
       <Erros e={d.errosMeta} />
     </section>
   );

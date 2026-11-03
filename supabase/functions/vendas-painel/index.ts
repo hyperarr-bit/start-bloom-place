@@ -145,8 +145,14 @@ async function turmasDesde(admin: Admin, hoje: string, desde: string) {
 }
 
 async function abaDias(admin: Admin, hoje: string) {
-  const [f, t] = await Promise.all([fontesDeVenda(admin, INICIO_DIAS), turmasDesde(admin, hoje, INICIO_DIAS)]);
-  const dias = t.turmas.map((tu) => resumoDoDia(vendasDoDia(f.pix, f.marcadores, f.linhaPorTx, f.renov, tu.dia), tu.dia, t.gastoSite[tu.dia] ?? 0, tu));
+  // 03/11 (dono): cada dia mostra a turma do iPhone COBRADA nele (começou em D−3) → as turmas começam 3 dias antes de 28/10
+  const [f, t] = await Promise.all([fontesDeVenda(admin, INICIO_DIAS), turmasDesde(admin, hoje, somaDias(INICIO_DIAS, -3))]);
+  const porDia = new Map(t.turmas.map((tu) => [tu.dia, tu]));
+  const vazia = { testes: 0, pagaram: 0, situacao: "fechada", liquido: 0, gasto: 0 };
+  const dias = t.turmas.filter((tu) => tu.dia >= INICIO_DIAS).map((tu) => {
+    const cobrada = porDia.get(somaDias(tu.dia, -3));
+    return resumoDoDia(vendasDoDia(f.pix, f.marcadores, f.linhaPorTx, f.renov, tu.dia), tu.dia, t.gastoSite[tu.dia] ?? 0, cobrada ? { ...cobrada } : { ...vazia, dia: somaDias(tu.dia, -3) });
+  });
   const soma = (g: (d: (typeof dias)[number]) => number) => Math.round(dias.reduce((s, d) => s + g(d), 0) * 100) / 100;
   return {
     dia: hoje, desde: INICIO_DIAS, dias,

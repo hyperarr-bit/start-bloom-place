@@ -318,7 +318,7 @@ export type DiaResumo = {
   vendas: number;
   porOrigem: Record<Origem, { n: number; valor: number }>;
   site: { vendas: number; bruto: number; liquido: number; gasto: number; gastoComImposto: number; imposto: number; lucro: number; retorno: number | null; cor: Cor };
-  iphone: { testes: number; pagaram: number; situacao: string; liquido: number; gasto: number; gastoComImposto: number; imposto: number; lucro: number; parcial: boolean };
+  iphone: { turma: string | null; testes: number; pagaram: number; situacao: string; liquido: number; gasto: number; gastoComImposto: number; imposto: number; lucro: number; parcial: boolean };
   android: { vendas: number; liquido: number; imposto: number; lucro: number };
   lucro: number;
 };
@@ -326,16 +326,16 @@ export type DiaResumo = {
 const arred = (x: number) => Math.round(x * 100) / 100;
 
 /**
- * Um dia da aba Dias. O SITE é do próprio dia (venda e gasto no mesmo dia). O IPHONE é a TURMA que começou no dia
- * (testes do dia → cobrança em D+3) contra o gasto de app do dia — nunca o caixa da Apple do dia, que mistura turmas
- * (regra do dono, 08/10). O Android entra pelo que vendeu no dia (sem campanha própria). Lucro = líquido − anúncio com
+ * Um dia da aba Dias. O SITE é do próprio dia (venda e gasto no mesmo dia). O IPHONE é a TURMA QUE FOI COBRADA no dia
+ * (a que começou 3 dias antes), com o líquido dela e o gasto de app do dia em que ELA começou (dono 03/11: "tem que vir a
+ * turma que fechou, com o gasto do dia que a turma veio") — nunca o caixa da Apple do dia, que mistura turmas (08/10). O Android entra pelo que vendeu no dia (sem campanha própria). Lucro = líquido − anúncio com
  * o imposto da Meta − o imposto da empresa.
  */
 export function resumoDoDia(
   vendas: { itens: ItemVenda[]; total_cents: number; porOrigem: Record<Origem, { n: number; cents: number }> },
   dia: string,
   gastoSite: number,
-  turma: { testes: number; pagaram: number; situacao: string; liquido: number; gasto: number },
+  turma: { dia?: string; testes: number; pagaram: number; situacao: string; liquido: number; gasto: number },
 ): DiaResumo {
   const pixItens = vendas.itens.filter((i) => i.origem === "pix");
   const bruto = pixItens.reduce((s, i) => s + i.valor_cents, 0) / 100;
@@ -360,7 +360,8 @@ export function resumoDoDia(
     vendas: vendas.itens.length,
     porOrigem,
     site: { vendas: pixItens.length, bruto: arred(bruto), liquido: arred(liqPix), gasto: arred(gastoSite), gastoComImposto: arred(gCom), imposto: arred(impSite), lucro: arred(lucroSite), retorno: r2(ret), cor: gastoSite > 0 ? (lucroSite > 0 ? (ret !== null && ret >= 1.5 ? "verde" : "amarelo") : "vermelho") : "neutro" },
-    iphone: { testes: turma.testes, pagaram: turma.pagaram, situacao: turma.situacao, liquido: arred(turma.liquido), gasto: arred(turma.gasto), gastoComImposto: arred(iGCom), imposto: arred(impIph), lucro: arred(lucroIph), parcial: turma.situacao !== "fechada" && turma.situacao !== "fecha_hoje" },
+    // "fecha_hoje" = a cobrança ainda está caindo hoje → parcial até o fim do dia
+    iphone: { turma: turma.dia ?? null, testes: turma.testes, pagaram: turma.pagaram, situacao: turma.situacao, liquido: arred(turma.liquido), gasto: arred(turma.gasto), gastoComImposto: arred(iGCom), imposto: arred(impIph), lucro: arred(lucroIph), parcial: turma.situacao !== "fechada" },
     android: { vendas: playItens.length, liquido: arred(liqPlay), imposto: arred(impPlay), lucro: arred(liqPlay - impPlay) },
     lucro: arred(lucroSite + lucroIph + liqPlay - impPlay),
   };

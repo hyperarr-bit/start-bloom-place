@@ -54,3 +54,13 @@ describe("aba Dias", () => {
     expect(r.site.cor).toBe("neutro");
   });
 });
+
+describe("03/11: o iPhone do dia é a turma COBRADA nele (começou 3 dias antes)", () => {
+  it("leva o dia da turma e só é parcial enquanto a cobrança cai (fecha hoje)", () => {
+    const v = vendasDoDia([], [], new Map(), [], "2026-11-02");
+    const fechou = resumoDoDia(v, "2026-11-02", 0, { dia: "2026-10-30", testes: 36, pagaram: 8, situacao: "fechada", liquido: 619, gasto: 280 });
+    expect(fechou.iphone).toMatchObject({ turma: "2026-10-30", parcial: false, liquido: 619, gasto: 280 });
+    const hoje = resumoDoDia(v, "2026-11-03", 0, { dia: "2026-10-31", testes: 33, pagaram: 5, situacao: "fecha_hoje", liquido: 401.5, gasto: 309 });
+    expect(hoje.iphone.parcial).toBe(true);
+  });
+});

@@ -107,7 +107,7 @@ export function dataBr(iso: string | null | undefined): string | null {
 
 /** Os links das lojas no e-mail (os mesmos do site: LojasCard / e-mail antigo). */
 /** 03/11: o guia "Seu CORE começa aqui" (PDF, 16 páginas) — public/guia no site. */
-export const URL_GUIA_PDF = "https://coreaplicativo.com.br/guia/core-comece-aqui.pdf";
+export const URL_GUIA_PDF = "https://www.coreaplicativo.com.br/guia/core-comece-aqui.pdf";
 export const URL_APP_STORE_EMAIL = "https://apps.apple.com/br/app/id6806913181";
 export const URL_PLAY_EMAIL = "https://play.google.com/store/apps/details?id=br.com.coreaplicativo.app&referrer=utm_source%3Dweb%26utm_medium%3Demail%26utm_campaign%3Dweb_hoje_email";
 

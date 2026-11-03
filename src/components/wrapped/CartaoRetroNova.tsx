@@ -6,10 +6,10 @@ import { ChevronRight, X } from "lucide-react";
  * aprovada em 30/10 (fundo grafite, "Seu outubro, / do seu jeito." com a 2ª linha em magenta) — a mesma do aviso
  * (AvisoRetroNova). Um objeto: igual no claro e no escuro. Sem lombada, espiral, lacre nem foil.
  */
-const INTER = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-const FUNDO = "linear-gradient(172deg, #2c2b31 0%, #232228 55%, #1d1c21 100%)";
-const BORDA = "inset 0 0 0 1px rgba(255,255,255,.09)";
-const MESES_CURTOS = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
+export const INTER = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+export const FUNDO = "linear-gradient(172deg, #2c2b31 0%, #232228 55%, #1d1c21 100%)";
+export const BORDA = "inset 0 0 0 1px rgba(255,255,255,.09)";
+export const MESES_CURTOS = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
 
 type Props = {
   /** nome do mês como a retrospectiva guarda ("Outubro") */

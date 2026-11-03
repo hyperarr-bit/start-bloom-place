@@ -117,6 +117,22 @@ export const URL_PLAY_EMAIL = "https://play.google.com/store/apps/details?id=br.
  */
 /* 31/10 (`extra`): o bloco do "Seu 2027" (_shared/pix-upsell.ts blocoU2027, chave UPSELL_2027_EMAIL) — entra DEPOIS dos 3 passos
  * de "Como entrar no app" (e do link do passo a passo) e antes de "No computador". Vazio = o e-mail de sempre, igual. */
+/**
+ * 03/11 (dono: "tem gente que ainda confunde e clica em Começar ao invés de Entrar"): o desenho dos 2 botões do app —
+ * o mesmo do "No app, toque aqui 👇" da página pós-compra (landing comoEntrarNoApp) — no ALTO do e-mail. Só tabela e
+ * texto (Gmail/Outlook sem imagem): "Começar" apagado com "✕ não é aqui", "Já tenho conta? Entrar" em destaque com
+ * "✓ é aqui".
+ */
+export const blocoEntrar = (e: string): string => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 18px;background:#fff6fa;border:2px solid #d22d80;border-radius:14px;" data-bloco="entrar"><tr><td style="padding:16px 16px 14px;">
+  <div style="font-size:15px;font-weight:900;color:#16121c;margin:0 0 4px;">No app, toque em “Entrar” 👇</div>
+  <div style="font-size:13.5px;line-height:1.45;color:#5b5560;margin:0 0 12px;">Você já pagou: não precisa criar conta nem pagar de novo.</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:0 8px;">
+    <tr><td style="background:#ece8eb;border-radius:12px;padding:11px 14px;font-size:15px;font-weight:800;color:#9a939e;text-decoration:line-through;">Começar</td><td style="width:96px;padding-left:10px;font-size:13px;font-weight:800;color:#b42318;white-space:nowrap;">✕ não é aqui</td></tr>
+    <tr><td style="background:#ffffff;border:2px solid #d22d80;border-radius:12px;padding:10px 13px;font-size:15px;font-weight:800;color:#16121c;">Já tenho conta? <span style="color:#d22d80;">Entrar</span></td><td style="width:96px;padding-left:10px;font-size:13px;font-weight:800;color:#15803d;white-space:nowrap;">✓ é aqui</td></tr>
+  </table>
+  <div style="font-size:13.5px;line-height:1.45;color:#5b5560;margin:6px 0 0;">Depois digite <b style="color:#16121c;">${e}</b> e o código de 8 números que chega neste e-mail.</div>
+</td></tr></table>`;
+
 export function htmlVenda(args: { email: string; nome?: string | null; periodo: PeriodoVenda; fim?: string | null; hoje?: boolean; extra?: string }): string {
   const e = esc(args.email);
   const primeiro = esc(String(args.nome ?? "").trim().split(/\s+/)[0] || "");
@@ -137,11 +153,12 @@ export function htmlVenda(args: { email: string; nome?: string | null; periodo: 
     <h1 style="font-size:22px;line-height:1.25;margin:10px 0 8px;">${primeiro ? `${primeiro}, seu` : "Seu"} CORE está liberado.</h1>
     <p style="font-size:15px;line-height:1.5;margin:0 0 14px;color:#5b5560;">${plano}</p>
     <p style="font-size:15px;line-height:1.5;margin:0 0 18px;color:#5b5560;">Sua conta: <b style="color:#16121c;">${e}</b></p>
+    ${blocoEntrar(e)}
     ${args.hoje ? blocoLojas(e) : ""}
     <p style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#8a838f;text-transform:uppercase;margin:0 0 10px;">Como entrar no app</p>
     <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
       ${passo(1, `Baixe o <b>CORE</b>: <a href="https://coreaplicativo.com.br/baixar?origem=venda_email" style="color:#d22d80;font-weight:700;">App Store ou Google Play</a>.`)}
-      ${passo(2, "Abra e toque em <b>“Entrar”</b>, logo abaixo do botão Começar. Não toque em “Começar”.")}
+      ${passo(2, "Abra e toque em <b>“Já tenho conta? Entrar”</b>, logo abaixo do botão Começar. <b>Não toque em “Começar”</b>: esse é o caminho de quem ainda não comprou e leva pra tela de pagamento.")}
       ${passo(3, `Digite <b>${e}</b> e toque em <b>“Entrar sem senha — receber código por e-mail”</b>. Use o código que chegar.`)}
     </table>
     <p style="font-size:13px;color:#5b5560;line-height:1.5;margin:4px 0 0;">Quer ver com fotos? <a href="https://coreaplicativo.com.br/como-entrar" style="color:#d22d80;font-weight:700;">Passo a passo</a></p>
@@ -170,6 +187,7 @@ export function htmlParceiro(args: { email: string; fim?: string | null; vitalic
     <div style="font-size:12px;font-weight:700;letter-spacing:.08em;color:#d22d80;text-transform:uppercase;">Presente pra vocês dois</div>
     <h1 style="font-size:22px;line-height:1.25;margin:10px 0 8px;">Alguém organizou a vida a dois com o CORE — e incluiu você.</h1>
     <p style="font-size:15px;line-height:1.5;margin:0 0 18px;color:#5b5560;">${acesso}</p>
+    ${blocoEntrar(e)}
     ${blocoLojas(e)}
     <p style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#8a838f;text-transform:uppercase;margin:0 0 10px;">Como entrar</p>
     <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">

@@ -101,12 +101,52 @@ const temAguaNoPe = (d: DadosCard) => d.tipo === "azul" || d.tipo === "poupanca"
 /** A folha é sempre escura: o interruptor com cores fixas (no modo escuro do app o padrão sumia no fundo). */
 const SWITCH_NA_FOLHA = "data-[state=unchecked]:bg-white/25 data-[state=checked]:bg-[#db2777] [&>span]:bg-white";
 
+/**
+ * (03/11, dono: "vê se aparece animações em todas transição") AS TRANSIÇÕES. Cada tela (card ou adivinha) é uma
+ * CAMADA com o fundo dela; ao trocar, a de antes fica parada embaixo (o conteúdo dela some com um deslize curto) e a
+ * nova entra por cima com fade + deslize curto na direção do avanço (de volta: do outro lado). Nunca corte seco nem o
+ * fundo piscando: sempre tem uma camada opaca embaixo. Só opacity/transform (nada de blur/filtro animado).
+ * Com "reduzir movimento": só fades curtos, sem deslize.
+ */
+const CURVA = "cubic-bezier(.22,1,.36,1)";
+const CURVA_SAI = "cubic-bezier(.4,0,.7,1)";
+export const TROCA = { entra: 420, sai: 280, frenteSai: 200, reduzido: 200, limpa: 480 } as const;
+export const FECHA_MS = 260;
+export const FOLHA_SAI_MS = 230;
+const DESLIZE = 28;
 const ESTILOS = `
 @keyframes retroTcBarra { from { transform: scaleX(0) } to { transform: scaleX(1) } }
 @keyframes retroTcEntra { from { opacity: 0 } to { opacity: 1 } }
-@keyframes retroTcFolha { from { transform: translateY(100%) } to { transform: translateY(0) } }
-@keyframes retroTcSobe { from { opacity: 0; transform: translateY(14px) scale(.96) } to { opacity: 1; transform: none } }
+@keyframes retroTcSome { from { opacity: 1 } to { opacity: 0 } }
+@keyframes retroTcAbre { from { opacity: 0; transform: scale(.985) } to { opacity: 1; transform: none } }
+@keyframes retroTcEntraDir { from { opacity: 0; transform: translate3d(${DESLIZE}px,0,0) } to { opacity: 1; transform: none } }
+@keyframes retroTcEntraEsq { from { opacity: 0; transform: translate3d(-${DESLIZE}px,0,0) } to { opacity: 1; transform: none } }
+@keyframes retroTcSaiEsq { from { opacity: 1; transform: none } to { opacity: 0; transform: translate3d(-20px,0,0) } }
+@keyframes retroTcSaiDir { from { opacity: 1; transform: none } to { opacity: 0; transform: translate3d(20px,0,0) } }
+@keyframes retroTcFolha { from { transform: translate3d(0,100%,0) } to { transform: none } }
+@keyframes retroTcFolhaSai { from { transform: none } to { transform: translate3d(0,100%,0) } }
+@keyframes retroTcSobe { from { opacity: 0; transform: translate3d(0,12px,0) scale(.98) } to { opacity: 1; transform: none } }
 `;
+
+type Fundo = { css: string; textura: CSSProperties | null; claro: boolean };
+type Palpite = { escolha: number | null; revelado: boolean };
+interface EncTela { coluna: number; w: number; h: number; x: number; y: number; escala: number; extra: number }
+/** Tudo o que uma tela precisa pra ser desenhada — a de agora e a que está saindo (congelada no instante da troca). */
+interface Snap {
+  chave: string;
+  tela: Tela;
+  dados: DadosCard | null;
+  enc: EncTela;
+  fundo: Fundo | null;
+  animar: boolean;
+  soFundo: boolean;
+  suspense: number;
+  palpite: Palpite;
+  pilula: boolean;
+  ultimo: boolean;
+  claro: boolean;
+  claroNoPe: boolean;
+}
 
 interface Props {
   retro: DadosDaRetro;
@@ -141,9 +181,14 @@ export const RetroTelaCheia = ({ retro, onClose, onProximoPasso }: Props) => {
   const [cobriu, setCobriu] = useState<string | null>(null);
   const [tela, setTela] = useState({ w: 390, h: 844 });
   const [seguro, setSeguro] = useState({ topo: 0, base: 0 });
-  const [fundo, setFundo] = useState<{ css: string; textura: CSSProperties | null; claro: boolean } | null>(null);
+  const [fundo, setFundo] = useState<Fundo | null>(null);
   /** O adivinha: o que a pessoa tocou (null = ainda não) e se já revelou. */
-  const [palpite, setPalpite] = useState<{ escolha: number | null; revelado: boolean }>({ escolha: null, revelado: false });
+  const [palpite, setPalpite] = useState<Palpite>({ escolha: null, revelado: false });
+  /** (03/11) A troca em andamento: a tela de antes (congelada) e pra que lado foi (1 avança, -1 volta, 0 recomeça). */
+  const [troca, setTroca] = useState<{ de: Snap; dir: 1 | -1 | 0 } | null>(null);
+  /** Fechando (a retrospectiva some suave antes de sair) e a folha descendo. */
+  const [fechando, setFechando] = useState(false);
+  const [folhaSaindo, setFolhaSaindo] = useState(false);
 
   const raiz = useRef<HTMLDivElement>(null);
   const sondaTopo = useRef<HTMLDivElement>(null);
@@ -153,6 +198,18 @@ export const RetroTelaCheia = ({ retro, onClose, onProximoPasso }: Props) => {
   const vistos = useRef(new Set<number>());
   const comoChegou = useRef<Como>("inicio");
   const comoFechou = useRef<string | null>(null);
+  const snapRef = useRef<Snap | null>(null);
+  const timerTroca = useRef(0);
+  const timerFecha = useRef(0);
+  const timerFolha = useRef(0);
+  useEffect(() => () => { window.clearTimeout(timerTroca.current); window.clearTimeout(timerFecha.current); window.clearTimeout(timerFolha.current); }, []);
+  /** Começa a troca: a tela de agora vira a "de antes" (fica embaixo) até a nova terminar de entrar. */
+  const comecarTroca = useCallback((dir: 1 | -1 | 0) => {
+    const de = snapRef.current;
+    if (de) setTroca({ de, dir });
+    window.clearTimeout(timerTroca.current);
+    timerTroca.current = window.setTimeout(() => setTroca(null), TROCA.limpa);
+  }, []);
 
   const atual = telas[Math.min(i, total - 1)];
   const card = atual.tipo === "card" ? atual.card : null;
@@ -207,7 +264,15 @@ export const RetroTelaCheia = ({ retro, onClose, onProximoPasso }: Props) => {
     trackEventBeacon("wrapped_fechou", { mes: MES, month: capitalizar(MES), vistos: vistos.current.size, total, chegou_ao_fim: vistos.current.has(total - 1), versao: VERSAO, como: comoFechou.current ?? "saiu" });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fechar = useCallback((como: string) => { comoFechou.current = como; onClose(); }, [onClose]);
+  /** (03/11) Fechar: a tela some suave (~0,26 s) e só então sai. */
+  const fecharDepois = useCallback((como: string, depois: () => void) => {
+    if (fechando) return;
+    comoFechou.current = como;
+    setFechando(true);
+    window.clearTimeout(timerFecha.current);
+    timerFecha.current = window.setTimeout(depois, reduzir ? TROCA.reduzido : FECHA_MS);
+  }, [fechando, reduzir]);
+  const fechar = useCallback((como: string) => fecharDepois(como, onClose), [fecharDepois, onClose]);
 
   const revelar = useCallback((escolha: number | null, como: "escolheu" | "sozinho" | "pulou") => {
     if (atual.tipo !== "adivinha") return;
@@ -219,15 +284,17 @@ export const RetroTelaCheia = ({ retro, onClose, onProximoPasso }: Props) => {
   }, [atual]);
 
   const ir = useCallback((passo: number, como: Como) => {
-    if (passo < 0 && i === 0) { setRodada((r) => r + 1); setRevisita(true); return; }
+    if (fechando) return;
+    if (passo < 0 && i === 0) { comecarTroca(0); setRodada((r) => r + 1); setRevisita(true); return; }
     const alvo = Math.max(0, Math.min(total - 1, i + passo));
     if (alvo === i) return;
+    comecarTroca(passo > 0 ? 1 : -1);
     // saiu do adivinha sem responder: conta como "pulou" (a resposta é o card de agora)
     if (atual.tipo === "adivinha" && !palpite.revelado && passo > 0) revelar(null, "pulou");
     comoChegou.current = passo < 0 ? "voltou" : como;
     setRevisita(vistos.current.has(alvo));
     setI(alvo);
-  }, [i, total, atual, palpite.revelado, revelar]);
+  }, [i, total, atual, palpite.revelado, revelar, fechando, comecarTroca]);
 
   // aba/app em segundo plano: pausa
   useEffect(() => {
@@ -238,14 +305,15 @@ export const RetroTelaCheia = ({ retro, onClose, onProximoPasso }: Props) => {
 
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { if (folha) setFolha(null); else fechar("esc"); }
-      else if (folha) return;
+      const aberta = !!folha && !folhaSaindo;
+      if (e.key === "Escape") { if (aberta) fecharFolha(); else if (!folha) fechar("esc"); }
+      else if (aberta) return;
       else if (e.key === "ArrowRight") ir(1, "tecla");
       else if (e.key === "ArrowLeft") ir(-1, "tecla");
     };
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
-  }, [ir, fechar, folha]);
+  }, [ir, fechar, folha, folhaSaindo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // o tamanho da tela e as áreas seguras (notch/ilha em cima, barra embaixo)
   useLayoutEffect(() => {
@@ -273,7 +341,7 @@ export const RetroTelaCheia = ({ retro, onClose, onProximoPasso }: Props) => {
   // (relogio.origem "espera": a animação não veio a tempo — o card fica parado, sem pular pro começo dela depois)
   const animarEste = !!card && animado && !revisita && !(relogio?.chave === chaveDoCard && relogio.origem === "espera");
 
-  const encDe = useCallback((k: number) => {
+  const encDe = useCallback((k: number): EncTela => {
     const e = encaixeDoCard({ largura: tela.w, altura: tela.h, topoSeguro: seguro.topo, baseSeguro: seguro.base, reserva: reservaDe(k) });
     const w = Math.round(e.w);
     const escala = w / FORMATOS.stories.w;
@@ -333,12 +401,13 @@ export const RetroTelaCheia = ({ retro, onClose, onProximoPasso }: Props) => {
     if (!animado || !relogio || !proximo || proximo.tipo !== "card") return;
     const prox = proximo.card.id === "leitura" && capas ? capas : proximo.card.dados;
     const t = window.setTimeout(() => {
-      import("./video-card").then((m) => m.prepararRoteiroDoCard(comEscolhas(prox, { valores, textosDasMetas }), "stories", undefined, undefined, { extra: extraProx, suspense: SUSPENSE })).catch(() => { /* prepara na hora */ });
-    }, 300);
+      import("./video-card").then((m) => m.prepararRoteiroDoCard(comEscolhas(prox, { valores, textosDasMetas }), "stories", undefined, undefined, { extra: extraProx, suspense: SUSPENSE, calmo: true })).catch(() => { /* prepara na hora */ });
+    }, 700); // (03/11) depois da troca: fotografar o próximo no meio dela engasgava o deslize
     return () => window.clearTimeout(t);
   }, [animado, relogio, proximo, capas, valores, textosDasMetas, extraProx]);
 
-  const pausado = segurando || !!folha || oculto || !!enviando || arrasto > 0;
+  const folhaAberta = !!folha && !folhaSaindo;
+  const pausado = segurando || folhaAberta || oculto || !!enviando || arrasto > 0 || fechando;
   const andando = !reduzir && !!relogio && relogio.chave === chaveDoCard && !pausado;
 
   const barraTerminou = () => {
@@ -401,10 +470,20 @@ export const RetroTelaCheia = ({ retro, onClose, onProximoPasso }: Props) => {
   };
 
   const abrirFolha = (origem: "icone" | "pilula" | "final") => {
-    if (!card) return;
+    if (!card || fechando) return;
+    window.clearTimeout(timerFolha.current);
+    setFolhaSaindo(false);
     setFormato("stories");
     setFolha(origem);
     trackEvent("wrapped_compartilhar_aberto", { mes: MES, card: atual.id, i, origem, versao: VERSAO });
+  };
+
+  /** A folha desce suave (~0,23 s) e só então sai; a retrospectiva volta a andar na hora. */
+  const fecharFolha = () => {
+    if (!folha || enviando) return;
+    setFolhaSaindo(true);
+    window.clearTimeout(timerFolha.current);
+    timerFolha.current = window.setTimeout(() => { setFolha(null); setFolhaSaindo(false); }, reduzir ? TROCA.reduzido : FOLHA_SAI_MS);
   };
 
   const compartilhar = async (acao: "postar" | "salvar") => {
@@ -424,10 +503,9 @@ export const RetroTelaCheia = ({ retro, onClose, onProximoPasso }: Props) => {
 
   const destino = useMemo(() => destinoDoProximoPasso(retro.cards), [retro.cards]);
   const proximoPasso = () => {
+    if (fechando) return;
     trackEvent("wrapped_proximo_passo", { mes: MES, destino, card: atual.id, versao: VERSAO });
-    comoFechou.current = "proximo";
-    if (onProximoPasso) onProximoPasso(destino);
-    else onClose();
+    fecharDepois("proximo", () => { if (onProximoPasso) onProximoPasso(destino); else onClose(); });
   };
 
   const tinta = claro ? "#1f1f24" : "#ffffff";
@@ -442,6 +520,128 @@ export const RetroTelaCheia = ({ retro, onClose, onProximoPasso }: Props) => {
   // a pílula fica no PÉ do card: no azul o pé é a água (azul escuro), mesmo com o topo creme
   const claroNoPe = claro && !(dados && temAguaNoPe(dados));
 
+  // (03/11) a tela de agora, do jeito que ela está (é ela que fica congelada embaixo quando a próxima entra)
+  const snap: Snap = { chave: chaveDoCard, tela: atual, dados, enc, fundo, animar: animarEste, soFundo, suspense, palpite, pilula, ultimo, claro, claroNoPe };
+  useLayoutEffect(() => { snapRef.current = snap; });
+  const dir = troca?.dir ?? 1;
+  const entraTela = reduzir
+    ? `retroTcEntra ${TROCA.reduzido}ms ease-out both`
+    : `${dir < 0 ? "retroTcEntraEsq" : dir > 0 ? "retroTcEntraDir" : "retroTcEntra"} ${TROCA.entra}ms ${CURVA} both`;
+  const saiConteudo = reduzir ? undefined : `${dir < 0 ? "retroTcSaiDir" : "retroTcSaiEsq"} ${TROCA.sai}ms ${CURVA_SAI} both`;
+  const saiFrente = `retroTcSome ${reduzir ? 120 : TROCA.frenteSai}ms ease-out both`;
+  const entraFinal = (atraso: number): CSSProperties => (reduzir ? {} : { animation: `retroTcSobe .5s ${CURVA} ${atraso}s backwards` });
+
+  /** O fundo + o card (embaixo do dedo). `saindo`: a tela de antes, parada, com o conteúdo sumindo. */
+  const camadaDeTras = (t: Snap, saindo: boolean) => {
+    const vivo = !saindo;
+    return (
+      <div
+        key={t.chave}
+        aria-hidden={saindo || undefined}
+        data-camada={saindo ? "saindo" : "atual"}
+        className="absolute inset-0 overflow-hidden pointer-events-none"
+        style={{ background: t.fundo?.css ?? FUNDO_ESCURO, animation: vivo && troca ? entraTela : undefined, willChange: troca ? "opacity, transform" : undefined }}
+      >
+        {t.fundo?.textura && <div aria-hidden className="absolute inset-0" style={t.fundo.textura} />}
+        {t.dados && temAguaNoPe(t.dados) && <div aria-hidden className="absolute left-0 right-0 bottom-0" style={{ top: t.enc.y + t.enc.h - 1, background: CORES_AGUA.azul[1] }} />}
+        <div className="absolute inset-0" style={{ animation: saindo ? saiConteudo : undefined }}>
+          {t.tela.tipo === "card" && t.dados && (
+            <div
+              ref={vivo ? cardRef : undefined}
+              data-testid={vivo ? "retro-palco" : undefined}
+              data-extra={t.enc.extra}
+              className="absolute"
+              style={{ left: t.enc.x, top: t.enc.y, width: t.enc.w, height: t.enc.h }}
+            >
+              <AlturaExtraCtx.Provider value={t.enc.extra}>
+                {/* o card cheio aparece com fade (ex.: a animação não veio a tempo e o card entra parado) */}
+                <div key={t.soFundo ? "fundo" : "tudo"} style={{ animation: !t.soFundo && !reduzir ? "retroTcEntra .3s ease-out both" : undefined }}>
+                  <CardEscalado elemento={<CardDeCompartilhar dados={t.dados} formato="stories" camada={t.soFundo ? "fundo" : "tudo"} />} largura={t.enc.w} w={FORMATOS.stories.w} h={FORMATOS.stories.h + t.enc.extra} />
+                </div>
+              </AlturaExtraCtx.Provider>
+              {t.animar && (
+                <div className="absolute inset-0" data-testid={vivo ? "retro-ao-vivo" : undefined}>
+                  <Suspense fallback={null}>
+                    <AnimacaoDoCard dados={t.dados} formato="stories" largura={t.enc.w} laco={false} pausado={saindo || pausado} onPronto={vivo ? animacaoPronta : undefined} alturaExtra={t.enc.extra} suspense={t.suspense} calmo />
+                  </Suspense>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  /** O que fica por cima do dedo: o adivinha, a pílula e os botões do último card. */
+  const camadaDaFrente = (t: Snap, saindo: boolean) => {
+    const vivo = !saindo;
+    const cardDaTela = t.tela.tipo === "card" ? t.tela.card : null;
+    return (
+      <div
+        key={t.chave}
+        aria-hidden={saindo || undefined}
+        className="absolute inset-0 pointer-events-none"
+        style={{ animation: saindo ? saiFrente : troca ? entraTela : undefined }}
+      >
+        {t.tela.tipo === "adivinha" && (
+          <TelaDoAdivinha
+            a={t.tela.a}
+            palpite={t.palpite}
+            onEscolher={(v) => revelar(v, "escolheu")}
+            topo={seguro.topo + 64 + 6}
+            base={seguro.base}
+            reduzir={reduzir}
+            escondido={escondeControles}
+            fantasma={saindo}
+          />
+        )}
+
+        {t.pilula && (
+          <div className="absolute left-0 right-0 flex justify-center transition-opacity duration-200" style={{ bottom: seguro.base + 14, opacity: escondeControles ? 0 : 1 }}>
+            <button
+              type="button"
+              tabIndex={vivo ? undefined : -1}
+              onClick={vivo ? () => abrirFolha("pilula") : undefined}
+              className={`h-11 px-5 rounded-full font-extrabold text-[14.5px] inline-flex items-center gap-2 active:scale-[.97] transition-transform ${vivo ? "pointer-events-auto" : ""}`}
+              style={t.claroNoPe ? { background: "rgba(31,31,36,.09)", color: "#1f1f24" } : { background: "rgba(255,255,255,.2)", color: "#ffffff", boxShadow: "inset 0 0 0 1px rgba(255,255,255,.28)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
+              data-testid={vivo ? "retro-compartilhar-pilula" : undefined}
+            >
+              <Share className="w-[16px] h-[16px]" strokeWidth={2.6} aria-hidden /> Compartilhar
+            </button>
+          </div>
+        )}
+
+        {t.ultimo && cardDaTela && (
+          <div className="absolute left-0 right-0 px-5 transition-opacity duration-200" style={{ bottom: seguro.base + 10, opacity: escondeControles ? 0 : 1 }}>
+            <button
+              type="button"
+              tabIndex={vivo ? undefined : -1}
+              onClick={vivo ? () => abrirFolha("final") : undefined}
+              className={`w-full h-[52px] rounded-2xl font-extrabold text-[15.5px] inline-flex items-center justify-center gap-2 active:scale-[.98] transition-transform ${vivo ? "pointer-events-auto" : ""}`}
+              style={{ ...(t.claro ? { background: "#25242a", color: "#fffdf8" } : { background: "#ffffff", color: "#111114", boxShadow: "0 10px 30px -10px rgba(0,0,0,.5)" }), ...entraFinal(0.35) }}
+              data-testid={vivo ? "retro-compartilhar-final" : undefined}
+            >
+              <Share className="w-[18px] h-[18px]" strokeWidth={2.5} aria-hidden /> Compartilhar meu {nomeDoMes(retro.mesIdx)}
+            </button>
+            <button
+              type="button"
+              tabIndex={vivo ? undefined : -1}
+              onClick={vivo ? proximoPasso : undefined}
+              className={`w-full h-11 mt-1.5 rounded-xl text-[14px] font-bold inline-flex items-center justify-center gap-1.5 active:opacity-70 ${vivo ? "pointer-events-auto" : ""}`}
+              style={{ color: t.claro ? "#25242a" : "rgba(255,255,255,.92)", ...entraFinal(0.45) }}
+              data-testid={vivo ? "retro-proximo-passo" : undefined}
+            >
+              {capitalizar(nomeDoMes((retro.mesIdx + 1) % 12))} começa agora <ArrowRight className="w-4 h-4" strokeWidth={2.6} aria-hidden /> registrar algo hoje
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const corTransicao = "color .35s ease-out, background-color .35s ease-out";
+
   return (
     <div
       ref={raiz}
@@ -453,8 +653,18 @@ export const RetroTelaCheia = ({ retro, onClose, onProximoPasso }: Props) => {
       data-card-atual={atual.id}
       data-pausado={pausado ? "sim" : "nao"}
       data-relogio={andando ? "andando" : "parado"}
+      data-fechando={fechando ? "sim" : undefined}
       className="fixed inset-0 z-[400] overflow-hidden select-none"
-      style={{ background: coluna ? FUNDO_ESCURO : fundo?.css ?? FUNDO_ESCURO, WebkitTouchCallout: "none" } as CSSProperties}
+      style={{
+        background: coluna ? FUNDO_ESCURO : fundo?.css ?? FUNDO_ESCURO,
+        WebkitTouchCallout: "none",
+        // abrir: fade + 0,985→1; fechar: some suave (sem corte)
+        // ("backwards": depois de aberta a animação solta a opacidade, e o fechar consegue levar pra 0)
+        animation: reduzir ? `retroTcEntra ${TROCA.reduzido}ms ease-out backwards` : `retroTcAbre .42s ${CURVA} backwards`,
+        opacity: fechando ? 0 : undefined,
+        transition: fechando ? `opacity ${reduzir ? TROCA.reduzido : FECHA_MS}ms ease-out` : undefined,
+        pointerEvents: fechando ? "none" : undefined,
+      } as CSSProperties}
     >
       <style>{ESTILOS}</style>
       <div ref={sondaTopo} aria-hidden style={{ position: "absolute", top: 0, left: 0, width: 1, height: "var(--app-safe-top)", visibility: "hidden", pointerEvents: "none" }} />
@@ -468,35 +678,16 @@ export const RetroTelaCheia = ({ retro, onClose, onProximoPasso }: Props) => {
           left: Math.round((tela.w - enc.coluna) / 2),
           width: enc.coluna,
           background: fundo?.css ?? FUNDO_ESCURO,
-          transform: arrasto ? `translateY(${arrasto}px) scale(${Math.max(0.86, 1 - arrasto / 1600)})` : undefined,
-          transition: arrasto ? "none" : "transform .2s ease-out",
-          borderRadius: arrasto ? 22 : 0,
+          transform: fechando && !reduzir ? `translate3d(0,${arrasto + 36}px,0) scale(${Math.max(0.86, 1 - arrasto / 1600) - 0.02})` : arrasto ? `translateY(${arrasto}px) scale(${Math.max(0.86, 1 - arrasto / 1600)})` : undefined,
+          transition: arrasto && !fechando ? "none" : `transform ${fechando ? FECHA_MS : 200}ms ${fechando ? CURVA : "ease-out"}, border-radius .2s ease-out`,
+          borderRadius: arrasto || (fechando && !reduzir) ? 22 : 0,
         }}
       >
-        {fundo?.textura && <div aria-hidden className="absolute inset-0 pointer-events-none" style={fundo.textura} />}
-        {dados && temAguaNoPe(dados) && <div aria-hidden className="absolute left-0 right-0 bottom-0 pointer-events-none" style={{ top: enc.y + enc.h - 1, background: CORES_AGUA.azul[1] }} />}
-
-        {card && dados && (
-          <div
-            key={chaveDoCard}
-            ref={cardRef}
-            data-testid="retro-palco"
-            data-extra={enc.extra}
-            className="absolute"
-            style={{ left: enc.x, top: enc.y, width: enc.w, height: enc.h, animation: reduzir ? undefined : "retroTcEntra .22s ease-out" }}
-          >
-            <AlturaExtraCtx.Provider value={enc.extra}>
-              <CardEscalado elemento={<CardDeCompartilhar dados={dados} formato="stories" camada={soFundo ? "fundo" : "tudo"} />} largura={enc.w} w={FORMATOS.stories.w} h={FORMATOS.stories.h + enc.extra} />
-            </AlturaExtraCtx.Provider>
-            {animarEste && (
-              <div className="absolute inset-0" data-testid="retro-ao-vivo">
-                <Suspense fallback={null}>
-                  <AnimacaoDoCard dados={dados} formato="stories" largura={enc.w} laco={false} pausado={pausado} onPronto={animacaoPronta} alturaExtra={enc.extra} suspense={suspense} />
-                </Suspense>
-              </div>
-            )}
-          </div>
-        )}
+        {/* as telas: a de antes (parada, embaixo) e a de agora entrando por cima */}
+        <div className="absolute inset-0" data-testid="retro-telas">
+          {troca && troca.de.chave !== chaveDoCard && camadaDeTras(troca.de, true)}
+          {camadaDeTras(snap, false)}
+        </div>
 
         {/* o dedo: a tela inteira (os botões de cima, as opções do adivinha e os de baixo ficam por cima desta camada) */}
         <div
@@ -512,34 +703,26 @@ export const RetroTelaCheia = ({ retro, onClose, onProximoPasso }: Props) => {
           <button type="button" aria-label="Próximo card" onClick={() => tocou(1)} className="absolute inset-y-0 right-0 w-[70%] cursor-default outline-none" data-testid="retro-proximo" />
         </div>
 
-        {atual.tipo === "adivinha" && (
-          <TelaDoAdivinha
-            key={chaveDoCard}
-            a={atual.a}
-            palpite={palpite}
-            onEscolher={(v) => revelar(v, "escolheu")}
-            topo={seguro.topo + 64 + 6}
-            base={seguro.base}
-            reduzir={reduzir}
-            escondido={escondeControles}
-          />
-        )}
+        <div className="absolute inset-0 pointer-events-none">
+          {troca && troca.de.chave !== chaveDoCard && camadaDaFrente(troca.de, true)}
+          {camadaDaFrente(snap, false)}
+        </div>
 
         <header
-          className="absolute left-0 right-0 top-0 px-3 transition-opacity duration-200"
-          style={{ paddingTop: seguro.topo + 8, opacity: escondeControles ? 0 : 1, color: tinta }}
+          className="absolute left-0 right-0 top-0 px-3"
+          style={{ paddingTop: seguro.topo + 8, opacity: escondeControles ? 0 : 1, color: tinta, transition: `opacity .2s ease-out, ${corTransicao}` }}
         >
           <div className="flex gap-1" aria-hidden data-testid="retro-barras">
             {telas.map((t, k) => (
-              <div key={`${t.id}-${k}`} className="h-[3px] flex-1 rounded-full overflow-hidden" style={{ background: trilho }}>
-                {k < i && <div className="h-full w-full" style={{ background: tinta }} />}
+              <div key={`${t.id}-${k}`} className="h-[3px] flex-1 rounded-full overflow-hidden" style={{ background: trilho, transition: corTransicao }}>
+                {k < i && <div className="h-full w-full" style={{ background: tinta, transition: corTransicao }} />}
                 {k === i && (
                   <div
                     key={chaveDoCard}
                     className="h-full w-full origin-left"
                     data-testid="retro-barra-atual"
                     onAnimationEnd={barraTerminou}
-                    style={reduzir ? { background: tinta } : { background: tinta, transform: "scaleX(0)", animationName: "retroTcBarra", animationDuration: `${ms}ms`, animationTimingFunction: "linear", animationFillMode: "forwards", animationPlayState: andando ? "running" : "paused" }}
+                    style={reduzir ? { background: tinta } : { background: tinta, transition: corTransicao, transform: "scaleX(0)", animationName: "retroTcBarra", animationDuration: `${ms}ms`, animationTimingFunction: "linear", animationFillMode: "forwards", animationPlayState: andando ? "running" : "paused", willChange: "transform" }}
                   />
                 )}
               </div>
@@ -548,52 +731,15 @@ export const RetroTelaCheia = ({ retro, onClose, onProximoPasso }: Props) => {
           <div className="h-[48px] flex items-center justify-end gap-1">
             <span className="sr-only" aria-live="polite" data-testid="retro-rotulo">{ROTULOS[atual.id]} · {i + 1} de {total}</span>
             {card && (
-              <button type="button" onClick={() => abrirFolha("icone")} aria-label="Compartilhar este card" className="w-11 h-11 grid place-items-center rounded-full active:scale-95 transition-transform" style={{ background: claro ? "rgba(31,31,36,.06)" : "rgba(0,0,0,.14)" }} data-testid="retro-compartilhar">
+              <button type="button" onClick={() => abrirFolha("icone")} aria-label="Compartilhar este card" className="w-11 h-11 grid place-items-center rounded-full active:scale-95" style={{ background: claro ? "rgba(31,31,36,.06)" : "rgba(0,0,0,.14)", transition: `transform .15s ease-out, ${corTransicao}`, animation: reduzir ? undefined : "retroTcEntra .25s ease-out backwards" }} data-testid="retro-compartilhar">
                 <Share className="w-[19px] h-[19px]" strokeWidth={2.4} />
               </button>
             )}
-            <button type="button" onClick={() => fechar("x")} aria-label="Fechar" className="w-11 h-11 grid place-items-center rounded-full active:scale-95 transition-transform" style={{ background: claro ? "rgba(31,31,36,.06)" : "rgba(0,0,0,.14)" }} data-testid="retro-fechar">
+            <button type="button" onClick={() => fechar("x")} aria-label="Fechar" className="w-11 h-11 grid place-items-center rounded-full active:scale-95" style={{ background: claro ? "rgba(31,31,36,.06)" : "rgba(0,0,0,.14)", transition: `transform .15s ease-out, ${corTransicao}` }} data-testid="retro-fechar">
               <X className="w-[21px] h-[21px]" strokeWidth={2.4} />
             </button>
           </div>
         </header>
-
-        {pilula && (
-          <div className="absolute left-0 right-0 flex justify-center transition-opacity duration-200" style={{ bottom: seguro.base + 14, opacity: escondeControles ? 0 : 1 }}>
-            <button
-              type="button"
-              onClick={() => abrirFolha("pilula")}
-              className="h-11 px-5 rounded-full font-extrabold text-[14.5px] inline-flex items-center gap-2 active:scale-[.97] transition-transform"
-              style={claroNoPe ? { background: "rgba(31,31,36,.09)", color: "#1f1f24" } : { background: "rgba(255,255,255,.2)", color: "#ffffff", boxShadow: "inset 0 0 0 1px rgba(255,255,255,.28)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
-              data-testid="retro-compartilhar-pilula"
-            >
-              <Share className="w-[16px] h-[16px]" strokeWidth={2.6} aria-hidden /> Compartilhar
-            </button>
-          </div>
-        )}
-
-        {ultimo && card && (
-          <div className="absolute left-0 right-0 px-5 transition-opacity duration-200" style={{ bottom: seguro.base + 10, opacity: escondeControles ? 0 : 1 }}>
-            <button
-              type="button"
-              onClick={() => abrirFolha("final")}
-              className="w-full h-[52px] rounded-2xl font-extrabold text-[15.5px] inline-flex items-center justify-center gap-2 active:scale-[.98] transition-transform"
-              style={claro ? { background: "#25242a", color: "#fffdf8" } : { background: "#ffffff", color: "#111114", boxShadow: "0 10px 30px -10px rgba(0,0,0,.5)" }}
-              data-testid="retro-compartilhar-final"
-            >
-              <Share className="w-[18px] h-[18px]" strokeWidth={2.5} aria-hidden /> Compartilhar meu {nomeDoMes(retro.mesIdx)}
-            </button>
-            <button
-              type="button"
-              onClick={proximoPasso}
-              className="w-full h-11 mt-1.5 rounded-xl text-[14px] font-bold inline-flex items-center justify-center gap-1.5 active:opacity-70"
-              style={{ color: claro ? "#25242a" : "rgba(255,255,255,.92)" }}
-              data-testid="retro-proximo-passo"
-            >
-              {capitalizar(nomeDoMes((retro.mesIdx + 1) % 12))} começa agora <ArrowRight className="w-4 h-4" strokeWidth={2.6} aria-hidden /> registrar algo hoje
-            </button>
-          </div>
-        )}
       </div>
 
       {folha && card && base && dados && (
@@ -612,7 +758,8 @@ export const RetroTelaCheia = ({ retro, onClose, onProximoPasso }: Props) => {
           progresso={progresso}
           onPostar={() => compartilhar("postar")}
           onSalvar={() => compartilhar("salvar")}
-          onFechar={() => { if (!enviando) setFolha(null); }}
+          onFechar={fecharFolha}
+          saindo={folhaSaindo}
           reduzir={reduzir}
           alturaTela={tela.h}
           largura={Math.min(enc.coluna, 520)}
@@ -627,16 +774,18 @@ export const RetroTelaCheia = ({ retro, onClose, onProximoPasso }: Props) => {
  * O adivinha (02/11): a pergunta, 3 opções, a revelação
  * ------------------------------------------------------------------------- */
 
-const TelaDoAdivinha = ({ a, palpite, onEscolher, topo, base, reduzir, escondido }: { a: Adivinha; palpite: { escolha: number | null; revelado: boolean }; onEscolher: (v: number) => void; topo: number; base: number; reduzir: boolean; escondido: boolean }) => {
+const TelaDoAdivinha = ({ a, palpite, onEscolher, topo, base, reduzir, escondido, fantasma = false }: { a: Adivinha; palpite: Palpite; onEscolher: (v: number) => void; topo: number; base: number; reduzir: boolean; escondido: boolean; /** (03/11) a cópia que está saindo na troca: sem toque e sem os ids de teste */ fantasma?: boolean }) => {
   const cor = TEMA_DO_MODULO[a.modulo].destaque;
   const acertou = palpite.revelado && palpite.escolha === a.certo;
-  const entra = (atraso: number): CSSProperties => (reduzir ? {} : { animation: `retroTcSobe .45s cubic-bezier(.2,.8,.2,1) ${atraso}s both` });
+  // (03/11) entradas suaves: fade + 12 px + 0,98→1, em cascata curta ("backwards": depois o botão fica livre pro :active)
+  const entra = (atraso: number): CSSProperties => (reduzir ? {} : { animation: `retroTcSobe .45s ${CURVA} ${atraso}s backwards` });
+  const id = (nome: string) => (fantasma ? undefined : nome);
   return (
-    <div className="absolute left-0 right-0 px-6 pointer-events-none transition-opacity duration-200" style={{ top: topo + 10, bottom: base + 20, opacity: escondido ? 0 : 1, color: "#ffffff" }} data-testid="retro-adivinha" data-revelado={palpite.revelado ? "sim" : "nao"}>
+    <div className="absolute left-0 right-0 px-6 pointer-events-none transition-opacity duration-200" style={{ top: topo + 10, bottom: base + 20, opacity: escondido ? 0 : 1, color: "#ffffff" }} data-testid={id("retro-adivinha")} data-revelado={palpite.revelado ? "sim" : "nao"}>
       <div className="h-full flex flex-col justify-center pb-[14%]">
         <span className="self-start h-8 px-3.5 rounded-full text-[12px] font-extrabold tracking-[.14em] inline-flex items-center" style={{ background: "rgba(255,255,255,.16)", ...entra(0) }}>ADIVINHA</span>
-        <p className="mt-5 text-[30px] leading-[1.12] font-black tracking-[-0.03em]" style={entra(0.08)} data-testid="retro-adivinha-pergunta">{a.pergunta}</p>
-        <div className="mt-7 flex flex-col gap-3 pointer-events-auto" role="group" aria-label="Opções">
+        <p className="mt-5 text-[30px] leading-[1.12] font-black tracking-[-0.03em]" style={entra(0.07)} data-testid={id("retro-adivinha-pergunta")}>{a.pergunta}</p>
+        <div className={`mt-7 flex flex-col gap-3 ${fantasma ? "" : "pointer-events-auto"}`} role="group" aria-label="Opções">
           {a.opcoes.map((v, k) => {
             const certa = v === a.certo;
             const escolhida = palpite.escolha === v;
@@ -646,33 +795,35 @@ const TelaDoAdivinha = ({ a, palpite, onEscolher, topo, base, reduzir, escondido
               <button
                 key={v}
                 type="button"
-                disabled={palpite.revelado}
+                disabled={palpite.revelado || fantasma}
+                tabIndex={fantasma ? -1 : undefined}
                 onClick={() => onEscolher(v)}
-                className="h-[64px] rounded-2xl px-5 flex items-center justify-between text-left transition-[background,opacity,transform] duration-300 active:scale-[.98]"
+                className="h-[64px] rounded-2xl px-5 flex items-center justify-between text-left active:scale-[.98]"
                 style={{
-                  ...entra(0.16 + k * 0.07),
+                  ...entra(0.14 + k * 0.07),
+                  transition: "background-color .35s ease-out, color .35s ease-out, box-shadow .35s ease-out, opacity .35s ease-out, transform .15s ease-out",
                   background: mostraCerta ? "#ffffff" : errada ? "rgba(0,0,0,.18)" : "rgba(255,255,255,.12)",
                   color: mostraCerta ? cor : "#ffffff",
                   boxShadow: mostraCerta ? "0 14px 30px -14px rgba(0,0,0,.5)" : "inset 0 0 0 2px rgba(255,255,255,.35)",
                   opacity: palpite.revelado && !certa && !escolhida ? 0.45 : 1,
                 }}
-                data-testid="retro-adivinha-opcao"
+                data-testid={id("retro-adivinha-opcao")}
                 data-valor={v}
               >
                 <span className="text-[30px] font-black tracking-[-0.04em] tabular-nums" style={errada ? { textDecoration: "line-through", textDecorationThickness: 3 } : undefined}>{v}</span>
-                {mostraCerta && <Check className="w-7 h-7" strokeWidth={3.2} aria-hidden />}
+                {mostraCerta && <Check className="w-7 h-7" strokeWidth={3.2} aria-hidden style={reduzir ? undefined : { animation: `retroTcSobe .35s ${CURVA} .05s backwards` }} />}
               </button>
             );
           })}
         </div>
-        <div className="mt-7 min-h-[96px]" aria-live="polite">
-          {palpite.revelado ? (
-            <div style={entra(0)} data-testid="retro-adivinha-resposta">
+        {/* o "Toque no seu palpite" some com fade enquanto a resposta entra no mesmo lugar (sem troca seca) */}
+        <div className="mt-7 min-h-[96px] relative" aria-live="polite">
+          <p className="absolute left-0 top-0 text-[14px] font-semibold" style={{ color: "rgba(255,255,255,.75)", opacity: palpite.revelado ? 0 : 1, transition: "opacity .2s ease-out", ...(palpite.revelado ? {} : entra(0.4)) }} aria-hidden={palpite.revelado || undefined}>Toque no seu palpite.</p>
+          {palpite.revelado && (
+            <div style={entra(0.08)} data-testid={id("retro-adivinha-resposta")}>
               <p className="text-[36px] font-black tracking-[-0.035em] leading-none">{acertou ? "Acertou!" : `Foram ${a.certo}!`}</p>
               <p className="mt-2 text-[16px] font-bold" style={{ color: "rgba(255,255,255,.86)" }}>{acertou ? `${a.certo} ${a.unidade}. Você conhece o seu mês.` : `${a.certo} ${a.unidade}.`}</p>
             </div>
-          ) : (
-            <p className="text-[14px] font-semibold" style={{ color: "rgba(255,255,255,.75)", ...entra(0.4) }}>Toque no seu palpite.</p>
           )}
         </div>
       </div>
@@ -700,22 +851,26 @@ interface PropsFolha {
   onPostar: () => void;
   onSalvar: () => void;
   onFechar: () => void;
+  /** (03/11) Descendo (some suave antes de sair): sem toque. */
+  saindo?: boolean;
   reduzir: boolean;
   alturaTela: number;
   largura: number;
   baseSegura: number;
 }
 
-const FolhaDeCompartilhar = ({ titulo, base, dados, formato, setFormato, valores, setValores, textos, setTextos, enviando, progresso, onPostar, onSalvar, onFechar, reduzir, alturaTela, largura, baseSegura }: PropsFolha) => {
+const FolhaDeCompartilhar = ({ titulo, base, dados, formato, setFormato, valores, setValores, textos, setTextos, enviando, progresso, onPostar, onSalvar, onFechar, saindo = false, reduzir, alturaTela, largura, baseSegura }: PropsFolha) => {
   const painel = useRef<HTMLDivElement>(null);
-  useEffect(() => { painel.current?.focus(); }, []);
+  // (03/11) preventScroll: focar a folha enquanto ela ainda está abaixo da tela (subindo) fazia o navegador ROLAR a
+  // retrospectiva pra cima — o card dava um pulo no meio da animação
+  useEffect(() => { painel.current?.focus({ preventScroll: true }); }, []);
   const { w: W, h: H } = FORMATOS[formato];
   // a prévia encolhe em tela baixa (iPhone SE) pra folha nunca passar da tela
   const alturaPrevia = Math.round(Math.max(110, Math.min(200, alturaTela * 0.24 - (temReais(base) || temTextos(base) ? 24 : 0))));
   const larguraPrevia = Math.round((alturaPrevia * W) / H);
   return (
-    <div className="absolute inset-0 z-10" data-testid="retro-folha">
-      <button type="button" aria-label="Fechar o compartilhar" onClick={onFechar} className="absolute inset-0 w-full h-full cursor-default" style={{ background: "rgba(0,0,0,.55)", animation: reduzir ? undefined : "retroTcEntra .2s ease-out" }} data-testid="retro-folha-fundo" />
+    <div className="absolute inset-0 z-10" data-testid={saindo ? "retro-folha-saindo" : "retro-folha"} style={{ pointerEvents: saindo ? "none" : undefined }}>
+      <button type="button" aria-label="Fechar o compartilhar" onClick={onFechar} className="absolute inset-0 w-full h-full cursor-default" style={{ background: "rgba(0,0,0,.55)", animation: saindo ? `retroTcSome ${reduzir ? TROCA.reduzido : FOLHA_SAI_MS}ms ease-out both` : `retroTcEntra ${reduzir ? 150 : 240}ms ease-out both` }} data-testid="retro-folha-fundo" />
       <div
         ref={painel}
         tabIndex={-1}
@@ -723,7 +878,13 @@ const FolhaDeCompartilhar = ({ titulo, base, dados, formato, setFormato, valores
         aria-modal="true"
         aria-label={`Compartilhar · ${titulo}`}
         className="absolute bottom-0 left-0 right-0 mx-auto rounded-t-[22px] text-white outline-none"
-        style={{ width: largura, background: "#18181c", boxShadow: "0 -20px 50px -20px rgba(0,0,0,.6)", animation: reduzir ? undefined : "retroTcFolha .26s cubic-bezier(.2,.8,.2,1)" }}
+        style={{
+          width: largura, background: "#18181c", boxShadow: "0 -20px 50px -20px rgba(0,0,0,.6)",
+          // sobe com ease-out (~0,32 s) e desce mais rápido (~0,23 s); com "reduzir movimento", só fade
+          animation: reduzir
+            ? `${saindo ? "retroTcSome" : "retroTcEntra"} ${saindo ? TROCA.reduzido : 150}ms ease-out both`
+            : saindo ? `retroTcFolhaSai ${FOLHA_SAI_MS}ms cubic-bezier(.4,0,1,1) both` : `retroTcFolha .32s ${CURVA} both`,
+        }}
       >
         <div className="px-4 pt-2">
           <div className="mx-auto w-10 h-[5px] rounded-full" style={{ background: "rgba(255,255,255,.22)" }} aria-hidden />

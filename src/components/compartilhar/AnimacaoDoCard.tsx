@@ -23,9 +23,11 @@ interface Props {
   /** 02/11 (tela cheia): px a mais de altura do card e o suspense da frase antes do número (video-card › OpcoesDoRoteiro). */
   alturaExtra?: number;
   suspense?: number;
+  /** 03/11 (tela cheia): a coreografia calma (video-card › OpcoesDoRoteiro.calmo) — sem clarão nos blocos grandes. */
+  calmo?: boolean;
 }
 
-const AnimacaoDoCard = ({ dados, formato, largura, pausado, moeda, laco = true, onPronto, alturaExtra = 0, suspense = 0 }: Props) => {
+const AnimacaoDoCard = ({ dados, formato, largura, pausado, moeda, laco = true, onPronto, alturaExtra = 0, suspense = 0, calmo = false }: Props) => {
   const ref = useRef<HTMLCanvasElement>(null);
   const roteiro = useRef<Roteiro | null>(null);
   const t0 = useRef(0);
@@ -40,14 +42,14 @@ const AnimacaoDoCard = ({ dados, formato, largura, pausado, moeda, laco = true, 
   useEffect(() => {
     let vivo = true;
     setPronto(false);
-    prepararRoteiroDoCard(dados, formato, moeda, undefined, { extra: alturaExtra, suspense }).then((r) => {
+    prepararRoteiroDoCard(dados, formato, moeda, undefined, { extra: alturaExtra, suspense, calmo }).then((r) => {
       if (!vivo) return;
       roteiro.current = r;
       if (r) { t0.current = performance.now(); pausadoEm.current = null; setPronto(true); avisar.current?.(r.duracao); }
     }).catch(() => { /* fica o card parado */ });
     return () => { vivo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dados, formato, alturaExtra, suspense]);
+  }, [dados, formato, alturaExtra, suspense, calmo]);
 
   useEffect(() => {
     const canvas = ref.current;

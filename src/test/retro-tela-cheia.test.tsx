@@ -7,7 +7,7 @@
  * (os de antes + os novos, sem e-mail/uid) e a chave que volta pra tela clássica.
  */
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, cleanup, screen, fireEvent, act } from "@testing-library/react";
+import { render, cleanup, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import {
   ALTURA_CONTROLES, CHAVE_FORCA_TELA_CHEIA, CONTEUDO, FOLGA_TOPO, MARGEM_LADO, PROPORCAO_COLUNA, RESERVA_BASE, RETRO_TELA_CHEIA, TEMPOS,
   encaixeDoCard, fundoClaro, fundoEsticado, guardarForcaTelaCheia, lerFundoDoCard, telaCheiaLigada, tempoDoCard, texturaEsticada, type ReservaBase,
@@ -218,7 +218,9 @@ describe("5. a tela cheia", () => {
     dedo(area, "pointermove", 200, 360);
     dedo(area, "pointermove", 200, 460);
     dedo(area, "pointerup", 200, 460);
-    expect(onClose).toHaveBeenCalledTimes(1);
+    // (03/11) some suave antes de sair
+    expect(screen.getByTestId("retro-outubro").getAttribute("data-fechando")).toBe("sim");
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     unmount();
     expect(de("wrapped_fechou")[0].dados).toMatchObject({ mes: "outubro", como: "arrastou", versao: "tela-cheia", vistos: 1, total: 10, chegou_ao_fim: false });
   });
@@ -226,7 +228,9 @@ describe("5. a tela cheia", () => {
   it("o X fecha (wrapped_fechou como 'x')", async () => {
     const { onClose, unmount } = await abrir();
     fireEvent.click(screen.getByTestId("retro-fechar"));
-    expect(onClose).toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled(); // (03/11) primeiro some suave…
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1)); // …depois sai (uma vez só)
+    fireEvent.click(screen.getByTestId("retro-fechar"));
     unmount();
     expect(de("wrapped_fechou")[0].dados).toMatchObject({ como: "x" });
   });
@@ -310,6 +314,64 @@ describe("5. a tela cheia", () => {
       for (const k of Object.keys(e.dados)) expect(k, e.nome).not.toMatch(/mail|uid|user/i);
       expect(JSON.stringify(e.dados), e.nome).not.toMatch(/@/);
     }
+  });
+});
+
+describe("5b. transições (03/11: 'vê se aparece animações em todas transição')", () => {
+  const camadas = () => Array.from(screen.getByTestId("retro-telas").children) as HTMLElement[];
+
+  it("avançar: a tela de antes fica embaixo (o conteúdo sai pro lado) e a nova entra por cima com fade + deslize; depois só fica a nova", async () => {
+    await abrir();
+    expect(camadas()).toHaveLength(1);
+    fireEvent.click(screen.getByTestId("retro-proximo"));
+    const [antes, agora] = camadas();
+    expect(antes.getAttribute("data-camada")).toBe("saindo");
+    expect(agora.getAttribute("data-camada")).toBe("atual");
+    expect(agora.style.animation).toMatch(/retroTcEntraDir/);
+    expect((antes.lastElementChild as HTMLElement).style.animation).toMatch(/retroTcSaiEsq/);
+    expect(screen.getAllByTestId("retro-palco")).toHaveLength(1); // a de antes não tem os ids (os testes e o toque vão na de agora)
+    await waitFor(() => expect(camadas()).toHaveLength(1));
+    expect(camadas()[0].style.animation).toBe("");
+  });
+
+  it("voltar: entra do outro lado; voltar num card já visto também anima (o card pronto)", async () => {
+    await abrir();
+    fireEvent.click(screen.getByTestId("retro-proximo"));
+    await waitFor(() => expect(camadas()).toHaveLength(1));
+    fireEvent.click(screen.getByTestId("retro-anterior"));
+    expect(atual()).toBe("abertura");
+    expect(camadas()[1].style.animation).toMatch(/retroTcEntraEsq/);
+    expect((camadas()[0].lastElementChild as HTMLElement).style.animation).toMatch(/retroTcSaiDir/);
+  });
+
+  it("adivinha → card: a pergunta sai com fade por cima, sem duplicar os ids", async () => {
+    await abrir();
+    for (let k = 0; k < 2; k++) fireEvent.click(screen.getByTestId("retro-proximo"));
+    expect(atual()).toBe("adivinha");
+    fireEvent.click(screen.getByTestId("retro-proximo"));
+    expect(atual()).toBe("treino");
+    expect(screen.queryByTestId("retro-adivinha")).toBeNull();
+    expect(document.querySelectorAll('[data-revelado]').length).toBe(1); // a cópia que está sumindo
+  });
+
+  it("'reduzir movimento': só fade curto, sem deslize", async () => {
+    movimento.reduzir = true;
+    await abrir();
+    fireEvent.click(screen.getByTestId("retro-proximo"));
+    const [antes, agora] = camadas();
+    expect(agora.style.animation).toMatch(/retroTcEntra /);
+    expect(agora.style.animation).not.toMatch(/Dir|Esq/);
+    expect((antes.lastElementChild as HTMLElement).style.animation).toBe("");
+  });
+
+  it("a folha desce suave ao fechar (sem toque nela enquanto desce) e a retrospectiva volta a andar na hora", async () => {
+    const { tela } = await abrir();
+    fireEvent.click(screen.getByTestId("retro-compartilhar"));
+    fireEvent.click(screen.getByTestId("retro-folha-fechar"));
+    expect(screen.queryByTestId("retro-folha")).toBeNull();
+    expect(screen.getByTestId("retro-folha-saindo").style.pointerEvents).toBe("none");
+    expect(tela.getAttribute("data-pausado")).toBe("nao");
+    await waitFor(() => expect(screen.queryByTestId("retro-folha-saindo")).toBeNull());
   });
 });
 
@@ -403,7 +465,7 @@ describe("6. rodada 2 (02/11): pílula, adivinha, perfil, próximo passo", () =>
     const passo = screen.getByTestId("retro-proximo-passo");
     expect(passo.textContent).toMatch(/Novembro começa agora.*registrar algo hoje/);
     fireEvent.click(passo);
-    expect(ir).toHaveBeenCalledWith("/treino");
+    await waitFor(() => expect(ir).toHaveBeenCalledWith("/treino"));
     expect(de("wrapped_proximo_passo")[0].dados).toMatchObject({ mes: "outubro", destino: "/treino", card: "resumo", versao: "tela-cheia" });
     unmount();
     expect(de("wrapped_fechou")[0].dados).toMatchObject({ como: "proximo", chegou_ao_fim: true });

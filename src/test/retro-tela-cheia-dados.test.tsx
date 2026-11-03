@@ -8,7 +8,7 @@ import { render, cleanup } from "@testing-library/react";
 import { AlturaExtraCtx, CardDeCompartilhar } from "@/components/compartilhar/cards";
 import { montarRetroOutubro } from "@/components/compartilhar/retro-outubro-dados";
 import { adivinhaDaRetro, comExtrasDaTelaCheia, extrasDoPoucoUso, MAX_MEIO_POUCO, montarRetroTelaCheia, opcoesDoAdivinha, perfilDoOutubro } from "@/components/compartilhar/retro-tela-cheia-dados";
-import { comSuspense, temposDoCard } from "@/components/compartilhar/video-card";
+import { comSuspense, roteiroQueAcende, temposDoCard, type CamadasDoCard } from "@/components/compartilhar/video-card";
 import type { DadosRetroExtra, DadosRetroPerfil } from "@/components/compartilhar/tipos";
 import { AGORA_EXEMPLO, SEMENTE_COMPLETA, SEMENTE_POUCO_1, SEMENTE_POUCO_3, leitorDe } from "@/pages/dev/retro-outubro-exemplo";
 
@@ -118,6 +118,53 @@ describe("3. o adivinha", () => {
     const semTreino = montarRetroOutubro(leitorDe({ ...SEMENTE_COMPLETA, "saude-workout-log": [] }), { agora: NOV })!;
     expect(adivinhaDaRetro(semTreino.cards)).toMatchObject({ antesDe: "rotina", certo: 24, pergunta: "Em quantos dias de outubro você acha que fez “meditar”?" });
     expect(adivinhaDaRetro(montarRetroOutubro(leitorDe(SEMENTE_POUCO_1), { agora: NOV })!.cards)).toBeNull();
+  });
+});
+
+describe("3b. o final calmo (03/11, dono: 'na última parece um pancadão… uma pancada de luz')", () => {
+  /** Um contexto de canvas de mentira: conta os clarões (gradiente radial) e guarda o maior "pop" (escala > 1). */
+  const ctxFalso = () => {
+    const reg = { claroes: 0, maiorEscala: 1 };
+    const ctx = new Proxy({} as Record<string, unknown>, {
+      get: (_, k) => {
+        if (k === "createRadialGradient") return () => { reg.claroes++; return { addColorStop: () => {} }; };
+        if (k === "createLinearGradient") return () => ({ addColorStop: () => {} });
+        if (k === "scale") return (x: number) => { reg.maiorEscala = Math.max(reg.maiorEscala, x); };
+        if (k === "measureText") return () => ({ width: 10 });
+        return () => {};
+      },
+      set: () => true,
+    }) as unknown as CanvasRenderingContext2D;
+    return { ctx, reg };
+  };
+  const tela = { width: 1080, height: 1920 } as HTMLCanvasElement;
+  // o resumo: 6 blocos grandes (446×220), sem número
+  const resumo: CamadasDoCard = {
+    fundo: tela, apagado: tela, aceso: tela, textos: tela,
+    medidas: { largura: 1080, altura: 1920, numero: null, blocos: { titulo: { x: 84, y: 250, w: 912, h: 240 } },
+      celulas: Array.from({ length: 6 }, (_, i) => ({ x: 84 + (i % 2) * 466, y: 540 + Math.floor(i / 2) * 240, w: 446, h: 220, feito: true })) },
+  };
+  const rodar = (calmo: boolean) => {
+    const r = roteiroQueAcende(resumo, 1080, 1920, 0.7, calmo);
+    const { ctx, reg } = ctxFalso();
+    for (let t = 0; t <= r.duracao; t += 1 / 30) r.desenhar(ctx, t, 1);
+    return { r, reg };
+  };
+
+  it("na tela cheia (calmo): os blocos grandes entram SEM clarão e sem passar do tamanho; postar (sem calmo) continua igual", () => {
+    const calmo = rodar(true);
+    expect(calmo.reg.claroes).toBe(0);
+    expect(calmo.reg.maiorEscala).toBeLessThanOrEqual(1);
+    const antes = rodar(false);
+    expect(antes.reg.claroes).toBeGreaterThan(0);
+    expect(antes.reg.maiorEscala).toBeGreaterThan(1);
+  });
+
+  it("calmo: cascata curta (~80 ms entre os blocos) e cada bloco leva ~0,55 s; os tempos de postar não mudam", () => {
+    const T = temposDoCard(6, { passoMax: 0.08, pop: 0.55 });
+    expect((T.acende[1] - 0.55 - T.acende[0]) / 5).toBeCloseTo(0.08, 5);
+    expect(temposDoCard(6)).toEqual({ ...temposDoCard(6, {}), pop: 0.3 });
+    expect(temposDoCard(6).acende[1]).toBeCloseTo(0.75 + 0.16 * 5 + 0.3, 5);
   });
 });
 

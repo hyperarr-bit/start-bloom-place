@@ -296,11 +296,18 @@ export const RetroTelaCheia = ({ retro, onClose, onProximoPasso }: Props) => {
     setI(alvo);
   }, [i, total, atual, palpite.revelado, revelar, fechando, comecarTroca]);
 
-  // aba/app em segundo plano: pausa
+  // aba/app em segundo plano: pausa. No app das lojas também pelo Capacitor — o visibilitychange do WKWebView nem sempre
+  // chega (festas-calma.ts), e sem ele a barrinha terminava no fundo e pulava 1 card ao voltar (revisão 1.0.24).
   useEffect(() => {
     const ver = () => setOculto(document.visibilityState === "hidden");
     document.addEventListener("visibilitychange", ver);
-    return () => document.removeEventListener("visibilitychange", ver);
+    let vivo = true;
+    let tirar: (() => void) | null = null;
+    void import("@capacitor/app")
+      .then(({ App }) => App.addListener("appStateChange", ({ isActive }) => setOculto(!isActive)))
+      .then((h) => { if (vivo) tirar = () => { void h.remove(); }; else void h.remove(); })
+      .catch(() => { /* sem plugin (web): fica o visibilitychange */ });
+    return () => { vivo = false; document.removeEventListener("visibilitychange", ver); tirar?.(); };
   }, []);
 
   useEffect(() => {
@@ -785,7 +792,8 @@ const TelaDoAdivinha = ({ a, palpite, onEscolher, topo, base, reduzir, escondido
       <div className="h-full flex flex-col justify-center pb-[14%]">
         <span className="self-start h-8 px-3.5 rounded-full text-[12px] font-extrabold tracking-[.14em] inline-flex items-center" style={{ background: "rgba(255,255,255,.16)", ...entra(0) }}>ADIVINHA</span>
         <p className="mt-5 text-[30px] leading-[1.12] font-black tracking-[-0.03em]" style={entra(0.07)} data-testid={id("retro-adivinha-pergunta")}>{a.pergunta}</p>
-        <div className={`mt-7 flex flex-col gap-3 ${fantasma ? "" : "pointer-events-auto"}`} role="group" aria-label="Opções">
+        {/* revisão 1.0.24: depois de revelado, as opções não seguram mais o toque — tocar em qualquer lugar avança */}
+        <div className={`mt-7 flex flex-col gap-3 ${fantasma || palpite.revelado ? "" : "pointer-events-auto"}`} role="group" aria-label="Opções">
           {a.opcoes.map((v, k) => {
             const certa = v === a.certo;
             const escolhida = palpite.escolha === v;

@@ -17,6 +17,7 @@ import {
   RETRO_OUTUBRO_APP, RETRO_OUTUBRO_WEB, CHAVE_FORCA_RETRO_OUTUBRO, retroOutubroAtiva, retroOutubroLigada, outubroJaAcabou,
   registrarRetroOutubroRemoto, _zerarRetroOutubroRemoto, guardarForcaRetroOutubro, lerChaveRemotaRetroOutubro,
 } from "@/lib/retro-outubro";
+import { CHAVE_FORCA_TELA_CHEIA } from "@/components/compartilhar/retro-tela-cheia";
 import { SEMENTE_POUCO_0, SEMENTE_POUCO_1, SEMENTE_POUCO_3, SEMENTE_COMPLETA, SEMENTE_DUAS_AREAS, SEMENTE_FIN_INCOMPLETA, SEMENTE_POUCA, SEMENTE_SO_DIAS, SEMENTE_UMA_AREA, AGORA_EXEMPLO, leitorDe } from "@/pages/dev/retro-outubro-exemplo";
 
 const nativo = vi.hoisted(() => ({ v: false }));
@@ -40,7 +41,7 @@ beforeEach(() => { nativo.v = false; eventos.length = 0; });
 afterEach(() => {
   cleanup();
   _zerarRetroOutubroRemoto();
-  try { localStorage.removeItem(CHAVE_FORCA_RETRO_OUTUBRO); } catch { /* sem storage */ }
+  try { localStorage.removeItem(CHAVE_FORCA_RETRO_OUTUBRO); localStorage.removeItem(CHAVE_FORCA_TELA_CHEIA); } catch { /* sem storage */ }
 });
 
 describe("1. só módulo com registro vira card; abertura e resumo sempre", () => {
@@ -259,7 +260,8 @@ describe("8. a tela", () => {
     fireEvent.click(screen.getByTestId("retro-vazio-ok"));
     expect(fechou).toHaveBeenCalled();
   });
-  it("conta completa: abre na abertura, avança, conta os cards e as telas com mes: 'outubro'; R$ começa desligado", async () => {
+  it("conta completa (tela CLÁSSICA, o rollback da tela cheia): abre na abertura, avança, conta os cards e as telas com mes: 'outubro'; R$ começa desligado", async () => {
+    localStorage.setItem(CHAVE_FORCA_TELA_CHEIA, "off");
     const { RetroOutubro } = await import("@/components/compartilhar/RetroOutubro");
     render(<RetroOutubro ler={leitorDe(SEMENTE_COMPLETA)} agora={NOV} onClose={() => {}} semDados={null} />);
     const tela = screen.getByTestId("retro-outubro");
@@ -433,7 +435,8 @@ describe("10. pouco uso (30/10): o critério, 0/1/2/3 módulos, o fechamento, se
       }
     }
   });
-  it("a tela: pouco uso abre na abertura, o último é o fechamento (compartilhável) e o evento conta pouco_dado", async () => {
+  it("a tela (clássica): pouco uso abre na abertura, o último é o fechamento (compartilhável) e o evento conta pouco_dado", async () => {
+    localStorage.setItem(CHAVE_FORCA_TELA_CHEIA, "off");
     const { RetroOutubro } = await import("@/components/compartilhar/RetroOutubro");
     render(<RetroOutubro ler={leitorDe(SEMENTE_POUCO_1)} agora={NOV} onClose={() => {}} />);
     const tela = screen.getByTestId("retro-outubro");

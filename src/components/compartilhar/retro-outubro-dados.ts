@@ -69,8 +69,9 @@ export const CRITERIO_AZUL = {
 } as const;
 
 export interface CardDaRetro {
-  /** "abertura" · "financas" · "treino" · "rotina" · "agua" · "leitura" · "metas" · "resumo" · "fechamento" (pouco uso) */
-  id: "abertura" | ModuloDaRetro | "resumo" | "fechamento";
+  /** "abertura" · "financas" · "treino" · "rotina" · "agua" · "leitura" · "metas" · "resumo" · "fechamento" (pouco uso)
+   *  · (02/11, só na tela cheia — retro-tela-cheia-dados.ts) "perfil" · "primeiro" · "dias" · "figurinhas" */
+  id: "abertura" | ModuloDaRetro | "resumo" | "fechamento" | "perfil" | "primeiro" | "dias" | "figurinhas";
   dados: DadosCard;
 }
 

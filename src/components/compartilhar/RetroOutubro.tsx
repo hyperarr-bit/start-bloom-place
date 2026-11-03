@@ -11,6 +11,9 @@ import { postarCardImagem, postarCardVideo, prepararCapas } from "./postar";
 import { comEscolhas, montarRetroOutubro, type CardDaRetro } from "./retro-outubro-dados";
 import { nomeDoMes, capitalizar } from "./textos";
 import { FORMATOS, type DadosCard } from "./tipos";
+import { RetroTelaCheia } from "./RetroTelaCheia";
+import { telaCheiaLigada } from "./retro-tela-cheia";
+import { montarRetroTelaCheia } from "./retro-tela-cheia-dados";
 
 const AnimacaoDoCard = lazy(() => import("./AnimacaoDoCard"));
 
@@ -41,10 +44,12 @@ interface Props {
   semDados?: ReactNode;
   /** Só testes/dev: o relógio. */
   agora?: Date;
+  /** (02/11, tela cheia) "Novembro começa agora → registrar algo hoje": leva pra rota (o módulo mais usado). Sem isto, só fecha. */
+  onProximoPasso?: (rota: string) => void;
 }
 
 const MES = "outubro";
-const ROTULOS: Record<CardDaRetro["id"], string> = { abertura: "Abertura", financas: "Finanças", treino: "Treino", rotina: "Rotina", agua: "Água", leitura: "Leitura", metas: "Metas", resumo: "Meu outubro", fechamento: "Até novembro" };
+const ROTULOS: Record<CardDaRetro["id"], string> = { abertura: "Abertura", financas: "Finanças", treino: "Treino", rotina: "Rotina", agua: "Água", leitura: "Leitura", metas: "Metas", resumo: "Meu outubro", fechamento: "Até novembro", perfil: "Seu perfil", primeiro: "O começo", dias: "Seus dias", figurinhas: "Figurinhas" };
 
 const CardEscalado = memo(({ elemento, largura, w, h }: { elemento: ReactElement; largura: number; w: number; h: number }) => {
   const s = largura / w;
@@ -95,7 +100,33 @@ const TelaSemRegistros = ({ onClose }: { onClose: () => void }) => {
   );
 };
 
-export const RetroOutubro = ({ ler, onClose, agora }: Props) => {
+/**
+ * (02/11) QUAL TELA: com RETRO_TELA_CHEIA "on" (retro-tela-cheia.ts), a de TELA CHEIA estilo Stories/Spotify
+ * (RetroTelaCheia); "off" = a de antes, card na moldura com os botões embaixo (RetroOutubroClassica, intocada).
+ * A tela "sem registros" é a mesma nas duas. A escolha vale a abertura inteira.
+ */
+export const RetroOutubro = (props: Props) => {
+  const [cheia] = useState(telaCheiaLigada);
+  return cheia ? <RetroOutubroTelaCheia {...props} /> : <RetroOutubroClassica {...props} />;
+};
+
+const RetroOutubroTelaCheia = ({ ler, onClose, agora, onProximoPasso }: Props) => {
+  // o store muda com a tela aberta (a marca "abriu a nova", a sincronização): com o MESMO conteúdo, o MESMO objeto —
+  // senão a animação do card recomeçava do zero no meio
+  const ultima = useRef<{ json: string; r: ReturnType<typeof montarRetroOutubro> } | null>(null);
+  const retro = useMemo(() => {
+    // (02/11) a tela cheia tem o perfil e os extras do pouco uso (a clássica não: continua a de antes)
+    const r = montarRetroTelaCheia(ler, { agora });
+    const json = JSON.stringify(r);
+    if (ultima.current?.json === json) return ultima.current.r;
+    ultima.current = { json, r };
+    return r;
+  }, [ler, agora]);
+  if (!retro || retro.cards.length === 0) return <TelaSemRegistros onClose={onClose} />;
+  return <RetroTelaCheia retro={retro} onClose={onClose} onProximoPasso={onProximoPasso} />;
+};
+
+const RetroOutubroClassica = ({ ler, onClose, agora }: Props) => {
   const reduzir = useReducedMotion();
   const retro = useMemo(() => montarRetroOutubro(ler, { agora }), [ler, agora]);
   const [i, setI] = useState(0);

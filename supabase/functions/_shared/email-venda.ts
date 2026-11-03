@@ -106,6 +106,8 @@ export function dataBr(iso: string | null | undefined): string | null {
 }
 
 /** Os links das lojas no e-mail (os mesmos do site: LojasCard / e-mail antigo). */
+/** 03/11: o guia "Seu CORE começa aqui" (PDF, 16 páginas) — public/guia no site. */
+export const URL_GUIA_PDF = "https://coreaplicativo.com.br/guia/core-comece-aqui.pdf";
 export const URL_APP_STORE_EMAIL = "https://apps.apple.com/br/app/id6806913181";
 export const URL_PLAY_EMAIL = "https://play.google.com/store/apps/details?id=br.com.coreaplicativo.app&referrer=utm_source%3Dweb%26utm_medium%3Demail%26utm_campaign%3Dweb_hoje_email";
 
@@ -152,7 +154,10 @@ export function htmlVenda(args: { email: string; nome?: string | null; periodo: 
     <p style="font-size:15px;line-height:1.5;margin:0 0 20px;color:#5b5560;">${plano}</p>
     ${args.hoje ? blocoLojas(e) : `<p style="font-size:14px;line-height:1.5;margin:0 0 12px;color:#3d3742;"><b>1 ·</b> Baixe o CORE: <a href="https://coreaplicativo.com.br/baixar?origem=venda_email" style="color:#d22d80;font-weight:700;">App Store ou Google Play</a>.</p>`}
     ${blocoEntrar(e, "2 · ")}
-    <p style="font-size:13px;color:#5b5560;line-height:1.5;margin:0;">Quer ver com fotos? <a href="https://coreaplicativo.com.br/como-entrar" style="color:#d22d80;font-weight:700;">Passo a passo</a></p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0;border:1px solid #e9e2e6;border-radius:14px;" data-bloco="guia"><tr>
+      <td style="padding:14px 6px 14px 16px;vertical-align:middle;"><div style="font-size:15px;font-weight:800;color:#16121c;">📖 Guia com fotos</div><div style="font-size:13px;line-height:1.4;color:#5b5560;margin-top:2px;">Como entrar, primeiros passos e dicas.</div></td>
+      <td style="padding:14px 14px 14px 6px;vertical-align:middle;text-align:right;white-space:nowrap;"><a href="${URL_GUIA_PDF}" style="display:inline-block;background:#d22d80;color:#fff;text-decoration:none;font-size:14px;font-weight:800;padding:11px 14px;border-radius:10px;">Abrir o guia</a></td>
+    </tr></table>
     ${args.extra ?? ""}<p style="font-size:12.5px;color:#8a838f;line-height:1.5;margin:14px 0 0;">No computador, é o mesmo CORE em coreaplicativo.com.br. Dúvida? É só responder este e-mail.</p>
   </div>
 </div></body></html>`;

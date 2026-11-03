@@ -50,7 +50,9 @@ const ASSETS = LOJA.assets;
 const MORTO = ["v3-hero.mp4", "v3-hero-poster.jpg", "videos", "hero-phones.png", "hero-phones.webp", "images",
   // 02/11 (revisor da 1.0.23): a página de venda (/organizar, com pixel e Pix) e o painel de vendas do dono entraram
   // no build como entradas próprias (vite.config) e iam de carona pro binário — nenhuma rota do app chega neles.
-  "landing.html", "vendas.html", "landing", "vendas"];
+  "landing.html", "vendas.html", "landing", "vendas",
+  // 03/11: o guia em PDF de quem comprou no site (link do e-mail da compra e da /como-entrar) — só no site
+  "guia"];
 
 // Rastreadores de anúncio que moram no index.html da WEB e vinham de carona
 // pro binário (o Capacitor copia a pasta public inteira).

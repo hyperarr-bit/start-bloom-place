@@ -291,7 +291,7 @@ describe("B. o bloco do 2027 no e-mail de compra confirmada", () => {
     const i = comBloco.indexOf('data-bloco="u2027"');
     expect(comBloco.indexOf('data-bloco="entrar"')).toBeLessThan(i); // 03/11: os passos viraram o bloco "No app, toque em Entrar"
     expect(comBloco.indexOf("Entrar sem senha")).toBeLessThan(i);
-    expect(comBloco.indexOf("Passo a passo")).toBeLessThan(i);
+    expect(comBloco.indexOf('data-bloco="guia"')).toBeLessThan(i); // 03/11: o guia em PDF no lugar do "Passo a passo"
     expect(comBloco.indexOf("No computador")).toBeGreaterThan(i);
   });
   it("os 4 lugares que mandam o e-mail da compra da landing passam o bloco", () => {

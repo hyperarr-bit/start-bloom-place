@@ -3,7 +3,7 @@ import { gerarCanvasEMedir } from "@/components/conquistas/gerar-imagem";
 import type { Roteiro } from "@/components/conquistas/video/camadas";
 import { codificarRoteiro, type EtapaVideo, type VideoGerado } from "@/components/conquistas/video/gerar-video";
 import { suporteVideo } from "@/components/conquistas/video/suporte";
-import { AGUA_FINAL, CORES_AGUA, CardDeCompartilhar, ONDA, pecasDaAbertura, type Camada, type CamadaDaPeca } from "./cards";
+import { AGUA_FINAL, AlturaExtraCtx, CORES_AGUA, CardDeCompartilhar, ONDA, pecasDaAbertura, type Camada, type CamadaDaPeca } from "./cards";
 import { caminhoDaOnda } from "./onda";
 import { numeroBR } from "./textos";
 import { FORMATOS, type DadosCard } from "./tipos";
@@ -80,10 +80,18 @@ export interface CamadasDoCard {
 
 type Formato916 = "stories" | "feed";
 
+/**
+ * (02/11) Só a retrospectiva em TELA CHEIA passa opções; sem elas (postar, Conquistas) é tudo como antes.
+ *  · `extra`: px a mais de altura do card (o celular é mais comprido que 9:16 — cards.tsx › AlturaExtraCtx);
+ *  · `suspense`: segundos em que só a FRASE aparece antes do número/prova entrar contando.
+ */
+export interface OpcoesDoRoteiro { extra?: number; suspense?: number }
+
 /** Fotografa as camadas (e mede na 1ª). A abertura da retrospectiva: fundo, textos e um mini-card por camada. */
-export async function prepararCamadasDoCard(dados: DadosCard, formato: Formato916, moeda?: ReactNode, onPasso?: (feitas: number, de: number) => void): Promise<CamadasDoCard | null> {
-  const { w, h } = FORMATOS[formato];
-  const foto = (camada: Camada) => <CardDeCompartilhar dados={dados} formato={formato} camada={camada} moeda={moeda} />;
+export async function prepararCamadasDoCard(dados: DadosCard, formato: Formato916, moeda?: ReactNode, onPasso?: (feitas: number, de: number) => void, extra = 0): Promise<CamadasDoCard | null> {
+  const { w } = FORMATOS[formato];
+  const h = FORMATOS[formato].h + extra;
+  const foto = (camada: Camada) => <AlturaExtraCtx.Provider value={extra}><CardDeCompartilhar dados={dados} formato={formato} camada={camada} moeda={moeda} /></AlturaExtraCtx.Provider>;
   const nPecas = dados.tipo === "retro-abertura" ? pecasDaAbertura(dados).length : 0;
   const lista: Camada[] = dados.tipo === "retro-abertura"
     ? ["textos", ...Array.from({ length: nPecas }, (_, i) => `peca${i}` as CamadaDaPeca)]
@@ -212,13 +220,17 @@ export function temposDoCard(nCasas: number): TemposDoCard {
   };
 }
 
-/** O roteiro geral: a prova acende casa por casa e o número conta junto. */
-export function roteiroQueAcende(cam: CamadasDoCard, largura: number, altura: number): Roteiro {
+/**
+ * O roteiro geral: a prova acende casa por casa e o número conta junto.
+ * (02/11) `suspense` > 0 (tela cheia): a FRASE (título/rótulo) aparece sozinha primeiro e o número + a prova
+ * entram `suspense` segundos depois, contando — o "segura… e revela".
+ */
+export function roteiroQueAcende(cam: CamadasDoCard, largura: number, altura: number, suspense = 0): Roteiro {
   const m = cam.medidas;
   const casas = m.celulas.filter((c) => c.feito);
   // sem casas (a insígnia, a figurinha): a prova inteira é uma "casa" só
   const alvos = casas.length ? casas : m.blocos.prova ? [m.blocos.prova] : [];
-  const T = temposDoCard(alvos.length);
+  const T = comSuspense(temposDoCard(alvos.length), suspense);
   const partes = m.numero ? partesDoNumero(m.numero.texto) : null;
   const passo = alvos.length > 1 ? (T.acende[1] - 0.3 - T.acende[0]) / (alvos.length - 1) : 0;
   const unica = !casas.length;
@@ -260,7 +272,7 @@ export function roteiroQueAcende(cam: CamadasDoCard, largura: number, altura: nu
     });
     // o número conta junto com as casas (e pulsa quando fecha)
     if (m.numero) {
-      const pn = saiCubico(prog(t, 0.2, 0.55));
+      const pn = saiCubico(prog(t, 0.2 + suspense, 0.55 + suspense));
       if (pn > 0) {
         let texto = m.numero.texto;
         if (partes && alvos.length) {
@@ -285,8 +297,10 @@ export function roteiroQueAcende(cam: CamadasDoCard, largura: number, altura: nu
     };
     // com uma prova só (a moeda, a figurinha), o rótulo vem DEPOIS dela
     const tRotulo: [number, number] = unica ? [T.acende[1] - 0.05, T.acende[1] + 0.4] : T.rotulo;
-    bloco("titulo", tRotulo);
-    bloco("rotulo", tRotulo);
+    // com suspense, a frase vem ANTES de tudo (é ela que segura a revelação); a legenda continua depois da prova
+    const tFrase: [number, number] = suspense > 0 ? [0.1, 0.55] : tRotulo;
+    bloco("titulo", tFrase);
+    bloco("rotulo", tFrase);
     bloco("legenda", tRotulo);
     bloco("nivel", [T.acende[1] - 0.1, T.acende[1] + 0.35]);
     bloco("estatisticas", T.estatisticas);
@@ -296,18 +310,25 @@ export function roteiroQueAcende(cam: CamadasDoCard, largura: number, altura: nu
   return { duracao: T.duracao, desenhar };
 }
 
+/** Os tempos com o suspense: tudo menos a frase anda `s` segundos pra frente. */
+export function comSuspense(T: TemposDoCard, s: number): TemposDoCard {
+  if (!s) return T;
+  const mais = ([a, b]: [number, number]): [number, number] => [a + s, b + s];
+  return { ...T, duracao: T.duracao + s, apagado: mais(T.apagado), rotulo: [0.1, 0.55], acende: mais(T.acende), estatisticas: mais(T.estatisticas), assinatura: mais(T.assinatura) };
+}
+
 /**
  * O roteiro da ÁGUA ("mês no azul" e "guardei X%"): a água sobe do pé do
  * card; no azul ela vem VERMELHA até passar da linha do zero e vira azul
  * (o saldo passando de negativo pra positivo). As ondas andam e param na
  * mesma fase da imagem parada.
  */
-export function roteiroDaAgua(cam: CamadasDoCard, largura: number, altura: number, formato: Formato916, comVermelho: boolean): Roteiro {
+export function roteiroDaAgua(cam: CamadasDoCard, largura: number, altura: number, formato: Formato916, comVermelho: boolean, suspense = 0): Roteiro {
   const m = cam.medidas;
   const superficieFinal = AGUA_FINAL[formato];
   const zero = Math.min(altura - 160, superficieFinal + (formato === "stories" ? 520 : 360));
-  const duracao = 5.6;
-  const sobe: [number, number] = [0.45, 2.9];
+  const duracao = 5.6 + suspense;
+  const sobe: [number, number] = [0.45 + suspense, 2.9 + suspense];
   const nivel = (t: number) => {
     const u = saiCubico(prog(t, sobe[0], sobe[1]));
     return altura + 40 - (altura + 40 - superficieFinal) * u;
@@ -329,7 +350,7 @@ export function roteiroDaAgua(cam: CamadasDoCard, largura: number, altura: numbe
     if (m.blocos.titulo) pedaco(ctx, cam.textos, m.blocos.titulo, { alfa: pt, dy: (1 - pt) * 30 });
     // a linha do zero (some depois que a água passa)
     const vermelho = comVermelho ? 1 - clamp01((t - tZero) / 0.35) : 0;
-    const linhaAlfa = comVermelho ? clamp01((t - 0.3) / 0.3) * (1 - clamp01((t - tZero - 0.25) / 0.4)) : 0;
+    const linhaAlfa = comVermelho ? clamp01((t - 0.3 - suspense) / 0.3) * (1 - clamp01((t - tZero - 0.25) / 0.4)) : 0;
     // a água
     const s = nivel(t);
     let caminho: Path2D | null = null;
@@ -464,32 +485,40 @@ export function roteiroDaAbertura(cam: CamadasDoCard, largura: number, altura: n
   return { duracao: T.duracao, desenhar };
 }
 
+/** Quanto o perfil segura o "Seu outubro foi…" antes do nome (vale também no vídeo de postar: sem isso o nome vinha antes da frase). */
+export const SUSPENSE_DO_PERFIL = 0.8;
+
 /** O roteiro de cada tipo de card. */
-export function roteiroDoCard(dados: DadosCard, cam: CamadasDoCard, formato: Formato916): Roteiro {
-  const { w, h } = FORMATOS[formato];
-  if (dados.tipo === "azul") return roteiroDaAgua(cam, w, h, formato, true);
-  if (dados.tipo === "poupanca") return roteiroDaAgua(cam, w, h, formato, false);
+export function roteiroDoCard(dados: DadosCard, cam: CamadasDoCard, formato: Formato916, opcoes: OpcoesDoRoteiro = {}): Roteiro {
+  const { w } = FORMATOS[formato];
+  const h = FORMATOS[formato].h + (opcoes.extra ?? 0);
+  const s = opcoes.suspense ?? 0;
+  if (dados.tipo === "azul") return roteiroDaAgua(cam, w, h, formato, true, s);
+  if (dados.tipo === "poupanca") return roteiroDaAgua(cam, w, h, formato, false, s);
   if (dados.tipo === "retro-abertura") return roteiroDaAbertura(cam, w, h);
-  return roteiroQueAcende(cam, w, h);
+  if (dados.tipo === "retro-perfil") return roteiroQueAcende(cam, w, h, Math.max(s, SUSPENSE_DO_PERFIL));
+  return roteiroQueAcende(cam, w, h, s);
 }
 
 /* ------------------------------------------------------------------------- *
  * Gerar (e guardar o roteiro pra prévia ao vivo e o "Postar vídeo" logo depois)
  * ------------------------------------------------------------------------- */
 
-const cache = new Map<string, Promise<Roteiro | null>>();
+/** (02/11) Guarda as CAMADAS (o caro); o roteiro é refeito na hora (barato) — o mesmo card com e sem suspense não fotografa duas vezes. */
+const cache = new Map<string, Promise<CamadasDoCard | null>>();
 
-export function prepararRoteiroDoCard(dados: DadosCard, formato: Formato916, moeda?: ReactNode, onPasso?: (f: number, de: number) => void): Promise<Roteiro | null> {
-  const chave = JSON.stringify([formato, dados]);
+export function prepararRoteiroDoCard(dados: DadosCard, formato: Formato916, moeda?: ReactNode, onPasso?: (f: number, de: number) => void, opcoes: OpcoesDoRoteiro = {}): Promise<Roteiro | null> {
+  const extra = Math.max(0, Math.round(opcoes.extra ?? 0));
+  const chave = JSON.stringify([formato, extra, dados]);
   let p = cache.get(chave);
   if (!p) {
-    p = prepararCamadasDoCard(dados, formato, moeda, onPasso).then((cam) => (cam ? roteiroDoCard(dados, cam, formato) : null));
+    p = prepararCamadasDoCard(dados, formato, moeda, onPasso, extra);
     cache.set(chave, p);
-    // cada roteiro guarda 4 camadas de 1080×1920 (~33 MB): no máximo 2 na memória
+    // cada card guarda 4 camadas de 1080×1920 (~33 MB): no máximo 2 na memória
     if (cache.size > 2) cache.delete(cache.keys().next().value!);
-    p.then((r) => { if (!r) cache.delete(chave); }, () => cache.delete(chave));
+    p.then((c) => { if (!c) cache.delete(chave); }, () => cache.delete(chave));
   }
-  return p;
+  return p.then((cam) => (cam ? roteiroDoCard(dados, cam, formato, { ...opcoes, extra }) : null));
 }
 
 /** Gera o MP4 do card no aparelho. null = não deu (quem chama manda a imagem). */

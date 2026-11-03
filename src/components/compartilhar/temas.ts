@@ -36,6 +36,9 @@ export const TEMAS: Record<TipoCard, TemaDoCard> = {
   "retro-resumo": { paradas: ["#2a2a31", "#1f1f25", "#141418"], angulo: 170, tinta: "#ffffff", suave: "rgba(255,255,255,.80)", apagado: "rgba(255,255,255,.10)", modulo: "Retrospectiva", destaque: "#db2777" },
   // 30/10 (pouco uso): o card do módulo usa o tema do card de verdade do módulo (cards.tsx › TEMA_DO_MODULO); este é só o padrão
   "retro-pouco": { paradas: ["#7c3aed", "#6d28d9", "#4c1d95"], angulo: 165, tinta: "#ffffff", suave: "rgba(255,255,255,.86)", apagado: "rgba(255,255,255,.16)", modulo: "Retrospectiva", destaque: "#6d28d9" },
+  // 02/11 (tela cheia): o perfil usa o tema do módulo dele e os extras do pouco uso, o grafite da marca; estes são só o padrão
+  "retro-perfil": { paradas: ["#2a2a31", "#1f1f25", "#141418"], angulo: 170, tinta: "#ffffff", suave: "rgba(255,255,255,.80)", apagado: "rgba(255,255,255,.10)", modulo: "Perfil do mês", destaque: "#db2777" },
+  "retro-extra": { paradas: ["#2a2a31", "#1f1f25", "#141418"], angulo: 170, tinta: "#ffffff", suave: "rgba(255,255,255,.80)", apagado: "rgba(255,255,255,.10)", modulo: "Retrospectiva", destaque: "#db2777" },
   // 30/10: o fechamento e o "sem registros" no papel do Codex (#f5f0e6 + tinta grafite)
   "retro-fechamento": { paradas: ["#f5f0e6"], angulo: 180, tinta: "#25242a", suave: "#5f574d", apagado: "rgba(37,36,42,.08)", modulo: "Retrospectiva", destaque: "#db2777" },
   "retro-vazio": { paradas: ["#f5f0e6"], angulo: 180, tinta: "#25242a", suave: "#5f574d", apagado: "rgba(37,36,42,.08)", modulo: "Retrospectiva", destaque: "#db2777" },

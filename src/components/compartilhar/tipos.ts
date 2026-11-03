@@ -293,7 +293,50 @@ export interface DadosRetroVazio {
   mesIdx: number;
 }
 
+/**
+ * O PERFIL DO MÊS (02/11, só na retrospectiva em TELA CHEIA — retro-tela-cheia-dados.ts › perfilDoOutubro):
+ * "Seu outubro foi…" + o nome do perfil, tirado do módulo que a pessoa MAIS usou, + uma frase com o número
+ * de verdade dela. Nada inventado: a frase e os "também" são os mesmos números dos cards.
+ */
+export interface DadosRetroPerfil {
+  tipo: "retro-perfil";
+  ano: number;
+  mesIdx: number;
+  /** O módulo que deu o perfil (a cor e o ícone do card vêm dele). */
+  modulo: ModuloDaRetro;
+  /** "Em movimento" · "Constância de ferro" */
+  nome: string;
+  /** "19 dias de treino em outubro." */
+  frase: string;
+  /** Até 2 outros destaques do mês (os itens do resumo). */
+  tambem: ItemDoResumo[];
+}
+
+/**
+ * EXTRAS DE QUEM USOU POUCO (02/11, tela cheia): o que sempre existe e é DE VERDADE — os dias com algo
+ * anotado no CORE (`core-dias-anotados`), as figurinhas ganhas no mês (`conquistas-desbloqueadas`) e o 1º
+ * registro do mês. Só entram com dado; nunca "0".
+ */
+export interface DadosRetroExtra {
+  tipo: "retro-extra";
+  extra: "dias" | "figurinhas" | "primeiro";
+  ano: number;
+  mesIdx: number;
+  /** "4" · "2" · "12" (o dia, no 1º registro) */
+  numero: string;
+  /** "dias com algo anotado" */
+  rotulo: string;
+  /** a linha de baixo ("no CORE, em outubro") */
+  sub: string;
+  /** Os dias (o card mostra quando) — vazio = sem dias. */
+  dias: string[];
+  /** No 1º registro: o módulo dele (quando dá pra saber). */
+  modulo?: ModuloDaRetro;
+}
+
 export type DadosCard =
+  | DadosRetroPerfil
+  | DadosRetroExtra
   | DadosRetroPouco
   | DadosRetroFechamento
   | DadosRetroVazio

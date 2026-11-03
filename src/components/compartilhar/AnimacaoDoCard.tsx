@@ -20,9 +20,12 @@ interface Props {
   laco?: boolean;
   /** Avisa quando a animação COMEÇA a tocar, com a duração dela em segundos (a tela cheia cronometra o card por aqui). */
   onPronto?: (duracao: number) => void;
+  /** 02/11 (tela cheia): px a mais de altura do card e o suspense da frase antes do número (video-card › OpcoesDoRoteiro). */
+  alturaExtra?: number;
+  suspense?: number;
 }
 
-const AnimacaoDoCard = ({ dados, formato, largura, pausado, moeda, laco = true, onPronto }: Props) => {
+const AnimacaoDoCard = ({ dados, formato, largura, pausado, moeda, laco = true, onPronto, alturaExtra = 0, suspense = 0 }: Props) => {
   const ref = useRef<HTMLCanvasElement>(null);
   const roteiro = useRef<Roteiro | null>(null);
   const t0 = useRef(0);
@@ -31,19 +34,20 @@ const AnimacaoDoCard = ({ dados, formato, largura, pausado, moeda, laco = true, 
   const avisar = useRef(onPronto);
   avisar.current = onPronto;
   const [pronto, setPronto] = useState(false);
-  const { w: W, h: H } = FORMATOS[formato];
+  const W = FORMATOS[formato].w;
+  const H = FORMATOS[formato].h + alturaExtra;
 
   useEffect(() => {
     let vivo = true;
     setPronto(false);
-    prepararRoteiroDoCard(dados, formato, moeda).then((r) => {
+    prepararRoteiroDoCard(dados, formato, moeda, undefined, { extra: alturaExtra, suspense }).then((r) => {
       if (!vivo) return;
       roteiro.current = r;
       if (r) { t0.current = performance.now(); pausadoEm.current = null; setPronto(true); avisar.current?.(r.duracao); }
     }).catch(() => { /* fica o card parado */ });
     return () => { vivo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dados, formato]);
+  }, [dados, formato, alturaExtra, suspense]);
 
   useEffect(() => {
     const canvas = ref.current;

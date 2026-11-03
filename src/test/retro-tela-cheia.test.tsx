@@ -9,8 +9,8 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, cleanup, screen, fireEvent, act } from "@testing-library/react";
 import {
-  ALTURA_CONTROLES, CHAVE_FORCA_TELA_CHEIA, MIOLO, PROPORCAO_COLUNA, RESERVA_BOTAO_FINAL, RETRO_TELA_CHEIA, TEMPOS,
-  encaixeDoCard, fundoClaro, fundoEsticado, guardarForcaTelaCheia, lerFundoDoCard, telaCheiaLigada, tempoDoCard, texturaEsticada,
+  ALTURA_CONTROLES, CHAVE_FORCA_TELA_CHEIA, CONTEUDO, FOLGA_TOPO, MARGEM_LADO, PROPORCAO_COLUNA, RESERVA_BASE, RETRO_TELA_CHEIA, TEMPOS,
+  encaixeDoCard, fundoClaro, fundoEsticado, guardarForcaTelaCheia, lerFundoDoCard, telaCheiaLigada, tempoDoCard, texturaEsticada, type ReservaBase,
 } from "@/components/compartilhar/retro-tela-cheia";
 import { SEMENTE_COMPLETA, SEMENTE_POUCO_1, AGORA_EXEMPLO, leitorDe } from "@/pages/dev/retro-outubro-exemplo";
 
@@ -73,25 +73,35 @@ describe("1. a chave", () => {
   });
 });
 
-describe("2. onde o card fica (o miolo nunca fica atrás da ilha, dos botões ou do botão final)", () => {
-  const confere = (e: ReturnType<typeof encaixeDoCard>, H: number, topo: number, base: number, final = false) => {
-    expect(e.y + MIOLO.topo * e.escala).toBeGreaterThanOrEqual(topo + ALTURA_CONTROLES - 0.01);
-    expect(e.y + MIOLO.fim * e.escala).toBeLessThanOrEqual(H - base - (final ? RESERVA_BOTAO_FINAL : 12) + 0.01);
+describe("2. onde o card fica (02/11: o conteúdo logo abaixo dos botões, o card esticado até o pé — sem faixa vazia)", () => {
+  const confere = (e: ReturnType<typeof encaixeDoCard>, H: number, topo: number, base: number, reserva: ReservaBase = "nada") => {
+    // o chip do card começa logo abaixo das barrinhas/botões (nunca atrás da ilha, nem lá no meio da tela)
+    expect(e.y + CONTEUDO.topo * e.escala).toBeCloseTo(topo + ALTURA_CONTROLES + FOLGA_TOPO, 5);
+    // o fim do conteúdo (com o extra) não passa da base nem da pílula/botões
+    expect(e.y + (CONTEUDO.fim + e.extra) * e.escala).toBeLessThanOrEqual(H - base - RESERVA_BASE[reserva] + 0.01);
   };
-  it("iPhone 390×844 (ilha 47, barra 34): de ponta a ponta na largura, centrado", () => {
-    const e = encaixeDoCard({ largura: 390, altura: 844, topoSeguro: 47, baseSeguro: 34 });
-    expect(e.coluna).toBe(390);
-    expect(e.w).toBeCloseTo(390, 5);
-    expect(e.x).toBeCloseTo(0, 5);
-    confere(e, 844, 47, 34);
-    confere(encaixeDoCard({ largura: 390, altura: 844, topoSeguro: 47, baseSeguro: 34, botaoFinal: true }), 844, 47, 34, true);
+  it("iPhone 390×844 (ilha 47, barra 34): a largura manda (margem fina dos lados), o card fica mais comprido e chega no pé", () => {
+    for (const reserva of ["nada", "pilula", "final"] as const) {
+      const e = encaixeDoCard({ largura: 390, altura: 844, topoSeguro: 47, baseSeguro: 34, reserva });
+      expect(e.coluna).toBe(390);
+      expect(e.escala).toBeCloseTo((390 - 2 * MARGEM_LADO) / CONTEUDO.largura, 5);
+      expect(e.extra).toBeGreaterThan(0);
+      confere(e, 844, 47, 34, reserva);
+      // o que sobra embaixo é só o respiro (menos de 1 px de card de folga)
+      expect(844 - 34 - RESERVA_BASE[reserva] - (e.y + (CONTEUDO.fim + e.extra) * e.escala)).toBeLessThan(1);
+    }
+    // sem pílula, o card é mais comprido que com pílula, e com os botões finais ainda menos
+    const [a, b, c] = (["nada", "pilula", "final"] as const).map((reserva) => encaixeDoCard({ largura: 390, altura: 844, topoSeguro: 47, baseSeguro: 34, reserva }).extra);
+    expect(a).toBeGreaterThan(b);
+    expect(b).toBeGreaterThan(c);
   });
-  it("iPhone pequeno 375×667 (com e sem a faixa do relógio) e o último card com o botão", () => {
+  it("iPhone pequeno 375×667 (com e sem a faixa do relógio): nada atrás dos botões; sem espaço, encolhe em vez de cortar", () => {
     for (const topo of [0, 20]) {
-      for (const final of [false, true]) {
-        const e = encaixeDoCard({ largura: 375, altura: 667, topoSeguro: topo, baseSeguro: 0, botaoFinal: final });
-        expect(e.w).toBeGreaterThan(340);
-        confere(e, 667, topo, 0, final);
+      for (const reserva of ["nada", "pilula", "final"] as const) {
+        const e = encaixeDoCard({ largura: 375, altura: 667, topoSeguro: topo, baseSeguro: 0, reserva });
+        expect(e.w).toBeGreaterThan(330);
+        expect(e.extra).toBeGreaterThanOrEqual(0);
+        confere(e, 667, topo, 0, reserva);
       }
     }
   });
@@ -99,7 +109,7 @@ describe("2. onde o card fica (o miolo nunca fica atrás da ilha, dos botões ou
     const e = encaixeDoCard({ largura: 1440, altura: 900, topoSeguro: 0, baseSeguro: 0 });
     expect(1440 / 900).toBeGreaterThan(PROPORCAO_COLUNA);
     expect(e.coluna).toBe(506);
-    expect(e.w).toBeLessThanOrEqual(e.coluna);
+    expect(e.w).toBeLessThanOrEqual(e.coluna + 2 * 84 * e.escala);
     confere(e, 900, 0, 0);
   });
 });
@@ -152,8 +162,9 @@ describe("5. a tela cheia", () => {
     expect(screen.queryByTestId("retro-salvar")).toBeNull();
     expect(screen.queryByTestId("retro-valores")).toBeNull();
     expect(screen.getByTestId("retro-compartilhar")).toBeTruthy();
-    expect(screen.getAllByTestId("retro-barras")[0].children.length).toBe(8);
-    expect(de("wrapped_cards")[0].dados).toMatchObject({ mes: "outubro", cards: "abertura,financas,treino,rotina,agua,leitura,metas,resumo", pouco_dado: false, versao: "tela-cheia" });
+    // 9 cards (com o perfil) + o adivinha
+    expect(screen.getAllByTestId("retro-barras")[0].children.length).toBe(10);
+    expect(de("wrapped_cards")[0].dados).toMatchObject({ mes: "outubro", cards: "abertura,financas,treino,rotina,agua,leitura,metas,perfil,resumo", pouco_dado: false, versao: "tela-cheia", adivinha: true });
     expect(de("wrapped_tela")[0].dados).toMatchObject({ mes: "outubro", id: "abertura", i: 0, como: "inicio", versao: "tela-cheia" });
   });
 
@@ -177,7 +188,7 @@ describe("5. a tela cheia", () => {
     fireEvent.click(screen.getByTestId("retro-anterior"));
     expect(atual()).toBe("financas");
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    expect(atual()).toBe("treino");
+    expect(atual()).toBe("adivinha");
   });
 
   it("SEGURAR pausa (o relógio para; wrapped_pausou) e soltar continua — sem pular de card", async () => {
@@ -209,7 +220,7 @@ describe("5. a tela cheia", () => {
     dedo(area, "pointerup", 200, 460);
     expect(onClose).toHaveBeenCalledTimes(1);
     unmount();
-    expect(de("wrapped_fechou")[0].dados).toMatchObject({ mes: "outubro", como: "arrastou", versao: "tela-cheia", vistos: 1, total: 8, chegou_ao_fim: false });
+    expect(de("wrapped_fechou")[0].dados).toMatchObject({ mes: "outubro", como: "arrastou", versao: "tela-cheia", vistos: 1, total: 10, chegou_ao_fim: false });
   });
 
   it("o X fecha (wrapped_fechou como 'x')", async () => {
@@ -251,7 +262,7 @@ describe("5. a tela cheia", () => {
 
   it("último card (resumo): o botão grande 'Compartilhar meu outubro' abre a mesma folha com o resumo; não passa sozinho daí", async () => {
     await abrir();
-    for (let k = 0; k < 7; k++) barraTermina();
+    for (let k = 0; k < 9; k++) fireEvent.click(screen.getByTestId("retro-proximo"));
     expect(atual()).toBe("resumo");
     barraTermina();
     expect(atual()).toBe("resumo");
@@ -260,7 +271,7 @@ describe("5. a tela cheia", () => {
     fireEvent.click(botao);
     expect(screen.getByTestId("retro-folha")).toBeTruthy();
     expect(de("wrapped_compartilhar_aberto").at(-1)!.dados).toMatchObject({ card: "resumo", origem: "final" });
-    expect(de("wrapped_tela").map((e) => e.dados.id)).toEqual(["abertura", "financas", "treino", "rotina", "agua", "leitura", "metas", "resumo"]);
+    expect(de("wrapped_tela").map((e) => e.dados.id)).toEqual(["abertura", "financas", "adivinha", "treino", "rotina", "agua", "leitura", "metas", "perfil", "resumo"]);
   });
 
   it("pouco uso: o último é o fechamento, com o mesmo botão grande", async () => {
@@ -301,3 +312,110 @@ describe("5. a tela cheia", () => {
     }
   });
 });
+
+describe("6. rodada 2 (02/11): pílula, adivinha, perfil, próximo passo", () => {
+  const ate = (id: string) => { for (let k = 0; k < 12 && atual() !== id; k++) fireEvent.click(screen.getByTestId("retro-proximo")); expect(atual()).toBe(id); };
+
+  it("a pílula 'Compartilhar' só nos cards bons de postar (Finanças, Treino, Leitura, Perfil); abre a mesma folha (origem 'pilula')", async () => {
+    await abrir();
+    const com: Record<string, boolean> = {};
+    for (let k = 0; k < 10; k++) {
+      com[atual()!] = !!screen.queryByTestId("retro-compartilhar-pilula");
+      fireEvent.click(screen.getByTestId("retro-proximo"));
+    }
+    expect(com).toMatchObject({ abertura: false, financas: true, adivinha: false, treino: true, rotina: false, agua: false, leitura: true, metas: false, perfil: true, resumo: false });
+    fireEvent.click(screen.getByTestId("retro-anterior")); // perfil
+    expect(atual()).toBe("perfil");
+    fireEvent.click(screen.getByTestId("retro-compartilhar-pilula"));
+    expect(screen.getByTestId("retro-folha")).toBeTruthy();
+    expect(de("wrapped_compartilhar_aberto").at(-1)!.dados).toMatchObject({ card: "perfil", origem: "pilula" });
+  });
+
+  it("adivinha antes do treino: 3 opções com a certa; tocar na certa → 'Acertou!' (wrapped_adivinha acertou) e o relógio anda pra passar", async () => {
+    const { tela } = await abrir();
+    ate("adivinha");
+    expect(screen.getByTestId("retro-adivinha-pergunta").textContent).toBe("Quantos dias você acha que treinou em outubro?");
+    expect(screen.queryByTestId("retro-compartilhar")).toBeNull(); // não é card: nada pra postar
+    const ops = screen.getAllByTestId("retro-adivinha-opcao").map((b) => Number(b.getAttribute("data-valor")));
+    expect(ops).toHaveLength(3);
+    expect(ops).toContain(18);
+    expect(tela.getAttribute("data-relogio")).toBe("parado"); // espera o palpite
+    fireEvent.click(screen.getAllByTestId("retro-adivinha-opcao").find((b) => b.getAttribute("data-valor") === "18")!);
+    expect(screen.getByTestId("retro-adivinha-resposta").textContent).toMatch(/Acertou!/);
+    expect(de("wrapped_adivinha")[0].dados).toMatchObject({ mes: "outubro", modulo: "treino", respondeu: true, acertou: true, como: "escolheu", versao: "tela-cheia" });
+    expect(tela.getAttribute("data-relogio")).toBe("andando");
+    barraTermina();
+    expect(atual()).toBe("treino");
+  });
+
+  it("adivinha: errou → 'Foram 18!'; sem toque, revela sozinho em 8 s (respondeu: false)", async () => {
+    await abrir();
+    ate("adivinha");
+    const errada = screen.getAllByTestId("retro-adivinha-opcao").find((b) => b.getAttribute("data-valor") !== "18")!;
+    fireEvent.click(errada);
+    expect(screen.getByTestId("retro-adivinha-resposta").textContent).toMatch(/Foram 18!/);
+    expect(de("wrapped_adivinha")[0].dados).toMatchObject({ respondeu: true, acertou: false });
+    cleanup();
+    eventos.length = 0;
+    vi.useFakeTimers();
+    await abrir();
+    ate("adivinha");
+    act(() => { vi.advanceTimersByTime(TEMPOS.adivinha + 50); });
+    expect(screen.getByTestId("retro-adivinha-resposta").textContent).toMatch(/Foram 18!/);
+    expect(de("wrapped_adivinha")[0].dados).toMatchObject({ respondeu: false, acertou: false, como: "sozinho" });
+  });
+
+  it("adivinha: passar sem responder conta como 'pulou'; com 'reduzir movimento' revela mas não passa sozinho", async () => {
+    await abrir();
+    ate("adivinha");
+    fireEvent.click(screen.getByTestId("retro-proximo"));
+    expect(atual()).toBe("treino");
+    expect(de("wrapped_adivinha")[0].dados).toMatchObject({ como: "pulou", respondeu: false });
+    cleanup();
+    movimento.reduzir = true;
+    const { tela } = await abrir();
+    ate("adivinha");
+    fireEvent.click(screen.getAllByTestId("retro-adivinha-opcao")[0]);
+    expect(screen.getByTestId("retro-adivinha").getAttribute("data-revelado")).toBe("sim");
+    expect(tela.getAttribute("data-relogio")).toBe("parado");
+  });
+
+  it("pouco uso sem número que valha: sem adivinha", async () => {
+    await abrir(SEMENTE_POUCO_1);
+    expect(screen.getAllByTestId("retro-barras")[0].children.length).toBe(3);
+    expect(de("wrapped_cards")[0].dados).toMatchObject({ adivinha: false });
+  });
+
+  it("o perfil: antes do resumo, com o evento wrapped_perfil (sem dado pessoal)", async () => {
+    await abrir();
+    ate("perfil");
+    expect(screen.getByText("Seu outubro foi…")).toBeTruthy();
+    expect(de("wrapped_perfil")[0].dados).toEqual({ mes: "outubro", perfil: "Modo atleta", modulo: "treino", versao: "tela-cheia" });
+  });
+
+  it("o próximo passo no fim: 'Novembro começa agora → registrar algo hoje' leva pro módulo do perfil (wrapped_proximo_passo; fechou como 'proximo')", async () => {
+    const { RetroOutubro } = await import("@/components/compartilhar/RetroOutubro");
+    const ir = vi.fn();
+    const onClose = vi.fn();
+    const { unmount } = render(<RetroOutubro ler={leitorDe(SEMENTE_COMPLETA)} agora={NOV} onClose={onClose} onProximoPasso={ir} />);
+    await act(async () => { await Promise.resolve(); });
+    ate("resumo");
+    const passo = screen.getByTestId("retro-proximo-passo");
+    expect(passo.textContent).toMatch(/Novembro começa agora.*registrar algo hoje/);
+    fireEvent.click(passo);
+    expect(ir).toHaveBeenCalledWith("/treino");
+    expect(de("wrapped_proximo_passo")[0].dados).toMatchObject({ mes: "outubro", destino: "/treino", card: "resumo", versao: "tela-cheia" });
+    unmount();
+    expect(de("wrapped_fechou")[0].dados).toMatchObject({ como: "proximo", chegou_ao_fim: true });
+  });
+
+  it("o card na tela cheia é mais comprido (extra), mas o da folha/postar continua 1080×1920", async () => {
+    await abrir();
+    const palco = screen.getByTestId("retro-palco");
+    expect(Number(palco.getAttribute("data-extra"))).toBeGreaterThanOrEqual(0);
+    fireEvent.click(screen.getByTestId("retro-compartilhar"));
+    const previa = screen.getByTestId("retro-folha-previa").querySelector<HTMLElement>("[data-cartao-share]")!;
+    expect(previa.style.height).toBe("1920px");
+  });
+});
+

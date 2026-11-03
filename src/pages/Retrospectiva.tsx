@@ -211,6 +211,7 @@ const Retrospectiva = () => {
         <RetroOutubro
           ler={lerRetro}
           onClose={() => setQaOutubro(false)}
+          onProximoPasso={(rota) => navigate(rota)}
           semDados={
             <div className="fixed inset-0 z-[400] grid place-items-center text-center px-8" style={{ background: "#0e0e11", color: "#fff" }}>
               <div>
@@ -235,7 +236,7 @@ const Retrospectiva = () => {
       return (
         <Suspense fallback={<div className="fixed inset-0 z-[400]" style={{ background: "#0e0e11" }} />}>
           <MarcaRetroNovaAberta />
-          <RetroOutubro ler={lerRetro} onClose={fechar} semDados={antiga} />
+          <RetroOutubro ler={lerRetro} onClose={fechar} semDados={antiga} onProximoPasso={(rota) => navigate(rota)} />
         </Suspense>
       );
     }

@@ -75,7 +75,14 @@ export const TEMPOS = {
   segurar: 220,
   /** Arrastar pra baixo mais que isto fecha. */
   arrastoFecha: 110,
+  /** (02/11) O "adivinha": sem toque, revela sozinho depois disto… */
+  adivinha: 8000,
+  /** …e a resposta fica na tela isto antes de passar pro card. */
+  resposta: 2200,
 } as const;
+
+/** (02/11) Segundos em que só a frase do card aparece antes do número entrar contando (o suspense). */
+export const SUSPENSE = 0.7;
 
 /** Quanto o card fica na tela antes de passar sozinho (ms). `duracaoAnimacao` em segundos. */
 export function tempoDoCard(id: string, duracaoAnimacao?: number | null): number {
@@ -89,16 +96,26 @@ export function tempoDoCard(id: string, duracaoAnimacao?: number | null): number
  * ------------------------------------------------------------------------- */
 
 /**
- * O card de Stories (1080×1920) tem as faixas de cima (0–250) e de baixo
- * (1680–1920) VAZIAS de propósito — a zona segura do Instagram. Na tela cheia
- * elas viram o lugar das barrinhas/botões (em cima) e do "Compartilhar meu
- * outubro" (embaixo); o que não pode ficar escondido é o miolo 250–1680.
+ * (02/11, dono: "tem muito espaço em branco no topo, as coisas só começam no meio") O card de Stories (1080×1920)
+ * tem as faixas de cima (0–250) e de baixo (1660–1920) VAZIAS de propósito — a zona segura do Instagram. Na tela
+ * cheia elas não servem pra nada: o CONTEÚDO (do chip do topo, em 250, até o fim da assinatura, em ~1660) é que
+ * é encaixado — o chip logo abaixo das barrinhas/botões, a largura com uma margem fina dos lados (a margem do
+ * card, 84 px, sai pra fora da tela), e o que sobra de altura vira `extra` (cards.tsx › AlturaExtraCtx): o card
+ * fica mais comprido só aqui e o que mora embaixo (estatísticas, assinatura) desce até o pé. Sem faixa vazia em
+ * cima nem embaixo. A imagem e o vídeo de postar não mudam (extra = 0 lá).
  */
-export const MIOLO = { topo: 250, fim: 1680 } as const;
+export const CONTEUDO = { topo: 250, fim: 1660, largura: 912 } as const;
 /** Altura das barrinhas + linha dos botões (abaixo da área segura de cima). */
 export const ALTURA_CONTROLES = 64;
-/** O espaço do botão grande do último card (acima da área segura de baixo). */
-export const RESERVA_BOTAO_FINAL = 84;
+/** O respiro entre os botões e o chip do card. */
+export const FOLGA_TOPO = 6;
+/** A margem do conteúdo até a borda da tela, dos lados. */
+export const MARGEM_LADO = 18;
+/** O que fica livre embaixo do card: nada (só o respiro), a pílula "Compartilhar" ou os botões do último card. */
+export const RESERVA_BASE = { nada: 14, pilula: 66, final: 124 } as const;
+export type ReservaBase = keyof typeof RESERVA_BASE;
+/** O card nunca cresce mais que isto (tela muito comprida: o resto é o fundo). */
+export const EXTRA_MAXIMO = 900;
 /** Tela mais larga que isto (tablet, PC): uma coluna 9:16 no meio, com fundo escuro em volta. */
 export const PROPORCAO_COLUNA = 0.62;
 
@@ -106,28 +123,28 @@ export interface Encaixe {
   /** A largura da coluna (= a tela no celular). */
   coluna: number;
   escala: number;
-  /** Onde o card fica DENTRO da coluna (px de tela). */
+  /** Onde o card fica DENTRO da coluna (px de tela). w/h já com o extra. */
   x: number;
   y: number;
   w: number;
   h: number;
+  /** px de CARD a mais de altura (o card desenhado tem 1920 + extra). */
+  extra: number;
 }
 
-export function encaixeDoCard(o: { largura: number; altura: number; topoSeguro: number; baseSeguro: number; botaoFinal?: boolean }): Encaixe {
+export function encaixeDoCard(o: { largura: number; altura: number; topoSeguro: number; baseSeguro: number; reserva?: ReservaBase }): Encaixe {
   const { w: CW, h: CH } = FORMATOS.stories;
   const H = Math.max(1, o.altura);
   const coluna = o.largura / H > PROPORCAO_COLUNA ? Math.min(o.largura, Math.round((H * CW) / CH)) : o.largura;
-  const T = o.topoSeguro + ALTURA_CONTROLES;
-  const B = o.baseSeguro + (o.botaoFinal ? RESERVA_BOTAO_FINAL : 12);
-  // de ponta a ponta na largura; só encolhe se o miolo não couber entre os controles e a base
-  const escala = Math.max(0.05, Math.min(coluna / CW, (H - T - B) / (MIOLO.fim - MIOLO.topo)));
+  const topo = o.topoSeguro + ALTURA_CONTROLES + FOLGA_TOPO;
+  const base = H - o.baseSeguro - RESERVA_BASE[o.reserva ?? "nada"];
+  // a largura manda (com a margem fina); só encolhe se o conteúdo não couber entre o topo e a base
+  const escala = Math.max(0.05, Math.min((coluna - 2 * MARGEM_LADO) / CONTEUDO.largura, (base - topo) / (CONTEUDO.fim - CONTEUDO.topo)));
+  const y = topo - CONTEUDO.topo * escala;
+  const extra = Math.max(0, Math.min(EXTRA_MAXIMO, Math.floor((base - y) / escala - CONTEUDO.fim)));
   const w = CW * escala;
-  const h = CH * escala;
-  const yMin = T - MIOLO.topo * escala;
-  const yMax = H - B - MIOLO.fim * escala;
-  const ideal = (H - h) / 2;
-  const y = Math.min(Math.max(ideal, yMin), Math.max(yMin, yMax));
-  return { coluna, escala, x: (coluna - w) / 2, y, w, h };
+  const h = (CH + extra) * escala;
+  return { coluna, escala, x: (coluna - w) / 2, y, w, h, extra };
 }
 
 /* ------------------------------------------------------------------------- *

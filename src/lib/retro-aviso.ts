@@ -52,9 +52,20 @@ export const marcarAvisoRetroNoAparelho = (uid: string): void => porNaLista(CHAV
 export const retroNovaAbertaNoAparelho = (uid: string): boolean => temNaLista(CHAVE_RETRO_NOVA_APARELHO, uid);
 export const marcarRetroNovaNoAparelho = (uid: string): void => porNaLista(CHAVE_RETRO_NOVA_APARELHO, uid);
 
-/** A janela do aviso: a nova de outubro ativa e hoje ≤ 10/11. */
+/**
+ * 02/11 noite (dono: "tira o aviso, essa experiência tá ruim"): DESLIGADO até a retrospectiva abrir em tela cheia
+ * (estilo Spotify Wrapped). "on" religa. Testes: `globalThis.__AVISO_RETRO__ = true|false` força.
+ */
+export const AVISO_RETRO = "off" as "on" | "off";
+const avisoRetroLigado = (): boolean => {
+  const g = (globalThis as { __AVISO_RETRO__?: unknown }).__AVISO_RETRO__;
+  if (g === true || g === false) return g;
+  return AVISO_RETRO === "on";
+};
+
+/** A janela do aviso: a chave ligada, a nova de outubro ativa e hoje ≤ 10/11. */
 export const janelaDoAvisoRetro = (agora: Date = new Date()): boolean =>
-  retroOutubroAtiva(RETRO_OUTUBRO.ano, RETRO_OUTUBRO.mesIdx, agora) && localDayKey(agora) <= ULTIMO_DIA_AVISO_RETRO;
+  avisoRetroLigado() && retroOutubroAtiva(RETRO_OUTUBRO.ano, RETRO_OUTUBRO.mesIdx, agora) && localDayKey(agora) <= ULTIMO_DIA_AVISO_RETRO;
 
 export interface EntradaAvisoRetro {
   userId: string | null;

@@ -13,6 +13,8 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
 
 const plat = vi.hoisted(() => ({ p: "web" as "web" | "ios" | "android" }));
+// 02/11: o aviso está DESLIGADO no código (AVISO_RETRO "off"); aqui a regra dele é testada com a chave ligada
+(globalThis as { __AVISO_RETRO__?: boolean }).__AVISO_RETRO__ = true;
 vi.mock("@/lib/native-shell", async (orig) => ({
   ...(await orig<typeof import("@/lib/native-shell")>()),
   isNativeShell: () => plat.p !== "web", plataformaApp: () => plat.p, isIOS: () => plat.p === "ios", isAndroid: () => plat.p === "android",

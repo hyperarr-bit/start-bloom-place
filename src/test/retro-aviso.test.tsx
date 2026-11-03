@@ -13,6 +13,8 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vite
 import { render, screen, fireEvent, cleanup, act, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
+// 02/11: o aviso está DESLIGADO no código (AVISO_RETRO "off"); aqui a regra dele é testada com a chave ligada
+(globalThis as { __AVISO_RETRO__?: boolean }).__AVISO_RETRO__ = true;
 vi.mock("@/lib/native-shell", async (orig) => ({ ...(await orig<typeof import("@/lib/native-shell")>()), isNativeShell: () => false }));
 const eventos = vi.hoisted(() => [] as Array<[string, Record<string, unknown>]>);
 vi.mock("@/lib/analytics", async (orig) => ({
@@ -208,5 +210,16 @@ describe("1 folha por abertura nos dois sentidos", () => {
     m.marcarAvisoRetroNestaAbertura();
     expect(m.avisoRetroApareceuNestaAbertura()).toBe(true);
     m._zerarMarcaAvisoRetroNestaAbertura();
+  });
+});
+
+describe("02/11: o aviso vem desligado no código", () => {
+  it("AVISO_RETRO = off e, sem a força dos testes, a janela fica fechada", async () => {
+    const m = await import("@/lib/retro-aviso");
+    expect(m.AVISO_RETRO).toBe("off");
+    const g = globalThis as { __AVISO_RETRO__?: boolean };
+    const antes = g.__AVISO_RETRO__;
+    delete g.__AVISO_RETRO__;
+    try { expect(m.janelaDoAvisoRetro(new Date("2026-11-03T12:00:00-03:00"))).toBe(false); } finally { g.__AVISO_RETRO__ = antes; }
   });
 });

@@ -200,7 +200,7 @@ describe("e-mail, nome do produto e UTMify", () => {
     expect(h).toContain("Seu CORE também no celular");
     expect(h).toContain("https://apps.apple.com/br/app/id6806913181");
     expect(h).toContain("play.google.com/store/apps/details?id=br.com.coreaplicativo.app");
-    expect(h).toContain("entre com este e-mail: <b style=\"color:#16121c;\">mari@exemplo.com</b>");
+    expect(h).toContain('Digite <b style="color:#16121c;">mari@exemplo.com</b>'); // 03/11: o e-mail fica no bloco "No app, toque em Entrar"
     expect(h).toContain("Nada é cobrado sozinho");
     expect(h).toContain("18/10/2027");
     expect(h).not.toMatch(/vital[ií]cio|senha que voc[eê] criou/i);

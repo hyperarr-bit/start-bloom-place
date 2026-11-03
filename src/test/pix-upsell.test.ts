@@ -282,14 +282,14 @@ describe("B. o bloco do 2027 no e-mail de compra confirmada", () => {
     expect(v).toMatchObject({ compra: "qr_vit_1", pix: { orderId: "qr_u27_1", qrCode: pix.qrCode, doEmail: true } });
     expect(voltaDoEmailU2027(new URL(link).searchParams, AGORA + 86_400_000)?.pix).toBeNull(); // vencido: a página mostra a oferta
   });
-  it("no e-mail: os 3 passos de 'Como entrar' ficam iguais e vêm ANTES do bloco; 'No computador' depois; sem extra = igual a antes", () => {
+  it("no e-mail: o 'No app, toque em Entrar' (03/11) fica igual e vêm ANTES do bloco; 'No computador' depois; sem extra = igual a antes", () => {
     const pix = { orderId: "qr_u27_1", qrCode: "000201abc", expiresAt: new Date(AGORA + 86_400_000).toISOString() };
     const bloco = htmlBlocoU2027({ compra: "qr_vit_1", pix });
     const semBloco = htmlVenda({ email: "maria@email.com", periodo: "lifetime", hoje: true });
     const comBloco = htmlVenda({ email: "maria@email.com", periodo: "lifetime", hoje: true, extra: bloco });
     expect(comBloco.replace(bloco, "")).toBe(semBloco);
     const i = comBloco.indexOf('data-bloco="u2027"');
-    expect(comBloco.indexOf("Como entrar no app")).toBeLessThan(i);
+    expect(comBloco.indexOf('data-bloco="entrar"')).toBeLessThan(i); // 03/11: os passos viraram o bloco "No app, toque em Entrar"
     expect(comBloco.indexOf("Entrar sem senha")).toBeLessThan(i);
     expect(comBloco.indexOf("Passo a passo")).toBeLessThan(i);
     expect(comBloco.indexOf("No computador")).toBeGreaterThan(i);

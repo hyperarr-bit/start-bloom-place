@@ -78,7 +78,7 @@ describe("e-mail de boas-vindas da venda", () => {
     const h = htmlVenda({ email: "ana@exemplo.com", nome: "Ana Souza", periodo: "annual", fim: "2027-10-15T15:00:00Z" });
     expect(h).toContain("Ana, seu CORE está liberado.");
     expect(h).toContain("plano anual</b> está ativo — acesso até <b>15/10/2027</b>");
-    expect(h).toContain("Entrar sem senha — receber código por e-mail");
+    expect(h).toContain("toque em <b>“Entrar sem senha”</b>"); // 03/11: e-mail mais curto
     expect(h).not.toMatch(/vital[ií]cio/i);
     expect(h).not.toMatch(/senha que você criou/i);
     expect(h).not.toMatch(/sem cart[aã]o/i);

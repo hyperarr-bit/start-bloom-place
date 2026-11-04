@@ -133,6 +133,13 @@ describe("o HTML do braço Hotmart", () => {
     expect(texto).toMatch(/Pagamento seguro pela Hotmart/);
     expect(div.querySelector("[data-hm-parcelas]")!.textContent).toBe("Pix ou cartão, em até 12x");
   });
+  it("preço do braço Hotmart (v3 e atual): espaço NÃO separável entre R$ e o número — o R$ nunca fica sozinho no fim da linha", () => {
+    const hm = [...div.querySelectorAll('[data-so-ext="hotmart"]')];
+    const comPreco = hm.filter((e) => /R\$/.test(e.textContent ?? ""));
+    expect(comPreco.length).toBeGreaterThanOrEqual(8);
+    for (const e of comPreco) expect(e.textContent).not.toMatch(/R\$[ \t\n]/);
+    expect(reaisDeCentavos(9790)).toBe("R$\u00a097,90");
+  });
   it("cada texto do braço Pix da /vida que fala de Pix tem o par do Hotmart (preço, sub, passo, FAQ, fim, selo), nos 2 braços", () => {
     const n = (sel: string, lp: string) => [...div.querySelectorAll(sel)].filter((e) => e.closest(`[data-so-lp="${lp}"]`)).length;
     expect(n('[data-so-ext="pix"]', "v2")).toBe(n('[data-so-ext="hotmart"]', "v2") - 3); // + parcelas, botão e erro do botão
@@ -212,9 +219,9 @@ describe("a /vida no jsdom", () => {
 
   it("Hotmart ON: os preços da página são o da constante (fixo e tela cheia também) e as parcelas aparecem; parcelas \"\" somem", async () => {
     await abrir({});
-    expect(document.querySelector(".lp-fixo .lp2-fixo-p b")!.textContent).toBe("R$ 97,90");
-    expect(document.querySelector(".lp2-cheia-baixo .lp2-fixo-p b")!.textContent).toBe("R$ 97,90");
-    expect(document.querySelector('#fim p[data-so-lp="v2"][data-so-ext="hotmart"]')!.textContent).toContain("R$ 97,90");
+    expect(document.querySelector(".lp-fixo .lp2-fixo-p b")!.textContent).toBe("R$\u00a097,90");
+    expect(document.querySelector(".lp2-cheia-baixo .lp2-fixo-p b")!.textContent).toBe("R$\u00a097,90");
+    expect(document.querySelector('#fim p[data-so-lp="v2"][data-so-ext="hotmart"]')!.textContent).toContain("R$\u00a097,90");
     expect(document.querySelector("[data-hm-parcelas]")).not.toBeNull();
     await abrir({ parcelas: "" });
     expect(document.querySelector("[data-hm-parcelas]")).toBeNull();

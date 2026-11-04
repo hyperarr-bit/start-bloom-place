@@ -48,4 +48,5 @@ export function urlCheckoutHotmart(base: string, args: { ref: string; src?: stri
 }
 
 /** "R$ 97,90" — o preço do braço Hotmart sai SEMPRE desta conta (constante HOTMART_PRECO_CENTAVOS no <head>). */
-export const reaisDeCentavos = (c: number): string => `R$ ${(c / 100).toFixed(2).replace(".", ",")}`;
+/** com espaço NÃO separável entre "R$" e o número (o "R$" nunca fica sozinho no fim da linha) */
+export const reaisDeCentavos = (c: number): string => `R$\u00a0${(c / 100).toFixed(2).replace(".", ",")}`;

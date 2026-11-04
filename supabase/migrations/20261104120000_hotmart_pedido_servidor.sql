@@ -25,7 +25,8 @@ CREATE POLICY "Users insert own events"
       'welcome_email_sent', 'app_winback_email', 'email_livre_enviado',
       'subscription_started', 'trial_converted', 'subscription_expired_no_payment',
       'retention_discount_applied', 'retention_offer_accepted', 'retention_offers_shown',
-      'cancel_confirmed', 'cancel_loja_bloqueado', 'support_ticket_answered', 'support_ticket_created'
+      'cancel_confirmed', 'cancel_loja_bloqueado', 'support_ticket_answered', 'support_ticket_created',
+      'hotmart_venda_ignorada', 'hotmart_email_falhou', 'hotmart_conta_divergente'
     ]::text[]))
   );
 
@@ -44,16 +45,15 @@ CREATE POLICY "Anon insert anonymous events"
       'welcome_email_sent', 'app_winback_email', 'email_livre_enviado',
       'subscription_started', 'trial_converted', 'subscription_expired_no_payment',
       'retention_discount_applied', 'retention_offer_accepted', 'retention_offers_shown',
-      'cancel_confirmed', 'cancel_loja_bloqueado', 'support_ticket_answered', 'support_ticket_created'
+      'cancel_confirmed', 'cancel_loja_bloqueado', 'support_ticket_answered', 'support_ticket_created',
+      'hotmart_venda_ignorada', 'hotmart_email_falhou', 'hotmart_conta_divergente'
     ]::text[]))
   );
 
 -- G (revisão 04/11): consultas baratas pelo pedido da Hotmart — índices PARCIAIS (só as linhas hotmart_order_created, poucas):
 --   · pela ref (o hotmart-webhook acha o pedido; o hotmart-iniciar recusa a ref repetida);
 --   · por IP + hora (o hotmart-iniciar limita 20 pedidos por IP em 10 min).
--- analytics_events é grande: rodar ANTES, à mão, com CONCURRENTLY (fora de transação) — aqui ficam IF NOT EXISTS e não
--- refazem nada se já existirem:
+-- analytics_events é grande: NÃO vão nesta migração (dentro da transação travariam a tabela). Rodar à mão, ANTES do deploy
+-- do hotmart-iniciar/hotmart-webhook, fora de transação:
 --   CREATE INDEX CONCURRENTLY IF NOT EXISTS analytics_events_hotmart_ref_idx ON public.analytics_events ((event_data->>'ref')) WHERE event_name = 'hotmart_order_created';
 --   CREATE INDEX CONCURRENTLY IF NOT EXISTS analytics_events_hotmart_ip_idx ON public.analytics_events ((event_data->>'client_ip'), created_at) WHERE event_name = 'hotmart_order_created';
-CREATE INDEX IF NOT EXISTS analytics_events_hotmart_ref_idx ON public.analytics_events ((event_data->>'ref')) WHERE event_name = 'hotmart_order_created';
-CREATE INDEX IF NOT EXISTS analytics_events_hotmart_ip_idx ON public.analytics_events ((event_data->>'client_ip'), created_at) WHERE event_name = 'hotmart_order_created';

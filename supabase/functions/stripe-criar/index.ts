@@ -6,7 +6,7 @@
  */
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { formUrl, ipPodeCriar, metadataDoPedido, paramsAtualizar, paramsCriar, validarPedidoStripe } from "../_shared/stripe-criar.ts";
+import { criarOuReaproveitar, formUrl, metadataDoPedido, validarPedidoStripe } from "../_shared/stripe-criar.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (b: Record<string, unknown>, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
@@ -36,20 +36,8 @@ serve(async (req) => {
     const ip = (req.headers.get("x-forwarded-for") ?? req.headers.get("cf-connecting-ip") ?? "").split(",")[0]?.trim() || null;
     const md = metadataDoPedido(p, { userId, ip, ua: req.headers.get("user-agent"), agoraIso: new Date().toISOString() });
 
-    if (p.pi) {
-      // atualizar: só o PI desta ref (a página não troca o de outra pessoa) e só o e-mail/sinais — nunca o valor
-      const atual = await stripe(`payment_intents/${p.pi}`, null);
-      if (!atual.ok || (atual.j.metadata as Record<string, string> | undefined)?.ref !== p.ref) return json({ ok: false }, 404);
-      if (["succeeded", "canceled"].includes(String(atual.j.status))) return json({ ok: true, client_secret: atual.j.client_secret, pi: p.pi });
-      const up = await stripe(`payment_intents/${p.pi}`, paramsAtualizar(md, p.email));
-      if (!up.ok) { log("atualizar falhou", { status: String((up.j.error as Record<string, unknown> | undefined)?.code ?? "") }); return json({ ok: false }, 502); }
-      return json({ ok: true, client_secret: up.j.client_secret, pi: p.pi });
-    }
-    if (!(await ipPodeCriar(admin, ip))) { log("limite por IP"); return json({ ok: false, limite: true }, 429); }
-    const r = await stripe("payment_intents", paramsCriar(md, p.email), `oferta-${p.ref}`);
-    if (!r.ok || typeof r.j.client_secret !== "string") { log("criar falhou", { code: String((r.j.error as Record<string, unknown> | undefined)?.code ?? "") }); return json({ ok: false }, 502); }
-    await admin.from("analytics_events").insert({ event_name: "stripe_order_created", user_id: userId, session_id: p.landing_session_id, event_data: { ref: p.ref, pi: r.j.id, pagina: "oferta", ...(ip ? { client_ip: ip } : {}), ...p.atrib } }).then(() => {}, () => {});
-    return json({ ok: true, client_secret: r.j.client_secret, pi: r.j.id });
+    const r = await criarOuReaproveitar({ admin, stripe, log }, p, md, { userId, ip });
+    return json(r.corpo, r.status);
   } catch (e) {
     log("erro", { msg: String(e).slice(0, 120) });
     return json({ ok: false }, 500);

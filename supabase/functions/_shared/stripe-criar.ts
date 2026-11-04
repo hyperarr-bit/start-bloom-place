@@ -44,26 +44,39 @@ export function metadataDoPedido(p: PedidoStripe, args: { userId: string | null;
   return out;
 }
 
-/** o form-encoded do POST /v1/payment_intents (criar). Pix + cartão; parcelas no cartão (installments BR); Pix vale 30 min. */
-export function paramsCriar(md: Record<string, string>, email: string | null): Array<[string, string]> {
-  const out: Array<[string, string]> = [
+/**
+ * O POST /v1/payment_intents (criar) — SÓ campos FIXOS da ref (revisão 05/11): com Idempotency-Key oferta-<ref>, a Stripe devolve
+ * o MESMO PaymentIntent numa recarga; um campo que muda (hora, IP, UA, fbp) dava idempotency_error por 24 h. Pix + cartão;
+ * parcelas no cartão (installments BR); Pix vale 30 min. Os sinais variáveis vão depois, pelo atualizar.
+ */
+export function paramsCriar(ref: string): Array<[string, string]> {
+  return [
     ["amount", String(STRIPE_PRECO_CENTAVOS)], ["currency", "brl"],
     ["payment_method_types[]", "card"], ["payment_method_types[]", "pix"],
     ["payment_method_options[card][installments][enabled]", "true"],
     ["payment_method_options[pix][expires_after_seconds]", "1800"],
     ["description", "CORE vitalicio"], ["statement_descriptor_suffix", "CORE"],
+    ["metadata[ref]", ref], ["metadata[pagina]", PAGINA_STRIPE],
   ];
+}
+
+/** O POST /v1/payment_intents/<id> (atualizar): o e-mail e os sinais do navegador (variáveis). O valor NUNCA é reenviado. */
+export function paramsAtualizar(md: Record<string, string>, email: string | null): Array<[string, string]> {
+  const out: Array<[string, string]> = [];
   if (email) out.push(["receipt_email", email]);
-  for (const [k, v] of Object.entries(md)) out.push([`metadata[${k}]`, v]);
+  for (const [k, v] of Object.entries(md)) if (k !== "ref" && k !== "pagina") out.push([`metadata[${k}]`, v]);
   return out;
 }
 
-/** o POST /v1/payment_intents/<id> (atualizar: o e-mail digitado na hora de pagar). O valor NÃO é reenviado. */
-export function paramsAtualizar(md: Record<string, string>, email: string | null): Array<[string, string]> {
-  const out: Array<[string, string]> = [];
-  if (email) out.push(["receipt_email", email], ["metadata[email]", email]);
-  for (const k of ["user_id", "fbp", "fbc"]) if (md[k]) out.push([`metadata[${k}]`, md[k]]);
-  return out;
+/** status em que ainda dá pra atualizar o PI (depois de confirmado, só lê) */
+export const PODE_ATUALIZAR = new Set(["requires_payment_method", "requires_confirmation"]);
+
+/** o Pix pendente do PI (pra recarga mostrar o MESMO QR) */
+export function pixDoIntento(j: Record<string, unknown>): { data?: string; image_url_png?: string; expires_at?: number } | null {
+  const na = j.next_action as { type?: string; pix_display_qr_code?: { data?: string; image_url_png?: string; expires_at?: number } } | null | undefined;
+  if (j.status !== "requires_action" || na?.type !== "pix_display_qr_code" || !na.pix_display_qr_code) return null;
+  const q = na.pix_display_qr_code;
+  return { data: q.data, image_url_png: q.image_url_png, expires_at: q.expires_at };
 }
 
 export const formUrl = (pares: Array<[string, string]>) => pares.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
@@ -90,4 +103,43 @@ export function respostaStatus(pi: { metadata?: Record<string, string> | null; s
   if (!pi || pi.metadata?.ref !== ref || pi.metadata?.pagina !== PAGINA_STRIPE) return { ok: false };
   const lc = pi.latest_charge && typeof pi.latest_charge === "object" ? pi.latest_charge : null;
   return { ok: true, status: pi.status, pago: pi.status === "succeeded", metodo: lc?.payment_method_details?.type ?? null };
+}
+
+/* ───────── o fluxo do stripe-criar (revisão 05/11), com a Stripe e o banco injetados (testado no vitest) ───────── */
+export type ChamarStripe = (caminho: string, pares: Array<[string, string]> | null, idem?: string) => Promise<{ ok: boolean; j: Record<string, unknown> }>;
+/**
+ * 1º o PI que a página já tem (sessionStorage); 2º o desta ref (stripe_order_created); só então cria — com Idempotency-Key
+ * oferta-<ref> e SÓ campos fixos (a recarga recebe o mesmo PI, nunca idempotency_error). Os sinais variáveis vão no atualizar,
+ * enquanto o PI aceita. Devolve o client_secret, o status e o Pix pendente (a recarga mostra o MESMO QR).
+ */
+export async function criarOuReaproveitar(
+  deps: { admin: ClienteMin; stripe: ChamarStripe; log: (m: string, d?: Record<string, unknown>) => void; agoraMs?: number },
+  p: PedidoStripe, md: Record<string, string>, ctx: { userId: string | null; ip: string | null },
+): Promise<{ status: number; corpo: Record<string, unknown> }> {
+  const { admin, stripe, log } = deps;
+  let pi = p.pi;
+  if (!pi) {
+    try {
+      const { data: ja } = await admin.from("analytics_events").select("event_data").eq("event_name", "stripe_order_created").eq("event_data->>ref", p.ref).limit(1);
+      const achado = (ja?.[0]?.event_data as { pi?: string } | undefined)?.pi;
+      if (typeof achado === "string" && /^pi_/.test(achado)) pi = achado;
+    } catch { /* cria (a chave de idempotência ainda segura o 2º) */ }
+  }
+  let j: Record<string, unknown>;
+  if (pi) {
+    const atual = await stripe(`payment_intents/${pi}`, null);
+    if (!atual.ok || (atual.j.metadata as Record<string, string> | undefined)?.ref !== p.ref) return { status: 404, corpo: { ok: false } };
+    j = atual.j;
+  } else {
+    if (!(await ipPodeCriar(admin, ctx.ip, deps.agoraMs))) { log("limite por IP"); return { status: 429, corpo: { ok: false, limite: true } }; }
+    const r = await stripe("payment_intents", paramsCriar(p.ref), `oferta-${p.ref}`);
+    if (!r.ok || typeof r.j.client_secret !== "string") { log("criar falhou", { code: String((r.j.error as Record<string, unknown> | undefined)?.code ?? "") }); return { status: 502, corpo: { ok: false } }; }
+    j = r.j;
+    try { await admin.from("analytics_events").insert({ event_name: "stripe_order_created", user_id: ctx.userId, session_id: p.landing_session_id, event_data: { ref: p.ref, pi: j.id, pagina: PAGINA_STRIPE, ...(ctx.ip ? { client_ip: ctx.ip } : {}), ...p.atrib } }); } catch { /* o PI existe; a próxima recarga acha pela chave */ }
+  }
+  if (PODE_ATUALIZAR.has(String(j.status))) {
+    const up = await stripe(`payment_intents/${j.id}`, paramsAtualizar(md, p.email));
+    if (up.ok) j = up.j; else log("atualizar falhou", { code: String((up.j.error as Record<string, unknown> | undefined)?.code ?? "") });
+  }
+  return { status: 200, corpo: { ok: true, client_secret: j.client_secret, pi: j.id, status: j.status, pix: pixDoIntento(j) } };
 }

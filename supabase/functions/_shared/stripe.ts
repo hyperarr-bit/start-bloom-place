@@ -115,8 +115,10 @@ export async function tratarStripe(deps: DepsStripe, req: { assinatura: string |
     log("assinatura recusada", { tem_secret: !!deps.secret, veio: !!req.assinatura });
     return { status: 401, corpo: { ok: false } };
   }
-  let evt: { id?: string; type?: string; data?: { object?: Record<string, unknown> } };
+  let evt: { id?: string; type?: string; livemode?: boolean; data?: { object?: Record<string, unknown> } };
   try { evt = JSON.parse(req.corpo); } catch { return { status: 400, corpo: { ok: false } }; }
+  // revisão 05/11: evento de TESTE (modo teste da Stripe / "enviar evento de teste") só vai pro log — nunca libera nem desliga
+  if (evt.livemode !== true) { log("evento de teste (livemode false) — só log", { tipo: String(evt.type ?? "") }); return { status: 200, corpo: { ok: true, ignorado: "teste" } }; }
   const tipo = String(evt.type ?? ""), evtId = String(evt.id ?? "");
   const obj = evt.data?.object ?? {};
   const TRATA = ["payment_intent.succeeded", "charge.refunded", "charge.dispute.created"];

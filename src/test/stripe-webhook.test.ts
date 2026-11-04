@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createHmac } from "node:crypto";
 import { assinaturaOk, tratarStripe, STRIPE_PRECO_CENTAVOS, type DepsStripe } from "../../supabase/functions/_shared/stripe";
-import { ipPodeCriar, metadataDoPedido, paramsAtualizar, paramsCriar, respostaStatus, validarPedidoStripe, LIMITE_POR_IP } from "../../supabase/functions/_shared/stripe-criar";
+import { criarOuReaproveitar, ipPodeCriar, metadataDoPedido, paramsAtualizar, paramsCriar, respostaStatus, validarPedidoStripe, LIMITE_POR_IP, type ChamarStripe } from "../../supabase/functions/_shared/stripe-criar";
 import { tituloVenda, vendaPix } from "../../supabase/functions/_shared/aviso-venda";
 import { funilOferta, resumoDoDia, taxaSiteCents, vendasDoDia } from "../../supabase/functions/_shared/vendas-painel";
 
@@ -80,7 +80,7 @@ function montar() {
 }
 const assinar = (corpo: string, t = Math.floor(AGORA.getTime() / 1000), segredo = WHSEC) => `t=${t},v1=${createHmac("sha256", segredo).update(`${t}.${corpo}`).digest("hex")}`;
 let nEvt = 0;
-const evento = (type: string, object: Linha, id = `evt_${++nEvt}`) => JSON.stringify({ id, type, data: { object } });
+const evento = (type: string, object: Linha, id = `evt_${++nEvt}`, livemode = true) => JSON.stringify({ id, type, livemode, data: { object } });
 const pi = (o: Partial<Linha> & { metadata?: Linha } = {}) => ({
   id: "pi_3Abc", object: "payment_intent", amount: 6790, amount_received: 6790, currency: "brl", status: "succeeded", livemode: true, latest_charge: "ch_1",
   ...o, metadata: { ref: "0f8a5c2e-1111-4222-8333-944455556666", pagina: "oferta", email: "maria@exemplo.com", fbp: "fb.1.1.abc", fbclid: "IwAR_x", ip: "200.1.2.3", ua: "Mozilla/5.0 iPhone", url: "https://www.coreaplicativo.com.br/oferta?utm_content=c7", criado_em: "2026-11-04T14:58:00.000Z", ...(o.metadata ?? {}) },
@@ -239,7 +239,7 @@ describe("stripe-criar / stripe-status", () => {
     const md = metadataDoPedido(p, { userId: "u1", ip: "1.2.3.4", ua: "UA", agoraIso: "2026-11-04T15:00:00Z" });
     expect(md).toMatchObject({ ref: REF, pagina: "oferta", email: "maria@exemplo.com", user_id: "u1", ip: "1.2.3.4", ua: "UA", utm_content: "c7" });
     expect(md).not.toHaveProperty("lixo");
-    const pares = paramsCriar(md, p.email);
+    const pares = paramsCriar(REF);
     expect(pares).toContainEqual(["amount", String(STRIPE_PRECO_CENTAVOS)]);
     expect(pares.filter(([k]) => k === "amount")).toHaveLength(1);
     expect(pares).toContainEqual(["currency", "brl"]);
@@ -247,11 +247,16 @@ describe("stripe-criar / stripe-status", () => {
     expect(pares).toContainEqual(["payment_method_options[card][installments][enabled]", "true"]);
     expect(pares).toContainEqual(["payment_method_options[pix][expires_after_seconds]", "1800"]);
     expect(paramsAtualizar(md, "maria@exemplo.com").some(([k]) => k === "amount")).toBe(false);
+    // revisão: o criar leva SÓ campos fixos da ref (nada de hora/IP/UA/fbp/e-mail) — a Idempotency-Key devolve o mesmo PI
+    expect(pares.filter(([k]) => k.startsWith("metadata[")).map(([k]) => k)).toEqual(["metadata[ref]", "metadata[pagina]"]);
+    expect(pares.some(([k]) => k === "receipt_email")).toBe(false);
+    expect(paramsAtualizar(md, "maria@exemplo.com")).toEqual(expect.arrayContaining([["receipt_email", "maria@exemplo.com"], ["metadata[ip]", "1.2.3.4"], ["metadata[criado_em]", "2026-11-04T15:00:00Z"]]));
     expect(validarPedidoStripe({ ref: "x" })).toBeNull();
     expect(validarPedidoStripe({ ref: REF, pi: "nao_e_pi" })!.pi).toBeNull();
     const fn = readFileSync(resolve(__dirname, "../../supabase/functions/stripe-criar/index.ts"), "utf8");
     expect(fn).toContain('"Idempotency-Key"');
-    expect(fn).toContain("`oferta-${p.ref}`");
+    expect(fn).toContain("criarOuReaproveitar(");
+    expect(readFileSync(resolve(__dirname, "../../supabase/functions/_shared/stripe-criar.ts"), "utf8")).toContain("`oferta-${p.ref}`");
   });
   it(`limite de ${LIMITE_POR_IP} PaymentIntents por IP em 10 min`, async () => {
     const m = montar();
@@ -298,5 +303,78 @@ describe("/vendas com a Stripe", () => {
     const novo = m("20261106120000_stripe_oferta_servidor.sql");
     expect(novo.match(/'stripe_order_created', 'stripe_venda', 'stripe_venda_ignorada', 'stripe_email_falhou', 'stripe_conta_divergente'/g)).toHaveLength(2);
     expect(novo.split("\n").filter((l) => /CREATE INDEX/i.test(l) && !l.trim().startsWith("--"))).toHaveLength(0);
+  });
+});
+
+/* ───────── revisão 05/11 ───────── */
+/** uma Stripe falsa com a regra de verdade da Idempotency-Key: mesma chave + parâmetros diferentes = idempotency_error */
+function stripeFalsa() {
+  const pis = new Map<string, Linha>();
+  const chaves = new Map<string, { corpo: string; pi: string }>();
+  let n = 0;
+  const chamadas: string[] = [];
+  const f: ChamarStripe = async (caminho, pares, idem) => {
+    chamadas.push(`${pares ? "POST" : "GET"} ${caminho}`);
+    if (caminho === "payment_intents" && pares) {
+      const corpo = JSON.stringify(pares);
+      if (idem && chaves.has(idem)) { const c = chaves.get(idem)!; if (c.corpo !== corpo) return { ok: false, j: { error: { type: "idempotency_error", code: "idempotency_key_in_use" } } }; return { ok: true, j: { ...pis.get(c.pi)! } }; }
+      const id = `pi_${++n}`;
+      const md: Record<string, string> = {}; for (const [k, v] of pares) { const m = /^metadata\[(.+)\]$/.exec(k); if (m) md[m[1]] = v; }
+      pis.set(id, { id, client_secret: `${id}_secret_x`, status: "requires_payment_method", amount: 6790, metadata: md });
+      if (idem) chaves.set(idem, { corpo, pi: id });
+      return { ok: true, j: { ...pis.get(id)! } };
+    }
+    const m = /^payment_intents\/(pi_\w+)$/.exec(caminho);
+    if (m) {
+      const p = pis.get(m[1]); if (!p) return { ok: false, j: {} };
+      if (pares) { for (const [k, v] of pares) { const mm = /^metadata\[(.+)\]$/.exec(k); if (mm) (p.metadata as Record<string, string>)[mm[1]] = v; else p[k] = v; } }
+      return { ok: true, j: { ...p, metadata: { ...(p.metadata as Linha) } } };
+    }
+    return { ok: false, j: {} };
+  };
+  return { f, pis, chamadas };
+}
+describe("revisão: stripe-criar na recarga", () => {
+  const REF = "0f8a5c2e-1111-4222-8333-944455556666";
+  const pedido = (o: Linha = {}) => validarPedidoStripe({ ref: REF, ...o })!;
+  const md = (ip: string, hora: string) => metadataDoPedido(pedido(), { userId: null, ip, ua: "UA", agoraIso: hora });
+  it("recarga com a mesma ref (outra hora/IP/UA, sem o pi na página): o MESMO client_secret, sem idempotency_error, 1 PI só", async () => {
+    const m = montar(); const s = stripeFalsa();
+    const r1 = await criarOuReaproveitar({ admin: m.admin as never, stripe: s.f, log: () => {} }, pedido(), md("1.1.1.1", "2026-11-04T15:00:00Z"), { userId: null, ip: "1.1.1.1" });
+    expect(r1).toMatchObject({ status: 200, corpo: { ok: true, client_secret: "pi_1_secret_x", pi: "pi_1" } });
+    // a recarga: o banco acha o PI pela ref (stripe_order_created) → GET + atualizar
+    const r2 = await criarOuReaproveitar({ admin: m.admin as never, stripe: s.f, log: () => {} }, pedido(), md("2.2.2.2", "2026-11-04T15:05:00Z"), { userId: null, ip: "2.2.2.2" });
+    expect(r2).toMatchObject({ status: 200, corpo: { client_secret: "pi_1_secret_x", pi: "pi_1" } });
+    expect(s.pis.size).toBe(1);
+    expect((s.pis.get("pi_1")!.metadata as Linha).ip).toBe("2.2.2.2"); // o sinal novo foi pelo atualizar
+    // mesmo sem o registro no banco (insert falhou), a chave de idempotência devolve o mesmo PI (só campos fixos)
+    const m2 = montar(); const r3 = await criarOuReaproveitar({ admin: m2.admin as never, stripe: s.f, log: () => {} }, pedido(), md("3.3.3.3", "2026-11-04T16:00:00Z"), { userId: null, ip: "3.3.3.3" });
+    expect(r3.corpo).toMatchObject({ client_secret: "pi_1_secret_x" });
+    expect(s.pis.size).toBe(1);
+  });
+  it("Pix pendente: a recarga (com o pi guardado na aba) devolve o MESMO QR e não mexe no PI", async () => {
+    const m = montar(); const s = stripeFalsa();
+    await criarOuReaproveitar({ admin: m.admin as never, stripe: s.f, log: () => {} }, pedido(), md("1.1.1.1", "x"), { userId: null, ip: "1.1.1.1" });
+    Object.assign(s.pis.get("pi_1")!, { status: "requires_action", next_action: { type: "pix_display_qr_code", pix_display_qr_code: { data: "000201PIXMESMO", image_url_png: "https://qr/x.png", expires_at: 1893456000 } } });
+    const antes = s.chamadas.length;
+    const r = await criarOuReaproveitar({ admin: m.admin as never, stripe: s.f, log: () => {} }, pedido({ pi: "pi_1" }), md("9.9.9.9", "y"), { userId: null, ip: "9.9.9.9" });
+    expect(r.corpo).toMatchObject({ client_secret: "pi_1_secret_x", status: "requires_action", pix: { data: "000201PIXMESMO", image_url_png: "https://qr/x.png" } });
+    expect(s.chamadas.slice(antes)).toEqual(["GET payment_intents/pi_1"]); // não atualiza PI já confirmado
+  });
+  it("PI de outra ref → 404 (a página não mexe no pedido de outra pessoa)", async () => {
+    const m = montar(); const s = stripeFalsa();
+    await criarOuReaproveitar({ admin: m.admin as never, stripe: s.f, log: () => {} }, pedido(), md("1.1.1.1", "x"), { userId: null, ip: "1.1.1.1" });
+    const outra = validarPedidoStripe({ ref: "aaaaaaaa-1111-4222-8333-944455556666", pi: "pi_1" })!;
+    expect((await criarOuReaproveitar({ admin: m.admin as never, stripe: s.f, log: () => {} }, outra, {}, { userId: null, ip: null })).status).toBe(404);
+  });
+});
+describe("revisão: livemode", () => {
+  it("evento de teste (livemode false) só loga — não libera, não desliga, não alarma", async () => {
+    const m = montar();
+    expect((await mandar(m, evento("payment_intent.succeeded", pi({ livemode: false }), undefined, false))).corpo).toMatchObject({ ignorado: "teste" });
+    expect((await mandar(m, evento("charge.refunded", { id: "ch_1", payment_intent: "pi_3Abc", refunded: true }, undefined, false))).corpo).toMatchObject({ ignorado: "teste" });
+    expect(m.db.subscriptions).toHaveLength(0);
+    expect(m.saida.push).toHaveLength(0);
+    expect(m.db.webhook_events.size).toBe(0);
   });
 });

@@ -13,6 +13,9 @@
  *               Purchase CAPI nos 2 pixels (event_id = id do PI, valor real) e o aviso do dono.
  *   estorno     charge.refunded (total) e charge.dispute.created → a linha daquele PI vira canceled; pago depois não libera.
  * Idempotência: `stripe-evt:<id do evento>` + as travas por PI. Nada de e-mail/segredo no log.
+ * CPF (nota fiscal, 04/11): fica SÓ na metadata[cpf] do PaymentIntent na Stripe (gravado pelo atualizar do stripe-criar). Não há
+ * tabela própria pra nota no banco, e a linha da assinatura não é lugar de CPF: a nota é emitida lendo o PI na Stripe
+ * (Pagamentos → o PI → Metadados → cpf). Este webhook nunca lê, grava ou loga o CPF.
  */
 import { creditarPedido } from "./grant-pix.ts";
 import { assuntoVenda, htmlVenda } from "./email-venda.ts";

@@ -428,3 +428,36 @@ describe("reconferência: e-mail no PI, cancelado, criado_em, e-mail da cobranç
     expect((await mandar(m2, evento("payment_intent.succeeded", pi({ receipt_email: null, metadata: { email: "" } })))).corpo).toMatchObject({ ignorado: "sem_conta" });
   });
 });
+
+/* ───────── CPF (nota fiscal) ───────── */
+describe("CPF: 2ª trava no servidor, só na metadata do PI", () => {
+  const REF = "0f8a5c2e-1111-4222-8333-944455556666";
+  const VALIDO = "52998224725";
+  it("stripe-criar: CPF inválido recusa o pedido; válido (com ou sem pontuação) vira só dígitos", () => {
+    expect(validarPedidoStripe({ ref: REF, cpf: "529.982.247-24" })).toBeNull();
+    expect(validarPedidoStripe({ ref: REF, cpf: "111.111.111-11" })).toBeNull();
+    expect(validarPedidoStripe({ ref: REF, cpf: "529.982.247-25" })!.cpf).toBe(VALIDO);
+    expect(validarPedidoStripe({ ref: REF })!.cpf).toBeNull();
+  });
+  it("só no atualizar (metadata[cpf]); nunca no criar idempotente, nunca na metadata geral nem no stripe_order_created", async () => {
+    const p = validarPedidoStripe({ ref: REF, cpf: VALIDO, email: "maria@exemplo.com" })!;
+    const md = metadataDoPedido(p, { userId: null, ip: "1.1.1.1", ua: "UA", agoraIso: "x" });
+    expect(JSON.stringify(md)).not.toContain(VALIDO);
+    expect(JSON.stringify(paramsCriar(REF))).not.toContain(VALIDO);
+    expect(paramsAtualizar(md, p.email, {}, p.cpf)).toContainEqual(["metadata[cpf]", VALIDO]);
+    expect(JSON.stringify(paramsAtualizar(md, p.email, {}, p.cpf))).not.toContain("tax_id");
+    const m = montar(); const s = stripeFalsa();
+    const logs: string[] = [];
+    await criarOuReaproveitar({ admin: m.admin as never, stripe: s.f, log: (a, d) => logs.push(`${a} ${JSON.stringify(d ?? {})}`) }, validarPedidoStripe({ ref: REF })!, md, { userId: null, ip: "1.1.1.1" });
+    await criarOuReaproveitar({ admin: m.admin as never, stripe: s.f, log: (a, d) => logs.push(`${a} ${JSON.stringify(d ?? {})}`) }, p, md, { userId: null, ip: "1.1.1.1" });
+    expect((s.pis.get("pi_1")!.metadata as Linha).cpf).toBe(VALIDO);
+    expect(JSON.stringify(m.db.analytics_events) + logs.join("\n")).not.toContain(VALIDO);
+  });
+  it("webhook: o CPF da metadata nunca vai pra banco, log, CAPI nem e-mail", async () => {
+    const m = montar();
+    await mandar(m, evento("payment_intent.succeeded", pi({ metadata: { cpf: VALIDO } })));
+    expect(m.db.subscriptions).toHaveLength(1);
+    const tudo = JSON.stringify(m.db.subscriptions) + JSON.stringify(m.db.analytics_events) + m.saida.logs.join("\n") + JSON.stringify(m.saida.capi) + JSON.stringify(m.saida.emails) + JSON.stringify([...m.db.webhook_events.keys()]);
+    expect(tudo).not.toContain(VALIDO);
+  });
+});

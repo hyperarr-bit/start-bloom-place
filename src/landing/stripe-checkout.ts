@@ -19,11 +19,14 @@
  */
 import { EMAIL_OK, URL_APP_STORE, sugestaoDeEmail, urlPlay } from "./regras";
 import { reaisDeCentavos } from "./hotmart";
+import { cpfValido, mascararCpf, soDigitosCpf } from "../../supabase/functions/_shared/cpf";
 
 export type Evento = (nome: string, dados?: Record<string, unknown>) => void;
 export type Pixel = (ev: string, params?: Record<string, unknown>, eventID?: string) => void;
 export type OpcoesCheckout = {
   pk: string; precoCentavos: number; parcelasMax: number; producao: boolean;
+  /** STRIPE_PEDE_CPF no <head> (nota fiscal): o campo de CPF abaixo do e-mail */
+  pedeCpf?: boolean;
   evento: Evento; pixel: Pixel; atrib: Record<string, string>; sessao: string; aparelho: string; urlChegada: string; fbclid: string | null;
   voltaDoBanco?: { pi: string; status: string };
 };
@@ -223,7 +226,8 @@ const ICO_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const ICO_CADEADO = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
 
 type Fase = "form" | "pix" | "aguardando" | "pago" | "recebido";
-type Estado = { fase: Fase; ref: string; pi: string | null; clientSecret: string | null; metodo: string; pix: PixQr | null; email: string };
+/** o CPF fica SÓ na memória desta página (nada de storage, evento ou log) e vai só pro stripe-criar */
+type Estado = { fase: Fase; ref: string; pi: string | null; clientSecret: string | null; metodo: string; pix: PixQr | null; email: string; cpf: string };
 
 let raiz: HTMLElement | null = null;
 let opc: OpcoesCheckout | null = null;
@@ -297,6 +301,9 @@ function telaForm() {
     <input class="oc-campo" id="oc-email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="254" placeholder="voce@email.com" value="${esc(est!.email)}" />
     <button type="button" class="oc-sug" id="oc-sug" hidden></button>
     <p class="oc-erro" id="oc-email-erro" role="alert" hidden></p>
+    ${o.pedeCpf ? `<label class="oc-rot" for="oc-cpf">CPF <span>· pra nota fiscal</span></label>
+    <input class="oc-campo" id="oc-cpf" type="text" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00" value="${esc(mascararCpf(est!.cpf))}" />
+    <p class="oc-erro" id="oc-cpf-erro" role="alert" hidden></p>` : ""}
     <div class="oc-pe" id="oc-pe"><div class="oc-pe-carregando">Carregando o pagamento…</div></div>
     <p class="oc-erro" id="oc-erro" role="alert" hidden></p>
     <button type="button" class="oc-cta" id="oc-pagar">Pagar ${esc(preco())}</button>
@@ -310,17 +317,20 @@ function telaForm() {
   campo.addEventListener("input", () => { est!.email = campo.value; erroEmail(null); atualizarSug(); });
   campo.addEventListener("blur", atualizarSug);
   sug.addEventListener("click", () => { campo.value = sug.dataset.s ?? campo.value; est!.email = campo.value; sug.hidden = true; o.evento("landing_email_antes_sugestao", { onde: "stripe" }); });
+  const cpf = alvo.querySelector<HTMLInputElement>("#oc-cpf");
+  cpf?.addEventListener("input", () => { const m = mascararCpf(cpf.value); if (cpf.value !== m) cpf.value = m; est!.cpf = soDigitosCpf(m); erroCpf(null); });
   alvo.querySelector("#oc-pagar")!.addEventListener("click", () => { void pagar(); });
   void montarElemento();
 }
 
 function erroEmail(m: string | null) { const e = raiz?.querySelector<HTMLElement>("#oc-email-erro"); if (e) { e.hidden = !m; e.textContent = m ?? ""; } }
+function erroCpf(m: string | null) { const e = raiz?.querySelector<HTMLElement>("#oc-cpf-erro"); if (e) { e.hidden = !m; e.textContent = m ?? ""; } }
 function erroGeral(m: string | null) { const e = raiz?.querySelector<HTMLElement>("#oc-erro"); if (e) { e.hidden = !m; e.textContent = m ?? ""; } }
 
-async function garantirIntento(email: string | null): Promise<boolean> {
+async function garantirIntento(email: string | null, cpf: string | null = null): Promise<boolean> {
   const o = opc!;
   const r = await api!.criar({
-    ref: est!.ref, pi: est!.pi, email, pagina: "oferta",
+    ref: est!.ref, pi: est!.pi, email, pagina: "oferta", ...(cpf ? { cpf } : {}),
     fbp: lerCookie("_fbp"), fbc: lerCookie("_fbc"), fbclid: o.fbclid, url: o.urlChegada.slice(0, 500),
     landing_session_id: o.sessao, landing_device_id: o.aparelho, atrib: o.atrib,
   }).catch(() => ({ ok: false } as RespostaCriar));
@@ -361,6 +371,14 @@ async function pagar() {
   const email = campo.value.trim().toLowerCase();
   if (!email) { erroEmail("Digite seu e-mail: é por ele que você entra no CORE."); campo.focus(); o.evento("landing_email_antes_erro", { motivo: "vazio", onde: "stripe" }); return; }
   if (!EMAIL_OK.test(email)) { erroEmail("Confira o e-mail: parece que falta alguma coisa."); campo.focus(); o.evento("landing_email_antes_erro", { motivo: "invalido", onde: "stripe" }); return; }
+  // CPF (nota fiscal): só os dígitos, conferidos aqui e de novo no servidor; nunca vai pra evento/log (só o motivo do erro)
+  let cpf: string | null = null;
+  if (o.pedeCpf) {
+    const campoCpf = raiz!.querySelector<HTMLInputElement>("#oc-cpf");
+    cpf = soDigitosCpf(campoCpf?.value);
+    if (!cpfValido(cpf)) { erroCpf("Confira o CPF: os números não batem."); campoCpf?.focus(); o.evento("landing_cpf_erro", { motivo: cpf.length ? "invalido" : "vazio" }); return; }
+    est.cpf = cpf;
+  }
   if (!stripe || !elementos || !est.clientSecret) { erroGeral("O pagamento ainda está carregando. Tente de novo em instantes."); return; }
   pagando = true;
   const botao = raiz!.querySelector<HTMLButtonElement>("#oc-pagar")!;
@@ -369,7 +387,7 @@ async function pagar() {
   est.email = email;
   try {
     o.evento("landing_stripe_pagar", { metodo: est.metodo });
-    if (!(await garantirIntento(email))) { erroGeral("Não consegui registrar o pagamento. Tente de novo em instantes."); return; }
+    if (!(await garantirIntento(email, cpf))) { erroGeral("Não consegui registrar o pagamento. Tente de novo em instantes."); return; }
     const sub = await elementos.submit();
     if (sub?.error) { erroGeral(sub.error.message ?? "Confira os dados do pagamento."); return; }
     if (est.metodo === "pix") {
@@ -518,7 +536,7 @@ export async function abrirCheckout(o: OpcoesCheckout): Promise<void> {
   travar();
   try { history.pushState({ ofertaCheckout: 1 }, ""); comHistorico = true; } catch { comHistorico = false; }
   window.addEventListener("popstate", aoVoltarNavegador);
-  if (!est) { const ref = refDaAba(); est = { fase: "form", ref, pi: piDaAba(ref), clientSecret: null, metodo: "card", pix: null, email: "" }; }
+  if (!est) { const ref = refDaAba(); est = { fase: "form", ref, pi: piDaAba(ref), clientSecret: null, metodo: "card", pix: null, email: "", cpf: "" }; }
   if (o.voltaDoBanco) {
     est.pi = o.voltaDoBanco.pi;
     est.fase = "aguardando"; telaAguardando();

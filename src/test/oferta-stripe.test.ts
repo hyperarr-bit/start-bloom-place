@@ -93,7 +93,7 @@ let statusPago = false;
 let confirmados: Array<{ tipo: string; args: unknown[] }> = [];
 let pixRetorno: Record<string, unknown> | null = null;
 let fbq: ReturnType<typeof vi.fn>;
-async function abrirPagina(o: { pagina?: "oferta" | null; url?: string; antes?: () => void; criar?: (c: Chamada) => Promise<Record<string, unknown>>; status?: () => Promise<Record<string, unknown>> } = {}) {
+async function abrirPagina(o: { pagina?: "oferta" | null; url?: string; pedeCpf?: boolean; antes?: () => void; criar?: (c: Chamada) => Promise<Record<string, unknown>>; status?: () => Promise<Record<string, unknown>> } = {}) {
   await dormir(20);
   vi.resetModules();
   localStorage.clear(); sessionStorage.clear();
@@ -120,7 +120,7 @@ async function abrirPagina(o: { pagina?: "oferta" | null; url?: string; antes?: 
   d.setAttribute("data-t", "a"); d.setAttribute("data-oferta", "sempre"); d.setAttribute("data-checkout", "email"); d.setAttribute("data-lp", "atual");
   const pagina = o.pagina === undefined ? "oferta" : o.pagina;
   if (pagina) { d.setAttribute("data-pagina", pagina); d.setAttribute("data-checkout-ext", "stripe"); }
-  (window as unknown as { __landing?: unknown }).__landing = pagina ? { pagina, checkout_ext: "stripe", stripe_pk: PK, stripe_preco_centavos: 6790, stripe_parcelas: "Pix ou cartão, em até 12x", stripe_parcelas_max: 12 } : undefined;
+  (window as unknown as { __landing?: unknown }).__landing = pagina ? { pagina, checkout_ext: "stripe", stripe_pk: PK, stripe_preco_centavos: 6790, stripe_parcelas: "Pix ou cartão, em até 12x", stripe_parcelas_max: 12, stripe_pede_cpf: o.pedeCpf === true } : undefined;
   document.head.querySelectorAll("style[data-teste-st]").forEach((s) => s.remove());
   const st = document.createElement("style"); st.setAttribute("data-teste-st", ""); st.textContent = estilo; document.head.appendChild(st);
   document.body.removeAttribute("style");
@@ -339,4 +339,67 @@ describe("reconferência: espera do cartão", () => {
     await vi.waitFor(() => { if (!document.querySelector('[data-testid="oferta-recebido"]')) throw new Error("sem recebido"); }, { timeout: 12000, interval: 100 });
     expect(i).toBeGreaterThanOrEqual(5);
   }, 20000);
+});
+
+/* ───────── CPF (nota fiscal, 04/11) ───────── */
+import { cpfValido, mascararCpf, soDigitosCpf } from "../../supabase/functions/_shared/cpf";
+describe("CPF no checkout da /oferta", () => {
+  const VALIDO = "52998224725";
+  it("máscara 000.000.000-00 (digitando e colando com/sem pontuação) e dígitos verificadores", () => {
+    expect(mascararCpf("529")).toBe("529");
+    expect(mascararCpf("5299822")).toBe("529.982.2");
+    expect(mascararCpf("52998224725")).toBe("529.982.247-25");
+    expect(mascararCpf("529.982.247-25")).toBe("529.982.247-25");
+    expect(mascararCpf("529 982 247 25 999")).toBe("529.982.247-25");
+    expect(soDigitosCpf("529.982.247-25")).toBe(VALIDO);
+    expect(cpfValido("529.982.247-25")).toBe(true);
+    expect(cpfValido("529.982.247-24")).toBe(false);
+    expect(cpfValido("111.111.111-11")).toBe(false);
+    expect(cpfValido("5299822472")).toBe(false);
+    expect(HTML).toMatch(/var STRIPE_PEDE_CPF = true;/);
+  });
+  it("o <head> passa STRIPE_PEDE_CPF pra página", () => {
+    expect(rodar(comStripe("on"), "/oferta").mem.stripe_pede_cpf).toBe(true);
+    expect(rodar(comStripe("on").replace("var STRIPE_PEDE_CPF = true;", "var STRIPE_PEDE_CPF = false;"), "/oferta").mem.stripe_pede_cpf).toBe(false);
+  });
+  it("STRIPE_PEDE_CPF false → o campo não existe", async () => {
+    await abrirPagina({ pedeCpf: false });
+    await abrirCheckout();
+    expect(document.getElementById("oc-cpf")).toBeNull();
+  });
+  it("o campo abaixo do e-mail: teclado numérico, máscara ao digitar/colar, 'pra nota fiscal'; CPF inválido bloqueia o pagar", async () => {
+    await abrirPagina({ pedeCpf: true });
+    await abrirCheckout();
+    const cpf = document.getElementById("oc-cpf") as HTMLInputElement;
+    const email = document.getElementById("oc-email")!;
+    expect(email.compareDocumentPosition(cpf) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(cpf.getAttribute("inputmode")).toBe("numeric");
+    expect(document.querySelector('label[for="oc-cpf"]')!.textContent).toMatch(/nota fiscal/i);
+    cpf.value = "52998224725"; cpf.dispatchEvent(new Event("input"));
+    expect(cpf.value).toBe("529.982.247-25");
+    (email as HTMLInputElement).value = "maria@gmail.com"; email.dispatchEvent(new Event("input"));
+    cpf.value = "529.982.247-24"; cpf.dispatchEvent(new Event("input"));
+    (document.getElementById("oc-pagar") as HTMLButtonElement).click();
+    await dormir(30);
+    expect(document.getElementById("oc-cpf-erro")!.hidden).toBe(false);
+    expect(document.getElementById("oc-cpf-erro")!.textContent).toContain("Confira o CPF");
+    expect(confirmados).toHaveLength(0);
+    expect(criadas).toHaveLength(1); // só o de abrir; o pagar nem chamou o servidor
+    expect(dos("landing_cpf_erro")[0]).toEqual(expect.objectContaining({ motivo: "invalido" }));
+  });
+  it("CPF válido vai SÓ pro stripe-criar (dígitos) — nunca pra evento, pixel, storage", async () => {
+    await abrirPagina({ pedeCpf: true });
+    await abrirCheckout();
+    const cpf = document.getElementById("oc-cpf") as HTMLInputElement;
+    cpf.value = "529.982.247-25"; cpf.dispatchEvent(new Event("input"));
+    const email = document.getElementById("oc-email") as HTMLInputElement;
+    email.value = "maria@gmail.com"; email.dispatchEvent(new Event("input"));
+    (document.getElementById("oc-pagar") as HTMLButtonElement).click();
+    await vi.waitFor(() => { if (!document.querySelector('[data-testid="oferta-pago"]')) throw new Error("sem pago"); }, { timeout: 3000, interval: 20 });
+    expect(criadas[1]).toMatchObject({ cpf: VALIDO, email: "maria@gmail.com" });
+    const tudo = JSON.stringify(eventos()) + JSON.stringify(fbq.mock.calls) + JSON.stringify({ ...sessionStorage }) + JSON.stringify({ ...localStorage }) + document.cookie;
+    expect(tudo).not.toContain(VALIDO);
+    expect(tudo).not.toContain("529.982.247-25");
+    expect(JSON.stringify((confirmados[0].args[0] as Record<string, unknown>).confirmParams)).not.toContain(VALIDO); // nada de tax_id na Stripe.js
+  });
 });

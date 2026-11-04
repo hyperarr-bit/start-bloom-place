@@ -92,6 +92,7 @@
         var STRIPE_PRECO_CENTAVOS = 6790; // só pra exibir — o valor cobrado vem SEMPRE do servidor (stripe-criar)
         var STRIPE_PARCELAS_MAX = 12;
         var STRIPE_PARCELAS_TEXTO = "Pix ou cartão, em até 12x"; // "" desliga a linha
+        var STRIPE_PEDE_CPF = true; // 04/11 (dono, nota fiscal): campo de CPF no checkout; false = some o campo
         var HOTMART_CHECKOUT_URL = "https://pay.hotmart.com/K108338476R?checkoutMode=10"; // 04/11: o checkout do produto 8885020 (dono). Com "PREENCHER" (ou URL inválida) o botão cai no Pix próprio
         var HOTMART_PRECO_CENTAVOS = 9790; // o preço do braço Hotmart (todo texto dele sai daqui; o HTML traz o mesmo número escrito — teste confere)
         var HOTMART_PARCELAS_TEXTO = "Pix ou cartão, em até 12x"; // "" desliga a linha (se o dono não liberar parcelamento na Hotmart)
@@ -189,7 +190,7 @@
           d.setAttribute("data-checkout-ext", "stripe");
           if (!STRIPE_PARCELAS_TEXTO) d.setAttribute("data-hm-sem-parcelas", "");
           mem.pagina = "oferta"; mem.checkout_ext = "stripe"; mem.ab_stripe = CHECKOUT_STRIPE;
-          mem.stripe_pk = STRIPE_PK; mem.stripe_preco_centavos = STRIPE_PRECO_CENTAVOS; mem.stripe_parcelas_max = STRIPE_PARCELAS_MAX; mem.stripe_parcelas = STRIPE_PARCELAS_TEXTO;
+          mem.stripe_pk = STRIPE_PK; mem.stripe_preco_centavos = STRIPE_PRECO_CENTAVOS; mem.stripe_parcelas_max = STRIPE_PARCELAS_MAX; mem.stripe_parcelas = STRIPE_PARCELAS_TEXTO; mem.stripe_pede_cpf = STRIPE_PEDE_CPF === true;
         }
         var plp = VIDA || OFERTA ? null : pega("lp");
         if (plp === "v2" || plp === "atual") grava("landing-lp-force", plp);

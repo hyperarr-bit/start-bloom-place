@@ -5,10 +5,13 @@
  * utm/ad e o momento — o webhook usa pra achar a conta e pra CAPI (o webhook é chamado pela Stripe: IP/UA só existem aqui).
  */
 import { PAGINA_STRIPE, STRIPE_PRECO_CENTAVOS } from "./stripe.ts";
+import { cpfValido, soDigitosCpf } from "./cpf.ts";
 
 export type PedidoStripe = {
   ref: string; pi: string | null; email: string | null; fbp: string | null; fbc: string | null; fbclid: string | null; url: string | null;
   landing_session_id: string | null; landing_device_id: string | null; atrib: Record<string, string>;
+  /** CPF (nota fiscal), só dígitos e válido — vai SÓ pra metadata[cpf] do PI pelo atualizar; nunca pra banco/log */
+  cpf: string | null;
 };
 const t = (v: unknown, n: number): string | null => (typeof v === "string" && v.trim() ? v.trim().slice(0, n) : null);
 const ATRIB = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "c_id", "as_id", "ad_id", "pl"];
@@ -20,6 +23,9 @@ export function validarPedidoStripe(body: unknown): PedidoStripe | null {
   const ref = t(b.ref, 64);
   if (!ref || !/^[A-Za-z0-9-]{8,64}$/.test(ref)) return null;
   const pi = t(b.pi, 80);
+  // CPF que veio e não confere = pedido recusado (a página já confere; aqui é a 2ª trava)
+  const cpfBruto = b.cpf === undefined || b.cpf === null || b.cpf === "" ? null : soDigitosCpf(String(b.cpf));
+  if (cpfBruto !== null && !cpfValido(cpfBruto)) return null;
   const email = t(b.email, 254)?.toLowerCase() ?? null;
   const url = t(b.url, 500);
   const a = (b.atrib && typeof b.atrib === "object" ? b.atrib : {}) as Record<string, unknown>;
@@ -28,7 +34,7 @@ export function validarPedidoStripe(body: unknown): PedidoStripe | null {
   return {
     ref, pi: pi && /^pi_[A-Za-z0-9]+$/.test(pi) ? pi : null, email: email && EMAIL_OK.test(email) ? email : null,
     fbp: t(b.fbp, 120), fbc: t(b.fbc, 400), fbclid: t(b.fbclid, 300), url: url && SITES.some((s) => url.startsWith(s)) ? url : null,
-    landing_session_id: t(b.landing_session_id, 64), landing_device_id: t(b.landing_device_id, 64), atrib,
+    landing_session_id: t(b.landing_session_id, 64), landing_device_id: t(b.landing_device_id, 64), atrib, cpf: cpfBruto,
   };
 }
 
@@ -62,9 +68,10 @@ export function paramsCriar(ref: string): Array<[string, string]> {
 
 /** O POST /v1/payment_intents/<id> (atualizar): o e-mail e os sinais do navegador (variáveis). O valor NUNCA é reenviado.
  *  `jaTem` = a metadata atual do PI: o criado_em só vai na 1ª vez (o fbc do fbclid usa esse horário). */
-export function paramsAtualizar(md: Record<string, string>, email: string | null, jaTem: Record<string, string> = {}): Array<[string, string]> {
+export function paramsAtualizar(md: Record<string, string>, email: string | null, jaTem: Record<string, string> = {}, cpf: string | null = null): Array<[string, string]> {
   const out: Array<[string, string]> = [];
   if (email) out.push(["receipt_email", email]);
+  if (cpf) out.push(["metadata[cpf]", cpf]); // nota fiscal: SÓ aqui (nunca no criar idempotente, nunca no banco)
   for (const [k, v] of Object.entries(md)) {
     if (k === "ref" || k === "pagina") continue;
     if (k === "criado_em" && jaTem.criado_em) continue;
@@ -155,7 +162,7 @@ export async function criarOuReaproveitar(
   }
   if (String(j.status) === "canceled") return { status: 502, corpo: { ok: false } };
   if (PODE_ATUALIZAR.has(String(j.status))) {
-    const up = await stripe(`payment_intents/${j.id}`, paramsAtualizar(md, p.email, (j.metadata ?? {}) as Record<string, string>));
+    const up = await stripe(`payment_intents/${j.id}`, paramsAtualizar(md, p.email, (j.metadata ?? {}) as Record<string, string>, p.cpf));
     if (up.ok) j = up.j;
     else {
       log("atualizar falhou", { code: String((up.j.error as Record<string, unknown> | undefined)?.code ?? "") });

@@ -445,3 +445,40 @@ describe("/vida braço atual no jsdom", () => {
     for (const e of eventos().filter((x) => x.nome.startsWith("landing_"))) expect(e).not.toHaveProperty("braco_vida");
   });
 });
+
+describe("revisão A/B (05/11): na /vida a oferta é sempre 'sempre' e o braço Hotmart não fala da caixa de e-mail", () => {
+  it("?oferta=ano e a força guardada são ignorados na /vida (o /organizar segue respeitando)", () => {
+    const store: Record<string, string> = { "landing-oferta-force": "ano" };
+    const r = rodar(comVida("on"), "/vida?oferta=ano&vida=atual", store);
+    expect(r.attrs["data-oferta"]).toBe("sempre");
+    expect(r.mem.oferta_forcada).toBe(false);
+    expect(store["landing-oferta-force"]).toBe("ano"); // não gravou nem apagou
+    expect(rodar(comVida("on"), "/organizar?oferta=ano", {}).attrs["data-oferta"]).toBe("ano");
+  });
+  it("braço Hotmart (atual e v3): sem landing_email_antes_visto; /organizar segue mandando", async () => {
+    type Cb = (e: Array<{ isIntersecting: boolean; target: Element; boundingClientRect: { top: number }; rootBounds?: null }>) => void;
+    const vistos: Cb[] = [];
+    const IO = class { constructor(cb: Cb) { vistos.push(cb); } observe() {} disconnect() {} };
+    const antes = (window as unknown as { IntersectionObserver?: unknown }).IntersectionObserver;
+    (window as unknown as { IntersectionObserver: unknown }).IntersectionObserver = IO;
+    const verOferta = () => {
+      const alvos = ["oferta", "lp-hotmart", "lp-hotmart-atual", "lp-pagar"].map((id) => document.getElementById(id)!).filter(Boolean);
+      for (const cb of vistos.splice(0)) { try { cb(alvos.map((target) => ({ isIntersecting: true, target, boundingClientRect: { top: 10 } }))); } catch { /* observador de outra coisa */ } }
+    };
+    try {
+      for (const vida of ["atual", "v3"] as const) {
+        await abrir({ vida });
+        verOferta();
+        expect(dos("landing_oferta_vista").length).toBeGreaterThan(0);
+        expect(dos("landing_email_antes_visto")).toHaveLength(0);
+      }
+      await abrir({ pagina: null, vida: "atual", url: "/organizar" });
+      verOferta();
+      expect(dos("landing_email_antes_visto")).toHaveLength(1);
+    } finally {
+      (window as unknown as { IntersectionObserver?: unknown }).IntersectionObserver = antes;
+    }
+    const fonte = readFileSync(resolve(raiz, "src/landing/landing.ts"), "utf8");
+    expect(fonte).toContain('if (brCheckout === "email" && !HOTMART) evento("landing_email_antes_visto", {});');
+  });
+});

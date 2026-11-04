@@ -117,10 +117,12 @@
           } else t = "a";
         }
 
-        var po = pega("oferta");
+        // 05/11: na /vida a oferta é sempre "sempre" (vitalício) — ignora ?oferta=ano e a força guardada (nenhum 27,90 do "ano" lá)
+        var naVida = /^\/vida\/?$/.test(location.pathname || "");
+        var po = naVida ? null : pega("oferta");
         if (po === "ano" || po === "sempre") grava("landing-oferta-force", po);
-        var o = (po === "ano" || po === "sempre") ? po : le("landing-oferta-force");
-        mem.oferta_forcada = !!o;
+        var o = naVida ? "sempre" : (po === "ano" || po === "sempre") ? po : le("landing-oferta-force");
+        mem.oferta_forcada = !naVida && !!o;
         if (o !== "ano" && o !== "sempre") {
           if (AB_OFERTA === "on") {
             o = le("landing-oferta");

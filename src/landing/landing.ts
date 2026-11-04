@@ -735,7 +735,7 @@ const viuAOferta = () => {
   if (ofertaVista) return;
   ofertaVista = true;
   evento("landing_oferta_vista", { via: V2 ? "botao_50" : "bloco_15" });
-  if (brCheckout === "email") evento("landing_email_antes_visto", {});
+  if (brCheckout === "email" && !HOTMART) evento("landing_email_antes_visto", {}); // 05/11: o braço Hotmart da /vida não tem a caixa de e-mail
   pixel("ViewContent", { content_name: HOTMART ? "vida_oferta" : "landing_oferta", value: HOTMART ? HM_PRECO / 100 : 27.9, currency: "BRL" });
   if (PIX_REAL && !SIMULADO && !HOTMART) void pg(false).catch(() => null); // pré-aquece o Pix de verdade (sem recarregar a página se falhar)
 };

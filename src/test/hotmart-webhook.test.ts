@@ -605,3 +605,44 @@ describe("AB_VIDA: o braço vai no pedido e na venda", () => {
     expect(r.sem_braco).toMatchObject({ visitas: 0, vendas: 1, porVisita: null });
   });
 });
+
+/* ───────── revisão do A/B (05/11) ───────── */
+describe("revisão A/B: /vendas só conta hotmart_venda com transação ativa; hotmart_venda que falha tenta de novo", () => {
+  it("vidaPorBraco com txValidas: forjada (tx que não existe), reembolsada e sem tx ficam fora", () => {
+    const ev = [{ event_name: "landing_html", sid: "b1", pagina: "vida", braco: "atual" }];
+    const vendas = [{ tx: "HP_ok", braco: "atual", valor_cents: 9790 }, { tx: "HP_forjada", braco: "atual", valor_cents: 9790 }, { tx: "HP_reemb", braco: "atual", valor_cents: 9790 }, { braco: "atual", valor_cents: 9790 }];
+    expect(vidaPorBraco(ev, vendas, new Set(["HP_ok"])).atual).toMatchObject({ vendas: 1, receita: 97.9 });
+    expect(vidaPorBraco(ev, vendas).atual.vendas).toBe(4); // sem o filtro, como antes
+    const fn = readFileSync(resolve(__dirname, "../../supabase/functions/vendas-painel/index.ts"), "utf8");
+    expect(fn).toContain('s.payment_method === "hotmart" && s.status === "active"');
+    expect(fn).toContain("txHotmartAtivas) };");
+  });
+  it("a migração 20261105120000 é a mesma da 20261104120000 (histórico)", () => {
+    const m = (f: string) => readFileSync(resolve(__dirname, "../../supabase/migrations", f), "utf8");
+    expect(m("20261105120000_hotmart_venda_servidor.sql")).toBe(m("20261104120000_hotmart_pedido_servidor.sql"));
+    expect(m("20261105120000_hotmart_venda_servidor.sql")).toContain("'hotmart_venda'");
+  });
+  it("erro ao gravar hotmart_venda: loga mascarado e solta a reserva; o crédito sai igual; o reenvio grava", async () => {
+    const m = montar();
+    const from0 = m.admin.from as (t: string) => Record<string, unknown>;
+    let falhar = true;
+    const deps = { ...m.deps, admin: { ...m.deps.admin, from: (t: string) => {
+      const q = from0(t);
+      if (t !== "analytics_events") return q;
+      const ins = q.insert as (d: Linha) => unknown;
+      return { ...q, insert: (d: Linha) => (falhar && d.event_name === "hotmart_venda" ? Promise.resolve({ error: { message: "falhou pra maria@exemplo.com" } }) : ins(d)) };
+    } } } as DepsHotmart;
+    const r1 = await tratarHotmart(deps, { hottok: SECRET, body: compra() });
+    expect(r1).toMatchObject({ status: 200, corpo: { novo: true } });
+    expect(m.db.subscriptions).toHaveLength(1);
+    expect(m.db.webhook_events.has("hotmart-venda:HP17715690036014")).toBe(false);
+    const log = m.saida.logs.find((l) => l.includes("hotmart_venda não gravou"))!;
+    expect(log).toBeDefined();
+    expect(log).not.toContain("maria@exemplo.com");
+    falhar = false;
+    await tratarHotmart(deps, { hottok: SECRET, body: compra({ evento: "PURCHASE_COMPLETE", status: "COMPLETE" }) });
+    expect(m.db.analytics_events.filter((e) => e.event_name === "hotmart_venda")).toHaveLength(1);
+    expect(m.db.subscriptions).toHaveLength(1);
+    expect(m.saida.capi).toHaveLength(1);
+  });
+});

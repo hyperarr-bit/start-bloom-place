@@ -207,11 +207,13 @@ async function abaWeb(admin: Admin, hoje: string) {
     .gte("created_at", inicioDiaBRT(hoje)).range(a, b), 30000);
   const pagos = new Set(subs.filter((s) => diaBRT(s.created_at ?? "") === hoje && s.abacatepay_billing_id).map((s) => String(s.abacatepay_billing_id)));
   // 04/11: a /vida (pagina:"vida") num funil próprio; "pagou" lá = as vendas da Hotmart de hoje (a ref do pedido não volta pro evento)
+  // 05/11: só vale a venda cuja transação está ativa na Hotmart (subscriptions) — evento forjado, reembolso e teste ficam fora
+  const txHotmartAtivas = new Set(subs.filter((s) => s.payment_method === "hotmart" && s.status === "active" && s.abacatepay_billing_id && !ehEmailTeste(s.customer_email)).map((s) => String(s.abacatepay_billing_id)));
   const hotmartHoje = subs.filter((s) => s.payment_method === "hotmart" && diaBRT(s.created_at ?? "") === hoje && !ehEmailTeste(s.customer_email)).length;
   // 04/11: o A/B da /vida por braço (a venda leva o braço do pedido: hotmart_venda gravado pelo hotmart-webhook)
-  const { data: vendasHm } = await admin.from("analytics_events").select("braco:event_data->>braco_vida,valor_cents:event_data->>valor_cents")
+  const { data: vendasHm } = await admin.from("analytics_events").select("tx:event_data->>tx,braco:event_data->>braco_vida,valor_cents:event_data->>valor_cents")
     .eq("event_name", "hotmart_venda").gte("created_at", inicioDiaBRT(hoje)).limit(2000);
-  const vida = { ...funilLanding(eventos, pagos, "vida"), pagou: hotmartHoje, bracos: vidaPorBraco(eventos as EventoVida[], (vendasHm ?? []) as Array<{ braco: string | null; valor_cents: string | null }>) };
+  const vida = { ...funilLanding(eventos, pagos, "vida"), pagou: hotmartHoje, bracos: vidaPorBraco(eventos as EventoVida[], (vendasHm ?? []) as Array<{ tx: string | null; braco: string | null; valor_cents: string | null }>, txHotmartAtivas) };
   return { dia: hoje, ...roi, landing: funilLanding(eventos, pagos), vida, errosMeta: ins.erros };
 }
 

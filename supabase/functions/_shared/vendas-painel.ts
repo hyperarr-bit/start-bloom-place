@@ -258,7 +258,9 @@ export function funilLanding(eventos: EventoLanding[], pedidosPagos: Set<string>
  * pedido), receita e R$ por visita. Venda sem braço (pedido sem registro) fica em "sem_braco". */
 export type EventoVida = EventoLanding & { braco?: string | null };
 export type LinhaBracoVida = { visitas: number; foiHotmart: number; vendas: number; receita: number; porVisita: number | null };
-export function vidaPorBraco(eventos: EventoVida[], vendas: Array<{ braco?: string | null; valor_cents?: number | string | null }>): Record<"v3" | "atual" | "sem_braco", LinhaBracoVida> {
+/** `txValidas` (05/11): só conta a venda cuja transação está em subscriptions como Hotmart ATIVA (tira forjada, reembolsada, teste). */
+export function vidaPorBraco(eventos: EventoVida[], vendasBrutas: Array<{ braco?: string | null; valor_cents?: number | string | null; tx?: string | null }>, txValidas?: Set<string>): Record<"v3" | "atual" | "sem_braco", LinhaBracoVida> {
+  const vendas = txValidas ? vendasBrutas.filter((v) => !!v.tx && txValidas.has(String(v.tx))) : vendasBrutas;
   const robos = new Set<string>();
   for (const e of eventos) if (e.sid && /right_column/i.test(e.termo ?? "")) robos.add(e.sid);
   const chave = (b: string | null | undefined): "v3" | "atual" | "sem_braco" => (b === "v3" || b === "atual" ? b : "sem_braco");

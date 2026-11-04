@@ -360,9 +360,16 @@ export async function tratarHotmart(deps: DepsHotmart, req: { hottok: string | n
     // 04/11 (A/B da /vida): a venda com o BRAÇO do pedido (hotmart-iniciar) — o /vendas separa a /vida por braço. 1× por transação.
     if (await reservar(admin, `hotmart-venda:${c.tx}`, "venda") === "ok") {
       const braco = (reg.dados as { braco_vida?: unknown } | null)?.braco_vida;
+      // 05/11: falhou → loga (mascarado) e solta a reserva: o próximo reenvio tenta de novo. O crédito não depende disto.
+      let erroVenda: string | null = null;
       try {
-        await admin.from("analytics_events").insert({ event_name: "hotmart_venda", user_id: conta.userId, event_data: { tx: c.tx, pagina: "vida", braco_vida: braco === "v3" || braco === "atual" ? braco : null, valor_cents: c.valorCents, via: conta.via } });
-      } catch { /* a venda já está liberada; o /vendas mostra "sem braço" */ }
+        const { error } = await admin.from("analytics_events").insert({ event_name: "hotmart_venda", user_id: conta.userId, event_data: { tx: c.tx, pagina: "vida", braco_vida: braco === "v3" || braco === "atual" ? braco : null, valor_cents: c.valorCents, via: conta.via } });
+        if (error) erroVenda = String((error as Erro)?.message ?? error);
+      } catch (e) { erroVenda = String((e as Error)?.message ?? e); }
+      if (erroVenda) {
+        await soltar(admin, `hotmart-venda:${c.tx}`);
+        log("hotmart_venda não gravou — tenta no próximo reenvio", { tx: c.tx, email: mascararEmail(emailConta), msg: erroVenda.replace(/[^\s@]+@[^\s@]+/g, "***").slice(0, 120) });
+      }
     }
     if (await reservar(admin, `hotmart-capi:${c.tx}`, "capi") === "ok") {
       const corpo = await eventoPurchaseHotmart({ tx: c.tx, valorCents: c.valorCents, userId: conta.userId, email: emailConta, registro: reg, agoraMs: agora.getTime() });

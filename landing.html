@@ -59,6 +59,10 @@
                               (HOTMART_CHECKOUT_URL + sck/src) por R$ 97,90 (HOTMART_PRECO_CENTAVOS). URL no placeholder = Pix.
                               QA: ?hotmart=on|off (fica: localStorage), ?hotmart=auto desfaz. Vira html[data-pagina="vida"] +
                               html[data-checkout-ext="hotmart"|"pix"]; pagina + braco_checkout_ext em todo evento. Obrigado: /vida/obrigado.
+        AB_VIDA      "off"  → (04/11) só na /vida: todos no "v3" (a LP v3, data-lp v2). "on" = 50/50 estável por aparelho (bit 24 de
+                              "vida:"+id) entre "v3" e "atual" (a página do /organizar, data-lp atual, com R$ 97,90 e a mesma Hotmart:
+                              os pares data-so-ext="hotmart"|"pix" dos textos de preço/Pix + #lp-hotmart-atual). QA: ?vida=v3|atual
+                              (fica: localStorage), ?vida=auto desfaz. Vira html[data-vida]; braco_vida em todo evento da /vida.
       A divisão 50/50 do /inicio (o mesmo link da campanha) mora no index.html (DIVISAO_INICIO_LANDING, "off").
     -->
     <script>
@@ -76,6 +80,10 @@
         // 04/11 (dono): /vida — a v3 num LINK PRÓPRIO pagando pela Hotmart. "off" = /vida com o Pix próprio de R$ 27,90 (fallback);
         // "on" = checkout Hotmart. O /organizar NÃO lê nada disto. Rollback: "off". Ver src/landing/hotmart.ts.
         var CHECKOUT_HOTMART = "on";
+        // 04/11 (dono): A/B NA /vida — "v3" (a LP v3, como hoje) × "atual" (a página do /organizar, com R$ 97,90 e a mesma Hotmart).
+        // "off" = todos no v3 · "on" = 50/50 estável por aparelho. QA: ?vida=v3|atual (fica: localStorage), ?vida=auto desfaz.
+        // O /organizar não lê. Rollback: "off".
+        var AB_VIDA = "off";
         var HOTMART_CHECKOUT_URL = "https://pay.hotmart.com/K108338476R?checkoutMode=10"; // 04/11: o checkout do produto 8885020 (dono). Com "PREENCHER" (ou URL inválida) o botão cai no Pix próprio
         var HOTMART_PRECO_CENTAVOS = 9790; // o preço do braço Hotmart (todo texto dele sai daqui; o HTML traz o mesmo número escrito — teste confere)
         var HOTMART_PARCELAS_TEXTO = "Pix ou cartão, em até 12x"; // "" desliga a linha (se o dono não liberar parcelamento na Hotmart)
@@ -161,7 +169,23 @@
         var plp = VIDA ? null : pega("lp");
         if (plp === "v2" || plp === "atual") grava("landing-lp-force", plp);
         if (plp === "auto") grava("landing-lp-force", null);
-        var lp = VIDA ? "v2" : (plp === "v2" || plp === "atual") ? plp : le("landing-lp-force");
+        // 04/11: o braço da /vida (AB_VIDA): "v3" = página v2 · "atual" = a página de hoje do /organizar (com a Hotmart)
+        var bvida = null;
+        if (VIDA) {
+          var pvd = pega("vida");
+          if (pvd === "v3" || pvd === "atual") grava("landing-vida-force", pvd);
+          if (pvd === "auto") grava("landing-vida-force", null);
+          bvida = (pvd === "v3" || pvd === "atual") ? pvd : pvd === "auto" ? null : le("landing-vida-force");
+          mem.vida_forcado = (bvida === "v3" || bvida === "atual");
+          if (bvida !== "v3" && bvida !== "atual") {
+            bvida = "v3";
+            // outro bit (24) com outro prefixo — independente do checkout (0), da tela do Pix (8) e da página do /organizar (16)
+            if (AB_VIDA === "on") bvida = ((hash("vida:" + pegaId()) >>> 24) & 1) === 0 ? "v3" : "atual";
+          }
+          d.setAttribute("data-vida", bvida);
+          mem.vida = bvida; mem.ab_vida = AB_VIDA;
+        }
+        var lp = VIDA ? (bvida === "atual" ? "atual" : "v2") : (plp === "v2" || plp === "atual") ? plp : le("landing-lp-force");
         mem.lp_forcado = !VIDA && (lp === "v2" || lp === "atual");
         if (lp !== "v2" && lp !== "atual") {
           lp = "atual";
@@ -739,11 +763,11 @@
         .lp2-foto .lp2-fone { --w: 316px; } /* tela 298 px: 3× = 894 ≤ 900 do print (0 upscale) */
       }
       /* ── /vida (04/11, src/landing/hotmart.ts): o checkout Hotmart. Só existe com html[data-pagina="vida"][data-checkout-ext]; no /organizar nada disto casa ── */
-      html[data-lp="v2"]:not([data-checkout-ext="hotmart"]) [data-so-lp="v2"][data-so-ext="hotmart"], html[data-lp="v2"][data-checkout-ext="hotmart"] [data-so-lp="v2"][data-so-ext="pix"] { display: none !important; }
-      html[data-lp="v2"][data-checkout-ext="hotmart"] .lp-email-antes, html[data-lp="v2"][data-checkout-ext="hotmart"] #lp-pagar, html[data-lp="v2"][data-checkout-ext="hotmart"] #lp-pagar-erro, html[data-lp="v2"][data-checkout-ext="hotmart"] #lp-pix { display: none !important; }
-      html[data-lp="v2"][data-hm-sem-parcelas] .lp2-hm-parcelas { display: none !important; }
-      html[data-lp="v2"] .lp-preco-sub.lp2-hm-parcelas { margin-top: 2px; font-size: 13.5px; color: var(--suave); font-weight: 600; }
-      html[data-lp="v2"] #lp-hotmart[aria-busy="true"] { opacity: .75; pointer-events: none; }
+      html:not([data-checkout-ext="hotmart"]) [data-so-ext="hotmart"], html[data-checkout-ext="hotmart"] [data-so-ext="pix"] { display: none !important; } /* nos 2 braços da /vida (v2 e atual) */
+      html[data-checkout-ext="hotmart"] .lp-email-antes, html[data-checkout-ext="hotmart"] #lp-pagar, html[data-checkout-ext="hotmart"] #lp-pagar-erro, html[data-checkout-ext="hotmart"] #lp-pix, html[data-checkout-ext="hotmart"] .lp-ancora { display: none !important; }
+      html[data-hm-sem-parcelas] .lp2-hm-parcelas { display: none !important; }
+      html[data-checkout-ext="hotmart"] .lp-preco-sub.lp2-hm-parcelas { margin-top: 2px; font-size: 13.5px; color: var(--suave); font-weight: 600; }
+      html[data-checkout-ext="hotmart"] #lp-hotmart[aria-busy="true"], html[data-checkout-ext="hotmart"] #lp-hotmart-atual[aria-busy="true"] { opacity: .75; pointer-events: none; }
     </style>
     <!-- Meta Pixel (só a fila aqui; o fbevents.js entra no carregador adiado do landing.ts, depois da 1ª pintura) -->
     <script>
@@ -959,7 +983,8 @@
         <div class="lp-kicker">Como funciona</div>
         <h2 class="lp-h2">Em 3 passos, hoje mesmo.</h2>
         <ol class="lp-passos">
-          <li><span class="lp-num">1</span><div class="lp-passo"><b>Pague uma vez no Pix</b><span>Leva 1 minuto, aqui nesta página.</span></div></li>
+          <li data-so-ext="pix"><span class="lp-num">1</span><div class="lp-passo"><b>Pague uma vez no Pix</b><span>Leva 1 minuto, aqui nesta página.</span></div></li>
+          <li data-so-ext="hotmart"><span class="lp-num">1</span><div class="lp-passo"><b>Pague uma vez, no Pix ou no cartão</b><span>Leva 1 minuto. O acesso chega no seu e-mail.</span></div></li>
           <li><span class="lp-num">2</span><div class="lp-passo"><b>Depois de pagar, entre no app com o mesmo e-mail</b><span>Tem na App Store e no Google Play, e no computador é só entrar no site. Os links aparecem logo depois do pagamento.</span>
             <!-- 28/10 (dono): sem selo/link de loja antes do preço — quem sai pra loja aqui some da venda do site e do pixel; os selos ficam só no pós-compra -->
             <div class="lp-disp"><span>📱 iPhone</span><span>🤖 Android</span><span>💻 Computador</span></div></div></li>
@@ -1013,11 +1038,14 @@
                    97,90 × 119,90 da 1.0.18 ligar (SINTESE.md §3). DECISÃO DO DONO: se quiser, 1 linha removível aqui, um
                    p.lp-ancora com data-so-lp="v2" e o texto "Anual na App Store: R$ 97,90". -->
               <h2 class="lp-preco-tit" data-so-oferta="ano">1 ano inteiro por <b>R$ 27,90</b></h2>
-              <h2 class="lp-preco-tit" data-so-oferta="sempre" data-so-lp="atual">Pra sempre por <b>R$ 27,90</b></h2>
+              <h2 data-so-ext="pix" class="lp-preco-tit" data-so-oferta="sempre" data-so-lp="atual">Pra sempre por <b>R$ 27,90</b></h2>
+              <h2 data-so-ext="hotmart" class="lp-preco-tit" data-so-oferta="sempre" data-so-lp="atual">Pra sempre por <b data-hm-preco>R$ 97,90</b></h2>
               <h2 class="lp-preco-tit" data-so-oferta="sempre" data-so-lp="v2" data-so-ext="pix">Vitalício por <b>R$ 27<small>,90</small></b></h2>
               <h2 class="lp-preco-tit" data-so-lp="v2" data-so-ext="hotmart">Vitalício por <b data-hm-preco="partes">R$ 97<small>,90</small></b></h2>
               <p class="lp-preco-sub" data-so-oferta="ano">Pagamento único no Pix · menos de R$ 0,08 por dia</p>
-              <p class="lp-preco-sub" data-so-oferta="sempre" data-so-lp="atual">Pagamento único no Pix · nunca mais paga</p>
+              <p data-so-ext="pix" class="lp-preco-sub" data-so-oferta="sempre" data-so-lp="atual">Pagamento único no Pix · nunca mais paga</p>
+              <p data-so-ext="hotmart" class="lp-preco-sub" data-so-oferta="sempre" data-so-lp="atual">Pagamento único · nunca mais paga</p>
+              <p class="lp-preco-sub lp2-hm-parcelas" data-so-oferta="sempre" data-so-lp="atual" data-so-ext="hotmart" data-hm-parcelas>Pix ou cartão, em até 12x</p>
               <p class="lp-preco-sub" data-so-oferta="sempre" data-so-lp="v2" data-so-ext="pix">Pagamento único. Nada é cobrado depois.</p>
               <p class="lp-preco-sub" data-so-lp="v2" data-so-ext="hotmart">Pagamento único. Nada é cobrado depois.</p>
               <p class="lp-preco-sub lp2-hm-parcelas" data-so-lp="v2" data-so-ext="hotmart" data-hm-parcelas>Pix ou cartão, em até 12x</p>
@@ -1042,11 +1070,14 @@
                 <button type="button" class="lp-cta" id="lp-pagar"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.2" y="5.2" width="13.6" height="13.6" rx="3.2" transform="rotate(45 12 12)" fill="none" stroke="currentColor" stroke-width="2.2"/><rect x="9.6" y="9.6" width="4.8" height="4.8" rx="1" transform="rotate(45 12 12)" fill="currentColor"/></svg><span id="lp-pagar-txt">Pagar R$ 27,90 no Pix</span></button>
                 <!-- r1 (pix 7): no v2 o erro de gerar o Pix fica colado no botão (o landing.ts escreve aqui; no atual continua no #lp-pix, como hoje) -->
                 <p class="lp-erro" id="lp-pagar-erro" role="alert" data-so-lp="v2" hidden></p>
-                <p class="lp-seguro" data-so-lp="atual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>O Pix sai aqui mesmo · CORE · CNPJ 55.041.112/0001-82</p>
+                <p data-so-ext="pix" class="lp-seguro" data-so-lp="atual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>O Pix sai aqui mesmo · CORE · CNPJ 55.041.112/0001-82</p>
                 <!-- r2 (oferta 3): no v2 a linha cabe em 1 linha até +15% ("O Pix sai aqui mesmo" já está no botão "Pagar … no Pix") -->
                 <!-- /vida + Hotmart: no lugar do "Pagar R$ 27,90 no Pix" (o CSS esconde o e-mail antes, o #lp-pagar e o #lp-pix) — grava o pedido e vai pro checkout -->
                 <button type="button" class="lp-cta" id="lp-hotmart" data-so-lp="v2" data-so-ext="hotmart">Quero organizar minha vida <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
                 <p class="lp-erro" id="lp-hotmart-erro" role="alert" data-so-lp="v2" data-so-ext="hotmart" hidden></p>
+                <!-- /vida braço "atual" (AB_VIDA): o mesmo fluxo da Hotmart no lugar do "Pagar R$ 27,90 no Pix" -->
+                <button type="button" class="lp-cta" id="lp-hotmart-atual" data-so-lp="atual" data-so-ext="hotmart">Quero organizar tudo <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                <p data-so-ext="hotmart" class="lp-seguro" data-so-lp="atual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>Pagamento seguro pela Hotmart</p>
                 <p class="lp-seguro" data-so-lp="v2" data-so-ext="pix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>CORE · CNPJ 55.041.112/0001-82</p>
                 <p class="lp-seguro" data-so-lp="v2" data-so-ext="hotmart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>Pagamento seguro pela Hotmart</p>
               </div>
@@ -1054,7 +1085,8 @@
             <div class="lp-pix" id="lp-pix" aria-live="polite"></div>
           </div>
         </div>
-        <div class="lp-garantia lp-so-oferta-fora" data-so-lp="atual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg><span><b>7 dias pra testar tudo.</b>Não gostou? Devolvemos 100% no Pix, é só mandar um e-mail.</span></div>
+        <div data-so-ext="pix" class="lp-garantia lp-so-oferta-fora" data-so-lp="atual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg><span><b>7 dias pra testar tudo.</b>Não gostou? Devolvemos 100% no Pix, é só mandar um e-mail.</span></div>
+        <div data-so-ext="hotmart" class="lp-garantia lp-so-oferta-fora" data-so-lp="atual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg><span><b>7 dias pra testar tudo.</b>Não gostou? Devolvemos 100%, é só mandar um e-mail.</span></div>
       </section>
 
       <!-- ═════════ 9. DÚVIDAS + CHAMADA FINAL ═════════ -->
@@ -1078,18 +1110,22 @@
           <details><summary>É um app de verdade?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Sim. O CORE está na App Store e na Google Play, e também abre no computador. É a mesma conta em todos.</p></details>
           <details data-so-oferta="ano"><summary>Renova sozinho?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Não. É 1 pagamento no Pix por 1 ano. Nada é cobrado sozinho.</p></details>
           <details data-so-oferta="ano"><summary>E depois de 1 ano?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>A gente te avisa antes e você decide se quer continuar. Se não quiser, não paga nada.</p></details>
-          <details data-so-oferta="sempre"><summary>Renova sozinho?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Não. Você paga uma vez no Pix e o CORE é seu pra sempre. Nada é cobrado depois.</p></details>
+          <details data-so-ext="pix" data-so-oferta="sempre"><summary>Renova sozinho?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Não. Você paga uma vez no Pix e o CORE é seu pra sempre. Nada é cobrado depois.</p></details>
+          <details data-so-ext="hotmart" data-so-oferta="sempre"><summary>Renova sozinho?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Não. Você paga <span data-hm-preco>R$ 97,90</span> uma vez (Pix ou cartão) e o CORE é seu pra sempre. Nada é cobrado depois.</p></details>
           <details><summary>Funciona no computador?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Sim. Entre no site com o mesmo e-mail e está tudo lá.</p></details>
-          <details><summary>Tem versão grátis?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Não, mas você tem 7 dias de garantia: se não gostar, devolvemos 100% no Pix. É só mandar um e-mail.</p></details>
+          <details data-so-ext="pix"><summary>Tem versão grátis?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Não, mas você tem 7 dias de garantia: se não gostar, devolvemos 100% no Pix. É só mandar um e-mail.</p></details>
+          <details data-so-ext="hotmart"><summary>Tem versão grátis?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Não, mas você tem 7 dias de garantia: se não gostar, devolvemos 100%. É só mandar um e-mail.</p></details>
           <details><summary>Como falo com vocês?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>Pelo e-mail <a href="mailto:contato@coreaplicativo.com.br">contato@coreaplicativo.com.br</a>. A gente responde rápido.</p></details>
         </div>
       </section>
     </main>
     <section class="lp-fim" id="fim" data-bloco="fim">
       <h2 data-so-oferta="ano">Sua vida inteira num app só, por R$ 27,90 o ano.</h2>
-      <h2 data-so-oferta="sempre" data-so-lp="atual">Sua vida inteira num app só, por R$ 27,90. Pra sempre.</h2>
+      <h2 data-so-ext="pix" data-so-oferta="sempre" data-so-lp="atual">Sua vida inteira num app só, por R$ 27,90. Pra sempre.</h2>
+      <h2 data-so-ext="hotmart" data-so-oferta="sempre" data-so-lp="atual">Sua vida inteira num app só, por <span data-hm-preco>R$ 97,90</span>. Pra sempre.</h2>
       <h2 data-so-oferta="sempre" data-so-lp="v2">Sua vida organizada num app só.</h2>
-      <p data-so-lp="atual">Pix na hora · 7 dias de garantia</p>
+      <p data-so-ext="pix" data-so-lp="atual">Pix na hora · 7 dias de garantia</p>
+      <p data-so-ext="hotmart" data-so-lp="atual">Pix ou cartão · 7 dias de garantia</p>
       <p data-so-lp="v2" data-so-ext="pix">Vitalício por R$ 27,90 · Pix na hora</p>
       <p data-so-lp="v2" data-so-ext="hotmart">Vitalício por <span data-hm-preco>R$ 97,90</span> · Pix ou cartão</p>
       <button type="button" class="lp-cta" data-ir="oferta" data-so-lp="atual">Quero organizar tudo</button>
@@ -1100,7 +1136,8 @@
       <a href="mailto:contato@coreaplicativo.com.br">contato@coreaplicativo.com.br</a> · <a href="/termos">Termos</a> · <a href="/privacidade">Privacidade</a>
     </footer>
     <div class="lp-fixo" id="lp-fixo" aria-hidden="true">
-      <button type="button" class="lp-cta" data-ir="oferta" tabindex="-1" data-so-lp="atual">Quero organizar tudo <small>· R$ 27,90</small></button>
+      <button data-so-ext="pix" type="button" class="lp-cta" data-ir="oferta" tabindex="-1" data-so-lp="atual">Quero organizar tudo <small>· R$ 27,90</small></button>
+      <button data-so-ext="hotmart" type="button" class="lp-cta" data-ir="oferta" tabindex="-1" data-so-lp="atual">Quero organizar tudo <small>· <span data-hm-preco>R$ 97,90</span></small></button>
       <!-- v3: preço à esquerda + botão numa linha só (o fixo deu 136 de 220 toques de CTA na página atual) -->
       <span class="lp2-fixo-p" data-so-lp="v2"><b>R$ 27,90</b><span>Vitalício<i> · Pix</i></span></span>
       <button type="button" class="lp-cta" data-ir="oferta" tabindex="-1" data-so-lp="v2">Quero organizar minha vida</button>

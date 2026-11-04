@@ -110,7 +110,7 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 const agora = () => Math.round(performance.now());
 type Janela = Window & {
   __landingSimularJaTem?: boolean;
-  __landing?: { pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null };
+  __landing?: { pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null };
   __eventosLanding?: Record<string, unknown>[];
   /** 02/11 (dev/testes): voltou() = "voltei do banco" (≥ 5 s fora) sem trocar de aba; vencer() = o QR vence em 1,5 s */
   __landingSimular?: { pagar: () => void; pagarU2027?: () => void; voltou?: () => void; vencer?: () => void };
@@ -159,6 +159,11 @@ const HM_URL = String(w.__landing?.hotmart_url ?? "");
 const HOTMART = PAGINA === "vida" && EXT === "hotmart" && urlHotmartValida(HM_URL);
 const HM_PRECO = Number(w.__landing?.hotmart_preco_centavos) > 0 ? Number(w.__landing?.hotmart_preco_centavos) : 9790;
 const HM_PARCELAS = typeof w.__landing?.hotmart_parcelas === "string" ? w.__landing.hotmart_parcelas : "";
+/** 04/11: o braço da /vida (AB_VIDA no <head>): "v3" (a LP v3) | "atual" (a página do /organizar com a Hotmart). Só na /vida. */
+const BRACO_VIDA = PAGINA ? (document.documentElement.getAttribute("data-vida") === "atual" ? "atual" : "v3") : null;
+/** o botão da Hotmart do braço na tela (v2: "Quero organizar minha vida"; atual: "Quero organizar tudo") */
+const ID_BOTAO_HM = V2 ? "lp-hotmart" : "lp-hotmart-atual";
+const ROTULO_BOTAO_HM = V2 ? "Quero organizar minha vida" : "Quero organizar tudo";
 const PIX_MOTIVO = motivoPixDoHtml(); // 02/11: chips "O que te travou?" no estado "voltou" do b (PIX_MOTIVO, padrão off)
 const U2027 = upsell2027DoHtml(); // 31/10: o "Seu 2027" no pós-pago (chave UPSELL_2027 / ?u2027=on)
 const VOLTA_U2027 = voltaDoEmailU2027(BUSCA); // 31/10: chegou pelo bloco do 2027 no e-mail de compra confirmada
@@ -207,7 +212,7 @@ for (const k of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm
 if (BUSCA.get("fbclid")) atrib.tem_fbclid = "1";
 
 export function evento(nome: string, dados: Record<string, unknown> = {}): void {
-  const corpo = { ...dados, ...(PAGINA ? { pagina: PAGINA, braco_checkout_ext: EXT } : {}), landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, braco_pix: brPix, pix_forcado: pixForcado, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
+  const corpo = { ...dados, ...(PAGINA ? { pagina: PAGINA, braco_checkout_ext: EXT, braco_vida: BRACO_VIDA } : {}), landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, braco_pix: brPix, pix_forcado: pixForcado, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
   listaDeEventos.push({ nome, ...corpo });
   if (!PRODUCAO) return;
   try {
@@ -227,7 +232,7 @@ requestAnimationFrame(() => {
   let ttfb: number | null = null;
   try { const n = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined; if (n) ttfb = Math.round(n.responseStart); } catch { /* noop */ }
   const m = w.__landing ?? {};
-  evento("landing_html", { tela1_ms: agora(), ttfb_ms: ttfb, t_forcado: !!m.t_forcado, oferta_forcada: !!m.oferta_forcada, checkout_forcado: !!m.checkout_forcado, lp_forcado: !!m.lp_forcado, pix_forcado: !!m.pix_forcado, divisao: m.divisao ?? null, ...(PAGINA ? { hotmart_forcado: !!m.hotmart_forcado } : {}) });
+  evento("landing_html", { tela1_ms: agora(), ttfb_ms: ttfb, t_forcado: !!m.t_forcado, oferta_forcada: !!m.oferta_forcada, checkout_forcado: !!m.checkout_forcado, lp_forcado: !!m.lp_forcado, pix_forcado: !!m.pix_forcado, divisao: m.divisao ?? null, ...(PAGINA ? { hotmart_forcado: !!m.hotmart_forcado, vida_forcado: !!m.vida_forcado } : {}) });
 });
 
 /*
@@ -736,7 +741,7 @@ const viuAOferta = () => {
 };
 if ("IntersectionObserver" in window) {
   if (V2) {
-    const botaoPagar = HOTMART ? $("lp-hotmart") : $("lp-pagar");
+    const botaoPagar = HOTMART ? $(ID_BOTAO_HM) : $("lp-pagar");
     new IntersectionObserver((ens) => { if (ens.some((e) => e.isIntersecting)) viuAOferta(); }, { threshold: 0.5 }).observe(botaoPagar);
     // crítica r2 2.5: o landing_bloco "oferta" do v2 também só com metade do bloco na tela (em 844+ os 15% apareciam sem rolar)
     new IntersectionObserver((ens, o) => { if (ens.some((e) => e.isIntersecting) && !vistos.has("oferta")) { vistos.add("oferta"); evento("landing_bloco", { bloco: "oferta", via: "50" }); o.disconnect(); } }, { threshold: 0.5 }).observe($("oferta"));
@@ -1732,7 +1737,7 @@ function registrarPedidoHotmart(ref: string): Promise<boolean> {
       headers: { "Content-Type": "application/json", apikey: KEY, Authorization: `Bearer ${token ?? KEY}` },
       body: JSON.stringify({
         ref, fbp: lerCookie("_fbp"), fbc: lerCookie("_fbc"), fbclid: BUSCA.get("fbclid"), url: URL_DE_CHEGADA.slice(0, 500),
-        landing_session_id: sessao, landing_device_id: aparelho, atrib, preco_centavos: HM_PRECO,
+        landing_session_id: sessao, landing_device_id: aparelho, atrib, preco_centavos: HM_PRECO, braco_vida: BRACO_VIDA,
       }),
     }).then((r) => r.ok, () => false);
   } catch { return Promise.resolve(false); }
@@ -1743,7 +1748,7 @@ type JanelaHm = Window & { __landingIrPara?: (url: string) => void };
 async function irHotmart() {
   if (indoHotmart) return;
   indoHotmart = true;
-  const botao = $("lp-hotmart");
+  const botao = $(ID_BOTAO_HM);
   botao.setAttribute("aria-busy", "true");
   porRotulo(botao, "Abrindo o pagamento…");
   const ref = novoId();
@@ -1762,14 +1767,14 @@ async function irHotmart() {
 }
 function soltarBotaoHotmart() {
   indoHotmart = false;
-  const botao = document.getElementById("lp-hotmart");
+  const botao = document.getElementById(ID_BOTAO_HM);
   if (!botao) return;
   botao.removeAttribute("aria-busy");
-  porRotulo(botao, "Quero organizar minha vida");
+  porRotulo(botao, ROTULO_BOTAO_HM);
 }
 // J (revisão): o Safari devolve a página do bfcache congelada — com "Abrindo o pagamento…" e os timers parados
 if (HOTMART) window.addEventListener("pageshow", (e) => { if ((e as PageTransitionEvent).persisted) soltarBotaoHotmart(); });
-if (HOTMART) document.getElementById("lp-hotmart")?.addEventListener("click", () => { evento("landing_cta", { onde: "hotmart", fase: estado.fase }); void irHotmart(); });
+if (HOTMART) document.getElementById(ID_BOTAO_HM)?.addEventListener("click", () => { evento("landing_cta", { onde: "hotmart", fase: estado.fase }); void irHotmart(); });
 
 /* ───────────────────────── 31/10: "Seu 2027 organizado" no pós-pago (./upsell-2027.ts, só com a chave ou o link do e-mail) ───────────────────────── */
 function carregarU2027(): Promise<ModU2027> {

@@ -116,13 +116,14 @@ const corpoDe = (html: string) => html.match(/<body>([\s\S]*)<\/body>/)![1];
 describe("o HTML do braço Hotmart", () => {
   const div = document.createElement("div");
   div.innerHTML = corpoDe(HTML);
-  it("todo elemento com data-so-ext é só do v2 (o /organizar no braço atual remove todos — teste byte a byte do landing-v2)", () => {
+  it("todo elemento com data-so-ext é de um braço (v2 ou atual); o CSS só mostra o da Hotmart com html[data-checkout-ext=hotmart] (o /organizar nunca tem)", () => {
     const els = [...div.querySelectorAll("[data-so-ext]")];
-    expect(els.length).toBeGreaterThan(10);
-    for (const el of els) expect(el.closest('[data-so-lp="v2"]')).not.toBeNull();
+    expect(els.length).toBeGreaterThan(20);
+    for (const el of els) expect(el.closest('[data-so-lp="v2"], [data-so-lp="atual"]')).not.toBeNull();
+    expect(HTML).toContain('html:not([data-checkout-ext="hotmart"]) [data-so-ext="hotmart"], html[data-checkout-ext="hotmart"] [data-so-ext="pix"] { display: none !important; }');
   });
   it("o preço escrito no HTML do braço Hotmart é o da constante (sem piscar) e nada de 27,90 / 'no Pix' nele", () => {
-    const hm = [...div.querySelectorAll('[data-so-ext="hotmart"]')];
+    const hm = [...div.querySelectorAll('[data-so-ext="hotmart"]')].filter((e) => e.closest('[data-so-lp="v2"]'));
     const texto = hm.map((e) => e.textContent ?? "").join(" | ");
     expect(texto).not.toMatch(/27,90|27\s*,90/);
     expect(texto).not.toMatch(/no Pix(?! ou)/);
@@ -132,12 +133,13 @@ describe("o HTML do braço Hotmart", () => {
     expect(texto).toMatch(/Pagamento seguro pela Hotmart/);
     expect(div.querySelector("[data-hm-parcelas]")!.textContent).toBe("Pix ou cartão, em até 12x");
   });
-  it("cada texto do braço Pix da /vida que fala de Pix tem o par do Hotmart (preço, sub, passo, FAQ, fim, selo)", () => {
-    expect(div.querySelectorAll('[data-so-ext="pix"]').length).toBe(div.querySelectorAll('[data-so-ext="hotmart"]').length - 3); // + parcelas, botão e erro do botão
+  it("cada texto do braço Pix da /vida que fala de Pix tem o par do Hotmart (preço, sub, passo, FAQ, fim, selo), nos 2 braços", () => {
+    const n = (sel: string, lp: string) => [...div.querySelectorAll(sel)].filter((e) => e.closest(`[data-so-lp="${lp}"]`)).length;
+    expect(n('[data-so-ext="pix"]', "v2")).toBe(n('[data-so-ext="hotmart"]', "v2") - 3); // + parcelas, botão e erro do botão
+    expect(n('[data-so-ext="pix"]', "atual")).toBe(n('[data-so-ext="hotmart"]', "atual") - 2); // + parcelas e botão
   });
-  it("o CSS some com o Pix (e-mail antes, #lp-pagar, #lp-pix) no braço Hotmart — tudo escopado no v2", () => {
-    expect(HTML).toContain('html[data-lp="v2"][data-checkout-ext="hotmart"] .lp-email-antes, html[data-lp="v2"][data-checkout-ext="hotmart"] #lp-pagar');
-    expect(HTML).toContain('html[data-lp="v2"][data-checkout-ext="hotmart"] #lp-pix { display: none !important; }');
+  it("o CSS some com o Pix (e-mail antes, #lp-pagar, #lp-pix) e com a âncora 'De R$ 97,90' quando a /vida é Hotmart — só com html[data-checkout-ext]", () => {
+    expect(HTML).toContain('html[data-checkout-ext="hotmart"] .lp-email-antes, html[data-checkout-ext="hotmart"] #lp-pagar, html[data-checkout-ext="hotmart"] #lp-pagar-erro, html[data-checkout-ext="hotmart"] #lp-pix, html[data-checkout-ext="hotmart"] .lp-ancora { display: none !important; }');
   });
 });
 
@@ -150,7 +152,7 @@ const eventos = (): Ev[] => ((window as unknown as { __eventosLanding?: Ev[] }).
 const dos = (nome: string) => eventos().filter((e) => e.nome === nome);
 const apagarCookies = () => { for (const c of document.cookie.split(";")) { const n = c.split("=")[0].trim(); if (n) document.cookie = `${n}=; Max-Age=0; Path=/`; } };
 let irPara: string[] = [];
-async function abrir(o: { pagina?: "vida" | null; ext?: "hotmart" | "pix"; url?: string; hmUrl?: string; parcelas?: string; antes?: () => void }) {
+async function abrir(o: { pagina?: "vida" | null; ext?: "hotmart" | "pix"; url?: string; hmUrl?: string; parcelas?: string; antes?: () => void; vida?: "v3" | "atual" }) {
   await dormir(25);
   vi.resetModules();
   localStorage.clear(); sessionStorage.clear(); apagarCookies();
@@ -160,10 +162,10 @@ async function abrir(o: { pagina?: "vida" | null; ext?: "hotmart" | "pix"; url?:
   irPara = [];
   (window as unknown as { __landingIrPara?: (u: string) => void }).__landingIrPara = (u) => { irPara.push(u); };
   const d = document.documentElement;
-  for (const a of ["data-pagina", "data-checkout-ext", "data-hm-sem-parcelas", "data-pix"]) d.removeAttribute(a);
-  d.setAttribute("data-t", "a"); d.setAttribute("data-oferta", "sempre"); d.setAttribute("data-checkout", "email"); d.setAttribute("data-lp", "v2");
+  for (const a of ["data-pagina", "data-checkout-ext", "data-hm-sem-parcelas", "data-pix", "data-vida"]) d.removeAttribute(a);
+  d.setAttribute("data-t", "a"); d.setAttribute("data-oferta", "sempre"); d.setAttribute("data-checkout", "email"); d.setAttribute("data-lp", o.vida === "atual" ? "atual" : "v2");
   const pagina = o.pagina === undefined ? "vida" : o.pagina;
-  if (pagina) { d.setAttribute("data-pagina", pagina); d.setAttribute("data-checkout-ext", o.ext ?? "hotmart"); }
+  if (pagina) { d.setAttribute("data-pagina", pagina); d.setAttribute("data-checkout-ext", o.ext ?? "hotmart"); d.setAttribute("data-vida", o.vida ?? "v3"); }
   (window as unknown as { __landing?: unknown }).__landing = pagina
     ? { pagina, checkout_ext: o.ext ?? "hotmart", hotmart_url: o.hmUrl ?? URL_REAL, hotmart_preco_centavos: 9790, hotmart_parcelas: o.parcelas ?? "Pix ou cartão, em até 12x" }
     : undefined;
@@ -212,7 +214,7 @@ describe("a /vida no jsdom", () => {
     await abrir({});
     expect(document.querySelector(".lp-fixo .lp2-fixo-p b")!.textContent).toBe("R$ 97,90");
     expect(document.querySelector(".lp2-cheia-baixo .lp2-fixo-p b")!.textContent).toBe("R$ 97,90");
-    expect(document.querySelector('#fim p[data-so-ext="hotmart"]')!.textContent).toContain("R$ 97,90");
+    expect(document.querySelector('#fim p[data-so-lp="v2"][data-so-ext="hotmart"]')!.textContent).toContain("R$ 97,90");
     expect(document.querySelector("[data-hm-parcelas]")).not.toBeNull();
     await abrir({ parcelas: "" });
     expect(document.querySelector("[data-hm-parcelas]")).toBeNull();
@@ -320,5 +322,119 @@ describe("hotmart.ts, rotas e obrigado", () => {
     expect(card.querySelector('a[href="https://www.coreaplicativo.com.br/guia/core-comece-aqui.pdf"]')).not.toBeNull();
     expect(card.textContent).toContain("contato@coreaplicativo.com.br");
     expect(OBRIGADO).not.toMatch(/fbq\(|fbevents|Purchase"/);
+  });
+});
+
+/* ───────── A/B na /vida (AB_VIDA, 04/11): "v3" × "atual" (a página do /organizar com R$ 97,90 e a Hotmart) ───────── */
+const comVida = (ab: "on" | "off", hm: "on" | "off" = "on") => comChave(hm).replace(/var AB_VIDA = "(on|off)"/, `var AB_VIDA = "${ab}"`);
+describe("AB_VIDA no <head>", () => {
+  it('no código: AB_VIDA "off" → todo mundo no v3 (data-lp v2), como antes', () => {
+    expect(HTML).toMatch(/var AB_VIDA = "off";/);
+    const r = rodar(comVida("off"), "/vida");
+    expect(r.attrs).toMatchObject({ "data-vida": "v3", "data-lp": "v2", "data-pagina": "vida" });
+    expect(r.mem).toMatchObject({ vida: "v3", ab_vida: "off", vida_forcado: false });
+  });
+  it('"on" = 50/50 estável por aparelho (o mesmo aparelho volta no mesmo braço); "atual" → data-lp atual', () => {
+    const vistos = { v3: 0, atual: 0 };
+    for (let i = 0; i < 80; i++) {
+      const store: Record<string, string> = {};
+      const r = rodar(comVida("on"), "/vida", store);
+      const b = r.attrs["data-vida"] as "v3" | "atual";
+      vistos[b]++;
+      expect(r.attrs["data-lp"]).toBe(b === "atual" ? "atual" : "v2");
+      expect(rodar(comVida("on"), "/vida", store).attrs["data-vida"]).toBe(b);
+    }
+    expect(vistos.v3).toBeGreaterThan(20);
+    expect(vistos.atual).toBeGreaterThan(20);
+  });
+  it("?vida=atual|v3 força e fica; ?vida=auto desfaz; a força vence a chave", () => {
+    const store: Record<string, string> = {};
+    expect(rodar(comVida("off"), "/vida?vida=atual", store).attrs["data-vida"]).toBe("atual");
+    expect(rodar(comVida("off"), "/vida", store).mem).toMatchObject({ vida: "atual", vida_forcado: true });
+    expect(rodar(comVida("on"), "/vida?vida=v3", store).attrs["data-vida"]).toBe("v3");
+    expect(rodar(comVida("off"), "/vida?vida=auto", store).attrs["data-vida"]).toBe("v3");
+    expect(store["landing-vida-force"]).toBeUndefined();
+  });
+  it("/organizar com AB_VIDA on (e ?vida=atual): nada muda — sem data-vida, os mesmos atributos e a mesma memória da chave off", () => {
+    for (const url of ["/organizar", "/organizar?vida=atual", "/organizar?lp=v2"]) {
+      const on = rodar(comVida("on"), url, {});
+      const off = rodar(comVida("off"), url, {});
+      expect(on.attrs["data-vida"]).toBeUndefined();
+      expect(on.mem.vida).toBeUndefined();
+      expect(on.store["landing-vida-force"]).toBeUndefined();
+      const sem = (a: Record<string, string>) => { const { "data-pix": _p, ...r } = a; return r; };
+      expect(sem(on.attrs)).toEqual(sem(off.attrs));
+    }
+  });
+});
+
+/** as regras "display: none !important" da página (o jsdom não respeita o !important contra um display da própria classe) */
+const ESCONDE = [...estilo.matchAll(/([^{}]+)\{\s*display:\s*none\s*!important;\s*\}/g)].flatMap((m) => m[1].replace(/\/\*[\s\S]*?\*\//g, "").split(",").map((x) => x.trim()).filter(Boolean));
+const escondido = (el: Element) => ESCONDE.some((sel) => { try { return el.matches(sel); } catch { return false; } });
+/** o texto que a pessoa VÊ (pula tudo que o CSS esconde, em qualquer ancestral) */
+function textoVisivel(el: Element): string {
+  if (getComputedStyle(el).display === "none" || el.hasAttribute("hidden") || escondido(el)) return "";
+  if (el.tagName === "SCRIPT" || el.tagName === "STYLE") return "";
+  let t = "";
+  for (const n of el.childNodes) t += n.nodeType === Node.TEXT_NODE ? n.textContent : n.nodeType === Node.ELEMENT_NODE ? ` ${textoVisivel(n as Element)} ` : "";
+  return t;
+}
+describe("/vida braço atual no jsdom", () => {
+  it("nenhum 27,90 na página visível; o preço é R$ 97,90 (título, fim, barra fixa, FAQ); sem âncora 'De R$ 97,90 por ano'; Pix ou cartão; selo da Hotmart", async () => {
+    await abrir({ vida: "atual" });
+    const t = textoVisivel(document.body).replace(/\s+/g, " ");
+    expect(t).not.toMatch(/27,90|27\s*,\s*90/);
+    expect(t).not.toMatch(/no Pix(?! ou)/);
+    expect(t.replace(/\s+/g, "")).not.toContain("De R$ 97,90 por ano".replace(/\s+/g, ""));
+    expect(t.replace(/\s+/g, "")).toContain("Pra sempre por R$ 97,90".replace(/\s+/g, ""));
+    expect(t.replace(/\s+/g, "")).toContain("Pagamento único · nunca mais paga".replace(/\s+/g, ""));
+    expect(t.replace(/\s+/g, "")).toContain("Pix ou cartão, em até 12x".replace(/\s+/g, ""));
+    expect(t.replace(/\s+/g, "")).toContain("Pagamento seguro pela Hotmart".replace(/\s+/g, ""));
+    expect(t.replace(/\s+/g, "")).toContain("Sua vida inteira num app só, por R$ 97,90. Pra sempre.".replace(/\s+/g, ""));
+    expect(t.replace(/\s+/g, "")).toContain("Quero organizar tudo · R$ 97,90".replace(/\s+/g, ""));
+    expect(t.replace(/\s+/g, "")).toContain("Devolvemos 100%, é só mandar um e-mail.".replace(/\s+/g, ""));
+    expect(t.replace(/\s+/g, "")).toContain("Pague uma vez, no Pix ou no cartão".replace(/\s+/g, ""));
+    const visivel2 = (sel: string) => { const el = document.querySelector(sel)!; return getComputedStyle(el).display !== "none" && !escondido(el); };
+    expect(visivel2("#lp-hotmart-atual")).toBe(true);
+    expect(visivel2("#lp-hotmart")).toBe(false);
+    expect(visivel2("#lp-pagar")).toBe(false);
+    expect(visivel2(".lp-email-antes")).toBe(false);
+    expect(visivel2("#lp-pix")).toBe(false);
+    expect(visivel2(".lp-ancora")).toBe(false);
+    expect(visivel2("#topo")).toBe(true); // a página do /organizar (faixa e topo de hoje)
+    expect(visivel2("#topo-v2")).toBe(false);
+  });
+  it("o botão 'Quero organizar tudo' vai pra Hotmart (sck=<ref>, src) pelo mesmo fluxo; todo evento leva braco_vida 'atual'; nada de Pix", async () => {
+    await abrir({ vida: "atual" });
+    const b = document.getElementById("lp-hotmart-atual") as HTMLButtonElement;
+    b.click();
+    await vi.waitFor(() => { if (!irPara.length) throw new Error("não saiu"); }, { timeout: 3000, interval: 30 });
+    const u = new URL(irPara[0]);
+    expect(`${u.origin}${u.pathname}`).toBe(URL_REAL);
+    const ev = dos("landing_hotmart_redirect")[0];
+    expect(u.searchParams.get("sck")).toBe(ev.ref);
+    expect(u.searchParams.get("src")).toBe("criativo_7");
+    expect(ev).toMatchObject({ pagina: "vida", braco_vida: "atual", braco_checkout_ext: "hotmart", braco_lp: "atual", valor: 97.9 });
+    expect(dos("landing_pix_gerado")).toHaveLength(0);
+    for (const e of eventos().filter((x) => x.nome.startsWith("landing_"))) expect(e.braco_vida).toBe("atual");
+    expect(b.textContent).toContain("Abrindo o pagamento");
+    const pv = new Event("pageshow"); Object.defineProperty(pv, "persisted", { value: true }); window.dispatchEvent(pv);
+    expect(b.textContent).toContain("Quero organizar tudo");
+  });
+  it("braço v3: braco_vida 'v3' em todo evento", async () => {
+    await abrir({ vida: "v3" });
+    const l = eventos().filter((x) => x.nome.startsWith("landing_"));
+    expect(l.length).toBeGreaterThan(0);
+    for (const e of l) expect(e.braco_vida).toBe("v3");
+  });
+  it("/organizar no braço atual: nada da Hotmart visível, o Pix de 27,90 como hoje, sem braco_vida", async () => {
+    await abrir({ pagina: null, vida: "atual", url: "/organizar" });
+    const t = textoVisivel(document.body).replace(/\s+/g, " ");
+    expect(t.replace(/\s+/g, "")).toContain("Pra sempre por R$ 27,90".replace(/\s+/g, ""));
+    expect(t.replace(/\s+/g, "")).not.toContain("97,90 · Pix ou cartão".replace(/\s+/g, ""));
+    expect(t.replace(/\s+/g, "")).not.toContain("Pagamento seguro pela Hotmart".replace(/\s+/g, ""));
+    expect(escondido(document.querySelector("#lp-hotmart-atual")!)).toBe(true);
+    expect(escondido(document.querySelector("#lp-pagar")!)).toBe(false);
+    for (const e of eventos().filter((x) => x.nome.startsWith("landing_"))) expect(e).not.toHaveProperty("braco_vida");
   });
 });

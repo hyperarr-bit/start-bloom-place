@@ -132,7 +132,8 @@ describe("o sorteio da página (AB_LP, head do landing.html)", () => {
 /* ───────── 2. o braço atual é a página de hoje, byte a byte ───────── */
 const corpoDe = (html: string) => html.match(/<body>([\s\S]*)<\/body>/)![1];
 const estiloDe = (html: string) => html.match(/<style>([\s\S]*?)<\/style>/)![1];
-const soV2 = /data-lp="v2"|data-so-lp|\.lp2-|BRAÇO v2/;
+// 04/11: + as regras da /vida (data-checkout-ext / data-so-ext / data-hm-*) — só casam com atributos que o /organizar nunca tem
+const soV2 = /data-lp="v2"|data-so-lp|\.lp2-|BRAÇO v2|data-checkout-ext|data-so-ext|data-hm-/;
 
 describe("braço atual = a página de hoje (origin/main 30/10), sem tirar nem pôr", () => {
   it("o HTML do corpo, tirando o que é só do v2 (e o atributo data-so-lp), é IGUAL ao de hoje", () => {
@@ -140,6 +141,9 @@ describe("braço atual = a página de hoje (origin/main 30/10), sem tirar nem p�
     novo.innerHTML = corpoDe(HTML);
     novo.querySelectorAll('[data-so-lp="v2"]').forEach((el) => el.remove());
     novo.querySelectorAll("[data-so-lp]").forEach((el) => el.removeAttribute("data-so-lp"));
+    // 04/11 (A/B da /vida): o que é só da Hotmart nunca aparece no /organizar (sem html[data-checkout-ext]); o atributo data-so-ext sai
+    novo.querySelectorAll('[data-so-ext="hotmart"]').forEach((el) => el.remove());
+    novo.querySelectorAll("[data-so-ext]").forEach((el) => el.removeAttribute("data-so-ext"));
     const velho = document.createElement("div");
     velho.innerHTML = corpoDe(MAIN);
     const limpo = (el: HTMLElement) => el.innerHTML.replace(/<!--[\s\S]*?-->/g, "").replace(/\s+/g, " ").trim();

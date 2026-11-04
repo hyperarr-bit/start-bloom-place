@@ -77,7 +77,8 @@ describe("o <head>: /organizar intocado; /vida decide pela rota e pela chave CHE
 
   it("/vida = sempre o braço v2, sem sorteio e sem ler nem gravar a força do ?lp do /organizar", () => {
     const store: Record<string, string> = { "landing-lp-force": "atual" };
-    const r = rodar(comChave("off"), "/vida?lp=atual", store);
+    // AB_VIDA off aqui (ligado no main desde 04/11: com ele, metade dos aparelhos novos cai no braço "atual" — o teste oscilava)
+    const r = rodar(comChave("off").replace(/var AB_VIDA = "(on|off)"/, 'var AB_VIDA = "off"'), "/vida?lp=atual", store);
     expect(r.attrs["data-lp"]).toBe("v2");
     expect(r.attrs["data-pagina"]).toBe("vida");
     expect(r.mem).toMatchObject({ lp: "v2", lp_forcado: false, pagina: "vida" });

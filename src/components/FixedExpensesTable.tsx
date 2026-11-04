@@ -58,6 +58,10 @@ interface FixedExpensesTableProps {
   mes?: string;
   /** 08/10: fixos do mês corrente PREVISTOS num mês futuro (MonthlySheet) — só leitura até a pessoa editar. */
   projetados?: FixedExpense[];
+  /** 01/11 (chamados f58d1b35, 9a7cf88d, 982febff, f175076b): nome do mês quando a
+   *  tabela está na planilha de um mês que NÃO é o atual. O fixo gravado lá vale
+   *  só para aquele mês, então a frase "repetem todo mês" mentia. Ausente = mês atual. */
+  soDoMes?: string;
 }
 
 /**
@@ -66,6 +70,17 @@ interface FixedExpensesTableProps {
  * casamento da adoção (virada-do-mes): o que a pessoa materializar aqui vence
  * quando o mês chegar, e nada duplica.
  */
+/** 01/11 (dono: "repetir todos os meses"; chamados f58d1b35, 9a7cf88d, 982febff, f175076b): o fixo cadastrado
+ *  na planilha de um mês FUTURO também é previsto nos meses seguintes. Junta, em ordem, o balde corrente e as
+ *  planilhas dos meses futuros anteriores ao que está aberto; o mais recente vence no mesmo perfil+descrição.
+ *  Só leitura — nada é gravado (quando o mês chega, a adoção da virada leva o fixo pro balde de vez). */
+export const juntarFixosEmCadeia = (listas: FixedExpense[][]): FixedExpense[] => {
+  const chave = (f: FixedExpense) => `${String((f as { perfil?: string }).perfil ?? "")}|${String(f.description ?? "").trim().toLowerCase()}`;
+  const porChave = new Map<string, FixedExpense>();
+  for (const lista of listas) for (const f of Array.isArray(lista) ? lista : []) if (f && typeof f === "object") porChave.set(chave(f), f);
+  return [...porChave.values()];
+};
+
 export const projetarFixos = (correntes: FixedExpense[], reais: FixedExpense[]): FixedExpense[] => {
   const chave = (f: FixedExpense) => `${String((f as { perfil?: string }).perfil ?? "")}|${String(f.description ?? "").trim().toLowerCase()}`;
   const temReal = new Set((Array.isArray(reais) ? reais : []).map(chave));
@@ -126,7 +141,7 @@ export const erroDoFixo = (descricao: string, valorDigitado: string): string | n
   return null;
 };
 
-export const FixedExpensesTable = ({ expenses, setExpenses, dueDays, setDueDays, mes, projetados = [] }: FixedExpensesTableProps) => {
+export const FixedExpensesTable = ({ expenses, setExpenses, dueDays, setDueDays, mes, projetados = [], soDoMes }: FixedExpensesTableProps) => {
   const { labelOf: getCategoryLabel, styleOf: getCategoryStyle } = useFinanceCategories();
   const { labelOf: getCardLabel, styleOf: getCardStyle } = useFinanceCards();
   const mesDaChave = mes ?? mesCorrenteId();
@@ -323,9 +338,15 @@ export const FixedExpensesTable = ({ expenses, setExpenses, dueDays, setDueDays,
       {/* Dizer com todas as letras o que este card é (07/09): "as contas
           recorrentes. Não consegui fazer" — estavam aqui o tempo todo, com
           outro nome. */}
-      <p className="px-4 py-1.5 text-[10px] text-muted-foreground border-b border-border/60">
-        contas recorrentes · repetem todo mês · o <strong>✓</strong> marca como paga este mês{dueDays ? " (o mesmo do MEU MÊS)" : ""}
-      </p>
+      {soDoMes ? (
+        <p className="px-4 py-1.5 text-[10px] text-muted-foreground border-b border-border/60">
+          Vale só para {soDoMes}. Pra repetir todo mês, cadastre em Meu financeiro.
+        </p>
+      ) : (
+        <p className="px-4 py-1.5 text-[10px] text-muted-foreground border-b border-border/60">
+          contas recorrentes · repetem todo mês · o <strong>✓</strong> marca como paga este mês{dueDays ? " (o mesmo do MEU MÊS)" : ""}
+        </p>
+      )}
 
       {/* Nome de quem divide. Fica aqui em cima porque é o que dá sentido a
           todo selo que aparece na lista abaixo. */}

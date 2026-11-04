@@ -74,6 +74,8 @@ export type ResultadoDestino =
 export async function encaminharParaDestino(admin: Admin, args: {
   uidAnonimo: string; orderId: string; offer: string;
   enviar: (para: string, assunto: string, html: string) => Promise<boolean>;
+  /** 31/10: o bloco do "Seu 2027" pro e-mail (dono = a conta de destino); "" = sem bloco. Nunca derruba o e-mail. */
+  extra?: (dono: string) => Promise<string>;
 }): Promise<ResultadoDestino> {
   const destino = await lerDestino(admin, args.uidAnonimo);
   if (!destino) return { r: "sem_destino" };
@@ -99,7 +101,8 @@ export async function encaminharParaDestino(admin: Admin, args: {
     const vit = todas.find((l) => l.billing_period === "lifetime" || l.plan === "lifetime");
     const maior = [...todas].sort((a, b) => Date.parse(String(b.current_period_end)) - Date.parse(String(a.current_period_end)))[0];
     const periodo = vit ? "lifetime" : periodoDoEmailVenda(args.offer)!;
-    mandou = await args.enviar(destino, assuntoVenda(periodo), htmlVenda({ email: destino, periodo, fim: maior?.current_period_end ?? null, hoje: true }));
+    const extra = args.extra ? await args.extra(para).catch(() => "") : "";
+    mandou = await args.enviar(destino, assuntoVenda(periodo), htmlVenda({ email: destino, periodo, fim: maior?.current_period_end ?? null, hoje: true, extra }));
     if (!mandou) await soltarBoasVindas(admin, args.orderId);
   }
   return { r: "movido", para, linhas: todas.length, email: mandou, dados };

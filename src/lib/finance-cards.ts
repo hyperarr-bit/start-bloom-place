@@ -22,23 +22,9 @@ import { useUserData } from "@/hooks/use-user-data";
  * nunca perdido.
  */
 
-export type FinanceCard = { value: string; label: string; color: string; custom?: boolean };
-
-// As 11 bandeiras de sempre — values e cores IDÊNTICOS aos que estavam nos três
-// arquivos, senão os dados já gravados perderiam a cor/rótulo.
-export const DEFAULT_CARDS: FinanceCard[] = [
-  { value: "nubank", label: "Nubank", color: "bg-purple-500/15 text-purple-700 dark:text-purple-300" },
-  { value: "inter", label: "Inter", color: "bg-orange-500/15 text-orange-700 dark:text-orange-300" },
-  { value: "itau", label: "Itaú", color: "bg-blue-600/15 text-blue-700 dark:text-blue-300" },
-  { value: "bradesco", label: "Bradesco", color: "bg-red-600/15 text-red-700 dark:text-red-300" },
-  { value: "santander", label: "Santander", color: "bg-red-500/15 text-red-600 dark:text-red-300" },
-  { value: "c6", label: "C6 Bank", color: "bg-gray-800/15 text-gray-700 dark:text-gray-300" },
-  { value: "bb", label: "Banco do Brasil", color: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300" },
-  { value: "caixa", label: "Caixa", color: "bg-blue-500/15 text-blue-600 dark:text-blue-300" },
-  { value: "neon", label: "Neon", color: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300" },
-  { value: "picpay", label: "PicPay", color: "bg-green-500/15 text-green-700 dark:text-green-300" },
-  { value: "outro", label: "Outro", color: "bg-gray-500/15 text-gray-700 dark:text-gray-300" },
-];
+// 31/10 (planner 2027): a lista e as chaves moram em ./finance-cards-dados (sem React) — o planner lê sem puxar o store.
+import { DEFAULT_CARDS, CUSTOM_CARDS_KEY, CARD_CONFIG_KEY, type FinanceCard } from "@/lib/finance-cards-dados";
+export { DEFAULT_CARDS, CUSTOM_CARDS_KEY, CARD_CONFIG_KEY, type FinanceCard };
 
 // Paleta dos PERSONALIZADOS — classes literais (o Tailwind precisa enxergá-las
 // no código-fonte). Escolhida por índice estável guardado no próprio cartão.
@@ -55,7 +41,6 @@ export const CARD_PALETTE: { color: string }[] = [
 
 const NEUTRO = "bg-gray-500/15 text-gray-700 dark:text-gray-300";
 
-export const CUSTOM_CARDS_KEY = "finance-custom-cards";
 export const MAX_CUSTOM_CARDS = 20;
 
 /**
@@ -67,7 +52,6 @@ export const MAX_CUSTOM_CARDS = 20;
  * Ausente = cartão sem fatura (comportamento de sempre). A regra do que
  * muda com isso mora em lib/finance-fatura.ts.
  */
-export const CARD_CONFIG_KEY = "finance-card-config";
 /** `mesDoVencimento` (07/10): sem fechamento, o gasto conta no mês seguinte — ver lib/finance-fatura. */
 export type CardConfig = { closingDay?: number; dueDay?: number; mesDoVencimento?: boolean };
 const SEM_CONFIG: Record<string, CardConfig> = {};

@@ -24,7 +24,10 @@ import type { AbaOcultavel, AbasOcultas } from "@/hooks/use-abas-ocultas";
 import { Switch } from "@/components/ui/switch";
 import { trackEvent } from "@/lib/analytics";
 import { emCaminhoDeDemo } from "@/lib/caminho-demo";
-import { EVENTO_ABRIR_ABA, EVENTO_ORGANIZAR_ABAS, type DetalheAbrirAba, type DetalheOrganizar } from "@/lib/dicas-do-modulo";
+import {
+  EVENTO_ABRIR_ABA, EVENTO_DICAS_DE_NOVO, EVENTO_ORGANIZAR_ABAS, dicasDoModulo, type DetalheAbrirAba, type DetalheDicasDeNovo, type DetalheOrganizar,
+} from "@/lib/dicas-do-modulo";
+import { useUserData } from "@/hooks/use-user-data";
 import {
   Alca, CLASSE_FUNDO_FOLHA, FaixaDoRelogioSobFolha, propsDaFolha, propsDoFundo, useFolhaArrastavel,
 } from "@/components/home-nova/e/folha-arrasto";
@@ -52,6 +55,10 @@ const SEGURAR_MS = 500;
  *  antes, sem a porta "Organizar abas" nem o "Ver todas" (dono 28/10). */
 export const fileiraDeDemo = (): boolean => {
   try { return emCaminhoDeDemo() || /^\/organizar\/demo(\/|$)/.test(window.location.pathname); } catch { return false; }
+};
+/** A conta, ou null quando a fileira está fora do provider (o useContext roda sempre — a ordem dos hooks não muda). */
+const useContaSePuder = () => {
+  try { return useUserData(); } catch { return null; }
 };
 const rotuloDe = (t: AbaOcultavel) => `${t.icon ? `${t.icon} ` : ""}${t.label}`;
 
@@ -256,8 +263,21 @@ interface FolhaProps<T extends AbaOcultavel> {
 }
 
 function FolhaOrganizarAbas<T extends AbaOcultavel>({ abas, aberta, onFechar, ocultarAba }: FolhaProps<T>) {
-  const { todas, visiveis, ocultas, mostrar, mostrarTodas, mover } = abas;
+  const { todas, visiveis, ocultas, mostrar, mostrarTodas, mover, modulo } = abas;
   const semMovimento = !!useReducedMotion();
+  /* 01/11 (chamado 00f3064c): o X das "Dicas para começar" grava `core-tip-seen-<módulo>` e não tinha volta. Linha
+     discreta no fim da folha: só quando o módulo tem dicas e a marca existe; apaga a marca e fecha a folha.
+     Fileira montada fora da conta (sem provider, o useUserData lança) só não mostra a linha. */
+  const conta = useContaSePuder();
+  const chaveDaDica = modulo ? `core-tip-seen-${modulo}` : "";
+  const podeVerDicas = !!conta && !!modulo && !fileiraDeDemo() && dicasDoModulo(modulo).length > 0 && !!conta.get<unknown>(chaveDaDica, "");
+  const verDicasDeNovo = () => {
+    if (!modulo || !conta) return;
+    conta.set(chaveDaDica, "");
+    window.dispatchEvent(new CustomEvent<DetalheDicasDeNovo>(EVENTO_DICAS_DE_NOVO, { detail: { modulo } }));
+    trackEvent("dicas_de_novo", { modulo });
+    onFechar();
+  };
   const arrasto = useFolhaArrastavel(onFechar, semMovimento);
 
   // Esc fecha (teclado no site / leitor de tela)
@@ -324,6 +344,11 @@ function FolhaOrganizarAbas<T extends AbaOcultavel>({ abas, aberta, onFechar, oc
             {ocultas.length > 0 && (
               <button type="button" onClick={() => mostrarTodas()} data-testid="abas-organizar-mostrar-todas" className="w-full h-12 mt-3 rounded-2xl text-[14px] font-bold border border-border">
                 Mostrar todas as abas
+              </button>
+            )}
+            {podeVerDicas && (
+              <button type="button" onClick={verDicasDeNovo} data-testid="abas-ver-dicas-de-novo" className="w-full mt-2 py-2 text-[12.5px] text-muted-foreground underline decoration-dotted underline-offset-4">
+                Ver dicas de novo
               </button>
             )}
           </motion.div>

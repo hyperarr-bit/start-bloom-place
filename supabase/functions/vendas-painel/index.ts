@@ -3,7 +3,8 @@
  * servidor. Só conta ADMIN (user_roles), pelo JWT. As contas são as de _shared/vendas-painel.ts (cópia da régua dos
  * scripts de métricas). A resposta não tem e-mail nem id de usuário.
  *
- *   POST { aba: "vendas" | "turmas" | "web" }
+ *   POST { aba: "vendas" | "dias" | "turmas" | "web" }   (02/11: "dias" = cada dia desde a campanha bid de 28/10;
+ *        "turmas" passa a mostrar todas desde 28/10)
  *   POST { aba: "campanhas", periodo: "hoje" | "ontem" | "7d" }
  *
  * Secrets: META_ADS_TOKEN (ads_read nas 2 contas — o mesmo do meta-insights), REVENUECAT_SECRET_KEY (já existe).
@@ -15,7 +16,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { diaBRT, inicioDiaBRT, somaDias, type LinhaSub, type Origem } from "../_shared/aviso-venda.ts";
 import {
-  desfecho, funilLanding, gastoPorDia, linhaCampanha, montarTurmas, normalizarLoja, roiWeb, vendasDoDia,
+  desfecho, funilLanding, gastoPorDia, INICIO_DIAS, linhaCampanha, montarTurmasDesde, normalizarLoja, resumoDoDia, roiWeb, vendasDoDia,
   type EstadoRC, type EventoLanding, type InfoCampanha, type InsightMeta,
 } from "../_shared/vendas-painel.ts";
 
@@ -109,8 +110,9 @@ async function todas<T>(consulta: (de: number, ate: number) => PromiseLike<{ dat
 }
 
 /* ---------------------------------------------------------------- abas */
-async function abaVendas(admin: Admin, hoje: string) {
-  const ini = inicioDiaBRT(hoje);
+/** O que alimenta o "Vendas de hoje", de `desde` até agora (Pix, marcadores das lojas, renovações avisadas). */
+async function fontesDeVenda(admin: Admin, desde: string) {
+  const ini = inicioDiaBRT(desde);
   const pix = await todas<LinhaSub>((a, b) => admin.from("subscriptions").select(COLS).eq("payment_method", "pix").gte("created_at", ini).range(a, b));
   const marcadores = await todas<{ event_name: string; event_data: { tx?: string; valor?: number } | null; created_at: string }>((a, b) =>
     admin.from("analytics_events").select("event_name,event_data,created_at").eq("event_name", "meta_capi_app_enviado").gte("created_at", ini).range(a, b));
@@ -121,12 +123,16 @@ async function abaVendas(admin: Admin, hoje: string) {
     for (const l of (data ?? []) as LinhaSub[]) if (l.revenuecat_subscription_id) linhaPorTx.set(l.revenuecat_subscription_id, l);
   }
   const { data: renov } = await admin.from("venda_avisada").select("chave,origem,valor_cents,plano,criado_em").eq("renovacao", true).gte("criado_em", ini);
-  const r = vendasDoDia(pix, marcadores, linhaPorTx, (renov ?? []) as Array<{ chave: string; origem: Origem; valor_cents: number; plano: string; criado_em: string }>, hoje);
-  return { dia: hoje, ...r };
+  return { pix, marcadores, linhaPorTx, renov: (renov ?? []) as Array<{ chave: string; origem: Origem; valor_cents: number; plano: string; criado_em: string }> };
 }
 
-async function abaTurmas(admin: Admin, hoje: string) {
-  const desde = somaDias(hoje, -3);
+async function abaVendas(admin: Admin, hoje: string) {
+  const f = await fontesDeVenda(admin, hoje);
+  return { dia: hoje, ...vendasDoDia(f.pix, f.marcadores, f.linhaPorTx, f.renov, hoje) };
+}
+
+/** As turmas do iPhone de `desde` até hoje + o gasto de app/site por dia (uma ida só ao RevenueCat e à Meta). */
+async function turmasDesde(admin: Admin, hoje: string, desde: string) {
   const subs = await todas<LinhaSub>((a, b) => admin.from("subscriptions").select(COLS).eq("payment_method", "play_store").gte("created_at", inicioDiaBRT(desde)).range(a, b));
   const { data: papeis } = await admin.from("user_roles").select("user_id").eq("role", "admin");
   const internos = new Set(((papeis ?? []) as Array<{ user_id: string }>).map((p) => p.user_id));
@@ -134,8 +140,31 @@ async function abaTurmas(admin: Admin, hoje: string) {
   const doIphone = linhas.filter((l) => l.loja === "apple" && (l.tipo === "teste_anual" || l.billing === "monthly"));
   const rc = await estadosRC(doIphone.map((l) => l.uid));
   const ins = await insightsPorDia(desde, hoje);
-  const turmas = montarTurmas(linhas, rc, gastoPorDia(ins.linhas, "app", SITE_EXTRA), hoje);
-  return { dia: hoje, turmas, semEstadoRC: doIphone.filter((l) => !rc.has(l.tx)).length, errosMeta: ins.erros };
+  const gastoApp = gastoPorDia(ins.linhas, "app", SITE_EXTRA);
+  return { turmas: montarTurmasDesde(linhas, rc, gastoApp, hoje, desde), gastoApp, gastoSite: gastoPorDia(ins.linhas, "site", SITE_EXTRA), semEstadoRC: doIphone.filter((l) => !rc.has(l.tx)).length, errosMeta: ins.erros };
+}
+
+async function abaDias(admin: Admin, hoje: string) {
+  // 03/11 (dono): cada dia mostra a turma do iPhone COBRADA nele (começou em D−3) → as turmas começam 3 dias antes de 28/10
+  const [f, t] = await Promise.all([fontesDeVenda(admin, INICIO_DIAS), turmasDesde(admin, hoje, somaDias(INICIO_DIAS, -3))]);
+  const porDia = new Map(t.turmas.map((tu) => [tu.dia, tu]));
+  const vazia = { testes: 0, pagaram: 0, situacao: "fechada", liquido: 0, gasto: 0 };
+  const dias = t.turmas.filter((tu) => tu.dia >= INICIO_DIAS).map((tu) => {
+    const cobrada = porDia.get(somaDias(tu.dia, -3));
+    return resumoDoDia(vendasDoDia(f.pix, f.marcadores, f.linhaPorTx, f.renov, tu.dia), tu.dia, t.gastoSite[tu.dia] ?? 0, cobrada ? { ...cobrada } : { ...vazia, dia: somaDias(tu.dia, -3) });
+  });
+  const soma = (g: (d: (typeof dias)[number]) => number) => Math.round(dias.reduce((s, d) => s + g(d), 0) * 100) / 100;
+  return {
+    dia: hoje, desde: INICIO_DIAS, dias,
+    total: { vendido: soma((d) => d.vendido), vendas: soma((d) => d.vendas), lucro: soma((d) => d.lucro), lucroSite: soma((d) => d.site.lucro), lucroIphone: soma((d) => d.iphone.lucro), lucroAndroid: soma((d) => d.android.lucro) },
+    semEstadoRC: t.semEstadoRC, errosMeta: t.errosMeta,
+  };
+}
+
+async function abaTurmas(admin: Admin, hoje: string) {
+  // 02/11 (dono): todas as turmas desde a campanha bid (28/10), não só as 4 de agora
+  const t = await turmasDesde(admin, hoje, INICIO_DIAS);
+  return { dia: hoje, turmas: t.turmas, semEstadoRC: t.semEstadoRC, errosMeta: t.errosMeta };
 }
 
 async function abaCampanhas(hoje: string, periodo: string) {
@@ -208,6 +237,7 @@ serve(async (req) => {
 
     let data: Record<string, unknown>;
     if (aba === "turmas") data = await abaTurmas(admin, hoje);
+    else if (aba === "dias") data = await abaDias(admin, hoje);
     else if (aba === "campanhas") data = await abaCampanhas(hoje, periodo);
     else if (aba === "web") data = await abaWeb(admin, hoje);
     else data = await abaVendas(admin, hoje);

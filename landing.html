@@ -29,12 +29,30 @@
                               de pagar), pelo landing_device_id (cookie + localStorage — o mesmo id do src/landing/marcador.ts;
                               a conta é a bracoCheckoutDoAparelho do src/landing/regras.ts). Forçar: ?checkout=livre|email
                               (fica neste navegador). O braço vai em html[data-checkout] e em todo evento landing_*.
+                              "email" (31/10) = todo mundo no braço "email" (sem sorteio, sem id de aparelho por causa disto).
         AB_LP        "off"  → (30/10) todo mundo no braço "atual" (a página de hoje, IDÊNTICA). "on" = 50/50 estável por
                               aparelho (o MESMO landing_device_id do AB_CHECKOUT, com outra conta — os dois sorteios são
                               independentes) entre "atual" e "v2" (vitrine: prints reais + preço e botão na 1ª tela,
                               oferta logo cedo, demo só no toque). Forçar: ?lp=v2|atual (fica neste navegador; ?lp=auto
                               desfaz). O braço vai em html[data-lp] e em todo evento landing_* (braco_lp). O braço do
                               e-mail (AB_CHECKOUT) continua sorteado por cima, nos dois.
+        UPSELL_2027  "off"  → (31/10) nada muda. "on" = depois do pagamento e do e-mail, o cartão oferece "Seu 2027 organizado"
+                              (R$ 19,90, Pix de 24 h já gerado, uma vez) antes da conta pronta, nos DOIS braços do AB_LP
+                              (src/landing/upsell-2027.ts). QA: ?u2027=on|off (fica neste navegador: localStorage + cookie;
+                              ?u2027=auto desfaz). Ligada, vira html[data-u2027="on"]. Rollback: "off".
+        UPSELL_POS   "2027" → (01/11) QUAL oferta o pós-pago mostra (só com o UPSELL_2027 ligado). "2027" = o "Seu 2027" de
+                              hoje, IDÊNTICO. "presente" = no MESMO lugar e na mesma página própria, "Leve alguém junto" R$ 14,90
+                              (o CORE pra sempre de presente, Pix pv149 de 24 h → cartão do WhatsApp → conta pronta;
+                              src/landing/upsell-presente.ts). Nunca as duas. QA: ?upsell=presente|2027 (fica neste navegador:
+                              localStorage + cookie; ?upsell=auto desfaz). Com "presente" vira html[data-upsell-pos="presente"].
+                              Rollback: "2027".
+        AB_PIX       "off"  → (02/11) braço "b" da TELA DO PIX = "Recibo da marca": marca + nº do pedido, preço, passo acima do
+                              botão, pílula "Esperando o Pix · confirma sozinha · vale por", recibo (No banco aparece / Garantia /
+                              Acesso), QR dobrado em "Ver QR code", estado "voltou do banco" e "Conferindo com o banco…" (10% das
+                              confirmações levam 10+ min). Só a fase `qr`; gerando/pago/conta iguais nos 2 braços. "on" = 50/50 por
+                              aparelho (bit próprio); "b" = todo mundo. QA: ?pix=atual|b (fica: localStorage), ?pix=auto desfaz.
+                              Vira html[data-pix="atual"|"b"]; braco_pix em todo evento. Rollback: "off". PIX_MOTIVO "off" liga os
+                              chips "O que te travou?" no estado "voltou" do b (?pixmotivo=on|off|auto → html[data-pix-motivo]).
       A divisão 50/50 do /inicio (o mesmo link da campanha) mora no index.html (DIVISAO_INICIO_LANDING, "off").
     -->
     <script>
@@ -43,8 +61,12 @@
         var AB_TITULO = "off";
         var BRACOS_TITULO = ["a", "b", "c"];
         var AB_OFERTA = "off";
-        var AB_CHECKOUT = "on"; // 29/10 (dono, depois da compra real pelo braço email): LIGADO. e-mail antes do Pix (braço "email") × checkout de hoje ("livre") — ver o comentário acima
+        var AB_CHECKOUT = "email"; // 31/10 noite (dono: "fixa sobe"): TODO MUNDO no e-mail antes do Pix. A/B 29–31/10: email 74 vendas / 1.410 sessões (5,25%) × livre 62 / 1.414 (4,38%); 0 × 3 pagaram sem e-mail. "on" = volta o 50/50 · "off" = todo mundo no livre
         var AB_LP = "off"; // 30/10: braço "v2" (vitrine) construído e DESLIGADO — "on" liga o 50/50 contra a página de hoje ("atual")
+        var AB_PIX = "on"; // 03/11 00h (dono 02/11: "vou testar o A/B à meia-noite"): 50/50 enxuta (atual) × recibo (b). 02/11: braço "b" da TELA DO PIX = "Recibo da marca" (conceito 3 + juízes; novidades-guardadas/2026-11-02/pix-b). "off" = todo mundo no atual (COMO ESTÁ) · "on" = 50/50 estável por aparelho (bit próprio, independente do AB_LP/AB_CHECKOUT) · "b" = todo mundo no b. QA: ?pix=atual|b força (localStorage + cookie), ?pix=auto desfaz. Rollback: "off"
+        var PIX_MOTIVO = "off"; // 02/11: no braço b, a pergunta de 1 toque "O que te travou?" quando a pessoa volta do banco sem pagar (chips). "on" liga; ?pixmotivo=on|off|auto
+        var UPSELL_POS = "presente"; // 01/11 tarde (dono: "muda pra aquele outro up"): LIGADO o presente "Leve alguém junto" R$ 14,90 no pós-pago no lugar do 2027 (2027: 89 viram, 1 pagou). Rollback: "2027"
+        var UPSELL_2027 = "on"; // 31/10 ~18h (dono: "pode subir", sem compra de teste): LIGADO — "Seu 2027" R$ 19,90 no pós-pago, nos dois braços (rollback: "off")
         var d = document.documentElement, q = null, mem = {};
         try { q = new URLSearchParams(location.search); } catch (e0) {}
         var pega = function (k) { try { return q ? q.get(k) : null; } catch (e) { return null; } };
@@ -117,6 +139,7 @@
         if (c !== "livre" && c !== "email") {
           c = "livre";
           if (AB_CHECKOUT === "on") c = hash(pegaId()) % 2 === 0 ? "livre" : "email";
+          if (AB_CHECKOUT === "email") c = "email";
         }
         d.setAttribute("data-checkout", c);
         mem.checkout = c; mem.ab_checkout = AB_CHECKOUT;
@@ -140,6 +163,54 @@
         // 2× e avisava "preloaded but not used"; medido na r2: 1 pedido e 0 avisos nos 2 motores com esta receita.
         if (lp === "v2") { try { var prel = document.createElement("link"); prel.rel = "preload"; prel.as = "image"; prel.href = "/landing/v3-home.webp"; prel.setAttribute("fetchpriority", "high"); document.head.appendChild(prel); } catch (e) {} }
         mem.lp = lp; mem.ab_lp = AB_LP;
+        // 02/11: o braço da TELA DO PIX ("atual" | "b" = recibo da marca). ?pix=atual|b força (localStorage); ?pix=auto apaga.
+        // Outro bit da conta (8), com outro prefixo — independente do checkout (bit 0) e da página (bit 16). Por APARELHO: ela
+        // volta do banco e vê a mesma tela.
+        // r1 (técnico): também num cookie — o Instagram zera o localStorage, e o QA do dono trocava de braço na volta do banco
+        var ppx = pega("pix"), ckp = null;
+        try { var csp = String(document.cookie || "").split(";"); for (var ip = 0; ip < csp.length; ip++) { var jp = csp[ip].indexOf("="); if (jp > 0 && csp[ip].slice(0, jp).trim() === "landing_pix_force") ckp = csp[ip].slice(jp + 1).trim(); } } catch (ep0) {}
+        if (ppx === "atual" || ppx === "b" || ppx === "auto") {
+          grava("landing-pix-force", ppx === "auto" ? null : ppx);
+          try { document.cookie = "landing_pix_force=" + (ppx === "auto" ? "; Max-Age=0" : ppx + "; Max-Age=2592000") + "; Path=/; SameSite=Lax"; } catch (ep1) {}
+        }
+        var bpx = (ppx === "atual" || ppx === "b") ? ppx : ppx === "auto" ? null : (le("landing-pix-force") || ckp);
+        mem.pix_forcado = (bpx === "atual" || bpx === "b");
+        if (bpx !== "atual" && bpx !== "b") {
+          bpx = "atual";
+          if (AB_PIX === "on") bpx = ((hash("pix:" + pegaId()) >>> 8) & 1) === 0 ? "atual" : "b";
+          if (AB_PIX === "b") bpx = "b";
+        }
+        d.setAttribute("data-pix", bpx);
+        mem.pix = bpx; mem.ab_pix = AB_PIX;
+        var pmo = pega("pixmotivo");
+        if (pmo === "on" || pmo === "off") grava("landing-pix-motivo-force", pmo);
+        if (pmo === "auto") grava("landing-pix-motivo-force", null);
+        var mot = (pmo === "on" || pmo === "off") ? pmo : le("landing-pix-motivo-force");
+        if (mot !== "on" && mot !== "off") mot = PIX_MOTIVO === "on" ? "on" : "off";
+        if (mot === "on") d.setAttribute("data-pix-motivo", "on");
+        mem.pix_motivo = mot;
+        // 31/10: o "Seu 2027" no pós-pago. ?u2027=on|off força (localStorage + cookie: o Instagram zera o storage); ?u2027=auto desfaz
+        var pu = pega("u2027"), cku = null;
+        try { var csu = String(document.cookie || "").split(";"); for (var iu = 0; iu < csu.length; iu++) { var ju = csu[iu].indexOf("="); if (ju > 0 && csu[iu].slice(0, ju).trim() === "landing_u2027_force") cku = csu[iu].slice(ju + 1).trim(); } } catch (eu0) {}
+        if (pu === "on" || pu === "off" || pu === "auto") {
+          grava("landing-u2027-force", pu === "auto" ? null : pu);
+          try { document.cookie = "landing_u2027_force=" + (pu === "auto" ? "; Max-Age=0" : pu + "; Max-Age=2592000") + "; Path=/; SameSite=Lax"; } catch (eu1) {}
+        }
+        var u27 = (pu === "on" || pu === "off") ? pu : pu === "auto" ? null : (le("landing-u2027-force") || cku);
+        mem.u2027_forcado = (u27 === "on" || u27 === "off");
+        if (u27 !== "on" && u27 !== "off") u27 = UPSELL_2027 === "on" ? "on" : "off";
+        if (u27 === "on") d.setAttribute("data-u2027", "on");
+        mem.u2027 = u27; mem.ab_u2027 = UPSELL_2027;
+        // 01/11: QUAL oferta no pós-pago ("2027" | "presente"). ?upsell=presente|2027 força (localStorage + cookie); ?upsell=auto desfaz
+        var pp = pega("upsell"), ckp = null;
+        try { var csp = String(document.cookie || "").split(";"); for (var ip = 0; ip < csp.length; ip++) { var jp = csp[ip].indexOf("="); if (jp > 0 && csp[ip].slice(0, jp).trim() === "landing_upsell_force") ckp = csp[ip].slice(jp + 1).trim(); } } catch (ep0) {}
+        if (pp === "presente" || pp === "2027" || pp === "auto") {
+          grava("landing-upsell-force", pp === "auto" ? null : pp);
+          try { document.cookie = "landing_upsell_force=" + (pp === "auto" ? "; Max-Age=0" : pp + "; Max-Age=2592000") + "; Path=/; SameSite=Lax"; } catch (ep1) {}
+        }
+        var pos = (pp === "presente" || pp === "2027") ? pp : pp === "auto" ? null : (le("landing-upsell-force") || ckp);
+        if (pos !== "presente" && pos !== "2027") pos = UPSELL_POS === "presente" ? "presente" : "2027";
+        if (pos === "presente") d.setAttribute("data-upsell-pos", "presente");
         mem.t = t; mem.oferta = o; mem.ab_titulo = AB_TITULO; mem.ab_oferta = AB_OFERTA;
         mem.divisao = pega("ld") === "1" ? "inicio" : null;
         d.setAttribute("data-t", t);
@@ -317,7 +388,7 @@
       .lp-progresso i { display: block; height: 100%; width: 0; border-radius: 5px; background: #32bcad; animation: lp-enche 1.2s ease-out forwards; }
       @keyframes lp-enche { to { width: 100%; } }
       .lp-pix-valor { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 2px 0 14px; border-bottom: 1px solid var(--borda); }
-      .lp-pix-valor b { font-size: 26px; font-weight: 850; letter-spacing: -.03em; }
+      .lp-pix-valor b { font-size: 26px; font-weight: 850; letter-spacing: -.03em; white-space: nowrap; }
       .lp-pix-valor span { font-size: 13px; color: var(--suave); font-weight: 600; text-align: right; }
       .lp-copiado { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 13px 14px; border-radius: 14px; background: var(--verde-suave); color: #14532d; font-size: 14px; line-height: 1.35; animation: lp-surge .3s ease-out both; }
       .lp-copiado svg { width: 22px; height: 22px; flex-shrink: 0; padding: 4px; border-radius: 50%; background: var(--verde); color: #fff; }
@@ -328,12 +399,56 @@
       .lp-qr img, .lp-qr svg { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
       .lp-qr-dica { font-size: 13.5px; line-height: 1.45; color: var(--suave); }
       .lp-qr-dica b { color: var(--tx); }
+      .lp-qr-nome { display: block; margin-top: 8px; font-size: 12.5px; line-height: 1.4; }
       .lp-codigo { margin-top: 14px; padding: 10px 12px; border-radius: 12px; background: var(--papel); font: 500 11.5px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: #6b6670; word-break: break-all; max-height: 52px; overflow: hidden; -webkit-user-select: all; user-select: all; }
       button.lp-copiar { width: 100%; min-height: 52px; margin-top: 10px; border-radius: 14px; border: 1.5px solid var(--grafite); background: #fff; color: var(--grafite); font-size: 15.5px; font-weight: 750; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
       button.lp-copiar.cheio { background: var(--grafite); color: #fff; }
       button.lp-copiar svg { width: 18px; height: 18px; }
       .lp-esperando { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--borda); font-size: 13.5px; line-height: 1.4; color: var(--suave); }
       .lp-esperando b { color: var(--tx); display: block; font-size: 14.5px; }
+      /* 02/11: AB_PIX braço "b" = "Recibo da marca" (conceito 3 + enxertos dos juízes) — só a fase qr; tudo escopado em html[data-pix="b"] / .lp-pixb-*; o braço "atual" não vê nada daqui */
+      html[data-pix="b"] .lp-card[data-fase="qr"] .lp-card-faixa { display: none; }
+      html[data-pix="b"] .lp-card[data-fase="qr"] .lp-card-corpo { padding: 16px 16px 14px; }
+      html[data-pix="b"] .lp-card[data-fase="qr"] + .lp-garantia { display: none; }
+      .lp-pixb-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+      .lp-pixb-marca { font-size: 14px; font-weight: 900; letter-spacing: .1em; color: var(--grafite); }
+      .lp-pixb-pedido { font-size: 12px; font-weight: 600; color: var(--fraco); letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+      .lp-pixb-valor { margin-top: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--borda); }
+      .lp-pixb-valor b { display: block; font-size: 34px; font-weight: 850; letter-spacing: -.035em; line-height: 1; white-space: nowrap; }
+      .lp-pixb-valor span { display: block; margin-top: 6px; font-size: 14px; font-weight: 600; color: var(--suave); }
+      .lp-pixb-passo { margin: 10px 0 0; text-align: center; text-wrap: balance; }
+      .lp-pixb-passo b { display: block; font-size: 17px; font-weight: 800; letter-spacing: -.015em; }
+      .lp-pixb-passo span { display: block; margin-top: 3px; font-size: 15px; font-weight: 500; color: var(--tx); }
+      button.lp-pixb-cta { width: 100%; min-height: 52px; margin-top: 12px; border-radius: 16px; border: 0; background: var(--grafite); color: #fff; font-size: 17px; font-weight: 750; letter-spacing: -.01em; display: inline-flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 8px 20px -6px rgba(0,0,0,.35); }
+      button.lp-pixb-cta svg { width: 19px; height: 19px; }
+      button.lp-pixb-cta.contorno { background: #fff; color: var(--grafite); border: 1.5px solid var(--grafite); box-shadow: none; }
+      .lp-pixb-status { margin-top: 12px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 10px; min-height: 36px; padding: 8px 12px; border-radius: 12px; background: var(--papel); font-size: 13.5px; font-weight: 700; line-height: 1.3; }
+      .lp-pixb-status .lado { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+      .lp-pixb-status > small { flex-basis: 100%; margin-top: 3px; padding-left: 16px; font-size: 12.5px; font-weight: 500; color: var(--suave); }
+      .lp-pixb-status .pt { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; background: var(--magenta); animation: lp-pixb-respira 2.4s ease-in-out infinite; }
+      @keyframes lp-pixb-respira { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+      .lp-pixb-status .vale { flex-shrink: 0; font-size: 12.5px; font-weight: 600; color: var(--suave); font-variant-numeric: tabular-nums; }
+      .lp-pixb-status.conferindo .pt { background: var(--grafite); }
+      .lp-pixb-conf { margin: 10px 2px 0; font-size: 13.5px; line-height: 1.45; color: var(--suave); }
+      .lp-pixb-conf b { color: var(--tx); font-weight: 700; }
+      .lp-pixb-qr { display: none; margin-top: 12px; padding: 12px; border-radius: 14px; border: 1px solid var(--borda); }
+      .lp-pixb-qr.aberto { display: block; }
+      .lp-pixb-qr .lp-qr { margin: 0 auto; }
+      .lp-pixb-qr .lp-codigo { max-height: none; }
+      .lp-pixb-linhas { margin: 12px 0 0; border-top: 1px solid var(--borda); }
+      .lp-pixb-l { padding: 6px 0; border-bottom: 1px solid var(--borda); }
+      .lp-pixb-l dt { margin: 0; font-size: 12.5px; font-weight: 600; color: var(--suave); }
+      .lp-pixb-l dd { margin: 2px 0 0; font-size: 14px; font-weight: 650; color: var(--tx); line-height: 1.35; letter-spacing: -.01em; overflow-wrap: anywhere; }
+      .lp-pixb-l dd small { display: block; margin-top: 2px; font-size: 12px; font-weight: 500; color: var(--suave); letter-spacing: 0; }
+      .lp-pixb-l dd small span { white-space: nowrap; }
+      .lp-pixb-l .lp-linha { margin-top: 6px; }
+      .lp-pixb-rotulo-campo { display: block; margin-top: 2px; font-size: 12.5px; font-weight: 500; color: var(--suave); }
+      .lp-pixb-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+      .lp-pixb-chips span { width: 100%; font-size: 12.5px; font-weight: 600; color: var(--suave); }
+      .lp-pixb-chips button { padding: 8px 12px; border-radius: 999px; border: 1.5px solid var(--borda); background: #fff; color: var(--tx); font-size: 13px; font-weight: 650; }
+      .lp-pixb .lp-links { margin-top: 12px; gap: 2px 22px; flex-wrap: wrap; }
+      .lp-pixb .lp-links a.lp-link { padding: 6px 2px; color: var(--magenta-escuro); font-size: 13.5px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+      .lp-pixb .lp-links button:disabled { opacity: .55; text-decoration: none; }
       .lp-ponto { width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; background: #f59e0b; flex-shrink: 0; box-shadow: 0 0 0 0 rgba(245,158,11,.5); animation: lp-onda 1.6s ease-out infinite; }
       @keyframes lp-onda { 0% { box-shadow: 0 0 0 0 rgba(245,158,11,.5); } 100% { box-shadow: 0 0 0 10px rgba(245,158,11,0); } }
       .lp-validade { margin-top: 8px; font-size: 12.5px; color: var(--fraco); text-align: center; font-weight: 600; }
@@ -363,6 +478,17 @@
       .lp-loja-bloco b { display: block; font-size: 15.5px; letter-spacing: -.01em; }
       .lp-loja-bloco p { margin: 4px 0 0; font-size: 13.5px; color: var(--suave); line-height: 1.4; text-align: left; }
       .lp-loja-bloco p strong { color: var(--tx); word-break: break-all; }
+      /* 01/11 (dono): "o pessoal não lê" — no app, o botão grande é "Começar" (conta nova, vazia); o certo é o link
+         "Já tenho conta? Entrar". O rodapé do app desenhado, com o errado apagado e o certo circulado. */
+      .lp-ce { margin-top: 14px; padding: 13px; border-radius: 14px; background: #fff; border: 1.5px solid #f0d6e5; }
+      .lp-ce-tit { display: block; margin: 0 0 9px; font-size: 14px; font-weight: 800; color: var(--tx); }
+      .lp-ce-app { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 13px 12px 9px; border-radius: 12px; background: #f1eeea; }
+      .lp-ce-comecar { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; height: 42px; border-radius: 999px; background: #bdb8bf; color: #fff; font-size: 15px; font-weight: 800; }
+      .lp-ce-nao { position: absolute; right: -4px; top: -9px; padding: 2px 8px; border-radius: 999px; background: #fff; border: 1.5px solid #f0c4c8; color: #c62f3c; font-size: 11px; font-weight: 800; }
+      .lp-ce-entrar { padding: 7px 14px; border-radius: 999px; background: #fff; border: 2.5px solid var(--magenta); box-shadow: 0 0 0 5px rgba(214,51,138,.12); font-size: 14px; color: #4f5a64; white-space: nowrap; }
+      .lp-ce-entrar span { color: #16121c; font-weight: 800; }
+      .lp-ce-sim { font-size: 11.5px; font-weight: 800; color: var(--magenta); }
+      .lp-loja-bloco .lp-ce p { margin-top: 9px; }
 
       /* ───────── 9. dúvidas + fim ───────── */
       .lp-duvidas { margin-top: 16px; border-top: 1px solid var(--borda); }

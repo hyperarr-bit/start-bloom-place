@@ -1,8 +1,8 @@
 /**
- * UPSELL "SEU 2027 JÁ ORGANIZADO" (21/10) — a chave, as copies e o estado do fluxo do lado do SITE.
+ * UPSELL "SEU 2027 ORGANIZADO" (21/10; sem o "já" desde 31/10) — a chave, as copies e o estado do fluxo do lado do SITE.
  *
  * Depois do "pagamento confirmado" do vitalício (R$ 27,90) no /inicio e no /hoje, ANTES das lojas: "Seu 2027 já
- * organizado" por R$ 19,90 (Pix Asaas `u2027`, uma vez só). Pago → "Pronto, seu 2027 tá no seu CORE" → o pós-compra de
+ * organizado" por R$ 19,90 (31/10 tarde: o dono manteve 19,90) (Pix Asaas `u2027`, uma vez só). Pago → "Pronto, seu 2027 tá no seu CORE" → o pós-compra de
  * sempre. O servidor grava `core-pacote-2027` na conta de quem pagou (supabase/functions/_shared/pacote-2027.ts); o app
  * mostra a aba "SEU 2027" em Desenvolvimento Pessoal (src/lib/pacote-2027.ts). A COMPRA é só na web: o app nunca mostra
  * a oferta nem link de pagamento.
@@ -31,6 +31,7 @@ export function upsell2027Ligado(busca: string = typeof window === "undefined" ?
 /* ───────────────────────── oferta ───────────────────────── */
 
 export const OFERTA_2027 = "u2027" as const;
+/** R$ 19,90 (31/10 tarde, dono: "19,90 mesmo") — o mesmo PRECOS_HOJE.u2027 do servidor. */
 export const VALOR_2027 = 19.9;
 
 /** As 2 versões da oferta (mockups a1-oferta-visual e a2-oferta-curta) — o dono escolhe. */
@@ -39,12 +40,12 @@ export const VERSAO_OFERTA_2027: VersaoOferta2027 = "visual";
 
 /** O que vem no pacote — SÓ o que o app faz de verdade (ver src/lib/pacote-2027.ts). */
 export const ITENS_2027 = [
-  { emoji: "🎯", titulo: "Planejar 2027 em 5 minutos", sub: "3 metas, orçamento do ano e as datas que importam", bonus: false },
+  { emoji: "🎯", titulo: "Planejar 2027 em 5 minutos", sub: "3 metas, quanto gastar e guardar por mês e as datas que importam", bonus: false },
   { emoji: "🗓️", titulo: "12 revisões do mês", sub: "no dia 1 de cada mês, o roteiro pronto", bonus: false },
   { emoji: "🐷", titulo: "Cofrinho das 52 semanas", sub: "R$ 1 a R$ 52 = R$ 1.378 no fim do ano", bonus: true },
-  { emoji: "🖨️", titulo: "Planner 2027 pra imprimir", sub: "PDF com as 16 áreas", bonus: true },
+  { emoji: "🖨️", titulo: "Planner 2027 pra imprimir", sub: "metas, dinheiro, datas e as 16 áreas", bonus: true },
 ] as const;
-export const PILULAS_2027 = ["🎯 3 metas", "💰 orçamento do ano", "🎂 datas que importam", "🐷 cofrinho 52 semanas", "🖨️ PDF pra imprimir"] as const;
+export const PILULAS_2027 = ["🎯 3 metas", "💰 gastar e guardar por mês", "🎂 datas que importam", "🐷 cofrinho 52 semanas", "🖨️ planner pra imprimir"] as const;
 export const MESES_CURTOS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"] as const;
 
 /* ───────────────────────── o fluxo (estado puro) ───────────────────────── */

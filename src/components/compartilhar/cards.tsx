@@ -1,5 +1,5 @@
 import { createContext, useContext, type CSSProperties, type ReactNode } from "react";
-import { BookOpen, Check, Droplets, Dumbbell, Flag, Flame, Moon, PiggyBank, Receipt, Sparkles, Sprout, Star, type LucideIcon } from "lucide-react";
+import { BookOpen, CalendarCheck, Check, Droplets, Dumbbell, Flag, Flame, Footprints, Moon, PiggyBank, Receipt, Sparkles, Sprout, Star, Sticker, type LucideIcon } from "lucide-react";
 import { Adesivo } from "@/components/conquistas/adesivos-arte";
 import { AnelRaridadeSvg } from "@/components/conquistas/adesivos-raridade";
 import { AssinaturaCore, IconeCore, INTER, SERIF } from "./marca";
@@ -7,7 +7,7 @@ import { CalendarioDoMes, FaixaDeSemanas, Numero, Rotulo, type CoresDoCalendario
 import { caminhoDaOnda } from "./onda";
 import { LETRAS_DA_SEMANA, diasMarcadosNoMes, maiorCorrida } from "./calendario";
 import { TEMAS, fundoDo, temaDaCor, type TemaDoCard } from "./temas";
-import { FORMATOS, type DadosLancamentos, type DadosRetroAbertura, type DadosRetroResumo, type ModuloDaRetro, type DadosNumero, type DadosAgua, type DadosAzul, type DadosCard, type DadosFigurinha, type DadosHabitos, type DadosInsignia, type DadosLivros, type DadosMetas, type DadosPoupanca, type DadosSequencia, type DadosSono, type DadosTreinos, type Formato, type Livro, type NivelMoeda } from "./tipos";
+import { FORMATOS, type DadosRetroExtra, type DadosRetroFechamento, type DadosRetroPerfil, type DadosRetroPouco, type DadosRetroVazio, type DadosLancamentos, type DadosRetroAbertura, type DadosRetroResumo, type ModuloDaRetro, type DadosNumero, type DadosAgua, type DadosAzul, type DadosCard, type DadosFigurinha, type DadosHabitos, type DadosInsignia, type DadosLivros, type DadosMetas, type DadosPoupanca, type DadosSequencia, type DadosSono, type DadosTreinos, type Formato, type Livro, type NivelMoeda } from "./tipos";
 import { capitalizar, desdeMes, diaDoMes, diasNoMes, lerMesId, mesAno, mesCurto, nomeDoMes, numeroBR, palavra, plural, porcento, reais, UNIDADES } from "./textos";
 
 /**
@@ -29,9 +29,20 @@ import { capitalizar, desdeMes, diaDoMes, diasNoMes, lerMesId, mesAno, mesCurto,
  * conta em cima dele (mede onde ele fica no "tudo").
  */
 
-export type Camada = "tudo" | "fundo" | "apagado" | "aceso" | "textos";
+export type Camada = "tudo" | "fundo" | "apagado" | "aceso" | "textos" | CamadaDaPeca;
+/** 30/10: cada mini-card da abertura da retrospectiva é uma camada própria (eles se sobrepõem: recortar do "aceso" pegaria o vizinho). */
+export type CamadaDaPeca = "peca0" | "peca1" | "peca2";
 const CamadaCtx = createContext<Camada>("tudo");
 const useCamada = () => useContext(CamadaCtx);
+
+/**
+ * (02/11) A RETROSPECTIVA EM TELA CHEIA: o celular é mais comprido que 9:16. Lá (e SÓ lá) o card ganha
+ * `extra` px de altura: o fundo vai mais longe, o que fica embaixo (estatísticas, assinatura, a água) desce e o
+ * que fica em cima continua no lugar — o card enche a tela sem barra vazia. Fora da tela cheia é 0: a imagem e
+ * o vídeo de postar (1080×1920) saem exatamente como antes.
+ */
+export const AlturaExtraCtx = createContext(0);
+const useExtra = () => useContext(AlturaExtraCtx);
 
 /** Mostra os filhos só na camada `de` (e sempre no "tudo"). Sem `de`: só no "tudo". */
 const Na = ({ de = [], children, style, bloco }: { de?: Camada | Camada[]; children: ReactNode; style?: CSSProperties; bloco?: string }) => {
@@ -43,7 +54,7 @@ const Na = ({ de = [], children, style, bloco }: { de?: Camada | Camada[]; child
 const ICONES: Record<DadosCard["tipo"], LucideIcon> = {
   treinos: Dumbbell, azul: PiggyBank, poupanca: PiggyBank, livros: BookOpen, sequencia: Flame, agua: Droplets,
   sono: Moon, habitos: Sprout, metas: Flag, insignia: Sparkles, figurinha: Sparkles, numero: Star,
-  lancamentos: Receipt, "retro-abertura": Sparkles, "retro-resumo": Sparkles,
+  lancamentos: Receipt, "retro-perfil": Sparkles, "retro-extra": Sparkles, "retro-abertura": Sparkles, "retro-resumo": Sparkles, "retro-pouco": Sparkles, "retro-fechamento": Sparkles, "retro-vazio": Sparkles,
 };
 
 /* ------------------------------------------------------------------------- *
@@ -76,13 +87,19 @@ interface PropsMoldura {
   tomAssinatura?: string;
   /** O ícone do assunto enorme e quase transparente atrás do número (padrão: sim). */
   marcaDagua?: boolean;
+  /** 30/10 (pouco uso): a assinatura do Codex ("CORE · seu mês, do seu jeito", maior) no lugar do @. */
+  assinaturaDoMes?: boolean;
+  /** 02/11: o ícone da marca d'água e do chip (padrão: o do tipo). */
+  icone?: LucideIcon;
 }
 
-export const Moldura = ({ tipo, formato, tema = TEMAS[tipo], periodo, modulo, children, cenario, cenarioVivo, tomAssinatura, marcaDagua = true }: PropsMoldura) => {
+export const Moldura = ({ tipo, formato, tema = TEMAS[tipo], periodo, modulo, children, cenario, cenarioVivo, tomAssinatura, marcaDagua = true, assinaturaDoMes = false, icone }: PropsMoldura) => {
   const c = useCamada();
-  const { w, h } = FORMATOS[formato];
+  const extra = useExtra();
+  const { w } = FORMATOS[formato];
+  const h = FORMATOS[formato].h + extra;
   const cx = CAIXA[formato];
-  const Icone = ICONES[tipo];
+  const Icone = icone ?? ICONES[tipo];
   const claro = tema.tinta !== "#ffffff";
   const comFundo = c === "tudo" || c === "fundo";
   return (
@@ -102,13 +119,24 @@ export const Moldura = ({ tipo, formato, tema = TEMAS[tipo], periodo, modulo, ch
         </div>
         <Rotulo cor={tema.suave} tam={24}>{periodo}</Rotulo>
       </Na>
-      <div style={{ position: "absolute", left: MARGEM, right: MARGEM, top: cx.conteudo, height: cx.fim - cx.conteudo }}>{children}</div>
-      <Na de="textos" bloco="assinatura" style={{ position: "absolute", left: MARGEM, top: cx.assinatura }}>
-        <AssinaturaCore tom={tomAssinatura ?? tema.tinta} tamanho={formato === "feed" ? 54 : 58} />
+      <div style={{ position: "absolute", left: MARGEM, right: MARGEM, top: cx.conteudo, height: cx.fim - cx.conteudo + extra }}>{children}</div>
+      <Na de="textos" bloco="assinatura" style={{ position: "absolute", left: MARGEM, top: cx.assinatura + extra }}>
+        {assinaturaDoMes ? <AssinaturaDoMes tom={tomAssinatura ?? tema.tinta} icone={formato === "feed" ? 58 : 63} /> : <AssinaturaCore tom={tomAssinatura ?? tema.tinta} tamanho={formato === "feed" ? 54 : 58} />}
       </Na>
     </div>
   );
 };
+
+/** A assinatura do Codex (abertura, pouco uso, fechamento): o ícone + "CORE" grande + "seu mês, do seu jeito". */
+const AssinaturaDoMes = ({ tom, icone }: { tom: string; icone: number }) => (
+  <div style={{ display: "flex", alignItems: "center", gap: Math.round(icone * 0.32) }}>
+    <IconeCore tamanho={icone} borda={tom !== "#ffffff" && tom !== "#fffdf8"} />
+    <div style={{ display: "flex", flexDirection: "column", gap: 2, lineHeight: 1.1, color: tom }}>
+      <span style={{ fontSize: Math.round(icone * 0.67), fontWeight: 800, letterSpacing: "-0.02em" }}>CORE</span>
+      <span style={{ fontSize: Math.round(icone * 0.46), fontWeight: 500 }}>seu mês, do seu jeito</span>
+    </div>
+  </div>
+);
 
 /** Tamanho do número gigante conforme quantos caracteres ele tem. */
 export const tamDoNumero = (texto: string, base: number) => {
@@ -276,7 +304,8 @@ export const CORES_AGUA = { azul: ["#3b82f6", "#1e40af"], vermelho: ["#f87171", 
 
 /** A água parada do card (a mesma forma que o vídeo desenha no último quadro). */
 const AguaDoCard = ({ formato }: { formato: "stories" | "feed" }) => {
-  const { w, h } = FORMATOS[formato];
+  const { w } = FORMATOS[formato];
+  const h = FORMATOS[formato].h + useExtra();
   const superficie = AGUA_FINAL[formato];
   const d = caminhoDaOnda({ largura: w, altura: h, superficie, amplitude: ONDA.amplitude, comprimento: ONDA.comprimento, fase: ONDA.faseFinal });
   return (
@@ -865,50 +894,124 @@ export const MODULOS_DA_RETRO: Record<ModuloDaRetro, { nome: string; Icone: Luci
 
 const MAGENTA = "#db2777";
 
-/** A ABERTURA: "Seu outubro", o número de dias com registro e o calendário do mês acendendo em magenta. */
-export const CardRetroAbertura = ({ d, formato }: { d: DadosRetroAbertura; formato: "stories" | "feed" }) => {
-  const tema = TEMAS["retro-abertura"];
-  const stories = formato === "stories";
-  const feitos = diasMarcadosNoMes(d.ano, d.mesIdx, d.dias);
-  const linhas = Math.ceil((((new Date(d.ano, d.mesIdx, 1).getDay() + 6) % 7) + diasNoMes(d.ano, d.mesIdx)) / 7);
-  const cores: CoresDoCalendario = { ...coresDoCalendario(tema), feito: MAGENTA, feitoTexto: "#ffffff" };
+/**
+ * A ABERTURA (30/10 — a versão do Codex que o dono escolheu, no lugar do
+ * calendário): grafite, "RETROSPECTIVA · OUT / 26", "Seu outubro," / "do seu
+ * jeito." em magenta, a frase, e até 3 MINI-CARDS inclinados e sobrepostos,
+ * cada um na cor do card do módulo com o MESMO número e rótulo do resumo
+ * (dados de verdade: `destaques`, escolhidos em retro-outubro-dados.ts). Nunca
+ * R$. Sem nenhum módulo com card, um mini-card só, com os dias com registro.
+ *
+ * O vídeo (video-card.tsx › roteiroDaAbertura) faz a entrada do Codex: as
+ * linhas do título sobem por trás de uma máscara, a frase aparece e os
+ * mini-cards entram um por um, de baixo. Cada mini-card é uma camada própria
+ * (peca0…peca2), porque eles se sobrepõem.
+ */
+export interface PecaDaAbertura { numero: string; rotulo: string; cor: string }
+
+/** O que vai nos mini-cards: os destaques (cor do módulo) ou, sem nenhum, os dias com registro. */
+export const pecasDaAbertura = (d: DadosRetroAbertura): PecaDaAbertura[] => {
+  const destaques = (d.destaques ?? []).slice(0, 3);
+  if (destaques.length) return destaques.map((it) => ({ numero: it.numero, rotulo: it.rotulo, cor: MODULOS_DA_RETRO[it.modulo].cor }));
+  const n = diasMarcadosNoMes(d.ano, d.mesIdx, d.dias).length;
+  return n > 0 ? [{ numero: String(n), rotulo: `${palavra(n, UNIDADES.dia)} com registro`, cor: MAGENTA }] : [];
+};
+
+interface LugarDaPeca { cx: number; cy: number; w: number; h: number; giro: number }
+
+/** Onde fica cada mini-card (centro, tamanho, giro em graus), por formato e quantidade — o leque do Codex. */
+export const LUGARES_DAS_PECAS: Record<"stories" | "feed", Record<1 | 2 | 3, LugarDaPeca[]>> = {
+  stories: {
+    3: [
+      { cx: 258, cy: 1112, w: 292, h: 384, giro: -7.5 },
+      { cx: 548, cy: 1168, w: 292, h: 384, giro: 4.5 },
+      { cx: 812, cy: 1094, w: 292, h: 384, giro: 10 },
+    ],
+    2: [
+      { cx: 366, cy: 1118, w: 318, h: 416, giro: -7 },
+      { cx: 706, cy: 1150, w: 318, h: 416, giro: 6 },
+    ],
+    1: [{ cx: 540, cy: 1136, w: 400, h: 500, giro: -5 }],
+  },
+  feed: {
+    3: [
+      { cx: 270, cy: 806, w: 276, h: 350, giro: -7.5 },
+      { cx: 546, cy: 852, w: 276, h: 350, giro: 4.5 },
+      { cx: 806, cy: 792, w: 276, h: 350, giro: 10 },
+    ],
+    2: [
+      { cx: 378, cy: 816, w: 296, h: 370, giro: -7 },
+      { cx: 696, cy: 842, w: 296, h: 370, giro: 6 },
+    ],
+    1: [{ cx: 540, cy: 826, w: 350, h: 430, giro: -5 }],
+  },
+};
+
+/** O corpo do número do mini-card: o maior que cabe na largura (dígitos do Inter Black ≈ 0,64 em). */
+export const tamDoNumeroDaPeca = (numero: string, w: number, h: number) => {
+  const livre = w - 2 * Math.round(w * 0.117);
+  const caracteres = Math.max(1, numero.replace(/\s/g, "").length);
+  return Math.round(Math.min(h * 0.35, livre / (0.66 * caracteres)));
+};
+
+const MiniCard = ({ peca, lugar, indice }: { peca: PecaDaAbertura; lugar: LugarDaPeca; indice: number }) => {
+  const { w, h } = lugar;
+  const pad = Math.round(w * 0.117);
+  const tamNumero = tamDoNumeroDaPeca(peca.numero, w, h);
+  const tamRotulo = Math.round(w * 0.108);
+  const ponto = Math.round(w * 0.103);
+  const vao = Math.round((w - 2 * pad - 5 * ponto) / 4);
   return (
-    <Moldura tipo="retro-abertura" formato={formato} periodo={mesAno(d.mesIdx, d.ano)} marcaDagua={false}>
-      <Na de="textos" bloco="titulo" style={{ fontSize: stories ? 168 : 116, fontWeight: 900, letterSpacing: "-0.06em", lineHeight: 0.9, color: tema.tinta }}>
-        Seu<br /><span style={{ color: MAGENTA }}>{nomeDoMes(d.mesIdx)}</span>
-      </Na>
-      <div style={{ position: "absolute", left: 0, right: 0, top: stories ? 352 : 238, display: "flex", alignItems: "flex-end", gap: stories ? 30 : 24 }}>
-        <Na>
-          <Numero tam={stories ? 190 : 128} cor={tema.tinta} style={{ marginLeft: -6 }}>
-            <span data-base="" style={{ display: "inline-block", width: 0, height: 0, verticalAlign: "baseline" }} />
-            {feitos.length}
-          </Numero>
-        </Na>
-        <Na de="textos" bloco="rotulo" style={{ fontSize: stories ? 50 : 38, fontWeight: 900, letterSpacing: "-0.03em", lineHeight: 1.02, color: tema.tinta, paddingBottom: stories ? 8 : 4 }}>
-          {feitos.length === 1 ? "dia" : "dias"} com a<br />vida anotada
-        </Na>
+    <Na de={`peca${indice}` as CamadaDaPeca} bloco={`peca${indice}`} style={{ position: "absolute", left: lugar.cx - w / 2, top: lugar.cy - h / 2, width: w, height: h, transform: `rotate(${lugar.giro}deg)`, zIndex: indice + 1 }}>
+      <div data-mini-card={indice} style={{ position: "relative", width: w, height: h, borderRadius: Math.round(w * 0.08), background: peca.cor, boxShadow: "0 14px 30px rgba(0,0,0,.32)", color: "#ffffff", overflow: "hidden" }}>
+        <div style={{ position: "absolute", left: pad, right: pad, top: Math.round(h * 0.16) }}>
+          <div style={{ fontSize: tamNumero, fontWeight: 900, letterSpacing: "-0.05em", lineHeight: 1, fontVariantNumeric: "tabular-nums", marginLeft: -Math.round(tamNumero * 0.04), whiteSpace: "nowrap" }}>{peca.numero}</div>
+          <div style={{ marginTop: Math.round(h * 0.035), fontSize: tamRotulo, fontWeight: 800, letterSpacing: "-0.015em", lineHeight: 1.12, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{peca.rotulo}</div>
+        </div>
+        <div style={{ position: "absolute", left: pad, bottom: Math.round(h * 0.12), display: "flex", gap: vao }}>
+          {Array.from({ length: 5 }, (_, k) => <div key={k} style={{ width: ponto, height: ponto, borderRadius: Math.round(ponto * 0.27), background: "rgba(255,255,255,.22)" }} />)}
+        </div>
       </div>
-      <Na de={["apagado", "aceso"]} bloco="prova" style={{ position: "absolute", left: stories ? 0 : 76, right: stories ? 0 : 76, top: stories ? 590 : 400 }}>
-        <CalendarioEmCamada ano={d.ano} mesIdx={d.mesIdx} feitos={new Set(feitos)} hoje={d.hoje} largura={stories ? 912 : 760} alturaLinha={stories ? (linhas > 5 ? 76 : 88) : (linhas > 5 ? 48 : 56)} cores={cores} />
+    </Na>
+  );
+};
+
+/** As medidas da abertura (o vídeo usa as mesmas). */
+const ABERTURA = {
+  stories: { topo: 238, titulo: 392, tamTitulo: 134, sub: 760, tamSub: 41, assinatura: 1582, icone: 63 },
+  feed: { topo: 64, titulo: 168, tamTitulo: 116, sub: 470, tamSub: 36, assinatura: 1206, icone: 58 },
+} as const;
+
+export const CardRetroAbertura = ({ d, formato }: { d: DadosRetroAbertura; formato: "stories" | "feed" }) => {
+  const c = useCamada();
+  const extra = useExtra();
+  const tema = TEMAS["retro-abertura"];
+  const { w } = FORMATOS[formato];
+  const h = FORMATOS[formato].h + extra;
+  const m = ABERTURA[formato];
+  const pecas = pecasDaAbertura(d);
+  // tela cheia (extra > 0): os mini-cards descem 60% do que sobrou, a assinatura vai pro pé
+  const lugares = (pecas.length ? LUGARES_DAS_PECAS[formato][pecas.length as 1 | 2 | 3] : []).map((l) => (extra ? { ...l, cy: l.cy + Math.round(extra * 0.6) } : l));
+  const comFundo = c === "tudo" || c === "fundo";
+  const linha = { fontSize: m.tamTitulo, fontWeight: 900, letterSpacing: "-0.032em", lineHeight: 1.2, whiteSpace: "nowrap" } as const;
+  return (
+    <div data-cartao-share="retro-abertura" data-formato={formato} data-camada={c} style={{ position: "relative", width: w, height: h, overflow: "hidden", fontFamily: INTER, WebkitFontSmoothing: "antialiased", background: comFundo ? "linear-gradient(172deg, #2c2b31 0%, #232228 55%, #1d1c21 100%)" : "transparent", color: tema.tinta }}>
+      <Na de="fundo" bloco="cabecalho" style={{ position: "absolute", left: MARGEM, right: MARGEM, top: m.topo, height: 60, display: "flex", alignItems: "center", justifyContent: "space-between", color: "#d6d0d8" }}>
+        <span style={{ fontSize: formato === "stories" ? 32 : 28, fontWeight: 800, letterSpacing: ".1em" }}>RETROSPECTIVA</span>
+        <span style={{ fontSize: formato === "stories" ? 30 : 26, fontWeight: 700, letterSpacing: ".01em" }}>{mesCurto(d.mesIdx)} / {String(d.ano).slice(-2)}</span>
       </Na>
-      {/* os módulos que vêm a seguir: uma bolinha por módulo, na cor do card dele (o resumo dá o nome) */}
-      {d.modulos.length > 0 && (
-        <Na de="textos" bloco="legenda" style={{ position: "absolute", left: 0, right: 0, bottom: 0, display: "flex", alignItems: "center", gap: stories ? 16 : 12 }}>
-          {d.modulos.map((m) => {
-            const { Icone, cor } = MODULOS_DA_RETRO[m];
-            const lado = stories ? 76 : 58;
-            return (
-              <div key={m} style={{ width: lado, height: lado, borderRadius: "50%", background: cor, color: "#ffffff", display: "grid", placeItems: "center", flexShrink: 0 }}>
-                <Icone size={lado * 0.46} strokeWidth={2.5} />
-              </div>
-            );
-          })}
-          <span style={{ marginLeft: stories ? 8 : 6, fontSize: stories ? 30 : 24, fontWeight: 800, color: tema.suave, whiteSpace: "nowrap" }}>
-            {d.modulos.length === 1 ? "1 área" : `${d.modulos.length} áreas`}
-          </span>
-        </Na>
-      )}
-    </Moldura>
+      <div style={{ position: "absolute", left: MARGEM - 6, top: m.titulo }}>
+        <Na de="textos" bloco="titulo1" style={{ ...linha, color: "#fffdf8" }}>Seu {nomeDoMes(d.mesIdx)},</Na>
+        <Na de="textos" bloco="titulo2" style={{ ...linha, color: MAGENTA }}>do seu jeito.</Na>
+      </div>
+      <Na de="textos" bloco="sub" style={{ position: "absolute", left: MARGEM, right: MARGEM, top: m.sub, fontSize: m.tamSub, fontWeight: 500, letterSpacing: "-0.01em", lineHeight: 1.2, color: "#e4dee6" }}>
+        {d.pouco ? "O que você registrou também conta." : "Os detalhes que fizeram o seu mês."}
+      </Na>
+      {pecas.map((p, i) => <MiniCard key={i} peca={p} lugar={lugares[i]} indice={i} />)}
+      <Na de="textos" bloco="assinatura" style={{ position: "absolute", left: MARGEM, top: m.assinatura + extra }}>
+        <AssinaturaDoMes tom="#fffdf8" icone={m.icone} />
+      </Na>
+    </div>
   );
 };
 
@@ -973,6 +1076,256 @@ export const CardRetroResumo = ({ d, formato }: { d: DadosRetroResumo; formato: 
 };
 
 /* ------------------------------------------------------------------------- *
+ * POUCO USO (30/10): o caminho próprio de quem usou pouco, no estilo do Codex
+ * ("um registro" e "sem registros"): abertura → 1 card por módulo usado (no
+ * máximo 3) → fechamento acolhedor. E a tela de quem não tem nenhum registro.
+ * ------------------------------------------------------------------------- */
+
+/** O card de verdade de cada módulo: a cor (tema) e o ícone do card pouco uso vêm dele. */
+const TIPO_DO_MODULO: Record<ModuloDaRetro, DadosCard["tipo"]> = { financas: "lancamentos", treino: "treinos", rotina: "habitos", agua: "agua", leitura: "livros", metas: "metas" };
+export const TEMA_DO_MODULO: Record<ModuloDaRetro, TemaDoCard> = {
+  financas: TEMAS.lancamentos, treino: TEMAS.treinos, rotina: TEMAS.habitos, agua: TEMAS.agua, leitura: TEMAS.livros, metas: TEMAS.metas,
+};
+
+const DIA_DA_SEMANA = ["DOMINGO", "SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO"];
+const DIA_DA_SEMANA_CURTO = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
+const semanaDe = (dia: string) => { const [a, m, d] = dia.split("-").map(Number); return new Date(a, m - 1, d).getDay(); };
+const numeroDoDia = (dia: string) => Number(dia.slice(8, 10));
+/** "1, 3 e 8" */
+export const listaDeDias = (dias: string[]) => { const n = dias.map((d) => String(numeroDoDia(d))); return n.length <= 1 ? n.join("") : `${n.slice(0, -1).join(", ")} e ${n[n.length - 1]}`; };
+
+/** A prova do pouco uso: QUANDO aconteceu. 1 dia = o dia grande (Codex); 2–4 = os dias lado a lado; 5+ = a lista. */
+const DiasDoPouco = ({ dias, mesIdx, stories, tinta }: { dias: string[]; mesIdx: number; stories: boolean; tinta?: string }) => {
+  const pad = stories ? 48 : 40;
+  const caixa: CSSProperties = { borderRadius: stories ? 32 : 28, background: tinta ? "rgba(31,31,36,.08)" : "rgba(255,255,255,.10)", padding: pad, boxSizing: "border-box", color: tinta ?? "#ffffff" };
+  const deMes = `de ${nomeDoMes(mesIdx)}`;
+  if (dias.length === 1) {
+    return (
+      <div style={{ ...caixa, height: stories ? 370 : 300, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+        <div style={{ fontSize: stories ? 35 : 30, fontWeight: 700, letterSpacing: ".04em" }}>{DIA_DA_SEMANA[semanaDe(dias[0])]}</div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: stories ? 44 : 34 }}>
+          <span style={{ fontSize: stories ? 205 : 160, fontWeight: 900, letterSpacing: "-0.05em", lineHeight: 1 }}>{numeroDoDia(dias[0])}</span>
+          <span style={{ fontSize: stories ? 57 : 46, fontWeight: 800, letterSpacing: "-0.02em" }}>{deMes}</span>
+        </div>
+      </div>
+    );
+  }
+  if (dias.length <= 4) {
+    return (
+      <div style={{ ...caixa, height: stories ? 370 : 300, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", gap: stories ? 28 : 22 }}>
+          {dias.map((d) => (
+            <div key={d} style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: stories ? 30 : 26, fontWeight: 700, letterSpacing: ".04em", opacity: 0.9 }}>{DIA_DA_SEMANA_CURTO[semanaDe(d)]}</div>
+              <div style={{ fontSize: stories ? (dias.length <= 2 ? 170 : 140) : (dias.length <= 2 ? 136 : 112), fontWeight: 900, letterSpacing: "-0.05em", lineHeight: 1 }}>{numeroDoDia(d)}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: stories ? 50 : 42, fontWeight: 800, letterSpacing: "-0.02em" }}>{deMes}</div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ ...caixa }}>
+      <div style={{ fontSize: stories ? 64 : 52, fontWeight: 900, letterSpacing: "-0.03em", lineHeight: 1.15 }}>{listaDeDias(dias)}</div>
+      <div style={{ fontSize: stories ? 50 : 42, fontWeight: 800, letterSpacing: "-0.02em", marginTop: 12 }}>{deMes}</div>
+    </div>
+  );
+};
+
+/** Um módulo usado, no pouco uso: o número, o rótulo, os dias em que aconteceu e "Um pedaço do seu mês, guardado." */
+export const CardRetroPouco = ({ d, formato }: { d: DadosRetroPouco; formato: "stories" | "feed" }) => {
+  const tema = TEMA_DO_MODULO[d.modulo];
+  const stories = formato === "stories";
+  return (
+    <Moldura tipo={TIPO_DO_MODULO[d.modulo]} tema={tema} modulo={MODULOS_DA_RETRO[d.modulo].nome} formato={formato} periodo={mesAno(d.mesIdx, d.ano)} assinaturaDoMes>
+      <Heroi numero={d.numero} rotulo={d.rotulo} base={stories ? 380 : 270} tema={tema} />
+      {d.dias.length > 0 && (
+        <Na de="aceso" bloco="prova" style={{ position: "absolute", left: 0, right: 0, top: stories ? 548 : 430 }}>
+          <DiasDoPouco dias={d.dias} mesIdx={d.mesIdx} stories={stories} />
+        </Na>
+      )}
+      <Na de="textos" bloco="estatisticas" style={{ position: "absolute", left: 0, right: 0, bottom: stories ? 50 : 150, fontSize: stories ? 43 : 38, fontWeight: 700, letterSpacing: "-0.01em", color: tema.tinta }}>
+        Um pedaço do seu mês, guardado.
+      </Na>
+    </Moldura>
+  );
+};
+
+
+/* ------------------------------------------------------------------------- *
+ * (02/11) TELA CHEIA: o PERFIL do mês e os EXTRAS de quem usou pouco
+ * ------------------------------------------------------------------------- */
+
+/** "Constância de ferro" → ["Constância", "de ferro"] (duas linhas equilibradas; palavra única fica numa). */
+export const linhasDoNomeDoPerfil = (nome: string): string[] => {
+  const p = nome.trim().split(/\s+/).filter(Boolean);
+  if (p.length <= 1) return p;
+  let melhor = [p.join(" ")];
+  let pior = Infinity;
+  for (let i = 1; i < p.length; i++) {
+    const a = p.slice(0, i).join(" "), b = p.slice(i).join(" ");
+    const m = Math.max(a.length, b.length);
+    if (m < pior) { pior = m; melhor = [a, b]; }
+  }
+  return melhor;
+};
+/** O maior corpo que cabe em 912 px (Inter Black ≈ 0,6 em por letra), entre 120 e 196. */
+export const tamDoNomeDoPerfil = (linhas: string[]) => Math.round(Math.max(120, Math.min(196, 912 / (0.6 * Math.max(1, ...linhas.map((l) => l.length))))));
+
+/**
+ * O PERFIL: "Seu outubro foi…" → (o vídeo segura um instante) → o NOME do perfil sobe → a frase com o número
+ * de verdade → "e também" com até 2 outros destaques. Na cor do módulo que deu o perfil.
+ */
+export const CardRetroPerfil = ({ d, formato }: { d: DadosRetroPerfil; formato: "stories" | "feed" }) => {
+  const tema = TEMA_DO_MODULO[d.modulo];
+  const stories = formato === "stories";
+  const { Icone } = MODULOS_DA_RETRO[d.modulo];
+  const linhas = linhasDoNomeDoPerfil(d.nome);
+  const tam = Math.round(tamDoNomeDoPerfil(linhas) * (stories ? 1 : 0.8));
+  return (
+    <Moldura tipo="retro-perfil" tema={tema} modulo="Perfil do mês" icone={Icone} formato={formato} periodo={mesAno(d.mesIdx, d.ano)} assinaturaDoMes>
+      <Na de="textos" bloco="titulo" style={{ marginTop: stories ? 24 : 0, fontSize: stories ? 76 : 60, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.05, color: tema.suave }}>
+        Seu {nomeDoMes(d.mesIdx)} foi…
+      </Na>
+      <Na de="aceso" bloco="prova" style={{ position: "absolute", left: 0, right: 0, top: stories ? 180 : 120 }}>
+        <div style={{ width: stories ? 132 : 104, height: stories ? 132 : 104, borderRadius: "50%", background: "#ffffff", color: tema.destaque, display: "grid", placeItems: "center", marginBottom: stories ? 34 : 22, boxShadow: "0 18px 40px -18px rgba(0,0,0,.45)" }}>
+          <Icone size={stories ? 70 : 56} strokeWidth={2.4} />
+        </div>
+        <div data-perfil-nome="" style={{ fontSize: tam, fontWeight: 900, letterSpacing: "-0.05em", lineHeight: 0.98, color: tema.tinta, marginLeft: -6 }}>
+          {linhas.map((l, i) => <div key={i} style={{ whiteSpace: "nowrap" }}>{l}</div>)}
+        </div>
+      </Na>
+      <Na de="textos" bloco="legenda" style={{ position: "absolute", left: 0, right: 0, top: (stories ? 180 + 166 : 120 + 126) + linhas.length * tam * 0.98 + (stories ? 36 : 22), fontSize: stories ? 52 : 42, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.2, color: tema.tinta }}>
+        {d.frase}
+      </Na>
+      {d.tambem.length > 0 && (
+        <Na de="textos" bloco="estatisticas" style={{ position: "absolute", left: 0, right: 0, bottom: stories ? 30 : 10 }}>
+          <div style={{ fontSize: stories ? 26 : 22, fontWeight: 800, letterSpacing: ".14em", color: tema.suave, marginBottom: 16 }}>E TAMBÉM</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: stories ? 14 : 10 }}>
+            {d.tambem.slice(0, 2).map((it) => {
+              const m = MODULOS_DA_RETRO[it.modulo];
+              return (
+                <div key={it.modulo} style={{ display: "flex", alignItems: "center", gap: 22, height: stories ? 100 : 80, padding: "0 30px", borderRadius: 26, background: "rgba(255,255,255,.13)", color: "#ffffff" }}>
+                  <m.Icone size={stories ? 40 : 32} strokeWidth={2.5} />
+                  <span style={{ fontSize: stories ? 54 : 44, fontWeight: 900, letterSpacing: "-0.04em", fontVariantNumeric: "tabular-nums" }}>{it.numero}</span>
+                  <span style={{ fontSize: stories ? 34 : 28, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.rotulo}</span>
+                </div>
+              );
+            })}
+          </div>
+        </Na>
+      )}
+    </Moldura>
+  );
+};
+
+const EXTRAS: Record<DadosRetroExtra["extra"], { Icone: LucideIcon; modulo: string; fim: string }> = {
+  dias: { Icone: CalendarCheck, modulo: "Seus dias", fim: "Cada dia anotado conta." },
+  figurinhas: { Icone: Sticker, modulo: "Figurinhas", fim: "Coladas no seu álbum." },
+  primeiro: { Icone: Footprints, modulo: "Começo", fim: "Foi aqui que o mês começou." },
+};
+
+/** Um extra do pouco uso: o número, o rótulo, quando foi e uma frase curta. */
+export const CardRetroExtra = ({ d, formato }: { d: DadosRetroExtra; formato: "stories" | "feed" }) => {
+  const e = EXTRAS[d.extra];
+  const tema = d.extra === "figurinhas" ? TEMAS.figurinha : d.extra === "primeiro" && d.modulo ? TEMA_DO_MODULO[d.modulo] : TEMAS["retro-extra"];
+  const stories = formato === "stories";
+  const claro = tema.tinta !== "#ffffff";
+  return (
+    <Moldura tipo="retro-extra" tema={tema} modulo={e.modulo} icone={e.Icone} formato={formato} periodo={mesAno(d.mesIdx, d.ano)} assinaturaDoMes>
+      <Heroi numero={d.numero} rotulo={d.rotulo} sub={d.sub} base={stories ? 380 : 270} tema={tema} />
+      {d.dias.length > 0 && (
+        <Na de="aceso" bloco="prova" style={{ position: "absolute", left: 0, right: 0, top: stories ? 610 : 470 }}>
+          <DiasDoPouco dias={d.dias} mesIdx={d.mesIdx} stories={stories} tinta={claro ? tema.tinta : undefined} />
+        </Na>
+      )}
+      <Na de="textos" bloco="estatisticas" style={{ position: "absolute", left: 0, right: 0, bottom: stories ? 50 : 150, fontSize: stories ? 43 : 38, fontWeight: 700, letterSpacing: "-0.01em", color: tema.tinta }}>
+        {e.fim}
+      </Na>
+    </Moldura>
+  );
+};
+
+/** As medidas do papel do Codex (fechamento e "sem registros"). */
+const PAPEL = {
+  stories: { topo: 238, titulo: 448, tamTitulo: 124, texto: 900, tamTexto: 53, caixa: 1196, assinatura: 1582, icone: 63 },
+  feed: { topo: 64, titulo: 190, tamTitulo: 108, texto: 520, tamTexto: 44, caixa: 840, assinatura: 1206, icone: 58 },
+} as const;
+const TINTA = "#25242a";
+
+/** O papel do Codex: cabeçalho, título em 2 linhas, um texto, um extra (as áreas), a caixa do convite e a assinatura. */
+const Papel = ({ tipo, formato, mesIdx, ano, titulo, texto, extra, convite }: { tipo: DadosCard["tipo"]; formato: "stories" | "feed"; mesIdx: number; ano: number; titulo: [ReactNode, ReactNode]; texto: ReactNode; extra?: ReactNode; convite: [string, string] }) => {
+  const c = useCamada();
+  const extraH = useExtra();
+  const { w } = FORMATOS[formato];
+  const h = FORMATOS[formato].h + extraH;
+  const m = PAPEL[formato];
+  const stories = formato === "stories";
+  const comFundo = c === "tudo" || c === "fundo";
+  return (
+    <div data-cartao-share={tipo} data-formato={formato} data-camada={c} style={{ position: "relative", width: w, height: h, overflow: "hidden", fontFamily: INTER, WebkitFontSmoothing: "antialiased", background: comFundo ? "#f5f0e6" : "transparent", color: TINTA }}>
+      <Na de="fundo" bloco="cabecalho" style={{ position: "absolute", left: MARGEM, right: MARGEM, top: m.topo, height: 60, display: "flex", alignItems: "center", fontSize: stories ? 35 : 30, fontWeight: 800, letterSpacing: ".05em" }}>
+        {mesAno(mesIdx, ano)}
+      </Na>
+      <Na de="textos" bloco="titulo" style={{ position: "absolute", left: MARGEM - 4, right: MARGEM, top: m.titulo, fontSize: m.tamTitulo, fontWeight: 900, letterSpacing: "-0.04em", lineHeight: 1.19 }}>
+        <div>{titulo[0]}</div>
+        <div>{titulo[1]}</div>
+      </Na>
+      <Na de="textos" bloco="rotulo" style={{ position: "absolute", left: MARGEM, right: MARGEM, top: m.texto, fontSize: m.tamTexto, fontWeight: 500, letterSpacing: "-0.01em", lineHeight: 1.36 }}>
+        {texto}
+        {extra}
+      </Na>
+      <Na de="aceso" bloco="prova" style={{ position: "absolute", left: MARGEM, right: MARGEM, top: m.caixa + Math.round(extraH * 0.6), borderRadius: 28, background: "rgba(230,41,131,.075)", padding: stories ? "34px 42px" : "28px 36px" }}>
+        <div style={{ fontSize: stories ? 45 : 38, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.25 }}>{convite[0]}</div>
+        <div style={{ fontSize: stories ? 39 : 33, fontWeight: 500, lineHeight: 1.3, marginTop: 4 }}>{convite[1]}</div>
+      </Na>
+      <Na de="textos" bloco="assinatura" style={{ position: "absolute", left: MARGEM, top: m.assinatura + extraH }}>
+        <AssinaturaDoMes tom={TINTA} icone={m.icone} />
+      </Na>
+    </div>
+  );
+};
+
+/** O FECHAMENTO do pouco uso: "O que fica de outubro." + os dias com registro + as áreas + o convite pra novembro. Compartilhável. */
+export const CardRetroFechamento = ({ d, formato }: { d: DadosRetroFechamento; formato: "stories" | "feed" }) => {
+  const stories = formato === "stories";
+  const proximo = nomeDoMes((d.mesIdx + 1) % 12);
+  return (
+    <Papel
+      tipo="retro-fechamento" formato={formato} mesIdx={d.mesIdx} ano={d.ano}
+      titulo={["O que fica", <span key="m">de {nomeDoMes(d.mesIdx)}<span style={{ color: MAGENTA }}>.</span></span>]}
+      texto={d.diasComRegistro > 0
+        ? <><b style={{ fontWeight: 800 }}>{d.diasComRegistro} {palavra(d.diasComRegistro, UNIDADES.dia)}</b> com registro<br />no CORE.</>
+        : <>Seus registros de {nomeDoMes(d.mesIdx)}<br />no CORE.</>}
+      extra={d.modulos.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: stories ? 14 : 12, marginTop: stories ? 34 : 26 }}>
+          {d.modulos.map((mod) => {
+            const { nome, Icone, cor } = MODULOS_DA_RETRO[mod];
+            return (
+              <span key={mod} style={{ display: "inline-flex", alignItems: "center", gap: 12, height: stories ? 66 : 56, padding: stories ? "0 28px 0 22px" : "0 24px 0 18px", borderRadius: 999, background: cor, color: "#ffffff", fontSize: stories ? 32 : 27, fontWeight: 800 }}>
+                <Icone size={stories ? 30 : 26} strokeWidth={2.5} />{nome}
+              </span>
+            );
+          })}
+        </div>
+      )}
+      convite={[`${capitalizar(proximo)} pode continuar`, "com o que fizer sentido para você."]}
+    />
+  );
+};
+
+/** SEM REGISTROS: a tela acolhedora do Codex, sem dado e sem conquista inventada. */
+export const CardRetroVazio = ({ d, formato }: { d: DadosRetroVazio; formato: "stories" | "feed" }) => (
+  <Papel
+    tipo="retro-vazio" formato={formato} mesIdx={d.mesIdx} ano={d.ano}
+    titulo={["Seu mês não", "cabe só aqui."]}
+    texto={<>{capitalizar(nomeDoMes(d.mesIdx))} ainda não tem<br />registros no CORE.</>}
+    convite={[`${capitalizar(nomeDoMes((d.mesIdx + 1) % 12))} pode começar`, "com o que fizer sentido para você."]}
+  />
+);
+
+/* ------------------------------------------------------------------------- *
  * O ADESIVO — o cartão branco com fundo transparente, pra pôr na própria foto
  * ------------------------------------------------------------------------- */
 
@@ -1002,6 +1355,11 @@ export const resumoDoAdesivo = (d: DadosCard): ResumoDoAdesivo => {
     case "lancamentos": return { ...base, numero: numeroBR(d.lancamentos), rotulo: d.lancamentos === 1 ? "lançamento" : "lançamentos", sub: `anotados em ${nomeDoMes(d.mesIdx)}` };
     case "retro-abertura": { const n = diasMarcadosNoMes(d.ano, d.mesIdx, d.dias).length; return { ...base, numero: String(n), rotulo: `${palavra(n, UNIDADES.dia)} com registro`, sub: `em ${nomeDoMes(d.mesIdx)}` }; }
     case "retro-resumo": return { ...base, numero: String(d.diasComRegistro), rotulo: `${palavra(d.diasComRegistro, UNIDADES.dia)} com registro`, sub: `em ${nomeDoMes(d.mesIdx)}` };
+    case "retro-pouco": { const m = MODULOS_DA_RETRO[d.modulo]; return { ...base, cor: TEMA_DO_MODULO[d.modulo].destaque, Icone: m.Icone, modulo: m.nome, numero: d.numero, rotulo: d.rotulo.replace(/\.$/, ""), sub: `em ${nomeDoMes(d.mesIdx)}` }; }
+    case "retro-fechamento": return { ...base, numero: String(d.diasComRegistro), rotulo: `${palavra(d.diasComRegistro, UNIDADES.dia)} com registro`, sub: `em ${nomeDoMes(d.mesIdx)}` };
+    case "retro-vazio": return { ...base, numero: capitalizar(nomeDoMes(d.mesIdx)), rotulo: "começa por aqui", sub: "no CORE" };
+    case "retro-perfil": { const m = MODULOS_DA_RETRO[d.modulo]; return { ...base, cor: TEMA_DO_MODULO[d.modulo].destaque, Icone: m.Icone, modulo: "Perfil do mês", numero: d.nome, rotulo: "", sub: d.frase }; }
+    case "retro-extra": return { ...base, Icone: EXTRAS[d.extra].Icone, modulo: EXTRAS[d.extra].modulo, numero: d.numero, rotulo: d.rotulo, sub: d.sub };
   }
 };
 
@@ -1063,6 +1421,11 @@ export const CardDeCompartilhar = ({ dados, formato, camada = "tudo", moeda }: P
     case "lancamentos": el = <CardLancamentos d={dados} formato={f} />; break;
     case "retro-abertura": el = <CardRetroAbertura d={dados} formato={f} />; break;
     case "retro-resumo": el = <CardRetroResumo d={dados} formato={f} />; break;
+    case "retro-pouco": el = <CardRetroPouco d={dados} formato={f} />; break;
+    case "retro-fechamento": el = <CardRetroFechamento d={dados} formato={f} />; break;
+    case "retro-vazio": el = <CardRetroVazio d={dados} formato={f} />; break;
+    case "retro-perfil": el = <CardRetroPerfil d={dados} formato={f} />; break;
+    case "retro-extra": el = <CardRetroExtra d={dados} formato={f} />; break;
   }
   return <CamadaCtx.Provider value={camada}>{el}</CamadaCtx.Provider>;
 };

@@ -237,6 +237,11 @@ describe("o Pix na página (simulado, fora do domínio de produção)", () => {
     expect(conta.querySelector('a[href*="apps.apple.com"]')).not.toBeNull();
     expect(conta.querySelector('a[href*="play.google.com"]')).not.toBeNull();
     expect(conta.textContent).not.toMatch(/pra sempre por|\+R\$|upgrade|2027/i);
+    // 01/11: diz QUAL botão tocar no app (o grande "Começar" cria conta nova vazia)
+    const ce = conta.querySelector('[data-testid="landing-como-entrar-app"]')!;
+    expect(ce.textContent).toContain("Já tenho conta? Entrar");
+    expect(ce.textContent).toContain("não é aqui");
+    expect(ce.textContent).toContain("maria@email.com");
     expect(eventos()).toEqual(expect.arrayContaining(["landing_pix_gerado", "landing_pix_copiado", "landing_pix_pago", "landing_email"]));
   });
 

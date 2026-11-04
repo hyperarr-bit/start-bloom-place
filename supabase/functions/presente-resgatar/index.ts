@@ -2,8 +2,10 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import {
   assuntoPresenteRecebido, contaDoComprador, corpoResend, decidirResgate, htmlPresenteRecebido, linkDoPresente,
-  mandarLinkPorEmail, nomeNoCartao, normalizarCodigo, presentePorCodigo, presentePorPedido, resgatarPresente, type LinhaMin, type Presente,
+  mandarLinkPorEmail, nomeNoCartao, normalizarCodigo, presentePorCodigo, presentePorPedido, resgatarPresente, temPraSempre, type LinhaMin, type Presente,
 } from "../_shared/presente.ts";
+import { estadoDia3, nomeDia3, pagamentoNaAsaas, sairDia3, tokenDoDono } from "../_shared/presente-dia3.ts";
+import { criarQrAsaas } from "../_shared/asaas-qr.ts";
 
 /**
  * O PRESENTE DO CORE (21/10) — o lado de quem deu e de quem ganhou. Regras em ../_shared/presente.ts.
@@ -18,6 +20,13 @@ import {
  *   resgatar { codigo }            quem GANHOU (conta com e-mail) → vitalício (linha própria payment_method "presente");
  *                                  já tem o CORE pra sempre → "ja_tem" (o código segue valendo); o próprio comprador →
  *                                  "proprio"; usado → "usado"; quem já resgatou ESTE → "ja_e_seu" (sucesso de novo)
+ *
+ * 31/10 (presente no DIA 3, _shared/presente-dia3.ts — a página /presente/dar, sem login, pelo TOKEN do e-mail):
+ *   dia3      { t, pedido?, gerar?, conferir? }  SEM login → o Pix de presente da conta do token (gerado agora com `gerar`, 24 h,
+ *                                  1 por conta) ou { pago, codigo, de } pro cartão do WhatsApp
+ *   dia3_nome { t, pedido, nome }  SEM login → o nome no cartão (só o comprador, só antes do resgate)
+ *   dia3_sair { t }                SEM login → "Não quero ofertas por e-mail" (o cron do dia 3 confere a recusa)
+ *   dia3_token {}                  com login → o token da PRÓPRIA conta (o aviso da página Você abre /presente/dar?t=…)
  * NUNCA usa liberar_vitalicio (duplicaria a venda): a linha nasce com o pedido do presente e o valor dele, 1 vez.
  */
 
@@ -55,6 +64,20 @@ serve(async (req) => {
       if (!p) return json({ ok: true, estado: "nao_existe", de: null });
       return json({ ok: true, estado: p.resgatado_por ? "usado" : "livre", de: p.de_nome ?? null });
     }
+
+    // ------------------------------------------------------------------ DIA 3 (sem login, pelo token)
+    if (acao === "dia3") {
+      const apiKey = Deno.env.get("ASAAS_API_KEY") ?? "";
+      const r = await estadoDia3(admin, {
+        t: body.t, pedido: body.pedido, gerar: body.gerar === true,
+        criarQr: criarQrAsaas(apiKey, log), pagamento: body.conferir === true ? pagamentoNaAsaas(fetch as never, apiKey) : undefined,
+      });
+      if (!r.ok) log("Dia 3 recusado", { motivo: r.motivo });
+      return json(r as unknown as Record<string, unknown>);
+    }
+    if (acao === "dia3_nome") return json(await nomeDia3(admin, { t: body.t, pedido: body.pedido, nome: body.nome }));
+    // crítica r1: "Não quero ofertas por e-mail" (o link do rodapé do e-mail do dia 3) — grava a recusa pelo token
+    if (acao === "dia3_sair") return json(await sairDia3(admin, { t: body.t }));
 
     // daqui pra baixo: com login
     const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
@@ -108,6 +131,13 @@ serve(async (req) => {
       if (!p) return json({ ok: false, motivo: "pedido" });
       const r = await mandarLinkPorEmail(admin, { orderId: p.pedido, codigo: p.codigo, para: emailUser, deNome: p.de_nome, de: remetente(), enviar: enviarCorpoResend });
       return json({ ok: r === "enviado" || r === "ja", r });
+    }
+
+    // ------------------------------------------------------------------ DIA3_TOKEN (o aviso da página Você)
+    if (acao === "dia3_token") {
+      if (!temPraSempre(await linhasDe(user.id))) return json({ ok: false, motivo: "sem_acesso" });
+      const t = await tokenDoDono(admin, user.id);
+      return json(t ? { ok: true, t } : { ok: false, motivo: "erro" });
     }
 
     // ------------------------------------------------------------------ RESGATAR

@@ -288,3 +288,81 @@ export function vendasDoDia(
   for (const i of itens) { porOrigem[i.origem].n++; porOrigem[i.origem].cents += i.valor_cents; }
   return { itens, total_cents: itens.reduce((s, i) => s + i.valor_cents, 0), porOrigem };
 }
+
+/* ------------------------------------------------------------------ dias (02/11) */
+
+/** O 1º dia da aba Dias: o dia em que a campanha bid da /organizar foi criada (28/10). Antes disso é outra história. */
+export const INICIO_DIAS = "2026-10-28";
+/** A Meta cobra +12,15% de imposto na fatura (PIS/Cofins 9,25% + ISS 2,9%, desde 01/01/2026); o `spend` da API vem sem. */
+export const IMPOSTO_META = 0.1215;
+/** Imposto da empresa sobre o faturamento (dono 02/11: "15,5% de imposto"). Base: bruto do Pix + o que as lojas repassam. */
+export const IMPOSTO_EMPRESA = 0.155;
+/** Taxa do Asaas por Pix (27,90 → 25,91 líquido, dono 01/11). */
+export const TAXA_PIX_CENTS = 199;
+
+/** Turmas de `inicio` até hoje (a mais nova primeiro): fechada (cobrou), fecha hoje (D = hoje−3) ou aberta. */
+export function montarTurmasDesde(linhas: LinhaLoja[], rc: Map<string, EstadoRC>, gastoAppPorDia: Record<string, number>, hoje: string, inicio: string): Array<Omit<Turma, "situacao"> & { situacao: Turma["situacao"] | "fechada" }> {
+  const out: Array<Omit<Turma, "situacao"> & { situacao: Turma["situacao"] | "fechada" }> = [];
+  for (let dia = hoje; dia >= inicio; dia = somaDias(dia, -1)) {
+    const k = Math.round((Date.parse(`${hoje}T00:00:00Z`) - Date.parse(`${dia}T00:00:00Z`)) / 86_400_000);
+    const t = montarTurmas(linhas, rc, gastoAppPorDia, somaDias(dia, Math.min(k, 3))).find((x) => x.dia === dia)!;
+    out.push({ ...t, situacao: k > 3 ? "fechada" : k === 3 ? "fecha_hoje" : "aberta", cor: k >= 3 ? corRetorno(t.retorno) : "neutro" });
+  }
+  return out;
+}
+
+export type DiaResumo = {
+  dia: string;
+  /** o mesmo número do "Vendas de hoje" daquele dia (Pix + Apple + Play, renovação inclusa), em reais */
+  vendido: number;
+  vendas: number;
+  porOrigem: Record<Origem, { n: number; valor: number }>;
+  site: { vendas: number; bruto: number; liquido: number; gasto: number; gastoComImposto: number; imposto: number; lucro: number; retorno: number | null; cor: Cor };
+  iphone: { turma: string | null; testes: number; pagaram: number; situacao: string; liquido: number; gasto: number; gastoComImposto: number; imposto: number; lucro: number; parcial: boolean };
+  android: { vendas: number; liquido: number; imposto: number; lucro: number };
+  lucro: number;
+};
+
+const arred = (x: number) => Math.round(x * 100) / 100;
+
+/**
+ * Um dia da aba Dias. O SITE é do próprio dia (venda e gasto no mesmo dia). O IPHONE é a TURMA QUE FOI COBRADA no dia
+ * (a que começou 3 dias antes), com o líquido dela e o gasto de app do dia em que ELA começou (dono 03/11: "tem que vir a
+ * turma que fechou, com o gasto do dia que a turma veio") — nunca o caixa da Apple do dia, que mistura turmas (08/10). O Android entra pelo que vendeu no dia (sem campanha própria). Lucro = líquido − anúncio com
+ * o imposto da Meta − o imposto da empresa.
+ */
+export function resumoDoDia(
+  vendas: { itens: ItemVenda[]; total_cents: number; porOrigem: Record<Origem, { n: number; cents: number }> },
+  dia: string,
+  gastoSite: number,
+  turma: { dia?: string; testes: number; pagaram: number; situacao: string; liquido: number; gasto: number },
+): DiaResumo {
+  const pixItens = vendas.itens.filter((i) => i.origem === "pix");
+  const bruto = pixItens.reduce((s, i) => s + i.valor_cents, 0) / 100;
+  const liqPix = pixItens.reduce((s, i) => s + Math.max(0, i.valor_cents - TAXA_PIX_CENTS), 0) / 100;
+  const gCom = gastoSite * (1 + IMPOSTO_META);
+  const impSite = bruto * IMPOSTO_EMPRESA;
+  const lucroSite = liqPix - gCom - impSite;
+
+  const iGCom = turma.gasto * (1 + IMPOSTO_META);
+  const impIph = turma.liquido * IMPOSTO_EMPRESA;
+  const lucroIph = turma.liquido - iGCom - impIph;
+
+  const playItens = vendas.itens.filter((i) => i.origem === "play");
+  const liqPlay = playItens.reduce((s, i) => s + liquidoCents(i.valor_cents, "play"), 0) / 100;
+  const impPlay = liqPlay * IMPOSTO_EMPRESA;
+
+  const porOrigem = Object.fromEntries((Object.keys(vendas.porOrigem) as Origem[]).map((o) => [o, { n: vendas.porOrigem[o].n, valor: vendas.porOrigem[o].cents / 100 }])) as DiaResumo["porOrigem"];
+  const ret = div(liqPix, gCom);
+  return {
+    dia,
+    vendido: vendas.total_cents / 100,
+    vendas: vendas.itens.length,
+    porOrigem,
+    site: { vendas: pixItens.length, bruto: arred(bruto), liquido: arred(liqPix), gasto: arred(gastoSite), gastoComImposto: arred(gCom), imposto: arred(impSite), lucro: arred(lucroSite), retorno: r2(ret), cor: gastoSite > 0 ? (lucroSite > 0 ? (ret !== null && ret >= 1.5 ? "verde" : "amarelo") : "vermelho") : "neutro" },
+    // "fecha_hoje" = a cobrança ainda está caindo hoje → parcial até o fim do dia
+    iphone: { turma: turma.dia ?? null, testes: turma.testes, pagaram: turma.pagaram, situacao: turma.situacao, liquido: arred(turma.liquido), gasto: arred(turma.gasto), gastoComImposto: arred(iGCom), imposto: arred(impIph), lucro: arred(lucroIph), parcial: turma.situacao !== "fechada" },
+    android: { vendas: playItens.length, liquido: arred(liqPlay), imposto: arred(impPlay), lucro: arred(liqPlay - impPlay) },
+    lucro: arred(lucroSite + lucroIph + liqPlay - impPlay),
+  };
+}

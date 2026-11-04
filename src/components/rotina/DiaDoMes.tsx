@@ -19,6 +19,7 @@ import {
  *  · TAREFA PRA OUTRO DIA (chamado 18/10): o dia com tarefa pendente (de hoje em diante) ganha
  *    um ponto; o dia aberto lista as tarefas dele (tocar abre a ficha: editar, mudar o dia,
  *    marcar) e tem "+ Tarefa pra esse dia".
+ *  · DIA PASSADO COM TAREFA FEITA (01/11, chamado 2541a7c9): ponto cinza.
  * Fica aqui pra Rotina.tsx só ganhar as marcas no grid.
  */
 
@@ -37,7 +38,17 @@ export function useMarcasDoMes(ano: number, mes: number) {
     }
     return s;
   }, [rotina.lista, carreira.lista, ano, mes, hoje]);
-  return { feriados, diasComTarefa };
+  /* 01/11 (chamado 2541a7c9): dia PASSADO com pelo menos uma tarefa feita ganha um ponto cinza —
+     "o que eu fiz naquele dia" à vista no mês. Tocar no dia continua listando as feitas. */
+  const diasComFeita = useMemo(() => {
+    const prefixo = `${ano}-${String(mes + 1).padStart(2, "0")}-`;
+    const s = new Set<string>();
+    for (const t of [...tarefasValidas(rotina.lista), ...tarefasValidas(carreira.lista)]) {
+      if (t.feito && t.dia < hoje && t.dia.startsWith(prefixo)) s.add(t.dia);
+    }
+    return s;
+  }, [rotina.lista, carreira.lista, ano, mes, hoje]);
+  return { feriados, diasComTarefa, diasComFeita };
 }
 
 /** "Mostrar feriados" — o interruptor, sob o calendário. */

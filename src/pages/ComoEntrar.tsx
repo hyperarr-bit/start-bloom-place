@@ -87,6 +87,16 @@ export default function ComoEntrar() {
           </p>
         </header>
 
+        {/* 03/11 (dono): o guia em PDF com fotos — o mesmo do e-mail da compra (public/guia, só no site) */}
+        <a href="/guia/core-comece-aqui.pdf" target="_blank" rel="noopener" data-testid="como-entrar-guia"
+          className="flex items-center justify-between gap-3 rounded-2xl border bg-card p-4">
+          <span className="text-left">
+            <span className="block text-[15px] font-bold text-foreground">📖 Guia com fotos (PDF)</span>
+            <span className="block text-[13px] text-muted-foreground">Como entrar, primeiros passos e dicas.</span>
+          </span>
+          <span className="shrink-0 rounded-xl px-3.5 py-2.5 text-[14px] font-bold text-white" style={{ background: MAGENTA }}>Abrir</span>
+        </a>
+
         {email && (
           <div className="rounded-2xl border-2 bg-card p-4 text-center" style={{ borderColor: MAGENTA }} data-testid="como-entrar-email">
             <p className="text-[12px] font-bold uppercase tracking-wider text-muted-foreground">Use este e-mail no app</p>

@@ -1,4 +1,7 @@
 import { lazy, Suspense, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { retroOutubroAtiva } from "@/lib/retro-outubro";
+import { CartaoRetroNova } from "./CartaoRetroNova";
 import { motion } from "framer-motion";
 import { ChevronRight, X } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -30,6 +33,7 @@ export const WrappedBanner = () => {
   const { get } = useUserData();
   const [open, setOpen] = useState(false);
   const [dismissedMonth, setDismissedMonth] = usePersistedState<string>("wrapped-banner-dismissed", "");
+  const navigate = useNavigate();
 
   const retro = useMemo(() => {
     // convidado sem conta continua sem banner (como antes); a demo, com as seeds, mostra
@@ -41,6 +45,17 @@ export const WrappedBanner = () => {
   }, [user?.id, get]);
 
   if (!retro || dismissedMonth === retro.mes) return null;
+
+  // 02/11: com a nova ligada pro mês, a faixa ganha a cara dela e leva pra página da retrospectiva.
+  // Na DEMO sem conta (/preview, funis) a página é protegida e mandaria pro login: lá fica a de sempre, que abre ali mesmo.
+  if (user?.id && retroOutubroAtiva(retro.ano, retro.mesIdx)) {
+    return (
+      <CartaoRetroNova variante="banner" mes={retro.mes} ano={retro.ano} mesIdx={retro.mesIdx}
+        // o wrapped_open sai da página (origem=banner) — contar aqui também dobrava (revisor 02/11)
+        onAbrir={() => navigate(`/retrospectiva?mes=${encodeURIComponent(retro.mes)}&origem=banner`)}
+        onFechar={() => { trackEvent("wrapped_dismiss", { month: retro.mes }); setDismissedMonth(retro.mes); }} />
+    );
+  }
 
   return (
     <>

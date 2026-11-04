@@ -1,6 +1,7 @@
 /**
- * /vendas (29/10) — o painel do dono no iPhone: aviso de cada venda (Web Push da PWA "CORE Vendas") + 4 abas
- * (Vendas · Turmas · Campanhas · Web). Tudo é calculado no servidor (vendas-painel / vendas-push, só admin); aqui só
+ * /vendas (29/10) — o painel do dono no iPhone: aviso de cada venda (Web Push da PWA "CORE Vendas") + 5 abas
+ * (Vendas · Dias · Turmas · Campanhas · Web). 02/11: "Dias" = cada dia desde a campanha bid (28/10) com o vendido e o
+ * lucro (já com o imposto da Meta e o da empresa); as Turmas também vão até 28/10. Tudo é calculado no servidor (vendas-painel / vendas-push, só admin); aqui só
  * se mostra. Atualiza ao abrir, ao voltar pro app (se passou 60 s), no botão e no puxar-pra-atualizar — sem polling.
  *
  * Acesso: sem sessão → entrar (a PWA da Tela de Início tem armazenamento próprio no iPhone, então o login é aqui);
@@ -17,7 +18,7 @@ type Origem = "pix" | "apple" | "play";
 type ItemVenda = { hora: string; valor_cents: number; origem: Origem; plano: string; renovacao: boolean };
 type RespVendas = { dia: string; itens: ItemVenda[]; total_cents: number; porOrigem: Record<Origem, { n: number; cents: number }> };
 type Turma = {
-  dia: string; situacao: "fecha_hoje" | "aberta"; fechaEm: string; testes: number; pagaram: number; pctPagaram: number | null;
+  dia: string; situacao: "fecha_hoje" | "aberta" | "fechada"; fechaEm: string; testes: number; pagaram: number; pctPagaram: number | null;
   recusas: number; cancelaram: number; emTeste: number; outros: number; mensais: number; gasto: number; custoPorTeste: number | null;
   liquido: number; retorno: number | null; cor: Cor;
 };
@@ -31,9 +32,18 @@ type RespCampanhas = { periodo: string; desde: string; ate: string; campanhas: C
 type PeriodoWeb = { vendas: number; receita: number; gasto: number; retorno: number | null; cor: Cor };
 type RespWeb = { dia: string; hoje: PeriodoWeb; semana: PeriodoWeb; dias: Array<PeriodoWeb & { dia: string }>; landing: { sessoes: number; viuOferta: number; gerouPix: number; pagou: number; robos: number }; errosMeta: string[] };
 
-type Aba = "vendas" | "turmas" | "campanhas" | "web";
+type DiaResumo = {
+  dia: string; vendido: number; vendas: number; porOrigem: Record<Origem, { n: number; valor: number }>;
+  site: { vendas: number; bruto: number; liquido: number; gasto: number; gastoComImposto: number; imposto: number; lucro: number; retorno: number | null; cor: Cor };
+  iphone: { turma: string | null; testes: number; pagaram: number; situacao: string; liquido: number; gasto: number; gastoComImposto: number; imposto: number; lucro: number; parcial: boolean };
+  android: { vendas: number; liquido: number; imposto: number; lucro: number };
+  lucro: number;
+};
+type RespDias = { dia: string; desde: string; dias: DiaResumo[]; total: { vendido: number; vendas: number; lucro: number; lucroSite: number; lucroIphone: number; lucroAndroid: number }; semEstadoRC: number; errosMeta: string[] };
+
+type Aba = "vendas" | "dias" | "turmas" | "campanhas" | "web";
 const ABAS: Array<{ id: Aba; nome: string }> = [
-  { id: "vendas", nome: "Vendas" }, { id: "turmas", nome: "Turmas" }, { id: "campanhas", nome: "Campanhas" }, { id: "web", nome: "Web" },
+  { id: "vendas", nome: "Hoje" }, { id: "dias", nome: "Dias" }, { id: "turmas", nome: "Turmas" }, { id: "campanhas", nome: "Campanhas" }, { id: "web", nome: "Web" },
 ];
 
 /* ------------------------------------------------------------ formato */
@@ -187,6 +197,7 @@ function Painel() {
       {erro && <p className="v-erro v-erro-bloco">{erro}</p>}
       {!atual && carregando && <div className="v-centro v-altura"><div className="v-giro" /></div>}
       {atual && aba === "vendas" && <AbaVendas d={atual.d as RespVendas} />}
+      {atual && aba === "dias" && <AbaDias d={atual.d as RespDias} />}
       {atual && aba === "turmas" && <AbaTurmas d={atual.d as RespTurmas} />}
       {aba === "campanhas" && (
         <>
@@ -330,6 +341,77 @@ function AbaVendas({ d }: { d: RespVendas }) {
   );
 }
 
+const sinal = (v: number) => `${v < 0 ? "−" : "+"}${brl(Math.abs(v), 0)}`;
+const corLucro = (v: number, parcial = false): Cor => (parcial ? "neutro" : v > 0 ? "verde" : v < 0 ? "vermelho" : "neutro");
+const DIA_SEMANA = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+const diaSemana = (d: string) => DIA_SEMANA[new Date(`${d}T12:00:00Z`).getUTCDay()];
+
+function AbaDias({ d }: { d: RespDias }) {
+  const [aberto, setAberto] = useState<string | null>(null);
+  return (
+    <section>
+      <div className="v-cartao v-total">
+        <div className="v-rotulo">Desde {ddmm(d.desde)} · {d.dias.length} dias</div>
+        <div className="v-numero-grande">{brl(d.total.vendido, 0)}</div>
+        <div className="v-sub">{num(d.total.vendas)} vendas · lucro <b className={`v-cor-${corLucro(d.total.lucro)}`}>{sinal(d.total.lucro)}</b></div>
+        <div className="v-chips">
+          <span className="v-chip v-chip-pix">Site {sinal(d.total.lucroSite)}</span>
+          <span className="v-chip v-chip-apple">iPhone {sinal(d.total.lucroIphone)}</span>
+          <span className="v-chip v-chip-play">Android {sinal(d.total.lucroAndroid)}</span>
+        </div>
+      </div>
+      {d.dias.map((x) => {
+        const ab = aberto === x.dia;
+        return (
+          <article key={x.dia} className="v-cartao v-dia" onClick={() => setAberto(ab ? null : x.dia)}>
+            <header>
+              <div>
+                <div className="v-titulo">{ddmm(x.dia)} <span className="v-sub">{x.dia === d.dia ? "hoje" : diaSemana(x.dia)}</span></div>
+                <div className="v-sub">{x.vendas} vendas</div>
+              </div>
+              <div className="v-retorno-caixa">
+                <div className="v-dia-vendido">{brl(x.vendido, 0)}</div>
+                <div className={`v-sub v-cor-${corLucro(x.lucro, x.iphone.parcial)}`}>lucro {sinal(x.lucro)}{x.iphone.parcial ? " · parcial" : ""}</div>
+              </div>
+            </header>
+            <ul className="v-lista v-lista-dia">
+              <li>
+                <span className="v-tag v-chip-pix">Site</span>
+                <span className="v-plano">{x.site.vendas} vendas · anúncio {brl(x.site.gastoComImposto, 0)}</span>
+                <span className={`v-valor v-cor-${corLucro(x.site.lucro)}`}>{sinal(x.site.lucro)}</span>
+              </li>
+              <li>
+                <span className="v-tag v-chip-apple">iPhone</span>
+                <span className="v-plano">turma {x.iphone.turma ? ddmm(x.iphone.turma) : ""}: {x.iphone.testes} testes · {x.iphone.pagaram} pagaram{x.iphone.parcial ? " (cobrando hoje)" : ""}</span>
+                <span className={`v-valor v-cor-${corLucro(x.iphone.lucro, x.iphone.parcial)}`}>{sinal(x.iphone.lucro)}</span>
+              </li>
+              {x.android.vendas > 0 && (
+                <li>
+                  <span className="v-tag v-chip-play">Android</span>
+                  <span className="v-plano">{x.android.vendas} {x.android.vendas === 1 ? "venda" : "vendas"}</span>
+                  <span className="v-valor v-cor-verde">{sinal(x.android.lucro)}</span>
+                </li>
+              )}
+            </ul>
+            {ab && (
+              <div className="v-grade v-dia-detalhe">
+                <Dado n={brl(x.site.bruto, 0)} r="site · vendido" />
+                <Dado n={brl(x.site.gasto, 0)} r="site · anúncio (Meta)" />
+                <Dado n={vezes(x.site.retorno)} r="site · retorno líquido" cor={x.site.cor} />
+                <Dado n={brl(x.iphone.liquido, 0)} r={`iPhone · turma ${x.iphone.turma ? ddmm(x.iphone.turma) : ""}`} />
+                <Dado n={brl(x.iphone.gasto, 0)} r={`iPhone · anúncio de ${x.iphone.turma ? ddmm(x.iphone.turma) : ""}`} />
+                <Dado n={brl(x.site.imposto + x.iphone.imposto + x.android.imposto, 0)} r="imposto 15,5%" />
+              </div>
+            )}
+          </article>
+        );
+      })}
+      <p className="v-nota">Vendido = tudo que entrou no dia (Pix do site + Apple + Google Play, como no “Hoje”). Lucro = líquido − anúncio com o imposto da Meta (+12,15%) − 15,5% de imposto. Site = vendas e anúncio do próprio dia. iPhone = a turma COBRADA no dia (começou 3 dias antes), com o anúncio de app do dia em que ela começou; “parcial” = a cobrança ainda está caindo hoje. Toque num dia pra ver os detalhes.{d.semEstadoRC ? ` ${d.semEstadoRC} sem resposta do RevenueCat.` : ""}</p>
+      <Erros e={d.errosMeta} />
+    </section>
+  );
+}
+
 function AbaTurmas({ d }: { d: RespTurmas }) {
   return (
     <section>
@@ -338,7 +420,7 @@ function AbaTurmas({ d }: { d: RespTurmas }) {
           <header>
             <div>
               <div className="v-titulo">Turma {ddmm(t.dia)}</div>
-              <div className="v-sub">{t.situacao === "fecha_hoje" ? "fecha hoje" : `em andamento · fecha ${ddmm(t.fechaEm)}`}</div>
+              <div className="v-sub">{t.situacao === "fechada" ? `cobrou em ${ddmm(t.fechaEm)}` : t.situacao === "fecha_hoje" ? "fecha hoje" : `em andamento · fecha ${ddmm(t.fechaEm)}`}</div>
             </div>
             <div className="v-retorno-caixa">
               <div className={`v-retorno v-cor-${t.cor}`}>{vezes(t.retorno)}</div>

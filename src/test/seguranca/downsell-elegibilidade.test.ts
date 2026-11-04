@@ -92,7 +92,7 @@ describe("os dois creates aplicam a regra antes de criar o Pix", () => {
     const create = s.indexOf('if (action === "create")');
     const regra = s.indexOf("podePedirDownsell(supabaseAdmin", create);
     expect(regra).toBeGreaterThan(create);
-    expect(regra).toBeLessThan(s.indexOf("/pix/qrCodes/static", create));
+    expect(regra).toBeLessThan(s.indexOf("postarQrEstatico(", create)); // 31/10: o POST do QR mora em _shared/asaas-qr.ts
     expect(s.slice(regra, regra + 400)).toMatch(/MENSAGEM_DOWNSELL_INDISPONIVEL, motivo: v\.motivo \}, 403\)/);
   });
   it("cakto-pix: idem, antes de pedir o Pix à Cakto", () => {

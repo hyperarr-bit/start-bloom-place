@@ -215,7 +215,11 @@ export interface DadosLancamentos {
 /** Um módulo que entrou na retrospectiva (o chip da abertura e o bloco do resumo). */
 export type ModuloDaRetro = "financas" | "treino" | "rotina" | "agua" | "leitura" | "metas";
 
-/** A ABERTURA da retrospectiva (23/10): "Seu outubro" + o calendário dos dias com registro acendendo. */
+/**
+ * A ABERTURA da retrospectiva (30/10, a versão do Codex que o dono escolheu):
+ * "Seu outubro, do seu jeito." + até 3 mini-cards inclinados, cada um na cor
+ * do card do módulo, com o MESMO número e rótulo do resumo.
+ */
 export interface DadosRetroAbertura {
   tipo: "retro-abertura";
   ano: number;
@@ -225,6 +229,15 @@ export interface DadosRetroAbertura {
   dias: string[];
   /** Os módulos que têm card, na ordem da sequência. */
   modulos: ModuloDaRetro[];
+  /**
+   * Os mini-cards: os até 3 destaques MAIS FORTES entre os cards da sequência
+   * (retro-outubro-dados.ts › forcaDoDestaque), na ordem da sequência. Os
+   * itens são os do resumo (nunca R$). Vazio = nenhum módulo com card: a
+   * abertura mostra um mini-card só com os dias com registro.
+   */
+  destaques?: ItemDoResumo[];
+  /** Retrospectiva curta (pouco dado): a frase de baixo muda, nada é inventado. */
+  pouco?: boolean;
 }
 
 export interface ItemDoResumo {
@@ -244,7 +257,89 @@ export interface DadosRetroResumo {
   diasComRegistro: number;
 }
 
+/**
+ * POUCO USO (30/10, caminho próprio de quem usou pouco — critério em
+ * retro-outubro-dados.ts › CRITERIO_POUCO_USO): um módulo REALMENTE usado,
+ * no estilo do card "um registro" do Codex — o número, o rótulo e os dias em
+ * que aconteceu. Basta 1 registro (nada é completado).
+ */
+export interface DadosRetroPouco {
+  tipo: "retro-pouco";
+  modulo: ModuloDaRetro;
+  ano: number;
+  mesIdx: number;
+  /** "1" · "3" — nunca R$ */
+  numero: string;
+  /** "dia de treino." · "lançamentos anotados." */
+  rotulo: string;
+  /** Os dias em que aconteceu ("AAAA-MM-DD"); vazio = o módulo não tem dia. */
+  dias: string[];
+}
+
+/** O FECHAMENTO do pouco uso (30/10): o que fica de outubro + o convite pra novembro. Compartilhável. */
+export interface DadosRetroFechamento {
+  tipo: "retro-fechamento";
+  ano: number;
+  mesIdx: number;
+  diasComRegistro: number;
+  /** Os módulos que tiveram card, na ordem da sequência. */
+  modulos: ModuloDaRetro[];
+}
+
+/** SEM REGISTROS (30/10): a tela acolhedora do Codex. Não é compartilhável (a tela esconde os botões). */
+export interface DadosRetroVazio {
+  tipo: "retro-vazio";
+  ano: number;
+  mesIdx: number;
+}
+
+/**
+ * O PERFIL DO MÊS (02/11, só na retrospectiva em TELA CHEIA — retro-tela-cheia-dados.ts › perfilDoOutubro):
+ * "Seu outubro foi…" + o nome do perfil, tirado do módulo que a pessoa MAIS usou, + uma frase com o número
+ * de verdade dela. Nada inventado: a frase e os "também" são os mesmos números dos cards.
+ */
+export interface DadosRetroPerfil {
+  tipo: "retro-perfil";
+  ano: number;
+  mesIdx: number;
+  /** O módulo que deu o perfil (a cor e o ícone do card vêm dele). */
+  modulo: ModuloDaRetro;
+  /** "Em movimento" · "Constância de ferro" */
+  nome: string;
+  /** "19 dias de treino em outubro." */
+  frase: string;
+  /** Até 2 outros destaques do mês (os itens do resumo). */
+  tambem: ItemDoResumo[];
+}
+
+/**
+ * EXTRAS DE QUEM USOU POUCO (02/11, tela cheia): o que sempre existe e é DE VERDADE — os dias com algo
+ * anotado no CORE (`core-dias-anotados`), as figurinhas ganhas no mês (`conquistas-desbloqueadas`) e o 1º
+ * registro do mês. Só entram com dado; nunca "0".
+ */
+export interface DadosRetroExtra {
+  tipo: "retro-extra";
+  extra: "dias" | "figurinhas" | "primeiro";
+  ano: number;
+  mesIdx: number;
+  /** "4" · "2" · "12" (o dia, no 1º registro) */
+  numero: string;
+  /** "dias com algo anotado" */
+  rotulo: string;
+  /** a linha de baixo ("no CORE, em outubro") */
+  sub: string;
+  /** Os dias (o card mostra quando) — vazio = sem dias. */
+  dias: string[];
+  /** No 1º registro: o módulo dele (quando dá pra saber). */
+  modulo?: ModuloDaRetro;
+}
+
 export type DadosCard =
+  | DadosRetroPerfil
+  | DadosRetroExtra
+  | DadosRetroPouco
+  | DadosRetroFechamento
+  | DadosRetroVazio
   | DadosLancamentos
   | DadosRetroAbertura
   | DadosRetroResumo

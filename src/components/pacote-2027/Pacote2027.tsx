@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Check, ChevronLeft, ChevronRight, Lock } from "lucide-react";
 import { toast } from "sonner";
@@ -12,6 +12,12 @@ import {
 } from "@/lib/pacote-2027";
 import { htmlDoPlanner2027, imprimirPlanner2027 } from "@/lib/pacote-2027-pdf";
 import { Planejar2027 } from "./Planejar2027";
+import { useUserData } from "@/hooks/use-user-data";
+import { bracoDoPlanner, camposDoBraco, plannerNovoLigado } from "@/lib/planner-2027-chave";
+import { useAuth } from "@/hooks/use-auth";
+/* crítica r1 (técnico BAIXA 5): o planner B (12 folhas + CSS + ícones) só baixa quando ela abre — com a chave off o
+ * módulo Desenvolvimento Pessoal fica do tamanho da versão A */
+const PlannerDoPacote = lazy(() => import("./PlannerB"));
 
 const ddmm = (d: Date) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR")}`;
@@ -25,10 +31,30 @@ const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR")}`;
 export function Pacote2027() {
   const { pacote, plano, cofrinho, dicaVista, loaded, salvarProgresso, salvarCofrinho, salvarPlano, marcarDicaVista } = usePacote2027();
   const navigate = useNavigate();
-  const [vista, setVista] = useState<"inicio" | "cofrinho" | number>("inicio");
+  const [vista, setVista] = useState<"inicio" | "cofrinho" | "planner" | number>("inicio");
+  // 31/10 versão B (chave PLANNER_2027, off = a versão A igual): o planner com os dados dela, prévia + baixar nativo
+  const [plannerB] = useState(() => plannerNovoLigado());
+  /* 31/10 teste A/B dos desenhos: o braço pelo e-mail da conta — o MESMO hash da oferta (src/lib/planner-2027-braco.ts), então
+   * ela recebe o desenho que viu ao comprar. Sem e-mail de verdade na conta: o id da conta (reserva). */
+  const { user } = useAuth();
+  const braco = plannerB ? bracoDoPlanner({ email: user?.email ?? null, reserva: user?.id ?? null }) : null;
+  const doBraco = braco ? camposDoBraco(braco) : {};
+  const { get } = useUserData();
   const [planejando, setPlanejando] = useState(false);
   const [verTodos, setVerTodos] = useState(false);
   const contou = useRef(false);
+  /* crítica r1 (compradora MEDIA 1): o "Pronto" da oferta manda direto pra cá — ?planejar=1 abre o Planejar, ?planner=1
+   * (o link do "Abra no Safari") abre o planner. Só com a versão B; 1x por montagem. */
+  const linkFeito = useRef(false);
+  useEffect(() => {
+    if (!plannerB || !loaded || !pacote || linkFeito.current) return;
+    linkFeito.current = true;
+    let q: URLSearchParams;
+    try { q = new URLSearchParams(window.location.search); } catch { return; }
+    if (q.get("planejar") === "1") { if (!dicaVista) marcarDicaVista(); trackEvent("plano2027_aberto", { via: "link_pronto" }); setPlanejando(true); }
+    else if (q.get("planner") === "1") { if (!dicaVista) marcarDicaVista(); trackEvent("plano2027_planner_abrir", { via: "link", ...doBraco }); setVista("planner"); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plannerB, loaded, pacote]);
 
   useEffect(() => {
     if (!pacote || contou.current) return;
@@ -55,6 +81,7 @@ export function Pacote2027() {
 
   const abrirPlanejar = (via: string) => { if (!dicaVista) marcarDicaVista(); trackEvent("plano2027_aberto", { via }); setPlanejando(true); };
   const imprimir = async () => {
+    if (plannerB) { trackEvent("plano2027_planner_abrir", { ...doBraco }); setVista("planner"); return; }
     const nativo = isNativeShell();
     trackEvent("plano2027_pdf", { nativo });
     const ok = await imprimirPlanner2027(htmlDoPlanner2027(plano, cofrinho), nativo);
@@ -76,7 +103,7 @@ export function Pacote2027() {
           <ol className="mt-3 space-y-2 text-[13px]">
             <li className="flex gap-2.5"><b className="w-6 h-6 rounded-full bg-foreground text-background grid place-items-center text-[11px] shrink-0">1</b><span><b>Planejar 2027</b>: 3 metas, dinheiro do mês e as datas. 5 minutos.</span></li>
             <li className="flex gap-2.5"><b className="w-6 h-6 rounded-full bg-foreground text-background grid place-items-center text-[11px] shrink-0">2</b><span><b>Revisão no dia 1</b> de cada mês, com o roteiro pronto.</span></li>
-            <li className="flex gap-2.5"><b className="w-6 h-6 rounded-full bg-foreground text-background grid place-items-center text-[11px] shrink-0">3</b><span><b>Cofrinho das 52 semanas</b> e o <b>planner pra imprimir</b>.</span></li>
+            <li className="flex gap-2.5"><b className="w-6 h-6 rounded-full bg-foreground text-background grid place-items-center text-[11px] shrink-0">3</b><span><b>Cofrinho das 52 semanas</b> e o <b>{plannerB ? "planner que se preenche com o que você anota" : "planner pra imprimir"}</b>.</span></li>
           </ol>
           <button type="button" onClick={() => abrirPlanejar("boas_vindas")} data-testid="pacote-2027-comecar"
             className="mt-4 w-full h-12 rounded-full bg-foreground text-background text-[14.5px] font-extrabold inline-flex items-center justify-center gap-1.5 active:scale-[0.98]">
@@ -86,6 +113,15 @@ export function Pacote2027() {
             className="mt-1 w-full h-10 text-[13px] font-bold text-muted-foreground">Ver o pacote antes</button>
         </div>
       </div>
+    );
+  }
+
+  /* ── o planner da versão B ── */
+  if (vista === "planner") {
+    return (
+      <Suspense fallback={<div className="h-40 grid place-items-center text-[13px] text-muted-foreground" data-testid="planner-b-carregando">Montando o seu planner…</div>}>
+        <PlannerDoPacote plano={plano} cofrinho={cofrinho} get={get} estilo={braco?.estilo ?? "codex"} via={braco?.via} onVoltar={() => setVista("inicio")} onPlanejar={() => { setVista("inicio"); abrirPlanejar("planner_b"); }} />
+      </Suspense>
     );
   }
 
@@ -186,7 +222,7 @@ export function Pacote2027() {
           </button>
           <button type="button" onClick={() => void imprimir()} data-testid="pacote-2027-pdf"
             className={`flex-1 h-10 rounded-lg text-[12px] font-bold inline-flex items-center justify-center gap-1 ${plano.salvoEm ? "bg-foreground text-background" : "border border-border bg-card"}`}>
-            <span>🖨️ Planner em PDF</span>
+            <span>{plannerB ? "🖨️ Seu planner 2027" : "🖨️ Planner pra imprimir"}</span>
           </button>
         </div>
       </div>

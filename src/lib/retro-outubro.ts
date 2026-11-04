@@ -29,8 +29,8 @@ import { localDayKey } from "@/lib/utils";
 export type ModoRetroOutubro = "on" | "off";
 
 /** Constantes locais. Ligar no site = trocar aqui + deploy; no app, pelo RevenueCat (ou aqui + build). */
-export const RETRO_OUTUBRO_APP: ModoRetroOutubro = "off";
-export const RETRO_OUTUBRO_WEB: ModoRetroOutubro = "off";
+export const RETRO_OUTUBRO_APP: ModoRetroOutubro = "on"; // 01/11 (dono: "quero a nova na próxima versão no Android, iOS e web")
+export const RETRO_OUTUBRO_WEB: ModoRetroOutubro = "on"; // 01/11 (dono): rollback = "off" + deploy
 
 export const CHAVE_REMOTA_RETRO_OUTUBRO = "retro_outubro";
 export const CHAVE_FORCA_RETRO_OUTUBRO = "retro-outubro-force";

@@ -25,6 +25,7 @@ export const ROTULO_OFERTA: Record<OfertaLanding, string> = {
   LN_anosempre478: "CORE pra sempre · pagamento único",
   LN_sempre279: "CORE pra sempre · pagamento único",
 };
+
 export const PRECO_CAIXINHA = 19.9;
 
 /** Qual oferta o botão de pagar gera: braço "ano" (com ou sem a caixinha) ou braço "sempre" (sem caixinha). */
@@ -194,6 +195,27 @@ export function bracoCheckoutDoAparelho(id: string): BracoCheckout {
 
 /** "atual" = a página de hoje (IDÊNTICA); "v2" = vitrine (prints reais + preço e botão na 1ª tela, oferta cedo, demo no toque). */
 export type BracoLp = "atual" | "v2";
+/** 02/11: o braço da TELA DO PIX (AB_PIX no <head>): "b" = "Recibo da marca" (conceito 3 + enxertos dos juízes, novidades-guardadas/2026-11-02/pix-b). */
+export type BracoPix = "atual" | "b";
+export function bracoPixDoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): BracoPix {
+  return el.getAttribute("data-pix") === "b" ? "b" : "atual";
+}
+/** A conta do <head> (bit 8 do djb2-xor de "pix:" + id — independente do checkout (bit 0) e da página (bit 16)), pros testes. */
+export function bracoPixDoAparelho(id: string): BracoPix {
+  let h = 5381;
+  const s = "pix:" + id;
+  for (let k = 0; k < s.length; k++) h = ((h * 33) ^ s.charCodeAt(k)) >>> 0;
+  return ((h >>> 8) & 1) === 0 ? "atual" : "b";
+}
+/** 02/11: a pergunta de 1 toque "O que te travou?" no estado "voltou" do braço b (chave PIX_MOTIVO no <head>, padrão off). */
+export function motivoPixDoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): boolean {
+  return el.getAttribute("data-pix-motivo") === "on";
+}
+/** Quem recebe o Pix no extrato do banco (QR estático do Asaas = a razão social da conta) e o CNPJ que o Mercado Pago imprime.
+ *  Iguais a EMPRESA.razaoSocial / EMPRESA.cnpj (lib/empresa) — copiados aqui pra não puxar o native-shell pro bundle da
+ *  página; um teste confere que são iguais. */
+export const NOME_NO_BANCO = "NATALIA DE JESUS E SILVA SANTOS LTDA";
+export const CNPJ_NO_BANCO = "55.041.112/0001-82";
 export function bracoLpDoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): BracoLp {
   return el.getAttribute("data-lp") === "v2" ? "v2" : "atual";
 }
@@ -264,4 +286,114 @@ export function voltaDoLembrete(busca: URLSearchParams, agora: number = Date.now
     pix = { orderId: pedido, qrCode: codigo, qrCodeBase64: null, expiresAt: new Date(vence).toISOString(), criadoEm: vence - VALIDADE_PIX_MS, oferta, doEmail: true };
   }
   return { toque: r, pedido, pix };
+}
+
+/* ───────────────────────── "Seu 2027 organizado" no pós-pago (31/10, chave UPSELL_2027 no <head>) ───────────────────────── */
+
+/** A chave do 2027 no pós-pago: html[data-u2027="on"] (decidida no <head>: UPSELL_2027 ou ?u2027=on|off; ?u2027=auto desfaz). */
+export function upsell2027DoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): boolean {
+  return el.getAttribute("data-u2027") === "on";
+}
+/** R$ 19,90 — o MESMO PRECOS_HOJE.u2027 do servidor (supabase/functions/_shared/ofertas-hoje.ts; o teste confere). */
+export const VALOR_U2027 = 19.9;
+export type EtapaU2027 = "oferta" | "qr" | "pronto" | "fim";
+export type PixU2027 = {
+  orderId: string; qrCode: string; qrCodeBase64: string | null; expiresAt: string;
+  /** a sessão desta aba é a dona do Pix (a página confere sozinha); false = a compra foi levada pra outra conta */
+  donoIgual: boolean;
+  /** reaberto pelo link do e-mail de compra confirmada (talvez em outro navegador) */
+  doEmail?: boolean;
+};
+export type EstadoU2027 = {
+  v: 1; compra: string; etapa: EtapaU2027; pix: PixU2027 | null; salvoEm: number;
+  /** o código DESTE pix já foi copiado (crítica r1: a volta do banco recarrega a aba e trocava "Código copiado" por "Copie o código") */
+  copiado?: boolean;
+  /** o MESMO código também foi pro e-mail desta compra (crítica r2: a frase sumia na volta do banco) */
+  comEmail?: boolean;
+};
+export const TTL_U2027_MS = 2 * 24 * 3600e3;
+export const novoEstadoU2027 = (compra: string, agora: number = Date.now()): EstadoU2027 => ({ v: 1, compra, etapa: "oferta", pix: null, salvoEm: agora });
+
+/** O estado guardado volta pra ESTA compra? (outra compra/velho/corrompido = começa na oferta; QR vencido = oferta de novo) */
+export function estadoU2027QueVolta(bruto: unknown, compra: string, agora: number = Date.now()): EstadoU2027 {
+  const e = bruto as Partial<EstadoU2027> | null;
+  if (!e || e.v !== 1 || e.compra !== compra || typeof e.salvoEm !== "number" || agora - e.salvoEm > TTL_U2027_MS) return novoEstadoU2027(compra, agora);
+  const etapa: EtapaU2027 = e.etapa === "qr" || e.etapa === "pronto" || e.etapa === "fim" ? e.etapa : "oferta";
+  const pix = e.pix && typeof e.pix.orderId === "string" && typeof e.pix.qrCode === "string" && typeof e.pix.expiresAt === "string" ? e.pix : null;
+  if (etapa === "qr" && (!pix || Date.parse(pix.expiresAt) <= agora)) return { ...novoEstadoU2027(compra, agora) };
+  return { v: 1, compra, etapa, pix, salvoEm: e.salvoEm, ...(pix && e.copiado === true ? { copiado: true } : {}), ...(pix && e.comEmail === true ? { comEmail: true } : {}) };
+}
+
+/** "Vale por 24 horas." / "Vale por mais 5 h." / "Vale por mais 12 min." / "Este código venceu." */
+export function validadeU2027(restaMs: number): string {
+  if (restaMs <= 0) return "Este código venceu.";
+  const h = restaMs / 3600e3;
+  if (h >= 23.5) return "Vale por 24 horas.";
+  if (h >= 1) return `Vale por mais ${Math.floor(h)} h.`;
+  return `Vale por mais ${Math.max(1, Math.ceil(restaMs / 60_000))} min.`;
+}
+
+export type VoltaU2027 = { compra: string; pix: PixU2027 | null };
+/**
+ * O link do bloco do e-mail de compra confirmada (_shared/pix-upsell.ts linkU2027):
+ * /organizar?r=u2027&compra=<vitalício>&pedido=<id do QR do 2027>&pix=<copia-e-cola>&vence=<ms>. Devolve o MESMO Pix
+ * pra reabrir quando ainda vale ≥ 1 min (vencido: pix null — a página mostra a oferta e gera outro).
+ */
+export function voltaDoEmailU2027(busca: URLSearchParams, agora: number = Date.now()): VoltaU2027 | null {
+  if (busca.get("r") !== "u2027") return null;
+  const ok = (v: string | null) => (v && /^[A-Za-z0-9_-]{6,80}$/.test(v) ? v : null);
+  const compra = ok(busca.get("compra"));
+  if (!compra) return null;
+  const pedido = ok(busca.get("pedido"));
+  const codigo = busca.get("pix") ?? "";
+  const vence = Number(busca.get("vence"));
+  const pix: PixU2027 | null = pedido && /^000201[\x20-\x7e]{20,600}$/.test(codigo) && Number.isFinite(vence) && vence - agora > 60_000
+    ? { orderId: pedido, qrCode: codigo, qrCodeBase64: null, expiresAt: new Date(vence).toISOString(), donoIgual: false, doEmail: true }
+    : null;
+  return { compra, pix };
+}
+
+/* ───────────────────────── 01/11: QUAL oferta o pós-pago mostra (chave UPSELL_POS no <head>) ───────────────────────── */
+
+/**
+ * UPSELL_POS no <head> do landing.html: "2027" (padrão = o "Seu 2027 organizado" de 31/10, igual) | "presente" (o "Leve
+ * alguém junto" R$ 14,90 no MESMO lugar, na mesma página própria). Só vale com o pós-pago ligado (UPSELL_2027 / data-u2027).
+ * Com "presente" o <head> põe html[data-upsell-pos="presente"]; com "2027" o atributo NÃO existe (a página fica idêntica).
+ * QA: ?upsell=presente|2027 (fica neste navegador: localStorage + cookie); ?upsell=auto desfaz.
+ */
+export type UpsellPos = "2027" | "presente";
+export function upsellPosDoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): UpsellPos {
+  return el.getAttribute("data-upsell-pos") === "presente" ? "presente" : "2027";
+}
+/** O presente só pra quem comprou o CORE PRA SEMPRE (o LN_ano279 é de 1 ano). O mesmo ehPraSempreLanding do servidor. */
+export const ehPraSempreOferta = (o: OfertaLanding | null | undefined): boolean => o === "LN_sempre279" || o === "LN_anosempre478";
+/** R$ 14,90 — o MESMO PRECO_PRESENTE_CENTAVOS do servidor (supabase/functions/_shared/presente.ts; o teste confere). */
+export const VALOR_PRESENTE_LP = 14.9;
+export type EtapaPresenteLp = "oferta" | "qr" | "cartao" | "fim";
+export type EstadoPresenteLp = {
+  v: 1; compra: string; etapa: EtapaPresenteLp; pix: PixU2027 | null; salvoEm: number;
+  /** o código DESTE pix já foi copiado (a volta do banco recarrega a aba) */
+  copiado?: boolean;
+  /** o pedido pago (o Pix do presente) e o código /presente/<código> */
+  pedido?: string | null; codigo?: string | null; de?: string | null;
+};
+export const TTL_PRESENTE_LP_MS = 2 * 24 * 3600e3;
+export const novoEstadoPresenteLp = (compra: string, agora: number = Date.now()): EstadoPresenteLp => ({ v: 1, compra, etapa: "oferta", pix: null, salvoEm: agora });
+/** O estado guardado volta pra ESTA compra? (outra compra/velho/corrompido = a oferta; QR vencido = a oferta de novo) */
+export function estadoPresenteLpQueVolta(bruto: unknown, compra: string, agora: number = Date.now()): EstadoPresenteLp {
+  const e = bruto as Partial<EstadoPresenteLp> | null;
+  if (!e || e.v !== 1 || e.compra !== compra || typeof e.salvoEm !== "number" || agora - e.salvoEm > TTL_PRESENTE_LP_MS) return novoEstadoPresenteLp(compra, agora);
+  const etapa: EtapaPresenteLp = e.etapa === "qr" || e.etapa === "cartao" || e.etapa === "fim" ? e.etapa : "oferta";
+  const pix = e.pix && typeof e.pix.orderId === "string" && typeof e.pix.qrCode === "string" && typeof e.pix.expiresAt === "string" ? e.pix : null;
+  if (etapa === "qr" && (!pix || Date.parse(pix.expiresAt) <= agora)) return novoEstadoPresenteLp(compra, agora);
+  const pedido = typeof e.pedido === "string" && e.pedido ? e.pedido : null;
+  // o cartão sem o pedido pago não tem como achar o código: volta pra oferta (nunca um cartão vazio)
+  if (etapa === "cartao" && !pedido) return novoEstadoPresenteLp(compra, agora);
+  return {
+    v: 1, compra, etapa, pix, salvoEm: e.salvoEm,
+    ...(pix && e.copiado === true ? { copiado: true } : {}),
+    ...(pedido ? { pedido } : {}),
+    ...(typeof e.codigo === "string" && e.codigo ? { codigo: e.codigo } : {}),
+    ...(typeof e.de === "string" && e.de ? { de: e.de } : {}),
+  };
 }

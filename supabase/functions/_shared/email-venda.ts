@@ -86,12 +86,11 @@ export function assuntoVenda(periodo: PeriodoVenda): string {
 }
 
 /** O bloco das lojas (já com o e-mail escapado). Botões de tabela: funcionam no Gmail/Outlook sem imagem. */
-const blocoLojas = (e: string): string => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 18px;background:#faf7f9;border:1px solid #efe6ec;border-radius:14px;"><tr><td style="padding:16px 16px 14px;">
-      <div style="font-size:15px;font-weight:800;color:#16121c;margin:0 0 4px;">Seu CORE também no celular</div>
-      <div style="font-size:13.5px;line-height:1.45;color:#5b5560;margin:0 0 12px;">O CORE é um app da App Store e da Google Play. Baixe e entre com este e-mail: <b style="color:#16121c;">${e}</b></div>
+const blocoLojas = (_e: string): string => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 12px;"><tr><td style="padding:0;">
+      <div style="font-size:12px;font-weight:800;letter-spacing:.08em;color:#8a838f;text-transform:uppercase;margin:0 0 8px;">1 · Seu CORE também no celular</div>
       <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-        <td style="padding:0 8px 0 0;"><a href="${URL_APP_STORE_EMAIL}" style="display:inline-block;background:#16121c;color:#fff;text-decoration:none;font-size:13px;font-weight:700;padding:10px 14px;border-radius:10px;">&#63743; App Store</a></td>
-        <td><a href="${URL_PLAY_EMAIL}" style="display:inline-block;background:#16121c;color:#fff;text-decoration:none;font-size:13px;font-weight:700;padding:10px 14px;border-radius:10px;">&#9654; Google Play</a></td>
+        <td style="padding:0 8px 0 0;"><a href="${URL_APP_STORE_EMAIL}" style="display:inline-block;background:#16121c;color:#fff;text-decoration:none;font-size:14px;font-weight:700;padding:11px 16px;border-radius:10px;">&#63743; App Store</a></td>
+        <td><a href="${URL_PLAY_EMAIL}" style="display:inline-block;background:#16121c;color:#fff;text-decoration:none;font-size:14px;font-weight:700;padding:11px 16px;border-radius:10px;">&#9654; Google Play</a></td>
       </tr></table>
     </td></tr></table>`;
 
@@ -107,6 +106,8 @@ export function dataBr(iso: string | null | undefined): string | null {
 }
 
 /** Os links das lojas no e-mail (os mesmos do site: LojasCard / e-mail antigo). */
+/** 03/11: o guia "Seu CORE começa aqui" (PDF, 16 páginas) — public/guia no site. */
+export const URL_GUIA_PDF = "https://www.coreaplicativo.com.br/guia/core-comece-aqui.pdf";
 export const URL_APP_STORE_EMAIL = "https://apps.apple.com/br/app/id6806913181";
 export const URL_PLAY_EMAIL = "https://play.google.com/store/apps/details?id=br.com.coreaplicativo.app&referrer=utm_source%3Dweb%26utm_medium%3Demail%26utm_campaign%3Dweb_hoje_email";
 
@@ -115,7 +116,24 @@ export const URL_PLAY_EMAIL = "https://play.google.com/store/apps/details?id=br.
  * do vitalício, a maior parte dos reembolsos era "pensei que era da loja"). Entra o bloco "Seu CORE também no celular"
  * com os dois botões das lojas + "entre com este e-mail", e a linha do anual diz que nada é cobrado sozinho.
  */
-export function htmlVenda(args: { email: string; nome?: string | null; periodo: PeriodoVenda; fim?: string | null; hoje?: boolean }): string {
+/* 31/10 (`extra`): o bloco do "Seu 2027" (_shared/pix-upsell.ts blocoU2027, chave UPSELL_2027_EMAIL) — entra DEPOIS dos 3 passos
+ * de "Como entrar no app" (e do link do passo a passo) e antes de "No computador". Vazio = o e-mail de sempre, igual. */
+/**
+ * 03/11 (dono: "tem gente que ainda confunde e clica em Começar ao invés de Entrar"): o desenho dos 2 botões do app —
+ * o mesmo do "No app, toque aqui 👇" da página pós-compra (landing comoEntrarNoApp) — no ALTO do e-mail. Só tabela e
+ * texto (Gmail/Outlook sem imagem): "Começar" apagado com "✕ não é aqui", "Já tenho conta? Entrar" em destaque com
+ * "✓ é aqui".
+ */
+export const blocoEntrar = (e: string, n = ""): string => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;background:#fff6fa;border:1.5px solid #e7a3c6;border-radius:14px;" data-bloco="entrar"><tr><td style="padding:16px 16px 14px;">
+  <div style="font-size:12px;font-weight:800;letter-spacing:.08em;color:#d22d80;text-transform:uppercase;margin:0 0 10px;">${n}No app, toque em “Entrar”</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:0 8px;">
+    <tr><td style="background:#ece8eb;border-radius:12px;padding:11px 14px;font-size:15px;font-weight:800;color:#9a939e;">Começar</td><td style="width:92px;padding-left:10px;font-size:13px;font-weight:800;color:#b42318;white-space:nowrap;">✕ não é aqui</td></tr>
+    <tr><td style="background:#ffffff;border:2px solid #d22d80;border-radius:12px;padding:10px 13px;font-size:15px;font-weight:800;color:#16121c;">Já tenho conta? <span style="color:#d22d80;">Entrar</span></td><td style="width:92px;padding-left:10px;font-size:13px;font-weight:800;color:#15803d;white-space:nowrap;">✓ é aqui</td></tr>
+  </table>
+  <div style="font-size:14px;line-height:1.5;color:#3d3742;margin:8px 0 0;">Digite <b style="color:#16121c;">${e}</b>, toque em <b>“Entrar sem senha”</b> e use o código de 8 números que chega neste e-mail. Você já pagou: não precisa pagar de novo.</div>
+</td></tr></table>`;
+
+export function htmlVenda(args: { email: string; nome?: string | null; periodo: PeriodoVenda; fim?: string | null; hoje?: boolean; extra?: string }): string {
   const e = esc(args.email);
   const primeiro = esc(String(args.nome ?? "").trim().split(/\s+/)[0] || "");
   const ate = dataBr(args.fim);
@@ -133,17 +151,14 @@ export function htmlVenda(args: { email: string; nome?: string | null; periodo: 
   <div style="background:#fff;border-radius:16px;padding:26px 22px;border:1px solid #e9e2e6;">
     <div style="font-size:12px;font-weight:700;letter-spacing:.08em;color:#d22d80;text-transform:uppercase;">Pagamento confirmado</div>
     <h1 style="font-size:22px;line-height:1.25;margin:10px 0 8px;">${primeiro ? `${primeiro}, seu` : "Seu"} CORE está liberado.</h1>
-    <p style="font-size:15px;line-height:1.5;margin:0 0 14px;color:#5b5560;">${plano}</p>
-    <p style="font-size:15px;line-height:1.5;margin:0 0 18px;color:#5b5560;">Sua conta: <b style="color:#16121c;">${e}</b></p>
-    ${args.hoje ? blocoLojas(e) : ""}
-    <p style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#8a838f;text-transform:uppercase;margin:0 0 10px;">Como entrar no app</p>
-    <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-      ${passo(1, `Baixe o <b>CORE</b>: <a href="https://coreaplicativo.com.br/baixar?origem=venda_email" style="color:#d22d80;font-weight:700;">App Store ou Google Play</a>.`)}
-      ${passo(2, "Abra e toque em <b>“Entrar”</b>, logo abaixo do botão Começar. Não toque em “Começar”.")}
-      ${passo(3, `Digite <b>${e}</b> e toque em <b>“Entrar sem senha — receber código por e-mail”</b>. Use o código que chegar.`)}
-    </table>
-    <p style="font-size:13px;color:#5b5560;line-height:1.5;margin:4px 0 0;">Quer ver com fotos? <a href="https://coreaplicativo.com.br/como-entrar" style="color:#d22d80;font-weight:700;">Passo a passo</a></p>
-    <p style="font-size:12.5px;color:#8a838f;line-height:1.5;margin:16px 0 0;">No computador, é o mesmo CORE em coreaplicativo.com.br.</p>
+    <p style="font-size:15px;line-height:1.5;margin:0 0 20px;color:#5b5560;">${plano}</p>
+    ${args.hoje ? blocoLojas(e) : `<p style="font-size:14px;line-height:1.5;margin:0 0 12px;color:#3d3742;"><b>1 ·</b> Baixe o CORE: <a href="https://coreaplicativo.com.br/baixar?origem=venda_email" style="color:#d22d80;font-weight:700;">App Store ou Google Play</a>.</p>`}
+    ${blocoEntrar(e, "2 · ")}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0;border:1px solid #e9e2e6;border-radius:14px;" data-bloco="guia"><tr>
+      <td style="padding:14px 6px 14px 16px;vertical-align:middle;"><div style="font-size:15px;font-weight:800;color:#16121c;">📖 Guia com fotos</div><div style="font-size:13px;line-height:1.4;color:#5b5560;margin-top:2px;">Como entrar, primeiros passos e dicas.</div></td>
+      <td style="padding:14px 14px 14px 6px;vertical-align:middle;text-align:right;white-space:nowrap;"><a href="${URL_GUIA_PDF}" style="display:inline-block;background:#d22d80;color:#fff;text-decoration:none;font-size:14px;font-weight:800;padding:11px 14px;border-radius:10px;">Abrir o guia</a></td>
+    </tr></table>
+    ${args.extra ?? ""}<p style="font-size:12.5px;color:#8a838f;line-height:1.5;margin:14px 0 0;">No computador, é o mesmo CORE em coreaplicativo.com.br. Dúvida? É só responder este e-mail.</p>
   </div>
 </div></body></html>`;
 }
@@ -168,6 +183,7 @@ export function htmlParceiro(args: { email: string; fim?: string | null; vitalic
     <div style="font-size:12px;font-weight:700;letter-spacing:.08em;color:#d22d80;text-transform:uppercase;">Presente pra vocês dois</div>
     <h1 style="font-size:22px;line-height:1.25;margin:10px 0 8px;">Alguém organizou a vida a dois com o CORE — e incluiu você.</h1>
     <p style="font-size:15px;line-height:1.5;margin:0 0 18px;color:#5b5560;">${acesso}</p>
+    ${blocoEntrar(e)}
     ${blocoLojas(e)}
     <p style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#8a838f;text-transform:uppercase;margin:0 0 10px;">Como entrar</p>
     <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">

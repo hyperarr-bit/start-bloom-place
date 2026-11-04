@@ -20,10 +20,10 @@ const raiz = resolve(__dirname, "../..");
 const HTML = readFileSync(resolve(raiz, "landing.html"), "utf8");
 
 /* ───────── o script do <head>, rodado num ambiente falso (com cookie) ───────── */
-const scriptDaCabeca = HTML.match(/<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
+const scriptDaCabeca = HTML.match(/<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/)![1].replace(/var AB_PIX = "(on|off|b)"/, 'var AB_PIX = "off"'); // 03/11: o AB_PIX (ligado no código) cria o id do aparelho — aqui os sorteios antigos são testados sozinhos
 // 29/10: a chave foi LIGADA no código; o caminho "off" (rollback) segue testado trocando a linha
-const ligado = scriptDaCabeca.replace(/var AB_CHECKOUT = "(on|off)"/, 'var AB_CHECKOUT = "on"');
-const desligado = scriptDaCabeca.replace(/var AB_CHECKOUT = "(on|off)"/, 'var AB_CHECKOUT = "off"');
+const ligado = scriptDaCabeca.replace(/var AB_CHECKOUT = "(on|off|email)"/, 'var AB_CHECKOUT = "on"');
+const desligado = scriptDaCabeca.replace(/var AB_CHECKOUT = "(on|off|email)"/, 'var AB_CHECKOUT = "off"');
 
 function rodar(fonte: string, url: string, store: Record<string, string> = {}, cookie: { v: string; ultimo?: string } = { v: "" }) {
   const u = new URL(url, "https://www.coreaplicativo.com.br");
@@ -49,7 +49,7 @@ function rodar(fonte: string, url: string, store: Record<string, string> = {}, c
 
 describe("o sorteio do checkout (head do landing.html)", () => {
   it("com a chave em \"off\" (rollback): todo mundo no checkout de hoje (livre), sem criar id de aparelho", () => {
-    expect(HTML).toMatch(/var AB_CHECKOUT = "on";/);
+    expect(HTML).toMatch(/var AB_CHECKOUT = "email";/); // 31/10 noite: fixado no braço email
     const r = rodar(desligado, "/organizar");
     expect(r.attrs["data-checkout"]).toBe("livre");
     expect(r.store["landing-device-id"]).toBeUndefined();
@@ -256,10 +256,10 @@ describe("braço email: o e-mail ANTES do Pix", () => {
     expect(document.getElementById("lp-card")!.getAttribute("data-fase")).toBe("codigo"); // o CSS esconde a oferta
     expect(nomes()).not.toContain("landing_pix_gerado");
     expect(eventos().find((e) => e.nome === "landing_email_antes_erro")).toMatchObject({ motivo: "tem_conta" });
-    digitar("lp-codigo-antes", "111111");
+    digitar("lp-codigo-antes", "11111111");
     (document.getElementById("lp-entrar-pagar") as HTMLButtonElement).click();
     await vi.waitFor(() => expect(document.querySelector('[data-testid="landing-email-tem-conta"] .lp-erro')?.textContent).toContain("Código errado"), { timeout: 3000 });
-    digitar("lp-codigo-antes", "123456");
+    digitar("lp-codigo-antes", "12345678");
     (document.getElementById("lp-entrar-pagar") as HTMLButtonElement).click();
     await espera('[data-testid="landing-codigo"]');
     expect(document.querySelector('[data-testid="landing-email-garantido"]')!.textContent).toContain("maria+existe@email.com");
@@ -283,7 +283,7 @@ describe("braço email: o e-mail ANTES do Pix", () => {
     digitar("lp-email-antes", "maria+jatem@email.com");
     pagar();
     await espera('[data-testid="landing-email-tem-conta"]');
-    digitar("lp-codigo-antes", "123456");
+    digitar("lp-codigo-antes", "12345678");
     (document.getElementById("lp-entrar-pagar") as HTMLButtonElement).click();
     const card = await espera('[data-testid="landing-ja-tem"]');
     expect(card.textContent).toContain("maria+jatem@email.com");
@@ -326,5 +326,14 @@ describe("a volta pelo e-mail de lembrete", () => {
     await abrirPagina("livre", { url: "/organizar?r=t20h&pedido=a6e3b0f1c2d34e5f9a8b7c6d5e4f3a2b&utm_source=lembrete_pix&utm_content=t20h" });
     expect(document.getElementById("lp-card")!.getAttribute("data-fase")).toBe("oferta");
     expect(eventos().find((e) => e.nome === "landing_lembrete_volta")).toMatchObject({ toque: "t20h", restaurado: "nao" });
+  });
+});
+
+describe("31/10 noite: AB_CHECKOUT = \"email\" fixa todo mundo no e-mail antes do Pix", () => {
+  it("sem força: braço email pra qualquer aparelho, sem criar id de aparelho; ?checkout=livre ainda força", () => {
+    const fixo = scriptDaCabeca.replace(/var AB_CHECKOUT = "(on|off|email)"/, 'var AB_CHECKOUT = "email"');
+    for (let i = 0; i < 5; i++) expect(rodar(fixo, "/organizar").attrs["data-checkout"]).toBe("email");
+    expect(rodar(fixo, "/organizar").store["landing-device-id"]).toBeUndefined();
+    expect(rodar(fixo, "/organizar?checkout=livre").attrs["data-checkout"]).toBe("livre");
   });
 });

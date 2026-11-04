@@ -38,7 +38,7 @@ import { useAuth } from "@/hooks/use-auth";
 
 import { FinancialSummary } from "@/components/FinancialSummary";
 import { InstallmentTracker } from "@/components/InstallmentTracker";
-import { DividasEntrePessoas } from "@/components/finance/DividasEntrePessoas";
+import { DividasEntrePessoas, totalQueDevoAPessoas, type DividaPessoal } from "@/components/finance/DividasEntrePessoas";
 import { AnnualBudget } from "@/components/AnnualBudget";
 import { MonthlyBudget } from "@/components/MonthlyBudget";
 import { WishlistItems } from "@/components/WishlistItems";
@@ -66,6 +66,7 @@ import { TotalPorCartao } from "@/components/finance/TotalPorCartao";
 import { usePainelLimpo } from "@/hooks/use-painel-limpo";
 import { useFinanceCards } from "@/lib/finance-cards";
 import { chaveArquivada } from "@/lib/virada-do-mes";
+import { guardarReceitaNoMes } from "@/lib/finance-receita-futura";
 import { mesCorrenteId } from "@/lib/virada-contas";
 import { useVersaoDaVirada } from "@/hooks/use-virada-do-mes";
 import { SeletorDePerfil } from "@/components/finance/SeletorDePerfil";
@@ -239,6 +240,8 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   };
 
   const [incomes, setIncomes] = usarListaDoPerfil(incomesTodos, setIncomesTodos, perfilValido);
+  // receita com data de mês futuro vai pra planilha daquele mês (01/11, lib/finance-receita-futura)
+  const guardarReceitaFutura = (receita: any) => guardarReceitaNoMes(receita, new Date(), getUserData, setUserData, perfilValido);
   const [expenses, setExpenses] = usarListaDoPerfil(expensesTodos, setExpensesTodos, perfilValido);
   const [fixedExpenses, setFixedExpenses] = usarListaDoPerfil(fixedExpensesTodos, setFixedExpensesTodos, perfilValido);
   const [installments, setInstallments] = usarListaDoPerfil(installmentsAvancados as any[], setInstallmentsTodos, perfilValido);
@@ -425,6 +428,12 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   const totalFixedExpenses = fixedExpenses.reduce((sum: number, e: any) => sum + (e.value || 0), 0);
   const totalExpenses = totalVariableExpenses + totalFixedExpenses;
   const totalDebts = installments.reduce((sum: number, i: any) => sum + (i.totalInstallments - i.paidInstallments) * i.installmentValue, 0);
+  /* 01/11 (card DÍVIDAS): o card passa a somar também o que a pessoa DEVE a outras pessoas (Dívidas e
+     empréstimos, só o que está em aberto, no perfil da tela). `totalDebts` continua só parcelas — é ele
+     que alimenta Dashboard, Saúde Financeira e o resto; este total é só pro card e pra barrinha de resumo. */
+  const [dividasPessoas] = usePersistedState<DividaPessoal[]>("finance-dividas-pessoas", []);
+  const devoAPessoas = totalQueDevoAPessoas(dividasPessoas, perfilValido);
+  const totalDoCardDividas = totalDebts + devoAPessoas;
   const totalInvestments = investments.reduce((sum: number, i: any) => sum + i.currentValue, 0);
   // Parcelas do mês pela mesma função que a planilha do mês usa (um total só).
   const monthlyInstallments = somaParcelasDoMes(installments as Parcela[]);
@@ -599,7 +608,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
             </div>
             <div className="flex items-baseline justify-between gap-2 min-w-0">
               <span className="text-[10px] text-muted-foreground shrink-0">Dívidas</span>
-              <span className="text-xs font-bold text-orange-400 truncate">R$ {reais(totalDebts)}</span>
+              <span className="text-xs font-bold text-orange-400 truncate">R$ {reais(totalDoCardDividas)}</span>
             </div>
             <div className="flex items-baseline justify-between gap-2 min-w-0">
               <span className="text-[10px] text-muted-foreground shrink-0">Invest.</span>
@@ -774,8 +783,10 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                   <FinancialSummary
                     totalIncome={totalIncome}
                     totalExpenses={monthlyOutflow}
-                    totalDebts={totalDebts}
+                    totalDebts={totalDoCardDividas}
                     totalInvestments={totalInvestments}
+                    /* 01/11: a linha "Parcelas · Pessoas" embaixo do total ficou DESLIGADA (dono: alongava o card).
+                       Pra ligar: partesDasDividas={{ parcelas: totalDebts, pessoas: devoAPessoas }} */
                   />
                 </TrackedCard>
                 <div className="grid lg:grid-cols-[1fr_280px] gap-4 min-w-0">
@@ -783,7 +794,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                     <TrackedCard cardKey="incomes" tab="financeiro">
                       {/* id: alvo do "Anotar minha renda" do QUANTO POSSO GASTAR HOJE compacto (1.0.22) */}
                       <div id="fin-receitas" className="scroll-mt-20">
-                      <IncomeTable incomes={incomes} setIncomes={setIncomes} prefillExample={getUserData<string>("spotlight-done-financas", "") !== "true" && incomes.length === 0} />
+                      <IncomeTable incomes={incomes} setIncomes={setIncomes} guardarEmOutroMes={guardarReceitaFutura} prefillExample={getUserData<string>("spotlight-done-financas", "") !== "true" && incomes.length === 0} />
                       </div>
                     </TrackedCard>
                   </div>

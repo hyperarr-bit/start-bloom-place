@@ -9,7 +9,9 @@ import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import { construirRetroMes, lerDadosDaVida, nomeDaPessoa, type Leitor, type RetroMes } from "@/lib/retrospectiva";
 import { MonthlyWrapped } from "@/components/wrapped/MonthlyWrapped";
-import { CHAVE_DO_TEMA, lerTema, perfilEmFrase, type TemaDaRetro } from "@/components/wrapped/temas";
+import { CHAVE_RETRO_NOVA_ABERTA, marcarRetroNovaNoAparelho } from "@/lib/retro-aviso";
+import { CHAVE_DO_TEMA, lerTema, type TemaDaRetro } from "@/components/wrapped/temas";
+import { BORDA, FUNDO, INTER, MESES_CURTOS } from "@/components/wrapped/CartaoRetroNova";
 import { foilCss } from "@/components/wrapped/prancheta";
 import { Espiral, Fita, P3, creme, kicker, linho, relevo, serif, vinheta } from "@/components/wrapped/pecas-planner";
 
@@ -76,6 +78,23 @@ const jaBuscadas = new Set<string>();
 
 /** Quanto esperar pelo mês pedido antes de desistir e mostrar a lista. */
 const ESPERA_MAXIMA_MS = 8000;
+
+/**
+ * (01/11) A retrospectiva de outubro abriu no visual NOVO: marca na conta (e no aparelho) — o aviso
+ * "ganhou cara nova" da Home (wrapped/AvisoRetroNova, lib/retro-aviso) não aparece mais pra esta conta.
+ */
+const MarcaRetroNovaAberta = () => {
+  const { user } = useAuth();
+  const { get, set } = useUserData();
+  const uid = user?.id ?? null;
+  const jaTem = get<unknown>(CHAVE_RETRO_NOVA_ABERTA, null) != null;
+  useEffect(() => {
+    if (!uid) return;
+    marcarRetroNovaNoAparelho(uid);
+    if (!jaTem) set(CHAVE_RETRO_NOVA_ABERTA, { em: new Date().toISOString() }, { system: true });
+  }, [uid, jaTem, set]);
+  return null;
+};
 
 const Retrospectiva = () => {
   const { user } = useAuth();
@@ -188,9 +207,11 @@ const Retrospectiva = () => {
   if (qaOutubro) {
     return (
       <Suspense fallback={<div className="fixed inset-0 z-[400]" style={{ background: "#0e0e11" }} />}>
+        <MarcaRetroNovaAberta />
         <RetroOutubro
           ler={lerRetro}
           onClose={() => setQaOutubro(false)}
+          onProximoPasso={(rota) => navigate(rota, { replace: true })}
           semDados={
             <div className="fixed inset-0 z-[400] grid place-items-center text-center px-8" style={{ background: "#0e0e11", color: "#fff" }}>
               <div>
@@ -214,7 +235,8 @@ const Retrospectiva = () => {
     if (retroOutubroAtiva(aberto.ano, aberto.mesIdx)) {
       return (
         <Suspense fallback={<div className="fixed inset-0 z-[400]" style={{ background: "#0e0e11" }} />}>
-          <RetroOutubro ler={lerRetro} onClose={fechar} semDados={antiga} />
+          <MarcaRetroNovaAberta />
+          <RetroOutubro ler={lerRetro} onClose={fechar} semDados={antiga} onProximoPasso={(rota) => navigate(rota, { replace: true })} />
         </Suspense>
       );
     }
@@ -273,8 +295,9 @@ const Retrospectiva = () => {
             </button>
           </div>
         ) : (
-          // (26/09, temas) cada mês é uma lombada do planner (a pele do tema padrão):
-          // linho grafite, espiral, o mês em foil; o mais recente leva o marcador
+          // (02/11, dono: "em retrospectivas esse card ainda é o antigo") cada mês no visual NOVO — o mesmo grafite do
+          // cartão da Home (CartaoRetroNova): selo "RETROSPECTIVA · OUT / 26", o mês grande, o resumo; o mais recente ganha
+          // ", do seu jeito." em magenta. Sai a lombada do planner (linho, espiral, foil).
           meses.map((r, i) => (
             <motion.button
               key={idDe(r)}
@@ -283,23 +306,21 @@ const Retrospectiva = () => {
               transition={{ delay: i * 0.05, duration: 0.35 }}
               onClick={() => abrir(r, "lista")}
               className="relative block w-full overflow-hidden text-left active:scale-[0.99] transition-transform"
-              style={{ borderRadius: 14, background: P3.mesa, color: P3.creme }}
+              style={{ borderRadius: 16, background: FUNDO, boxShadow: BORDA, fontFamily: INTER, WebkitFontSmoothing: "antialiased" }}
+              data-estilo="novo"
             >
-              <span aria-hidden style={{ position: "absolute", left: 12, top: 0, right: 0, bottom: 0, borderRadius: "3px 14px 14px 3px", ...linho() }} />
-              <span aria-hidden style={{ ...vinheta, left: 12 }} />
-              <Espiral n={3} passo={26} topo={10} esquerda={12} w={10} h={18} caixa={24} />
-              {i === 0 && <Fita style={{ right: 48, top: -4, height: 44 }} largura={10} bico={6} />}
-              <span className="relative flex items-center gap-3" style={{ padding: "13px 14px 14px 32px" }}>
+              <span className="relative flex items-center gap-3" style={{ padding: "14px 14px 15px 18px" }}>
                 <span className="flex-1 min-w-0">
-                  {/* mês curto (pouco dado) não tem perfil — 26/09 */}
-                  <span className="block truncate" style={kicker(9)}>{r.curta ? "Edição curta" : perfilEmFrase(r.perfil.name)}</span>
-                  <span className="block" style={{ ...serif, fontSize: 25, lineHeight: 1.05, marginTop: 2 }}>
-                    <span style={{ ...foilCss, paddingRight: 3 }}>{r.mes}</span>
-                    {r.ano !== new Date().getFullYear() && <span style={{ ...relevo, fontFamily: "inherit", fontStyle: "normal", fontSize: 13, fontWeight: 900, letterSpacing: ".06em" }}> {r.ano}</span>}
+                  <span className="block" style={{ color: "#d6d0d8", fontSize: 9.5, letterSpacing: ".1em", fontWeight: 800 }}>
+                    RETROSPECTIVA · {MESES_CURTOS[r.mesIdx] ?? ""} / {String(r.ano).slice(-2)}
                   </span>
-                  <span className="block truncate" style={{ fontSize: 12, color: creme(0.55), marginTop: 2 }}>{RESUMO_DE(r)}</span>
+                  <span className="block" style={{ fontSize: 22, fontWeight: 900, letterSpacing: "-0.03em", lineHeight: 1.1, marginTop: 4, whiteSpace: "nowrap" }}>
+                    <span style={{ color: "#fffdf8" }}>{r.mes}</span>
+                    {i === 0 && <span style={{ color: "#db2777" }}>, do seu jeito.</span>}
+                  </span>
+                  <span className="block truncate" style={{ fontSize: 12, color: "rgba(255,253,248,.6)", marginTop: 4 }}>{RESUMO_DE(r)}</span>
                 </span>
-                <ChevronRight className="w-4 h-4 shrink-0" style={{ color: P3.ouroTxt }} />
+                <ChevronRight className="w-4 h-4 shrink-0" style={{ color: "#d6d0d8" }} />
               </span>
             </motion.button>
           ))

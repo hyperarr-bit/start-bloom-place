@@ -13,6 +13,9 @@ import { afterAll } from "vitest";
 /* 27/10 — HOME NOVA NO SITE (lib/web-home-nova): a chave WEB_HOME_NOVA é "on", mas a suíte de antes descreve o site de
  * hoje (nada classificado, Home de hoje). Aqui ela vira "off"; os testes da chave (web-home-nova.test.tsx) apagam o global. */
 (globalThis as { __WEB_HOME_NOVA__?: string }).__WEB_HOME_NOVA__ = "off";
+// 31/10: o planner novo e a oferta com as folhas foram LIGADOS no site; a suíte de antes descreve as chaves desligadas
+(globalThis as { __PLANNER_2027__?: string; __U27_PLANNER__?: string }).__PLANNER_2027__ = "off";
+(globalThis as { __PLANNER_2027__?: string; __U27_PLANNER__?: string }).__U27_PLANNER__ = "off";
 
 /**
  * REDE EXTERNA BLOQUEADA NOS TESTES (28/09). O cliente do Supabase aponta pra

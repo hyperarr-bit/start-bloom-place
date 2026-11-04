@@ -31,7 +31,7 @@ const ConfirmandoPagamento = () => (
   <motion.div
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
-    className="fixed inset-0 z-[310] bg-white grid place-items-center px-6 text-center"
+    data-camada-guia="paywall" className="fixed inset-0 z-[310] bg-white grid place-items-center px-6 text-center"
   >
     <div className="max-w-sm">
       <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 grid place-items-center mx-auto mb-5">
@@ -195,7 +195,7 @@ export const TrialBanner = () => {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="fixed inset-0 z-[310] overflow-y-auto bg-white"
+        data-camada-guia="paywall" className="fixed inset-0 z-[310] overflow-y-auto bg-white"
       >
         {/* Boundary: crash/chunk velho aqui era TELA BRANCA na hora de pagar */}
         <RouteErrorBoundary routeName="paywall-gate">
@@ -255,7 +255,7 @@ export const TrialBanner = () => {
   // "Assine no app" — o "Ver planos" dela levava ao Pix. O app segue abaixo.
   if (trialExpired && !isNativeShell() && !VENDA_NA_WEB) {
     return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[310] overflow-y-auto bg-white">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} data-camada-guia="paywall" className="fixed inset-0 z-[310] overflow-y-auto bg-white">
         <RouteErrorBoundary routeName="paywall-gate"><AssineNoApp variante="gate" /></RouteErrorBoundary>
       </motion.div>
     );
@@ -267,7 +267,7 @@ export const TrialBanner = () => {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="fixed inset-0 z-[310] bg-background flex items-center justify-center px-4"
+        data-camada-guia="paywall" className="fixed inset-0 z-[310] bg-background flex items-center justify-center px-4"
       >
         <div className="max-w-sm w-full text-center space-y-6">
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">

@@ -97,7 +97,7 @@ describe("servidor · quem já tem o CORE pra sempre", () => {
     const create = s.slice(s.indexOf('if (action === "create")'), s.indexOf('if (action === "check")'));
     const trava = create.indexOf("jaTemOCore(");
     expect(trava).toBeGreaterThan(0);
-    expect(trava).toBeLessThan(create.indexOf("/pix/qrCodes/static"));
+    expect(trava).toBeLessThan(create.indexOf("postarQrEstatico(")); // 31/10: o POST do QR mora em _shared/asaas-qr.ts
     expect(create).toMatch(/if \(ehOfertaLanding\(offer\)\)/);
     expect(create).toMatch(/jsonResponse\(\{ ja_tem: true, error: "ja_tem"/);
     // o e-mail opcional da tela do Pix também não vira destino de quem já tem
@@ -323,6 +323,7 @@ describe("a página · já comprou", () => {
     expect(card.textContent).toContain("Você já tem o CORE");
     expect(card.textContent).toContain("Abrir meu CORE");
     expect(card.querySelector('a[href*="apps.apple.com"]')).not.toBeNull();
+    expect(card.querySelector('[data-testid="landing-como-entrar-app"]')?.textContent).toContain("Já tenho conta? Entrar");
     expect(card.querySelector('a[href*="play.google.com"]')).not.toBeNull();
     expect(document.getElementById("lp-card")!.getAttribute("data-fase")).toBe("conta"); // o CSS esconde a oferta
     expect(eventos()).toEqual(expect.arrayContaining([expect.objectContaining({ nome: "landing_ja_tem", via: "marcador" })]));

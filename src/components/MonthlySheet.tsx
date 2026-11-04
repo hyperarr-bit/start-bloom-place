@@ -4,7 +4,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { usarListaDoPerfil, usarDueDaysDoPerfil, doPerfil, PERFIL_PESSOAL } from "@/lib/finance-perfil";
 import { IncomeTable } from "@/components/IncomeTable";
 import { ExpenseTable } from "@/components/ExpenseTable";
-import { FixedExpensesTable, projetarFixos, type FixedExpense } from "@/components/FixedExpensesTable";
+import { FixedExpensesTable, juntarFixosEmCadeia, projetarFixos, type FixedExpense } from "@/components/FixedExpensesTable";
 import { BillsDueCards } from "@/components/BillsDueCards";
 import { InstallmentTracker } from "@/components/InstallmentTracker";
 import { Notes } from "@/components/Notes";
@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { getFinanceStorageKeys, isCurrentMonth, getCurrentYear } from "@/components/finance/storage-keys";
 import { computeArchivedLooseBillsOutflow, computeLooseBillsOutflow, computeMonthlyOutflow } from "@/lib/finance-totals";
 import {
-  type Parcela, mesIdDe, mesesAnteriores, somarMeses, chaveArquivadaDeParcelas, projetarParcelas, somaParcelasDoMes,
+  type Parcela, mesIdDe, mesesAnteriores, mesesEntre, somarMeses, chaveArquivadaDeParcelas, projetarParcelas, somaParcelasDoMes,
 } from "@/lib/finance-parcelas";
 import { variaveisDoMes } from "@/lib/finance-fatura";
 import { useFinanceCards } from "@/lib/finance-cards";
@@ -108,7 +108,11 @@ export const MonthlySheet = ({ month, year, onClose }: MonthlySheetProps) => {
      Só pra FRENTE: o mês corrente É o balde e o passado já tem o retrato. */
   const fixosProjetados = useMemo(() => {
     if (isCurrent || mesId <= agora) return VAZIA as FixedExpense[];
-    return projetarFixos(doPerfil(get<FixedExpense[]>("finance-fixed-expenses", VAZIA) || VAZIA, perfilAtivo || PERFIL_PESSOAL), fixedExpenses as FixedExpense[]);
+    // 01/11: + os fixos cadastrados nas planilhas dos meses futuros ANTES deste (lib: juntarFixosEmCadeia)
+    const doMesFuturo = (m: string) => get<FixedExpense[]>(chaveArquivada(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1, "fixed"), VAZIA) || VAZIA;
+    const intermediarios = Array.from({ length: Math.max(0, mesesEntre(agora, mesId) - 1) }, (_, i) => somarMeses(agora, i + 1));
+    const cadeia = juntarFixosEmCadeia([get<FixedExpense[]>("finance-fixed-expenses", VAZIA) || VAZIA, ...intermediarios.map(doMesFuturo)]);
+    return projetarFixos(doPerfil(cadeia, perfilAtivo || PERFIL_PESSOAL), fixedExpenses as FixedExpense[]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCurrent, mesId, agora, fixedTodos, perfilAtivo, get]);
 
@@ -185,7 +189,9 @@ export const MonthlySheet = ({ month, year, onClose }: MonthlySheetProps) => {
             com os ✓ dentro. A planilha do mês passado só não ENTREGAVA esse balde à
             tabela, que caía no `pagoEm` (vazio pra fixo com Dia) e mostrava setembro
             inteiro como não pago. Passa o balde do próprio mês: corrente, passado ou
-            futuro, a conta lida/gravada é sempre a da chave deste mês. */}
+            futuro, a conta lida/gravada é sempre a da chave deste mês.
+            01/11: a frase "vale só para {mês}" (prop soDoMes) ficou DESLIGADA — o dono achou que
+            complicava a planilha. Pra ligar, passar soDoMes={isCurrent ? undefined : month}. */}
         <FixedExpensesTable expenses={fixedExpenses} setExpenses={setFixedExpenses} dueDays={dueDays as any[]} setDueDays={setDueDays as (d: any[]) => void} mes={mesId} projetados={fixosProjetados} />
       </div>
       <div className="min-w-0">

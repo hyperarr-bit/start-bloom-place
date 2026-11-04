@@ -278,7 +278,7 @@ ${miolo}
 export const assuntoPresenteComprador = (): string => "Seu presente do CORE está pronto 🎁";
 export function htmlPresenteComprador(a: { codigo: string; deNome?: string | null }): string {
   const link = linkDoPresente(a.codigo);
-  const msg = `${a.deNome ? `${a.deNome} te deu` : "Ganhei pra você"} o CORE pra sempre 💛 Abre aqui: ${link}`;
+  const msg = `${a.deNome ? `${a.deNome} te deu o CORE pra sempre 💛` : "Um presente pra você: o CORE pra sempre 💛"} Abre aqui: ${link}`;
   const zap = `https://wa.me/?text=${encodeURIComponent(msg)}`;
   return moldura(`    <div style="font-size:12px;font-weight:800;letter-spacing:.08em;color:#d6338a;text-transform:uppercase;">Presente pago</div>
     <h1 style="font-size:22px;line-height:1.25;margin:10px 0 8px;">Agora é só mandar o link 💌</h1>

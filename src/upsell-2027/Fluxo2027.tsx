@@ -9,6 +9,10 @@ import {
 import { PixHoje, type PixSalvo } from "@/pages/hoje/PixHoje";
 import type { OfertaHoje } from "@/pages/hoje/conteudo";
 import { Confete2027, IlustraPlanner } from "./IlustraPlanner";
+import {
+  CTA_PRONTO_U2027_PLANNER, ITEM_PLANNER_U2027, LEGENDA_U2027_PLANNER, LINK_PLANEJAR_2027, ZOOM_U2027_PLANNER, folhaAnoDoPlanner, imagemDoPlanner,
+  srcsetDoPlanner, u27PlannerLigado, bracoDoPlanner, camposDoBraco,
+} from "@/lib/planner-2027-chave";
 import "@/pages/hoje/funil-hoje.css";
 import "./u2027.css";
 
@@ -24,10 +28,11 @@ import "./u2027.css";
  *
  * Eventos (todos com `origem` + `versao` + os ids do funil): u2027_oferta_view · u2027_quero · u2027_nao ·
  * u2027_pix_gerado · u2027_pago · u2027_continuar. (O PixHoje manda os dele também: hoje_pix_gerado etc.)
+ * Com a versão B (U27_PLANNER), todos levam braco_planner/braco_planner_via (teste A/B dos desenhos, 31/10).
  */
 export type Fim2027 = { pedido: string | null };
 
-export function Fluxo2027({ origem, compra, valorPago, ids, onFim, versao = VERSAO_OFERTA_2027 }: {
+export function Fluxo2027({ origem, compra, valorPago, ids, onFim, versao = VERSAO_OFERTA_2027, email = null }: {
   origem: "inicio" | "hoje";
   /** o pedido do vitalício que abriu o fluxo (1 fluxo por compra) */
   compra: string;
@@ -35,14 +40,28 @@ export function Fluxo2027({ origem, compra, valorPago, ids, onFim, versao = VERS
   ids?: () => Record<string, unknown>;
   onFim: (r: Fim2027) => void;
   versao?: VersaoOferta2027;
+  /** 31/10 teste A/B dos desenhos: o e-mail da compra (o app sorteia pelo e-mail da conta; sem e-mail → a compra) */
+  email?: string | null;
 }) {
   const [e, setE] = useState<Estado2027>(() => lerEstado2027(compra));
+  // 31/10 versão B (U27_PLANNER, off = a oferta de sempre): as 2 folhas reais do planner no lugar do caderno desenhado
+  const [comPlanner] = useState(() => u27PlannerLigado());
+  /* o braço do desenho (1x por montagem): o mesmo hash do e-mail que o app faz com a conta (src/lib/planner-2027-braco.ts) */
+  const [braco] = useState(() => (comPlanner ? bracoDoPlanner({ email, reserva: compra }) : null));
+  /** crítica r1 (compradora MEDIA 2): tocar na imagem abre a folha "Meu ano" grande */
+  const [zoom, setZoom] = useState(false);
+  useEffect(() => {
+    if (!zoom) return;
+    const tecla = (k: KeyboardEvent) => { if (k.key === "Escape") setZoom(false); };
+    document.addEventListener("keydown", tecla);
+    return () => document.removeEventListener("keydown", tecla);
+  }, [zoom]);
   const set = useCallback((f: (x: Estado2027) => Estado2027) => {
     setE((x) => { const n = f(x); gravarEstado2027(n); return n; });
   }, []);
   const idsRef = useRef(ids);
   idsRef.current = ids;
-  const base = useCallback((): Record<string, unknown> => ({ origem, versao, ...(idsRef.current?.() ?? {}) }), [origem, versao]);
+  const base = useCallback((): Record<string, unknown> => ({ origem, versao, ...(braco ? camposDoBraco(braco) : {}), ...(idsRef.current?.() ?? {}) }), [origem, versao, braco]);
   const evento = (nome: string, extra: Record<string, unknown> = {}) => trackEvent(nome, { ...extra, ...base() });
 
   useEffect(() => {
@@ -66,7 +85,7 @@ export function Fluxo2027({ origem, compra, valorPago, ids, onFim, versao = VERS
           onClick={() => { evento("u2027_quero"); set((x) => ({ ...x, etapa: "pix" })); }}><span>Quero meu 2027 organizado</span></button>
         <button type="button" className="u27-nao" data-testid="u2027-nao"
           onClick={() => { evento("u2027_nao"); set((x) => ({ ...x, pix: null, etapa: "fim" })); }}>Agora não</button>
-        {versao === "curta" && <p className="u27-miuda">Aparece no app e no site, na hora</p>}
+        {versao === "curta" && <p className="u27-miuda">Por enquanto, no site e no app do iPhone</p>}
       </div>
     );
     const topo = (
@@ -80,8 +99,8 @@ export function Fluxo2027({ origem, compra, valorPago, ids, onFim, versao = VERS
         <div className="u27-tela" data-testid="u2027-oferta" data-versao="curta">
           <div className="u27-col">
             {topo}
-            <h1 className="u27-titulo" style={{ marginTop: 34 }}>Seu 2027 já <em>organizado</em></h1>
-            <p className="u27-sub">Tudo montado no seu CORE hoje. Uma vez só.</p>
+            <h1 className="u27-titulo" style={{ marginTop: 34 }}>Seu 2027 <em>organizado</em></h1>
+            <p className="u27-sub">Entra no seu CORE assim que o Pix cair. Uma vez só.</p>
             <div className="u27-lista"><ul>
               {ITENS_2027.map((it) => (
                 <li key={it.titulo}><i aria-hidden>{it.emoji}</i><span><b>{it.titulo}</b><small>{it.sub}</small></span>{it.bonus && <em data-bonus="">BÔNUS</em>}</li>
@@ -97,16 +116,31 @@ export function Fluxo2027({ origem, compra, valorPago, ids, onFim, versao = VERS
       <div className="u27-tela" data-testid="u2027-oferta" data-versao="visual">
         <div className="u27-col">
           {topo}
-          <div className="u27-cena"><IlustraPlanner size={140} /></div>
-          <h1 className="u27-titulo">Seu 2027 já <em>organizado</em></h1>
-          <p className="u27-sub">Montado no seu CORE hoje, por <b data-testid="u2027-preco">{reais2027(VALOR_2027)}</b></p>
-          <div className="u27-folha">
+          {comPlanner
+            ? <figure className="u27-planner-img" data-testid="u2027-planner" data-estilo={braco?.estilo}>
+                <button type="button" aria-label={ZOOM_U2027_PLANNER} onClick={() => { evento("u2027_zoom"); setZoom(true); }}>
+                  <img src={imagemDoPlanner(braco?.estilo)} srcSet={srcsetDoPlanner(braco?.estilo)} width={640} height={460} alt="Duas folhas do planner 2027: a capa e o ano numa página" decoding="async" />
+                </button>
+                <figcaption>{LEGENDA_U2027_PLANNER} <u>{ZOOM_U2027_PLANNER}</u></figcaption>
+              </figure>
+            : <div className="u27-cena"><IlustraPlanner size={140} /></div>}
+          <h1 className="u27-titulo">Seu 2027 <em>organizado</em></h1>
+          <p className="u27-sub">No seu CORE, por <b data-testid="u2027-preco">{reais2027(VALOR_2027)}</b>, uma vez</p>
+          {!comPlanner && <div className="u27-folha">
             <div className="u27-folha-topo"><b>PLANNER 2027</b><small>revisão no dia 1 de cada mês</small></div>
             <div className="u27-meses">{MESES_CURTOS.map((m, i) => <span key={m} data-on={i === 0 ? "" : undefined}><i />{m}</span>)}</div>
-          </div>
+          </div>}
           <div className="u27-chips">{PILULAS_2027.map((p) => <span key={p}>{p}</span>)}</div>
         </div>
         {rodape}
+        {zoom && (
+          <div className="u27-zoom" role="dialog" aria-modal="true" aria-label="Exemplo de uma folha do planner: Meu ano" data-testid="u2027-zoom"
+            onClick={(ev) => { if (ev.target === ev.currentTarget) setZoom(false); }}>
+            <button type="button" aria-label="Fechar" autoFocus onClick={() => setZoom(false)}>×</button>
+            <small>EXEMPLO · O SEU SAI COM O QUE VOCÊ PLANEJAR</small>
+            <img src={folhaAnoDoPlanner(braco?.estilo)} width={1080} height={1528} alt="A folha Meu ano do planner 2027, com metas, dinheiro, cofrinho, datas e hábitos de exemplo" />
+          </div>
+        )}
       </div>
     );
   }
@@ -115,7 +149,7 @@ export function Fluxo2027({ origem, compra, valorPago, ids, onFim, versao = VERS
     const oferta = OFERTA_2027 as OfertaHoje;
     return (
       <PixHoje key={oferta} oferta={oferta} valor={VALOR_2027} rotulo="Seu 2027 no CORE · uma vez só"
-        faixa={<div className="u27-pix-cabeca">🗓️ Seu 2027 já organizado</div>}
+        faixa={<div className="u27-pix-cabeca">🗓️ Seu 2027 organizado</div>}
         pix={e.pix && e.pix.oferta === oferta ? (e.pix as unknown as PixSalvo) : null}
         onPix={(p) => {
           if (p && p.orderId !== e.pix?.orderId) evento("u2027_pix_gerado", { order_id: p.orderId, valor: VALOR_2027 });
@@ -145,15 +179,24 @@ export function Fluxo2027({ origem, compra, valorPago, ids, onFim, versao = VERS
             <li><i><Check size={13} strokeWidth={3.4} /></i>Planejar 2027 (5 minutos)</li>
             <li><i><Check size={13} strokeWidth={3.4} /></i>12 revisões do mês</li>
             <li><i><Check size={13} strokeWidth={3.4} /></i>Cofrinho das 52 semanas</li>
-            <li><i><Check size={13} strokeWidth={3.4} /></i>Planner 2027 em PDF</li>
+            <li><i><Check size={13} strokeWidth={3.4} /></i>{comPlanner ? ITEM_PLANNER_U2027 : "Planner 2027 pra imprimir"}</li>
           </ul></div>
-          <div className="u27-onde" data-testid="u2027-onde">No app e no site: <b>Dev. Pessoal → Seu 2027</b>.<br />Entre com o mesmo e-mail da compra.</div>
+          <div className="u27-onde" data-testid="u2027-onde">Fica no módulo <b>Desenvolvimento Pessoal</b>, aba <b>Seu 2027</b>. Por enquanto, no site e no app do iPhone.<br />Entre com o mesmo e-mail da compra.</div>
           <SelosDasLojas onde="u2027_pronto" prefixo="web" altura={40} className="justify-center mt-3" />
         </div>
-        <div className="u27-rodape">
-          <button type="button" className="u27-cta" data-testid="u2027-continuar"
-            onClick={() => { evento("u2027_continuar"); set((x) => ({ ...x, etapa: "fim" })); }}><span>Continuar</span></button>
-        </div>
+        {comPlanner ? (
+          /* crítica r1 (compradora MEDIA 1): com a versão B, o "Pronto" leva direto ao Planejar (o planner sai com os dados dela) */
+          <div className="u27-rodape">
+            <a className="u27-cta" data-testid="u2027-planejar" href={LINK_PLANEJAR_2027} onClick={() => evento("u2027_planejar")}><span>{CTA_PRONTO_U2027_PLANNER}</span></a>
+            <button type="button" className="u27-nao" data-testid="u2027-continuar"
+              onClick={() => { evento("u2027_continuar"); set((x) => ({ ...x, etapa: "fim" })); }}>Depois</button>
+          </div>
+        ) : (
+          <div className="u27-rodape">
+            <button type="button" className="u27-cta" data-testid="u2027-continuar"
+              onClick={() => { evento("u2027_continuar"); set((x) => ({ ...x, etapa: "fim" })); }}><span>Continuar</span></button>
+          </div>
+        )}
       </div>
     );
   }

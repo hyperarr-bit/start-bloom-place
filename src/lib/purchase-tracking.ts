@@ -58,7 +58,7 @@ type PendingOffer = "lifetime" | "downsell" | "w97" | "w25" | "w47" | "w27" | "a
 const VALOR_DA_OFERTA: Record<PendingOffer, number> = {
   lifetime: 97.9, // 03/09: a web virou preço único — ver PIX_PRICES no PixCheckout
   w25: 24.9,      // 03/09: 1 mês pré-pago na web (2ª coluna do paywall)
-  u2027: 19.9,    // 21/10: o upsell "Seu 2027 já organizado" (supabase/functions/_shared/pacote-2027.ts)
+  u2027: 19.9,    // 21/10: o upsell "Seu 2027 já organizado" (supabase/functions/_shared/pacote-2027.ts); 31/10: 19,90 (o Pix de upsell não manda Purchase)
 
   downsell: 19.9,
   w97: 97.9,

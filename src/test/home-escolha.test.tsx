@@ -133,12 +133,14 @@ describe("a regra (lib/home-nova)", () => {
     localStorage.setItem(CHAVE_HOME_CONVITE_APARELHO, "u9,u1");
     expect(deveConvidarHomeNova(base)).toBe(false); // já viu neste aparelho
   });
-  it("plataforma: iPhone sim; Android nunca; iPhone com a chave remota 'off' ou 'admin', nunca", () => {
+  it("plataforma: iPhone e site sim; Android nunca; iPhone com a chave remota 'off' ou 'admin', nunca", () => {
     const base2 = { ...base };
     plat.p = "ios"; _zerarHomeNova();
     expect(deveConvidarHomeNova(base2)).toBe(true);
     plat.p = "android"; _zerarHomeNova();
     expect(deveConvidarHomeNova(base2)).toBe(false);
+    plat.p = "web"; _zerarHomeNova();
+    expect(deveConvidarHomeNova(base2)).toBe(true); // 31/10 (dono): o convite também no site
     plat.p = "ios"; _zerarHomeNova(); localStorage.setItem(CHAVE_HOME_NOVA_APARELHO, "off");
     expect(deveConvidarHomeNova(base2)).toBe(false);
     _zerarHomeNova(); localStorage.setItem(CHAVE_HOME_NOVA_APARELHO, "admin");
@@ -155,7 +157,9 @@ describe("a regra (lib/home-nova)", () => {
     localStorage.clear(); plat.p = "android"; _zerarHomeNova();
     expect(homeNovaLigada(false, "antiga", "nova")).toBe(false); // Android: a Home de sempre
     plat.p = "web"; _zerarHomeNova();
-    expect(homeNovaLigada(null, null, "nova")).toBe(false); // 1.0.22: no site a escolha não vale (só iPhone nesta versão)
+    expect(homeNovaLigada(null, null, "nova")).toBe(false); // origem desconhecida: a escolha não vale (nunca na dúvida)
+    expect(homeNovaLigada(false, "antiga", "nova")).toBe(true); // 31/10: no site a escolha da conta antiga vale
+    expect(homeNovaLigada(false, "antiga", "classica")).toBe(false);
   });
   it("o formato gravado: objeto { home, em, via } (e a palavra solta); lixo = nada; o espelho é por conta", () => {
     expect(lerEscolhaDaHome({ home: "nova", em: "x", via: "voce" })).toBe("nova");
@@ -228,7 +232,7 @@ describe("o convite na Home clássica (site)", () => {
     expect(screen.queryByTestId("home-convite")).toBeNull();
   });
 
-  it("nunca por cima de outra camada: com uma folha aberta ele espera; a folha sai, ele aparece", async () => {
+  it("nunca por cima nem logo depois de outra camada: com uma folha aberta ele desiste desta abertura e volta na próxima", async () => {
     const outra = document.createElement("div");
     outra.setAttribute("role", "dialog"); outra.setAttribute("data-teste-camada", "");
     document.body.appendChild(outra);
@@ -238,6 +242,11 @@ describe("o convite na Home clássica (site)", () => {
     expect(screen.queryByTestId("home-convite")).toBeNull();
     expect(n.ler(CHAVE_HOME_CONVITE)).toBeUndefined(); // não conta como visto
     outra.remove();
+    await respirar(2900);
+    expect(screen.queryByTestId("home-convite")).toBeNull(); // 02/11: não abre logo depois (um popup atrás do outro)
+    expect(n.ler(CHAVE_HOME_CONVITE)).toBeUndefined();
+    cleanup();
+    await abrir(n); // próxima abertura, tela livre: aparece
     await waitFor(() => expect(screen.getByTestId("home-convite")).toBeTruthy(), ESPERA);
   });
 

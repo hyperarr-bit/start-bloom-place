@@ -1334,7 +1334,7 @@ export function PixCheckout({ offer, onClose, context, v2, funilB, backFunil }: 
       {pacote2027Ativo && step === "confirmed" && !pacote2027Fim && (
         <Suspense fallback={null}>
           <div className="fn u27 u27-sobre" data-testid="inicio-2027"><div className="fn-corpo">
-            <Fluxo2027 origem="inicio" compra={pix?.orderId ?? "inicio"} valorPago={Number(pix?.amount) || 27.9}
+            <Fluxo2027 origem="inicio" compra={pix?.orderId ?? "inicio"} valorPago={Number(pix?.amount) || 27.9} email={emailDoAcesso}
               onFim={(r) => setPacote2027Fim(r.pedido ? "pago" : "recusou")} />
           </div></div>
         </Suspense>

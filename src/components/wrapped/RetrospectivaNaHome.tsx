@@ -6,6 +6,8 @@ import { useUserData } from "@/hooks/use-user-data";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
 import { construirRetroMes, mesAnterior, type Leitor } from "@/lib/retrospectiva";
+import { retroOutubroAtiva } from "@/lib/retro-outubro";
+import { CartaoRetroNova } from "./CartaoRetroNova";
 import { FOIL, foilCss } from "./prancheta";
 import { Espiral, Lacre, P3, creme, kicker, linho, relevo, serif, vinheta } from "./pecas-planner";
 
@@ -55,6 +57,14 @@ export const RetrospectivaNaHome = ({ agora: agoraFixo }: { agora?: Date }) => {
   const mesMinusculo = retro.mes.toLowerCase();
   const MES = retro.mes.toUpperCase();
   const abrir = () => navigate(`/retrospectiva?mes=${encodeURIComponent(retro.mes)}&origem=home`);
+
+  // 02/11: com a retrospectiva nova ligada pro mês, o cartão ganha a cara dela (CartaoRetroNova) — o de planner ficou pros meses da antiga
+  if (retroOutubroAtiva(retro.ano, retro.mesIdx)) {
+    return (
+      <CartaoRetroNova mes={retro.mes} ano={retro.ano} mesIdx={retro.mesIdx} onAbrir={abrir}
+        onFechar={() => { trackEvent("wrapped_dismiss", { month: retro.mes, origem: "home" }); setDispensada(id); }} />
+    );
+  }
 
   return (
     <div

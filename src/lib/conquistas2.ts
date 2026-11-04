@@ -16,6 +16,7 @@
  *   3. a constante local: "on" no APP das lojas, "off" no site.
  */
 import { isNativeShell } from "@/lib/native-shell";
+import { homeNovaLigadaSincrona } from "@/lib/home-nova";
 
 export type ModoConquistas2 = "on" | "off";
 
@@ -75,5 +76,9 @@ export function conquistas2Ligada(): boolean {
   const f = modoDe(ls.get(CHAVE_FORCA_CONQUISTAS2));
   if (f) return f === "on";
   if (remota) return remota === "on";
-  return (isNativeShell() ? CONQUISTAS2_APP : CONQUISTAS2_WEB) === "on";
+  if (isNativeShell()) return CONQUISTAS2_APP === "on";
+  // 01/11 (dono: "quem tá com a home nova vê o conquistas antigo ainda, com o planner — tem que ser tudo novo"): no SITE,
+  // quem está na Home nova (conta nova do site ou conta antiga que escolheu a nova) vê as Conquistas novas e as festas
+  // delas; a Home de sempre segue com as de sempre.
+  return CONQUISTAS2_WEB === "on" || homeNovaLigadaSincrona();
 }

@@ -34,8 +34,8 @@ const semSorteio = (a: Record<string, string>) => { const { "data-pix": _p, "dat
 
 describe("o <head> da /oferta", () => {
   it("no código: CHECKOUT_STRIPE off, pk no placeholder, 6790, 12 parcelas", () => {
-    expect(HTML).toMatch(/var CHECKOUT_STRIPE = "off";/);
-    expect(HTML).toMatch(/var STRIPE_PK = "pk_live_PREENCHER";/);
+    expect(HTML).toMatch(/var CHECKOUT_STRIPE = "on";/);
+    expect(HTML).toMatch(/var STRIPE_PK = "pk_live_51TJnAQQdjmrIbUhHDSWqG1trOT6mFfV87AC4Vv47kFJTAFOhYsNmvryGRnf3x824Ke3mXSsWiFCovKPIR6Kqx0IX00VcuAawhC";/);
     expect(HTML).toMatch(/var STRIPE_PRECO_CENTAVOS = 6790;/);
     expect(HTML).toMatch(/var STRIPE_PARCELAS_MAX = 12;/);
     expect(pkStripeValida("pk_live_PREENCHER")).toBe(false);

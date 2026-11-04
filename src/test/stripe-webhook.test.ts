@@ -461,3 +461,22 @@ describe("CPF: 2ª trava no servidor, só na metadata do PI", () => {
     expect(tudo).not.toContain(VALIDO);
   });
 });
+
+describe("requires_action (3DS abandonado): a nova tentativa atualiza e-mail/CPF; a recarga só lê", () => {
+  it("com e-mail/CPF → GET + atualizar; sem (recarga) → só GET", async () => {
+    const REF = "0f8a5c2e-1111-4222-8333-944455556666";
+    const m = montar(); const s = stripeFalsa();
+    const p0 = validarPedidoStripe({ ref: REF })!;
+    await criarOuReaproveitar({ admin: m.admin as never, stripe: s.f, log: () => {} }, p0, metadataDoPedido(p0, { userId: null, ip: null, ua: null, agoraIso: "x" }), { userId: null, ip: null });
+    s.pis.get("pi_1")!.status = "requires_action";
+    let antes = s.chamadas.length;
+    await criarOuReaproveitar({ admin: m.admin as never, stripe: s.f, log: () => {} }, validarPedidoStripe({ ref: REF, pi: "pi_1" })!, {}, { userId: null, ip: null });
+    expect(s.chamadas.slice(antes)).toEqual(["GET payment_intents/pi_1"]);
+    antes = s.chamadas.length;
+    const p = validarPedidoStripe({ ref: REF, pi: "pi_1", email: "ana@exemplo.com", cpf: "529.982.247-25" })!;
+    const r = await criarOuReaproveitar({ admin: m.admin as never, stripe: s.f, log: () => {} }, p, metadataDoPedido(p, { userId: null, ip: null, ua: null, agoraIso: "x" }), { userId: null, ip: null });
+    expect(r.status).toBe(200);
+    expect(s.chamadas.slice(antes)).toEqual(["GET payment_intents/pi_1", "POST payment_intents/pi_1"]);
+    expect(s.pis.get("pi_1")!).toMatchObject({ receipt_email: "ana@exemplo.com", metadata: expect.objectContaining({ cpf: "52998224725", email: "ana@exemplo.com" }) });
+  });
+});

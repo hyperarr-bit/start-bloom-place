@@ -403,3 +403,25 @@ describe("CPF no checkout da /oferta", () => {
     expect(JSON.stringify((confirmados[0].args[0] as Record<string, unknown>).confirmParams)).not.toContain(VALIDO); // nada de tax_id na Stripe.js
   });
 });
+
+describe("CPF: colar com texto e vazio", () => {
+  it("colar 'CPF: 529.982.247-25' não corta (sem maxlength; a máscara limita a 11 dígitos)", async () => {
+    await abrirPagina({ pedeCpf: true });
+    await abrirCheckout();
+    const cpf = document.getElementById("oc-cpf") as HTMLInputElement;
+    expect(cpf.hasAttribute("maxlength")).toBe(false);
+    cpf.value = "CPF: 529.982.247-25"; cpf.dispatchEvent(new Event("input"));
+    expect(cpf.value).toBe("529.982.247-25");
+  });
+  it("vazio → 'Digite seu CPF (pra nota fiscal).'", async () => {
+    await abrirPagina({ pedeCpf: true });
+    await abrirCheckout();
+    const email = document.getElementById("oc-email") as HTMLInputElement;
+    email.value = "maria@gmail.com"; email.dispatchEvent(new Event("input"));
+    (document.getElementById("oc-pagar") as HTMLButtonElement).click();
+    await dormir(30);
+    expect(document.getElementById("oc-cpf-erro")!.textContent).toBe("Digite seu CPF (pra nota fiscal).");
+    expect(confirmados).toHaveLength(0);
+    expect(dos("landing_cpf_erro")[0]).toEqual(expect.objectContaining({ motivo: "vazio" }));
+  });
+});

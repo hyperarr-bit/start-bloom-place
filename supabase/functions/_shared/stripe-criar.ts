@@ -161,7 +161,9 @@ export async function criarOuReaproveitar(
     if (String(j.status) !== "canceled") await registrar(j.id);
   }
   if (String(j.status) === "canceled") return { status: 502, corpo: { ok: false } };
-  if (PODE_ATUALIZAR.has(String(j.status))) {
+  // requires_action (3DS abandonado / Pix gerado) também aceita mudar metadata e receipt_email na Stripe — só quando é uma NOVA
+  // tentativa de pagar (veio e-mail ou CPF); a recarga só lê (o Pix pendente fica intacto)
+  if (PODE_ATUALIZAR.has(String(j.status)) || (String(j.status) === "requires_action" && (p.email || p.cpf))) {
     const up = await stripe(`payment_intents/${j.id}`, paramsAtualizar(md, p.email, (j.metadata ?? {}) as Record<string, string>, p.cpf));
     if (up.ok) j = up.j;
     else {

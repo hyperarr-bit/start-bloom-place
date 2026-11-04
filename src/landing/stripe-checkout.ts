@@ -302,7 +302,7 @@ function telaForm() {
     <button type="button" class="oc-sug" id="oc-sug" hidden></button>
     <p class="oc-erro" id="oc-email-erro" role="alert" hidden></p>
     ${o.pedeCpf ? `<label class="oc-rot" for="oc-cpf">CPF <span>· pra nota fiscal</span></label>
-    <input class="oc-campo" id="oc-cpf" type="text" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00" value="${esc(mascararCpf(est!.cpf))}" />
+    <input class="oc-campo" id="oc-cpf" type="text" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00" value="${esc(mascararCpf(est!.cpf))}" />
     <p class="oc-erro" id="oc-cpf-erro" role="alert" hidden></p>` : ""}
     <div class="oc-pe" id="oc-pe"><div class="oc-pe-carregando">Carregando o pagamento…</div></div>
     <p class="oc-erro" id="oc-erro" role="alert" hidden></p>
@@ -376,7 +376,8 @@ async function pagar() {
   if (o.pedeCpf) {
     const campoCpf = raiz!.querySelector<HTMLInputElement>("#oc-cpf");
     cpf = soDigitosCpf(campoCpf?.value);
-    if (!cpfValido(cpf)) { erroCpf("Confira o CPF: os números não batem."); campoCpf?.focus(); o.evento("landing_cpf_erro", { motivo: cpf.length ? "invalido" : "vazio" }); return; }
+    if (!cpf) { erroCpf("Digite seu CPF (pra nota fiscal)."); campoCpf?.focus(); o.evento("landing_cpf_erro", { motivo: "vazio" }); return; }
+    if (!cpfValido(cpf)) { erroCpf("Confira o CPF: os números não batem."); campoCpf?.focus(); o.evento("landing_cpf_erro", { motivo: "invalido" }); return; }
     est.cpf = cpf;
   }
   if (!stripe || !elementos || !est.clientSecret) { erroGeral("O pagamento ainda está carregando. Tente de novo em instantes."); return; }

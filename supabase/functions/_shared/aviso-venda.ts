@@ -39,7 +39,7 @@ export type Venda = {
   chave: string;
   origem: Origem;
   /** 04/11: venda do site pela Hotmart (/vida) — origem "pix" (é venda do SITE), cobrada pela Hotmart (outra taxa) */
-  gateway?: "hotmart";
+  gateway?: "hotmart" | "stripe"; // 04/11: + stripe (/oferta)
   valor_cents: number;
   plano: string;
   renovacao: boolean;
@@ -80,7 +80,7 @@ export const NOME_ORIGEM: Record<Origem, string> = { pix: "Pix do site", apple: 
 
 /** Título da notificação: "💰 Venda · R$ 27,90 · Pix do site (1 ano)" / "💰 Venda · R$ 97,90 · Apple anual". */
 export function tituloVenda(v: Pick<Venda, "origem" | "valor_cents" | "plano" | "renovacao"> & { gateway?: Venda["gateway"] }): string {
-  const rotulo = v.origem === "pix" ? (v.gateway === "hotmart" ? `Hotmart do site (${v.plano})` : `Pix do site (${v.plano})`) : `${NOME_ORIGEM[v.origem]} ${v.plano}`;
+  const rotulo = v.origem === "pix" ? (v.gateway === "hotmart" ? `Hotmart do site (${v.plano})` : v.gateway === "stripe" ? `Stripe do site (${v.plano})` : `Pix do site (${v.plano})`) : `${NOME_ORIGEM[v.origem]} ${v.plano}`;
   return `💰 ${v.renovacao ? "Renovação" : "Venda"} · ${reais(v.valor_cents)} · ${rotulo}`;
 }
 
@@ -94,7 +94,7 @@ export function dadosPush(titulo: string, corpo: string, tag: string) {
 }
 
 /** Pix do site: a linha conta como venda? 04/11: a venda da /vida pela Hotmart (payment_method "hotmart") também é venda do site. */
-export const PAGAMENTOS_SITE: readonly string[] = ["pix", "hotmart"];
+export const PAGAMENTOS_SITE: readonly string[] = ["pix", "hotmart", "stripe"]; // 04/11: + stripe (/oferta)
 export function vendaPix(l: LinhaSub): Venda | null {
   if (!PAGAMENTOS_SITE.includes(String(l.payment_method ?? "")) || l.status !== "active") return null;
   const cents = Number(l.amount_cents ?? 0);
@@ -102,7 +102,7 @@ export function vendaPix(l: LinhaSub): Venda | null {
   return {
     chave: `pix:${l.abacatepay_billing_id || l.id}`,
     origem: "pix",
-    ...(l.payment_method === "hotmart" ? { gateway: "hotmart" as const } : {}),
+    ...(l.payment_method === "hotmart" ? { gateway: "hotmart" as const } : l.payment_method === "stripe" ? { gateway: "stripe" as const } : {}),
     valor_cents: cents,
     plano: rotuloPlano(l, "pix"),
     renovacao: false,

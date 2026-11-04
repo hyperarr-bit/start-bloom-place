@@ -17,7 +17,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { PAGAMENTOS_SITE, diaBRT, ehEmailTeste, inicioDiaBRT, somaDias, type LinhaSub, type Origem } from "../_shared/aviso-venda.ts";
 import {
   desfecho, funilLanding, gastoPorDia, INICIO_DIAS, linhaCampanha, montarTurmasDesde, normalizarLoja, resumoDoDia, roiWeb, vendasDoDia,
-  vidaPorBraco, type EstadoRC, type EventoLanding, type EventoVida, type InfoCampanha, type InsightMeta,
+  vidaPorBraco, funilOferta, type VendaStripe, type EstadoRC, type EventoLanding, type EventoVida, type InfoCampanha, type InsightMeta,
 } from "../_shared/vendas-painel.ts";
 
 const cors = {
@@ -123,12 +123,16 @@ async function fontesDeVenda(admin: Admin, desde: string) {
     for (const l of (data ?? []) as LinhaSub[]) if (l.revenuecat_subscription_id) linhaPorTx.set(l.revenuecat_subscription_id, l);
   }
   const { data: renov } = await admin.from("venda_avisada").select("chave,origem,valor_cents,plano,criado_em").eq("renovacao", true).gte("criado_em", ini);
-  return { pix, marcadores, linhaPorTx, renov: (renov ?? []) as Array<{ chave: string; origem: Origem; valor_cents: number; plano: string; criado_em: string }> };
+  // 04/11 (Stripe): o método de cada PI (stripe_venda) — a taxa do Pix da Stripe é outra
+  const { data: stv } = await admin.from("analytics_events").select("pi:event_data->>pi,metodo:event_data->>metodo").eq("event_name", "stripe_venda").gte("created_at", ini).limit(5000);
+  const metodoStripe = new Map<string, "pix" | "card">();
+  for (const r of (stv ?? []) as Array<{ pi: string | null; metodo: string | null }>) if (r.pi && (r.metodo === "pix" || r.metodo === "card")) metodoStripe.set(r.pi, r.metodo);
+  return { pix, marcadores, linhaPorTx, metodoStripe, renov: (renov ?? []) as Array<{ chave: string; origem: Origem; valor_cents: number; plano: string; criado_em: string }> };
 }
 
 async function abaVendas(admin: Admin, hoje: string) {
   const f = await fontesDeVenda(admin, hoje);
-  return { dia: hoje, ...vendasDoDia(f.pix, f.marcadores, f.linhaPorTx, f.renov, hoje) };
+  return { dia: hoje, ...vendasDoDia(f.pix, f.marcadores, f.linhaPorTx, f.renov, hoje, f.metodoStripe) };
 }
 
 /** As turmas do iPhone de `desde` até hoje + o gasto de app/site por dia (uma ida só ao RevenueCat e à Meta). */
@@ -151,7 +155,7 @@ async function abaDias(admin: Admin, hoje: string) {
   const vazia = { testes: 0, pagaram: 0, situacao: "fechada", liquido: 0, gasto: 0 };
   const dias = t.turmas.filter((tu) => tu.dia >= INICIO_DIAS).map((tu) => {
     const cobrada = porDia.get(somaDias(tu.dia, -3));
-    return resumoDoDia(vendasDoDia(f.pix, f.marcadores, f.linhaPorTx, f.renov, tu.dia), tu.dia, t.gastoSite[tu.dia] ?? 0, cobrada ? { ...cobrada } : { ...vazia, dia: somaDias(tu.dia, -3) });
+    return resumoDoDia(vendasDoDia(f.pix, f.marcadores, f.linhaPorTx, f.renov, tu.dia, f.metodoStripe), tu.dia, t.gastoSite[tu.dia] ?? 0, cobrada ? { ...cobrada } : { ...vazia, dia: somaDias(tu.dia, -3) });
   });
   const soma = (g: (d: (typeof dias)[number]) => number) => Math.round(dias.reduce((s, d) => s + g(d), 0) * 100) / 100;
   return {
@@ -203,7 +207,7 @@ async function abaWeb(admin: Admin, hoje: string) {
   const roi = roiWeb(subs, gastoPorDia(ins.linhas, "site", SITE_EXTRA), hoje);
   const eventos = await todas<EventoLanding>((a, b) => admin.from("analytics_events")
     .select("event_name,sid:event_data->>landing_session_id,termo:event_data->>utm_term,simulado:event_data->>simulado,order_id:event_data->>order_id,pagina:event_data->>pagina,braco:event_data->>braco_vida")
-    .in("event_name", ["landing_html", "landing_oferta_vista", "landing_pix_gerado", "landing_pix_pago", "landing_hotmart_redirect"])
+    .in("event_name", ["landing_html", "landing_oferta_vista", "landing_pix_gerado", "landing_pix_pago", "landing_hotmart_redirect", "landing_stripe_aberto"])
     .gte("created_at", inicioDiaBRT(hoje)).range(a, b), 30000);
   const pagos = new Set(subs.filter((s) => diaBRT(s.created_at ?? "") === hoje && s.abacatepay_billing_id).map((s) => String(s.abacatepay_billing_id)));
   // 04/11: a /vida (pagina:"vida") num funil próprio; "pagou" lá = as vendas da Hotmart de hoje (a ref do pedido não volta pro evento)
@@ -214,7 +218,12 @@ async function abaWeb(admin: Admin, hoje: string) {
   const { data: vendasHm } = await admin.from("analytics_events").select("tx:event_data->>tx,braco:event_data->>braco_vida,valor_cents:event_data->>valor_cents")
     .eq("event_name", "hotmart_venda").gte("created_at", inicioDiaBRT(hoje)).limit(2000);
   const vida = { ...funilLanding(eventos, pagos, "vida"), pagou: hotmartHoje, bracos: vidaPorBraco(eventos as EventoVida[], (vendasHm ?? []) as Array<{ tx: string | null; braco: string | null; valor_cents: string | null }>, txHotmartAtivas) };
-  return { dia: hoje, ...roi, landing: funilLanding(eventos, pagos), vida, errosMeta: ins.erros };
+  // 04/11: a /oferta (Stripe) — só vale o PI ativo em subscriptions (forjado, estornado e teste ficam fora)
+  const piStripeAtivos = new Set(subs.filter((s) => s.payment_method === "stripe" && s.status === "active" && s.abacatepay_billing_id && !ehEmailTeste(s.customer_email)).map((s) => String(s.abacatepay_billing_id)));
+  const { data: vendasSt } = await admin.from("analytics_events").select("pi:event_data->>pi,valor_cents:event_data->>valor_cents,metodo:event_data->>metodo")
+    .eq("event_name", "stripe_venda").gte("created_at", inicioDiaBRT(hoje)).limit(2000);
+  const oferta = funilOferta(eventos, (vendasSt ?? []) as VendaStripe[], piStripeAtivos);
+  return { dia: hoje, ...roi, landing: funilLanding(eventos, pagos), vida, oferta, errosMeta: ins.erros };
 }
 
 /* ---------------------------------------------------------------- servidor */

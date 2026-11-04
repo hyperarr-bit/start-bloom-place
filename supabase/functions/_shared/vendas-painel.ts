@@ -281,15 +281,39 @@ export function vidaPorBraco(eventos: EventoVida[], vendasBrutas: Array<{ braco?
   return out;
 }
 
+/* 04/11: a /oferta (Stripe) — visitas, abriram o checkout, pagaram (stripe_venda com PI ativo em subscriptions), R$ por visita,
+ * Pix × cartão. */
+export type VendaStripe = { pi?: string | null; valor_cents?: number | string | null; metodo?: string | null };
+export function funilOferta(eventos: EventoLanding[], vendasBrutas: VendaStripe[], piValidos: Set<string>) {
+  const robos = new Set<string>();
+  for (const e of eventos) if (e.sid && /right_column/i.test(e.termo ?? "")) robos.add(e.sid);
+  const visitas = new Set<string>(), abriram = new Set<string>();
+  for (const e of eventos) {
+    if (!e.sid || robos.has(e.sid) || e.pagina !== "oferta") continue;
+    visitas.add(e.sid);
+    if (e.event_name === "landing_stripe_aberto") abriram.add(e.sid);
+  }
+  const vistos = new Set<string>();
+  const vendas = vendasBrutas.filter((v) => { const p = String(v.pi ?? ""); if (!p || !piValidos.has(p) || vistos.has(p)) return false; vistos.add(p); return true; });
+  const receita = Math.round(vendas.reduce((s, v) => s + Number(v.valor_cents ?? 0), 0)) / 100;
+  return {
+    visitas: visitas.size, abriramCheckout: abriram.size, pagaram: vendas.length, receita,
+    porVisita: visitas.size ? Math.round((receita / visitas.size) * 100) / 100 : null,
+    pix: vendas.filter((v) => v.metodo === "pix").length, cartao: vendas.filter((v) => v.metodo === "card").length,
+  };
+}
+
 /* ------------------------------------------------------------------ vendas de hoje */
 
-export type ItemVenda = { hora: string; valor_cents: number; origem: Origem; plano: string; renovacao: boolean; gateway?: "hotmart" };
+export type ItemVenda = { hora: string; valor_cents: number; origem: Origem; plano: string; renovacao: boolean; gateway?: "hotmart" | "stripe"; metodo?: "pix" | "card" };
 export function vendasDoDia(
   subsPix: LinhaSub[],
   marcadores: Array<{ event_name: string; event_data: { tx?: string; valor?: number } | null; created_at: string }>,
   linhaPorTx: Map<string, LinhaSub>,
   renovacoes: Array<{ chave: string; origem: Origem; valor_cents: number; plano: string; criado_em: string }>,
   hoje: string,
+  /** 04/11 (Stripe): o método de cada PI (stripe_venda) — a taxa do Pix é outra; sem o método conta como cartão (a maior) */
+  metodoStripe: Map<string, "pix" | "card"> = new Map(),
 ): { itens: ItemVenda[]; total_cents: number; porOrigem: Record<Origem, { n: number; cents: number }> } {
   const vistas = new Set<string>();
   const itens: ItemVenda[] = [];
@@ -299,7 +323,8 @@ export function vendasDoDia(
     const v = vendaPix(s);
     if (!v || vistas.has(v.chave)) continue;
     vistas.add(v.chave);
-    itens.push({ hora: hora(v.quando), valor_cents: v.valor_cents, origem: "pix", plano: v.plano, renovacao: false, ...(v.gateway ? { gateway: v.gateway } : {}) });
+    const met = v.gateway === "stripe" ? metodoStripe.get(String(s.abacatepay_billing_id ?? "")) : undefined;
+    itens.push({ hora: hora(v.quando), valor_cents: v.valor_cents, origem: "pix", plano: v.plano, renovacao: false, ...(v.gateway ? { gateway: v.gateway } : {}), ...(met ? { metodo: met } : {}) });
   }
   for (const m of marcadores) {
     if (diaBRT(m.created_at) !== hoje) continue;
@@ -334,9 +359,15 @@ export const TAXA_PIX_CENTS = 199;
  *  97,90 → 87,21 líquido. */
 export const TAXA_HOTMART_PCT = 0.099;
 export const TAXA_HOTMART_FIXA_CENTS = 100;
-/** A taxa de UMA venda do site, pelo gateway (Asaas no Pix próprio; Hotmart na /vida). */
-export function taxaSiteCents(i: Pick<ItemVenda, "valor_cents" | "gateway">): number {
+/** 04/11: taxas da STRIPE (/oferta) — CONFERIR com a conta (tabela BR pública): cartão 3,99% + R$ 0,39; Pix 1,19%. O parcelamento
+ *  no cartão (installments) é cobrado à parte quando o LOJISTA absorve os juros — CONFERIR na conta e somar aqui se for o caso. */
+export const TAXA_STRIPE_CARTAO_PCT = 0.0399;
+export const TAXA_STRIPE_CARTAO_FIXA_CENTS = 39;
+export const TAXA_STRIPE_PIX_PCT = 0.0119;
+/** A taxa de UMA venda do site, pelo gateway (Asaas no Pix próprio; Hotmart na /vida; Stripe na /oferta). */
+export function taxaSiteCents(i: Pick<ItemVenda, "valor_cents" | "gateway"> & { metodo?: ItemVenda["metodo"] }): number {
   if (i.gateway === "hotmart") return Math.round(i.valor_cents * TAXA_HOTMART_PCT) + TAXA_HOTMART_FIXA_CENTS;
+  if (i.gateway === "stripe") return i.metodo === "pix" ? Math.round(i.valor_cents * TAXA_STRIPE_PIX_PCT) : Math.round(i.valor_cents * TAXA_STRIPE_CARTAO_PCT) + TAXA_STRIPE_CARTAO_FIXA_CENTS;
   return TAXA_PIX_CENTS;
 }
 

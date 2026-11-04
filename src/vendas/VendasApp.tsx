@@ -30,7 +30,7 @@ type Campanha = {
 };
 type RespCampanhas = { periodo: string; desde: string; ate: string; campanhas: Campanha[]; fusos: Record<string, string>; errosMeta: string[]; totais: { gasto: number; gastoApp: number; testes: number; custoPorTeste: number | null } };
 type PeriodoWeb = { vendas: number; receita: number; gasto: number; retorno: number | null; cor: Cor };
-type RespWeb = { dia: string; hoje: PeriodoWeb; semana: PeriodoWeb; dias: Array<PeriodoWeb & { dia: string }>; landing: { sessoes: number; viuOferta: number; gerouPix: number; pagou: number; robos: number }; vida?: { sessoes: number; viuOferta: number; gerouPix: number; foiHotmart?: number; pagou: number; bracos?: Record<"v3" | "atual" | "sem_braco", BracoVida> }; errosMeta: string[] };
+type RespWeb = { dia: string; hoje: PeriodoWeb; semana: PeriodoWeb; dias: Array<PeriodoWeb & { dia: string }>; landing: { sessoes: number; viuOferta: number; gerouPix: number; pagou: number; robos: number }; oferta?: { visitas: number; abriramCheckout: number; pagaram: number; receita: number; porVisita: number | null; pix: number; cartao: number }; vida?: { sessoes: number; viuOferta: number; gerouPix: number; foiHotmart?: number; pagou: number; bracos?: Record<"v3" | "atual" | "sem_braco", BracoVida> }; errosMeta: string[] };
 
 type DiaResumo = {
   dia: string; vendido: number; vendas: number; porOrigem: Record<Origem, { n: number; valor: number }>;
@@ -551,6 +551,16 @@ function AbaWeb({ d }: { d: RespWeb }) {
           {d.vida.bracos && <VidaPorBraco b={d.vida.bracos} />}
         </article>
       )}
+      {d.oferta && d.oferta.visitas > 0 && (
+        <article className="v-cartao" data-testid="oferta-stripe">
+          {/* 04/11: a /oferta (página atual a R$ 67,90 + checkout Stripe em tela cheia) */}
+          <div className="v-titulo">Landing /oferta (Stripe) · hoje</div>
+          <ul className="v-lista">
+            <li><span className="v-hora">visitas</span><span className="v-plano">{num(d.oferta.visitas)} · {num(d.oferta.abriramCheckout)} abriram o checkout · {num(d.oferta.pagaram)} pagaram</span><span className="v-valor">{d.oferta.porVisita === null ? "—" : `${brl(d.oferta.porVisita)}/visita`}</span></li>
+            <li><span className="v-hora">método</span><span className="v-plano">{num(d.oferta.pix)} Pix · {num(d.oferta.cartao)} cartão</span><span className="v-valor">{brl(d.oferta.receita)}</span></li>
+          </ul>
+        </article>
+      )}
       <article className="v-cartao">
         <div className="v-titulo">Dia a dia</div>
         <ul className="v-lista v-lista-dias">
@@ -563,7 +573,7 @@ function AbaWeb({ d }: { d: RespWeb }) {
           ))}
         </ul>
       </article>
-      <p className="v-nota">Web = vendas do site do banco (Pix e Hotmart, valor real) ÷ gasto das campanhas de site (objetivo de vendas/tráfego) nas 2 contas.</p>
+      <p className="v-nota">Web = vendas do site do banco (Pix, Hotmart e Stripe, valor real) ÷ gasto das campanhas de site (objetivo de vendas/tráfego) nas 2 contas.</p>
       <Erros e={d.errosMeta} />
     </section>
   );

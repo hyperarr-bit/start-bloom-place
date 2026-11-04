@@ -76,7 +76,7 @@
         // 04/11 (dono): /vida — a v3 num LINK PRÓPRIO pagando pela Hotmart. "off" = /vida com o Pix próprio de R$ 27,90 (fallback);
         // "on" = checkout Hotmart. O /organizar NÃO lê nada disto. Rollback: "off". Ver src/landing/hotmart.ts.
         var CHECKOUT_HOTMART = "on";
-        var HOTMART_CHECKOUT_URL = "https://pay.hotmart.com/K108338476R"; // 04/11: o checkout do produto 8885020 (dono). Com "PREENCHER" (ou URL inválida) o botão cai no Pix próprio
+        var HOTMART_CHECKOUT_URL = "https://pay.hotmart.com/K108338476R?checkoutMode=10"; // 04/11: o checkout do produto 8885020 (dono). Com "PREENCHER" (ou URL inválida) o botão cai no Pix próprio
         var HOTMART_PRECO_CENTAVOS = 9790; // o preço do braço Hotmart (todo texto dele sai daqui; o HTML traz o mesmo número escrito — teste confere)
         var HOTMART_PARCELAS_TEXTO = "Pix ou cartão, em até 12x"; // "" desliga a linha (se o dono não liberar parcelamento na Hotmart)
         var d = document.documentElement, q = null, mem = {};

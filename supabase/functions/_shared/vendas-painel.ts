@@ -233,27 +233,30 @@ export function roiWeb(subsPix: LinhaSub[], gastoSite: Record<string, number>, h
   return { hoje: periodo([hoje]), semana: periodo(semana), dias: semana.map((d) => ({ dia: d, ...periodo([d]) })).reverse() };
 }
 
-export type EventoLanding = { event_name: string; sid?: string | null; termo?: string | null; simulado?: string | boolean | null; order_id?: string | null };
-/** Funil da landing /organizar: sessões reais → viu a oferta → gerou Pix → pagou. */
-export function funilLanding(eventos: EventoLanding[], pedidosPagos: Set<string> = new Set()) {
+export type EventoLanding = { event_name: string; sid?: string | null; termo?: string | null; simulado?: string | boolean | null; order_id?: string | null; pagina?: string | null };
+/** Funil da landing /organizar: sessões reais → viu a oferta → gerou Pix → pagou.
+ *  04/11: `pagina` separa a /vida (eventos com pagina:"vida") do /organizar (sem pagina) — nunca se misturam.
+ *  foiHotmart = sessões que tocaram no botão da Hotmart (landing_hotmart_redirect; só a /vida com a chave ligada). */
+export function funilLanding(eventos: EventoLanding[], pedidosPagos: Set<string> = new Set(), pagina: string | null = null) {
   const robos = new Set<string>();
   for (const e of eventos) if (e.sid && /right_column/i.test(e.termo ?? "")) robos.add(e.sid);
-  const sessoes = new Set<string>(), oferta = new Set<string>(), pix = new Set<string>(), pagou = new Set<string>();
+  const sessoes = new Set<string>(), oferta = new Set<string>(), pix = new Set<string>(), pagou = new Set<string>(), hotmart = new Set<string>();
   const simulado = (v: EventoLanding["simulado"]) => v === true || v === "true";
   for (const e of eventos) {
     const s = e.sid;
-    if (!s || robos.has(s)) continue;
+    if (!s || robos.has(s) || (e.pagina || null) !== pagina) continue;
+    if (e.event_name === "landing_hotmart_redirect") hotmart.add(s);
     sessoes.add(s);
     if (e.event_name === "landing_oferta_vista") oferta.add(s);
     if (e.event_name === "landing_pix_gerado" && !simulado(e.simulado)) { pix.add(s); if (e.order_id && pedidosPagos.has(e.order_id)) pagou.add(s); }
     if (e.event_name === "landing_pix_pago" && !simulado(e.simulado)) pagou.add(s);
   }
-  return { sessoes: sessoes.size, viuOferta: oferta.size, gerouPix: pix.size, pagou: pagou.size, robos: robos.size };
+  return { sessoes: sessoes.size, viuOferta: oferta.size, gerouPix: pix.size, foiHotmart: hotmart.size, pagou: pagou.size, robos: robos.size };
 }
 
 /* ------------------------------------------------------------------ vendas de hoje */
 
-export type ItemVenda = { hora: string; valor_cents: number; origem: Origem; plano: string; renovacao: boolean };
+export type ItemVenda = { hora: string; valor_cents: number; origem: Origem; plano: string; renovacao: boolean; gateway?: "hotmart" };
 export function vendasDoDia(
   subsPix: LinhaSub[],
   marcadores: Array<{ event_name: string; event_data: { tx?: string; valor?: number } | null; created_at: string }>,
@@ -269,7 +272,7 @@ export function vendasDoDia(
     const v = vendaPix(s);
     if (!v || vistas.has(v.chave)) continue;
     vistas.add(v.chave);
-    itens.push({ hora: hora(v.quando), valor_cents: v.valor_cents, origem: "pix", plano: v.plano, renovacao: false });
+    itens.push({ hora: hora(v.quando), valor_cents: v.valor_cents, origem: "pix", plano: v.plano, renovacao: false, ...(v.gateway ? { gateway: v.gateway } : {}) });
   }
   for (const m of marcadores) {
     if (diaBRT(m.created_at) !== hoje) continue;
@@ -299,6 +302,16 @@ export const IMPOSTO_META = 0.1215;
 export const IMPOSTO_EMPRESA = 0.155;
 /** Taxa do Asaas por Pix (27,90 → 25,91 líquido, dono 01/11). */
 export const TAXA_PIX_CENTS = 199;
+/** 04/11: taxa da HOTMART por venda (/vida): 9,9% + R$ 1,00 sobre o valor real — CONFERIR COM O CONTRATO (o webhook também
+ *  traz `commissions` com a parte do produtor; quando o dono confirmar, dá pra trocar a estimativa pelo número da Hotmart).
+ *  97,90 → 87,21 líquido. */
+export const TAXA_HOTMART_PCT = 0.099;
+export const TAXA_HOTMART_FIXA_CENTS = 100;
+/** A taxa de UMA venda do site, pelo gateway (Asaas no Pix próprio; Hotmart na /vida). */
+export function taxaSiteCents(i: Pick<ItemVenda, "valor_cents" | "gateway">): number {
+  if (i.gateway === "hotmart") return Math.round(i.valor_cents * TAXA_HOTMART_PCT) + TAXA_HOTMART_FIXA_CENTS;
+  return TAXA_PIX_CENTS;
+}
 
 /** Turmas de `inicio` até hoje (a mais nova primeiro): fechada (cobrou), fecha hoje (D = hoje−3) ou aberta. */
 export function montarTurmasDesde(linhas: LinhaLoja[], rc: Map<string, EstadoRC>, gastoAppPorDia: Record<string, number>, hoje: string, inicio: string): Array<Omit<Turma, "situacao"> & { situacao: Turma["situacao"] | "fechada" }> {
@@ -339,7 +352,7 @@ export function resumoDoDia(
 ): DiaResumo {
   const pixItens = vendas.itens.filter((i) => i.origem === "pix");
   const bruto = pixItens.reduce((s, i) => s + i.valor_cents, 0) / 100;
-  const liqPix = pixItens.reduce((s, i) => s + Math.max(0, i.valor_cents - TAXA_PIX_CENTS), 0) / 100;
+  const liqPix = pixItens.reduce((s, i) => s + Math.max(0, i.valor_cents - taxaSiteCents(i)), 0) / 100;
   const gCom = gastoSite * (1 + IMPOSTO_META);
   const impSite = bruto * IMPOSTO_EMPRESA;
   const lucroSite = liqPix - gCom - impSite;

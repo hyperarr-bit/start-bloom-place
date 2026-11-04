@@ -151,7 +151,7 @@ describe("web", () => {
       { event_name: "landing_html", sid: "robo", termo: "Instagram_Right_Column" }, { event_name: "landing_oferta_vista", sid: "robo", termo: "Instagram_Right_Column" },
       { event_name: "landing_html", sid: null },
     ];
-    expect(funilLanding(ev, new Set(["pay_1"]))).toEqual({ sessoes: 3, viuOferta: 2, gerouPix: 2, pagou: 2, robos: 1 });
+    expect(funilLanding(ev, new Set(["pay_1"]))).toEqual({ sessoes: 3, viuOferta: 2, gerouPix: 2, foiHotmart: 0, pagou: 2, robos: 1 }); // 04/11: + foiHotmart (só a /vida)
   });
 });
 

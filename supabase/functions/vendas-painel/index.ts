@@ -14,7 +14,7 @@
  */
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { diaBRT, inicioDiaBRT, somaDias, type LinhaSub, type Origem } from "../_shared/aviso-venda.ts";
+import { PAGAMENTOS_SITE, diaBRT, ehEmailTeste, inicioDiaBRT, somaDias, type LinhaSub, type Origem } from "../_shared/aviso-venda.ts";
 import {
   desfecho, funilLanding, gastoPorDia, INICIO_DIAS, linhaCampanha, montarTurmasDesde, normalizarLoja, resumoDoDia, roiWeb, vendasDoDia,
   type EstadoRC, type EventoLanding, type InfoCampanha, type InsightMeta,
@@ -113,7 +113,7 @@ async function todas<T>(consulta: (de: number, ate: number) => PromiseLike<{ dat
 /** O que alimenta o "Vendas de hoje", de `desde` até agora (Pix, marcadores das lojas, renovações avisadas). */
 async function fontesDeVenda(admin: Admin, desde: string) {
   const ini = inicioDiaBRT(desde);
-  const pix = await todas<LinhaSub>((a, b) => admin.from("subscriptions").select(COLS).eq("payment_method", "pix").gte("created_at", ini).range(a, b));
+  const pix = await todas<LinhaSub>((a, b) => admin.from("subscriptions").select(COLS).in("payment_method", PAGAMENTOS_SITE as string[]).gte("created_at", ini).range(a, b)); // 04/11: + "hotmart" (/vida)
   const marcadores = await todas<{ event_name: string; event_data: { tx?: string; valor?: number } | null; created_at: string }>((a, b) =>
     admin.from("analytics_events").select("event_name,event_data,created_at").eq("event_name", "meta_capi_app_enviado").gte("created_at", ini).range(a, b));
   const txs = [...new Set(marcadores.map((m) => String(m.event_data?.tx ?? "")).filter(Boolean))];
@@ -202,11 +202,14 @@ async function abaWeb(admin: Admin, hoje: string) {
   const ins = await insightsPorDia(desde, hoje);
   const roi = roiWeb(subs, gastoPorDia(ins.linhas, "site", SITE_EXTRA), hoje);
   const eventos = await todas<EventoLanding>((a, b) => admin.from("analytics_events")
-    .select("event_name,sid:event_data->>landing_session_id,termo:event_data->>utm_term,simulado:event_data->>simulado,order_id:event_data->>order_id")
-    .in("event_name", ["landing_html", "landing_oferta_vista", "landing_pix_gerado", "landing_pix_pago"])
+    .select("event_name,sid:event_data->>landing_session_id,termo:event_data->>utm_term,simulado:event_data->>simulado,order_id:event_data->>order_id,pagina:event_data->>pagina")
+    .in("event_name", ["landing_html", "landing_oferta_vista", "landing_pix_gerado", "landing_pix_pago", "landing_hotmart_redirect"])
     .gte("created_at", inicioDiaBRT(hoje)).range(a, b), 30000);
   const pagos = new Set(subs.filter((s) => diaBRT(s.created_at ?? "") === hoje && s.abacatepay_billing_id).map((s) => String(s.abacatepay_billing_id)));
-  return { dia: hoje, ...roi, landing: funilLanding(eventos, pagos), errosMeta: ins.erros };
+  // 04/11: a /vida (pagina:"vida") num funil próprio; "pagou" lá = as vendas da Hotmart de hoje (a ref do pedido não volta pro evento)
+  const hotmartHoje = subs.filter((s) => s.payment_method === "hotmart" && diaBRT(s.created_at ?? "") === hoje && !ehEmailTeste(s.customer_email)).length;
+  const vida = { ...funilLanding(eventos, pagos, "vida"), pagou: hotmartHoje };
+  return { dia: hoje, ...roi, landing: funilLanding(eventos, pagos), vida, errosMeta: ins.erros };
 }
 
 /* ---------------------------------------------------------------- servidor */

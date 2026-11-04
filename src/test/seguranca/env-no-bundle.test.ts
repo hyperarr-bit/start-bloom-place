@@ -73,7 +73,8 @@ describe("cabeçalhos de segurança do site (vercel.json)", () => {
   it("as rotas continuam as mesmas", () => {
     // 28/10: + /organizar → /landing.html (a landing nova, desligada por LANDING_NOVA; a página não carrega o app)
     // 29/10: + /vendas e /vendas/ → /vendas.html (o painel e o aviso de venda do dono, PWA própria)
-    expect(cfg.rewrites).toHaveLength(6);
+    // 04/11: + /vida → /landing.html e /vida/obrigado → /vida-obrigado.html (a LP v3 com checkout Hotmart, link próprio)
+    expect(cfg.rewrites).toHaveLength(8);
     expect((cfg.rewrites as Array<{ source: string }>).map((r) => r.source)).toContain("/organizar");
     expect((cfg.rewrites as Array<{ source: string }>).map((r) => r.source)).toContain("/vendas");
   });

@@ -30,7 +30,7 @@ type Campanha = {
 };
 type RespCampanhas = { periodo: string; desde: string; ate: string; campanhas: Campanha[]; fusos: Record<string, string>; errosMeta: string[]; totais: { gasto: number; gastoApp: number; testes: number; custoPorTeste: number | null } };
 type PeriodoWeb = { vendas: number; receita: number; gasto: number; retorno: number | null; cor: Cor };
-type RespWeb = { dia: string; hoje: PeriodoWeb; semana: PeriodoWeb; dias: Array<PeriodoWeb & { dia: string }>; landing: { sessoes: number; viuOferta: number; gerouPix: number; pagou: number; robos: number }; errosMeta: string[] };
+type RespWeb = { dia: string; hoje: PeriodoWeb; semana: PeriodoWeb; dias: Array<PeriodoWeb & { dia: string }>; landing: { sessoes: number; viuOferta: number; gerouPix: number; pagou: number; robos: number }; vida?: { sessoes: number; viuOferta: number; gerouPix: number; foiHotmart?: number; pagou: number }; errosMeta: string[] };
 
 type DiaResumo = {
   dia: string; vendido: number; vendas: number; porOrigem: Record<Origem, { n: number; valor: number }>;
@@ -513,6 +513,26 @@ function AbaWeb({ d }: { d: RespWeb }) {
         </div>
         {l.robos > 0 && <p className="v-nota">{l.robos} sessões de robô de revisão (Right_Column) fora da conta.</p>}
       </article>
+      {d.vida && d.vida.sessoes > 0 && (
+        <article className="v-cartao">
+          {/* 04/11: a /vida (LP v3 + Hotmart) num funil próprio — "pagou" = vendas da Hotmart de hoje */}
+          <div className="v-titulo">Landing /vida · hoje</div>
+          <div className="v-funil">
+            {[
+              { r: "sessões reais", n: d.vida.sessoes },
+              { r: "viu a oferta", n: d.vida.viuOferta },
+              (d.vida.foiHotmart ?? 0) > 0 ? { r: "foi pra Hotmart", n: d.vida.foiHotmart ?? 0 } : { r: "gerou Pix", n: d.vida.gerouPix },
+              { r: "pagou", n: d.vida.pagou },
+            ].map((p, k, arr) => (
+              <div key={p.r} className="v-funil-passo">
+                <div className="v-funil-barra" style={{ width: `${d.vida!.sessoes ? Math.max(4, (p.n / d.vida!.sessoes) * 100) : 4}%` }} />
+                <span className="v-funil-n">{num(p.n)}</span>
+                <span className="v-funil-r">{p.r}{k > 0 ? ` · ${pct(p.n, arr[k - 1].n)}` : ""}</span>
+              </div>
+            ))}
+          </div>
+        </article>
+      )}
       <article className="v-cartao">
         <div className="v-titulo">Dia a dia</div>
         <ul className="v-lista v-lista-dias">
@@ -525,7 +545,7 @@ function AbaWeb({ d }: { d: RespWeb }) {
           ))}
         </ul>
       </article>
-      <p className="v-nota">Web = vendas Pix do banco (valor real) ÷ gasto das campanhas de site (objetivo de vendas/tráfego) nas 2 contas.</p>
+      <p className="v-nota">Web = vendas do site do banco (Pix e Hotmart, valor real) ÷ gasto das campanhas de site (objetivo de vendas/tráfego) nas 2 contas.</p>
       <Erros e={d.errosMeta} />
     </section>
   );

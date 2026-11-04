@@ -38,6 +38,8 @@ export type Origem = "pix" | "apple" | "play";
 export type Venda = {
   chave: string;
   origem: Origem;
+  /** 04/11: venda do site pela Hotmart (/vida) — origem "pix" (é venda do SITE), cobrada pela Hotmart (outra taxa) */
+  gateway?: "hotmart";
   valor_cents: number;
   plano: string;
   renovacao: boolean;
@@ -77,8 +79,8 @@ export function rotuloPlano(l: Pick<LinhaSub, "billing_period" | "current_period
 export const NOME_ORIGEM: Record<Origem, string> = { pix: "Pix do site", apple: "Apple", play: "Google Play" };
 
 /** Título da notificação: "💰 Venda · R$ 27,90 · Pix do site (1 ano)" / "💰 Venda · R$ 97,90 · Apple anual". */
-export function tituloVenda(v: Pick<Venda, "origem" | "valor_cents" | "plano" | "renovacao">): string {
-  const rotulo = v.origem === "pix" ? `Pix do site (${v.plano})` : `${NOME_ORIGEM[v.origem]} ${v.plano}`;
+export function tituloVenda(v: Pick<Venda, "origem" | "valor_cents" | "plano" | "renovacao"> & { gateway?: Venda["gateway"] }): string {
+  const rotulo = v.origem === "pix" ? (v.gateway === "hotmart" ? `Hotmart do site (${v.plano})` : `Pix do site (${v.plano})`) : `${NOME_ORIGEM[v.origem]} ${v.plano}`;
   return `💰 ${v.renovacao ? "Renovação" : "Venda"} · ${reais(v.valor_cents)} · ${rotulo}`;
 }
 
@@ -91,14 +93,16 @@ export function dadosPush(titulo: string, corpo: string, tag: string) {
   return { title: titulo, body: corpo, tag, url: "/vendas", icon: "/icon-192.png", badge: "/icon-192.png" };
 }
 
-/** Pix do site: a linha conta como venda? */
+/** Pix do site: a linha conta como venda? 04/11: a venda da /vida pela Hotmart (payment_method "hotmart") também é venda do site. */
+export const PAGAMENTOS_SITE: readonly string[] = ["pix", "hotmart"];
 export function vendaPix(l: LinhaSub): Venda | null {
-  if (l.payment_method !== "pix" || l.status !== "active") return null;
+  if (!PAGAMENTOS_SITE.includes(String(l.payment_method ?? "")) || l.status !== "active") return null;
   const cents = Number(l.amount_cents ?? 0);
   if (!(cents > 0) || ehEmailTeste(l.customer_email)) return null;
   return {
     chave: `pix:${l.abacatepay_billing_id || l.id}`,
     origem: "pix",
+    ...(l.payment_method === "hotmart" ? { gateway: "hotmart" as const } : {}),
     valor_cents: cents,
     plano: rotuloPlano(l, "pix"),
     renovacao: false,

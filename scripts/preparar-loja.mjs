@@ -52,7 +52,9 @@ const MORTO = ["v3-hero.mp4", "v3-hero-poster.jpg", "videos", "hero-phones.png",
   // no build como entradas próprias (vite.config) e iam de carona pro binário — nenhuma rota do app chega neles.
   "landing.html", "vendas.html", "landing", "vendas",
   // 03/11: o guia em PDF de quem comprou no site (link do e-mail da compra e da /como-entrar) — só no site
-  "guia"];
+  "guia",
+  // 04/11: a página de obrigado da Hotmart (/vida/obrigado) — só no site
+  "vida-obrigado.html"];
 
 // Rastreadores de anúncio que moram no index.html da WEB e vinham de carona
 // pro binário (o Capacitor copia a pasta public inteira).
@@ -283,7 +285,7 @@ for (const f of readdirSync(join(ASSETS, "assets"))) {
   console.log(`  − assets/${f}`);
   rmSync(join(ASSETS, "assets", f), { force: true });
 }
-if (["landing.html", "vendas.html"].some((f) => existsSync(join(ASSETS, f)))) {
+if (["landing.html", "vendas.html", "vida-obrigado.html"].some((f) => existsSync(join(ASSETS, f)))) {
   console.error("\n✗ TRAVA: a página de venda/painel continua no bundle do app");
   process.exit(1);
 }

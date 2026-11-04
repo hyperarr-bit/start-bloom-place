@@ -1757,9 +1757,18 @@ async function irHotmart() {
   if (ok === false) evento("landing_erro", { onde: "hotmart_iniciar", msg: "registro_falhou" });
   const ir = (w as JanelaHm).__landingIrPara;
   if (ir) ir(url); else location.href = url;
-  // voltou pela seta do navegador (bfcache): o botão volta a funcionar
-  window.setTimeout(() => { indoHotmart = false; botao.removeAttribute("aria-busy"); porRotulo(botao, "Quero organizar minha vida"); }, 4000);
+  // voltou pela seta do navegador: o botão volta a funcionar (reserva de 4 s; o Safari com bfcache volta pelo pageshow, abaixo)
+  window.setTimeout(soltarBotaoHotmart, 4000);
 }
+function soltarBotaoHotmart() {
+  indoHotmart = false;
+  const botao = document.getElementById("lp-hotmart");
+  if (!botao) return;
+  botao.removeAttribute("aria-busy");
+  porRotulo(botao, "Quero organizar minha vida");
+}
+// J (revisão): o Safari devolve a página do bfcache congelada — com "Abrindo o pagamento…" e os timers parados
+if (HOTMART) window.addEventListener("pageshow", (e) => { if ((e as PageTransitionEvent).persisted) soltarBotaoHotmart(); });
 if (HOTMART) document.getElementById("lp-hotmart")?.addEventListener("click", () => { evento("landing_cta", { onde: "hotmart", fase: estado.fase }); void irHotmart(); });
 
 /* ───────────────────────── 31/10: "Seu 2027 organizado" no pós-pago (./upsell-2027.ts, só com a chave ou o link do e-mail) ───────────────────────── */

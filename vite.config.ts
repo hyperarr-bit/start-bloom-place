@@ -47,8 +47,8 @@ const rotaDaMissao = () => {
     // 28/10: a LANDING NOVA (/organizar → landing.html; a demo /organizar/demo continua no SPA)
     else if (req.url === "/organizar" || req.url?.startsWith("/organizar?")) req.url = req.url.replace("/organizar", "/landing.html");
     // 04/11: /vida = a mesma landing (o <head> vê a rota e liga a v3 + o checkout da chave CHECKOUT_HOTMART); /vida/obrigado = a página de obrigado da Hotmart
-    else if (req.url === "/vida/obrigado" || req.url?.startsWith("/vida/obrigado?")) req.url = req.url.replace("/vida/obrigado", "/vida-obrigado.html");
-    else if (req.url === "/vida" || req.url?.startsWith("/vida?")) req.url = req.url.replace("/vida", "/landing.html");
+    else if (/^\/vida\/obrigado\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/vida\/obrigado\/?/, "/vida-obrigado.html");
+    else if (/^\/vida\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/vida\/?/, "/landing.html");
     // 29/10: o painel do dono (/vendas → vendas.html, PWA própria com manifest e SW em /vendas/)
     else if (req.url === "/vendas" || req.url === "/vendas/" || req.url?.startsWith("/vendas?")) req.url = "/vendas.html" + (req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "");
     next();

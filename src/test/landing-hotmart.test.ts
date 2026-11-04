@@ -52,9 +52,10 @@ function rodar(fonte: string, url: string, store: Record<string, string> = {}) {
 
 /* ───────── 1. o <head> ───────── */
 describe("o <head>: /organizar intocado; /vida decide pela rota e pela chave CHECKOUT_HOTMART", () => {
-  it("no código: CHECKOUT_HOTMART off, URL no placeholder, preço 9790, parcelas com texto", () => {
+  it("no código: CHECKOUT_HOTMART off, a URL real do checkout do dono (produto 8885020), preço 9790, parcelas com texto", () => {
     expect(HTML).toMatch(/var CHECKOUT_HOTMART = "off";/);
-    expect(HTML).toMatch(/var HOTMART_CHECKOUT_URL = "https:\/\/pay\.hotmart\.com\/PREENCHER";/);
+    expect(HTML).toMatch(/var HOTMART_CHECKOUT_URL = "https:\/\/pay\.hotmart\.com\/K108338476R";/);
+    expect(urlHotmartValida("https://pay.hotmart.com/K108338476R")).toBe(true);
     expect(HTML).toMatch(/var HOTMART_PRECO_CENTAVOS = 9790;/);
     expect(HTML).toMatch(/var HOTMART_PARCELAS_TEXTO = "Pix ou cartão, em até 12x";/);
   });
@@ -239,6 +240,21 @@ describe("a /vida no jsdom", () => {
     for (const e of eventos().filter((x) => x.nome.startsWith("landing_"))) expect(e).toMatchObject({ pagina: "vida", braco_checkout_ext: "pix" });
   });
 
+  it("J: voltou do checkout pelo bfcache do Safari (pageshow persisted) → o botão destrava na hora", async () => {
+    await abrir({});
+    const b = document.getElementById("lp-hotmart") as HTMLButtonElement;
+    b.click();
+    await vi.waitFor(() => { if (!irPara.length) throw new Error("não saiu"); }, { timeout: 3000, interval: 30 });
+    expect(b.getAttribute("aria-busy")).toBe("true");
+    expect(b.textContent).toContain("Abrindo o pagamento");
+    const ev = new Event("pageshow"); Object.defineProperty(ev, "persisted", { value: true });
+    window.dispatchEvent(ev);
+    expect(b.getAttribute("aria-busy")).toBeNull();
+    expect(b.textContent).toContain("Quero organizar minha vida");
+    b.click();
+    await vi.waitFor(() => { if (irPara.length < 2) throw new Error("não saiu de novo"); }, { timeout: 3000, interval: 30 });
+  });
+
   it("URL no placeholder com o atributo hotmart (página velha em cache): o landing.ts também não vai pra Hotmart", async () => {
     await abrir({ hmUrl: "https://pay.hotmart.com/PREENCHER" });
     (document.getElementById("lp-hotmart") as HTMLButtonElement).click();
@@ -272,16 +288,22 @@ describe("hotmart.ts, rotas e obrigado", () => {
     expect(checkoutExtDoHtml({ getAttribute: () => "hotmart" })).toBe("hotmart");
     expect(checkoutExtDoHtml({ getAttribute: () => "x" })).toBeNull();
   });
-  it("vercel.json e vite.config.ts: /vida → landing.html, /vida/obrigado → vida-obrigado.html (antes do catch-all); o /organizar igual", () => {
+  it("vercel.json e vite.config.ts: /vida e /vida/ → landing.html, /vida/obrigado e /vida/obrigado/ → vida-obrigado.html (antes do catch-all); o /organizar igual", () => {
     const v = JSON.parse(readFileSync(resolve(raiz, "vercel.json"), "utf8")) as { rewrites: Array<{ source: string; destination: string }> };
     const i = (s: string) => v.rewrites.findIndex((r) => r.source === s);
     expect(v.rewrites[i("/vida")].destination).toBe("/landing.html");
     expect(v.rewrites[i("/vida/obrigado")].destination).toBe("/vida-obrigado.html");
+    expect(v.rewrites[i("/vida/")].destination).toBe("/landing.html"); // K (revisão): com barra também
+    expect(v.rewrites[i("/vida/obrigado/")].destination).toBe("/vida-obrigado.html");
+    expect(i("/vida/obrigado/")).toBeLessThan(i("/(.*)"));
     expect(v.rewrites[i("/organizar")].destination).toBe("/landing.html");
     expect(i("/vida/obrigado")).toBeLessThan(i("/(.*)"));
     const vite = readFileSync(resolve(raiz, "vite.config.ts"), "utf8");
     expect(vite).toContain('vidaObrigado: path.resolve(__dirname, "vida-obrigado.html")');
-    expect(vite).toContain('req.url.replace("/vida/obrigado", "/vida-obrigado.html")');
+    expect(vite).toContain('replace(/^\\/vida\\/obrigado\\/?/, "/vida-obrigado.html")');
+    const loja = readFileSync(resolve(raiz, "scripts/preparar-loja.mjs"), "utf8");
+    expect(loja).toMatch(/"vida-obrigado\.html"\];/); // I (revisão): a página de obrigado não vai pro app de loja
+    expect(loja).toContain('["landing.html", "vendas.html", "vida-obrigado.html"].some');
   });
   it("obrigado: lojas primeiro, e-mail em até 1 minuto, 'Já tenho conta? Entrar' (não 'Começar'), guia, contato, e SEM pixel/Purchase", () => {
     const d = document.createElement("div");

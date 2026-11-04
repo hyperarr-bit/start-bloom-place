@@ -120,7 +120,7 @@ describe("o HTML do braço Hotmart", () => {
     const els = [...div.querySelectorAll("[data-so-ext]")];
     expect(els.length).toBeGreaterThan(20);
     for (const el of els) expect(el.closest('[data-so-lp="v2"], [data-so-lp="atual"]')).not.toBeNull();
-    expect(HTML).toContain('html:not([data-checkout-ext="hotmart"]) [data-so-ext="hotmart"], html[data-checkout-ext="hotmart"] [data-so-ext="pix"] { display: none !important; }');
+    expect(HTML).toContain('html:not([data-checkout-ext="hotmart"]):not([data-checkout-ext="stripe"]) [data-so-ext="hotmart"], html[data-checkout-ext="hotmart"] [data-so-ext="pix"], html[data-checkout-ext="stripe"] [data-so-ext="pix"] { display: none !important; }');
   });
   it("o preço escrito no HTML do braço Hotmart é o da constante (sem piscar) e nada de 27,90 / 'no Pix' nele", () => {
     const hm = [...div.querySelectorAll('[data-so-ext="hotmart"]')].filter((e) => e.closest('[data-so-lp="v2"]'));
@@ -143,10 +143,10 @@ describe("o HTML do braço Hotmart", () => {
   it("cada texto do braço Pix da /vida que fala de Pix tem o par do Hotmart (preço, sub, passo, FAQ, fim, selo), nos 2 braços", () => {
     const n = (sel: string, lp: string) => [...div.querySelectorAll(sel)].filter((e) => e.closest(`[data-so-lp="${lp}"]`)).length;
     expect(n('[data-so-ext="pix"]', "v2")).toBe(n('[data-so-ext="hotmart"]', "v2") - 3); // + parcelas, botão e erro do botão
-    expect(n('[data-so-ext="pix"]', "atual")).toBe(n('[data-so-ext="hotmart"]', "atual") - 2); // + parcelas e botão
+    expect(n('[data-so-ext="pix"]', "atual")).toBe(n('[data-so-ext="hotmart"]', "atual") - 3); // + parcelas, botão e o selo da Stripe (/oferta)
   });
   it("o CSS some com o Pix (e-mail antes, #lp-pagar, #lp-pix) e com a âncora 'De R$ 97,90' quando a /vida é Hotmart — só com html[data-checkout-ext]", () => {
-    expect(HTML).toContain('html[data-checkout-ext="hotmart"] .lp-email-antes, html[data-checkout-ext="hotmart"] #lp-pagar, html[data-checkout-ext="hotmart"] #lp-pagar-erro, html[data-checkout-ext="hotmart"] #lp-pix, html[data-checkout-ext="hotmart"] .lp-ancora { display: none !important; }');
+    expect(HTML).toContain('html[data-checkout-ext="hotmart"] .lp-email-antes, html[data-checkout-ext="hotmart"] #lp-pagar, html[data-checkout-ext="hotmart"] #lp-pagar-erro, html[data-checkout-ext="hotmart"] #lp-pix, html[data-checkout-ext="hotmart"] .lp-ancora, html[data-checkout-ext="stripe"]');
   });
 });
 
@@ -479,6 +479,6 @@ describe("revisão A/B (05/11): na /vida a oferta é sempre 'sempre' e o braço 
       (window as unknown as { IntersectionObserver?: unknown }).IntersectionObserver = antes;
     }
     const fonte = readFileSync(resolve(raiz, "src/landing/landing.ts"), "utf8");
-    expect(fonte).toContain('if (brCheckout === "email" && !HOTMART) evento("landing_email_antes_visto", {});');
+    expect(fonte).toContain('if (brCheckout === "email" && !EXTERNO) evento("landing_email_antes_visto", {});');
   });
 });

@@ -84,6 +84,14 @@
         // "off" = todos no v3 · "on" = 50/50 estável por aparelho. QA: ?vida=v3|atual (fica: localStorage), ?vida=auto desfaz.
         // O /organizar não lê. Rollback: "off".
         var AB_VIDA = "on";
+        // 04/11 (dono): /oferta — a página atual do /organizar a R$ 67,90 com o checkout STRIPE em tela cheia (Pix + cartão
+        // parcelado), sem sair do site. "off" (ou STRIPE_PK no placeholder) = a /oferta manda pro /organizar. O /organizar e a
+        // /vida não leem nada disto. Ver src/landing/stripe-checkout.ts. Rollback: "off".
+        var CHECKOUT_STRIPE = "off";
+        var STRIPE_PK = "pk_live_PREENCHER"; // a chave PUBLICÁVEL (pk_live_…); com "PREENCHER" = comportamento off
+        var STRIPE_PRECO_CENTAVOS = 6790; // só pra exibir — o valor cobrado vem SEMPRE do servidor (stripe-criar)
+        var STRIPE_PARCELAS_MAX = 12;
+        var STRIPE_PARCELAS_TEXTO = "Pix ou cartão, em até 12x"; // "" desliga a linha
         var HOTMART_CHECKOUT_URL = "https://pay.hotmart.com/K108338476R?checkoutMode=10"; // 04/11: o checkout do produto 8885020 (dono). Com "PREENCHER" (ou URL inválida) o botão cai no Pix próprio
         var HOTMART_PRECO_CENTAVOS = 9790; // o preço do braço Hotmart (todo texto dele sai daqui; o HTML traz o mesmo número escrito — teste confere)
         var HOTMART_PARCELAS_TEXTO = "Pix ou cartão, em até 12x"; // "" desliga a linha (se o dono não liberar parcelamento na Hotmart)
@@ -118,7 +126,7 @@
         }
 
         // 05/11: na /vida a oferta é sempre "sempre" (vitalício) — ignora ?oferta=ano e a força guardada (nenhum 27,90 do "ano" lá)
-        var naVida = /^\/vida\/?$/.test(location.pathname || "");
+        var naVida = /^\/(vida|oferta)\/?$/.test(location.pathname || ""); // 04/11: a /oferta também (vitalício, nada de 27,90)
         var po = naVida ? null : pega("oferta");
         if (po === "ano" || po === "sempre") grava("landing-oferta-force", po);
         var o = naVida ? "sempre" : (po === "ano" || po === "sempre") ? po : le("landing-oferta-force");
@@ -168,7 +176,22 @@
         // 30/10: o braço da página ("atual" = a de hoje | "v2" = vitrine). ?lp=auto apaga a força.
         // 04/11: /vida = a v3 num link próprio (sem sorteio, sem ler/gravar a força do /organizar): sempre o braço v2
         var VIDA = /^\/vida\/?$/.test(location.pathname || "");
-        var plp = VIDA ? null : pega("lp");
+        // 04/11: /oferta = a página atual do /organizar (sem sorteio, sem ler/gravar a força do ?lp), com a Stripe — ou vai pro /organizar
+        var OFERTA = /^\/oferta\/?$/.test(location.pathname || "");
+        if (OFERTA) {
+          var stOk = CHECKOUT_STRIPE === "on" && /^pk_(live|test)_[A-Za-z0-9]+$/.test(STRIPE_PK) && !/PREENCHER/i.test(STRIPE_PK);
+          if (!stOk) {
+            d.setAttribute("data-desligada", "");
+            try { location.replace("/organizar" + (location.search || "") + (location.hash || "")); } catch (eo) {}
+            return;
+          }
+          d.setAttribute("data-pagina", "oferta");
+          d.setAttribute("data-checkout-ext", "stripe");
+          if (!STRIPE_PARCELAS_TEXTO) d.setAttribute("data-hm-sem-parcelas", "");
+          mem.pagina = "oferta"; mem.checkout_ext = "stripe"; mem.ab_stripe = CHECKOUT_STRIPE;
+          mem.stripe_pk = STRIPE_PK; mem.stripe_preco_centavos = STRIPE_PRECO_CENTAVOS; mem.stripe_parcelas_max = STRIPE_PARCELAS_MAX; mem.stripe_parcelas = STRIPE_PARCELAS_TEXTO;
+        }
+        var plp = VIDA || OFERTA ? null : pega("lp");
         if (plp === "v2" || plp === "atual") grava("landing-lp-force", plp);
         if (plp === "auto") grava("landing-lp-force", null);
         // 04/11: o braço da /vida (AB_VIDA): "v3" = página v2 · "atual" = a página de hoje do /organizar (com a Hotmart)
@@ -187,8 +210,8 @@
           d.setAttribute("data-vida", bvida);
           mem.vida = bvida; mem.ab_vida = AB_VIDA;
         }
-        var lp = VIDA ? (bvida === "atual" ? "atual" : "v2") : (plp === "v2" || plp === "atual") ? plp : le("landing-lp-force");
-        mem.lp_forcado = !VIDA && (lp === "v2" || lp === "atual");
+        var lp = OFERTA ? "atual" : VIDA ? (bvida === "atual" ? "atual" : "v2") : (plp === "v2" || plp === "atual") ? plp : le("landing-lp-force");
+        mem.lp_forcado = !VIDA && !OFERTA && (lp === "v2" || lp === "atual");
         if (lp !== "v2" && lp !== "atual") {
           lp = "atual";
           // outro bit da conta (o bit 0 do djb2 é só a paridade dos caracteres — seria o MESMO braço do checkout) → independente
@@ -765,10 +788,11 @@
         .lp2-foto .lp2-fone { --w: 316px; } /* tela 298 px: 3× = 894 ≤ 900 do print (0 upscale) */
       }
       /* ── /vida (04/11, src/landing/hotmart.ts): o checkout Hotmart. Só existe com html[data-pagina="vida"][data-checkout-ext]; no /organizar nada disto casa ── */
-      html:not([data-checkout-ext="hotmart"]) [data-so-ext="hotmart"], html[data-checkout-ext="hotmart"] [data-so-ext="pix"] { display: none !important; } /* nos 2 braços da /vida (v2 e atual) */
-      html[data-checkout-ext="hotmart"] .lp-email-antes, html[data-checkout-ext="hotmart"] #lp-pagar, html[data-checkout-ext="hotmart"] #lp-pagar-erro, html[data-checkout-ext="hotmart"] #lp-pix, html[data-checkout-ext="hotmart"] .lp-ancora { display: none !important; }
+      html:not([data-checkout-ext="hotmart"]):not([data-checkout-ext="stripe"]) [data-so-ext="hotmart"], html[data-checkout-ext="hotmart"] [data-so-ext="pix"], html[data-checkout-ext="stripe"] [data-so-ext="pix"] { display: none !important; } /* /vida (Hotmart) e /oferta (Stripe): "hotmart" = os textos do checkout externo */
+      html:not([data-checkout-ext="stripe"]) [data-so-gw="stripe"], html[data-checkout-ext="stripe"] [data-so-gw="hotmart"] { display: none !important; } /* o selo do gateway */ /* nos 2 braços da /vida (v2 e atual) */
+      html[data-checkout-ext="hotmart"] .lp-email-antes, html[data-checkout-ext="hotmart"] #lp-pagar, html[data-checkout-ext="hotmart"] #lp-pagar-erro, html[data-checkout-ext="hotmart"] #lp-pix, html[data-checkout-ext="hotmart"] .lp-ancora, html[data-checkout-ext="stripe"] .lp-email-antes, html[data-checkout-ext="stripe"] #lp-pagar, html[data-checkout-ext="stripe"] #lp-pagar-erro, html[data-checkout-ext="stripe"] #lp-pix, html[data-checkout-ext="stripe"] .lp-ancora { display: none !important; }
       html[data-hm-sem-parcelas] .lp2-hm-parcelas { display: none !important; }
-      html[data-checkout-ext="hotmart"] .lp-preco-sub.lp2-hm-parcelas { margin-top: 2px; font-size: 13.5px; color: var(--suave); font-weight: 600; }
+      html[data-checkout-ext="hotmart"] .lp-preco-sub.lp2-hm-parcelas, html[data-checkout-ext="stripe"] .lp-preco-sub.lp2-hm-parcelas { margin-top: 2px; font-size: 13.5px; color: var(--suave); font-weight: 600; }
       html[data-checkout-ext="hotmart"] #lp-hotmart[aria-busy="true"], html[data-checkout-ext="hotmart"] #lp-hotmart-atual[aria-busy="true"] { opacity: .75; pointer-events: none; }
     </style>
     <!-- Meta Pixel (só a fila aqui; o fbevents.js entra no carregador adiado do landing.ts, depois da 1ª pintura) -->
@@ -1079,9 +1103,10 @@
                 <p class="lp-erro" id="lp-hotmart-erro" role="alert" data-so-lp="v2" data-so-ext="hotmart" hidden></p>
                 <!-- /vida braço "atual" (AB_VIDA): o mesmo fluxo da Hotmart no lugar do "Pagar R$ 27,90 no Pix" -->
                 <button type="button" class="lp-cta" id="lp-hotmart-atual" data-so-lp="atual" data-so-ext="hotmart">Quero organizar tudo <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
-                <p data-so-ext="hotmart" class="lp-seguro" data-so-lp="atual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>Pagamento seguro pela Hotmart</p>
+                <p data-so-gw="hotmart" data-so-ext="hotmart" class="lp-seguro" data-so-lp="atual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>Pagamento seguro pela Hotmart</p>
+                <p data-so-gw="stripe" data-so-ext="hotmart" class="lp-seguro" data-so-lp="atual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>Pagamento seguro · Pix ou cartão</p>
                 <p class="lp-seguro" data-so-lp="v2" data-so-ext="pix"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>CORE · CNPJ 55.041.112/0001-82</p>
-                <p class="lp-seguro" data-so-lp="v2" data-so-ext="hotmart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>Pagamento seguro pela Hotmart</p>
+                <p data-so-gw="hotmart" class="lp-seguro" data-so-lp="v2" data-so-ext="hotmart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>Pagamento seguro pela Hotmart</p>
               </div>
             </div>
             <div class="lp-pix" id="lp-pix" aria-live="polite"></div>

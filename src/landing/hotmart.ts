@@ -11,7 +11,7 @@
  * pagina:"vida" e braco_checkout_ext. Este arquivo é PURO (testado em src/test/landing-hotmart.test.ts).
  */
 
-export type BracoCheckoutExt = "hotmart" | "pix";
+export type BracoCheckoutExt = "hotmart" | "pix" | "stripe";
 
 /** A URL do checkout é de verdade? (https://pay.hotmart.com/<código>, sem o placeholder) — a MESMA conta do <head>. */
 export function urlHotmartValida(url: string | null | undefined): boolean {
@@ -19,13 +19,21 @@ export function urlHotmartValida(url: string | null | undefined): boolean {
   return /^https:\/\/pay\.hotmart\.com\/[A-Za-z0-9]+/.test(u) && !/PREENCHER/i.test(u);
 }
 
-export function paginaDoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): "vida" | null {
-  return el.getAttribute("data-pagina") === "vida" ? "vida" : null;
+/** 04/11: "vida" (Hotmart) ou "oferta" (Stripe, ./stripe-checkout.ts); no /organizar, null. */
+export function paginaDoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): "vida" | "oferta" | null {
+  const p = el.getAttribute("data-pagina");
+  return p === "vida" ? "vida" : p === "oferta" ? "oferta" : null;
 }
 
 export function checkoutExtDoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): BracoCheckoutExt | null {
   const v = el.getAttribute("data-checkout-ext");
-  return v === "hotmart" ? "hotmart" : v === "pix" ? "pix" : null;
+  return v === "hotmart" ? "hotmart" : v === "pix" ? "pix" : v === "stripe" ? "stripe" : null;
+}
+
+/** 04/11: a chave publicável da Stripe é de verdade? (pk_live_/pk_test_, sem o placeholder) — a MESMA conta do <head>. */
+export function pkStripeValida(pk: string | null | undefined): boolean {
+  const s = String(pk ?? "");
+  return /^pk_(live|test)_[A-Za-z0-9]+$/.test(s) && !/PREENCHER/i.test(s);
 }
 
 /** sck/src da Hotmart: só letras, números, _ - . | (o resto vira "_"), até 100. */

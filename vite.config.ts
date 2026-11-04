@@ -49,6 +49,8 @@ const rotaDaMissao = () => {
     // 04/11: /vida = a mesma landing (o <head> vê a rota e liga a v3 + o checkout da chave CHECKOUT_HOTMART); /vida/obrigado = a página de obrigado da Hotmart
     else if (/^\/vida\/obrigado\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/vida\/obrigado\/?/, "/vida-obrigado.html");
     else if (/^\/vida\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/vida\/?/, "/landing.html");
+    // 04/11: /oferta = a mesma landing (o <head> vê a rota: página atual a R$ 67,90 + checkout Stripe; chave off → /organizar)
+    else if (/^\/oferta\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/oferta\/?/, "/landing.html");
     // 29/10: o painel do dono (/vendas → vendas.html, PWA própria com manifest e SW em /vendas/)
     else if (req.url === "/vendas" || req.url === "/vendas/" || req.url?.startsWith("/vendas?")) req.url = "/vendas.html" + (req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "");
     next();

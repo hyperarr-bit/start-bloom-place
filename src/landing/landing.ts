@@ -83,6 +83,7 @@ import { lerEstadoU2027, lerU2027Guardado } from "./u2027-estado";
 import { lerEstadoPresenteLp } from "./presente-estado";
 import { esquecerCompra, esquecerPixVivo, gravarCookie, gravarPixVivo, idDoAparelho, lerCompra, lerCookie, lerPixVivo, marcarCompra, temSessaoNoStorage, type MarcaCompra } from "./marcador";
 import { carregarComRetry, limparMarcaDeRecarga } from "./carregar";
+import { REF_OK, checkoutExtDoHtml, paginaDoHtml, reaisDeCentavos, urlCheckoutHotmart, urlHotmartValida } from "./hotmart";
 
 // o Pix de verdade carrega sob demanda — declarado antes do observador dos blocos, que pode pré-aquecê-lo (com PIX_REAL).
 // 30/10: com 2ª chance; o pré-aquecimento (recarregar=false) nunca recarrega a página — só o toque em pagar.
@@ -109,7 +110,7 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 const agora = () => Math.round(performance.now());
 type Janela = Window & {
   __landingSimularJaTem?: boolean;
-  __landing?: { t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null };
+  __landing?: { pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null };
   __eventosLanding?: Record<string, unknown>[];
   /** 02/11 (dev/testes): voltou() = "voltei do banco" (≥ 5 s fora) sem trocar de aba; vencer() = o QR vence em 1,5 s */
   __landingSimular?: { pagar: () => void; pagarU2027?: () => void; voltou?: () => void; vencer?: () => void };
@@ -150,6 +151,14 @@ const brLp = bracoLpDoHtml(); // 30/10: "atual" (a página de hoje) | "v2" (vitr
 const V2 = brLp === "v2";
 const brPix = bracoPixDoHtml(); // 02/11: "atual" (a tela do Pix de hoje) | "b" ("Recibo da marca" — AB_PIX no <head>)
 const PIXB = brPix === "b";
+/* 04/11: /vida (a v3 num link próprio — ./hotmart.ts). PAGINA só existe na /vida; HOTMART = o botão vai pro checkout Hotmart
+ * (chave CHECKOUT_HOTMART "on" e URL de verdade). No /organizar os dois ficam null/false e nada abaixo muda. */
+const PAGINA = paginaDoHtml();
+const EXT = PAGINA ? checkoutExtDoHtml() : null;
+const HM_URL = String(w.__landing?.hotmart_url ?? "");
+const HOTMART = PAGINA === "vida" && EXT === "hotmart" && urlHotmartValida(HM_URL);
+const HM_PRECO = Number(w.__landing?.hotmart_preco_centavos) > 0 ? Number(w.__landing?.hotmart_preco_centavos) : 9790;
+const HM_PARCELAS = typeof w.__landing?.hotmart_parcelas === "string" ? w.__landing.hotmart_parcelas : "";
 const PIX_MOTIVO = motivoPixDoHtml(); // 02/11: chips "O que te travou?" no estado "voltou" do b (PIX_MOTIVO, padrão off)
 const U2027 = upsell2027DoHtml(); // 31/10: o "Seu 2027" no pós-pago (chave UPSELL_2027 / ?u2027=on)
 const VOLTA_U2027 = voltaDoEmailU2027(BUSCA); // 31/10: chegou pelo bloco do 2027 no e-mail de compra confirmada
@@ -198,7 +207,7 @@ for (const k of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm
 if (BUSCA.get("fbclid")) atrib.tem_fbclid = "1";
 
 export function evento(nome: string, dados: Record<string, unknown> = {}): void {
-  const corpo = { ...dados, landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, braco_pix: brPix, pix_forcado: pixForcado, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
+  const corpo = { ...dados, ...(PAGINA ? { pagina: PAGINA, braco_checkout_ext: EXT } : {}), landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, braco_pix: brPix, pix_forcado: pixForcado, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
   listaDeEventos.push({ nome, ...corpo });
   if (!PRODUCAO) return;
   try {
@@ -218,7 +227,7 @@ requestAnimationFrame(() => {
   let ttfb: number | null = null;
   try { const n = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined; if (n) ttfb = Math.round(n.responseStart); } catch { /* noop */ }
   const m = w.__landing ?? {};
-  evento("landing_html", { tela1_ms: agora(), ttfb_ms: ttfb, t_forcado: !!m.t_forcado, oferta_forcada: !!m.oferta_forcada, checkout_forcado: !!m.checkout_forcado, lp_forcado: !!m.lp_forcado, pix_forcado: !!m.pix_forcado, divisao: m.divisao ?? null });
+  evento("landing_html", { tela1_ms: agora(), ttfb_ms: ttfb, t_forcado: !!m.t_forcado, oferta_forcada: !!m.oferta_forcada, checkout_forcado: !!m.checkout_forcado, lp_forcado: !!m.lp_forcado, pix_forcado: !!m.pix_forcado, divisao: m.divisao ?? null, ...(PAGINA ? { hotmart_forcado: !!m.hotmart_forcado } : {}) });
 });
 
 /*
@@ -654,7 +663,8 @@ const lerEstado = (): EstadoLanding => {
   }
   return estadoQueVolta(bruto);
 };
-let estado: EstadoLanding = lerEstado();
+// 04/11: no braço Hotmart da /vida não existe Pix nesta página — um Pix do /organizar guardado no aparelho não aparece aqui
+let estado: EstadoLanding = HOTMART ? estadoQueVolta(null) : lerEstado();
 /* 29/10: "Você já tem o CORE" no lugar da oferta (marcador do aparelho, ou o servidor disse `ja_tem`) */
 let jaTem: MarcaCompra | null = null;
 /** o "já tem" veio da saída do 2027 pelo link do e-mail (o "Não fui eu que comprei" não aparece: ela abriu o e-mail da compra) */
@@ -693,12 +703,13 @@ function atualizarRotulos() {
   porRotulo(document.querySelector('#fim button[data-so-lp="v2"]'), t);
   const fim = $("fim");
   fim.dataset.fase = contaNaTela() ? "conta" : estado.fase;
-  const fimP = fim.querySelector<HTMLElement>('p[data-so-lp="v2"]');
-  if (fimP) fimP.textContent = contaNaTela() ? "Sua conta está pronta." : estado.fase === "pago" ? "Pagamento confirmado. Falta só o seu e-mail." : estado.fase === "qr" ? "Seu Pix está logo acima." : "Vitalício por R$ 27,90 · Pix na hora";
+  const fimP = fim.querySelector<HTMLElement>(HOTMART ? 'p[data-so-lp="v2"][data-so-ext="hotmart"]' : 'p[data-so-lp="v2"]');
+  if (fimP) fimP.textContent = contaNaTela() ? "Sua conta está pronta." : estado.fase === "pago" ? "Pagamento confirmado. Falta só o seu e-mail." : estado.fase === "qr" ? "Seu Pix está logo acima." : HOTMART ? `Vitalício por ${reaisDeCentavos(HM_PRECO)} · Pix ou cartão` : "Vitalício por R$ 27,90 · Pix na hora";
   for (const barra of barrasDePreco()) {
     const fixoB = barra.querySelector<HTMLElement>(".lp2-fixo-p b"); const fixoS = barra.querySelector<HTMLElement>(".lp2-fixo-p span");
     if (!fixoB || !fixoS) continue;
     if (estado.fase === "qr" && estado.pix) { fixoB.textContent = "Pix gerado"; fixoS.textContent = `vale por ${mmss(Math.max(0, venceEm(estado.pix) - Date.now()))}`; }
+    else if (HOTMART) { fixoB.textContent = reaisDeCentavos(HM_PRECO); fixoS.innerHTML = "Vitalício<i> · Pix ou cartão</i>"; }
     else { fixoB.textContent = "R$ 27,90"; fixoS.innerHTML = "Vitalício<i> · Pix</i>"; }
   }
 }
@@ -720,12 +731,12 @@ const viuAOferta = () => {
   ofertaVista = true;
   evento("landing_oferta_vista", { via: V2 ? "botao_50" : "bloco_15" });
   if (brCheckout === "email") evento("landing_email_antes_visto", {});
-  pixel("ViewContent", { content_name: "landing_oferta", value: 27.9, currency: "BRL" });
-  if (PIX_REAL && !SIMULADO) void pg(false).catch(() => null); // pré-aquece o Pix de verdade (sem recarregar a página se falhar)
+  pixel("ViewContent", { content_name: HOTMART ? "vida_oferta" : "landing_oferta", value: HOTMART ? HM_PRECO / 100 : 27.9, currency: "BRL" });
+  if (PIX_REAL && !SIMULADO && !HOTMART) void pg(false).catch(() => null); // pré-aquece o Pix de verdade (sem recarregar a página se falhar)
 };
 if ("IntersectionObserver" in window) {
   if (V2) {
-    const botaoPagar = $("lp-pagar");
+    const botaoPagar = HOTMART ? $("lp-hotmart") : $("lp-pagar");
     new IntersectionObserver((ens) => { if (ens.some((e) => e.isIntersecting)) viuAOferta(); }, { threshold: 0.5 }).observe(botaoPagar);
     // crítica r2 2.5: o landing_bloco "oferta" do v2 também só com metade do bloco na tela (em 844+ os 15% apareciam sem rolar)
     new IntersectionObserver((ens, o) => { if (ens.some((e) => e.isIntersecting) && !vistos.has("oferta")) { vistos.add("oferta"); evento("landing_bloco", { bloco: "oferta", via: "50" }); o.disconnect(); } }, { threshold: 0.5 }).observe($("oferta"));
@@ -1685,6 +1696,71 @@ function renderDoCartao() {
 const ehPraSempreTxt = () => (estado.pago && estado.pago.oferta !== "LN_ano279" ? (V2 ? "O CORE é seu pra sempre." : "Seu CORE é seu pra sempre.") : "Seu CORE está liberado por 1 ano.");
 
 $("lp-pagar").addEventListener("click", () => { void gerar(); });
+
+/* ───────────────────────── /vida: o checkout Hotmart (04/11, ./hotmart.ts) ───────────────────────── */
+/* O preço do braço Hotmart sai de HOTMART_PRECO_CENTAVOS (o HTML já vem com o mesmo número escrito — sem piscar) e a linha das
+ * parcelas de HOTMART_PARCELAS_TEXTO ("" = some, o <head> já escondeu antes de pintar). */
+if (HOTMART) {
+  const r = reaisDeCentavos(HM_PRECO);
+  document.querySelectorAll<HTMLElement>("[data-hm-preco]").forEach((el) => {
+    if (el.dataset.hmPreco === "partes") { const [int, cent] = r.split(","); el.innerHTML = `${esc(int)}<small>,${esc(cent)}</small>`; }
+    else el.textContent = r;
+  });
+  document.querySelectorAll<HTMLElement>("[data-hm-parcelas]").forEach((el) => { if (HM_PARCELAS) el.textContent = HM_PARCELAS; else el.remove(); });
+  atualizarRotulos();
+}
+const URL_HOTMART_INICIAR = "https://itoylenzvahbscgjgtqf.supabase.co/functions/v1/hotmart-iniciar";
+/** o token da sessão do Supabase guardada neste navegador (a anônima da demo/compra, se houver) — sem baixar o supabase-js */
+function tokenDaSessao(): string | null {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !/^sb-.*-auth-token$/.test(k)) continue;
+      const t = (JSON.parse(localStorage.getItem(k) || "null") as { access_token?: unknown } | null)?.access_token;
+      if (typeof t === "string" && t.length > 20) return t;
+    }
+  } catch { /* sem storage */ }
+  return null;
+}
+/** grava o pedido no servidor (hotmart-iniciar): a ref volta no sck do webhook e liga a compra à sessão, ao fbp/fbc e ao anúncio. */
+function registrarPedidoHotmart(ref: string): Promise<boolean> {
+  if (!PRODUCAO) return Promise.resolve(true); // fora do domínio: nada sai (o teste e o dev só veem o redirect)
+  const token = tokenDaSessao();
+  try {
+    return fetch(URL_HOTMART_INICIAR, {
+      method: "POST", keepalive: true,
+      headers: { "Content-Type": "application/json", apikey: KEY, Authorization: `Bearer ${token ?? KEY}` },
+      body: JSON.stringify({
+        ref, fbp: lerCookie("_fbp"), fbc: lerCookie("_fbc"), fbclid: BUSCA.get("fbclid"), url: URL_DE_CHEGADA.slice(0, 500),
+        landing_session_id: sessao, landing_device_id: aparelho, atrib, preco_centavos: HM_PRECO,
+      }),
+    }).then((r) => r.ok, () => false);
+  } catch { return Promise.resolve(false); }
+}
+let indoHotmart = false;
+/** test/QA: em vez de sair da página, guarda a URL (o jsdom não navega) */
+type JanelaHm = Window & { __landingIrPara?: (url: string) => void };
+async function irHotmart() {
+  if (indoHotmart) return;
+  indoHotmart = true;
+  const botao = $("lp-hotmart");
+  botao.setAttribute("aria-busy", "true");
+  porRotulo(botao, "Abrindo o pagamento…");
+  const ref = novoId();
+  const email = (estado.email || estado.emailPix || lerCompra()?.email || "").trim() || null;
+  const src = atrib.utm_content || atrib.ad_id || null;
+  const url = urlCheckoutHotmart(HM_URL, { ref: REF_OK.test(ref) ? ref : novoId(), src, email });
+  evento("landing_hotmart_redirect", { ref, src, com_email: !!email, valor: HM_PRECO / 100 });
+  pixel("InitiateCheckout", { value: HM_PRECO / 100, currency: "BRL", content_name: "vida_hotmart" }, `ic-${ref}`);
+  // o registro tem até 1,5 s (keepalive: segue mesmo depois de a página sair); falhar não segura a venda — o webhook acha pelo e-mail
+  const ok = await Promise.race([registrarPedidoHotmart(ref), espera(1500).then(() => null)]);
+  if (ok === false) evento("landing_erro", { onde: "hotmart_iniciar", msg: "registro_falhou" });
+  const ir = (w as JanelaHm).__landingIrPara;
+  if (ir) ir(url); else location.href = url;
+  // voltou pela seta do navegador (bfcache): o botão volta a funcionar
+  window.setTimeout(() => { indoHotmart = false; botao.removeAttribute("aria-busy"); porRotulo(botao, "Quero organizar minha vida"); }, 4000);
+}
+if (HOTMART) document.getElementById("lp-hotmart")?.addEventListener("click", () => { evento("landing_cta", { onde: "hotmart", fase: estado.fase }); void irHotmart(); });
 
 /* ───────────────────────── 31/10: "Seu 2027 organizado" no pós-pago (./upsell-2027.ts, só com a chave ou o link do e-mail) ───────────────────────── */
 function carregarU2027(): Promise<ModU2027> {

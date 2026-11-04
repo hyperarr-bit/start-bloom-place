@@ -40,6 +40,14 @@
       "destination": "/landing.html"
     },
     {
+      "source": "/vida",
+      "destination": "/landing.html"
+    },
+    {
+      "source": "/vida/obrigado",
+      "destination": "/vida-obrigado.html"
+    },
+    {
       "source": "/vendas",
       "destination": "/vendas.html"
     },

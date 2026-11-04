@@ -167,7 +167,8 @@ describe("braço atual = a página de hoje (origin/main 30/10), sem tirar nem p�
 /* ───────── 3. o que o v2 (= v3 "produto em uso", SINTESE.md) tem ───────── */
 const txt = (el: Element | null) => (el?.innerHTML ?? "").replace(/<br\s*\/?>/g, " ").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
 describe("braço v2 · a 1ª tela: uma frase, UM celular real, um preço, um botão", () => {
-  const html = () => { const d = document.createElement("div"); d.innerHTML = corpoDe(HTML); return d; };
+  // 04/11: o v2 do /organizar (e da /vida com a chave off) = sem os elementos do braço Hotmart da /vida (landing-hotmart.test.ts)
+  const html = () => { const d = document.createElement("div"); d.innerHTML = corpoDe(HTML); d.querySelectorAll('[data-so-ext="hotmart"]').forEach((el) => el.remove()); return d; };
   it("#topo-v2: faixa com CORE, título (a = dor nº 1; b = a legenda do anúncio, por ?t=b), 1 celular com a Home, lojas em texto, preço vitalício, botão, miúda — 7 elementos", () => {
     const d = html();
     const topo = d.querySelector("#topo-v2")!;
@@ -230,7 +231,8 @@ describe("braço v2 · a 1ª tela: uma frase, UM celular real, um preço, um bot
 });
 
 describe("braço v2 · 'Sim, é um app de verdade': 3 painéis empilhados no estilo das fotos de loja", () => {
-  const html = () => { const d = document.createElement("div"); d.innerHTML = corpoDe(HTML); return d; };
+  // 04/11: o v2 do /organizar (e da /vida com a chave off) = sem os elementos do braço Hotmart da /vida (landing-hotmart.test.ts)
+  const html = () => { const d = document.createElement("div"); d.innerHTML = corpoDe(HTML); d.querySelectorAll('[data-so-ext="hotmart"]').forEach((el) => el.remove()); return d; };
   it("os 16 DENTRO do celular em 1º (a imagem do anúncio, a 1 rolagem da dobra), depois Finanças com o card R$ 146 ampliado e a legenda que explica o número, depois Rotina; nunca fita", () => {
     const d = html();
     const sec = d.querySelector("#dentro-v2")!;
@@ -289,7 +291,8 @@ describe("braço v2 · 'Sim, é um app de verdade': 3 painéis empilhados no est
 });
 
 describe("braço v2 · cartão, avaliações, como funciona, dúvidas, demo, fim e barra fixa", () => {
-  const html = () => { const d = document.createElement("div"); d.innerHTML = corpoDe(HTML); return d; };
+  // 04/11: o v2 do /organizar (e da /vida com a chave off) = sem os elementos do braço Hotmart da /vida (landing-hotmart.test.ts)
+  const html = () => { const d = document.createElement("div"); d.innerHTML = corpoDe(HTML); d.querySelectorAll('[data-so-ext="hotmart"]').forEach((el) => el.remove()); return d; };
   it("o cartão: 8 linhas, 1 fato por linha — 'Vitalício por R$ 27,90', 'Pagamento único no Pix. Nada é cobrado depois.' 1x, 2 checks (app de verdade com a mesma conta · 7 dias), e-mail do AB_CHECKOUT, botão, CNPJ; sem âncora, sem linha repetida embaixo do botão", () => {
     const card = html().querySelector("#lp-card")!;
     card.querySelectorAll('[data-so-lp="atual"], [data-so-oferta="ano"]').forEach((el) => el.remove());

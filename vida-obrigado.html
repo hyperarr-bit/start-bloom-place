@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>CORE · Compra confirmada</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="color-scheme" content="light" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!--
+      /vida/obrigado (04/11) — a "página de obrigado" do checkout HOTMART da /vida (configurar na Hotmart: Produto → Checkout →
+      Página de obrigado = https://www.coreaplicativo.com.br/vida/obrigado). HTML estático, sem bundle e SEM pixel: o Purchase sai
+      do servidor (hotmart-webhook → CAPI nos 2 pixels, event_id = transação). Não configurar Purchase no pixel da Hotmart (contaria 2×).
+      A mesma cara do estado "pago" da v3 (landing.html): selos das lojas PRIMEIRO (regra do dono: todo pós-compra mostra as 2 lojas),
+      o acesso chega no e-mail da compra, o botão certo do app ("Já tenho conta? Entrar", não "Começar"), guia em PDF, contato.
+      Medição: 1 evento landing_hotmart_obrigado (só no domínio de produção), com pagina:"vida".
+    -->
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-latin.woff2" crossorigin />
+    <style>
+      @font-face { font-family: 'Inter'; font-style: normal; font-weight: 300 900; font-display: swap; src: url(/fonts/inter-latin.woff2) format('woff2'); }
+      :root { --tx: #1c1a1f; --suave: #6b6670; --borda: #ebe8ee; --grafite: #262626; --magenta: #d6338a; --verde: #16a34a; --verde-suave: #ecfdf3; }
+      html, body { margin: 0; background: #fff; color: var(--tx); font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%; }
+      * { box-sizing: border-box; }
+      .ob { max-width: 480px; margin: 0 auto; padding: 0 16px 40px; }
+      .ob-promo { height: 34px; display: flex; align-items: center; justify-content: center; background: var(--magenta); color: #fff; font-size: 12.5px; font-weight: 800; letter-spacing: .14em; }
+      .ob-card { margin-top: 22px; border-radius: 24px; border: 1.5px solid #ecdfe7; background: #fff; box-shadow: 0 30px 60px -30px rgba(22,18,28,.28); padding: 24px 18px 20px; text-align: center; }
+      .ob-check { width: 68px; height: 68px; margin: 0 auto; border-radius: 50%; display: grid; place-items: center; background: var(--verde); color: #fff; box-shadow: 0 0 0 10px var(--verde-suave); animation: pop .45s cubic-bezier(.2,1.4,.4,1) both; }
+      .ob-check svg { width: 34px; height: 34px; }
+      @keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+      @media (prefers-reduced-motion: reduce) { .ob-check { animation: none; } }
+      h1 { margin: 18px 0 0; font-size: 24px; line-height: 1.15; font-weight: 850; letter-spacing: -.025em; }
+      .ob-sub { margin: 8px 0 0; font-size: 15px; line-height: 1.45; color: var(--suave); }
+      .ob-selos { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+      .ob-selos a { display: inline-flex; }
+      .ob-selos img { height: 48px; width: auto; display: block; }
+      .ob-ce { margin-top: 16px; padding: 13px; border-radius: 14px; background: #fff; border: 1.5px solid #f0d6e5; text-align: center; }
+      .ob-ce-tit { display: block; margin: 0 0 9px; font-size: 14px; font-weight: 800; }
+      .ob-ce-app { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 13px 12px 9px; border-radius: 12px; background: #f1eeea; }
+      .ob-ce-comecar { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; height: 42px; border-radius: 999px; background: #bdb8bf; color: #fff; font-size: 15px; font-weight: 800; }
+      .ob-ce-nao { position: absolute; right: -4px; top: -9px; padding: 2px 8px; border-radius: 999px; background: #fff; border: 1.5px solid #f0c4c8; color: #c62f3c; font-size: 11px; font-weight: 800; }
+      .ob-ce-entrar { padding: 7px 14px; border-radius: 999px; background: #fff; border: 2.5px solid var(--magenta); box-shadow: 0 0 0 5px rgba(214,51,138,.12); font-size: 14px; color: #4f5a64; white-space: nowrap; }
+      .ob-ce-entrar span { color: #16121c; font-weight: 800; }
+      .ob-ce-sim { font-size: 11.5px; font-weight: 800; color: var(--magenta); }
+      .ob-ce p { margin: 9px 0 0; font-size: 13.5px; line-height: 1.4; color: var(--suave); }
+      .ob-guia { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; padding: 13px 14px; border-radius: 14px; border: 1px solid var(--borda); text-align: left; }
+      .ob-guia b { display: block; font-size: 15px; }
+      .ob-guia span { display: block; font-size: 13px; color: var(--suave); margin-top: 2px; }
+      .ob-guia a { flex: none; background: var(--grafite); color: #fff; text-decoration: none; font-size: 14px; font-weight: 800; padding: 11px 14px; border-radius: 10px; }
+      .ob-pc { margin: 14px 0 0; font-size: 13px; line-height: 1.45; color: var(--suave); }
+      .ob-pc a { color: var(--tx); font-weight: 700; }
+      .ob-rodape { margin-top: 26px; text-align: center; font-size: 12px; color: #9a95a0; line-height: 1.6; }
+      .ob-rodape a { color: var(--suave); }
+    </style>
+  </head>
+  <body>
+    <div class="ob-promo">CORE</div>
+    <main class="ob">
+      <div class="ob-card" data-testid="vida-obrigado">
+        <div class="ob-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></div>
+        <h1>Compra confirmada!</h1>
+        <p class="ob-sub">Seu acesso chega no <b>e-mail da compra</b> em até 1 minuto. Agora é só baixar o app:</p>
+        <div class="ob-selos">
+          <a href="https://apps.apple.com/br/app/id6806913181" data-loja="ios"><img src="/selos/app-store.svg" alt="Baixar na App Store" width="144" height="48" /></a>
+          <a href="https://play.google.com/store/apps/details?id=br.com.coreaplicativo.app&amp;referrer=utm_source%3Dweb%26utm_medium%3Dvida_obrigado%26utm_campaign%3Dweb_vida_obrigado" data-loja="android"><img src="/selos/google-play.png" alt="Disponível no Google Play" width="124" height="48" /></a>
+        </div>
+        <div class="ob-ce">
+          <span class="ob-ce-tit">No app, toque aqui 👇</span>
+          <div class="ob-ce-app" role="img" aria-label="No app, toque em Já tenho conta? Entrar, e não em Começar">
+            <div class="ob-ce-comecar">Começar<span class="ob-ce-nao">✕ não é aqui</span></div>
+            <div class="ob-ce-entrar">Já tenho conta? <span>Entrar</span></div>
+            <div class="ob-ce-sim">✓ é aqui</div>
+          </div>
+          <p>Toque em <b>“Já tenho conta? Entrar”</b> (não em “Começar”), digite o e-mail da compra e o código de 8 números que chega nele. Sem senha, sem pagar de novo.</p>
+        </div>
+        <div class="ob-guia">
+          <div><b>📖 Guia com fotos</b><span>Como entrar, primeiros passos e dicas.</span></div>
+          <a href="https://www.coreaplicativo.com.br/guia/core-comece-aqui.pdf" data-guia>Abrir o guia</a>
+        </div>
+        <p class="ob-pc">No computador, é o mesmo CORE em <a href="/home">coreaplicativo.com.br</a>. Não chegou o e-mail? Olhe o spam ou escreva pra <a href="mailto:contato@coreaplicativo.com.br">contato@coreaplicativo.com.br</a>.</p>
+      </div>
+      <p class="ob-rodape">CORE · CNPJ 55.041.112/0001-82<br /><a href="mailto:contato@coreaplicativo.com.br">contato@coreaplicativo.com.br</a> · <a href="/termos">Termos</a> · <a href="/privacidade">Privacidade</a></p>
+    </main>
+    <script>
+      /* 1 evento por abertura (só no domínio de produção): quantos chegaram ao obrigado e quantos tocaram nas lojas / no guia */
+      (function () {
+        if (!/(^|\.)coreaplicativo\.com\.br$/.test(location.hostname)) return;
+        var KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0b3lsZW56dmFoYnNjZ2pndHFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMTc4NzUsImV4cCI6MjA4OTg5Mzg3NX0.G3bJEdD5B5lmc1cic6UYGeu2xv4XrbmZ9MA_afoYnLg";
+        var sid = null; try { sid = sessionStorage.getItem("landing-sessao-v1"); } catch (e) {}
+        var q = null; try { q = new URLSearchParams(location.search); } catch (e) {}
+        var manda = function (nome, dados) {
+          try {
+            var d = { pagina: "vida", braco_checkout_ext: "hotmart", landing_session_id: sid, path: location.pathname };
+            for (var k in dados) d[k] = dados[k];
+            fetch("https://itoylenzvahbscgjgtqf.supabase.co/rest/v1/analytics_events", { method: "POST", keepalive: true, headers: { "Content-Type": "application/json", apikey: KEY, Authorization: "Bearer " + KEY, Prefer: "return=minimal" }, body: JSON.stringify({ user_id: null, session_id: sid, event_name: nome, event_data: d }) }).catch(function () {});
+          } catch (e) {}
+        };
+        manda("landing_hotmart_obrigado", { sck: q ? (q.get("sck") || "").slice(0, 64) || null : null });
+        var as = document.querySelectorAll("a[data-loja], a[data-guia]");
+        for (var i = 0; i < as.length; i++) as[i].addEventListener("click", function (e) { var a = e.currentTarget; manda("landing_loja", { loja: a.getAttribute("data-loja") || "guia", onde: "obrigado_hotmart" }); });
+      })();
+    </script>
+  </body>
+</html>

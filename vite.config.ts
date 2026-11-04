@@ -46,6 +46,9 @@ const rotaDaMissao = () => {
     if (req.url === "/missao" || req.url?.startsWith("/missao?")) req.url = req.url.replace("/missao", "/missao.html");
     // 28/10: a LANDING NOVA (/organizar → landing.html; a demo /organizar/demo continua no SPA)
     else if (req.url === "/organizar" || req.url?.startsWith("/organizar?")) req.url = req.url.replace("/organizar", "/landing.html");
+    // 04/11: /vida = a mesma landing (o <head> vê a rota e liga a v3 + o checkout da chave CHECKOUT_HOTMART); /vida/obrigado = a página de obrigado da Hotmart
+    else if (req.url === "/vida/obrigado" || req.url?.startsWith("/vida/obrigado?")) req.url = req.url.replace("/vida/obrigado", "/vida-obrigado.html");
+    else if (req.url === "/vida" || req.url?.startsWith("/vida?")) req.url = req.url.replace("/vida", "/landing.html");
     // 29/10: o painel do dono (/vendas → vendas.html, PWA própria com manifest e SW em /vendas/)
     else if (req.url === "/vendas" || req.url === "/vendas/" || req.url?.startsWith("/vendas?")) req.url = "/vendas.html" + (req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "");
     next();
@@ -126,6 +129,8 @@ export default defineConfig(({ mode }) => ({
         missao: path.resolve(__dirname, "missao.html"),
         // 28/10: a LANDING NOVA (/organizar, chave LANDING_NOVA "off" no próprio HTML) — HTML + CSS + src/landing/landing.ts
         landing: path.resolve(__dirname, "landing.html"),
+        // 04/11: /vida/obrigado — a "página de obrigado" do checkout Hotmart da /vida (HTML estático, sem bundle)
+        vidaObrigado: path.resolve(__dirname, "vida-obrigado.html"),
         // 29/10: /vendas — painel e aviso de venda do dono (PWA isolada: manifest e service worker só do /vendas)
         vendas: path.resolve(__dirname, "vendas.html"),
       },

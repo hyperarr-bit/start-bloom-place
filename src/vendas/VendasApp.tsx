@@ -30,7 +30,7 @@ type Campanha = {
 };
 type RespCampanhas = { periodo: string; desde: string; ate: string; campanhas: Campanha[]; fusos: Record<string, string>; errosMeta: string[]; totais: { gasto: number; gastoApp: number; testes: number; custoPorTeste: number | null } };
 type PeriodoWeb = { vendas: number; receita: number; gasto: number; retorno: number | null; cor: Cor };
-type RespWeb = { dia: string; hoje: PeriodoWeb; semana: PeriodoWeb; dias: Array<PeriodoWeb & { dia: string }>; landing: { sessoes: number; viuOferta: number; gerouPix: number; pagou: number; robos: number }; vida?: { sessoes: number; viuOferta: number; gerouPix: number; foiHotmart?: number; pagou: number }; errosMeta: string[] };
+type RespWeb = { dia: string; hoje: PeriodoWeb; semana: PeriodoWeb; dias: Array<PeriodoWeb & { dia: string }>; landing: { sessoes: number; viuOferta: number; gerouPix: number; pagou: number; robos: number }; vida?: { sessoes: number; viuOferta: number; gerouPix: number; foiHotmart?: number; pagou: number; bracos?: Record<"v3" | "atual" | "sem_braco", BracoVida> }; errosMeta: string[] };
 
 type DiaResumo = {
   dia: string; vendido: number; vendas: number; porOrigem: Record<Origem, { n: number; valor: number }>;
@@ -486,6 +486,23 @@ function AbaCampanhas({ d }: { d: RespCampanhas }) {
   );
 }
 
+type BracoVida = { visitas: number; foiHotmart: number; vendas: number; receita: number; porVisita: number | null };
+/** 04/11: o A/B da /vida (AB_VIDA) — uma linha por braço: visitas · foram pra Hotmart · vendas · R$ por visita */
+function VidaPorBraco({ b }: { b: Record<"v3" | "atual" | "sem_braco", BracoVida> }) {
+  const nomes: Array<["v3" | "atual" | "sem_braco", string]> = [["v3", "v3"], ["atual", "atual (97,90)"], ["sem_braco", "sem braço"]];
+  return (
+    <ul className="v-lista" data-testid="vida-bracos">
+      {nomes.filter(([k]) => k !== "sem_braco" || b.sem_braco.vendas > 0 || b.sem_braco.visitas > 0).map(([k, nome]) => (
+        <li key={k}>
+          <span className="v-hora">{nome}</span>
+          <span className="v-plano">{num(b[k].visitas)} visitas · {num(b[k].foiHotmart)} foram pra Hotmart · {num(b[k].vendas)} vendas</span>
+          <span className="v-valor">{b[k].porVisita === null ? "—" : `${brl(b[k].porVisita!)}/visita`}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function AbaWeb({ d }: { d: RespWeb }) {
   const l = d.landing;
   const passos = [
@@ -531,6 +548,7 @@ function AbaWeb({ d }: { d: RespWeb }) {
               </div>
             ))}
           </div>
+          {d.vida.bracos && <VidaPorBraco b={d.vida.bracos} />}
         </article>
       )}
       <article className="v-cartao">

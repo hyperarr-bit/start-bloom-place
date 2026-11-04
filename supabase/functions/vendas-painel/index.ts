@@ -17,7 +17,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { PAGAMENTOS_SITE, diaBRT, ehEmailTeste, inicioDiaBRT, somaDias, type LinhaSub, type Origem } from "../_shared/aviso-venda.ts";
 import {
   desfecho, funilLanding, gastoPorDia, INICIO_DIAS, linhaCampanha, montarTurmasDesde, normalizarLoja, resumoDoDia, roiWeb, vendasDoDia,
-  type EstadoRC, type EventoLanding, type InfoCampanha, type InsightMeta,
+  vidaPorBraco, type EstadoRC, type EventoLanding, type EventoVida, type InfoCampanha, type InsightMeta,
 } from "../_shared/vendas-painel.ts";
 
 const cors = {
@@ -202,13 +202,16 @@ async function abaWeb(admin: Admin, hoje: string) {
   const ins = await insightsPorDia(desde, hoje);
   const roi = roiWeb(subs, gastoPorDia(ins.linhas, "site", SITE_EXTRA), hoje);
   const eventos = await todas<EventoLanding>((a, b) => admin.from("analytics_events")
-    .select("event_name,sid:event_data->>landing_session_id,termo:event_data->>utm_term,simulado:event_data->>simulado,order_id:event_data->>order_id,pagina:event_data->>pagina")
+    .select("event_name,sid:event_data->>landing_session_id,termo:event_data->>utm_term,simulado:event_data->>simulado,order_id:event_data->>order_id,pagina:event_data->>pagina,braco:event_data->>braco_vida")
     .in("event_name", ["landing_html", "landing_oferta_vista", "landing_pix_gerado", "landing_pix_pago", "landing_hotmart_redirect"])
     .gte("created_at", inicioDiaBRT(hoje)).range(a, b), 30000);
   const pagos = new Set(subs.filter((s) => diaBRT(s.created_at ?? "") === hoje && s.abacatepay_billing_id).map((s) => String(s.abacatepay_billing_id)));
   // 04/11: a /vida (pagina:"vida") num funil próprio; "pagou" lá = as vendas da Hotmart de hoje (a ref do pedido não volta pro evento)
   const hotmartHoje = subs.filter((s) => s.payment_method === "hotmart" && diaBRT(s.created_at ?? "") === hoje && !ehEmailTeste(s.customer_email)).length;
-  const vida = { ...funilLanding(eventos, pagos, "vida"), pagou: hotmartHoje };
+  // 04/11: o A/B da /vida por braço (a venda leva o braço do pedido: hotmart_venda gravado pelo hotmart-webhook)
+  const { data: vendasHm } = await admin.from("analytics_events").select("braco:event_data->>braco_vida,valor_cents:event_data->>valor_cents")
+    .eq("event_name", "hotmart_venda").gte("created_at", inicioDiaBRT(hoje)).limit(2000);
+  const vida = { ...funilLanding(eventos, pagos, "vida"), pagou: hotmartHoje, bracos: vidaPorBraco(eventos as EventoVida[], (vendasHm ?? []) as Array<{ braco: string | null; valor_cents: string | null }>) };
   return { dia: hoje, ...roi, landing: funilLanding(eventos, pagos), vida, errosMeta: ins.erros };
 }
 

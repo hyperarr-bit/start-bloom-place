@@ -254,6 +254,31 @@ export function funilLanding(eventos: EventoLanding[], pedidosPagos: Set<string>
   return { sessoes: sessoes.size, viuOferta: oferta.size, gerouPix: pix.size, foiHotmart: hotmart.size, pagou: pagou.size, robos: robos.size };
 }
 
+/* 04/11: o A/B da /vida (AB_VIDA) — por braço: visitas (sessões reais), foram pra Hotmart, vendas (hotmart_venda com o braço do
+ * pedido), receita e R$ por visita. Venda sem braço (pedido sem registro) fica em "sem_braco". */
+export type EventoVida = EventoLanding & { braco?: string | null };
+export type LinhaBracoVida = { visitas: number; foiHotmart: number; vendas: number; receita: number; porVisita: number | null };
+export function vidaPorBraco(eventos: EventoVida[], vendas: Array<{ braco?: string | null; valor_cents?: number | string | null }>): Record<"v3" | "atual" | "sem_braco", LinhaBracoVida> {
+  const robos = new Set<string>();
+  for (const e of eventos) if (e.sid && /right_column/i.test(e.termo ?? "")) robos.add(e.sid);
+  const chave = (b: string | null | undefined): "v3" | "atual" | "sem_braco" => (b === "v3" || b === "atual" ? b : "sem_braco");
+  const vis: Record<string, Set<string>> = { v3: new Set(), atual: new Set(), sem_braco: new Set() };
+  const hm: Record<string, Set<string>> = { v3: new Set(), atual: new Set(), sem_braco: new Set() };
+  for (const e of eventos) {
+    if (!e.sid || robos.has(e.sid) || e.pagina !== "vida") continue;
+    const k = chave(e.braco ?? "v3"); // eventos de antes do A/B (sem braco_vida) eram todos do v3
+    vis[k].add(e.sid);
+    if (e.event_name === "landing_hotmart_redirect") hm[k].add(e.sid);
+  }
+  const out = {} as Record<"v3" | "atual" | "sem_braco", LinhaBracoVida>;
+  for (const k of ["v3", "atual", "sem_braco"] as const) {
+    const vs = vendas.filter((v) => chave(v.braco) === k);
+    const receita = Math.round(vs.reduce((s, v) => s + Number(v.valor_cents ?? 0), 0)) / 100;
+    out[k] = { visitas: vis[k].size, foiHotmart: hm[k].size, vendas: vs.length, receita, porVisita: vis[k].size ? Math.round((receita / vis[k].size) * 100) / 100 : null };
+  }
+  return out;
+}
+
 /* ------------------------------------------------------------------ vendas de hoje */
 
 export type ItemVenda = { hora: string; valor_cents: number; origem: Origem; plano: string; renovacao: boolean; gateway?: "hotmart" };

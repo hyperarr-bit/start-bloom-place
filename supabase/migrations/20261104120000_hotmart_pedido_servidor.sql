@@ -26,7 +26,7 @@ CREATE POLICY "Users insert own events"
       'subscription_started', 'trial_converted', 'subscription_expired_no_payment',
       'retention_discount_applied', 'retention_offer_accepted', 'retention_offers_shown',
       'cancel_confirmed', 'cancel_loja_bloqueado', 'support_ticket_answered', 'support_ticket_created',
-      'hotmart_venda_ignorada', 'hotmart_email_falhou', 'hotmart_conta_divergente'
+      'hotmart_venda_ignorada', 'hotmart_email_falhou', 'hotmart_conta_divergente', 'hotmart_venda'
     ]::text[]))
   );
 
@@ -46,7 +46,7 @@ CREATE POLICY "Anon insert anonymous events"
       'subscription_started', 'trial_converted', 'subscription_expired_no_payment',
       'retention_discount_applied', 'retention_offer_accepted', 'retention_offers_shown',
       'cancel_confirmed', 'cancel_loja_bloqueado', 'support_ticket_answered', 'support_ticket_created',
-      'hotmart_venda_ignorada', 'hotmart_email_falhou', 'hotmart_conta_divergente'
+      'hotmart_venda_ignorada', 'hotmart_email_falhou', 'hotmart_conta_divergente', 'hotmart_venda'
     ]::text[]))
   );
 

@@ -357,6 +357,13 @@ export async function tratarHotmart(deps: DepsHotmart, req: { hottok: string | n
       if (!ok) { await soltar(admin, `hotmart-email:${c.tx}`); emailFalhou = true; }
       log(ok ? "e-mail da compra enviado" : "e-mail da compra FALHOU", { para: mascararEmail(emailConta) });
     }
+    // 04/11 (A/B da /vida): a venda com o BRAÇO do pedido (hotmart-iniciar) — o /vendas separa a /vida por braço. 1× por transação.
+    if (await reservar(admin, `hotmart-venda:${c.tx}`, "venda") === "ok") {
+      const braco = (reg.dados as { braco_vida?: unknown } | null)?.braco_vida;
+      try {
+        await admin.from("analytics_events").insert({ event_name: "hotmart_venda", user_id: conta.userId, event_data: { tx: c.tx, pagina: "vida", braco_vida: braco === "v3" || braco === "atual" ? braco : null, valor_cents: c.valorCents, via: conta.via } });
+      } catch { /* a venda já está liberada; o /vendas mostra "sem braço" */ }
+    }
     if (await reservar(admin, `hotmart-capi:${c.tx}`, "capi") === "ok") {
       const corpo = await eventoPurchaseHotmart({ tx: c.tx, valorCents: c.valorCents, userId: conta.userId, email: emailConta, registro: reg, agoraMs: agora.getTime() });
       const ok = await deps.mandarCapi(corpo).catch(() => false);

@@ -5,6 +5,8 @@
 export type InicioHotmart = {
   ref: string; fbp: string | null; fbc: string | null; fbclid: string | null; url: string | null;
   landing_session_id: string | null; landing_device_id: string | null; preco_centavos: number | null; atrib: Record<string, string>;
+  /** 04/11: o braço do A/B da /vida (AB_VIDA) — cada venda fica com o braço */
+  braco_vida: "v3" | "atual" | null;
 };
 
 const t = (v: unknown, n: number): string | null => (typeof v === "string" && v.trim() ? v.trim().slice(0, n) : null);
@@ -25,6 +27,7 @@ export function validarInicio(body: unknown): InicioHotmart | null {
     url: url && SITES.some((s) => url.startsWith(s)) ? url : null,
     landing_session_id: t(b.landing_session_id, 64), landing_device_id: t(b.landing_device_id, 64),
     preco_centavos: Number.isInteger(preco) && preco > 0 && preco < 1_000_000 ? preco : null, atrib,
+    braco_vida: b.braco_vida === "v3" || b.braco_vida === "atual" ? b.braco_vida : null,
   };
 }
 
@@ -42,6 +45,7 @@ export function linhaDoPedidoHotmart(p: InicioHotmart, args: { userId: string | 
       ...(p.landing_session_id ? { landing_session_id: p.landing_session_id } : {}),
       ...(p.landing_device_id ? { landing_device_id: p.landing_device_id } : {}),
       ...(p.preco_centavos ? { preco_centavos: p.preco_centavos } : {}),
+      ...(p.braco_vida ? { braco_vida: p.braco_vida } : {}),
       ...p.atrib,
     },
   };

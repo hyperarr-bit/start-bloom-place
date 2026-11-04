@@ -11,7 +11,7 @@ import { resolve } from "node:path";
 import { tratarHotmart, lerCompraHotmart, hottokOk, mascararEmail, escolherRegistroHotmart, type DepsHotmart } from "../../supabase/functions/_shared/hotmart";
 import { validarInicio, linhaDoPedidoHotmart, ipPodeIniciar, refJaExiste, LIMITE_POR_IP } from "../../supabase/functions/_shared/hotmart-iniciar";
 import { vendaPix, tituloVenda } from "../../supabase/functions/_shared/aviso-venda";
-import { funilLanding, resumoDoDia, taxaSiteCents, vendasDoDia } from "../../supabase/functions/_shared/vendas-painel";
+import { funilLanding, resumoDoDia, taxaSiteCents, vendasDoDia, vidaPorBraco } from "../../supabase/functions/_shared/vendas-painel";
 
 const SECRET = "tok_hotmart_123";
 type Linha = Record<string, unknown>;
@@ -567,5 +567,41 @@ describe("reconferência 4: hotmart_conta_divergente 1× por transação", () =>
     await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ sck: REF }) });
     await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ sck: REF, evento: "PURCHASE_COMPLETE", status: "COMPLETE" }) });
     expect(m.db.analytics_events.filter((e) => e.event_name === "hotmart_conta_divergente")).toHaveLength(1);
+  });
+});
+
+/* ───────── A/B da /vida (AB_VIDA): cada venda com o braço do pedido ───────── */
+describe("AB_VIDA: o braço vai no pedido e na venda", () => {
+  it("hotmart-iniciar aceita braco_vida v3|atual (outro valor some) e grava no pedido", () => {
+    expect(validarInicio({ ref: REF, braco_vida: "atual" })!.braco_vida).toBe("atual");
+    expect(validarInicio({ ref: REF, braco_vida: "zzz" })!.braco_vida).toBeNull();
+    expect(linhaDoPedidoHotmart(validarInicio({ ref: REF, braco_vida: "v3" })!, { userId: null, ip: null, ua: null }).event_data).toMatchObject({ braco_vida: "v3" });
+  });
+  it("venda liberada → 1 hotmart_venda com o braço do pedido (reenvio/COMPLETE não repetem); sem pedido → braço null", async () => {
+    const m = montar();
+    registrar(m.db, null, { braco_vida: "atual" });
+    await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ sck: REF }) });
+    await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ sck: REF }) });
+    await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ sck: REF, evento: "PURCHASE_COMPLETE", status: "COMPLETE" }) });
+    const v = m.db.analytics_events.filter((e) => e.event_name === "hotmart_venda");
+    expect(v).toHaveLength(1);
+    expect(v[0].event_data).toMatchObject({ tx: "HP17715690036014", braco_vida: "atual", valor_cents: 9790, pagina: "vida" });
+    const m2 = montar();
+    await tratarHotmart(m2.deps, { hottok: SECRET, body: compra() });
+    expect(m2.db.analytics_events.find((e) => e.event_name === "hotmart_venda")!.event_data).toMatchObject({ braco_vida: null });
+  });
+  it("/vendas: por braço — visitas, foram pra Hotmart, vendas e R$ por visita (robô e /organizar fora; evento antigo sem braço = v3)", () => {
+    const ev = [
+      { event_name: "landing_html", sid: "a1", pagina: "vida", braco: "v3" }, { event_name: "landing_hotmart_redirect", sid: "a1", pagina: "vida", braco: "v3" },
+      { event_name: "landing_html", sid: "a2", pagina: "vida", braco: "v3" },
+      { event_name: "landing_html", sid: "a3", pagina: "vida" },
+      { event_name: "landing_html", sid: "b1", pagina: "vida", braco: "atual" }, { event_name: "landing_hotmart_redirect", sid: "b1", pagina: "vida", braco: "atual" },
+      { event_name: "landing_html", sid: "r", pagina: "vida", braco: "atual", termo: "x_Right_Column" },
+      { event_name: "landing_html", sid: "o1" },
+    ];
+    const r = vidaPorBraco(ev, [{ braco: "v3", valor_cents: "9790" }, { braco: "atual", valor_cents: 9790 }, { braco: "atual", valor_cents: 9790 }, { braco: null, valor_cents: 9790 }]);
+    expect(r.v3).toEqual({ visitas: 3, foiHotmart: 1, vendas: 1, receita: 97.9, porVisita: 32.63 });
+    expect(r.atual).toEqual({ visitas: 1, foiHotmart: 1, vendas: 2, receita: 195.8, porVisita: 195.8 });
+    expect(r.sem_braco).toMatchObject({ visitas: 0, vendas: 1, porVisita: null });
   });
 });

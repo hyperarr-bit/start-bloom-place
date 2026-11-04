@@ -52,8 +52,8 @@ function rodar(fonte: string, url: string, store: Record<string, string> = {}) {
 
 /* ───────── 1. o <head> ───────── */
 describe("o <head>: /organizar intocado; /vida decide pela rota e pela chave CHECKOUT_HOTMART", () => {
-  it("no código: CHECKOUT_HOTMART off, a URL real do checkout do dono (produto 8885020), preço 9790, parcelas com texto", () => {
-    expect(HTML).toMatch(/var CHECKOUT_HOTMART = "off";/);
+  it("no código: CHECKOUT_HOTMART on (04/11, dono ligou), a URL real do checkout do dono (produto 8885020), preço 9790, parcelas com texto", () => {
+    expect(HTML).toMatch(/var CHECKOUT_HOTMART = "on";/);
     expect(HTML).toMatch(/var HOTMART_CHECKOUT_URL = "https:\/\/pay\.hotmart\.com\/K108338476R";/);
     expect(urlHotmartValida("https://pay.hotmart.com/K108338476R")).toBe(true);
     expect(HTML).toMatch(/var HOTMART_PRECO_CENTAVOS = 9790;/);

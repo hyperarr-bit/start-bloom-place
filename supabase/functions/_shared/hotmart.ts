@@ -45,6 +45,12 @@ const STATUS_PAGO = new Set(["APPROVED", "COMPLETE", "COMPLETED"]);
 /** o nome do registro do pedido (hotmart-iniciar) em analytics_events — só o servidor grava (migração 20261104120000) */
 export const EVENTO_PEDIDO_HOTMART = "hotmart_order_created";
 export const OFERTA_HOTMART = "HM_vida";
+/** 04/11 (revisão A): o produto da /vida na Hotmart. Só ele libera — o "Enviar teste" da Hotmart (produto 0) e qualquer outro
+ *  produto da conta são ignorados. O secret HOTMART_PRODUTO_ID só sobrescreve. */
+export const PRODUTO_HOTMART_PADRAO = "8885020";
+/** 04/11 (revisão E): abaixo disto não é a venda da /vida (R$ 97,90; cupom de até ~50% ainda passa). */
+export const VALOR_MINIMO_CENTS = 5000;
+const EVENTOS_ESTORNO_LISTA = ["PURCHASE_REFUNDED", "PURCHASE_CHARGEBACK", "PURCHASE_CANCELED"];
 export const GATEWAY_HOTMART = "hotmart";
 const SITE = "https://www.coreaplicativo.com.br";
 
@@ -122,7 +128,7 @@ export async function registroHotmart(admin: ClienteMin, ref: string | null): Pr
   if (!ref || !/^[A-Za-z0-9-]{8,64}$/.test(ref)) return { userId: null, dados: null, criadoEm: null, conflito: false };
   try {
     const { data } = await admin.from("analytics_events").select("user_id, event_data, created_at")
-      .eq("event_name", EVENTO_PEDIDO_HOTMART).contains("event_data", { ref }).limit(10);
+      .eq("event_name", EVENTO_PEDIDO_HOTMART).eq("event_data->>ref", ref).limit(10); // índice parcial (migração 20261104120000)
     return escolherRegistroHotmart(data as never);
   } catch {
     return { userId: null, dados: null, criadoEm: null, conflito: false };
@@ -130,7 +136,7 @@ export async function registroHotmart(admin: ClienteMin, ref: string | null): Pr
 }
 
 /* ───────────────────────── a conta ───────────────────────── */
-export type ContaHotmart = { userId: string; email: string | null; via: "ref" | "ref_batizada" | "email" | "email_outra_conta" | "nova" };
+export type ContaHotmart = { userId: string; email: string | null; via: "ref" | "ref_batizada" | "email" | "email_outra_conta" | "nova"; divergenteDe?: string };
 
 /**
  * 1º a conta da ref (a anônima da sessão; sem e-mail → ganha o do comprador, se ele não for de outra conta);
@@ -145,7 +151,13 @@ export async function acharContaHotmart(admin: AdminHotmart, args: {
     const conta = u?.data?.user ?? null;
     if (conta) {
       const temEmail = (conta.email ?? "").trim().toLowerCase();
-      if (temEmail || !email) return { userId: conta.id, email: temEmail || null, via: "ref" };
+      if (!email || temEmail === email) return { userId: conta.id, email: temEmail || null, via: "ref" };
+      if (temEmail) {
+        // F (revisão): a sessão do navegador é de OUTRA conta (outro e-mail; o token pega o login de qualquer conta do domínio) —
+        // a compra vai pro e-mail de quem comprou (acha ou cria) e a divergência fica registrada
+        const r = await contaDoEmail(admin, email, args.acharConta);
+        return r ? { ...r, divergenteDe: conta.id } : { userId: conta.id, email: temEmail, via: "ref" };
+      }
       const outra = await args.acharConta(email).catch(() => null);
       if (outra && outra !== conta.id) return { userId: outra, email, via: "email_outra_conta" };
       const upd = await admin.auth.admin.updateUserById(conta.id, { email, email_confirm: true }).catch((e) => ({ error: { message: String(e) } }));
@@ -156,11 +168,15 @@ export async function acharContaHotmart(admin: AdminHotmart, args: {
     }
   }
   if (!email) return null;
-  const doEmail = await args.acharConta(email).catch(() => null);
+  return contaDoEmail(admin, email, args.acharConta);
+}
+
+async function contaDoEmail(admin: AdminHotmart, email: string, acharConta: (email: string) => Promise<string | null>): Promise<ContaHotmart | null> {
+  const doEmail = await acharConta(email).catch(() => null);
   if (doEmail) return { userId: doEmail, email, via: "email" };
   const criada = await admin.auth.admin.createUser({ email, email_confirm: true, user_metadata: { origem: "hotmart_vida" } }).catch((e) => ({ error: { message: String(e) } }) as ResultadoAuth);
   if (criada?.data?.user?.id) return { userId: criada.data.user.id, email, via: "nova" };
-  const deNovo = await args.acharConta(email).catch(() => null);
+  const deNovo = await acharConta(email).catch(() => null);
   return deNovo ? { userId: deNovo, email, via: "email" } : null;
 }
 
@@ -203,7 +219,7 @@ export async function eventoPurchaseHotmart(args: {
 export type DepsHotmart = {
   admin: AdminHotmart;
   secret: string | null;
-  /** só aceita este produto (secret/env HOTMART_PRODUTO_ID); vazio = qualquer um */
+  /** o produto aceito (secret HOTMART_PRODUTO_ID); vazio = PRODUTO_HOTMART_PADRAO. Produto ausente/diferente = ignorado. */
   produtoId?: string | null;
   acharConta: (email: string) => Promise<string | null>;
   enviarEmail: (para: string, assunto: string, html: string) => Promise<boolean>;
@@ -228,6 +244,17 @@ async function soltar(admin: ClienteMin, id: string): Promise<void> {
   try { await admin.from("webhook_events").delete().eq("id", id); } catch { /* noop */ }
 }
 
+/** B: algum estorno desta transação já passou por aqui? */
+async function jaEstornada(admin: ClienteMin, tx: string): Promise<boolean> {
+  for (const ev of EVENTOS_ESTORNO_LISTA) {
+    try {
+      const { data } = await admin.from("webhook_events").select("id").eq("id", `hotmart:${tx}:${ev}`).maybeSingle();
+      if (data) return true;
+    } catch { /* sem leitura: segue */ }
+  }
+  return false;
+}
+
 export async function tratarHotmart(deps: DepsHotmart, req: { hottok: string | null; body: unknown }): Promise<Resposta> {
   const { admin, log } = deps;
   if (!hottokOk(req.hottok, deps.secret)) {
@@ -237,7 +264,8 @@ export async function tratarHotmart(deps: DepsHotmart, req: { hottok: string | n
   const c = lerCompraHotmart(req.body);
   const base = { evento: c.evento, tx: c.tx, status: c.status, valor: c.valorCents, email: mascararEmail(c.email), sck: c.sck ? `${c.sck.slice(0, 8)}…` : null, pagamento: c.pagamento };
   if (!c.tx || !c.evento) { log("sem transação/evento — ignorado", base); return { status: 200, corpo: { ok: true, ignorado: "sem_transacao" } }; }
-  if (deps.produtoId && c.produtoId && c.produtoId !== deps.produtoId) { log("outro produto — ignorado", { ...base, produto: c.produtoId }); return { status: 200, corpo: { ok: true, ignorado: "outro_produto" } }; }
+  const produto = deps.produtoId || PRODUTO_HOTMART_PADRAO;
+  if (c.produtoId !== produto) { log("outro produto (ou o teste da Hotmart) — ignorado", { ...base, produto: c.produtoId }); return { status: 200, corpo: { ok: true, ignorado: "outro_produto" } }; }
 
   const pago = EVENTOS_PAGO.has(c.evento);
   const estorno = EVENTOS_ESTORNO.has(c.evento);
@@ -255,20 +283,29 @@ export async function tratarHotmart(deps: DepsHotmart, req: { hottok: string | n
       return { status: 200, corpo: { ok: true, desligado: true } };
     }
 
-    if (c.status && !STATUS_PAGO.has(c.status)) { log("evento de pago com status estranho — não libera", base); return { status: 200, corpo: { ok: true, ignorado: "status" } }; }
-    if (!c.valorCents || (c.moeda && c.moeda !== "BRL")) { log("valor/moeda inválidos — não libera", { ...base, moeda: c.moeda }); return { status: 200, corpo: { ok: true, ignorado: "valor" } }; }
+    if (!c.status || !STATUS_PAGO.has(c.status)) { log("evento de pago sem status pago — não libera", base); return { status: 200, corpo: { ok: true, ignorado: "status" } }; }
+    if (!c.valorCents || c.valorCents < VALOR_MINIMO_CENTS || c.moeda !== "BRL") { log("valor/moeda inválidos — não libera", { ...base, moeda: c.moeda }); return { status: 200, corpo: { ok: true, ignorado: "valor" } }; }
+    // B (revisão): o estorno chegou ANTES (fora de ordem) ou o APPROVED foi reenviado depois do reembolso → não libera
+    if (await jaEstornada(admin, c.tx)) { log("transação já estornada — não libera", base); return { status: 200, corpo: { ok: true, ignorado: "estornada" } }; }
 
     const reg = await registroHotmart(admin, c.sck);
     if (reg.conflito) log("ALARME registro do pedido em conflito — vai pelo e-mail", base);
     const conta = await acharContaHotmart(admin, { refUserId: reg.userId, email: c.email, acharConta: deps.acharConta });
     if (!conta) { log("ALARME sem conta (sem ref e sem e-mail) — não libera", base); return { status: 200, corpo: { ok: true, ignorado: "sem_conta" } }; }
     log("conta", { ...base, via: conta.via, ref: !!reg.userId });
+    if (conta.divergenteDe) {
+      // F (revisão): a sessão do navegador era de outra conta (outro e-mail) — a compra foi pro e-mail do comprador
+      try { await admin.from("analytics_events").insert({ event_name: "hotmart_conta_divergente", user_id: conta.divergenteDe, event_data: { tx: c.tx, para: conta.userId, via: conta.via } }); } catch { /* registro é luxo */ }
+    }
 
     const agora = deps.agora ? deps.agora() : new Date();
     const emailConta = conta.email ?? c.email;
     const g = await creditarPedido(admin, {
       userId: conta.userId, orderId: c.tx, gateway: GATEWAY_HOTMART, concessao: { dias: null }, agora,
       protegerVitalicio: true, offer: OFERTA_HOTMART,
+      // C (revisão): linha SÓ da transação — nunca reescreve a linha Pix viva da pessoa (ex.: o anual LN_ano279); o reembolso
+      // da Hotmart desliga só esta linha
+      linhaNova: true,
       montarPayload: (fim) => ({
         user_id: conta.userId, status: "active", plan: "lifetime", billing_period: "lifetime",
         payment_method: GATEWAY_HOTMART, abacatepay_billing_id: c.tx, customer_email: emailConta, amount_cents: c.valorCents,
@@ -276,16 +313,20 @@ export async function tratarHotmart(deps: DepsHotmart, req: { hottok: string | n
       }),
     });
     if (g.r === "erro" || g.r === "em_andamento") throw new Error(g.r === "erro" ? g.msg : "em_andamento");
-    if (g.r !== "creditado" || g.jaLiberado) {
+    if (g.r === "preservado" || (g.r === "creditado" && g.jaLiberado)) {
       log(g.r === "creditado" ? "creditado, já tinha vitalício — nada sai" : `nada a creditar (${g.r})`, base);
       return { status: 200, corpo: { ok: true, liberado: true, novo: false } };
     }
-    log("vitalício liberado", { ...base, acao: g.acao });
+    if (g.r === "creditado") log("vitalício liberado", { ...base, acao: g.acao });
+    else log("transação já creditada — confere o que falta sair (e-mail/Purchase/aviso, 1 de cada)", base);
 
-    // 1 de cada por transação (o PURCHASE_COMPLETE depois do APPROVED cai no ja_creditado acima; a reserva cobre corrida)
+    /* 1 de cada por TRANSAÇÃO (reserva em webhook_events): roda no crédito E no "já creditado" (o reenvio depois de um e-mail
+     * que falhou, ou o PURCHASE_COMPLETE) — o que já saiu não sai de novo. D (revisão): e-mail que falha → 500 + solta a chave
+     * do evento (a Hotmart reenvia; o crédito e o Purchase não repetem). */
+    let emailFalhou = false;
     if (emailConta && await reservar(admin, `hotmart-email:${c.tx}`, "email") === "ok") {
-      const ok = await deps.enviarEmail(emailConta, assuntoVenda("lifetime"), htmlVenda({ email: emailConta, nome: c.nome, periodo: "lifetime", fim: g.fim, hoje: true })).catch(() => false);
-      if (!ok) await soltar(admin, `hotmart-email:${c.tx}`);
+      const ok = await deps.enviarEmail(emailConta, assuntoVenda("lifetime"), htmlVenda({ email: emailConta, nome: c.nome, periodo: "lifetime", fim: g.r === "creditado" ? g.fim : null, hoje: true })).catch(() => false);
+      if (!ok) { await soltar(admin, `hotmart-email:${c.tx}`); emailFalhou = true; }
       log(ok ? "e-mail da compra enviado" : "e-mail da compra FALHOU", { para: mascararEmail(emailConta) });
     }
     if (await reservar(admin, `hotmart-capi:${c.tx}`, "capi") === "ok") {
@@ -295,9 +336,10 @@ export async function tratarHotmart(deps: DepsHotmart, req: { hottok: string | n
     }
     try {
       const { data } = await admin.from("subscriptions").select("id").eq("abacatepay_billing_id", c.tx).eq("user_id", conta.userId).maybeSingle();
-      if (data?.id) await deps.avisarVenda(String(data.id));
+      if (data?.id && g.r === "creditado") await deps.avisarVenda(String(data.id)); // o aviso sai no crédito (o reenvio não avisa de novo)
     } catch { /* aviso é luxo */ }
-    return { status: 200, corpo: { ok: true, liberado: true, novo: true, via: conta.via } };
+    if (emailFalhou) throw new Error("email_falhou");
+    return { status: 200, corpo: { ok: true, liberado: true, novo: g.r === "creditado", via: conta.via } };
   } catch (e) {
     await soltar(admin, chave); // a Hotmart reenvia e a gente tenta de novo
     log("ERRO — a Hotmart vai reenviar", { ...base, msg: String((e as Error)?.message ?? e).slice(0, 160) });

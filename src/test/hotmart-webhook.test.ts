@@ -9,7 +9,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { tratarHotmart, lerCompraHotmart, hottokOk, mascararEmail, escolherRegistroHotmart, type DepsHotmart } from "../../supabase/functions/_shared/hotmart";
-import { validarInicio, linhaDoPedidoHotmart } from "../../supabase/functions/_shared/hotmart-iniciar";
+import { validarInicio, linhaDoPedidoHotmart, ipPodeIniciar, refJaExiste, LIMITE_POR_IP } from "../../supabase/functions/_shared/hotmart-iniciar";
 import { vendaPix, tituloVenda } from "../../supabase/functions/_shared/aviso-venda";
 import { funilLanding, resumoDoDia, taxaSiteCents, vendasDoDia } from "../../supabase/functions/_shared/vendas-painel";
 
@@ -27,10 +27,11 @@ function bancoFalso() {
   const from = (tabela: string) => {
     const filtros: Array<(r: Linha) => boolean> = [];
     let op: { tipo: "select" | "insert" | "update" | "delete"; dados?: Linha } = { tipo: "select" };
-    let unico = false;
+    let unico = false, contar = false;
     const exec = async () => {
       await new Promise((r) => setTimeout(r, 0));
       const casa = (r: Linha) => filtros.every((f) => f(r));
+      if (contar) return { count: (tabela === "subscriptions" ? db.subscriptions : db.analytics_events).filter(casa).length, error: null };
       if (tabela === "webhook_events") {
         if (op.tipo === "insert") {
           const id = String(op.dados!.id);
@@ -48,11 +49,12 @@ function bancoFalso() {
       return { data: unico ? a[0] ?? null : a, error: null };
     };
     const q: Record<string, unknown> = {
-      select: () => { if (op.tipo !== "update") op = { tipo: "select" }; return q; },
+      select: (_c?: string, o?: { count?: string; head?: boolean }) => { if (op.tipo !== "update") op = { tipo: "select" }; if (o?.head) contar = true; return q; },
       insert: (d: Linha) => { op = { tipo: "insert", dados: d }; return q; },
       update: (d: Linha) => { op = { tipo: "update", dados: d }; return q; },
       delete: () => { op = { tipo: "delete" }; return q; },
-      eq: (k: string, v: unknown) => { filtros.push((r) => r[k] === v); return q; },
+      eq: (k: string, v: unknown) => { const [col, sub] = k.split("->>"); filtros.push((r) => (sub ? String((r[col] as Linha | undefined)?.[sub] ?? "") : r[k]) === v); return q; },
+      gte: (k: string, v: string) => { filtros.push((r) => String(r[k] ?? "") >= v); return q; },
       contains: (k: string, v: Record<string, unknown>) => { filtros.push((r) => Object.entries(v).every(([kk, vv]) => (r[k] as Linha | undefined)?.[kk] === vv)); return q; },
       limit: () => q,
       maybeSingle: () => { unico = true; return q; },
@@ -86,14 +88,14 @@ function montar(db = bancoFalso()) {
   return { ...db, deps, saida };
 }
 
-const compra = (o: { evento?: string; tx?: string; email?: string | null; sck?: string | null; valor?: number; status?: string } = {}) => ({
+const compra = (o: { evento?: string; tx?: string; email?: string | null; sck?: string | null; valor?: number; status?: string | null; produto?: number | null; moeda?: string | null } = {}) => ({
   id: `evt-${Math.random()}`, creation_date: 1762268400000, event: o.evento ?? "PURCHASE_APPROVED", version: "2.0.0",
   data: {
-    product: { id: 123456, name: "CORE vitalício" },
+    product: { id: o.produto === undefined ? 8885020 : o.produto, name: "CORE vitalício" },
     buyer: { email: o.email === undefined ? "Maria@Exemplo.com" : o.email, name: "Maria Souza" },
     purchase: {
-      transaction: o.tx ?? "HP17715690036014", status: o.status ?? "APPROVED",
-      price: { value: o.valor ?? 97.9, currency_value: "BRL" }, full_price: { value: 102.5, currency_value: "BRL" },
+      transaction: o.tx ?? "HP17715690036014", status: o.status === undefined ? "APPROVED" : o.status,
+      price: { value: o.valor ?? 97.9, currency_value: o.moeda === undefined ? "BRL" : o.moeda }, full_price: { value: 102.5, currency_value: "BRL" },
       payment: { type: "PIX", installments_number: 1 }, origin: { sck: o.sck === undefined ? null : o.sck, src: "criativo_7" },
     },
   },
@@ -213,14 +215,14 @@ describe("compra aprovada", () => {
 });
 
 describe("de quem é a compra", () => {
-  it("pela REF: conta da sessão que já tem e-mail fica com a compra (mesmo com outro e-mail no checkout)", async () => {
+  it("pela REF: conta da sessão com o MESMO e-mail do comprador fica com a compra (outro e-mail = revisão F, abaixo)", async () => {
     const m = montar();
-    m.db.users.set("u_ref", { id: "u_ref", email: "ana@exemplo.com" });
+    m.db.users.set("u_ref", { id: "u_ref", email: "maria@exemplo.com" });
     registrar(m.db, "u_ref");
     const r = await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ sck: REF }) });
     expect(r.corpo).toMatchObject({ via: "ref" });
-    expect(m.db.subscriptions[0]).toMatchObject({ user_id: "u_ref", customer_email: "ana@exemplo.com" });
-    expect(m.saida.emails[0].para).toBe("ana@exemplo.com");
+    expect(m.db.subscriptions[0]).toMatchObject({ user_id: "u_ref", customer_email: "maria@exemplo.com" });
+    expect(m.saida.emails[0].para).toBe("maria@exemplo.com");
   });
 
   it("pela REF sem e-mail, mas o e-mail do comprador já é de OUTRA conta → a compra vai pra outra (e fica no log)", async () => {
@@ -289,7 +291,7 @@ describe("reembolso / chargeback / cancelada", () => {
 describe("puros: leitura do corpo, hotmart-iniciar, máscaras", () => {
   it("lerCompraHotmart pega os campos da doc 2.0.0 (price, não full_price)", () => {
     const c = lerCompraHotmart(compra({ sck: REF }));
-    expect(c).toMatchObject({ evento: "PURCHASE_APPROVED", tx: "HP17715690036014", status: "APPROVED", valorCents: 9790, moeda: "BRL", email: "maria@exemplo.com", sck: REF, src: "criativo_7", produtoId: "123456", pagamento: "PIX" });
+    expect(c).toMatchObject({ evento: "PURCHASE_APPROVED", tx: "HP17715690036014", status: "APPROVED", valorCents: 9790, moeda: "BRL", email: "maria@exemplo.com", sck: REF, src: "criativo_7", produtoId: "8885020", pagamento: "PIX" });
     expect(lerCompraHotmart(null)).toMatchObject({ tx: null, evento: "" });
     expect(mascararEmail("maria@exemplo.com")).toBe("ma***@exemplo.com");
   });
@@ -342,5 +344,149 @@ describe("/vendas e o aviso: Hotmart é venda do site, com a taxa da Hotmart", (
     ];
     expect(funilLanding(ev)).toMatchObject({ sessoes: 1, viuOferta: 1, foiHotmart: 0 });
     expect(funilLanding(ev, new Set(), "vida")).toMatchObject({ sessoes: 1, viuOferta: 1, foiHotmart: 1 });
+  });
+});
+
+/* ───────── a revisão independente (04/11): A–G ───────── */
+describe("revisão A: só o produto 8885020 libera", () => {
+  it('o "Enviar teste" da Hotmart (produto 0, R$ 1.500) não cria conta, não libera, não manda nada', async () => {
+    const m = montar();
+    const r = await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ produto: 0, valor: 1500, email: "teste@hotmart.com" }) });
+    expect(r).toMatchObject({ status: 200, corpo: { ignorado: "outro_produto" } });
+    expect(m.db.subscriptions).toHaveLength(0);
+    expect(m.db.users.size).toBe(0);
+    expect(m.saida.capi.length + m.saida.emails.length + m.saida.avisos.length).toBe(0);
+  });
+  it("produto ausente ou outro → ignorado; o secret HOTMART_PRODUTO_ID sobrescreve o padrão", async () => {
+    const m = montar();
+    expect((await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ produto: null }) })).corpo).toMatchObject({ ignorado: "outro_produto" });
+    expect((await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ produto: 777 }) })).corpo).toMatchObject({ ignorado: "outro_produto" });
+    expect((await tratarHotmart({ ...m.deps, produtoId: "777" }, { hottok: SECRET, body: compra({ produto: 777 }) })).corpo).toMatchObject({ novo: true });
+    expect(m.db.subscriptions).toHaveLength(1);
+  });
+});
+
+describe("revisão B: estorno fora de ordem", () => {
+  it("REFUNDED chega ANTES do APPROVED → o APPROVED não libera nem manda Purchase", async () => {
+    const m = montar();
+    await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ evento: "PURCHASE_REFUNDED", status: "REFUNDED" }) });
+    const r = await tratarHotmart(m.deps, { hottok: SECRET, body: compra() });
+    expect(r.corpo).toMatchObject({ ignorado: "estornada" });
+    expect(m.db.subscriptions).toHaveLength(0);
+    expect(m.saida.capi).toHaveLength(0);
+  });
+  it("COMPLETE (ou o APPROVED reenviado) depois do CHARGEBACK → continua desligado", async () => {
+    const m = montar();
+    await tratarHotmart(m.deps, { hottok: SECRET, body: compra() });
+    await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ evento: "PURCHASE_CHARGEBACK", status: "CHARGEBACK" }) });
+    const r = await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ evento: "PURCHASE_COMPLETE", status: "COMPLETE" }) });
+    expect(r.corpo).toMatchObject({ ignorado: "estornada" });
+    expect(m.db.subscriptions[0].status).toBe("canceled");
+    expect(m.saida.capi).toHaveLength(1);
+  });
+});
+
+describe("revisão C: a linha Pix viva da pessoa nunca é reescrita", () => {
+  it("quem tem o ANUAL do Pix (LN_ano279) e compra na Hotmart ganha uma linha NOVA; o reembolso da Hotmart desliga só ela", async () => {
+    const m = montar();
+    m.db.users.set("u_maria", { id: "u_maria", email: "maria@exemplo.com" });
+    m.db.subscriptions.push({ id: "anual", user_id: "u_maria", status: "active", plan: "core-pro", billing_period: "annual", payment_method: "pix", abacatepay_billing_id: "qr_anual", amount_cents: 2790, current_period_end: "2027-10-30T00:00:00Z" });
+    await tratarHotmart(m.deps, { hottok: SECRET, body: compra() });
+    expect(m.db.subscriptions).toHaveLength(2);
+    expect(m.db.subscriptions.find((x) => x.id === "anual")).toMatchObject({ payment_method: "pix", abacatepay_billing_id: "qr_anual", amount_cents: 2790, status: "active" });
+    await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ evento: "PURCHASE_REFUNDED", status: "REFUNDED" }) });
+    expect(m.db.subscriptions.find((x) => x.id === "anual")!.status).toBe("active");
+    expect(m.db.subscriptions.find((x) => x.payment_method === "hotmart")!.status).toBe("canceled");
+  });
+});
+
+describe("revisão D: e-mail da compra que falha é repetido", () => {
+  it("falhou → 500 e a chave do evento é solta; no reenvio sai 1 e-mail e 0 Purchase extra (e 1 linha só)", async () => {
+    const m = montar();
+    let falhar = true;
+    m.deps.enviarEmail = async (para, assunto, html) => { if (falhar) return false; m.saida.emails.push({ para, assunto, html }); return true; };
+    const r1 = await tratarHotmart(m.deps, { hottok: SECRET, body: compra() });
+    expect(r1.status).toBe(500);
+    expect(m.db.subscriptions).toHaveLength(1); // o acesso já está liberado
+    expect(m.saida.capi).toHaveLength(1);
+    expect(m.db.webhook_events.has("hotmart:HP17715690036014:PURCHASE_APPROVED")).toBe(false);
+    falhar = false;
+    const r2 = await tratarHotmart(m.deps, { hottok: SECRET, body: compra() });
+    expect(r2.status).toBe(200);
+    expect(m.saida.emails).toHaveLength(1);
+    expect(m.saida.capi).toHaveLength(1);
+    expect(m.db.subscriptions).toHaveLength(1);
+    const r3 = await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ evento: "PURCHASE_COMPLETE", status: "COMPLETE" }) });
+    expect(r3.status).toBe(200);
+    expect(m.saida.emails).toHaveLength(1);
+    expect(m.saida.avisos.length).toBeGreaterThanOrEqual(1); // o aviso é idempotente no avisar-venda (venda_avisada)
+  });
+});
+
+describe("revisão E: status pago, BRL e valor mínimo", () => {
+  it("sem status, R$ 0,01, R$ 49,99, sem moeda → não libera; R$ 50,00 libera", async () => {
+    const m = montar();
+    const semMoeda = compra({ tx: "HPf" }); delete (semMoeda.data.purchase.price as Linha).currency_value; delete (semMoeda.data.purchase.full_price as Linha).currency_value;
+    expect((await tratarHotmart(m.deps, { hottok: SECRET, body: semMoeda })).corpo).toMatchObject({ ignorado: "valor" });
+    for (const [tx, o] of [["HPa", { status: null }], ["HPb", { valor: 0.01 }], ["HPc", { valor: 49.99 }], ["HPd", { moeda: "USD" }]] as const) {
+      const r = await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ tx, ...o }) });
+      expect(r.status).toBe(200);
+      expect(r.corpo.liberado).toBeUndefined();
+    }
+    expect(m.db.subscriptions).toHaveLength(0);
+    expect((await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ tx: "HPe", valor: 50 }) })).corpo).toMatchObject({ novo: true });
+  });
+});
+
+describe("revisão F: a sessão do navegador era de OUTRA conta", () => {
+  it("conta da ref com e-mail ≠ do comprador → a compra vai pro e-mail do comprador (acha) + evento hotmart_conta_divergente", async () => {
+    const m = montar();
+    m.db.users.set("u_logada", { id: "u_logada", email: "joao@outro.com" });
+    m.db.users.set("u_maria", { id: "u_maria", email: "maria@exemplo.com" });
+    registrar(m.db, "u_logada");
+    const r = await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ sck: REF }) });
+    expect(r.corpo).toMatchObject({ via: "email" });
+    expect(m.db.subscriptions[0].user_id).toBe("u_maria");
+    const ev = m.db.analytics_events.find((e) => e.event_name === "hotmart_conta_divergente")!;
+    expect(ev).toMatchObject({ user_id: "u_logada", event_data: { tx: "HP17715690036014", para: "u_maria" } });
+    expect(m.saida.emails[0].para).toBe("maria@exemplo.com");
+  });
+  it("…e se o comprador não tem conta, cria a dele (nunca a logada)", async () => {
+    const m = montar();
+    m.db.users.set("u_logada", { id: "u_logada", email: "joao@outro.com" });
+    registrar(m.db, "u_logada");
+    const r = await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ sck: REF }) });
+    expect(r.corpo).toMatchObject({ via: "nova" });
+    expect(m.db.subscriptions[0].user_id).not.toBe("u_logada");
+  });
+  it("mesmo e-mail (maiúsculas à parte) → fica na conta da ref, sem evento", async () => {
+    const m = montar();
+    m.db.users.set("u_ref", { id: "u_ref", email: "maria@exemplo.com" });
+    registrar(m.db, "u_ref");
+    const r = await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ sck: REF, email: "MARIA@exemplo.com" }) });
+    expect(r.corpo).toMatchObject({ via: "ref" });
+    expect(m.db.analytics_events.some((e) => e.event_name === "hotmart_conta_divergente")).toBe(false);
+  });
+});
+
+describe("revisão G: hotmart-iniciar com limite por IP e consulta pela ref (índices na migração nova)", () => {
+  it(`até ${LIMITE_POR_IP} pedidos por IP em 10 min; o 21º é recusado; outro IP / sem IP passa; fora da janela passa`, async () => {
+    const m = montar();
+    const agora = Date.parse("2026-11-04T15:00:00Z");
+    for (let i = 0; i < LIMITE_POR_IP; i++) m.db.analytics_events.push({ event_name: "hotmart_order_created", created_at: new Date(agora - 60_000).toISOString(), event_data: { ref: `ref-${i}-aaaaaaa`, client_ip: "9.9.9.9" } });
+    expect(await ipPodeIniciar(m.admin as never, "9.9.9.9", agora)).toBe(false);
+    expect(await ipPodeIniciar(m.admin as never, "8.8.8.8", agora)).toBe(true);
+    expect(await ipPodeIniciar(m.admin as never, null, agora)).toBe(true);
+    expect(await ipPodeIniciar(m.admin as never, "9.9.9.9", agora + 11 * 60_000)).toBe(true);
+    expect(await refJaExiste(m.admin as never, "ref-3-aaaaaaa")).toBe(true);
+    expect(await refJaExiste(m.admin as never, "ref-nao-tem-00")).toBe(false);
+    const raiz = resolve(__dirname, "../..");
+    const mig = readFileSync(resolve(raiz, "supabase/migrations/20261104120000_hotmart_pedido_servidor.sql"), "utf8");
+    expect(mig).toMatch(/CREATE INDEX IF NOT EXISTS analytics_events_hotmart_ref_idx ON public\.analytics_events \(\(event_data->>'ref'\)\) WHERE event_name = 'hotmart_order_created';/);
+    expect(mig).toMatch(/analytics_events_hotmart_ip_idx ON public\.analytics_events \(\(event_data->>'client_ip'\), created_at\) WHERE event_name = 'hotmart_order_created';/);
+    const fn = readFileSync(resolve(raiz, "supabase/functions/hotmart-iniciar/index.ts"), "utf8");
+    expect(fn).toContain("ipPodeIniciar(admin, ip)");
+    expect(fn).toContain("refJaExiste(admin, pedido.ref)");
+    expect(fn).not.toContain(".contains(");
   });
 });

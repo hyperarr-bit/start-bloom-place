@@ -4,7 +4,8 @@
  * Resend, a CAPI nos 2 pixels e o aviso de venda.
  *
  * Deploy (NÃO feito): `supabase functions deploy hotmart-webhook --no-verify-jwt` (a Hotmart não manda JWT; a trava é o
- * hottok). Secrets: HOTMART_HOTTOK (obrigatório — sem ele tudo volta 401), HOTMART_PRODUTO_ID (opcional: só esse produto).
+ * hottok). Secrets: HOTMART_HOTTOK (obrigatório — sem ele tudo volta 401), HOTMART_PRODUTO_ID (opcional: sobrescreve o produto
+ * padrão 8885020; qualquer outro produto, inclusive o "Enviar teste" da Hotmart, é ignorado).
  * Na Hotmart: Ferramentas → Webhook (API e notificações) → URL https://itoylenzvahbscgjgtqf.supabase.co/functions/v1/hotmart-webhook,
  * versão 2.0.0, eventos de compra (aprovada, completa, reembolsada, chargeback, cancelada).
  */
@@ -37,7 +38,7 @@ serve(async (req) => {
   const r = await tratarHotmart({
     admin: admin as unknown as AdminHotmart,
     secret: Deno.env.get("HOTMART_HOTTOK") ?? null,
-    produtoId: Deno.env.get("HOTMART_PRODUTO_ID") ?? null,
+    produtoId: Deno.env.get("HOTMART_PRODUTO_ID") || null, // vazio = PRODUTO_HOTMART_PADRAO (8885020)
     acharConta: (email) => acharConta(admin as never, email.toLowerCase()),
     enviarEmail: enviarResend,
     mandarCapi: async (corpo) => {

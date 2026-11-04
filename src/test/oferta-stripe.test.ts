@@ -322,3 +322,21 @@ describe("revisão: fechar de verdade, recarga, volta do banco, InitiateCheckout
     expect(dos("landing_stripe_aberto")).toHaveLength(3);
   });
 });
+
+describe("reconferência: espera do cartão", () => {
+  it("4: 1 resposta ok:false isolada não mostra 'Pagamento recebido?'; 3 seguidas mostram", async () => {
+    const respostas = [{ ok: false }, { ok: true, status: "processing", pago: false }, { ok: false }, { ok: false }, { ok: false }];
+    let i = 0;
+    await abrirPagina({ status: async () => respostas[Math.min(i++, respostas.length - 1)] });
+    await abrirCheckout();
+    (window as unknown as { __stripeFalso: Record<string, unknown> }).__stripeFalso.confirmPayment = async () => ({ paymentIntent: { id: "pi_123", status: "processing" } });
+    const campo = document.getElementById("oc-email") as HTMLInputElement;
+    campo.value = "maria@gmail.com"; campo.dispatchEvent(new Event("input"));
+    (document.getElementById("oc-pagar") as HTMLButtonElement).click();
+    await vi.waitFor(() => { if (!document.querySelector('[data-testid="oferta-aguardando"]')) throw new Error("sem espera"); }, { timeout: 3000, interval: 20 });
+    await vi.waitFor(() => { if (i < 2) throw new Error("poucas"); }, { timeout: 5000, interval: 50 });
+    expect(document.querySelector('[data-testid="oferta-recebido"]')).toBeNull(); // 1 erro e depois ok: segue esperando
+    await vi.waitFor(() => { if (!document.querySelector('[data-testid="oferta-recebido"]')) throw new Error("sem recebido"); }, { timeout: 12000, interval: 100 });
+    expect(i).toBeGreaterThanOrEqual(5);
+  }, 20000);
+});

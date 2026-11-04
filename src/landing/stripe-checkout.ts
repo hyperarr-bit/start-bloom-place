@@ -240,6 +240,8 @@ let comHistorico = false;
 let ultimaCriacao: RespostaCriar | null = null;
 const icNoHeap = new Set<string>();
 let vigiaDesde = 0;
+/** revisão 2 (4): respostas ok:false SEGUIDAS na espera do cartão (1 erro isolado não basta) */
+let semConfirmar = 0;
 /** 3 (revisão): sem resposta em ~2 min na espera do cartão/banco → para e mostra "Pagamento recebido?" */
 const VIGIA_MAX_MS = 120_000;
 
@@ -451,11 +453,13 @@ function telaAguardando() {
 function vigiar() {
   if (consulta !== null) return;
   vigiaDesde = Date.now();
+  semConfirmar = 0;
   const uma = async () => {
     if (!est?.pi || est.fase === "pago" || est.fase === "recebido") return;
     const r = await api!.status({ ref: est.ref, pi: est.pi }).catch(() => null);
     if (r?.pago) return mostrarPago((r.metodo as string) || est.metodo);
-    if (est.fase === "aguardando" && (r?.ok === false || Date.now() - vigiaDesde > VIGIA_MAX_MS)) telaRecebido();
+    semConfirmar = r?.ok === false ? semConfirmar + 1 : 0;
+    if (est.fase === "aguardando" && (semConfirmar >= 3 || Date.now() - vigiaDesde > VIGIA_MAX_MS)) telaRecebido();
   };
   consulta = window.setInterval(() => { void uma(); }, 3000);
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") void uma(); });

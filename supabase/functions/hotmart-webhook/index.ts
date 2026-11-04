@@ -14,6 +14,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { tratarHotmart, type AdminHotmart } from "../_shared/hotmart.ts";
 import { acharConta } from "../_shared/destino-hoje.ts";
 import { fetchNosPixels } from "../_shared/meta-pixels.ts";
+import { chavesVapidDoAmbiente, mandarParaTodos } from "../_shared/push-dono.ts";
+import { dadosPush } from "../_shared/aviso-venda.ts";
 
 const log = (passo: string, d?: Record<string, unknown>) => console.log(`[HOTMART-WEBHOOK] ${passo}${d ? ` - ${JSON.stringify(d)}` : ""}`);
 const json = (b: Record<string, unknown>, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { "Content-Type": "application/json" } });
@@ -53,6 +55,7 @@ serve(async (req) => {
         body: JSON.stringify({ fonte: "pix", id: linhaId }),
       }).catch(() => null);
     },
+    avisarDono: async (titulo, corpo, tag) => { await mandarParaTodos(admin, chavesVapidDoAmbiente(), dadosPush(titulo, corpo, tag)); },
     log,
   }, { hottok: req.headers.get("x-hotmart-hottok"), body });
   return json(r.corpo, r.status);

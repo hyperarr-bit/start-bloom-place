@@ -75,13 +75,14 @@ function bancoFalso() {
 }
 
 function montar(db = bancoFalso()) {
-  const saida = { emails: [] as Array<{ para: string; assunto: string; html: string }>, capi: [] as Linha[], avisos: [] as string[], logs: [] as string[] };
+  const saida = { emails: [] as Array<{ para: string; assunto: string; html: string }>, capi: [] as Linha[], avisos: [] as string[], logs: [] as string[], push: [] as Array<{ titulo: string; corpo: string; tag: string }> };
   const deps: DepsHotmart = {
     admin: db.admin as never, secret: SECRET,
     acharConta: async (email) => [...db.db.users.values()].find((u) => u.email === email.toLowerCase())?.id ?? null,
     enviarEmail: async (para, assunto, html) => { saida.emails.push({ para, assunto, html }); return true; },
     mandarCapi: async (c) => { saida.capi.push(c); return true; },
     avisarVenda: async (id) => { saida.avisos.push(id); },
+    avisarDono: async (titulo, corpo, tag) => { saida.push.push({ titulo, corpo, tag }); },
     log: (p, d) => { saida.logs.push(`${p} ${JSON.stringify(d ?? {})}`); },
     agora: () => new Date("2026-11-04T15:00:00Z"),
   };
@@ -482,11 +483,89 @@ describe("revisão G: hotmart-iniciar com limite por IP e consulta pela ref (ín
     expect(await refJaExiste(m.admin as never, "ref-nao-tem-00")).toBe(false);
     const raiz = resolve(__dirname, "../..");
     const mig = readFileSync(resolve(raiz, "supabase/migrations/20261104120000_hotmart_pedido_servidor.sql"), "utf8");
-    expect(mig).toMatch(/CREATE INDEX IF NOT EXISTS analytics_events_hotmart_ref_idx ON public\.analytics_events \(\(event_data->>'ref'\)\) WHERE event_name = 'hotmart_order_created';/);
-    expect(mig).toMatch(/analytics_events_hotmart_ip_idx ON public\.analytics_events \(\(event_data->>'client_ip'\), created_at\) WHERE event_name = 'hotmart_order_created';/);
+    // revisão 2 (2): os índices NÃO rodam na migração (travariam a tabela) — só comentados, na versão CONCURRENTLY pra rodar à mão
+    expect(mig.split("\n").filter((l) => /CREATE INDEX/i.test(l) && !l.trim().startsWith("--"))).toHaveLength(0);
+    expect(mig).toMatch(/-- {3}CREATE INDEX CONCURRENTLY IF NOT EXISTS analytics_events_hotmart_ref_idx ON public\.analytics_events \(\(event_data->>'ref'\)\) WHERE event_name = 'hotmart_order_created';/);
+    expect(mig).toMatch(/-- {3}CREATE INDEX CONCURRENTLY IF NOT EXISTS analytics_events_hotmart_ip_idx ON public\.analytics_events \(\(event_data->>'client_ip'\), created_at\) WHERE event_name = 'hotmart_order_created';/);
     const fn = readFileSync(resolve(raiz, "supabase/functions/hotmart-iniciar/index.ts"), "utf8");
     expect(fn).toContain("ipPodeIniciar(admin, ip)");
     expect(fn).toContain("refJaExiste(admin, pedido.ref)");
     expect(fn).not.toContain(".contains(");
+  });
+});
+
+/* ───────── reconferência (04/11): alarmes e limites ───────── */
+describe("reconferência 1: evento PAGO ignorado gera alarme + push, 1× por transação", () => {
+  const alarmes = (m: ReturnType<typeof montar>) => m.db.analytics_events.filter((e) => e.event_name === "hotmart_venda_ignorada");
+  for (const [motivo, o] of [["outro_produto", { produto: 777 }], ["outro_produto", { produto: null }], ["status", { status: null }], ["valor", { valor: 10 }], ["valor", { moeda: "USD" }]] as const) {
+    it(`${motivo} (${JSON.stringify(o)}) → hotmart_venda_ignorada + push "Venda Hotmart IGNORADA", sem e-mail em claro; reenvio não repete`, async () => {
+      const m = montar();
+      const r = await tratarHotmart(m.deps, { hottok: SECRET, body: compra(o) });
+      expect(r).toMatchObject({ status: 200, corpo: { ignorado: motivo } });
+      await tratarHotmart(m.deps, { hottok: SECRET, body: compra(o) });
+      await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ ...o, evento: "PURCHASE_COMPLETE", status: "status" in o ? null : "COMPLETE" }) });
+      expect(alarmes(m)).toHaveLength(1);
+      expect(alarmes(m)[0].event_data).toMatchObject({ motivo, tx: "HP17715690036014", email: "ma***@exemplo.com" });
+      expect(JSON.stringify(alarmes(m)[0])).not.toContain("maria@exemplo.com");
+      expect(m.saida.push).toHaveLength(1);
+      expect(m.saida.push[0].titulo).toBe(`⚠️ Venda Hotmart IGNORADA: ${motivo}`);
+      expect(m.db.subscriptions).toHaveLength(0);
+    });
+  }
+  it("transação já estornada → alarme 'estornada'", async () => {
+    const m = montar();
+    await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ evento: "PURCHASE_REFUNDED", status: "REFUNDED" }) });
+    await tratarHotmart(m.deps, { hottok: SECRET, body: compra() });
+    expect(alarmes(m)[0].event_data).toMatchObject({ motivo: "estornada" });
+    expect(m.saida.push).toHaveLength(1);
+  });
+  it('o "Enviar teste" da Hotmart (produto 0, ou e-mail @example.com) só loga — sem alarme e sem push', async () => {
+    const m = montar();
+    await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ produto: 0, valor: 1500, email: "teste@hotmart.com" }) });
+    await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ tx: "HPx", produto: 777, email: "comprador@example.com" }) });
+    expect(alarmes(m)).toHaveLength(0);
+    expect(m.saida.push).toHaveLength(0);
+    expect(m.saida.logs.some((l) => l.includes("venda ignorada"))).toBe(true);
+  });
+  it("estorno de outro produto e eventos sem ação não alarmam", async () => {
+    const m = montar();
+    await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ produto: 777, evento: "PURCHASE_REFUNDED", status: "REFUNDED" }) });
+    await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ evento: "PURCHASE_DELAYED" }) });
+    expect(alarmes(m)).toHaveLength(0);
+    expect(m.saida.push).toHaveLength(0);
+  });
+});
+
+describe("reconferência 3: e-mail que falha sempre", () => {
+  it("4 tentativas → 500 (a Hotmart reenvia); na 5ª → 200 + hotmart_email_falhou + push, 1× só; crédito e Purchase 1×", async () => {
+    const m = montar();
+    m.deps.enviarEmail = async () => false;
+    const st: number[] = [];
+    for (let i = 0; i < 7; i++) st.push((await tratarHotmart(m.deps, { hottok: SECRET, body: compra() })).status);
+    expect(st.slice(0, 4)).toEqual([500, 500, 500, 500]);
+    expect(st[4]).toBe(200);
+    expect(st.slice(5)).toEqual([200, 200]); // a chave do evento ficou: o resto é "repetido"
+    const al = m.db.analytics_events.filter((e) => e.event_name === "hotmart_email_falhou");
+    expect(al).toHaveLength(1);
+    expect(al[0].event_data).toMatchObject({ tx: "HP17715690036014", tentativas: 5, email: "ma***@exemplo.com" });
+    expect(m.saida.push.filter((p) => p.titulo.includes("e-mail da compra NÃO saiu"))).toHaveLength(1);
+    expect(m.db.subscriptions).toHaveLength(1);
+    expect(m.saida.capi).toHaveLength(1);
+  });
+});
+
+describe("reconferência 4: hotmart_conta_divergente 1× por transação", () => {
+  it("o reenvio (e o COMPLETE) não grava o evento de novo", async () => {
+    const m = montar();
+    m.db.users.set("u_logada", { id: "u_logada", email: "joao@outro.com" });
+    m.db.users.set("u_maria", { id: "u_maria", email: "maria@exemplo.com" });
+    registrar(m.db, "u_logada");
+    let falhar = true;
+    m.deps.enviarEmail = async (para, assunto, html) => { if (falhar) return false; m.saida.emails.push({ para, assunto, html }); return true; };
+    await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ sck: REF }) }); // 500 (e-mail) → reenvio
+    falhar = false;
+    await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ sck: REF }) });
+    await tratarHotmart(m.deps, { hottok: SECRET, body: compra({ sck: REF, evento: "PURCHASE_COMPLETE", status: "COMPLETE" }) });
+    expect(m.db.analytics_events.filter((e) => e.event_name === "hotmart_conta_divergente")).toHaveLength(1);
   });
 });

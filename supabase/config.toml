@@ -9,6 +9,10 @@ verify_jwt = false
 [functions.cakto-webhook]
 verify_jwt = false
 
+# 04/11: o Postback da Hotmart (/vida) não manda JWT — a trava é o hottok (secret HOTMART_HOTTOK)
+[functions.hotmart-webhook]
+verify_jwt = false
+
 [functions.abacate-webhook]
 verify_jwt = false
 

@@ -1,0 +1,306 @@
+/**
+ * HOTMART (04/11) — a venda da /vida (a LP v3 num link próprio, R$ 97,90 no checkout da Hotmart). As regras do webhook,
+ * sem Deno: o cliente do banco e o resto vêm injetados (testado no vitest: src/test/hotmart-webhook.test.ts).
+ *
+ * Postback 2.0.0 da Hotmart (developers.hotmart.com/docs/pt-BR/2.0.0/webhook/purchase-webhook — conferido 04/11):
+ *   · header X-HOTMART-HOTTOK = o token da conta (o único jeito de saber que veio da Hotmart) → secret HOTMART_HOTTOK;
+ *   · corpo { id (do evento), creation_date, event, version: "2.0.0", data: { product{id,name}, buyer{email,name},
+ *     purchase{ transaction ("HP…"), status, price{value,currency_value}, full_price{value}, payment{type,installments_number},
+ *     origin{sck,src,xcod}, approved_date }, commissions[] } };
+ *   · eventos: PURCHASE_APPROVED (pago — inclusive Pix), PURCHASE_COMPLETE (fim da garantia, já pago), PURCHASE_REFUNDED,
+ *     PURCHASE_CHARGEBACK, PURCHASE_CANCELED, PURCHASE_PROTEST, PURCHASE_EXPIRED, PURCHASE_DELAYED, PURCHASE_BILLET_PRINTED.
+ *
+ * O que acontece:
+ *   pago     → acha a conta (1º a ref do sck → hotmart_order_created gravado pelo hotmart-iniciar: a conta anônima da sessão,
+ *              com os dados dela; 2º o e-mail do comprador; 3º cria a conta com o e-mail, já confirmado). Conta da ref sem e-mail
+ *              ganha o e-mail do comprador (se o e-mail já é de outra conta, a compra vai pra outra — e fica no log).
+ *              Libera o VITALÍCIO pelo MESMO caminho do Pix da landing (_shared/grant-pix.ts: mesma linha de subscriptions,
+ *              mesmas travas; payment_method "hotmart", amount_cents = o valor da Hotmart, abacatepay_billing_id = a transação).
+ *              Creditou agora → e-mail da compra (email-venda), aviso de venda pro dono (avisar-venda) e Purchase na CAPI dos 2
+ *              pixels (event_id = transação, fbp/fbc/IP/UA do pedido) — 1 de cada por transação (reserva em webhook_events).
+ *   estorno  → REFUNDED / CHARGEBACK / CANCELED: a linha da transação vira "canceled" (sem acesso; só a linha dela).
+ *   outros   → log e 200.
+ * Idempotência: `hotmart:<transação>:<evento>` em webhook_events (chave primária). Erro nosso no meio solta a chave e
+ * responde 500 (a Hotmart reenvia). Nada de e-mail/token no log (mascarado).
+ */
+import { creditarPedido } from "./grant-pix.ts";
+import { assuntoVenda, htmlVenda } from "./email-venda.ts";
+
+// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ClienteMin = { from: (t: string) => any };
+type ResultadoAuth = { data?: { user?: { id: string; email?: string | null } | null } | null; error?: { message?: string } | null };
+export type AdminHotmart = ClienteMin & {
+  auth: { admin: {
+    getUserById: (id: string) => Promise<ResultadoAuth>;
+    updateUserById: (id: string, attrs: Record<string, unknown>) => Promise<ResultadoAuth>;
+    createUser: (attrs: Record<string, unknown>) => Promise<ResultadoAuth>;
+  } };
+};
+
+export const EVENTOS_PAGO = new Set(["PURCHASE_APPROVED", "PURCHASE_COMPLETE"]);
+export const EVENTOS_ESTORNO = new Set(["PURCHASE_REFUNDED", "PURCHASE_CHARGEBACK", "PURCHASE_CANCELED"]);
+/** os status da compra que são dinheiro na conta (o evento já diz; o status confere) */
+const STATUS_PAGO = new Set(["APPROVED", "COMPLETE", "COMPLETED"]);
+/** o nome do registro do pedido (hotmart-iniciar) em analytics_events — só o servidor grava (migração 20261104120000) */
+export const EVENTO_PEDIDO_HOTMART = "hotmart_order_created";
+export const OFERTA_HOTMART = "HM_vida";
+export const GATEWAY_HOTMART = "hotmart";
+const SITE = "https://www.coreaplicativo.com.br";
+
+/** Compara o hottok sem vazar tempo. Sem secret configurado = recusa sempre. */
+export function hottokOk(recebido: string | null | undefined, secret: string | null | undefined): boolean {
+  const a = String(recebido ?? ""), b = String(secret ?? "");
+  if (!b || !a || a.length !== b.length) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
+
+export const mascararEmail = (e: string | null | undefined): string | null => {
+  const s = String(e ?? "");
+  if (!s.includes("@")) return s ? "***" : null;
+  const [u, dom] = s.split("@");
+  return `${u.slice(0, 2)}***@${dom}`;
+};
+
+const EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const texto = (v: unknown, n = 200): string | null => (typeof v === "string" && v.trim() ? v.trim().slice(0, n) : typeof v === "number" ? String(v).slice(0, n) : null);
+const centavos = (v: unknown): number | null => {
+  const n = typeof v === "number" ? v : typeof v === "string" ? Number(v.replace(",", ".")) : NaN;
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null;
+};
+
+export type CompraHotmart = {
+  eventoId: string | null; evento: string; tx: string | null; status: string | null;
+  valorCents: number | null; moeda: string | null; email: string | null; nome: string | null;
+  sck: string | null; src: string | null; produtoId: string | null; pagamento: string | null; parcelas: number | null;
+};
+
+/** O corpo do Postback 2.0 → o que interessa. Nunca lança. O valor é o `price` da compra (o da oferta; o full_price tem juros). */
+export function lerCompraHotmart(body: unknown): CompraHotmart {
+  const b = (body ?? {}) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const d = (b.data ?? {}) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const p = (d.purchase ?? {}) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const email = texto(d.buyer?.email, 254)?.toLowerCase() ?? null;
+  return {
+    eventoId: texto(b.id, 80),
+    evento: String(b.event ?? "").toUpperCase().slice(0, 60),
+    tx: texto(p.transaction, 80),
+    status: texto(p.status, 40)?.toUpperCase() ?? null,
+    // o price (o valor da oferta); o full_price (com juros do parcelamento) só se a Hotmart não mandar o price
+    valorCents: p.price?.value !== undefined && p.price?.value !== null ? centavos(p.price.value) : centavos(p.full_price?.value),
+    moeda: texto(p.price?.currency_value ?? p.full_price?.currency_value, 8)?.toUpperCase() ?? null,
+    email: email && EMAIL_OK.test(email) ? email : null,
+    nome: texto(d.buyer?.name, 120),
+    sck: texto(p.origin?.sck, 100),
+    src: texto(p.origin?.src, 100),
+    produtoId: texto(d.product?.id, 40),
+    pagamento: texto(p.payment?.type, 40),
+    parcelas: Number.isFinite(Number(p.payment?.installments_number)) ? Number(p.payment.installments_number) : null,
+  };
+}
+
+/* ───────────────────────── o registro do pedido (hotmart-iniciar) ───────────────────────── */
+export type RegistroHotmart = { userId: string | null; dados: Record<string, unknown> | null; criadoEm: string | null; conflito: boolean };
+
+/**
+ * As linhas do pedido (até 10). As que têm conta precisam concordar (senão ninguém leva — mesma trava do Pix,
+ * _shared/registro-pedido.ts). Os dados de atribuição (fbp/fbc/IP/UA) vêm da 1ª linha (a com conta, se houver).
+ */
+export function escolherRegistroHotmart(linhas: Array<{ user_id?: string | null; event_data?: Record<string, unknown> | null; created_at?: string | null }> | null | undefined): RegistroHotmart {
+  const todas = (linhas ?? []).filter(Boolean);
+  if (!todas.length) return { userId: null, dados: null, criadoEm: null, conflito: false };
+  const comDono = todas.filter((l) => typeof l.user_id === "string" && l.user_id);
+  const donos = new Set(comDono.map((l) => l.user_id));
+  if (donos.size > 1) return { userId: null, dados: null, criadoEm: null, conflito: true };
+  const l = comDono[0] ?? todas[0];
+  return { userId: comDono[0]?.user_id ?? null, dados: l.event_data ?? null, criadoEm: l.created_at ?? null, conflito: false };
+}
+
+export async function registroHotmart(admin: ClienteMin, ref: string | null): Promise<RegistroHotmart> {
+  if (!ref || !/^[A-Za-z0-9-]{8,64}$/.test(ref)) return { userId: null, dados: null, criadoEm: null, conflito: false };
+  try {
+    const { data } = await admin.from("analytics_events").select("user_id, event_data, created_at")
+      .eq("event_name", EVENTO_PEDIDO_HOTMART).contains("event_data", { ref }).limit(10);
+    return escolherRegistroHotmart(data as never);
+  } catch {
+    return { userId: null, dados: null, criadoEm: null, conflito: false };
+  }
+}
+
+/* ───────────────────────── a conta ───────────────────────── */
+export type ContaHotmart = { userId: string; email: string | null; via: "ref" | "ref_batizada" | "email" | "email_outra_conta" | "nova" };
+
+/**
+ * 1º a conta da ref (a anônima da sessão; sem e-mail → ganha o do comprador, se ele não for de outra conta);
+ * 2º a conta do e-mail; 3º conta nova com o e-mail (já confirmado). Sem ref e sem e-mail → null.
+ */
+export async function acharContaHotmart(admin: AdminHotmart, args: {
+  refUserId: string | null; email: string | null; acharConta: (email: string) => Promise<string | null>;
+}): Promise<ContaHotmart | null> {
+  const email = args.email;
+  if (args.refUserId) {
+    const u = await admin.auth.admin.getUserById(args.refUserId).catch(() => null);
+    const conta = u?.data?.user ?? null;
+    if (conta) {
+      const temEmail = (conta.email ?? "").trim().toLowerCase();
+      if (temEmail || !email) return { userId: conta.id, email: temEmail || null, via: "ref" };
+      const outra = await args.acharConta(email).catch(() => null);
+      if (outra && outra !== conta.id) return { userId: outra, email, via: "email_outra_conta" };
+      const upd = await admin.auth.admin.updateUserById(conta.id, { email, email_confirm: true }).catch((e) => ({ error: { message: String(e) } }));
+      if (!upd?.error) return { userId: conta.id, email, via: "ref_batizada" };
+      const depois = await args.acharConta(email).catch(() => null); // corrida: o e-mail virou de alguém agora
+      if (depois) return { userId: depois, email, via: "email_outra_conta" };
+      return { userId: conta.id, email: null, via: "ref" };
+    }
+  }
+  if (!email) return null;
+  const doEmail = await args.acharConta(email).catch(() => null);
+  if (doEmail) return { userId: doEmail, email, via: "email" };
+  const criada = await admin.auth.admin.createUser({ email, email_confirm: true, user_metadata: { origem: "hotmart_vida" } }).catch((e) => ({ error: { message: String(e) } }) as ResultadoAuth);
+  if (criada?.data?.user?.id) return { userId: criada.data.user.id, email, via: "nova" };
+  const deNovo = await args.acharConta(email).catch(() => null);
+  return deNovo ? { userId: deNovo, email, via: "email" } : null;
+}
+
+/* ───────────────────────── a CAPI ───────────────────────── */
+const sha = async (v: string): Promise<string> => {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(v.trim().toLowerCase()));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+};
+
+/** O Purchase da CAPI (os 2 pixels recebem o MESMO corpo): event_id = transação, valor = o da compra, sinais do pedido. */
+export async function eventoPurchaseHotmart(args: {
+  tx: string; valorCents: number; userId: string; email: string | null; registro: RegistroHotmart; agoraMs?: number;
+}): Promise<Record<string, unknown>> {
+  const r = (args.registro.dados ?? {}) as Record<string, unknown>;
+  const s = (k: string) => (typeof r[k] === "string" && (r[k] as string) ? (r[k] as string) : null);
+  let fbc = s("fbc");
+  const fbclid = s("fbclid");
+  if (!fbc && fbclid) {
+    const em = Date.parse(args.registro.criadoEm ?? "");
+    fbc = `fb.1.${Number.isFinite(em) ? em : (args.agoraMs ?? Date.now())}.${fbclid}`;
+  }
+  const ip = s("client_ip"), ua = s("user_agent");
+  return {
+    data: [{
+      event_name: "Purchase", event_time: Math.floor((args.agoraMs ?? Date.now()) / 1000), event_id: args.tx,
+      action_source: "website", event_source_url: s("source_url") || `${SITE}/vida`,
+      user_data: {
+        ...(args.email ? { em: [await sha(args.email)] } : {}),
+        external_id: [await sha(args.userId)],
+        ...(fbc ? { fbc } : {}),
+        ...(s("fbp") ? { fbp: s("fbp") } : {}),
+        ...(ip && ua ? { client_ip_address: ip, client_user_agent: ua } : {}),
+      },
+      custom_data: { value: args.valorCents / 100, currency: "BRL", content_name: "CORE vitalício (Hotmart)" },
+    }],
+  };
+}
+
+/* ───────────────────────── o webhook ───────────────────────── */
+export type DepsHotmart = {
+  admin: AdminHotmart;
+  secret: string | null;
+  /** só aceita este produto (secret/env HOTMART_PRODUTO_ID); vazio = qualquer um */
+  produtoId?: string | null;
+  acharConta: (email: string) => Promise<string | null>;
+  enviarEmail: (para: string, assunto: string, html: string) => Promise<boolean>;
+  /** manda o corpo pros 2 pixels (fetchNosPixels no Deno) */
+  mandarCapi: (corpo: Record<string, unknown>) => Promise<boolean>;
+  /** o push "💰 Venda" do dono (função avisar-venda, idempotente pela venda) */
+  avisarVenda: (linhaId: string) => Promise<void>;
+  log: (passo: string, d?: Record<string, unknown>) => void;
+  agora?: () => Date;
+};
+export type Resposta = { status: number; corpo: Record<string, unknown> };
+
+type Erro = { code?: string; message?: string } | null;
+async function reservar(admin: ClienteMin, id: string, event: string): Promise<"ok" | "ja" | "erro"> {
+  try {
+    const { error } = await admin.from("webhook_events").insert({ id, source: "hotmart", event });
+    if (!error) return "ok";
+    return (error as Erro)?.code === "23505" ? "ja" : "erro";
+  } catch { return "erro"; }
+}
+async function soltar(admin: ClienteMin, id: string): Promise<void> {
+  try { await admin.from("webhook_events").delete().eq("id", id); } catch { /* noop */ }
+}
+
+export async function tratarHotmart(deps: DepsHotmart, req: { hottok: string | null; body: unknown }): Promise<Resposta> {
+  const { admin, log } = deps;
+  if (!hottokOk(req.hottok, deps.secret)) {
+    log("hottok recusado", { tem_secret: !!deps.secret, veio: !!req.hottok });
+    return { status: 401, corpo: { ok: false } };
+  }
+  const c = lerCompraHotmart(req.body);
+  const base = { evento: c.evento, tx: c.tx, status: c.status, valor: c.valorCents, email: mascararEmail(c.email), sck: c.sck ? `${c.sck.slice(0, 8)}…` : null, pagamento: c.pagamento };
+  if (!c.tx || !c.evento) { log("sem transação/evento — ignorado", base); return { status: 200, corpo: { ok: true, ignorado: "sem_transacao" } }; }
+  if (deps.produtoId && c.produtoId && c.produtoId !== deps.produtoId) { log("outro produto — ignorado", { ...base, produto: c.produtoId }); return { status: 200, corpo: { ok: true, ignorado: "outro_produto" } }; }
+
+  const pago = EVENTOS_PAGO.has(c.evento);
+  const estorno = EVENTOS_ESTORNO.has(c.evento);
+  if (!pago && !estorno) { log("evento sem ação", base); return { status: 200, corpo: { ok: true, ignorado: "evento" } }; }
+
+  const chave = `hotmart:${c.tx}:${c.evento}`;
+  const r = await reservar(admin, chave, c.evento);
+  if (r === "ja") { log("repetido — nada a fazer", base); return { status: 200, corpo: { ok: true, duplicado: true } }; }
+
+  try {
+    if (estorno) {
+      const { error } = await admin.from("subscriptions").update({ status: "canceled" }).eq("abacatepay_billing_id", c.tx).eq("payment_method", GATEWAY_HOTMART);
+      if (error) throw new Error(String((error as Erro)?.message ?? error));
+      log("estorno — acesso desligado", base);
+      return { status: 200, corpo: { ok: true, desligado: true } };
+    }
+
+    if (c.status && !STATUS_PAGO.has(c.status)) { log("evento de pago com status estranho — não libera", base); return { status: 200, corpo: { ok: true, ignorado: "status" } }; }
+    if (!c.valorCents || (c.moeda && c.moeda !== "BRL")) { log("valor/moeda inválidos — não libera", { ...base, moeda: c.moeda }); return { status: 200, corpo: { ok: true, ignorado: "valor" } }; }
+
+    const reg = await registroHotmart(admin, c.sck);
+    if (reg.conflito) log("ALARME registro do pedido em conflito — vai pelo e-mail", base);
+    const conta = await acharContaHotmart(admin, { refUserId: reg.userId, email: c.email, acharConta: deps.acharConta });
+    if (!conta) { log("ALARME sem conta (sem ref e sem e-mail) — não libera", base); return { status: 200, corpo: { ok: true, ignorado: "sem_conta" } }; }
+    log("conta", { ...base, via: conta.via, ref: !!reg.userId });
+
+    const agora = deps.agora ? deps.agora() : new Date();
+    const emailConta = conta.email ?? c.email;
+    const g = await creditarPedido(admin, {
+      userId: conta.userId, orderId: c.tx, gateway: GATEWAY_HOTMART, concessao: { dias: null }, agora,
+      protegerVitalicio: true, offer: OFERTA_HOTMART,
+      montarPayload: (fim) => ({
+        user_id: conta.userId, status: "active", plan: "lifetime", billing_period: "lifetime",
+        payment_method: GATEWAY_HOTMART, abacatepay_billing_id: c.tx, customer_email: emailConta, amount_cents: c.valorCents,
+        current_period_start: agora.toISOString(), current_period_end: fim,
+      }),
+    });
+    if (g.r === "erro" || g.r === "em_andamento") throw new Error(g.r === "erro" ? g.msg : "em_andamento");
+    if (g.r !== "creditado" || g.jaLiberado) {
+      log(g.r === "creditado" ? "creditado, já tinha vitalício — nada sai" : `nada a creditar (${g.r})`, base);
+      return { status: 200, corpo: { ok: true, liberado: true, novo: false } };
+    }
+    log("vitalício liberado", { ...base, acao: g.acao });
+
+    // 1 de cada por transação (o PURCHASE_COMPLETE depois do APPROVED cai no ja_creditado acima; a reserva cobre corrida)
+    if (emailConta && await reservar(admin, `hotmart-email:${c.tx}`, "email") === "ok") {
+      const ok = await deps.enviarEmail(emailConta, assuntoVenda("lifetime"), htmlVenda({ email: emailConta, nome: c.nome, periodo: "lifetime", fim: g.fim, hoje: true })).catch(() => false);
+      if (!ok) await soltar(admin, `hotmart-email:${c.tx}`);
+      log(ok ? "e-mail da compra enviado" : "e-mail da compra FALHOU", { para: mascararEmail(emailConta) });
+    }
+    if (await reservar(admin, `hotmart-capi:${c.tx}`, "capi") === "ok") {
+      const corpo = await eventoPurchaseHotmart({ tx: c.tx, valorCents: c.valorCents, userId: conta.userId, email: emailConta, registro: reg, agoraMs: agora.getTime() });
+      const ok = await deps.mandarCapi(corpo).catch(() => false);
+      log(ok ? "Purchase CAPI enviado" : "Purchase CAPI falhou", { tx: c.tx });
+    }
+    try {
+      const { data } = await admin.from("subscriptions").select("id").eq("abacatepay_billing_id", c.tx).eq("user_id", conta.userId).maybeSingle();
+      if (data?.id) await deps.avisarVenda(String(data.id));
+    } catch { /* aviso é luxo */ }
+    return { status: 200, corpo: { ok: true, liberado: true, novo: true, via: conta.via } };
+  } catch (e) {
+    await soltar(admin, chave); // a Hotmart reenvia e a gente tenta de novo
+    log("ERRO — a Hotmart vai reenviar", { ...base, msg: String((e as Error)?.message ?? e).slice(0, 160) });
+    return { status: 500, corpo: { ok: false } };
+  }
+}

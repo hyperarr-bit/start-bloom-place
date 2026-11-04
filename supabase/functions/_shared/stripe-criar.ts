@@ -60,11 +60,16 @@ export function paramsCriar(ref: string): Array<[string, string]> {
   ];
 }
 
-/** O POST /v1/payment_intents/<id> (atualizar): o e-mail e os sinais do navegador (variáveis). O valor NUNCA é reenviado. */
-export function paramsAtualizar(md: Record<string, string>, email: string | null): Array<[string, string]> {
+/** O POST /v1/payment_intents/<id> (atualizar): o e-mail e os sinais do navegador (variáveis). O valor NUNCA é reenviado.
+ *  `jaTem` = a metadata atual do PI: o criado_em só vai na 1ª vez (o fbc do fbclid usa esse horário). */
+export function paramsAtualizar(md: Record<string, string>, email: string | null, jaTem: Record<string, string> = {}): Array<[string, string]> {
   const out: Array<[string, string]> = [];
   if (email) out.push(["receipt_email", email]);
-  for (const [k, v] of Object.entries(md)) if (k !== "ref" && k !== "pagina") out.push([`metadata[${k}]`, v]);
+  for (const [k, v] of Object.entries(md)) {
+    if (k === "ref" || k === "pagina") continue;
+    if (k === "criado_em" && jaTem.criado_em) continue;
+    out.push([`metadata[${k}]`, v]);
+  }
   return out;
 }
 
@@ -120,12 +125,16 @@ export async function criarOuReaproveitar(
   let pi = p.pi;
   if (!pi) {
     try {
-      const { data: ja } = await admin.from("analytics_events").select("event_data").eq("event_name", "stripe_order_created").eq("event_data->>ref", p.ref).limit(1);
-      const achado = (ja?.[0]?.event_data as { pi?: string } | undefined)?.pi;
-      if (typeof achado === "string" && /^pi_/.test(achado)) pi = achado;
+      // o MAIS NOVO desta ref (um PI cancelado dá lugar a outro: -2, -3…)
+      const { data: ja } = await admin.from("analytics_events").select("event_data").eq("event_name", "stripe_order_created").eq("event_data->>ref", p.ref).limit(10);
+      const achado = ((ja ?? []) as Array<{ event_data?: { pi?: string } }>).map((l) => l.event_data?.pi).filter((x): x is string => typeof x === "string" && /^pi_/.test(x)).at(-1);
+      if (achado) pi = achado;
     } catch { /* cria (a chave de idempotência ainda segura o 2º) */ }
   }
-  let j: Record<string, unknown>;
+  const registrar = async (id: unknown) => {
+    try { await admin.from("analytics_events").insert({ event_name: "stripe_order_created", user_id: ctx.userId, session_id: p.landing_session_id, event_data: { ref: p.ref, pi: id, pagina: PAGINA_STRIPE, ...(ctx.ip ? { client_ip: ctx.ip } : {}), ...p.atrib } }); } catch { /* o PI existe; a próxima recarga acha pela chave */ }
+  };
+  let j: Record<string, unknown> | null = null;
   if (pi) {
     const atual = await stripe(`payment_intents/${pi}`, null);
     if (!atual.ok || (atual.j.metadata as Record<string, string> | undefined)?.ref !== p.ref) return { status: 404, corpo: { ok: false } };
@@ -135,11 +144,24 @@ export async function criarOuReaproveitar(
     const r = await stripe("payment_intents", paramsCriar(p.ref), `oferta-${p.ref}`);
     if (!r.ok || typeof r.j.client_secret !== "string") { log("criar falhou", { code: String((r.j.error as Record<string, unknown> | undefined)?.code ?? "") }); return { status: 502, corpo: { ok: false } }; }
     j = r.j;
-    try { await admin.from("analytics_events").insert({ event_name: "stripe_order_created", user_id: ctx.userId, session_id: p.landing_session_id, event_data: { ref: p.ref, pi: j.id, pagina: PAGINA_STRIPE, ...(ctx.ip ? { client_ip: ctx.ip } : {}), ...p.atrib } }); } catch { /* o PI existe; a próxima recarga acha pela chave */ }
+    await registrar(j.id);
   }
+  // 05/11 (revisão 2): PI cancelado não serve pra pagar → um novo pra mesma ref, com outra chave (oferta-<ref>-2, -3…)
+  for (let n = 2; String(j.status) === "canceled" && n <= 6; n++) {
+    const r = await stripe("payment_intents", paramsCriar(p.ref), `oferta-${p.ref}-${n}`);
+    if (!r.ok || typeof r.j.client_secret !== "string") { log("recriar falhou", { n }); return { status: 502, corpo: { ok: false } }; }
+    j = r.j;
+    if (String(j.status) !== "canceled") await registrar(j.id);
+  }
+  if (String(j.status) === "canceled") return { status: 502, corpo: { ok: false } };
   if (PODE_ATUALIZAR.has(String(j.status))) {
-    const up = await stripe(`payment_intents/${j.id}`, paramsAtualizar(md, p.email));
-    if (up.ok) j = up.j; else log("atualizar falhou", { code: String((up.j.error as Record<string, unknown> | undefined)?.code ?? "") });
+    const up = await stripe(`payment_intents/${j.id}`, paramsAtualizar(md, p.email, (j.metadata ?? {}) as Record<string, string>));
+    if (up.ok) j = up.j;
+    else {
+      log("atualizar falhou", { code: String((up.j.error as Record<string, unknown> | undefined)?.code ?? "") });
+      // revisão 2 (1): na hora de pagar (veio o e-mail), sem o e-mail no PI não paga — a página mostra o erro e tenta de novo
+      if (p.email) return { status: 502, corpo: { ok: false } };
+    }
   }
   return { status: 200, corpo: { ok: true, client_secret: j.client_secret, pi: j.id, status: j.status, pix: pixDoIntento(j) } };
 }

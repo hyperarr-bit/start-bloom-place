@@ -313,8 +313,10 @@ function stripeFalsa() {
   const chaves = new Map<string, { corpo: string; pi: string }>();
   let n = 0;
   const chamadas: string[] = [];
+  const ctl = { falharUpdate: false, idems: [] as string[] };
   const f: ChamarStripe = async (caminho, pares, idem) => {
     chamadas.push(`${pares ? "POST" : "GET"} ${caminho}`);
+    if (idem) ctl.idems.push(idem);
     if (caminho === "payment_intents" && pares) {
       const corpo = JSON.stringify(pares);
       if (idem && chaves.has(idem)) { const c = chaves.get(idem)!; if (c.corpo !== corpo) return { ok: false, j: { error: { type: "idempotency_error", code: "idempotency_key_in_use" } } }; return { ok: true, j: { ...pis.get(c.pi)! } }; }
@@ -327,12 +329,13 @@ function stripeFalsa() {
     const m = /^payment_intents\/(pi_\w+)$/.exec(caminho);
     if (m) {
       const p = pis.get(m[1]); if (!p) return { ok: false, j: {} };
+      if (pares && ctl.falharUpdate) return { ok: false, j: { error: { code: "resource_missing" } } };
       if (pares) { for (const [k, v] of pares) { const mm = /^metadata\[(.+)\]$/.exec(k); if (mm) (p.metadata as Record<string, string>)[mm[1]] = v; else p[k] = v; } }
       return { ok: true, j: { ...p, metadata: { ...(p.metadata as Linha) } } };
     }
     return { ok: false, j: {} };
   };
-  return { f, pis, chamadas };
+  return { f, pis, chamadas, ctl };
 }
 describe("revisão: stripe-criar na recarga", () => {
   const REF = "0f8a5c2e-1111-4222-8333-944455556666";
@@ -376,5 +379,52 @@ describe("revisão: livemode", () => {
     expect(m.db.subscriptions).toHaveLength(0);
     expect(m.saida.push).toHaveLength(0);
     expect(m.db.webhook_events.size).toBe(0);
+  });
+});
+
+/* ───────── reconferência 05/11 ───────── */
+describe("reconferência: e-mail no PI, cancelado, criado_em, e-mail da cobrança", () => {
+  const REF = "0f8a5c2e-1111-4222-8333-944455556666";
+  const pedido = (o: Linha = {}) => validarPedidoStripe({ ref: REF, ...o })!;
+  const md = (hora: string) => metadataDoPedido(pedido(), { userId: null, ip: "1.1.1.1", ua: "UA", agoraIso: hora });
+  const chamar = (m: ReturnType<typeof montar>, s: ReturnType<typeof stripeFalsa>, p: ReturnType<typeof pedido>, hora = "2026-11-04T15:00:00Z") =>
+    criarOuReaproveitar({ admin: m.admin as never, stripe: s.f, log: () => {} }, p, metadataDoPedido(p, { userId: null, ip: "1.1.1.1", ua: "UA", agoraIso: hora }), { userId: null, ip: "1.1.1.1" });
+  it("1: na hora de pagar (com e-mail) o atualizar falha → 502 (não paga sem o e-mail no PI); ao abrir (sem e-mail) segue 200", async () => {
+    const m = montar(); const s = stripeFalsa();
+    await chamar(m, s, pedido());
+    s.ctl.falharUpdate = true;
+    expect((await chamar(m, s, pedido({ pi: "pi_1", email: "maria@exemplo.com" }))).status).toBe(502);
+    expect((await chamar(m, s, pedido({ pi: "pi_1" }))).status).toBe(200);
+  });
+  it("2: PI cancelado → um novo com a chave oferta-<ref>-2, registrado; a recarga seguinte acha o novo", async () => {
+    const m = montar(); const s = stripeFalsa();
+    await chamar(m, s, pedido());
+    s.pis.get("pi_1")!.status = "canceled";
+    const r = await chamar(m, s, pedido());
+    expect(r.corpo).toMatchObject({ pi: "pi_2", client_secret: "pi_2_secret_x" });
+    expect(s.ctl.idems).toContain(`oferta-${REF}-2`);
+    const r2 = await chamar(m, s, pedido());
+    expect(r2.corpo).toMatchObject({ pi: "pi_2" });
+    expect(s.pis.size).toBe(2);
+  });
+  it("3: criado_em só na 1ª vez (o atualizar da recarga não sobrescreve)", async () => {
+    const m = montar(); const s = stripeFalsa();
+    await chamar(m, s, pedido(), "2026-11-04T15:00:00Z");
+    expect((s.pis.get("pi_1")!.metadata as Linha).criado_em).toBe("2026-11-04T15:00:00Z");
+    await chamar(m, s, pedido({ email: "maria@exemplo.com" }), "2026-11-04T18:00:00Z");
+    expect((s.pis.get("pi_1")!.metadata as Linha).criado_em).toBe("2026-11-04T15:00:00Z");
+    expect((s.pis.get("pi_1")!.metadata as Linha).email).toBe("maria@exemplo.com");
+    expect(paramsAtualizar(md("x"), null, { criado_em: "y" }).some(([k]) => k === "metadata[criado_em]")).toBe(false);
+  });
+  it("1: webhook sem e-mail na metadata → usa o billing_details.email da cobrança (não cai em 'sem_conta')", async () => {
+    const m = montar();
+    m.db.users.set("u_maria", { id: "u_maria", email: "maria@exemplo.com" });
+    m.deps.buscarCobranca = async () => ({ metodo: "pix", parcelas: null, email: "Maria@Exemplo.com" });
+    const r = await mandar(m, evento("payment_intent.succeeded", pi({ receipt_email: null, metadata: { email: "" } })));
+    expect(r.corpo).toMatchObject({ novo: true, via: "email" });
+    expect(m.db.subscriptions[0]).toMatchObject({ user_id: "u_maria", customer_email: "maria@exemplo.com" });
+    const m2 = montar();
+    m2.deps.buscarCobranca = async () => ({ metodo: "pix", parcelas: null, email: null });
+    expect((await mandar(m2, evento("payment_intent.succeeded", pi({ receipt_email: null, metadata: { email: "" } })))).corpo).toMatchObject({ ignorado: "sem_conta" });
   });
 });

@@ -44,8 +44,8 @@ serve(async (req) => {
       if (!sk) return null;
       const res = await fetch(`https://api.stripe.com/v1/charges/${ch}`, { headers: { Authorization: `Bearer ${sk}` } });
       if (!res.ok) return null;
-      const j = await res.json() as { payment_method_details?: { type?: string; card?: { installments?: { plan?: { count?: number } | null } | null } } };
-      return { metodo: j.payment_method_details?.type ?? null, parcelas: j.payment_method_details?.card?.installments?.plan?.count ?? (j.payment_method_details?.type === "card" ? 1 : null) };
+      const j = await res.json() as { billing_details?: { email?: string | null }; payment_method_details?: { type?: string; card?: { installments?: { plan?: { count?: number } | null } | null } } };
+      return { metodo: j.payment_method_details?.type ?? null, parcelas: j.payment_method_details?.card?.installments?.plan?.count ?? (j.payment_method_details?.type === "card" ? 1 : null), email: j.billing_details?.email ?? null };
     },
     log,
   }, { assinatura: req.headers.get("stripe-signature"), corpo });

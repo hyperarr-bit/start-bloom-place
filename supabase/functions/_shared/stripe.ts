@@ -70,7 +70,7 @@ export function lerIntento(o: unknown): IntentoStripe | null {
 }
 
 /* ───────────────────────── o webhook ───────────────────────── */
-export type CobrancaStripe = { metodo: "pix" | "card" | string | null; parcelas: number | null };
+export type CobrancaStripe = { metodo: "pix" | "card" | string | null; parcelas: number | null; email?: string | null };
 export type DepsStripe = {
   admin: AdminHotmart;
   secret: string | null;
@@ -160,14 +160,19 @@ export async function tratarStripe(deps: DepsStripe, req: { assinatura: string |
     if (pi.currency !== "brl" || valor !== STRIPE_PRECO_CENTAVOS) return ignorar("valor");
     if (await existe(admin, `stripe-estorno:${pi.id}`)) return ignorar("estornada");
 
-    const conta = await acharContaHotmart(admin, { refUserId: t(md.user_id, 64), email: email && EMAIL_OK.test(email) ? email : null, acharConta: deps.acharConta });
+    // a cobrança (método, parcelas e o e-mail de cobrança): 1 leitura, usada na conta e no stripe_venda
+    const cob = pi.latest_charge ? await deps.buscarCobranca(pi.latest_charge).catch(() => null) : null;
+    // revisão 2 (1): sem o e-mail na metadata, o billing_details.email da cobrança antes de cair em "sem_conta"
+    let emailCompra = email && EMAIL_OK.test(email) ? email : null;
+    if (!emailCompra) { const be = (cob?.email ?? "").trim().toLowerCase(); if (EMAIL_OK.test(be)) emailCompra = be; }
+    const conta = await acharContaHotmart(admin, { refUserId: t(md.user_id, 64), email: emailCompra, acharConta: deps.acharConta });
     if (!conta) return ignorar("sem_conta");
     log("conta", { ...base, via: conta.via });
     if (conta.divergenteDe && await reservar(admin, `stripe-divergente:${pi.id}`, "divergente") === "ok") {
       try { await admin.from("analytics_events").insert({ event_name: "stripe_conta_divergente", user_id: conta.divergenteDe, event_data: { pi: pi.id, para: conta.userId, via: conta.via } }); } catch { /* registro é luxo */ }
     }
 
-    const emailConta = conta.email ?? email;
+    const emailConta = conta.email ?? emailCompra;
     const g = await creditarPedido(admin, {
       userId: conta.userId, orderId: pi.id, gateway: GATEWAY_STRIPE, concessao: { dias: null }, agora,
       protegerVitalicio: true, offer: OFERTA_STRIPE, linhaNova: true,
@@ -192,7 +197,6 @@ export async function tratarStripe(deps: DepsStripe, req: { assinatura: string |
       log(ok ? "e-mail da compra enviado" : "e-mail da compra FALHOU", { para: mascararEmail(emailConta) });
     }
     if (await reservar(admin, `stripe-venda:${pi.id}`, "venda") === "ok") {
-      const cob = pi.latest_charge ? await deps.buscarCobranca(pi.latest_charge).catch(() => null) : null;
       let erroVenda: string | null = null;
       try {
         const { error } = await admin.from("analytics_events").insert({ event_name: "stripe_venda", user_id: conta.userId, event_data: { pi: pi.id, pagina: PAGINA_STRIPE, valor_cents: valor, metodo: cob?.metodo ?? null, parcelas: cob?.parcelas ?? null, via: conta.via, ref: md.ref ?? null } });

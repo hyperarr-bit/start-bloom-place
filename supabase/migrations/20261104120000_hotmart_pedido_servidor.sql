@@ -47,3 +47,13 @@ CREATE POLICY "Anon insert anonymous events"
       'cancel_confirmed', 'cancel_loja_bloqueado', 'support_ticket_answered', 'support_ticket_created'
     ]::text[]))
   );
+
+-- G (revisão 04/11): consultas baratas pelo pedido da Hotmart — índices PARCIAIS (só as linhas hotmart_order_created, poucas):
+--   · pela ref (o hotmart-webhook acha o pedido; o hotmart-iniciar recusa a ref repetida);
+--   · por IP + hora (o hotmart-iniciar limita 20 pedidos por IP em 10 min).
+-- analytics_events é grande: rodar ANTES, à mão, com CONCURRENTLY (fora de transação) — aqui ficam IF NOT EXISTS e não
+-- refazem nada se já existirem:
+--   CREATE INDEX CONCURRENTLY IF NOT EXISTS analytics_events_hotmart_ref_idx ON public.analytics_events ((event_data->>'ref')) WHERE event_name = 'hotmart_order_created';
+--   CREATE INDEX CONCURRENTLY IF NOT EXISTS analytics_events_hotmart_ip_idx ON public.analytics_events ((event_data->>'client_ip'), created_at) WHERE event_name = 'hotmart_order_created';
+CREATE INDEX IF NOT EXISTS analytics_events_hotmart_ref_idx ON public.analytics_events ((event_data->>'ref')) WHERE event_name = 'hotmart_order_created';
+CREATE INDEX IF NOT EXISTS analytics_events_hotmart_ip_idx ON public.analytics_events ((event_data->>'client_ip'), created_at) WHERE event_name = 'hotmart_order_created';

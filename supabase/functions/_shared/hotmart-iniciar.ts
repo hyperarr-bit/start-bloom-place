@@ -46,3 +46,32 @@ export function linhaDoPedidoHotmart(p: InicioHotmart, args: { userId: string | 
     },
   };
 }
+
+/* ───────── G (revisão 04/11): limite por IP + consultas baratas ───────── */
+// deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ClienteMin = { from: (t: string) => any };
+/** Até 20 pedidos por IP a cada 10 min (uma pessoa toca 1–3×; o resto é robô/abuso). */
+export const LIMITE_POR_IP = 20;
+export const JANELA_IP_MS = 10 * 60_000;
+
+/** O IP ainda pode gravar pedido? Conta pelo índice parcial (event_data->>'client_ip', created_at) da migração
+ *  20261104120000. Sem IP ou erro de leitura = deixa (nunca trava uma venda por falha nossa). */
+export async function ipPodeIniciar(admin: ClienteMin, ip: string | null, agoraMs: number = Date.now()): Promise<boolean> {
+  if (!ip) return true;
+  try {
+    const { count, error } = await admin.from("analytics_events").select("id", { count: "exact", head: true })
+      .eq("event_name", "hotmart_order_created").eq("event_data->>client_ip", ip)
+      .gte("created_at", new Date(agoraMs - JANELA_IP_MS).toISOString());
+    if (error || typeof count !== "number") return true;
+    return count < LIMITE_POR_IP;
+  } catch { return true; }
+}
+
+/** A ref já foi gravada? (toque duplo / reenvio = 1 linha só) — pelo índice parcial (event_data->>'ref'). */
+export async function refJaExiste(admin: ClienteMin, ref: string): Promise<boolean> {
+  try {
+    const { data } = await admin.from("analytics_events").select("id").eq("event_name", "hotmart_order_created").eq("event_data->>ref", ref).limit(1);
+    return Array.isArray(data) && data.length > 0;
+  } catch { return false; }
+}

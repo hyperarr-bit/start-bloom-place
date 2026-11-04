@@ -28,7 +28,7 @@ export type OpcoesCheckout = {
   voltaDoBanco?: { pi: string; status: string };
 };
 
-export type RespostaCriar = { ok: boolean; clientSecret?: string; pi?: string; erro?: string };
+export type RespostaCriar = { ok: boolean; clientSecret?: string; pi?: string; erro?: string; status?: string; pix?: PixQr | null };
 export type RespostaStatus = { ok: boolean; status?: string; pago?: boolean; metodo?: string | null };
 export type ApiOferta = {
   criar: (corpo: Record<string, unknown>) => Promise<RespostaCriar>;
@@ -51,9 +51,15 @@ const FUNCOES = "https://itoylenzvahbscgjgtqf.supabase.co/functions/v1";
 const ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0b3lsZW56dmFoYnNjZ2pndHFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMTc4NzUsImV4cCI6MjA4OTg5Mzg3NX0.G3bJEdD5B5lmc1cic6UYGeu2xv4XrbmZ9MA_afoYnLg";
 const GUIA = "https://www.coreaplicativo.com.br/guia/core-comece-aqui.pdf";
 const CHAVE_REF = "oferta-stripe-ref";
+const CHAVE_PI = "oferta-stripe-pi";
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 const novoId = () => { try { return crypto.randomUUID(); } catch { return `o${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`; } };
 
+/** o PaymentIntent desta ref (sessionStorage, junto da ref): a recarga reaproveita o mesmo (e o mesmo QR do Pix) */
+function piDaAba(ref: string): string | null {
+  try { const j = JSON.parse(sessionStorage.getItem(CHAVE_PI) || "null") as { ref?: string; pi?: string } | null; return j && j.ref === ref && typeof j.pi === "string" && /^pi_/.test(j.pi) ? j.pi : null; } catch { return null; }
+}
+function guardarPi(ref: string, pi: string) { try { sessionStorage.setItem(CHAVE_PI, JSON.stringify({ ref, pi })); } catch { /* heap */ } }
 /** a ref do pedido nesta aba (a mesma se a pessoa fecha e reabre — o servidor não cria 2 PaymentIntents) */
 function refDaAba(): string {
   try { const r = sessionStorage.getItem(CHAVE_REF); if (r && /^[A-Za-z0-9-]{8,64}$/.test(r)) return r; } catch { /* noop */ }
@@ -81,7 +87,7 @@ const postar = async (fn: string, corpo: Record<string, unknown>): Promise<Recor
   return r.ok ? j : { ...j, ok: false };
 };
 const apiReal: ApiOferta = {
-  criar: async (c) => { const j = await postar("stripe-criar", c); return { ok: j.ok === true, clientSecret: j.client_secret as string | undefined, pi: j.pi as string | undefined, erro: j.erro as string | undefined }; },
+  criar: async (c) => { const j = await postar("stripe-criar", c); return { ok: j.ok === true, clientSecret: j.client_secret as string | undefined, pi: j.pi as string | undefined, erro: j.erro as string | undefined, status: j.status as string | undefined, pix: (j.pix as PixQr | null | undefined) ?? null }; },
   status: async (c) => { const j = await postar("stripe-status", c); return { ok: j.ok === true, status: j.status as string | undefined, pago: j.pago === true, metodo: (j.metodo as string | null) ?? null }; },
 };
 /** fora do domínio de produção: nada sai pra Stripe. O Pix simulado "cai" 6 s depois de gerado. */
@@ -143,6 +149,7 @@ function stripeDeVerdade(pk: string): Promise<StripeLike> {
 /* ───────────────────────── a camada ───────────────────────── */
 const CSS = `
 .oc{position:fixed;inset:0;z-index:300;background:#fff;display:flex;flex-direction:column;height:100vh;height:100dvh;overscroll-behavior:contain;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--tx,#1c1a1f);animation:oc-sobe .22s ease}
+.oc[hidden]{display:none!important}
 @keyframes oc-sobe{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.oc{animation:none}}
 .oc-barra{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;height:52px;padding:0 8px 0 16px;border-bottom:1px solid var(--borda,#ebe8ee);padding-top:env(safe-area-inset-top)}
@@ -215,7 +222,7 @@ const CSS = `
 const ICO_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
 const ICO_CADEADO = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
 
-type Fase = "form" | "pix" | "aguardando" | "pago";
+type Fase = "form" | "pix" | "aguardando" | "pago" | "recebido";
 type Estado = { fase: Fase; ref: string; pi: string | null; clientSecret: string | null; metodo: string; pix: PixQr | null; email: string };
 
 let raiz: HTMLElement | null = null;
@@ -230,6 +237,11 @@ let focoAntes: HTMLElement | null = null;
 let consulta: number | null = null;
 let pagando = false;
 let comHistorico = false;
+let ultimaCriacao: RespostaCriar | null = null;
+const icNoHeap = new Set<string>();
+let vigiaDesde = 0;
+/** 3 (revisão): sem resposta em ~2 min na espera do cartão/banco → para e mostra "Pagamento recebido?" */
+const VIGIA_MAX_MS = 120_000;
 
 /** a camada está aberta? (testes) */
 export const estaAberto = () => aberta;
@@ -312,6 +324,8 @@ async function garantirIntento(email: string | null): Promise<boolean> {
   }).catch(() => ({ ok: false } as RespostaCriar));
   if (!r.ok || !r.clientSecret) { o.evento("landing_erro", { onde: "stripe_criar", msg: String(r.erro ?? "falhou").slice(0, 80) }); return false; }
   est!.clientSecret = r.clientSecret; est!.pi = r.pi ?? est!.pi;
+  if (est!.pi) guardarPi(est!.ref, est!.pi);
+  ultimaCriacao = r;
   return true;
 }
 
@@ -319,6 +333,9 @@ async function montarElemento() {
   const o = opc!;
   const caixa = raiz!.querySelector<HTMLElement>("#oc-pe")!;
   if (!(await garantirIntento(null))) { caixa.innerHTML = ""; erroGeral("Não consegui abrir o pagamento agora. Tente de novo em instantes."); return; }
+  // 2 (revisão): a recarga reaproveitou o PI — Pix já gerado volta com o MESMO QR; já pago vai pro pago
+  if (ultimaCriacao?.status === "succeeded") { mostrarPago(est!.metodo); return; }
+  if (ultimaCriacao?.pix && (ultimaCriacao.pix.data || ultimaCriacao.pix.image_url_png)) { est!.pix = ultimaCriacao.pix; est!.metodo = "pix"; est!.fase = "pix"; telaPix(); return; }
   try {
     stripe = w.__stripeFalso ?? (o.producao ? await stripeDeVerdade(o.pk) : stripeSimulado(api!));
   } catch {
@@ -410,6 +427,21 @@ async function desenharQr(alvo: HTMLElement, valor: string) {
   } catch { /* o copia-e-cola continua */ }
 }
 
+/** 3 (revisão): a volta do banco sem confirmação daqui (outro navegador, ref perdida, ou 2 min sem resposta) — nunca "Confirmando…" pra sempre */
+function telaRecebido() {
+  if (!est || !raiz) return;
+  est.fase = "recebido";
+  pararVigia();
+  opc?.evento("landing_stripe_recebido_sem_confirmar", { pi: est.pi });
+  raiz.querySelector<HTMLElement>("#oc-in")!.innerHTML = `
+    <div class="oc-pago" data-testid="oferta-recebido">
+      <h2 id="oc-tit">Pagamento recebido?</h2>
+      <p>O acesso chega no seu e-mail em até 1 minuto. Enquanto isso, baixe o app:</p>
+      <div class="oc-selos"><a href="${URL_APP_STORE}" data-loja="ios"><img src="/selos/app-store.svg" alt="Baixar na App Store" width="144" height="48" /></a><a href="${esc(urlPlay("oferta"))}" data-loja="android"><img src="/selos/google-play.png" alt="Disponível no Google Play" width="124" height="48" /></a></div>
+      <p class="oc-contato">No app, toque em <b>“Já tenho conta? Entrar”</b> com o e-mail da compra. Não chegou? <a href="mailto:contato@coreaplicativo.com.br">contato@coreaplicativo.com.br</a></p>
+    </div>`;
+}
+
 function telaAguardando() {
   const alvo = raiz!.querySelector<HTMLElement>("#oc-in")!;
   alvo.innerHTML = `<div class="oc-pix" data-testid="oferta-aguardando"><h2 id="oc-tit">Confirmando o pagamento…</h2><span class="oc-pilula"><i></i>Só um instante</span><p>Não feche esta tela. O acesso também chega no seu e-mail.</p></div>`;
@@ -418,10 +450,12 @@ function telaAguardando() {
 /** pergunta ao servidor se o PaymentIntent pagou (a cada 3 s, e na volta pra aba) */
 function vigiar() {
   if (consulta !== null) return;
+  vigiaDesde = Date.now();
   const uma = async () => {
-    if (!est?.pi || est.fase === "pago") return;
+    if (!est?.pi || est.fase === "pago" || est.fase === "recebido") return;
     const r = await api!.status({ ref: est.ref, pi: est.pi }).catch(() => null);
-    if (r?.pago) mostrarPago((r.metodo as string) || est.metodo);
+    if (r?.pago) return mostrarPago((r.metodo as string) || est.metodo);
+    if (est.fase === "aguardando" && (r?.ok === false || Date.now() - vigiaDesde > VIGIA_MAX_MS)) telaRecebido();
   };
   consulta = window.setInterval(() => { void uma(); }, 3000);
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") void uma(); });
@@ -440,7 +474,7 @@ function mostrarPago(metodo: string) {
     try { history.pushState({ ofertaCheckout: 1 }, ""); comHistorico = true; } catch { comHistorico = false; }
     window.addEventListener("popstate", aoVoltarNavegador);
   }
-  try { sessionStorage.removeItem(CHAVE_REF); } catch { /* noop */ }
+  try { sessionStorage.removeItem(CHAVE_REF); sessionStorage.removeItem(CHAVE_PI); } catch { /* noop */ }
   o.evento("landing_stripe_pago", { metodo, pi: est.pi });
   if (est.pi) o.pixel("Purchase", { value: o.precoCentavos / 100, currency: "BRL", content_name: "oferta_stripe" }, est.pi);
   const e = est.email;
@@ -480,20 +514,25 @@ export async function abrirCheckout(o: OpcoesCheckout): Promise<void> {
   travar();
   try { history.pushState({ ofertaCheckout: 1 }, ""); comHistorico = true; } catch { comHistorico = false; }
   window.addEventListener("popstate", aoVoltarNavegador);
-  if (!est) est = { fase: "form", ref: refDaAba(), pi: null, clientSecret: null, metodo: "card", pix: null, email: "" };
+  if (!est) { const ref = refDaAba(); est = { fase: "form", ref, pi: piDaAba(ref), clientSecret: null, metodo: "card", pix: null, email: "" }; }
   if (o.voltaDoBanco) {
     est.pi = o.voltaDoBanco.pi;
     est.fase = "aguardando"; telaAguardando();
     const r = await api.status({ ref: est.ref, pi: est.pi }).catch(() => null);
     if (r?.pago) mostrarPago(r.metodo ?? "card");
     else if (o.voltaDoBanco.status === "failed") { est.fase = "form"; telaForm(); erroGeral("O banco não aprovou. Tente de novo ou use o Pix."); }
+    else if (!r || r.ok === false) telaRecebido(); // ref perdida / outro navegador: não dá pra conferir daqui
     else vigiar();
   } else if (est.fase === "pix" && est.pix) telaPix();
   else if (est.fase === "pago") { est.fase = "form"; telaForm(); }
   else if (est.fase === "aguardando") { telaAguardando(); vigiar(); }
   else telaForm();
   o.evento("landing_stripe_aberto", { fase: est.fase });
-  if (est.fase === "form") o.pixel("InitiateCheckout", { value: o.precoCentavos / 100, currency: "BRL", content_name: "oferta_stripe" }, `ic-${est.ref}`);
+  // 5 (revisão): InitiateCheckout 1× por ref (abrir e fechar várias vezes não infla)
+  const chaveIc = `oferta-ic-${est.ref}`;
+  let jaFoi = false; try { jaFoi = sessionStorage.getItem(chaveIc) === "1"; sessionStorage.setItem(chaveIc, "1"); } catch { /* heap */ }
+  if (est.fase === "form" && !jaFoi && !icNoHeap.has(est.ref)) o.pixel("InitiateCheckout", { value: o.precoCentavos / 100, currency: "BRL", content_name: "oferta_stripe" }, `ic-${est.ref}`);
+  icNoHeap.add(est.ref);
   window.setTimeout(() => { raiz?.querySelector<HTMLElement>("#oc-email, #oc-copiar, #oc-x")?.focus(); }, 30);
 }
 
@@ -514,4 +553,4 @@ function fecharJa(_via: string) {
 }
 
 /** testes: zera o módulo entre páginas */
-export function _zerar() { pararVigia(); raiz?.remove(); raiz = null; est = null; aberta = false; opc = null; api = null; stripe = null; elementos = null; window.removeEventListener("popstate", aoVoltarNavegador); soltar(); }
+export function _zerar() { pararVigia(); raiz?.remove(); raiz = null; est = null; ultimaCriacao = null; icNoHeap.clear(); aberta = false; opc = null; api = null; stripe = null; elementos = null; window.removeEventListener("popstate", aoVoltarNavegador); soltar(); }

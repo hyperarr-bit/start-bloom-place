@@ -1799,6 +1799,12 @@ if (STRIPE) {
   });
   // voltou de um 3DS por redirecionamento (?payment_intent=…&redirect_status=…): reabre o checkout no estado certo
   if (BUSCA.get("payment_intent") && BUSCA.get("redirect_status")) {
+    // 3 (revisão): lido o retorno do banco, a URL fica limpa (recarregar não reabre a "volta" de novo)
+    try {
+      const limpa = new URL(location.href);
+      for (const k of ["payment_intent", "payment_intent_client_secret", "redirect_status"]) limpa.searchParams.delete(k);
+      history.replaceState(history.state, "", `${limpa.pathname}${limpa.search}${limpa.hash}`);
+    } catch { /* noop */ }
     void carregarStripeCheckout().then((m) => m.abrirCheckout({
       pk: ST_PK, precoCentavos: ST_PRECO, parcelasMax: Number(w.__landing?.stripe_parcelas_max) || 12, producao: PRODUCAO,
       evento, pixel, atrib, sessao, aparelho, urlChegada: URL_DE_CHEGADA, fbclid: BUSCA.get("fbclid"),

@@ -93,18 +93,19 @@ let statusPago = false;
 let confirmados: Array<{ tipo: string; args: unknown[] }> = [];
 let pixRetorno: Record<string, unknown> | null = null;
 let fbq: ReturnType<typeof vi.fn>;
-async function abrirPagina(o: { pagina?: "oferta" | null; url?: string } = {}) {
+async function abrirPagina(o: { pagina?: "oferta" | null; url?: string; antes?: () => void; criar?: (c: Chamada) => Promise<Record<string, unknown>>; status?: () => Promise<Record<string, unknown>> } = {}) {
   await dormir(20);
   vi.resetModules();
   localStorage.clear(); sessionStorage.clear();
+  o.antes?.();
   window.history.replaceState(null, "", o.url ?? "/oferta?utm_content=c7&fbclid=abc");
   (window as unknown as { __eventosLanding?: Ev[] }).__eventosLanding = [];
   criadas = []; statusPago = false; confirmados = []; pixRetorno = null;
   fbq = vi.fn();
   (window as unknown as { fbq?: unknown }).fbq = fbq;
   (window as unknown as { __ofertaApi?: unknown }).__ofertaApi = {
-    criar: async (c: Chamada) => { criadas.push(c); return { ok: true, clientSecret: "pi_123_secret_abc", pi: "pi_123" }; },
-    status: async () => ({ ok: true, status: statusPago ? "succeeded" : "requires_action", pago: statusPago, metodo: statusPago ? "pix" : null }),
+    criar: async (c: Chamada) => { criadas.push(c); return o.criar ? o.criar(c) : { ok: true, clientSecret: "pi_123_secret_abc", pi: "pi_123" }; },
+    status: async () => (o.status ? o.status() : { ok: true, status: statusPago ? "succeeded" : "requires_action", pago: statusPago, metodo: statusPago ? "pix" : null }),
   };
   let tipo = "card";
   const cbs: Array<(e: { value?: { type?: string } }) => void> = [];
@@ -265,5 +266,59 @@ describe("a /oferta no jsdom", () => {
     expect(i("/oferta/")).toBeLessThan(i("/(.*)"));
     expect(readFileSync(resolve(raiz, "vite.config.ts"), "utf8")).toContain('replace(/^\\/oferta\\/?/, "/landing.html")');
     expect(readFileSync(resolve(raiz, "supabase/config.toml"), "utf8")).toMatch(/\[functions\.stripe-webhook\]\nverify_jwt = false/);
+  });
+});
+
+/* ───────── revisão 05/11 ───────── */
+describe("revisão: fechar de verdade, recarga, volta do banco, InitiateCheckout 1×", () => {
+  it("1: a camada fechada some (regra .oc[hidden] vence o display:flex) — X, Esc e voltar", async () => {
+    const fonte = readFileSync(resolve(raiz, "src/landing/stripe-checkout.ts"), "utf8");
+    expect(fonte).toContain(".oc[hidden]{display:none!important}");
+    await abrirPagina();
+    await abrirCheckout();
+    expect(getComputedStyle(camada()!).display).toBe("flex");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    expect(camada()!.hidden).toBe(true);
+    expect(getComputedStyle(camada()!).display).toBe("none");
+  });
+  it("2: recarga com a ref e o pi guardados na aba → o stripe-criar recebe o MESMO pi e o Pix pendente volta com o MESMO QR", async () => {
+    const REF = "0f8a5c2e-1111-4222-8333-944455556666";
+    await abrirPagina({
+      antes: () => { sessionStorage.setItem("oferta-stripe-ref", REF); sessionStorage.setItem("oferta-stripe-pi", JSON.stringify({ ref: REF, pi: "pi_123" })); },
+      criar: async () => ({ ok: true, clientSecret: "pi_123_secret_abc", pi: "pi_123", status: "requires_action", pix: { data: "000201PIXMESMO", image_url_png: "https://qr/mesmo.png", expires_at: 1893456000 } }),
+    });
+    (document.getElementById("lp-hotmart-atual") as HTMLButtonElement).click();
+    await vi.waitFor(() => { if (!document.querySelector('[data-testid="oferta-pix"]')) throw new Error("sem pix"); }, { timeout: 3000, interval: 20 });
+    expect(criadas[0]).toMatchObject({ ref: REF, pi: "pi_123" });
+    expect((document.getElementById("oc-codigo") as HTMLInputElement).value).toBe("000201PIXMESMO");
+    expect(document.querySelector<HTMLImageElement>("#oc-qr img")!.src).toBe("https://qr/mesmo.png");
+    expect(confirmados).toHaveLength(0); // não gerou outro Pix
+  });
+  it("2: o pi novo fica guardado junto da ref (a próxima recarga reaproveita)", async () => {
+    await abrirPagina();
+    await abrirCheckout();
+    const ref = sessionStorage.getItem("oferta-stripe-ref");
+    expect(JSON.parse(sessionStorage.getItem("oferta-stripe-pi")!)).toEqual({ ref, pi: "pi_123" });
+  });
+  it("3: volta do 3DS por redirecionamento sem conseguir conferir (outro navegador) → 'Pagamento recebido?' com as lojas; a URL fica limpa", async () => {
+    await abrirPagina({ url: "/oferta?utm_content=c7&payment_intent=pi_999&payment_intent_client_secret=pi_999_secret&redirect_status=succeeded", status: async () => ({ ok: false }) });
+    await vi.waitFor(() => { if (!document.querySelector('[data-testid="oferta-recebido"]')) throw new Error("sem recebido"); }, { timeout: 3000, interval: 20 });
+    const t = document.querySelector('[data-testid="oferta-recebido"]')!.textContent!;
+    expect(t).toContain("Pagamento recebido?");
+    expect(t).toContain("O acesso chega no seu e-mail em até 1 minuto");
+    expect(document.querySelector('[data-testid="oferta-recebido"] a[data-loja="ios"]')).not.toBeNull();
+    expect(location.search).toBe("?utm_content=c7");
+    expect(dos("landing_stripe_recebido_sem_confirmar")).toHaveLength(1);
+  });
+  it("3: volta do banco que confirma → pago", async () => {
+    await abrirPagina({ url: "/oferta?payment_intent=pi_123&redirect_status=succeeded", status: async () => ({ ok: true, status: "succeeded", pago: true, metodo: "card" }) });
+    await vi.waitFor(() => { if (!document.querySelector('[data-testid="oferta-pago"]')) throw new Error("sem pago"); }, { timeout: 3000, interval: 20 });
+    expect(location.search).toBe("");
+  });
+  it("5: InitiateCheckout 1× por ref (abrir e fechar 3× não repete)", async () => {
+    await abrirPagina();
+    for (let i = 0; i < 3; i++) { await abrirCheckout(); window.dispatchEvent(new PopStateEvent("popstate")); }
+    expect(fbq.mock.calls.filter((c) => c[1] === "InitiateCheckout")).toHaveLength(1);
+    expect(dos("landing_stripe_aberto")).toHaveLength(3);
   });
 });

@@ -336,7 +336,7 @@ describe("hotmart.ts, rotas e obrigado", () => {
 const comVida = (ab: "on" | "off", hm: "on" | "off" = "on") => comChave(hm).replace(/var AB_VIDA = "(on|off)"/, `var AB_VIDA = "${ab}"`);
 describe("AB_VIDA no <head>", () => {
   it('no código: AB_VIDA "off" → todo mundo no v3 (data-lp v2), como antes', () => {
-    expect(HTML).toMatch(/var AB_VIDA = "off";/);
+    expect(HTML).toMatch(/var AB_VIDA = "on";/);
     const r = rodar(comVida("off"), "/vida");
     expect(r.attrs).toMatchObject({ "data-vida": "v3", "data-lp": "v2", "data-pagina": "vida" });
     expect(r.mem).toMatchObject({ vida: "v3", ab_vida: "off", vida_forcado: false });

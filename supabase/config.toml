@@ -13,6 +13,10 @@ verify_jwt = false
 [functions.hotmart-webhook]
 verify_jwt = false
 
+# 04/11: o webhook da Stripe (/oferta) não manda JWT — a trava é a assinatura (secret STRIPE_WEBHOOK_SECRET)
+[functions.stripe-webhook]
+verify_jwt = false
+
 [functions.abacate-webhook]
 verify_jwt = false
 

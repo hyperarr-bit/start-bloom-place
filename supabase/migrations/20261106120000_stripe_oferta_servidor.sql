@@ -1,0 +1,67 @@
+-- STRIPE /oferta (04/11/2026) — NÃO APLICADA. Cópia da 20261105120000 (a lista só-servidor de analytics_events) com os
+-- eventos da Stripe a mais: stripe_order_created (o pedido do stripe-criar; o limite por IP lê), stripe_venda (a venda com
+-- método/parcelas; o /vendas lê), stripe_venda_ignorada / stripe_email_falhou / stripe_conta_divergente (alarmes).
+-- Idempotente (DROP/CREATE das 2 policies). Índice pra o limite por IP: à mão, CONCURRENTLY, fora de transação:
+--   CREATE INDEX CONCURRENTLY IF NOT EXISTS analytics_events_stripe_ip_idx ON public.analytics_events ((event_data->>'client_ip'), created_at) WHERE event_name = 'stripe_order_created';
+
+-- HOTMART /vida (04/11/2026) — NÃO APLICADA. Aplicar só com ok do dono (db push), junto do deploy do hotmart-iniciar /
+-- hotmart-webhook. Sem ela a venda funciona igual; ela fecha uma porta:
+--
+-- `hotmart_order_created` é o elo pedido(ref do sck)↔conta da venda pela Hotmart (o hotmart-webhook lê). Como o
+-- `pix_order_created`, só o servidor pode gravar esse nome — senão uma sessão logada gravaria uma linha com a PRÓPRIA
+-- conta e a ref de outra pessoa. (A ref é um uuid aleatório que só a página de quem comprou conhece, e o webhook ainda
+-- exige que as linhas com conta concordem — esta é a 3ª trava.)
+--
+-- As 2 policies de insert de analytics_events são recriadas IGUAIS às da 20261022120000_seguranca_eventos_servidor.sql,
+-- com 'hotmart_order_created' a mais na lista. Se aquela migração ainda não estiver aplicada, esta a substitui no item 1.
+
+-- ---------------------------------------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Users insert own events" ON public.analytics_events;
+CREATE POLICY "Users insert own events"
+  ON public.analytics_events FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    (auth.uid() = user_id OR user_id IS NULL)
+    AND NOT (event_name = ANY (ARRAY[
+      'pix_order_created', 'hotmart_order_created', 'pix_reconciled', 'compra_vinculada', 'compra_avista',
+      'presente_resgatado_servidor', 'codigo_resgatado', 'referral_reward', 'hoje_casal_liberado',
+      'cakto_falha', 'cakto_falha_adiantado', 'cakto_disjuntor_aberto',
+      'porta_capi_cr', 'porta_capi_trial', 'porta_capi_pago', 'porta_email_enviado', 'porta_lembrete_enviado',
+      'pix_pendente_email_enviado', 'meta_capi_app_enviado', 'recovery_email_sent', 'trial_email_sent',
+      'welcome_email_sent', 'app_winback_email', 'email_livre_enviado',
+      'subscription_started', 'trial_converted', 'subscription_expired_no_payment',
+      'retention_discount_applied', 'retention_offer_accepted', 'retention_offers_shown',
+      'cancel_confirmed', 'cancel_loja_bloqueado', 'support_ticket_answered', 'support_ticket_created',
+      'hotmart_venda_ignorada', 'hotmart_email_falhou', 'hotmart_conta_divergente', 'hotmart_venda',
+      'stripe_order_created', 'stripe_venda', 'stripe_venda_ignorada', 'stripe_email_falhou', 'stripe_conta_divergente'
+    ]::text[]))
+  );
+
+DROP POLICY IF EXISTS "Anon insert anonymous events" ON public.analytics_events;
+CREATE POLICY "Anon insert anonymous events"
+  ON public.analytics_events FOR INSERT
+  TO anon
+  WITH CHECK (
+    user_id IS NULL
+    AND NOT (event_name = ANY (ARRAY[
+      'pix_order_created', 'hotmart_order_created', 'pix_reconciled', 'compra_vinculada', 'compra_avista',
+      'presente_resgatado_servidor', 'codigo_resgatado', 'referral_reward', 'hoje_casal_liberado',
+      'cakto_falha', 'cakto_falha_adiantado', 'cakto_disjuntor_aberto',
+      'porta_capi_cr', 'porta_capi_trial', 'porta_capi_pago', 'porta_email_enviado', 'porta_lembrete_enviado',
+      'pix_pendente_email_enviado', 'meta_capi_app_enviado', 'recovery_email_sent', 'trial_email_sent',
+      'welcome_email_sent', 'app_winback_email', 'email_livre_enviado',
+      'subscription_started', 'trial_converted', 'subscription_expired_no_payment',
+      'retention_discount_applied', 'retention_offer_accepted', 'retention_offers_shown',
+      'cancel_confirmed', 'cancel_loja_bloqueado', 'support_ticket_answered', 'support_ticket_created',
+      'hotmart_venda_ignorada', 'hotmart_email_falhou', 'hotmart_conta_divergente', 'hotmart_venda',
+      'stripe_order_created', 'stripe_venda', 'stripe_venda_ignorada', 'stripe_email_falhou', 'stripe_conta_divergente'
+    ]::text[]))
+  );
+
+-- G (revisão 04/11): consultas baratas pelo pedido da Hotmart — índices PARCIAIS (só as linhas hotmart_order_created, poucas):
+--   · pela ref (o hotmart-webhook acha o pedido; o hotmart-iniciar recusa a ref repetida);
+--   · por IP + hora (o hotmart-iniciar limita 20 pedidos por IP em 10 min).
+-- analytics_events é grande: NÃO vão nesta migração (dentro da transação travariam a tabela). Rodar à mão, ANTES do deploy
+-- do hotmart-iniciar/hotmart-webhook, fora de transação:
+--   CREATE INDEX CONCURRENTLY IF NOT EXISTS analytics_events_hotmart_ref_idx ON public.analytics_events ((event_data->>'ref')) WHERE event_name = 'hotmart_order_created';
+--   CREATE INDEX CONCURRENTLY IF NOT EXISTS analytics_events_hotmart_ip_idx ON public.analytics_events ((event_data->>'client_ip'), created_at) WHERE event_name = 'hotmart_order_created';

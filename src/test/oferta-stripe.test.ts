@@ -356,11 +356,11 @@ describe("CPF no checkout da /oferta", () => {
     expect(cpfValido("529.982.247-24")).toBe(false);
     expect(cpfValido("111.111.111-11")).toBe(false);
     expect(cpfValido("5299822472")).toBe(false);
-    expect(HTML).toMatch(/var STRIPE_PEDE_CPF = true;/);
+    expect(HTML).toMatch(/var STRIPE_PEDE_CPF = false;/);
   });
   it("o <head> passa STRIPE_PEDE_CPF pra página", () => {
-    expect(rodar(comStripe("on"), "/oferta").mem.stripe_pede_cpf).toBe(true);
-    expect(rodar(comStripe("on").replace("var STRIPE_PEDE_CPF = true;", "var STRIPE_PEDE_CPF = false;"), "/oferta").mem.stripe_pede_cpf).toBe(false);
+    expect(rodar(comStripe("on"), "/oferta").mem.stripe_pede_cpf).toBe(false);
+    expect(rodar(comStripe("on").replace("var STRIPE_PEDE_CPF = false;", "var STRIPE_PEDE_CPF = true;"), "/oferta").mem.stripe_pede_cpf).toBe(true);
   });
   it("STRIPE_PEDE_CPF false → o campo não existe", async () => {
     await abrirPagina({ pedeCpf: false });

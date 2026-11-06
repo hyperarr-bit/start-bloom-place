@@ -33,11 +33,12 @@ function rodar(fonte: string, url: string, store: Record<string, string> = {}) {
 const semSorteio = (a: Record<string, string>) => { const { "data-pix": _p, "data-vida": _v, "data-lp": _l, ...r } = a; return r; };
 
 describe("o <head> da /oferta", () => {
-  it("no código: CHECKOUT_STRIPE off, pk no placeholder, 6790, 12 parcelas", () => {
+  it("no código: CHECKOUT_STRIPE on, pk real, 6790, sem parcelas", () => {
     expect(HTML).toMatch(/var CHECKOUT_STRIPE = "on";/);
     expect(HTML).toMatch(/var STRIPE_PK = "pk_live_51TJnAQQdjmrIbUhHDSWqG1trOT6mFfV87AC4Vv47kFJTAFOhYsNmvryGRnf3x824Ke3mXSsWiFCovKPIR6Kqx0IX00VcuAawhC";/);
     expect(HTML).toMatch(/var STRIPE_PRECO_CENTAVOS = 6790;/);
-    expect(HTML).toMatch(/var STRIPE_PARCELAS_MAX = 12;/);
+    expect(HTML).toMatch(/var STRIPE_PARCELAS_MAX = 1;/);
+    expect(HTML).toMatch(/var STRIPE_PARCELAS_TEXTO = "Pix ou cartão";/);
     expect(pkStripeValida("pk_live_PREENCHER")).toBe(false);
     expect(pkStripeValida(PK)).toBe(true);
   });

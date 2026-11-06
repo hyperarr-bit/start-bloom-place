@@ -21,6 +21,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { aplicarDecisao, classificarEvento, type EventoRC, type Venda } from "../_shared/afiliados.ts";
+import { avisarCompraLojaSobrePix, modoAviso, type EventoCompraLoja } from "../_shared/loja-apos-pix.ts";
 import { MARCADOR, decidirCapiPorta, montarEventoCapiPorta, tipoDoEvento, type EventoRCPorta, type PortaDaConta } from "../_shared/porta-capi.ts";
 
 const log = (step: string, d?: unknown) =>
@@ -86,6 +87,14 @@ serve(async (req) => {
       // pagamento — quem teve o cartão recusado quase nunca abre o app de
       // novo. Nunca derruba o webhook: o estado já foi reconciliado acima.
       if (ev.type === "BILLING_ISSUE" && ev.store === "APP_STORE") await avisarCobrancaRecusada(uid);
+      // PAGOU DE NOVO NA LOJA (06/11): compra na conta que já tem o vitalício do Pix → chamado (e e-mail com a chave "on").
+      // Desligado sem LOJA_APOS_PIX_AVISO (aí não faz nem consulta). Só avisa, nunca cancela. Nunca derruba o webhook.
+      const modoLoja = modoAviso(Deno.env.get("LOJA_APOS_PIX_AVISO"));
+      if (modoLoja !== "off") {
+        await avisarCompraLojaSobrePix(admin, { ev: ev as EventoCompraLoja, userId: uid, email: u.user.email ?? null, modo: modoLoja, enviar: enviarAvisoLoja })
+          .then((r) => log("loja apos pix", r))
+          .catch((e) => log("loja apos pix ERRO", { msg: String(e).slice(0, 160) }));
+      }
       // PORTA (12/10): teste/1ª cobrança de conta da /comece como evento de SITE na CAPI do pixel do site.
       // Desligado sem PORTA_CAPI_TRIAL="on" (aí não faz nem consulta). Nunca derruba o webhook.
       if (Deno.env.get("PORTA_CAPI_TRIAL") === "on") await capiPortaDoSite(admin, ev as EventoRCPorta, u.user).catch((e) => log("porta capi ERRO", { msg: String(e).slice(0, 160) }));
@@ -192,6 +201,18 @@ async function capiPortaDoSite(
       session_id: null,
     });
   }
+}
+
+/** O e-mail do "pagou de novo na loja" (o mesmo remetente das boas-vindas, resposta pra contato@). true = saiu. */
+async function enviarAvisoLoja(para: string, assunto: string, html: string): Promise<boolean> {
+  const chave = Deno.env.get("RESEND_API_KEY") ?? "";
+  if (!chave) return false;
+  const from = Deno.env.get("WELCOME_EMAIL_FROM") || Deno.env.get("RECOVERY_EMAIL_FROM") || "onboarding@resend.dev";
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST", headers: { Authorization: `Bearer ${chave}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from, to: [para], reply_to: "contato@coreaplicativo.com.br", subject: assunto, html }),
+  }).catch(() => null);
+  return !!r?.ok;
 }
 
 /** Chama a cobranca-recusada (ela confere o estado no RevenueCat, evita

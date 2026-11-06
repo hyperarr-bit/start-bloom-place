@@ -67,6 +67,9 @@ const ROTULO: Record<string, { txt: string; cor: string }> = {
   // 29/10: abertos pelo servidor (landing /organizar — _shared/landing-travas.ts)
   pix_sem_email: { txt: "Pix pago sem e-mail", cor: "bg-destructive/10 text-destructive" },
   pix_em_dobro: { txt: "Pix pago em dobro", cor: "bg-destructive/10 text-destructive" },
+  // 06/11: _shared/pix-recuperacao.ts e _shared/loja-apos-pix.ts
+  pix_sem_credito: { txt: "Pix sem crédito", cor: "bg-destructive/10 text-destructive" },
+  loja_pos_pix: { txt: "Pagou de novo na loja", cor: "bg-destructive/10 text-destructive" },
 };
 const rotulo = (s: string) => ROTULO[s] ?? { txt: s, cor: "bg-muted text-muted-foreground" };
 

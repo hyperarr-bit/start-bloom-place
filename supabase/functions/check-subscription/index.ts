@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { chaveLigada, conferirPixAoAbrir } from "../_shared/pix-recuperacao.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -126,6 +127,49 @@ serve(async (req) => {
 
       // Passou do grace → considera não-assinante (cleanup cron marca como canceled)
       logStep("Grace period expired", { daysSinceExpiry });
+    }
+
+    /* 06/11 (PIX_CHECK_AO_ABRIR=on; desligada não faz nem consulta): conta sem acesso com Pix das últimas 2 h pede a
+     * varredura só dela, e o crédito sai quando a pessoa abre o app em vez de esperar a próxima passada. Teto: 1 pedido a
+     * cada 2 min por conta, 10 por minuto e 100 por hora no total, 6 s de espera. Quem credita é o pix-reconcile (1 caminho só); erro aqui nunca derruba o gate. */
+    const creditouAgora = await conferirPixAoAbrir(supabaseClient, {
+      ligado: chaveLigada(Deno.env.get("PIX_CHECK_AO_ABRIR")),
+      userId: user.id,
+      varrer: async (uid) => {
+        const r = await fetch(`${Deno.env.get("SUPABASE_URL") ?? ""}/functions/v1/pix-reconcile`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ soUsuario: uid, token: Deno.env.get("RECONCILE_TOKEN") ?? "" }),
+          signal: AbortSignal.timeout(6000),
+        });
+        const out = await r.json().catch(() => ({}));
+        return r.ok && Array.isArray(out?.creditados) && out.creditados.length > 0;
+      },
+    });
+    if (creditouAgora) {
+      const { data: nova } = await supabaseClient
+        .from("subscriptions")
+        .select("current_period_end, billing_period, payment_method")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .order("current_period_end", { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle();
+      if (nova && (!nova.current_period_end || new Date(nova.current_period_end) > new Date())) {
+        logStep("Pix creditado ao abrir", { end: nova.current_period_end });
+        return new Response(
+          JSON.stringify({
+            subscribed: true,
+            trial_expired: false,
+            in_grace_period: false,
+            grace_days_left: null,
+            payment_method: nova.payment_method ?? null,
+            billing_period: nova.billing_period ?? null,
+            subscription_end: nova.current_period_end,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        );
+      }
     }
 
     // Sem assinatura ativa — calcula trial

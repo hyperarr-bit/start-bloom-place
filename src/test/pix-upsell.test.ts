@@ -364,7 +364,8 @@ describe("crítica r1 (31/10): os consertos do dinheiro", () => {
     const depois = Array.from({ length: 16 }, (_, i) => consultarUpsellAgora(criado, true, t0 + 3 * 3600e3 + i * 900e3));
     expect(depois.filter(Boolean)).toHaveLength(4); // 4 horas, 4 consultas (era 16)
     const rc = readFileSync(join(__dirname, "../../supabase/functions/pix-reconcile/index.ts"), "utf8");
-    expect(rc.match(/consultarUpsellAgora\(o\.criadoEm, !!o\.upsellChave\)/g)!.length).toBe(2); // u2027 e pv149
+    // 06/11: na varredura quem faz isso agora é a agenda (_shared/pix-recuperacao.ts): 1x por hora, espalhado entre as passadas
+    expect(rc).toMatch(/consultarNestaPassada\(/);
   });
   it("o check do u2027 confere o dono ANTES da Asaas (quem não é dono não gasta consulta)", () => {
     const pix = readFileSync(join(__dirname, "../../supabase/functions/asaas-pix/index.ts"), "utf8");

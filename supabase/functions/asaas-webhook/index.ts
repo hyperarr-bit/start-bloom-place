@@ -13,6 +13,7 @@ import { ehOfertaLanding } from "../_shared/ofertas-landing.ts";
 import { guardarNomeDoPagador, nomeDoPagadorAsaas } from "../_shared/landing-travas.ts";
 import { avisarPronto2027, blocoLigado, blocoU2027, donoNaHora, ehDobro2027, mandaPurchaseMeta, registrarDobro2027, SECRET_U2027_EMAIL } from "../_shared/pix-upsell.ts";
 import { criarQrAsaas } from "../_shared/asaas-qr.ts";
+import { chaveLigada, marcarPendente, podePedirReenvio, reconfirmarAsaas, soltarEvento } from "../_shared/pix-recuperacao.ts";
 import {
   PRECOS_PLANO30, PRECOS_PRESENTE, chaveCapiPlano30, chaveCapiPresente, ehOfertaPlano30, ehOfertaPresente, garantirPresente, liberarKitDoBump, liberarPlano30, mandarLinkPorEmail, reservar,
 } from "../_shared/presente.ts";
@@ -32,6 +33,9 @@ import {
  *  - Se responder ≠ 200 ou demorar >10s, conta como falha; 15 falhas seguidas
  *    PAUSAM a fila (manual pra religar) e eventos com +14 dias somem. Então:
  *    responder 200 SEMPRE (inclusive em erro nosso) e rápido.
+ *  - 06/11: 200 significa "entregue": a Asaas não reenvia. Crédito que não saiu solta a trava do evento e entra na fila de
+ *    pendências (`pix-pend:<pedido>`), que a varredura olha primeiro. Com ASAAS_WEBHOOK_REENVIO=on, até 5 respostas 503
+ *    por hora pedem o reenvio (_shared/pix-recuperacao.ts); desligada, é 200 como sempre.
  *
  * SEGURANÇA (dupla trava, como nos outros webhooks):
  *   1. token no header asaas-access-token == ASAAS_WEBHOOK_SECRET.
@@ -42,7 +46,6 @@ import {
  * pixQrCodeId do payment (= order_id gravado em pix_order_created no create).
  */
 
-const ASAAS_API = "https://api.asaas.com/v3";
 /* TEM QUE ESPELHAR o asaas-pix. Se uma oferta existe lá e não existe aqui, a
  * linha abaixo a rebaixa pra "lifetime" e a venda entra pelo preço errado —
  * dinheiro real registrado como outro valor, e o CAPI da Meta disparando o
@@ -69,7 +72,6 @@ const CONCESSAO: Record<string, { plano: string; periodo: string; dias: number |
   ...CONCESSAO_HOJE, // 18/10: o /hoje (o hc199 fica de fora: quem ganha é a outra conta, pela ação `parceiro` do asaas-pix)
 };
 const APP_URL = "https://www.coreaplicativo.com.br";
-const PAGOS = new Set(["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"]);
 
 const logStep = (step: string, details?: unknown) => {
   const d = details ? ` - ${JSON.stringify(details)}` : "";
@@ -78,7 +80,6 @@ const logStep = (step: string, details?: unknown) => {
 const jsonResponse = (body: Record<string, unknown>, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 const utcStamp = (d: Date) => d.toISOString().slice(0, 19).replace("T", " ");
-const asaasHeaders = (key: string) => ({ access_token: key, "User-Agent": "CORE/1.0 (Supabase Edge)" });
 
 type Admin = ReturnType<typeof createClient>;
 
@@ -231,12 +232,27 @@ serve(async (req) => {
     ligado: blocoLigado(Deno.env.get(SECRET_U2027_EMAIL)), compra, dono, offer, criarQr: criarQrAsaas(apiKey, logStep),
   });
 
+  /* 06/11: o estado que o catch precisa. `travado` = o evento foi gravado; `creditou` = o pedido já valeu, e daí em diante
+   * falha (e-mail, UTMify) não solta nada: reprocessar só daria "ja_creditado", sem Purchase nem e-mail novo. */
+  let eventId = "";
+  let qrCodeId = "";
+  let travado = false;
+  let creditou = false;
+  /** O crédito não saiu: solta o evento, entra na fila da varredura e (chave ligada, com teto) pede o reenvio. */
+  const falhou = async (motivo: string, corpo: Record<string, unknown>, pedirReenvio = true) => {
+    logStep("Crédito não saiu — pendência", { motivo, qrCodeId: qrCodeId.slice(0, 20) });
+    await soltarEvento(admin, eventId);
+    await marcarPendente(admin, qrCodeId, motivo);
+    if (pedirReenvio && await podePedirReenvio(admin, chaveLigada(Deno.env.get("ASAAS_WEBHOOK_REENVIO")))) return jsonResponse({ ...corpo, reenviar: true }, 503);
+    return jsonResponse(corpo);
+  };
+
   try {
     const body = await req.json().catch(() => ({}));
-    const eventId = String(body.id ?? "");        // evt_... — chave de idempotência
+    eventId = String(body.id ?? "");        // evt_... — chave de idempotência
     const event = String(body.event ?? "");
     const payment = body.payment ?? {};
-    const qrCodeId = String(payment.pixQrCodeId ?? "");
+    qrCodeId = String(payment.pixQrCodeId ?? "");
     logStep("Webhook received", { event, eventId: eventId.slice(0, 20), qrCodeId: qrCodeId.slice(0, 20) });
 
     // só cobrança paga interessa; o resto reconhecemos com 200 e ignoramos
@@ -251,14 +267,16 @@ serve(async (req) => {
       logStep("Duplicate ignored", { eventId: eventId.slice(0, 20) });
       return jsonResponse({ received: true, duplicate: true });
     }
+    travado = true;
 
     if (!qrCodeId) { logStep("Pagamento sem pixQrCodeId (não é do nosso QR estático)", { paymentId: payment.id }); return jsonResponse({ received: true, warning: "no_qr" }); }
 
     // TRAVA 2: reconfirma na API — lista os payments desse QR e exige status pago
-    const chk = await fetch(`${ASAAS_API}/payments?pixQrCodeId=${encodeURIComponent(qrCodeId)}&limit=10`, { headers: asaasHeaders(apiKey) });
-    const chkOut = await chk.json().catch(() => ({}));
-    const pago = (chkOut?.data ?? []).find((p: { status?: string }) => PAGOS.has(String(p?.status)));
-    if (!pago) { logStep("Not paid on reconfirm — ignoring", { qrCodeId: qrCodeId.slice(0, 20) }); return jsonResponse({ received: true, status: "not_paid" }); }
+    // 06/11: erro da Asaas não é "não pagou" (antes um 429 virava not_paid e o evento se perdia); nos dois casos o evento volta
+    const chk = await reconfirmarAsaas(fetch as never, apiKey, qrCodeId);
+    if (chk.erro) return await falhou(`reconfirma_${chk.erro}`, { received: true, status: "reconfirm_error" });
+    const pago = chk.pago as { value?: unknown; customer?: unknown } | null;
+    if (!pago) return await falhou("nao_pago_na_reconfirmacao", { received: true, status: "not_paid" });
 
     // resolve dono + oferta pelo registro do create (o QR estático não tem nosso user)
     let userId: string | null = null;
@@ -267,14 +285,15 @@ serve(async (req) => {
     const reg = await registroDoPedido(admin, qrCodeId, logStep);
     const regData = (reg?.[0]?.event_data ?? {}) as Record<string, string>;
     if (reg?.[0]) { userId = reg[0].user_id as string; offer = String(regData.offer ?? ""); }
-    if (!userId) { logStep("No user resolved for QR", { qrCodeId: qrCodeId.slice(0, 20) }); return jsonResponse({ received: true, warning: "no_user" }); }
+    if (!userId) return await falhou("sem_registro_do_pedido", { received: true, warning: "no_user" }, false);
     /* 18/10 (/hoje, "vida a dois"): o hc199 não credita quem pagou (a página libera a outra conta pela ação `parceiro`).
      * Aqui só o Purchase, 1x por pedido — cobre quem pagou e fechou a aba antes do check da página. */
     /* 21/10 (presente, pv149): pagou e fechou a aba antes do check → o código nasce aqui (1 por pedido), o Purchase 14,90
      * sai 1x (IP/UA do pedido) e o link vai por e-mail se a conta já tem e-mail. Quem pagou não ganha linha. */
     if (ehOfertaPresente(offer) && valorCobre(pago.value, PRECOS_CENTAVOS[offer])) {
       const presente = await garantirPresente(admin, { orderId: qrCodeId, compradorId: userId, valorCentavos: PRECOS_CENTAVOS[offer] });
-      if (!presente) { logStep("Presente pago — código não gravou (o reconcile tenta de novo)", { qrCodeId: qrCodeId.slice(0, 20) }); return jsonResponse({ received: true, granted: false, presente: true, error: "codigo" }); }
+      if (!presente) return await falhou("presente_codigo", { received: true, granted: false, presente: true, error: "codigo" });
+      creditou = true;
       const { data: uc } = await admin.auth.admin.getUserById(userId);
       const emailComprador = uc?.user?.email ?? null;
       if (await reservar(admin, chaveCapiPresente(qrCodeId), "capi")) {
@@ -291,7 +310,8 @@ serve(async (req) => {
     /* 21/10 (downsell do presente, pk99): o plano de 30 dias na conta de QUEM PAGOU + Purchase 9,90 1x (IP/UA do pedido). */
     if (ehOfertaPlano30(offer) && valorCobre(pago.value, PRECOS_CENTAVOS[offer])) {
       const lib = await liberarPlano30(admin, { userId, orderId: qrCodeId, area: regData.area });
-      if (lib === "falhou") return jsonResponse({ received: true, granted: false, plano30: true, error: "gravar" });
+      if (lib === "falhou") return await falhou("plano30_gravar", { received: true, granted: false, plano30: true, error: "gravar" });
+      creditou = true;
       if (await reservar(admin, chaveCapiPlano30(qrCodeId), "capi")) {
         const { data: uc } = await admin.auth.admin.getUserById(userId);
         const em = uc?.user?.email ?? null;
@@ -324,7 +344,8 @@ serve(async (req) => {
           if (mandaPurchaseMeta(offer)) await sendMetaCapi(admin, { userId: dono27, email: em, orderId: qrCodeId, offer, amountCents: PRECOS_CENTAVOS[offer], fbp: regData.fbp ?? null, fbc: regData.fbc ?? null, sourceUrl: regData.source_url ?? null, ...ipUaDoPedido(regData) });
         },
       });
-      if (p27.r === "falhou") return jsonResponse({ received: true, granted: false, pacote2027: true, error: "gravar" });
+      if (p27.r === "falhou") return await falhou("pacote2027_gravar", { received: true, granted: false, pacote2027: true, error: "gravar" });
+      creditou = true;
       // crítica r1: o 2º pagamento do 2027 na mesma conta (outro QR vivo da mesma compra) vira chamado de devolução
       // crítica r2: e esse pagamento em dobro (vai ser devolvido) não ganha outro "Pronto"
       const dobro27 = p27.r === "ja_tinha" && await ehDobro2027(admin, { userId: dono27, orderId: qrCodeId });
@@ -340,7 +361,7 @@ serve(async (req) => {
      * o pix-reconcile tenta de novo depois do deploy que a conhece. 200 sempre (a fila da Asaas não pode pausar). */
     if (!(offer in PRECOS_CENTAVOS) || !CONCESSAO[offer]) {
       logStep("Oferta desconhecida — não credita", { offer: offer.slice(0, 20), qrCodeId: qrCodeId.slice(0, 20) });
-      return jsonResponse({ received: true, granted: false, warning: "oferta_desconhecida" });
+      return await falhou("oferta_desconhecida", { received: true, granted: false, warning: "oferta_desconhecida" }, false);
     }
     const amountCents = PRECOS_CENTAVOS[offer];
     /* 15/10: o pagamento tem que cobrir o preço da oferta DELE (cada oferta com o seu valor). */
@@ -376,6 +397,7 @@ serve(async (req) => {
     });
     // 21/10 (segurança): o kit do order bump (h279k/h149k) nasce no servidor — idempotente, também pro pedido já creditado
     if (g.r !== "erro" && g.r !== "em_andamento") {
+      creditou = true;
       const kit = await liberarKitDoBump(admin, { userId, orderId: qrCodeId, offer });
       if (kit === "falhou") logStep("Kit do bump não gravou (o reconcile tenta de novo)", { offer, qrCodeId: qrCodeId.slice(0, 20) });
     }
@@ -394,12 +416,14 @@ serve(async (req) => {
     if (g.r === "ja_creditado" || g.r === "em_andamento") {
       // o check da página / o reconcile já creditou (ou está creditando) ESTE pedido: não escreve, não manda nada
       logStep(g.r === "ja_creditado" ? "Pedido já creditado — nada a fazer" : "Pedido sendo creditado por outro caminho", { userId, offer, qrCodeId: qrCodeId.slice(0, 20) });
+      // 06/11: "em andamento" pode ser um caminho que morreu no meio — a varredura confere (sem pedir reenvio: a trava decide)
+      if (g.r === "em_andamento") return await falhou("em_andamento", { received: true, granted: false, jaCreditado: false, emAndamento: true }, false);
       return jsonResponse({ received: true, granted: g.r === "ja_creditado", jaCreditado: g.r === "ja_creditado", emAndamento: g.r === "em_andamento" });
     }
     if (g.r === "erro") {
-      // 200 mesmo assim (a fila do Asaas não pode pausar); o pix-reconcile credita depois
+      // 200 por padrão (a fila do Asaas não pode pausar); o pix-reconcile credita depois, pela pendência
       logStep("Grant FALHOU", { userId, offer, qrCodeId: qrCodeId.slice(0, 20), message: g.msg });
-      return jsonResponse({ received: true, granted: false, error: "grant_failed" });
+      return await falhou("grant_falhou", { received: true, granted: false, error: "grant_failed" });
     }
     const jaLiberado = g.jaLiberado;
     logStep("Access granted", { userId, offer, ate: g.fim, qrCodeId: qrCodeId.slice(0, 20), jaLiberado, acao: g.acao });
@@ -457,6 +481,7 @@ serve(async (req) => {
     return jsonResponse({ received: true, granted: true });
   } catch (error) {
     logStep("ERROR", { message: error instanceof Error ? error.message : String(error) });
-    return jsonResponse({ received: true, error: "internal" }); // 200 SEMPRE — senão a fila do Asaas pausa
+    if (travado && qrCodeId && !creditou) return await falhou("excecao", { received: true, error: "internal" });
+    return jsonResponse({ received: true, error: "internal" }); // 200 — senão a fila do Asaas pausa
   }
 });

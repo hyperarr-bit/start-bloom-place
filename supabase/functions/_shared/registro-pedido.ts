@@ -61,6 +61,19 @@ export async function registroDoPedido(
   }
 }
 
+/** 06/11: as linhas CRUAS do pedido (com a data), pro reconcile juntar à leitura em lote: lá pedidosEmConflito decide. */
+export async function linhasDoPedido(admin: ClienteMin, orderId: string): Promise<Array<RegistroPix & { created_at: string }>> {
+  if (!orderId) return [];
+  try {
+    const { data } = await admin.from("analytics_events")
+      .select("user_id, event_data, created_at").eq("event_name", "pix_order_created")
+      .contains("event_data", { order_id: orderId }).limit(LIMITE_REGISTROS);
+    return (data ?? []) as Array<RegistroPix & { created_at: string }>;
+  } catch {
+    return [];
+  }
+}
+
 /** Pedidos com registros que discordam (pro reconcile, que lê os registros em lote). Puro. */
 export function pedidosEmConflito(linhas: Array<{ user_id?: string | null; event_data?: Record<string, unknown> | null }> | null | undefined): Set<string> {
   const porPedido = new Map<string, RegistroPix[]>();

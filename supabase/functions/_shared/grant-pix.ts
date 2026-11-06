@@ -17,7 +17,7 @@
  * inclusive dois caminhos AO MESMO TEMPO.
  */
 import { COLUNAS_DECISAO, decidirGrantPix, pedidoJaCreditado, type Concessao, type LinhaAssinatura } from "./linha-pix.ts";
-import { pegarTrava, soltarTrava } from "./trava-grant.ts";
+import { marcarCreditado, pedidoComMarca, pegarTrava, soltarTrava } from "./trava-grant.ts";
 import { registrarPagoEmDobro } from "./landing-travas.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -62,6 +62,8 @@ export async function creditarPedido(admin: ClienteMin, args: {
     const { data: emOutra } = await admin.from("subscriptions").select("id, user_id").eq("abacatepay_billing_id", args.orderId);
     if (Array.isArray(emOutra) && emOutra.some((l: { user_id?: string }) => l.user_id && l.user_id !== args.userId)) return { r: "ja_creditado" };
   } catch { /* sem a consulta, segue a regra de sempre */ }
+  // 06/11: a marca vem antes da decisão: pedido que já valeu e teve a linha reescrita não pode virar "pago em dobro"
+  if (await pedidoComMarca(admin, args.gateway, args.orderId)) return { r: "ja_creditado" };
   const decisao = decidirGrantPix(await ler(), args.concessao, args.agora, args.orderId, { protegerVitalicio: args.protegerVitalicio });
   if (decisao.acao === "preservar") {
     if (decisao.motivo === "vitalicio_pagou_de_novo") {
@@ -71,9 +73,13 @@ export async function creditarPedido(admin: ClienteMin, args: {
     }
     return { r: "preservado", motivo: decisao.motivo };
   }
-  if (decisao.acao === "ja_creditado") return { r: "ja_creditado" };
+  if (decisao.acao === "ja_creditado") {
+    await marcarCreditado(admin, args.gateway, args.orderId); // a linha prova o crédito: conserta a marca que não gravou
+    return { r: "ja_creditado" };
+  }
 
   const trava = await pegarTrava(admin, args.gateway, args.orderId);
+  if (trava === "creditada") return { r: "ja_creditado" }; // 06/11: a linha pode ter sido reescrita por outro pedido; a marca vale
   if (trava === "ocupada") return pedidoJaCreditado(await ler(), args.orderId) ? { r: "ja_creditado" } : { r: "em_andamento" };
 
   const payload = args.montarPayload(decisao.fim);
@@ -85,5 +91,6 @@ export async function creditarPedido(admin: ClienteMin, args: {
     if (trava === "pegou") await soltarTrava(admin, args.gateway, args.orderId);
     return { r: "erro", msg: String((error as { message?: string }).message ?? error).slice(0, 200) };
   }
+  if (trava === "pegou") await marcarCreditado(admin, args.gateway, args.orderId);
   return { r: "creditado", acao, jaLiberado: decisao.jaLiberado, fim: decisao.fim };
 }

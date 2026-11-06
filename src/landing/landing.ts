@@ -737,6 +737,7 @@ const atualizarFixo = () => {
 };
 const vistos = new Set<string>();
 let ofertaVista = false;
+let aoVerOferta: (() => void) | null = null; // 06/11: a /oferta baixa o Stripe.js aqui (o bloco da Stripe fica lá embaixo)
 /** "viu a oferta" (1x): o evento da régua + ViewContent + pré-aquecimento do Pix. Atual: 15% do bloco #oferta na tela (como hoje).
  *  v2 (crítica r1 8.1): o BOTÃO DE PAGAR ≥ 50% visível — no v2 a oferta começa em y 684 e, em telas de 844+, 15% do bloco
  *  aparecia sem rolar (a régua inflava e a Meta recebia ViewContent de quem só abriu). */
@@ -747,6 +748,7 @@ const viuAOferta = () => {
   if (brCheckout === "email" && !EXTERNO) evento("landing_email_antes_visto", {}); // 05/11: o braço Hotmart da /vida (e a /oferta) não tem a caixa de e-mail
   pixel("ViewContent", { content_name: STRIPE ? "oferta_stripe" : HOTMART ? "vida_oferta" : "landing_oferta", value: EXTERNO ? PRECO_EXT / 100 : 27.9, currency: "BRL" });
   if (PIX_REAL && !SIMULADO && !EXTERNO) void pg(false).catch(() => null); // pré-aquece o Pix de verdade (sem recarregar a página se falhar)
+  aoVerOferta?.();
 };
 if ("IntersectionObserver" in window) {
   if (V2) {
@@ -1813,6 +1815,9 @@ if (STRIPE) {
   }
   // pré-aquece o módulo quando a oferta aparece (o toque abre na hora)
   ocioso(() => { void carregarStripeCheckout(); }, 4000);
+  // 06/11: o Stripe.js em segundo plano assim que a oferta aparece, ocioso (metade esperava mais de 3,8 s depois do toque)
+  aoVerOferta = () => ocioso(() => { void carregarStripeCheckout().then((m) => m.preaquecerStripe(ST_PK, PRODUCAO)); }, 2000);
+  if (ofertaVista) aoVerOferta();
 }
 
 /* ───────────────────────── 31/10: "Seu 2027 organizado" no pós-pago (./upsell-2027.ts, só com a chave ou o link do e-mail) ───────────────────────── */

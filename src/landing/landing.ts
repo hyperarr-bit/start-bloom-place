@@ -1815,7 +1815,8 @@ if (STRIPE) {
   }
   // pré-aquece o módulo quando a oferta aparece (o toque abre na hora)
   ocioso(() => { void carregarStripeCheckout(); }, 4000);
-  // 06/11: o Stripe.js em segundo plano assim que a oferta aparece, ocioso (metade esperava mais de 3,8 s depois do toque)
+  // 06/11 (dono): o Stripe.js em segundo plano logo depois da 1ª tela, sem esperar a oferta (metade esperava mais de 3,8 s depois do toque)
+  ocioso(() => { void carregarStripeCheckout().then((m) => m.preaquecerStripe(ST_PK, PRODUCAO)); }, 3000);
   aoVerOferta = () => ocioso(() => { void carregarStripeCheckout().then((m) => m.preaquecerStripe(ST_PK, PRODUCAO)); }, 2000);
   if (ofertaVista) aoVerOferta();
 }

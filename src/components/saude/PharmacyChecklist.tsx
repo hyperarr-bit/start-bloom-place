@@ -14,7 +14,7 @@ import { reagendarTudo, type Leitor } from "@/lib/reagendar";
 import { trackEvent } from "@/lib/analytics";
 import { avisarApagado } from "@/lib/desfazer";
 import {
-  OPCOES_VEZES, agruparRemedios, doseDaHora, dosesDoGrupoAgora, ehDia, gerarHorarios, inicioAoMudarPrimeira, inicioEscolhido, montarLinhas, moverMarcasDoGrupo, rotuloDosHorarios,
+  OPCOES_VEZES, agruparRemedios, doseDaHora, dosesDoGrupoAgora, ehDia, gerarHorarios, inicioAoMudarPrimeira, inicioEscolhido, momentoDoInicio, montarLinhas, moverMarcasDoGrupo, rotuloDosHorarios,
   tratamentoTerminou, ultimasDosesDoGrupo, type DoseMarcavel, type GrupoDeRemedio, type Remedio as Supplement, type VezesAoDia,
 } from "@/lib/remedios";
 
@@ -37,6 +37,13 @@ const lerEstoque = (v: string): number | null => {
 };
 /** "2026-11-12" → "12/11" */
 const diaCurto = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+/** "hoje 08:00" / "amanhã 09:00" / "10/11 08:00" — o começo do tratamento, na fileira de edição */
+const comecoEmTexto = (inicio: Date, agora: Date) => {
+  const dia = localDayKey(inicio);
+  const amanha = localDayKey(new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + 1));
+  const hora = `${String(inicio.getHours()).padStart(2, "0")}:${String(inicio.getMinutes()).padStart(2, "0")}`;
+  return `${dia === localDayKey(agora) ? "hoje" : dia === amanha ? "amanhã" : diaCurto(dia)} ${hora}`;
+};
 
 const EstoqueEditavel = ({ nome, valor, baixo, onSalvar }: { nome: string; valor: number; baixo: boolean; onSalvar: (n: number) => void }) => {
   const [editando, setEditando] = useState(false);
@@ -381,6 +388,8 @@ export const PharmacyChecklist = () => {
                   const partesDoDetalhe = [rotulo, g.ate ? (encerrado ? `terminou ${diaCurto(g.ate)}` : `até ${diaCurto(g.ate)}`) : ""].filter(Boolean);
                   const detalhe = partesDoDetalhe.join(" · ");
                   const abertoPraEditar = editando === g.chave;
+                  const inicioDoGrupo = g.itens.length > 1 ? momentoDoInicio(linha.inicio) : null;
+                  const comecoDoGrupo = abertoPraEditar && inicioDoGrupo && inicioDoGrupo.getTime() > agora.getTime() ? comecoEmTexto(inicioDoGrupo, agora) : "";
                   const linhas = [
                     <motion.tr
                       key={g.chave}
@@ -517,7 +526,12 @@ export const PharmacyChecklist = () => {
                     <motion.tr key={`${g.chave}-editar`} className="bg-muted/30">
                       <td colSpan={5} className="px-3 pb-3 pt-1">
                         <div className="flex flex-wrap items-center gap-1.5" data-testid="remedio-editar">
-                          <span className="w-full text-[10px] text-muted-foreground">A 1ª dose ajusta as outras</span>
+                          <span className="w-full text-[10px] text-muted-foreground">
+                            A 1ª dose ajusta as outras
+                            {/* enquanto não começou, o começo à vista, só texto (conserto final 07/11: mudar a 1ª
+                                dose depois de "Começa amanhã" desfazia a escolha, e esta fileira nem mostrava) */}
+                            {comecoDoGrupo && <span data-testid="remedio-editar-comeca"> · começa {comecoDoGrupo}</span>}
+                          </span>
                           {g.itens.map((s, i) => (
                             <input
                               key={s.id}

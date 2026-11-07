@@ -482,3 +482,140 @@ describe("cadastro: 'Começa hoje/amanhã'", () => {
     expect(screen.queryByTestId("remedio-comeca")).toBeNull();
   });
 });
+
+/* Conserto final da crítica (07/11): a troca de hora feita ANTES da dose da manhã — quando o dia do
+   tratamento vira por causa da troca — levava a marca de ontem pra dose de hoje (a pessoa pulava uma
+   dose de antibiótico) ou apagava marcas verdadeiras de ontem. A marca agora vai da MESMA ocorrência
+   (o mesmo dia do tratamento) com as horas velhas pra ela com as horas novas. */
+describe("mudar a hora antes da dose da manhã (o dia do tratamento vira com a troca)", () => {
+  const ordenado = (v: unknown) => [...((v as string[] | undefined) ?? [])].sort();
+  const logDe = (store: ReturnType<typeof criarStore>) => store.estado.dados[LOG] as Record<string, string[]>;
+  const quemTomaTudo = (ids: string[]) => {
+    const [d1, d2, d3] = ids;
+    return { "2026-11-05": [d1, d2], "2026-11-06": [d3, d1, d2], "2026-11-07": [d3] };
+  };
+
+  it("(B) às 06:50, 08:00 → 07:00: a das 07:00 de hoje NÃO está marcada, tem aviso, e ontem continua completo", () => {
+    const novas = cadastro(agoraEm(5, 10), "08:00");
+    const [d1, d2, d3] = novas.map((l) => l.id);
+    const store = criarStore({ [CHAVE]: novas.map((l) => ({ ...l, stock: 14 })), [LOG]: quemTomaTudo([d1, d2, d3]) });
+    agoraEm(7, 6, 50);
+    mudarPrimeiraNaTela(store, "07:00");
+    expect(linhas(store).map((l) => l.time)).toEqual(["07:00", "15:00", "23:00"]);
+    expect(ordenado(logDe(store)["2026-11-06"])).toEqual([d1, d2, d3].sort());
+    expect(logDe(store)["2026-11-07"] ?? []).toEqual([]);
+    expect(linhas(store).map((l) => l.stock)).toEqual([14, 14, 14]);
+    expect(planoDe(store).map((a) => fmt(a.quando)).slice(0, 2)).toEqual(["07/07:00", "07/15:00"]);
+    agoraEm(7, 6, 59);
+    montar(store);
+    expect(screen.getByTestId(`dose-${d1}`)).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId(`dose-${d1}`)).toHaveAttribute("data-da-vez", "true");
+  });
+
+  it("(D) às 06:30, 08:00 → 06:00: a das 06:00 de hoje (que já passou) aparece por tomar, não tomada", () => {
+    const novas = cadastro(agoraEm(5, 10), "08:00");
+    const [d1, d2, d3] = novas.map((l) => l.id);
+    const store = criarStore({ [CHAVE]: novas, [LOG]: quemTomaTudo([d1, d2, d3]) });
+    agoraEm(7, 6, 30);
+    mudarPrimeiraNaTela(store, "06:00");
+    expect(ordenado(logDe(store)["2026-11-06"])).toEqual([d1, d2, d3].sort());
+    expect(logDe(store)["2026-11-07"] ?? []).toEqual([]);
+    montar(store);
+    expect(screen.getByTestId(`dose-${d1}`)).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (06:00)" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Editar horários de Amoxicilina" }));
+    expect(screen.queryByTestId("remedio-editar-comeca")).toBeNull(); // já começou: sem "começa"
+  });
+
+  it("(C) às 07:30, 08:00 → 12:00: as marcas de 06/11 e 07/11 continuam; nenhuma dose que já passou fica 'por tomar'", () => {
+    const novas = cadastro(agoraEm(5, 10), "08:00");
+    const [d1, d2, d3] = novas.map((l) => l.id);
+    const store = criarStore({ [CHAVE]: novas, [LOG]: quemTomaTudo([d1, d2, d3]) });
+    agoraEm(7, 7, 30);
+    mudarPrimeiraNaTela(store, "12:00");
+    expect(linhas(store).map((l) => l.time)).toEqual(["12:00", "20:00", "04:00"]);
+    expect(ordenado(logDe(store)["2026-11-06"])).toEqual([d1, d2, d3].sort());
+    expect(logDe(store)["2026-11-07"]).toEqual([d3]);
+    agoraEm(7, 7, 35);
+    montar(store);
+    for (const id of [d1, d2, d3]) expect(screen.getByTestId(`dose-${id}`)).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("button", { name: /Marcar próxima dose/ })).toBeNull();
+    // o próximo aviso é o da dose de hoje com a hora nova
+    expect(fmt(planoDe(store)[0].quando)).toBe("07/12:00");
+  });
+
+  it("(E) 12 em 12, às 06:40, 08:00 → 07:00: ontem não fica vazio, e a das 07:00 de hoje tem aviso e não está marcada", () => {
+    const novas = montarLinhas({ name: "Amoxicilina", stock: 21 }, gerarHorarios("08:00", 2), "2026-11-13", new Date(2026, 10, 5, 10).getTime());
+    const [d1, d2] = novas.map((l) => l.id);
+    const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-05": [d1, d2], "2026-11-06": [d1, d2] } });
+    agoraEm(7, 6, 40);
+    mudarPrimeiraNaTela(store, "07:00");
+    expect(logDe(store)["2026-11-06"]).toEqual([d1, d2]);
+    expect(logDe(store)["2026-11-07"] ?? []).toEqual([]);
+    expect(fmt(planoDe(store)[0].quando)).toBe("07/07:00");
+    montar(store);
+    expect(screen.getByTestId(`dose-${d1}`)).toHaveAttribute("aria-pressed", "false");
+  });
+});
+
+/* Conserto final da crítica (07/11): "Começa amanhã" escolhido no cadastro não pode se perder quando a
+   pessoa acerta o horário da 1ª dose antes do tratamento começar. */
+describe("'Começa amanhã' e depois mudar a 1ª dose", () => {
+  it("amanhã 08:00 → 09:00 às 21:35 continua amanhã (09:00); 00:30 → 23:30 às 23:00 ainda começa hoje", () => {
+    expect(inicioAoMudarPrimeira("2026-11-08T08:00", "09:00", new Date(2026, 10, 7, 21, 35), gerarHorarios("09:00", 3))).toBe("2026-11-08T09:00");
+    expect(inicioAoMudarPrimeira("2026-11-08T08:00", "07:00", new Date(2026, 10, 7, 21, 35), gerarHorarios("07:00", 3))).toBe("2026-11-08T07:00");
+    expect(inicioAoMudarPrimeira("2026-11-08T00:30", "23:30", new Date(2026, 10, 7, 23), gerarHorarios("23:30", 3))).toBe("2026-11-07T23:30");
+    // a ocorrência mais perto do início antigo já passou: aí vale o cadastro de agora
+    expect(inicioAoMudarPrimeira("2026-11-07T20:00", "09:00", new Date(2026, 10, 7, 10), gerarHorarios("09:00", 3))).toBe("2026-11-07T09:00");
+  });
+
+  it("na tela: cadastrou às 21:30 com 'Começa amanhã 08:00' e às 21:35 mudou pra 09:00 → sem aviso de madrugada, 1º aviso amanhã 09:00", () => {
+    agoraEm(7, 21, 30);
+    const store = criarStore({});
+    montar(store);
+    fireEvent.change(screen.getByPlaceholderText("Novo remédio ou suplemento..."), { target: { value: "Amoxicilina" } });
+    fireEvent.click(screen.getByRole("button", { name: "8 em 8" }));
+    fireEvent.click(screen.getByTestId("remedio-comeca"));
+    expect(screen.getByTestId("remedio-comeca").textContent).toBe("Começa amanhã 08:00");
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar remédio" }));
+    cleanup();
+    agoraEm(7, 21, 35);
+    montar(store);
+    fireEvent.click(screen.getByRole("button", { name: "Editar horários de Amoxicilina" }));
+    expect(screen.getByTestId("remedio-editar-comeca").textContent).toBe(" · começa amanhã 08:00"); // a fileira mostra o começo
+    fireEvent.change(screen.getByLabelText("Horário de Amoxicilina (1ª dose)"), { target: { value: "09:00" } });
+    expect(screen.getByTestId("remedio-editar-comeca").textContent).toBe(" · começa amanhã 09:00");
+    cleanup();
+    expect(linhas(store).map((l) => [l.time, l.inicio])).toEqual([["09:00", "2026-11-08T09:00"], ["17:00", "2026-11-08T09:00"], ["01:00", "2026-11-08T09:00"]]);
+    expect(planoDe(store).map((a) => fmt(a.quando)).slice(0, 3)).toEqual(["08/09:00", "08/17:00", "09/01:00"]);
+    agoraEm(7, 23);
+    montar(store);
+    expect(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (09:00)" })).toBeInTheDocument();
+  });
+});
+
+/* Conserto final da crítica (07/11): a caixa marca a dose que vence em minutos (até 1 h antes,
+   o mesmo "tomar um pouco antes" do dia do tratamento), não a atrasada mais antiga. */
+describe("a caixa e a dose que vence em minutos", () => {
+  it("23:55 com a das 16:00 em aberto → a das 00:00; 21:31 com a das 21:00 em aberto → continua a das 21:00", () => {
+    const g = agruparRemedios(cadastro(agoraEm(7, 7, 50), "08:00"))[0];
+    const agora = agoraEm(7, 23, 55);
+    const semA08 = dosesDoGrupoAgora(g, agora).filter((d) => d.time !== "08:00");
+    expect(doseDaHora(semA08, agora)?.time).toBe("00:00");
+    const g21 = agruparRemedios(cadastro(agoraEm(7, 20, 50), "21:00"))[0];
+    const as2131 = agoraEm(7, 21, 31);
+    expect(doseDaHora(dosesDoGrupoAgora(g21, as2131), as2131)?.time).toBe("21:00");
+  });
+
+  it("na tela: cadastrado às 21:30 com o 08:00 do campo; às 23:55 a caixa marca a das 00:00 e o aviso das 00:00 sai", () => {
+    const novas = cadastro(agoraEm(7, 21, 30), "08:00");
+    const [, , d3] = novas.map((l) => l.id);
+    const store = criarStore({ [CHAVE]: novas });
+    agoraEm(7, 23, 55);
+    montar(store);
+    expect(screen.getByTestId(`dose-${d3}`)).toHaveAttribute("data-da-vez", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (00:00)" }));
+    expect(store.estado.dados[LOG]).toEqual({ "2026-11-08": [d3] });
+    expect(planoDe(store).map((a) => fmt(a.quando))).not.toContain("08/00:00");
+  });
+});

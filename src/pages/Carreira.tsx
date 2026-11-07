@@ -6,12 +6,18 @@ import { localDayKey, dataSegura } from "@/lib/utils";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
+import { useUserData } from "@/hooks/use-user-data";
+import { apagarComDesfazer } from "@/lib/desfazer";
+import { trackEvent } from "@/lib/analytics";
+import { AVISOS, AVISO_PADRAO, CHAVE_COMPROMISSOS, type Compromisso } from "@/lib/compromissos";
+import { armarAvisosDeCompromissos } from "@/components/rotina/Compromissos";
 import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { MesDoCabecalho } from "@/components/MesDoCabecalho";
-import { ArrowLeft, Plus, Trash2, ExternalLink, Edit2, X, Star, Clock, TrendingUp, TrendingDown, Link2, Briefcase } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ExternalLink, Edit2, X, Star, Clock, TrendingUp, TrendingDown, Link2, Briefcase, CalendarPlus, Search } from "lucide-react";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
 import { BlocoDeFases, type Fase } from "@/components/fases/BlocoDeFases";
 import { Button } from "@/components/ui/button";
@@ -64,7 +70,12 @@ const EtiquetasChips = ({ tags, onChange }: { tags: string[]; onChange: (tags: s
     </div>
   );
 };
-type Contact = { id: string; name: string; company: string; role: string; linkedin: string; email: string; phone: string; notes: string; lastContact: string; category: string };
+/* `onde`/`conheceuEm`/`assunto` opcionais (dono 07/11: "registro de contatos
+   profissionais" — pessoa, empresa, lugar, contato, data, assunto, marcar
+   reunião). Mesma chave `career-contacts`, mesmo array: contato antigo sem os
+   três continua válido, e o app antigo das lojas regrava os campos que não
+   conhece junto com o resto (`{ ...c, ...form }`). */
+type Contact = { id: string; name: string; company: string; role: string; linkedin: string; email: string; phone: string; notes: string; lastContact: string; category: string; onde?: string; conheceuEm?: string; assunto?: string };
 type Skill = { id: string; name: string; category: string; level: number; targetLevel: number; notes: string };
 /* Fase/TarefaDoDia agora moram em @/components/fases/BlocoDeFases — o mesmo
    bloco passou a ser usado pela Rotina. */
@@ -381,6 +392,87 @@ const Portfolio = () => {
 };
 
 // ============= NETWORKING =============
+/** Busca simples, sem acento e sem caixa: "joao" acha "João", "core" acha "CORE". */
+const semAcento = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+export const contatoCasaBusca = (c: Contact, busca: string): boolean => {
+  const q = semAcento(busca.trim());
+  if (!q) return true;
+  return [c.name, c.company, c.role, c.onde, c.assunto, c.notes, c.phone, c.email]
+    .some((v) => typeof v === "string" && semAcento(v).includes(q));
+};
+
+/** Os três campos novos só ficam no objeto com texto (editar pra vazio tira o campo — o app antigo não os conhece). */
+const comOpcionais = (c: Contact, form: Partial<Contact>): Contact => {
+  const r: Contact = { ...c };
+  for (const k of ["onde", "conheceuEm", "assunto"] as const) {
+    const v = (form[k] ?? "").trim();
+    if (v) r[k] = v; else delete r[k];
+  }
+  return r;
+};
+
+/**
+ * "Marcar reunião" (dono 07/11): o compromisso da Rotina que a reunião vira — o
+ * mesmo registro que a pessoa criaria em Meu mês (título, data, hora, aviso,
+ * local, notas), lido pelo app antigo das lojas. `ref` = id do contato; SEM
+ * `origem` de propósito: a reunião é da pessoa e continua editável na Rotina
+ * (o que vem dos Estudos/Beleza trava a edição lá porque tem espelho).
+ */
+export const reuniaoDoContato = (
+  c: Pick<Contact, "id" | "name">,
+  dados: { titulo: string; data: string; hora: string; aviso: number; local: string; notas: string },
+  id: string,
+): Compromisso => ({
+  id,
+  titulo: dados.titulo.trim() || `Reunião com ${c.name}`,
+  data: dados.data,
+  hora: dados.hora,
+  aviso: dados.aviso,
+  ...(dados.local.trim() ? { local: dados.local.trim() } : {}),
+  ...(dados.notas.trim() ? { notas: dados.notas.trim() } : {}),
+  ref: c.id,
+});
+
+/** As notas com que a reunião nasce: o assunto e o telefone do contato (dá pra mexer antes de marcar). */
+const notasDaReuniao = (c: Contact): string =>
+  [c.assunto?.trim() ?? "", c.phone?.trim() ? `Tel: ${c.phone.trim()}` : ""].filter((x) => x).join("\n");
+
+/** O formulário da reunião, debaixo da linha do contato — os mesmos campos do compromisso da Rotina, sem repetição. */
+const FormReuniao = ({ contato, onMarcar, onCancelar }: { contato: Contact; onMarcar: (c: Compromisso) => void; onCancelar: () => void }) => {
+  const [titulo, setTitulo] = useState(`Reunião com ${contato.name}`);
+  const [data, setData] = useState(localDayKey());
+  const [hora, setHora] = useState("09:00");
+  const [aviso, setAviso] = useState<number>(AVISO_PADRAO);
+  const [local, setLocal] = useState("");
+  const [notas, setNotas] = useState(notasDaReuniao(contato));
+  const marcar = () => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) { toast.error("Escolhe o dia da reunião"); return; }
+    if (!/^\d{1,2}:\d{2}$/.test(hora)) { toast.error("Escolhe a hora"); return; }
+    onMarcar(reuniaoDoContato(contato, { titulo, data, hora, aviso, local, notas }, genId()));
+  };
+  return (
+    <div className="mt-2 p-3 rounded-md border border-sky-200 dark:border-sky-900/60 bg-sky-50/60 dark:bg-sky-950/20 space-y-2" data-testid="form-reuniao">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">📅 Reunião — vai pra Rotina, com aviso</p>
+      <Input value={titulo} onChange={e => setTitulo(e.target.value)} onKeyDown={e => e.key === "Enter" && marcar()} className="h-8 text-xs" aria-label="Nome da reunião" />
+      <div className="grid grid-cols-2 gap-2">
+        <CampoData rotulo="Data" value={data} onChange={e => setData(e.target.value)} className="h-8 text-xs" aria-label="Data da reunião" />
+        <Input type="time" value={hora} onChange={e => setHora(e.target.value)} className="h-8 text-xs" aria-label="Hora da reunião" />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <select value={aviso} onChange={e => setAviso(Number(e.target.value))} className="h-8 text-[11px] rounded-md border border-input bg-background px-1.5" aria-label="Antecedência do aviso">
+          {AVISOS.map(a => <option key={a.valor} value={a.valor}>{a.rotulo}</option>)}
+        </select>
+        <Input placeholder="Onde? (opcional)" value={local} onChange={e => setLocal(e.target.value)} className="h-8 text-xs" aria-label="Local da reunião" />
+      </div>
+      <Textarea value={notas} onChange={e => setNotas(e.target.value)} placeholder="Notas (opcional): pauta, telefone…" rows={2} className="min-h-[56px] text-xs resize-none" aria-label="Notas da reunião" />
+      <div className="flex gap-2">
+        <Button size="sm" onClick={marcar} className="h-8 text-xs flex-1 bg-sky-600 hover:bg-sky-700 text-white">Marcar na Rotina</Button>
+        <Button size="sm" variant="ghost" onClick={onCancelar} className="h-8 text-xs">Cancelar</Button>
+      </div>
+    </div>
+  );
+};
+
 const Networking = () => {
   const [contacts, setContacts] = usePersistedState<Contact[]>("career-contacts", []);
   const [showForm, setShowForm] = useState(false);
@@ -390,19 +482,27 @@ const Networking = () => {
   const categories = ["profissional", "mentor", "recrutador", "colega", "cliente"];
   const catEmoji: Record<string, string> = { profissional: "👔", mentor: "🧠", recrutador: "🎯", colega: "🤝", cliente: "💼" };
   const [inlineForm, setInlineForm] = useState({ name: "", company: "" });
+  // 07/11 (dono): busca simples, "Marcar reunião" (vira compromisso da Rotina)
+  // e lixeira sempre à vista — o group-hover de antes não existe no celular.
+  const [busca, setBusca] = useState("");
+  const [marcando, setMarcando] = useState<string | null>(null);
+  const [compromissos, setCompromissos] = usePersistedState<Compromisso[]>(CHAVE_COMPROMISSOS, []);
+  const { get } = useUserData();
+  const navigate = useNavigate();
+  const naDemo = ehCaminhoDeDemo(useLocation().pathname);
 
   const save = () => {
     if (!form.name) return;
     if (editId) {
-      setContacts(prev => prev.map(c => c.id === editId ? { ...c, ...form, name: form.name || c.name } as Contact : c));
+      setContacts(prev => prev.map(c => c.id === editId ? comOpcionais({ ...c, ...form, name: form.name || c.name } as Contact, form) : c));
     } else {
       // Nasce com último contato = HOJE, como o "+ Add" da linha (26/09,
       // varredura): vazio, o contato recém-criado caía direto no follow-up.
-      setContacts(prev => [...prev, { id: genId(), name: form.name || "", company: form.company || "", role: form.role || "", linkedin: form.linkedin || "", email: form.email || "", phone: form.phone || "", notes: form.notes || "", lastContact: form.lastContact || localDayKey(), category: form.category || "profissional" }]);
+      setContacts(prev => [...prev, comOpcionais({ id: genId(), name: form.name || "", company: form.company || "", role: form.role || "", linkedin: form.linkedin || "", email: form.email || "", phone: form.phone || "", notes: form.notes || "", lastContact: form.lastContact || localDayKey(), category: form.category || "profissional" }, form)]);
     }
     setForm({ category: "profissional" }); setEditId(null); setShowForm(false);
   };
-  const editar = (c: Contact) => { setForm(c); setEditId(c.id); setShowForm(true); };
+  const editar = (c: Contact) => { setForm(c); setEditId(c.id); setShowForm(true); setMarcando(null); };
 
   const addInline = () => {
     if (!inlineForm.name) return;
@@ -410,7 +510,22 @@ const Networking = () => {
     setInlineForm({ name: "", company: "" });
   };
 
+  const apagar = (c: Contact) => apagarComDesfazer<Contact[]>(setContacts, prev => prev.filter(x => x.id !== c.id), `${c.name} apagado`);
+
+  const marcarReuniao = (c: Contact, novo: Compromisso) => {
+    const nova = [...compromissos, novo];
+    setCompromissos(nova);
+    // marcar a reunião É um contato: a pessoa sai do follow-up
+    setContacts(prev => prev.map(x => x.id === c.id ? { ...x, lastContact: localDayKey() } : x));
+    setMarcando(null);
+    const aviso = novo.aviso ?? AVISO_PADRAO;
+    trackEvent("carreira_reuniao_marcada", { aviso, com_assunto: !!c.assunto });
+    toast.success(`${novo.titulo}: ${dataCurtaCarreira(novo.data)} às ${novo.hora}`, naDemo ? undefined : { action: { label: "Ver na Rotina", onClick: () => navigate("/rotina?aba=mes") } });
+    void armarAvisosDeCompromissos(get, nova, aviso >= 0);
+  };
+
   const needsFollowUp = contacts.filter(c => { if (!c.lastContact) return true; return (Date.now() - new Date(c.lastContact).getTime()) / (1000 * 60 * 60 * 24) > 30; });
+  const visiveis = contacts.filter(c => contatoCasaBusca(c, busca));
 
   return (
     <div className="space-y-4">
@@ -426,9 +541,12 @@ const Networking = () => {
             <p className="text-[10px] text-muted-foreground text-center py-1">Nenhum follow-up pendente 🎉</p>
           )}
           {needsFollowUp.slice(0, 5).map(c => (
-            <div key={c.id} className="flex items-center justify-between py-1">
-              <span className="text-xs">{catEmoji[c.category]} {c.name}</span>
-              <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() => setContacts(prev => prev.map(x => x.id === c.id ? { ...x, lastContact: localDayKey() } : x))}>Contatei ✓</Button>
+            <div key={c.id} className="flex items-center justify-between gap-2 py-1">
+              <div className="min-w-0">
+                <span className="text-xs">{catEmoji[c.category]} {c.name}</span>
+                {c.assunto && <p className="text-[10px] text-muted-foreground truncate">→ {c.assunto}</p>}
+              </div>
+              <Button size="sm" variant="outline" className="h-6 text-[10px] shrink-0" onClick={() => setContacts(prev => prev.map(x => x.id === c.id ? { ...x, lastContact: localDayKey() } : x))}>Contatei ✓</Button>
             </div>
           ))}
         </div>
@@ -439,6 +557,12 @@ const Networking = () => {
           <Input placeholder="Nome" value={form.name || ""} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="h-9 text-sm" />
           <div className="grid grid-cols-2 gap-2"><Input placeholder="Empresa" value={form.company || ""} onChange={e => setForm(p => ({ ...p, company: e.target.value }))} className="h-9 text-sm" /><Input placeholder="Cargo" value={form.role || ""} onChange={e => setForm(p => ({ ...p, role: e.target.value }))} className="h-9 text-sm" /></div>
           <Select value={form.category || "profissional"} onValueChange={v => setForm(p => ({ ...p, category: v }))}><SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger><SelectContent>{categories.map(c => <SelectItem key={c} value={c}>{catEmoji[c]} {c}</SelectItem>)}</SelectContent></Select>
+          {/* 07/11 (dono): onde conheceu, quando, e o assunto/próximo passo — opcionais */}
+          <div className="grid grid-cols-2 gap-2">
+            <Input placeholder="Onde conheceu (ex.: evento em SP)" value={form.onde || ""} onChange={e => setForm(p => ({ ...p, onde: e.target.value }))} className="h-9 text-sm" />
+            <CampoData rotulo="Data" value={form.conheceuEm || ""} onChange={e => setForm(p => ({ ...p, conheceuEm: e.target.value }))} className="h-9 text-sm" aria-label="Data em que conheceu" />
+          </div>
+          <Input placeholder="Assunto / próximo passo (ex.: marcar reunião)" value={form.assunto || ""} onChange={e => setForm(p => ({ ...p, assunto: e.target.value }))} className="h-9 text-sm" />
           <Input placeholder="LinkedIn URL" value={form.linkedin || ""} onChange={e => setForm(p => ({ ...p, linkedin: e.target.value }))} className="h-9 text-sm" />
           <div className="grid grid-cols-2 gap-2"><Input placeholder="Email" value={form.email || ""} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} className="h-9 text-sm" /><Input placeholder="Telefone" value={form.phone || ""} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} className="h-9 text-sm" /></div>
           <Textarea placeholder="Notas..." value={form.notes || ""} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} className="text-sm min-h-[50px]" />
@@ -457,32 +581,49 @@ const Networking = () => {
             <Plus className="w-3 h-3 inline mr-0.5" />Detalhado
           </button>
         </div>
-        <div className="bg-purple-100 dark:bg-purple-900/20 px-3 py-1.5 grid grid-cols-12 gap-1 text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
-          <span className="col-span-1"></span>
-          <span className="col-span-3">Nome</span>
-          <span className="col-span-3">Empresa / Cargo</span>
-          <span className="col-span-3">Último Contato</span>
-          <span className="col-span-2 text-right">Ações</span>
-        </div>
+        {/* A faixa de títulos de coluna virou a busca (só com contato pra buscar) */}
+        {contacts.length > 0 && (
+          <div className="bg-purple-100 dark:bg-purple-900/20 px-3 py-1.5">
+            <div className="relative">
+              <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              <Input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por nome, empresa, assunto..." aria-label="Buscar contato"
+                className="h-7 text-[11px] pl-6 bg-background/60 border-border/60 rounded-md focus-visible:ring-1 focus-visible:ring-primary/30" />
+            </div>
+          </div>
+        )}
         <div className="divide-y divide-border bg-card">
           {contacts.length === 0 && (
             <div className="px-3 py-4 text-center">
               <p className="text-[10px] text-muted-foreground">Nenhum contato ainda</p>
             </div>
           )}
-          {contacts.map(c => (
-            <div key={c.id} className="px-3 py-2 grid grid-cols-12 gap-1 items-center hover:bg-muted/30 transition-colors group">
-              <span className="col-span-1 text-sm">{catEmoji[c.category]}</span>
-              <span className="col-span-3 text-xs font-medium truncate">{c.name}</span>
-              <div className="col-span-3 min-w-0">
-                <p className="text-[10px] text-muted-foreground truncate">{c.role}{c.company ? ` @ ${c.company}` : ""}</p>
+          {contacts.length > 0 && visiveis.length === 0 && (
+            <div className="px-3 py-4 text-center">
+              <p className="text-[10px] text-muted-foreground">Nenhum contato com "{busca.trim()}"</p>
+            </div>
+          )}
+          {visiveis.map(c => (
+            <div key={c.id} className="px-3 py-2 hover:bg-muted/30 transition-colors">
+              <div className="flex items-start gap-2">
+                <span className="text-sm shrink-0 leading-5">{catEmoji[c.category]}</span>
+                <div className="flex-1 min-w-0 space-y-0.5">
+                  <p className="text-xs font-medium truncate">{c.name}</p>
+                  {(c.role || c.company) && <p className="text-[10px] text-muted-foreground truncate">{[c.role, c.company].filter(Boolean).join(" @ ")}</p>}
+                  {(c.onde || c.conheceuEm) && <p className="text-[10px] text-muted-foreground truncate">📍 {[c.onde, c.conheceuEm ? dataCurtaCarreira(c.conheceuEm) : ""].filter(Boolean).join(" · ")}</p>}
+                  {c.assunto && <p className="text-[10px] text-primary truncate">→ {c.assunto}</p>}
+                  {c.phone && <a href={`tel:${c.phone.replace(/[^\d+]/g, "")}`} className="block text-[10px] text-muted-foreground truncate">📞 {c.phone}</a>}
+                </div>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <span className="text-[9px] text-muted-foreground whitespace-nowrap">último contato {dataCurtaCarreira(c.lastContact)}</span>
+                  <div className="flex gap-0.5">
+                    {c.linkedin && <Button variant="ghost" size="icon" className="h-6 w-6" aria-label={`LinkedIn de ${c.name}`} onClick={() => window.open(c.linkedin, "_blank")}><Link2 className="w-3 h-3" /></Button>}
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-sky-700 dark:text-sky-300" aria-label={`Marcar reunião com ${c.name}`} aria-pressed={marcando === c.id} onClick={() => setMarcando(marcando === c.id ? null : c.id)}><CalendarPlus className="w-3.5 h-3.5" /></Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" aria-label={`Editar ${c.name}`} onClick={() => editar(c)}><Edit2 className="w-3 h-3" /></Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/70 hover:text-destructive" aria-label={`Apagar ${c.name}`} onClick={() => apagar(c)}><Trash2 className="w-3 h-3" /></Button>
+                  </div>
+                </div>
               </div>
-              <span className="col-span-3 text-[10px] text-muted-foreground">{dataCurtaCarreira(c.lastContact)}</span>
-              <div className="col-span-2 flex justify-end gap-1">
-                {c.linkedin && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => window.open(c.linkedin, "_blank")}><Link2 className="w-3 h-3" /></Button>}
-                <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={`Editar ${c.name}`} onClick={() => editar(c)}><Edit2 className="w-3 h-3" /></Button>
-                <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive opacity-0 group-hover:opacity-100" onClick={() => setContacts(prev => prev.filter(x => x.id !== c.id))}><Trash2 className="w-3 h-3" /></Button>
-              </div>
+              {marcando === c.id && <FormReuniao contato={c} onMarcar={novo => marcarReuniao(c, novo)} onCancelar={() => setMarcando(null)} />}
             </div>
           ))}
           {/* Inline quick-add */}

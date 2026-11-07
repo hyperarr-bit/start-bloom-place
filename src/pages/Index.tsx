@@ -426,6 +426,9 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   // cartão sai deste mês e entra no seguinte; sem fechamento cadastrado a
   // conta é a de sempre (lib/finance-fatura).
   const variaveisMes = variaveisDoMes(expenses, expensesAnterior, mesAgora, configOf);
+  // (07/11, bug "dois-numeros") `variaveisMes.noMes` é a lista que CONTA no mês: vai pro Dashboard (gráfico por
+  // categoria, top 5, por pagamento) e pros LIMITES, pra fechar com o "Despesas". `expenses` cru segue só pras
+  // listas que EDITAM (tabela, importação, relatórios) e pras que são por DATA (calendário, desafio da semana).
   const totalVariableExpenses = variaveisMes.total;
   /* 17/10 — o que ela gastou HOJE (variáveis que contam neste mês): a linha "Sobram R$ X pra hoje" do card
      QUANTO POSSO GASTAR HOJE (Dashboard `gastoDeHoje`; no de sempre só aparece com gasto hoje). */
@@ -638,7 +641,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 monthlyInstallments={monthlyInstallments}
                 totalDebts={totalDebts}
                 totalInvestments={totalInvestments}
-                expenses={expenses}
+                expenses={variaveisMes.noMes}
                 fixedExpenses={fixedExpenses}
                 dueDays={dueDaysComFaturas as any[]}
                 savingsRate={savingsRate}
@@ -713,7 +716,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 monthlyInstallments={monthlyInstallments}
                 totalDebts={totalDebts}
                 totalInvestments={totalInvestments}
-                expenses={expenses}
+                expenses={variaveisMes.noMes}
                 fixedExpenses={fixedExpenses}
                 dueDays={dueDaysComFaturas as any[]}
                 savingsRate={savingsRate}
@@ -938,7 +941,10 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
           <TrackedCard cardKey="category-budgets" tab="limites">
             {/* 09/09: o perfil vai junto — os gastos já chegam filtrados, e o
                 teto tem que ser do MESMO perfil (ver CategoryBudgets). */}
-            <CategoryBudgets expenses={[...expenses, ...fixedExpenses]} perfil={perfilValido} perfis={perfis} />
+            {/* (07/11, bug "dois-numeros") os gastos que CONTAM no mês pela regra da fatura, como o total — com
+                `expenses` cru a compra de 26/11 (fatura de dezembro) entrava no limite de novembro e a de 28/10
+                (fatura de novembro) não. */}
+            <CategoryBudgets expenses={[...variaveisMes.noMes, ...fixedExpenses]} perfil={perfilValido} perfis={perfis} />
           </TrackedCard>
         )}
 

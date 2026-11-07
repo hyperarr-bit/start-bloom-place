@@ -26,6 +26,10 @@
  */
 
 import { mesesEntre, somarMeses } from "@/lib/finance-parcelas";
+import { chaveArquivada } from "@/lib/virada-do-mes";
+import { mesCorrenteId } from "@/lib/virada-contas";
+import { doPerfil } from "@/lib/finance-perfil";
+import { CARD_CONFIG_KEY } from "@/lib/finance-cards-dados";
 
 export interface CardConfig {
   /** Dia em que a fatura fecha (1-31). Compra DEPOIS dele vai pro mês seguinte. */
@@ -54,7 +58,8 @@ export const contaNoMesDoVencimento = (cfg: CardConfig | undefined): boolean =>
  *  índice, senão a interface `Expense` do ExpenseTable não encaixa. */
 export interface GastoDeCartao {
   id?: string;
-  value?: number;
+  /** (07/11) também texto/null: é como o lançamento chega da retrospectiva e de chave antiga — quem soma usa Number(). */
+  value?: number | string | null;
   date?: string;
   paymentMethod?: string;
   cardName?: string;
@@ -159,4 +164,55 @@ export const rotuloVencimento = (cfg: CardConfig | undefined): string | null => 
   if (!cfg || !diaValido(cfg.dueDay)) return null;
   const seguinte = diaValido(cfg.closingDay) && cfg.dueDay <= cfg.closingDay;
   return `vence dia ${cfg.dueDay}${seguinte ? " do mês seguinte" : ""}`;
+};
+
+/* ═══ UMA FONTE SÓ PRA QUEM LÊ O MÊS DO STORE (bug "dois-numeros", 07/11) ═══
+ *
+ * A regra acima só valia nas duas telas que têm as listas na mão (Index e
+ * MonthlySheet, via `variaveisDoMes`). Todo mundo que LÊ o mês pelo store —
+ * comparação mensal/anual, balanço anual, retrospectiva, Home, widget de
+ * orçamento, lembrete do dia 2 — somava a chave crua, e o mesmo mês dava dois
+ * números: compra de R$ 1.000 em 28/10 com fechamento 25 → tela out 200 ·
+ * nov 1.000; comparação out 1.200 · nov 0. Daqui pra frente quem lê do store
+ * passa por `variaveisDoMesLidas`; quem já tem as listas segue em
+ * `variaveisDoMes`. Sem cartão com fechamento/vencimento cadastrado as duas
+ * dão a soma crua de sempre — ninguém sem fatura vê número mudar.
+ */
+
+/** Quem lê uma chave lógica: o `get` do useUserData sem o padrão, o `readMonthData` de um usuário, o `ler` da
+ *  retrospectiva. `undefined`/`null` = ausente. */
+export type LeitorDeChave = (chave: string) => unknown;
+
+/** O `configOf` do useFinanceCards sem React, a partir do `finance-card-config` cru: entrada com fechamento OU
+ *  vencimento inteiro vale; o resto é "sem fatura" (comportamento de sempre). O hook usa esta mesma função. */
+export const configOfDe = (bruto: unknown): ((card: string) => CardConfig | undefined) => {
+  const config = bruto && typeof bruto === "object" && !Array.isArray(bruto) ? (bruto as Record<string, CardConfig | undefined>) : {};
+  return (card) => {
+    const c = config[card];
+    return c && (Number.isInteger(c.closingDay) || Number.isInteger(c.dueDay)) ? c : undefined;
+  };
+};
+
+/** Chave lógica dos gastos variáveis de um mês: o balde corrente ou o arquivo dele — a mesma escolha de
+ *  getFinanceStorageKeys e da planilha do mês (MonthlySheet). */
+export const chaveDeGastosDoMes = (mesId: string, atual: string = mesCorrenteId()): string =>
+  mesId === atual ? "finance-expenses" : chaveArquivada(Number(mesId.slice(0, 4)), Number(mesId.slice(5, 7)) - 1, "expenses");
+
+/**
+ * Os gastos variáveis que CONTAM num mês, lidos do store: a chave do mês e a
+ * do anterior (compra depois do fechamento de lá cai aqui), no perfil pedido
+ * (sem `perfil`, todos), pela regra da fatura do `finance-card-config`.
+ * `atual` é o mês corrente — quem simula outra data passa o dele.
+ */
+export const variaveisDoMesLidas = <T extends GastoDeCartao & { perfil?: string }>(
+  mesId: string, ler: LeitorDeChave, perfil?: string, atual: string = mesCorrenteId(),
+): VariaveisDoMes<T> => {
+  const lista = (chave: string): T[] => { const v = ler(chave); return Array.isArray(v) ? (v as T[]) : []; };
+  const doPerfilPedido = (l: T[]): T[] => (perfil ? doPerfil(l, perfil) : l);
+  return variaveisDoMes(
+    doPerfilPedido(lista(chaveDeGastosDoMes(mesId, atual))),
+    doPerfilPedido(lista(chaveDeGastosDoMes(somarMeses(mesId, -1), atual))),
+    mesId,
+    configOfDe(ler(CARD_CONFIG_KEY)),
+  );
 };

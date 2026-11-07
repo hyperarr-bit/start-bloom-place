@@ -5,6 +5,8 @@ import { semanaAtualId } from "@/lib/utils";
 import { doPerfil, doPerfilDueDays, PERFIL_PESSOAL } from "@/lib/finance-perfil";
 import { somaParcelasDoMes, type Parcela } from "@/lib/finance-parcelas";
 import { computeLooseBillsOutflow, computeMonthlyBalance, computeMonthlyOutflow } from "@/lib/finance-totals";
+import { variaveisDoMesLidas } from "@/lib/finance-fatura";
+import { mesCorrenteId } from "@/lib/virada-contas";
 import { CHAVE_KCAL, CHAVE_META_KCAL_ANTIGA, CHAVE_META_KCAL_MODO, META_KCAL_PADRAO, consumoDoDia, nomeDoDiaDieta } from "@/lib/dieta-consumo";
 import { CHAVE_MACROS, type MacrosPlano } from "@/lib/dieta-macros";
 import {
@@ -175,7 +177,10 @@ export function useLifeHubData(): LifeHubData {
     const variableExpenses = doPerfil(get<any[]>("finance-expenses", []), perfil);
     const fixedExpenses = doPerfil(get<any[]>("finance-fixed-expenses", []), perfil);
     const totalIncome = incomes.reduce((s: number, i: any) => s + (Number(i.value) || Number(i.amount) || 0), 0);
-    const totalVariableExpense = variableExpenses.reduce((s: number, e: any) => s + (Number(e.value) || Number(e.amount) || 0), 0);
+    /* (07/11, bug "dois-numeros") as variáveis do mês pela REGRA DA FATURA, como o módulo (lib/finance-fatura): compra
+       no crédito depois do fechamento é da fatura do mês que vem; a do mês passado depois do fechamento de lá conta
+       aqui. A Home somava o balde cru e dava outro saldo. `variableExpenses` (cru) segue só pro "gasto de hoje". */
+    const totalVariableExpense = variaveisDoMesLidas(mesCorrenteId(), (k) => get<unknown>(k, undefined), perfil).total;
     const totalFixedExpense = fixedExpenses.reduce((s: number, e: any) => s + (Number(e.value) || Number(e.amount) || 0), 0);
     /* SALDO DA HOME = SALDO DO FINANÇAS (29/09, varredura). A Home fazia a conta
        própria (receitas − variáveis − fixos) e esquecia as PARCELAS do mês: com

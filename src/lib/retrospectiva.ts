@@ -2,9 +2,11 @@ import { getMonthKey, readMonthData } from "@/components/finance/storage-keys";
 import { doPerfil, doPerfilDueDays, perfilAtivoLocal } from "@/lib/finance-perfil";
 import { computeArchivedLooseBillsOutflow, computeLooseBillsOutflow, computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
 import {
-  chaveArquivadaDeParcelas, mesesAnteriores, mesesEntre, projetarParcelas, somaParcelasDoMes,
+  chaveArquivadaDeParcelas, mesesAnteriores, mesesEntre, projetarParcelas, somaParcelasDoMes, somarMeses,
   valorDaParcelaNoMes, viradaDeParcelas, type Parcela,
 } from "@/lib/finance-parcelas";
+import { configOfDe, variaveisDoMes } from "@/lib/finance-fatura";
+import { CARD_CONFIG_KEY } from "@/lib/finance-cards-dados";
 import {
   CARIMBOS, mesCarimbado, metaPadrao, semanasNaMeta, type GrupoDoCarimbo, type MetaDaSessao,
 } from "@/lib/treino-constancia";
@@ -363,7 +365,14 @@ const sonoDoMes = (ano: number, mesIdx: number, dados: DadosDaVida) => {
 
 export interface FinancasDoMes {
   incomes: Item[];
+  /** Os gastos variáveis que CONTAM no mês pela regra da fatura (lib/finance-fatura, 07/11): os lançados nele
+   *  que não foram adiados + os da chave do mês anterior cuja fatura cai aqui. É o que entra no "Saiu", nas
+   *  categorias e no maior gasto — o mesmo número da tela de Finanças. */
   expenses: Item[];
+  /** (07/11) Os gastos LANÇADOS no mês (a chave dele, com a data dentro dele), adiados ou não: é a base de
+   *  "dias com gasto", 1º dia de uso e atividade — isso é sobre o que a pessoa fez, não sobre a fatura.
+   *  Ausente = `expenses` (quem monta o bloco na mão). */
+  lancados?: Item[];
   fixed: Item[];
   parcelas: Parcela[];
   /** (17/10) contas avulsas do MEU MÊS daquele mês (com valor, pagas ou não) — computeLooseBillsOutflow */
@@ -408,31 +417,48 @@ export const lerFinancasDoMes = (
   const mesId = idDoMes(ano, mesIdx);
   const atual = idDoMes(agora.getFullYear(), agora.getMonth());
   const atras = mesesEntre(mesId, atual); // >0 passado · 0 corrente · <0 futuro
+  /* (07/11, bug "dois-numeros") Os gastos variáveis que CONTAM no mês seguem a REGRA DA FATURA, como a tela
+     (lib/finance-fatura `variaveisDoMes`): os lançados no mês que não foram adiados + os da chave do mês
+     anterior cuja fatura cai aqui. A retrospectiva dizia "saiu R$ 1.200" num outubro em que a tela dizia
+     R$ 200 (TV de R$ 1.000 em 28/10, fechamento 25 → fatura de novembro). Sem cartão com fechamento
+     cadastrado, é a lista crua de sempre. Os "dias com gasto" seguem a DATA da compra (`lancados`). */
+  const configOf = configOfDe(ler(CARD_CONFIG_KEY));
+  const mesAnterior = somarMeses(mesId, -1);
+  const doBalde = (chave: string, mes = mesId) =>
+    mesesEntre(mes, atual) > 0 ? lista<Item>(ler(chave)).filter((i) => typeof i?.date === "string" && i.date.trim().startsWith(`${mes}-`)) : [];
+  const chaveDe = (mes: string, sufixo: string) => chaveDoMes(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)) - 1, sufixo);
+  /** Os gastos gravados na chave de um mês, como a planilha dele lê: corrente = o balde; passado = arquivo ∪
+   *  balde com a data dele (MÊS FRIO, acima); futuro = só a chave dele. */
+  const gastosGravadosEm = (mes: string): Item[] =>
+    mes === atual ? lista<Item>(ler("finance-expenses")) : juntarPorId(lista<Item>(ler(chaveDe(mes, "expenses"))), doBalde("finance-expenses", mes));
 
   if (atras === 0) {
     const balde = lista<Parcela>(ler("finance-installments"));
     const fontes = [atual, ...mesesAnteriores(atual, 24)].map((mes) => ({ mes, itens: lista<Parcela>(ler(chaveArquivadaDeParcelas(mes))) }));
     const fixed = doPerfil(lista<Item>(ler("finance-fixed-expenses")), perfil);
+    const lancados = doPerfil(lista<Item>(ler("finance-expenses")), perfil);
+    // o mês anterior só pelo arquivo, como o Index: antes da virada os itens dele ainda estão no balde (e o balde é o mês)
+    const anteriores = doPerfil(lista<Item>(ler(chaveDe(mesAnterior, "expenses"))), perfil);
     return {
       incomes: doPerfil(lista<Item>(ler("finance-incomes")), perfil),
-      expenses: doPerfil(lista<Item>(ler("finance-expenses")), perfil),
+      expenses: variaveisDoMes(lancados, anteriores, mesId, configOf).noMes,
+      lancados,
       fixed,
       parcelas: doPerfil(viradaDeParcelas(balde, atual, fontes)?.lista ?? balde, perfil),
       avulsas: computeLooseBillsOutflow(doPerfilDueDays(lista<any>(ler("finance-dueDays")), perfil), fixed),
     };
   }
 
-  const doBalde = (chave: string) =>
-    atras > 0 ? lista<Item>(ler(chave)).filter((i) => typeof i?.date === "string" && i.date.trim().startsWith(`${mesId}-`)) : [];
   const recemFechado = atras === 1;
   const incomes = juntarPorId(lista<Item>(ler(chaveDoMes(ano, mesIdx, "incomes"))), doBalde("finance-incomes"));
-  const expenses = juntarPorId(lista<Item>(ler(chaveDoMes(ano, mesIdx, "expenses"))), doBalde("finance-expenses"));
+  const lancados = gastosGravadosEm(mesId);
+  const expenses = variaveisDoMes(doPerfil(lancados, perfil), doPerfil(gastosGravadosEm(mesAnterior), perfil), mesId, configOf).noMes;
 
   // Fixos: mesma regra da virada (lib/virada-do-mes, viradaDeFixos) — mês
   // sem receita nem gasto não ganha retrato dos fixos, senão ele "existiria"
   // só com os fixos ("saiu R$ 2.040, entrou R$ 0").
   const fixosArquivo = ler(chaveDoMes(ano, mesIdx, "fixed"));
-  const teveMovimento = incomes.length + expenses.length > 0;
+  const teveMovimento = incomes.length + lancados.length > 0;
   const fixed = fixosArquivo !== undefined && fixosArquivo !== null
     ? lista<Item>(fixosArquivo)
     : recemFechado && teveMovimento
@@ -451,7 +477,8 @@ export const lerFinancasDoMes = (
 
   return {
     incomes: doPerfil(incomes, perfil),
-    expenses: doPerfil(expenses, perfil),
+    expenses,
+    lancados: doPerfil(lancados, perfil),
     fixed: doPerfil(fixed, perfil),
     parcelas: doPerfil([...proprias, ...projetadas], perfil),
     // (17/10) só o retrato de contas DAQUELE mês; sem retrato, 0 (não se inventa)
@@ -515,6 +542,8 @@ const montarWrapped = (
   base: BaseDoMes, mesId: string,
 ): WrappedData | null => {
   const { expenses, fixed, parcelas } = f;
+  // (07/11) o dinheiro (`expenses`) segue a fatura; os DIAS e a contagem do que ela anotou seguem a data da compra
+  const lancados = f.lancados ?? expenses;
   const income = soma(f.incomes);
   // "Saiu" = fixos + variáveis + PARCELAS do mês + contas avulsas (17/10),
   // como no Dashboard (26/09, varredura: a parcela do celular sumia da
@@ -561,7 +590,7 @@ const montarWrapped = (
 
   // dias sem gasto, contados na mesma base dos percentuais
   const todosOsDiasComGasto = [...new Set(
-    expenses
+    lancados
       .filter((e) => typeof e?.date === "string" && e.date.startsWith(`${mesId}-`))
       .map((e) => diaDe(e.date as string)),
   )].sort((a, b) => a - b);
@@ -604,7 +633,7 @@ const montarWrapped = (
     txCount: all.length,
     ego,
     temRenda,
-    gastosAnotados: expenses.length,
+    gastosAnotados: lancados.length,
     diasSemGasto,
     diasComGasto: todosOsDiasComGasto,
   };
@@ -636,7 +665,7 @@ export const buildWrappedData = (
 };
 
 const primeiroDiaDasFinancas = (f: FinancasDoMes, ano: number, mesIdx: number): number | null => {
-  const dias = [...f.expenses, ...f.incomes]
+  const dias = [...(f.lancados ?? f.expenses), ...f.incomes]
     .filter((i) => typeof i?.date === "string" && naFaixa(i.date, ano, mesIdx))
     .map((i) => diaDe(i.date as string));
   return dias.length ? Math.min(...dias) : null;
@@ -674,11 +703,13 @@ export const atividadeDoMes = (
   };
 
   if (fin) {
-    const datados = [...fin.expenses, ...fin.incomes]
+    // (07/11) os gastos LANÇADOS no mês, pela data da compra — `fin.expenses` é a fatura (dinheiro), não atividade
+    const lancados = fin.lancados ?? fin.expenses;
+    const datados = [...lancados, ...fin.incomes]
       .filter((i) => typeof i?.date === "string" && naFaixa(i.date, ano, mesIdx))
       .map((i) => diaDe(i.date as string));
     // fixos e parcelas contam como registro (é dado do mês), mas não têm dia
-    marcar("financas", datados, fin.expenses.length + fin.incomes.length + fin.fixed.length + fin.parcelas.length);
+    marcar("financas", datados, lancados.length + fin.incomes.length + fin.fixed.length + fin.parcelas.length);
   }
   const heat = diasDoHeatmap(ano, mesIdx, dados);
   const hab = habitosDoMes(ano, mesIdx, dados);

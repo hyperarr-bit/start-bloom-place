@@ -1,4 +1,6 @@
 import { doPerfil, perfilAtivoLocal } from "@/lib/finance-perfil";
+import { variaveisDoMesLidas } from "@/lib/finance-fatura";
+import { mesIdDe } from "@/lib/finance-parcelas";
 // Shared finance storage key utilities.
 //
 // IMPORTANT: All app data is stored in localStorage under a per-user prefix
@@ -142,18 +144,22 @@ const writeJsonForUser = (userId: string | null | undefined, logicalKey: string,
  * Leitores de cópia/arquivo (virada de mês) usam readMonthData, que segue cru.
  */
 export const getMonthTotals = (month: string, userId: string | null | undefined, year?: number, perfil?: string) => {
-  const keys = getFinanceStorageKeys(month, year);
+  const targetYear = year ?? getCurrentYear();
+  const keys = getFinanceStorageKeys(month, targetYear);
   const p = perfil ?? perfilAtivoLocal(userId);
 
   const incomes = doPerfil(readJsonForUser(userId, keys.incomes) || [], p);
-  const expenses = doPerfil(readJsonForUser(userId, keys.expenses) || [], p);
   const fixed = doPerfil(readJsonForUser(userId, keys.fixed) || [], p);
   const installments = doPerfil(readJsonForUser(userId, keys.installments) || [], p);
+  // (07/11, bug "dois-numeros") variáveis pela REGRA DA FATURA, como a tela: a chave do mês + a do anterior
+  // (lib/finance-fatura `variaveisDoMesLidas`). Somar a chave crua dava outro número pro mesmo mês na Comparação
+  // e no Balanço. Sem cartão com fechamento cadastrado, é a soma crua de sempre.
+  const variaveis = variaveisDoMesLidas(mesIdDe(month, targetYear), (chave) => readJsonForUser(userId, chave), p);
 
   return {
     receitas: incomes.reduce((s: number, i: any) => s + (i.value || 0), 0),
     custosFixos: fixed.reduce((s: number, e: any) => s + (e.value || 0), 0),
-    custosVariaveis: expenses.reduce((s: number, e: any) => s + (e.value || 0), 0),
+    custosVariaveis: variaveis.total,
     dividas: installments.reduce(
       (s: number, i: any) => {
         const remaining = (i.totalInstallments || 0) - (i.paidInstallments || 0);

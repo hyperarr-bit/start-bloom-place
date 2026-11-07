@@ -572,3 +572,52 @@ describe("o 1º gesto com a conta lida noutro dia não apaga o que o celular lan
     expect(ids(servidor().get("finance-expenses"))).toEqual(["a", "farmacia"]);
   });
 });
+
+/* Crítica do ciclo r2 (07/11, bug "meia-noite-dois-aparelhos", achado com 2 navegadores e backend falso em
+   scratchpad/ciclo/dias.mjs): A abre 07/11 23:57 e lança Mercado; B lança Padaria 08/11 00:05; A, ainda aberto, lança
+   Farmácia às 00:10. A releitura acontecia, mas o servidor terminava com [Mercado, Farmácia] — a Padaria sumia, até
+   depois de reabrir. Já existia antes do ramo. O gesto das 00:10 é o "gesto em cima do retrato velho" (bug
+   "retrato-velho"): entra segurado e é juntado com mesclar3 na releitura. */
+describe("A e B lançando na mesma lista depois da meia-noite", () => {
+  const MERCADO = { id: "mercado", date: "2026-11-07", value: 50, description: "Mercado" };
+  const PADARIA_B = { id: "padaria-b", date: "2026-11-08", value: 12, description: "Padaria" };
+  const FARMACIA_A = { id: "farmacia-a", date: "2026-11-08", value: 30, description: "Farmácia" };
+
+  it("pelo get: o servidor termina com Mercado, Padaria e Farmácia, e a reabertura também", async () => {
+    vi.setSystemTime(em(2026, 11, 7, 23, 57));
+    const r = montar();
+    await waitFor(() => expect(api.loaded).toBe(true));
+    act(() => api.set("finance-expenses", [MERCADO]));
+    await esperar(400);
+    expect(ids(servidor().get("finance-expenses"))).toEqual(["mercado"]);
+
+    servidor().set("finance-expenses", [MERCADO, PADARIA_B]); // B, 08/11 00:05
+    vi.setSystemTime(em(2026, 11, 8, 0, 10));
+    act(() => api.set("finance-expenses", [...api.get<Gasto[]>("finance-expenses", []), FARMACIA_A]));
+    await esperar(600);
+    expect(ids(servidor().get("finance-expenses"))).toEqual(["mercado", "padaria-b", "farmacia-a"]);
+    expect(ids(api.get("finance-expenses", []))).toEqual(["mercado", "padaria-b", "farmacia-a"]);
+
+    r.unmount();
+    montar();
+    await waitFor(() => expect(api.loaded).toBe(true));
+    expect(ids(api.get("finance-expenses", []))).toEqual(["mercado", "padaria-b", "farmacia-a"]);
+  });
+
+  it("pela tela de Finanças: a tela de A mostra a Padaria de B junto", async () => {
+    vi.setSystemTime(em(2026, 11, 7, 23, 57));
+    servidor().set(CHAVE_CARIMBO_CONTAS, "2026-11");
+    montar(true);
+    await waitFor(() => expect(api.loaded).toBe(true));
+    act(() => setGastosNaTela([MERCADO]));
+    await esperar(400);
+    servidor().set("finance-expenses", [MERCADO, PADARIA_B]);
+    vi.setSystemTime(em(2026, 11, 8, 0, 10));
+    act(() => setGastosNaTela((p) => [...p, FARMACIA_A]));
+    await esperar(600);
+    expect(ids(servidor().get("finance-expenses"))).toEqual(["mercado", "padaria-b", "farmacia-a"]);
+    expect(ids(gastosNaTela)).toEqual(["mercado", "padaria-b", "farmacia-a"]);
+    // e o dia 08 entra na sequência (sobe na liberação, depois do gasto juntado)
+    await waitFor(() => expect(servidor().get(CHAVE_DIAS_ANOTADOS)).toEqual(["2026-11-07", "2026-11-08"]));
+  });
+});

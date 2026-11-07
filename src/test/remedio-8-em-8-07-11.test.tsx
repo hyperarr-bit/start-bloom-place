@@ -105,7 +105,7 @@ beforeEach(() => {
   plataforma.nativo = false; plataforma.android = false;
   eventos.length = 0; toast.ultimo = null;
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 /* ───────────────────────────── a conta pura ───────────────────────────── */
 describe("lib/remedios: horários de N em N horas", () => {
@@ -274,10 +274,13 @@ describe("Vitaminas e Remédios: o grupo na tabela", () => {
   const grupo = (ate?: string): Linha[] => ["08:00", "16:00", "00:00"].map((time, i) => ({ id: `a${i}`, name: "Amoxicilina", time, stock: 21, dosesPerDay: 1, grupo: "g1", ...(ate ? { ate } : {}) }));
 
   it("marcar uma dose grava o id DAQUELA linha e baixa o estoque do grupo inteiro; desmarcar devolve", () => {
+    // relógio fixo às 11:00: antes das 07:00 o dia do tratamento ainda é o de ontem (lib/remedios)
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 7, 11, 0));
     const store = criarStore({ [CHAVE]: [...grupo(), { id: "o", name: "Ômega 3", time: "12:30", stock: 18, dosesPerDay: 1 }] });
     montar(store);
     fireEvent.click(screen.getByRole("button", { name: "Marcar dose das 16:00 de Amoxicilina" }));
-    expect(store.estado.dados[LOG]).toEqual({ [HOJE]: ["a1"] });
+    expect(store.estado.dados[LOG]).toEqual({ "2026-11-07": ["a1"] });
     expect(linhas(store).map((x) => x.stock)).toEqual([20, 20, 20, 18]); // o Ômega 3 não mexe
     expect(screen.getByRole("button", { name: "Alterar estoque de Amoxicilina (20)" })).toBeInTheDocument();
     expect(screen.getByTestId("remedio-doses-feitas").textContent).toBe("1/3");
@@ -297,11 +300,12 @@ describe("Vitaminas e Remédios: o grupo na tabela", () => {
       expect(store.estado.dados[LOG]).toEqual({ "2026-11-07": ["a1"] });
       fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (08:00)" }));
       fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (00:00)" }));
-      expect(store.estado.dados[LOG]).toEqual({ "2026-11-07": ["a1", "a0", "a2"] });
+      // a das 00:00 marcada às 23:00 é a de daqui a 1 h: grava no dia em que ela acontece (08/11)
+      expect(store.estado.dados[LOG]).toEqual({ "2026-11-07": ["a1", "a0"], "2026-11-08": ["a2"] });
       expect(linhas(store).map((x) => x.stock)).toEqual([18, 18, 18]);
       expect(screen.getByText("Amoxicilina").className).toContain("line-through");
       fireEvent.click(screen.getByRole("button", { name: "Desmarcar Amoxicilina" }));
-      expect(store.estado.dados[LOG]).toEqual({ "2026-11-07": ["a0", "a2"] });
+      expect(store.estado.dados[LOG]).toEqual({ "2026-11-07": ["a0"], "2026-11-08": ["a2"] });
     } finally { vi.useRealTimers(); }
   });
 

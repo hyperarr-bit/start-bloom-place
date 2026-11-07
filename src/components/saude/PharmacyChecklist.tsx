@@ -13,12 +13,12 @@ import { reagendarTudo, type Leitor } from "@/lib/reagendar";
 import { trackEvent } from "@/lib/analytics";
 import { avisarApagado } from "@/lib/desfazer";
 import {
-  OPCOES_VEZES, agruparRemedios, doseDaHora, dosesDoGrupoAgora, ehDia, gerarHorarios, montarLinhas, rotuloDosHorarios, tratamentoTerminou,
-  type GrupoDeRemedio, type Remedio as Supplement, type VezesAoDia,
+  OPCOES_VEZES, agruparRemedios, doseDaHora, dosesDoGrupoAgora, ehDia, gerarHorarios, inicioAoMudarPrimeira, montarLinhas, rotuloDosHorarios,
+  tratamentoTerminou, ultimasDosesDoGrupo, type DoseMarcavel, type GrupoDeRemedio, type Remedio as Supplement, type VezesAoDia,
 } from "@/lib/remedios";
 
 /* O tipo da linha (`Remedio`, lib/remedios) é o de sempre — id, name, time,
- * stock, dosesPerDay, quem — mais `grupo` e `ate` (07/11), os dois opcionais:
+ * stock, dosesPerDay, quem — mais `grupo`, `ate` e `inicio` (07/11), opcionais:
  * um remédio de 8 em 8 h são 3 linhas normais ligadas pelo `grupo`, e o app
  * antigo continua lendo e marcando cada linha. */
 
@@ -121,8 +121,8 @@ export const PharmacyChecklist = () => {
   const [alarmeExato, setAlarmeExato] = useState<EstadoAlarmeExato>("indisponivel");
   const [dependentes, setDependentes] = usePersistedState<string[]>(CHAVE_DEPENDENTES, []);
   const [semBaixa, setSemBaixa] = usePersistedState<SemBaixa>(CHAVE_SEM_BAIXA, { dia: "", ids: [] });
-  const takenToday = supplementLog[today] || [];
-  const semBaixaHoje = semBaixa?.dia === today && Array.isArray(semBaixa.ids) ? semBaixa.ids : [];
+  /** a dose foi marcada no dia em que ela acontece? (a das 00:00 tomada às 23:50 mora no dia seguinte) */
+  const foiTomada = (d: { id: string; dia: string }) => (supplementLog[d.dia] || []).includes(d.id);
   const grupos = agruparRemedios(supplements);
   const horariosGerados = gerarHorarios(newTime, newVezes);
   const horarios = horariosEditados ?? (horariosGerados.length ? horariosGerados : [newTime]);
@@ -130,21 +130,24 @@ export const PharmacyChecklist = () => {
   /** as linhas que andam juntas com esta: o grupo inteiro, ou só ela */
   const mesmoGrupo = (linha: Supplement) => (s: Supplement) => (linha.grupo ? s.grupo === linha.grupo : s.id === linha.id);
 
-  const toggleTaken = (id: string) => {
+  /** `dia`: o dia em que a dose acontece (lib/remedios, dosesDoGrupoAgora) — o registro vai pra ele */
+  const toggleTaken = (id: string, dia: string = today) => {
     const linha = supplements.find(s => s.id === id);
     if (!linha) return;
     const juntas = mesmoGrupo(linha);
-    const alreadyTaken = takenToday.includes(id);
-    const newTaken = alreadyTaken ? takenToday.filter(x => x !== id) : [...takenToday, id];
-    setSupplementLog(prev => ({ ...prev, [today]: newTaken }));
+    const doDia = supplementLog[dia] || [];
+    const semBaixaDoDia = semBaixa?.dia === dia && Array.isArray(semBaixa.ids) ? semBaixa.ids : [];
+    const alreadyTaken = doDia.includes(id);
+    const newTaken = alreadyTaken ? doDia.filter(x => x !== id) : [...doDia, id];
+    setSupplementLog(prev => ({ ...prev, [dia]: newTaken }));
     // o estoque de um remédio de 8 em 8 é um só: as linhas do grupo sobem e descem juntas (vale a menor)
     const semEstoque = Math.min(...supplements.filter(juntas).map(s => s.stock ?? 0)) <= 0;
     if (!alreadyTaken && semEstoque) {
-      setSemBaixa({ dia: today, ids: [...semBaixaHoje.filter(x => x !== id), id] });
+      setSemBaixa({ dia, ids: [...semBaixaDoDia.filter(x => x !== id), id] });
     } else if (!alreadyTaken) {
       setSupplements(prev => prev.map(s => juntas(s) ? { ...s, stock: Math.max(0, s.stock - 1) } : s));
-    } else if (semBaixaHoje.includes(id)) {
-      setSemBaixa({ dia: today, ids: semBaixaHoje.filter(x => x !== id) }); // não tirou, não devolve
+    } else if (semBaixaDoDia.includes(id)) {
+      setSemBaixa({ dia, ids: semBaixaDoDia.filter(x => x !== id) }); // não tirou, não devolve
     } else {
       setSupplements(prev => prev.map(s => juntas(s) ? { ...s, stock: s.stock + 1 } : s));
     }
@@ -260,7 +263,14 @@ export const PharmacyChecklist = () => {
    *  pra 20h exigia apagar e recadastrar (perdendo o estoque). */
   const changeTime = (id: string, time: string) => {
     if (!time) return;
-    const lista = supplements.map(s => s.id === id ? { ...s, time } : s);
+    // 07/11: a 1ª dose de um tratamento que ainda não começou leva o `inicio` junto (lib/remedios)
+    const linha = supplements.find(s => s.id === id);
+    const primeiraDoGrupo = linha?.grupo ? supplements.find(s => s.grupo === linha.grupo) : undefined;
+    const inicio = primeiraDoGrupo?.id === id ? inicioAoMudarPrimeira(linha?.inicio, time) : undefined;
+    const lista = supplements.map(s => {
+      const comHora = s.id === id ? { ...s, time } : s;
+      return inicio && linha?.grupo && s.grupo === linha.grupo ? { ...comHora, inicio } : comHora;
+    });
     setSupplements(lista);
     void rearmarLembretes(lista, false);
   };
@@ -314,16 +324,18 @@ export const PharmacyChecklist = () => {
                   const agora = new Date();
                   // 07/11: "terminou" só depois da última dose, e a da noite do último dia ainda conta (lib/remedios)
                   const encerrado = tratamentoTerminou(g, agora);
-                  const doses = encerrado ? g.itens : dosesDoGrupoAgora(g, agora);
-                  const tomadas = doses.filter(s => takenToday.includes(s.id));
+                  // cada dose na ocorrência que vale agora, com o dia em que ela acontece (é nele que o "tomado" grava)
+                  const doses: DoseMarcavel[] = encerrado ? ultimasDosesDoGrupo(g) : dosesDoGrupoAgora(g, agora);
+                  const tomadas = doses.filter(foiTomada);
                   const taken = doses.length > 0 && tomadas.length === doses.length;
                   // a caixa marca a dose DA HORA (a mais recente que já passou), nunca a 1ª do cadastro
-                  const proxima = doseDaHora(doses.filter(s => !takenToday.includes(s.id)), agora);
+                  const proxima = doseDaHora(doses.filter(d => !foiTomada(d)), agora);
                   const ultimaTomada = doseDaHora(tomadas, agora);
                   const lowStock = g.estoque <= 5;
                   const color = nameColors[idx % nameColors.length];
                   const rotulo = g.itens.length > 1 ? rotuloDosHorarios(g.itens.map(s => s.time)) : "";
-                  const detalhe = [rotulo, g.ate ? (encerrado ? `terminou ${diaCurto(g.ate)}` : `até ${diaCurto(g.ate)}`) : ""].filter(Boolean).join(" · ");
+                  const partesDoDetalhe = [rotulo, g.ate ? (encerrado ? `terminou ${diaCurto(g.ate)}` : `até ${diaCurto(g.ate)}`) : ""].filter(Boolean);
+                  const detalhe = partesDoDetalhe.join(" · ");
                   const abertoPraEditar = editando === g.chave;
                   const linhas = [
                     <motion.tr
@@ -336,20 +348,24 @@ export const PharmacyChecklist = () => {
                       data-testid={`remedio-linha-${g.chave}`}
                     >
                       <td className="pl-3 pr-1 py-3 align-top">
-                        {/* remédio de várias doses: a caixa marca a dose da hora (a pílula com contorno verde) e, com todas marcadas, desmarca a última */}
+                        {/* remédio de várias doses: a caixa marca a dose da hora (a pílula com contorno verde) e, com todas marcadas, desmarca a última.
+                            O quadrado de 20 px é só o desenho: o botão em volta tem 36 px, como a lixeira (07/11, crítica) */}
                         <button
                           onClick={() => {
-                            if (g.itens.length === 1) toggleTaken(linha.id);
-                            else if (taken) { if (ultimaTomada) toggleTaken(ultimaTomada.id); }
-                            else if (proxima) toggleTaken(proxima.id);
+                            if (g.itens.length === 1) toggleTaken(linha.id, doses[0]?.dia ?? today);
+                            else if (taken) { if (ultimaTomada) toggleTaken(ultimaTomada.id, ultimaTomada.dia); }
+                            else if (proxima) toggleTaken(proxima.id, proxima.dia);
                           }}
                           disabled={encerrado}
                           aria-label={g.itens.length === 1
                             ? (taken ? `Desmarcar ${g.nome}` : `Marcar ${g.nome} como tomado`)
                             : (taken ? `Desmarcar ${g.nome}` : `Marcar próxima dose de ${g.nome}${proxima ? ` (${proxima.time})` : ""}`)}
-                          className={`w-5 h-5 mt-0.5 rounded border-2 flex items-center justify-center transition-all disabled:cursor-not-allowed ${taken ? "bg-[hsl(var(--saude-green))] border-[hsl(var(--saude-green))]" : "border-muted-foreground/30 hover:border-[hsl(var(--saude-green)/0.5)]"}`}
+                          className="group w-9 h-9 -mx-2 -mt-1.5 -mb-2 grid place-items-center rounded-lg disabled:cursor-not-allowed"
+                          data-testid={`remedio-caixa-${g.chave}`}
                         >
-                          {taken && <Check className="w-3 h-3 text-white" />}
+                          <span className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${taken ? "bg-[hsl(var(--saude-green))] border-[hsl(var(--saude-green))]" : "border-muted-foreground/30 group-hover:border-[hsl(var(--saude-green)/0.5)]"}`}>
+                            {taken && <Check className="w-3 h-3 text-white" />}
+                          </span>
                         </button>
                         {g.itens.length > 1 && tomadas.length > 0 && !taken && (
                           <span className="block mt-1 text-[10px] font-semibold text-muted-foreground tabular-nums text-center" data-testid="remedio-doses-feitas">{tomadas.length}/{doses.length}</span>
@@ -364,8 +380,28 @@ export const PharmacyChecklist = () => {
                             👤 {g.quem.trim()}
                           </span>
                         )}
-                        {detalhe && (
-                          <span className="block mt-1 text-[10px] text-muted-foreground" data-testid="remedio-detalhe">{detalhe}</span>
+                        {/* o lápis mora aqui, no fim da linha do detalhe (07/11, crítica: na grade das doses ele
+                            sobrava sozinho numa 3ª linha e deixava a linha alta) */}
+                        {(detalhe || !simples) && (
+                          <div className="mt-0.5 flex flex-wrap items-center gap-x-0.5">
+                            {/* cada pedaço inteiro ("6 em 6 h", "até 13/11"): quebra entre eles, nunca no meio */}
+                            {detalhe && (
+                              <span className="text-[10px] text-muted-foreground" data-testid="remedio-detalhe">
+                                {partesDoDetalhe.map((t, i) => <span key={i}>{i > 0 && " · "}<span className="whitespace-nowrap">{t}</span></span>)}
+                              </span>
+                            )}
+                            {!simples && (
+                              <button
+                                type="button"
+                                onClick={() => setEditando(abertoPraEditar ? null : g.chave)}
+                                aria-label={`Editar horários de ${g.nome}`}
+                                aria-pressed={abertoPraEditar}
+                                className={`h-8 w-8 -my-1.5 shrink-0 rounded-md flex items-center justify-center hover:text-foreground ${abertoPraEditar ? "text-foreground bg-muted" : "text-muted-foreground/60"}`}
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
                         )}
                       </td>
                       <td className="px-1 py-3 text-xs text-muted-foreground align-top">
@@ -379,36 +415,38 @@ export const PharmacyChecklist = () => {
                           />
                         ) : (
                           /* uma pílula por dose: toque marca aquela dose. 32 px de altura (07/11,
-                             crítica: com 24 px o dedo marcava a vizinha e o estoque descia junto) */
-                          <div className="flex flex-wrap items-center gap-1.5 max-w-[7.5rem]">
+                             crítica: com 24 px o dedo marcava a vizinha e o estoque descia junto).
+                             GRADE FIXA de 2 colunas (1 em tela de menos de 380 px, pra tabela caber),
+                             largura igual pra todas e 8 px entre as linhas
+                             (07/11, 3ª rodada): o ✓ largo mudava a arrumação debaixo do dedo; agora
+                             marcar só pinta a pílula e põe um selinho no canto, nada se mexe — e a
+                             área de toque de 44 px do app não chega na pílula de cima/baixo. */
+                          <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-x-1 gap-y-2 w-max" data-testid={`remedio-doses-${g.chave}`}>
                             {g.itens.map(s => {
-                              const t = takenToday.includes(s.id);
+                              const dose = doses.find(d => d.id === s.id);
+                              const t = !!dose && foiTomada(dose);
                               const daVez = !encerrado && !t && proxima?.id === s.id;
                               return (
                                 <button
                                   key={s.id}
                                   type="button"
-                                  disabled={encerrado || !doses.includes(s)}
-                                  onClick={() => toggleTaken(s.id)}
+                                  disabled={encerrado || !dose}
+                                  onClick={() => dose && toggleTaken(s.id, dose.dia)}
                                   aria-pressed={t}
                                   aria-label={t ? `Desmarcar dose das ${s.time} de ${g.nome}` : `Marcar dose das ${s.time} de ${g.nome}`}
                                   data-testid={`dose-${s.id}`}
                                   data-da-vez={daVez || undefined}
-                                  className={`h-8 min-w-[3.4rem] px-2 rounded-md border text-[11px] font-semibold tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${t ? "bg-[hsl(var(--saude-green))] border-[hsl(var(--saude-green))] text-white" : daVez ? "border-[hsl(var(--saude-green))] text-foreground" : "border-border text-muted-foreground hover:border-[hsl(var(--saude-green)/0.5)]"}`}
+                                  className={`relative h-8 w-[3.25rem] rounded-md border text-[11px] font-semibold tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${t ? "bg-[hsl(var(--saude-green))] border-[hsl(var(--saude-green))] text-white" : daVez ? "border-[hsl(var(--saude-green))] text-foreground" : "border-border text-muted-foreground hover:border-[hsl(var(--saude-green)/0.5)]"}`}
                                 >
-                                  {t && <Check className="inline w-2.5 h-2.5 mr-0.5 -mt-px" aria-hidden />}{s.time}
+                                  {s.time}
+                                  {t && (
+                                    <span aria-hidden className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-card border border-[hsl(var(--saude-green))] grid place-items-center">
+                                      <Check className="w-2 h-2 text-[hsl(var(--saude-green))]" strokeWidth={3.5} />
+                                    </span>
+                                  )}
                                 </button>
                               );
                             })}
-                            <button
-                              type="button"
-                              onClick={() => setEditando(abertoPraEditar ? null : g.chave)}
-                              aria-label={`Editar horários de ${g.nome}`}
-                              aria-pressed={abertoPraEditar}
-                              className={`h-8 w-7 rounded-md flex items-center justify-center hover:text-foreground ${abertoPraEditar ? "text-foreground bg-muted" : "text-muted-foreground/60"}`}
-                            >
-                              <Pencil className="w-3 h-3" />
-                            </button>
                           </div>
                         )}
                       </td>

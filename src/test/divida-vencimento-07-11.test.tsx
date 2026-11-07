@@ -127,6 +127,8 @@ describe("Dívidas entre pessoas: vencimento opcional (07/11)", () => {
     expect(within(linha("Antiga")).queryByTestId("prazo-da-divida")).toBeNull();
 
     expect(within(linha("Atrasada")).getByTestId("selo-atrasada")).toHaveTextContent("atrasada");
+    // rounded-full na própria classe: é o que o modo escuro reconhece como selo e mantém vermelho forte (styles/escuro.css)
+    expect(within(linha("Atrasada")).getByTestId("selo-atrasada").className.split(" ")).toContain("rounded-full");
     expect(linha("Atrasada")).toHaveTextContent("venceu há 3 dias");
 
     expect(within(linha("Hoje")).getByTestId("selo-vence-hoje")).toHaveTextContent("vence hoje");

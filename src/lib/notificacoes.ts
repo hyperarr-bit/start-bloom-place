@@ -861,9 +861,18 @@ export type RemedioAgendavel = {
   id: string; nome: string; hora: string; tomadoHoje: boolean;
   /** 07/11: último dia desta dose ("AAAA-MM-DD") — depois dele o aviso não existe (lib/remedios, ultimoDiaDaDose) */
   ate?: string;
+  /** 07/11: a dose de AMANHÃ já foi marcada (a das 00:00 tomada às 23:50 grava no dia em que acontece) */
+  tomadoAmanha?: boolean;
+  /** 07/11: momento da 1ª dose do tratamento ("AAAA-MM-DDTHH:MM") — antes dele não há aviso */
+  desde?: string;
 };
 
 const diaValido = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+/** "2026-11-07T20:00" → ms (ou -Infinity: sem início, vale desde sempre) */
+const msDoDesde = (v: unknown): number => {
+  const m = typeof v === "string" ? /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(v) : null;
+  return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], 0, 0).getTime() : -Infinity;
+};
 
 /** "Ômega 3", "Ômega 3 e Vitamina D", "A, B e C", "A, B, C e mais 2". */
 const listarNomes = (nomes: string[]) => {
@@ -895,6 +904,7 @@ const listarNomes = (nomes: string[]) => {
  */
 export function planejarRemedios(lista: RemedioAgendavel[], agora = new Date()): Planejado[] {
   const hoje = localDia(agora);
+  const amanha = localDia(new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + 1));
   const porHorario = new Map<string, RemedioAgendavel[]>();
   lista
     .filter((r) => r?.nome && /^\d{1,2}:\d{2}$/.test(r?.hora ?? ""))
@@ -908,9 +918,11 @@ export function planejarRemedios(lista: RemedioAgendavel[], agora = new Date()):
       if (quando.getTime() <= agora.getTime()) continue;
       const dia = localDia(quando);
       const ehHoje = dia === hoje;
-      // (07/11) `ate` aqui é o último dia DESTA dose (lib/remedios, dosesEmVigor): depois dele ela sai do aviso
+      // (07/11) `ate` aqui é o último dia DESTA dose (lib/remedios, dosesEmVigor): depois dele ela sai do aviso;
+      // antes do `desde` (a 1ª dose do tratamento) ela ainda não existe; a de amanhã já marcada também sai
       const nomes = (porHorario.get(hora) ?? [])
-        .filter((r) => !(ehHoje && r.tomadoHoje) && !(diaValido(r.ate) && dia > r.ate))
+        .filter((r) => !(ehHoje && r.tomadoHoje) && !(dia === amanha && r.tomadoAmanha)
+          && !(diaValido(r.ate) && dia > r.ate) && quando.getTime() >= msDoDesde(r.desde))
         .map((r) => r.nome);
       if (!nomes.length) continue;
       avisos.push({

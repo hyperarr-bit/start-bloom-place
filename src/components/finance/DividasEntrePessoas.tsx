@@ -395,8 +395,9 @@ export const DividasEntrePessoas = ({ perfil = PERFIL_PESSOAL, perfis = [], onRe
                         </span>
                       )}
                       {/* Prazo (07/11): o selo só nos dois casos que pedem ação hoje; o resto vai na linha de baixo */}
+                      {/* `rounded-full` na própria classe (07/11): é o que o modo escuro reconhece como selo e mantém o vermelho forte (styles/escuro.css) */}
                       {prazo?.tom === "atrasada" && (
-                        <span className="category-badge bg-rose-500 text-white" data-testid="selo-atrasada">⚠ atrasada</span>
+                        <span className="category-badge rounded-full bg-rose-500 text-white" data-testid="selo-atrasada">⚠ atrasada</span>
                       )}
                       {prazo?.tom === "hoje" && (
                         <span className="category-badge bg-amber-500/15 text-amber-700 dark:text-amber-400" data-testid="selo-vence-hoje">vence hoje</span>

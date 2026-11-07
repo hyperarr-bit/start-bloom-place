@@ -227,10 +227,12 @@ describe("a caixa da linha marca a dose da hora", () => {
     expect(store.estado.dados[LOG]).toEqual({ "2026-11-08": ["b1"] });
     const plano = planejarRemedios(lerDadosDosLembretes(store.get).remedios);
     expect(plano[0].quando.getTime()).toBe(new Date(2026, 10, 8, 20, 0).getTime());
-    // com as duas marcadas, a caixa desmarca a da hora (a das 08:00), não a do cadastro
+    // a pílula das 20:00, às 08:05, é a de ONTEM à noite (o dia do tratamento começa às 20:00): grava em 07/11
     fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Dipirona (20:00)" }));
+    expect(store.estado.dados[LOG]).toEqual({ "2026-11-08": ["b1"], "2026-11-07": ["b0"] });
+    // com as duas marcadas, a caixa desmarca a da hora (a das 08:00), não a do cadastro
     fireEvent.click(screen.getByRole("button", { name: "Desmarcar Dipirona" }));
-    expect(store.estado.dados[LOG]).toEqual({ "2026-11-08": ["b0"] });
+    expect(store.estado.dados[LOG]).toEqual({ "2026-11-08": [], "2026-11-07": ["b0"] });
   });
 });
 
@@ -247,20 +249,21 @@ describe("a dose das 00:00 do último dia", () => {
     expect(de(new Date())).toHaveLength(21);
   });
 
-  it("às 00:10 do dia 14 dá pra marcar a das 00:00 (as outras ficam travadas); 'terminou' só às 08:00", () => {
+  it("às 00:10 do dia 14 dá pra marcar a das 00:00 (as do dia 13 seguem como estavam); 'terminou' só às 08:00", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(2026, 10, 14, 0, 10));
     const g = agruparRemedios(amox())[0];
     expect(tratamentoTerminou(g)).toBe(false);
-    expect(dosesDoGrupoAgora(g).map((s) => s.time)).toEqual(["00:00"]);
-    const store = criarStore({ [CHAVE]: amox() });
+    // ainda é o dia 13 do tratamento: as de 08:00 e 16:00 são as do dia 13; a das 00:00, a de agora
+    expect(dosesDoGrupoAgora(g).map((s) => `${s.time}@${s.dia}`)).toEqual(["08:00@2026-11-13", "16:00@2026-11-13", "00:00@2026-11-14"]);
+    const store = criarStore({ [CHAVE]: amox(), [LOG]: { "2026-11-13": ["a0", "a1"] } });
     const { unmount } = render(<MemoryRouter><store.Provedor><PharmacyChecklist /></store.Provedor></MemoryRouter>);
     expect(screen.getByTestId("remedio-detalhe").textContent).toBe("8 em 8 h · até 13/11");
-    expect(screen.getByTestId("dose-a0")).toBeDisabled();
+    expect(screen.getByTestId("dose-a0")).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId("dose-a2")).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (00:00)" }));
-    expect(store.estado.dados[LOG]).toEqual({ "2026-11-14": ["a2"] });
-    expect(screen.getByText("Amoxicilina").className).toContain("line-through"); // a dose que existia hoje foi
+    expect(store.estado.dados[LOG]).toEqual({ "2026-11-13": ["a0", "a1"], "2026-11-14": ["a2"] });
+    expect(screen.getByText("Amoxicilina").className).toContain("line-through"); // as 3 doses do último dia foram
     unmount();
 
     vi.setSystemTime(new Date(2026, 10, 14, 8, 0));

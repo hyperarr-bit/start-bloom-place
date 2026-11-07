@@ -477,7 +477,8 @@ const FormReuniao = ({ contato, onMarcar, onCancelar }: { contato: Contact; onMa
         </select>
         <Input placeholder="Onde? (opcional)" value={local} onChange={e => setLocal(e.target.value)} className="h-8 text-xs" aria-label="Local da reunião" />
       </div>
-      <Textarea value={notas} onChange={e => setNotas(e.target.value)} placeholder="Notas (opcional): pauta, telefone…" rows={2} className="min-h-[56px] text-xs resize-none" aria-label="Notas da reunião" />
+      {/* 3 linhas no mínimo e cresce com o texto (07/11, crítica: assunto + telefone nascem em 3 linhas e o "Tel:" saía cortado) */}
+      <Textarea value={notas} onChange={e => setNotas(e.target.value)} placeholder="Notas (opcional): pauta, telefone…" rows={Math.min(6, Math.max(3, notas.split("\n").length))} className="min-h-[84px] text-xs resize-none" aria-label="Notas da reunião" />
       <div className="flex gap-2">
         <Button size="sm" onClick={marcar} className="h-8 text-xs flex-1 bg-sky-600 hover:bg-sky-700 text-white">Marcar na Rotina</Button>
         <Button size="sm" variant="ghost" onClick={onCancelar} className="h-8 text-xs">Cancelar</Button>
@@ -617,24 +618,26 @@ const Networking = () => {
           )}
           {visiveis.map(c => (
             <div key={c.id} className="px-3 py-2 hover:bg-muted/30 transition-colors">
+              {/* o texto usa a largura toda do card; botões e "último contato" numa linha própria embaixo
+                  (07/11, crítica: à direita eles tomavam metade da linha e cortavam nome, empresa e assunto) */}
               <div className="flex items-start gap-2">
                 <span className="text-sm shrink-0 leading-5">{catEmoji[c.category]}</span>
                 <div className="flex-1 min-w-0 space-y-0.5">
                   <p className="text-xs font-medium truncate">{c.name}</p>
                   {(c.role || c.company) && <p className="text-[10px] text-muted-foreground truncate">{[c.role, c.company].filter(Boolean).join(" @ ")}</p>}
                   {(c.onde || c.conheceuEm) && <p className="text-[10px] text-muted-foreground truncate">📍 {[c.onde, c.conheceuEm ? dataCurtaCarreira(c.conheceuEm) : ""].filter(Boolean).join(" · ")}</p>}
-                  {c.assunto && <p className="text-[10px] text-primary truncate">→ {c.assunto}</p>}
+                  {c.assunto && <p className="text-[10px] text-primary line-clamp-2 break-words">→ {c.assunto}</p>}
                   {c.phone && <a href={`tel:${c.phone.replace(/[^\d+]/g, "")}`} className="block text-[10px] text-primary underline decoration-dotted underline-offset-2 truncate">📞 {c.phone}</a>}
                 </div>
-                <div className="flex flex-col items-end gap-1 shrink-0">
-                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">último contato {dataCurtaCarreira(c.lastContact)}</span>
-                  {/* 32 px por botão e a lixeira afastada (07/11, crítica: com 24 px colados, apagava querendo editar) */}
-                  <div className="flex gap-1">
-                    {c.linkedin && <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`LinkedIn de ${c.name}`} onClick={() => window.open(c.linkedin, "_blank")}><Link2 className="w-3 h-3" /></Button>}
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-sky-700 dark:text-sky-300" aria-label={`Marcar reunião com ${c.name}`} aria-pressed={marcando === c.id} onClick={() => setMarcando(marcando === c.id ? null : c.id)}><CalendarPlus className="w-3.5 h-3.5" /></Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Editar ${c.name}`} onClick={() => editar(c)}><Edit2 className="w-3 h-3" /></Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 ml-1 text-destructive/70 hover:text-destructive" aria-label={`Apagar ${c.name}`} onClick={() => apagar(c)}><Trash2 className="w-3 h-3" /></Button>
-                  </div>
+              </div>
+              <div className="mt-1 pl-6 flex items-center justify-between gap-2">
+                <span className="text-[10px] text-muted-foreground whitespace-nowrap">último contato {dataCurtaCarreira(c.lastContact)}</span>
+                {/* 32 px por botão e a lixeira afastada (07/11, crítica: com 24 px colados, apagava querendo editar) */}
+                <div className="flex gap-1">
+                  {c.linkedin && <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`LinkedIn de ${c.name}`} onClick={() => window.open(c.linkedin, "_blank")}><Link2 className="w-3 h-3" /></Button>}
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-sky-700 dark:text-sky-300" aria-label={`Marcar reunião com ${c.name}`} aria-pressed={marcando === c.id} onClick={() => setMarcando(marcando === c.id ? null : c.id)}><CalendarPlus className="w-3.5 h-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Editar ${c.name}`} onClick={() => editar(c)}><Edit2 className="w-3 h-3" /></Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 ml-1 text-destructive/70 hover:text-destructive" aria-label={`Apagar ${c.name}`} onClick={() => apagar(c)}><Trash2 className="w-3 h-3" /></Button>
                 </div>
               </div>
               {marcando === c.id && <FormReuniao contato={c} onMarcar={novo => marcarReuniao(c, novo)} onCancelar={() => setMarcando(null)} />}

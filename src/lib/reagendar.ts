@@ -29,7 +29,7 @@ import { mesCorrenteId } from "@/lib/virada-contas";
 import { chaveArquivada } from "@/lib/virada-do-mes";
 import type { PrefsNotificacoes } from "@/lib/prefs-notificacoes";
 import { nomeComQuem } from "@/lib/saude-dependentes";
-import { dosesEmVigor, ehDia as ehDiaDeRemedio } from "@/lib/remedios";
+import { dosesEmVigor, ehDia as ehDiaDeRemedio, ehInicio } from "@/lib/remedios";
 import { localDayKey } from "@/lib/utils";
 import { algumLigado, lerDadosDoSkincare, type DadosDoSkincare } from "@/lib/beleza-lembrete";
 // 17/10 (1.0.16, "Rotina pronta em 3 toques"): o lembrete de manhã da Rotina — prefs na chave própria
@@ -158,9 +158,14 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
   const diarioDieta = get<Record<string, { meals?: Record<string, unknown> }>>("dieta-diary-v2", {}) ?? {};
 
   // Remédios (07/09): a lista do PharmacyChecklist + o log de "tomado hoje"
-  type Suplemento = { id?: string; name?: string; time?: string; quem?: string; ate?: string; grupo?: string };
+  type Suplemento = { id?: string; name?: string; time?: string; quem?: string; ate?: string; grupo?: string; inicio?: string };
   const suplementos = get<Suplemento[]>("core-saude-supplements", []) ?? [];
-  const tomadosHoje = (get<Record<string, string[]>>("core-saude-supplement-log", {}) ?? {})[hoje] ?? [];
+  const logRemedio = get<Record<string, string[]>>("core-saude-supplement-log", {}) ?? {};
+  const tomadosHoje = logRemedio[hoje] ?? [];
+  // (07/11) a dose das 00:00 marcada às 23:50 grava no dia em que acontece (amanhã): o aviso dela sai da fila
+  const amanhaDate = new Date();
+  amanhaDate.setDate(amanhaDate.getDate() + 1);
+  const tomadosAmanha = logRemedio[localDayKey(amanhaDate)] ?? [];
   // (07/11) tratamento com data de fim já passada não entra no plano; a dose da noite do último dia, sim (lib/remedios)
   const remedios: RemedioAgendavel[] = dosesEmVigor((Array.isArray(suplementos) ? suplementos : []).filter((s) => s?.name && s?.time))
     .map((s) => ({
@@ -169,7 +174,9 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
       nome: nomeComQuem(String(s.name), s.quem),
       hora: String(s.time),
       tomadoHoje: Array.isArray(tomadosHoje) && tomadosHoje.includes(String(s.id)),
+      ...(Array.isArray(tomadosAmanha) && tomadosAmanha.includes(String(s.id)) ? { tomadoAmanha: true } : {}),
       ...(ehDiaDeRemedio(s.ate) ? { ate: s.ate } : {}),
+      ...(ehInicio(s.inicio) ? { desde: s.inicio } : {}),
     }));
 
   /* FATURA DO CARTÃO no aviso de conta a vencer (22/09): a mesma conta da

@@ -312,11 +312,16 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
     const { dueDays: reais, faturas: marcadas } = extrairFaturas(lista, dueDays as any[]);
     setDueDays(reais as any[]);
     if (!marcadas.length) return;
-    // a estimativa só segue a fatura que MUDOU (tocar outra conta devolve todas as faturas de novo)
+    /* SÓ A FATURA QUE MUDOU. Tocar em qualquer conta devolve TODAS as faturas da lista, com o estado
+       delas. A estimativa já seguia só as que mudaram; o "paguei" ia com a lista inteira — e
+       `marcarFaturas` remarca as parcelas do cartão a cada fatura "paga" que recebe: a parcela que a
+       pessoa tinha DESMARCADO voltava a paga no ✓ da Luz (07/11, bug "parcela-sozinha"). Nada mudou
+       nas faturas = nada a gravar em `finance-faturas-pagas`. */
     const mudaram = marcadas.filter((m) => (faturas.find((f) => f.card === m.card)?.paga ?? false) !== m.paga);
+    if (!mudaram.length) return;
     const fixosNovos = comEstimativasMarcadas(fixedExpenses as any[], mudaram);
     if (fixosNovos !== fixedExpenses) setFixedExpenses(fixosNovos as any[]);
-    marcarFaturas(marcadas);
+    marcarFaturas(mudaram);
   };
   /** "Paguei" das faturas: o `finance-faturas-pagas` + as parcelas daquele cartão no mês (22/09). */
   const marcarFaturas = (marcadas: { card: string; paga: boolean }[]) => {

@@ -153,3 +153,42 @@ export const statusDoPodeGastar = (
   const idealPerDay = totalIncome > 0 ? (totalIncome - fixedCostsRecorded) / daysInMonth : 0;
   return base.cantSpend ? "danger" : base.perDay > idealPerDay * 0.8 ? "good" : "warning";
 };
+
+/**
+ * PREVISÃO DO FIM DO MÊS (07/11, bug "pergunte-ritmo") — a conta saiu de dentro do Dashboard pra cá, pro
+ * Pergunte ao CORE ("Tô melhor que mês passado?") usar a MESMA. O Pergunte multiplicava a saída inteira
+ * (aluguel, parcelas e avulsas junto) pelos dias do mês: no dia 7, com aluguel de R$ 2.000, "fecha em
+ * ~R$ 9.000" enquanto o Dashboard dizia "sobra R$ 571".
+ *
+ * Só as VARIÁVEIS seguem o ritmo do dia. Fixos, parcelas (valor fixo do mês) e contas avulsas com valor
+ * (17/10) já estão inteiros em `monthlyOutflow` e entram uma vez. A avulsa SEM valor ainda não está na
+ * saída: entra pela estimativa de computeUnpaidOutsideOutflow (o mesmo número do "quanto posso gastar").
+ */
+export const previsaoDoMes = ({
+  totalIncome, monthlyOutflow, fixedExpenses, monthlyInstallments, dueDays, agora = new Date(),
+}: {
+  totalIncome: number;
+  /** A saída do mês (computeMonthlyOutflow) — fixos + variáveis + parcelas + avulsas. */
+  monthlyOutflow: number;
+  fixedExpenses: any[];
+  monthlyInstallments: number;
+  dueDays: any[];
+  agora?: Date;
+}) => {
+  const day = agora.getDate();
+  const daysInMonth = new Date(agora.getFullYear(), agora.getMonth() + 1, 0).getDate();
+  const remainingDays = daysInMonth - day;
+  const fixedCostsRecorded = (fixedExpenses ?? []).reduce((s: number, e: any) => s + (e?.value || 0), 0);
+  const variableSpent = Math.max(0, monthlyOutflow - fixedCostsRecorded - monthlyInstallments - computeLooseBillsOutflow(dueDays, fixedExpenses));
+  const dailyVariableRate = day > 0 ? variableSpent / day : 0;
+  const projectedVariableRemaining = dailyVariableRate * remainingDays;
+  const unpaidBillsEstimate = computeUnpaidOutsideOutflow(dueDays, fixedExpenses);
+  /** Quanto o mês fecha de saída nesse ritmo. */
+  const saidaProjetada = monthlyOutflow + unpaidBillsEstimate + projectedVariableRemaining;
+  return {
+    day, daysInMonth, remainingDays, fixedCostsRecorded, variableSpent, dailyVariableRate,
+    projectedVariableRemaining, unpaidBillsEstimate, saidaProjetada,
+    projectedBalance: totalIncome - saidaProjetada,
+    totalAlreadySpent: monthlyOutflow,
+  };
+};

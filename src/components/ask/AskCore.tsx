@@ -6,7 +6,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { parPadrao, totaisDoMes } from "@/components/finance/MonthComparison";
-import { computeDailyBudget } from "@/lib/finance-totals";
+import { computeDailyBudget, previsaoDoMes } from "@/lib/finance-totals";
 import { perfilAtivoLocal } from "@/lib/finance-perfil";
 import { trackEvent } from "@/lib/analytics";
 
@@ -216,9 +216,13 @@ const QUESTIONS: Question[] = [
       if (prevOutflow <= 0 && prev.receitas <= 0) {
         return `Ainda não tenho ${prevMonth} registrado pra comparar. A partir do mês que vem essa resposta fica boa.`;
       }
-      const today = new Date().getDate();
-      const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-      const paceOutflow = (ctx.monthlyOutflow / today) * daysInMonth;
+      // (07/11, bug "pergunte-ritmo") o ritmo é o da PREVISÃO DO FIM DO MÊS do Dashboard (lib/finance-totals
+      // `previsaoDoMes`): só as variáveis seguem o passo do dia. Multiplicar a saída inteira pelos dias do mês
+      // projetava o aluguel de novo a cada semana ("fecha em ~R$ 9.000" no dia 7 com R$ 100 de gasto).
+      const paceOutflow = previsaoDoMes({
+        totalIncome: ctx.totalIncome, monthlyOutflow: ctx.monthlyOutflow, fixedExpenses: ctx.fixedExpenses,
+        monthlyInstallments: ctx.monthlyInstallments, dueDays: ctx.dueDays,
+      }).saidaProjetada;
       const better = paceOutflow < prevOutflow;
       return `${prevMonth}: ${fmt(prevOutflow)} de gastos.\nEste mês até agora: ${fmt(ctx.monthlyOutflow)} — no ritmo atual, fecha em ~${fmt(paceOutflow)}.\n\n${better ? "✅ Sim! Nesse passo você gasta MENOS que mês passado." : `⚠️ No ritmo atual, passa ${fmt(paceOutflow - prevOutflow)} do mês anterior. Dá tempo de frear.`}`;
     },

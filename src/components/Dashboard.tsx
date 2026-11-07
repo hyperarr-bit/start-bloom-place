@@ -15,7 +15,7 @@ import { AlertTriangle, Bell, CheckCircle, TrendingUp, TrendingDown, Calendar, D
 import { getCurrentYear } from "@/components/finance/storage-keys";
 import { totaisDoMes } from "@/components/finance/MonthComparison";
 import { perfilAtivoLocal } from "@/lib/finance-perfil";
-import { computeDailyBudget, computeLooseBillsOutflow, computeUnpaidOutsideOutflow, statusDoPodeGastar } from "@/lib/finance-totals";
+import { computeDailyBudget, previsaoDoMes, statusDoPodeGastar } from "@/lib/finance-totals";
 import { useAuth } from "@/hooks/use-auth";
 import { useMesCorrente, useVersaoDaVirada } from "@/hooks/use-virada-do-mes";
 import { useFinanceCategories } from "@/lib/finance-categories";
@@ -423,34 +423,11 @@ export const Dashboard = ({
   // Logic: totalExpenses already includes fixedExpenses that are recorded.
   // We only need to project future variable spending + unpaid bills NOT yet in totalExpenses.
   const forecast = useMemo(() => {
-    const now = new Date();
-    const day = now.getDate();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const remainingDays = daysInMonth - day;
-
-    // Fixed costs already recorded (these are already inside totalExpenses)
-    const fixedCostsRecorded = fixedExpenses.reduce((s, e) => s + e.value, 0);
-
-    // Variable expenses = totalExpenses minus fixed costs and installments
-    // (parcelas são valor fixo do mês — não entram no ritmo diário projetado;
-    // 17/10: nem as contas avulsas do MEU MÊS, que agora estão em totalExpenses)
-    const variableSpent = Math.max(0, totalExpenses - fixedCostsRecorded - monthlyInstallments - computeLooseBillsOutflow(dueDays, fixedExpenses));
-    const dailyVariableRate = day > 0 ? variableSpent / day : 0;
-    const projectedVariableRemaining = dailyVariableRate * remainingDays;
-
-    // Unpaid bills: obrigações futuras ainda fora de totalExpenses — cálculo
-    // compartilhado em lib/finance-totals (mesmo número no Pergunte ao CORE).
-    // Só as avulsas: conta de fixo e fatura já estão em totalExpenses (26/09).
-    const unpaidBillsEstimate = computeUnpaidOutsideOutflow(dueDays, fixedExpenses);
-
-    // Projected balance = income - what's already spent - future bills - future variable
-    const projectedBalance = totalIncome - totalExpenses - unpaidBillsEstimate - projectedVariableRemaining;
-
-    return {
-      projectedBalance, dailyVariableRate, remainingDays, daysInMonth, day,
-      fixedCostsRecorded, unpaidBillsEstimate, variableSpent, projectedVariableRemaining,
-      totalAlreadySpent: totalExpenses,
-    };
+    // (07/11, bug "pergunte-ritmo") a conta mora em lib/finance-totals `previsaoDoMes` — a mesma do Pergunte ao
+    // CORE. Só as variáveis seguem o ritmo do dia (parcelas são valor fixo do mês; 17/10: nem as contas avulsas
+    // do MEU MÊS, que já estão em totalExpenses); as contas sem valor entram pela estimativa
+    // (computeUnpaidOutsideOutflow — conta de fixo e fatura já estão em totalExpenses, 26/09).
+    return previsaoDoMes({ totalIncome, monthlyOutflow: totalExpenses, fixedExpenses, monthlyInstallments, dueDays });
   }, [totalIncome, totalExpenses, fixedExpenses, dueDays, monthlyInstallments]);
 
   // Daily budget: how much you can spend per day

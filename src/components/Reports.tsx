@@ -38,7 +38,15 @@ interface FixedExpense {
 
 interface ReportsProps {
   incomes: Income[];
+  /** O balde CRU do mês — só pro ImportExtrato, que edita a lista (07/11). Os números do relatório vêm de
+   *  `despesasDoMes`. */
   expenses: Expense[];
+  /** Os gastos que CONTAM no mês pela regra da fatura (Index: `variaveisMes.noMes`, a mesma lista do
+   *  Dashboard e dos LIMITES). Ausente = o balde cru (quem não tem cartão com fechamento). */
+  despesasDoMes?: Expense[];
+  /** Contas avulsas do MEU MÊS com valor (lib/finance-totals listarContasAvulsasDoMes) — já estão no
+   *  `totalExpenses` desde 17/10. Ausente = nenhuma. */
+  contasAvulsas?: { day: number; bill: { id: string; name?: string; value: number; category?: string; paymentMethod?: string } }[];
   totalIncome: number;
   totalExpenses: number;
   totalDebts: number;
@@ -83,7 +91,7 @@ const reais = (v: number) => {
 /** Uma linha de despesa do relatório: gasto do dia a dia, custo fixo ou parcela. */
 export interface LinhaDeDespesa {
   id: string;
-  tipo: "Variável" | "Fixo" | "Parcela";
+  tipo: "Variável" | "Fixo" | "Parcela" | "Conta";
   descricao: string;
   /** "10 de 12" pra parcela, "vence dia 5" pro fixo */
   detalhe?: string;
@@ -100,7 +108,9 @@ export interface LinhaDeDespesa {
  * dia (R$ 464) — o relatório não fechava. Agora os três tipos entram, cada
  * um marcado.
  */
-export const linhasDeDespesa = (expenses: Expense[], fixos: FixedExpense[], parcelas: Parcela[]): LinhaDeDespesa[] => [
+export const linhasDeDespesa = (
+  expenses: Expense[], fixos: FixedExpense[], parcelas: Parcela[], avulsas: ReportsProps["contasAvulsas"] = [],
+): LinhaDeDespesa[] => [
   ...(expenses ?? []).map((e): LinhaDeDespesa => ({
     id: `v-${e.id}`, tipo: "Variável", descricao: e.description, categoria: e.category || "outros",
     valor: Number(e.value) || 0, data: e.date, pagamento: e.paymentMethod,
@@ -114,6 +124,11 @@ export const linhasDeDespesa = (expenses: Expense[], fixos: FixedExpense[], parc
     categoria: p.category === "roupa" ? "vestuario" : p.category || "outros",
     valor: valorDaParcelaNoMes(p), detalhe: `${parcelaDoMes(p)} de ${p.totalInstallments}`,
     data: p.date, pagamento: "credito",
+  })),
+  /* (07/11) Conta avulsa do MEU MÊS: entra no card desde 17/10 e aqui sumia dentro do "dia a dia". */
+  ...(avulsas ?? []).map(({ day, bill }): LinhaDeDespesa => ({
+    id: `c-${bill.id}`, tipo: "Conta", descricao: bill.name || "Conta", categoria: bill.category || "outros",
+    valor: Number(bill.value) || 0, detalhe: Number.isInteger(day) ? `vence dia ${day}` : undefined, pagamento: bill.paymentMethod,
   })),
 ];
 
@@ -186,6 +201,8 @@ export const montarHtmlDoRelatorio = (mes: string, corpo: string) => `
 export const Reports = ({
   incomes,
   expenses,
+  despesasDoMes,
+  contasAvulsas,
   totalIncome,
   totalExpenses,
   totalDebts,
@@ -214,13 +231,16 @@ export const Reports = ({
   const fixos = fixedExpenses ?? doPerfil(lista<FixedExpense>(get("finance-fixed-expenses", [])), perfil);
   const parcelas = installments ?? doPerfil(lista<Parcela>(get("finance-installments", [])), perfil);
 
-  const despesas = linhasDeDespesa(expenses, fixos, parcelas);
+  /* (07/11, bug "relatorio-fatura") Categorias, lista e CSV/Imprimir saem dos gastos que CONTAM no mês pela regra
+     da fatura — os mesmos do card "Despesas". Antes vinha o balde cru: com cartão que fecha dia 25, a TV de 28/10
+     (fatura de novembro) ficava fora das categorias e o cinema de 26/11 (fatura de dezembro) entrava, e o
+     "dia a dia" fechava com o card só na marra, por subtração. Agora cada parte é a soma da sua lista. */
+  const despesas = linhasDeDespesa(despesasDoMes ?? expenses, fixos, parcelas, contasAvulsas);
+  const somaDo = (tipo: LinhaDeDespesa["tipo"]) => despesas.filter((d) => d.tipo === tipo).reduce((s, d) => s + d.valor, 0);
   const totalFixos = fixos.reduce((s, f) => s + (Number(f.value) || 0), 0);
   const totalParcelas = somaParcelasDoMes(parcelas);
-  // O dia a dia é o que sobra do total oficial: assim os três somam EXATAMENTE
-  // o "Despesas" de cima, mesmo com compra no crédito que foi pra fatura do
-  // mês que vem (regra da fatura, lib/finance-fatura).
-  const totalDiaADia = Math.max(0, totalExpenses - totalFixos - totalParcelas);
+  const totalDiaADia = somaDo("Variável");
+  const totalAvulsas = somaDo("Conta");
 
   // Group expenses by category (dia a dia + fixos + parcelas)
   const expensesByCategory = despesas.reduce((acc, d) => {
@@ -339,6 +359,7 @@ export const Reports = ({
         {/* De onde vem o "Despesas": os três somam o número do card (26/09) */}
         <p className="text-[11px] text-muted-foreground mb-6" data-testid="despesas-composicao">
           Despesas = custos fixos {reais(totalFixos)} + dia a dia {reais(totalDiaADia)} + parcelas {reais(totalParcelas)}
+          {totalAvulsas > 0 ? ` + contas avulsas ${reais(totalAvulsas)}` : ""}
         </p>
 
         {/* Expenses by Category */}
@@ -412,7 +433,7 @@ export const Reports = ({
                         {d.descricao}
                         {d.tipo !== "Variável" && (
                           <span className="block text-[10px] text-muted-foreground">
-                            {d.tipo === "Fixo" ? "custo fixo" : "parcela"}{d.detalhe ? ` · ${d.detalhe}` : ""}
+                            {d.tipo === "Fixo" ? "custo fixo" : d.tipo === "Conta" ? "conta do mês" : "parcela"}{d.detalhe ? ` · ${d.detalhe}` : ""}
                           </span>
                         )}
                       </td>

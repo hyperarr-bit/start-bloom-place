@@ -78,6 +78,17 @@ const temValor = (b: any) => typeof b?.value === "number" && b.value > 0;
 export const computeLooseBillsOutflow = (dueDays: any[], fixedExpenses: any[]): number =>
   contasAvulsas(dueDays, fixedExpenses).reduce((s: number, b: any) => s + (temValor(b) ? b.value : 0), 0);
 
+/** As MESMAS contas que computeLooseBillsOutflow soma, uma a uma e com o dia em que vencem (07/11, bug
+ *  "relatorio-fatura"): o RELATÓRIOS lista cada uma como linha própria, em vez de escondê-las dentro do
+ *  "dia a dia". A soma dos `value` desta lista é sempre igual a computeLooseBillsOutflow. */
+export const listarContasAvulsasDoMes = (dueDays: any[], fixedExpenses: any[]): { day: number; bill: any }[] => {
+  const fixos = new Set((fixedExpenses ?? []).map((f: any) => f?.id).filter(Boolean));
+  return (dueDays ?? []).flatMap((d: any) =>
+    (Array.isArray(d?.bills) ? d.bills : [])
+      .filter((b: any) => b && !jaNaSaidaPorOutroTermo(b, fixos) && temValor(b))
+      .map((bill: any) => ({ day: d?.day, bill })));
+};
+
 /** Avulsas de um mês que NÃO é o corrente (arquivo do mês passado, planilha
  *  de mês futuro). Conta nascida de custo fixo (`fixedId`) nunca entra aqui:
  *  o retrato dos fixos daquele mês pode não existir (antes de 26/09 ninguém

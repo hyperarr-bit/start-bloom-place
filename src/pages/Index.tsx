@@ -56,7 +56,7 @@ import { CategoryBudgets } from "@/components/CategoryBudgets";
 import { MonthComparison } from "@/components/finance/MonthComparison";
 import { YearComparison } from "@/components/finance/YearComparison";
 import { TrackedCard } from "@/components/admin/TrackedCard";
-import { computeLooseBillsOutflow, computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
+import { computeLooseBillsOutflow, computeMonthlyOutflow, computeSavingsRate, listarContasAvulsasDoMes } from "@/lib/finance-totals";
 import { syncFixedExpensesToBills } from "@/lib/finance-sync";
 import { usarListaDoPerfil, usarDueDaysDoPerfil, mesclarPerfil, mesclarPerfilDueDays, doPerfil, devolverAoPessoal, registrarPerfis, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
 import { type Parcela, viradaDeParcelas, mesesAnteriores, chaveArquivadaDeParcelas, somaParcelasDoMes, somarMeses, marcarParcelaDoMes, parcelaPagaNoMes, valorDaParcelaNoMes } from "@/lib/finance-parcelas";
@@ -429,8 +429,8 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   // conta é a de sempre (lib/finance-fatura).
   const variaveisMes = variaveisDoMes(expenses, expensesAnterior, mesAgora, configOf);
   // (07/11, bug "dois-numeros") `variaveisMes.noMes` é a lista que CONTA no mês: vai pro Dashboard (gráfico por
-  // categoria, top 5, por pagamento) e pros LIMITES, pra fechar com o "Despesas". `expenses` cru segue só pras
-  // listas que EDITAM (tabela, importação, relatórios) e pras que são por DATA (calendário, desafio da semana,
+  // categoria, top 5, por pagamento), pros LIMITES e pro RELATÓRIOS (`despesasDoMes`), pra fechar com o "Despesas".
+  // `expenses` cru segue só pras listas que EDITAM (tabela, importação) e pras que são por DATA (calendário, desafio da semana,
   // e no Dashboard `lancados`: ÚLTIMAS TRANSAÇÕES e o "mês em uso" do elogio da poupança).
   const totalVariableExpenses = variaveisMes.total;
   /* 17/10 — o que ela gastou HOJE (variáveis que contam neste mês): a linha "Sobram R$ X pra hoje" do card
@@ -955,9 +955,13 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
 
         {activeTab === "relatorios" && (
           <TrackedCard cardKey="reports" tab="relatorios">
+            {/* (07/11, bug "relatorio-fatura") `expenses` cru só pro ImportExtrato; os números saem de
+                `despesasDoMes` (regra da fatura) + as contas avulsas — o mesmo que o `monthlyOutflow` soma. */}
             <Reports
               incomes={incomes}
               expenses={expenses}
+              despesasDoMes={variaveisMes.noMes}
+              contasAvulsas={listarContasAvulsasDoMes(dueDays as any[], fixedExpenses)}
               totalIncome={totalIncome}
               totalExpenses={monthlyOutflow}
               totalDebts={totalDebts}

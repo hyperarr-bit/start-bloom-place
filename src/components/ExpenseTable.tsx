@@ -251,7 +251,10 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes, guar
       description: newExpense.description.trim(),
       category: newExpense.category || "outros",
       value: numeroBR(newExpense.value),
-      date: newExpense.date || dataDoGastoSemData(mesDaChave),
+      // (07/11, bug "virada-sem-data") a tabela do MÊS CORRENTE (quem passa a guarda: Index e a planilha do
+      // MÊS ATUAL) grava no balde: sem data é hoje, como sempre. O `mes` dela é do último desenho do pai e fica
+      // no mês velho se a tela atravessou a meia-noite do dia 1º — o dia 1 do mês velho arquivava o gasto lá.
+      date: newExpense.date || (guardarEmOutroMes ? localDayKey() : dataDoGastoSemData(mesDaChave)),
       paymentMethod: newExpense.paymentMethod || "pix",
       cardName: isCardPayment(newExpense.paymentMethod) ? (newExpense.cardName || "outro") : undefined,
       ...(!isCardPayment(newExpense.paymentMethod) && newExpense.conta ? { conta: newExpense.conta } : {}),

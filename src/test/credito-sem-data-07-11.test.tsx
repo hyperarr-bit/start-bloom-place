@@ -33,6 +33,7 @@ vi.mock("@/hooks/use-auth", () => ({
 import { mesDoGasto, variaveisDoMes, type CardConfig } from "@/lib/finance-fatura";
 import { faturasDoMes } from "@/lib/finance-faturas";
 import { ExpenseTable, dataDoGastoSemData } from "@/components/ExpenseTable";
+import { mesCorrenteId } from "@/lib/virada-contas";
 
 const cfg: Record<string, CardConfig> = { nubank: { closingDay: 25, dueDay: 5 } };
 const configOf = (c: string) => cfg[c];
@@ -176,5 +177,30 @@ describe("planilha de OUTRO mês: gasto sem data ganha o dia 1 daquele mês", ()
     const lista = await lancar("2026-09", { credito: true, data: "2026-09-28" });
     expect(lista[0].date).toBe("2026-09-28");
     expect(mesDoGasto(lista[0], configOf, "2026-09")).toBe("2026-10"); // depois do fechamento 25 → fatura de outubro, como sempre
+  });
+});
+
+/* ═══════════════ a tela do MÊS CORRENTE atravessando a virada (bug "virada-sem-data", 07/11) ═══════════════ */
+
+/** Como o Index (e a MonthlySheet do MÊS ATUAL): `mes` = mesCorrenteId() do último render DO PAI, e a guarda do
+ *  gasto futuro ligada. Digitar só re-renderiza a tabela — o `mes` fica o do último render do pai. */
+const TelaDoMesCorrente = ({ controle }: { controle: { lista: Gasto[] } }) => {
+  const [lista, setLista] = useState<Gasto[]>([]);
+  controle.lista = lista;
+  return <ExpenseTable expenses={lista} setExpenses={(l) => setLista(l as Gasto[])} mes={mesCorrenteId()} guardarEmOutroMes={() => null} />;
+};
+
+describe("Finanças aberta desde 30/11 23:59, gasto sem data lançado em 01/12", () => {
+  it("o gasto leva a data de HOJE (01/12), como antes do conserto do credito-sem-data — não 01/11", () => {
+    vi.setSystemTime(new Date(2026, 10, 30, 23, 59));
+    const controle = { lista: [] as Gasto[] };
+    const store = criarStore();
+    render(<UserDataContext.Provider value={store.valor}><TelaDoMesCorrente controle={controle} /></UserDataContext.Provider>);
+    vi.setSystemTime(new Date(2026, 11, 1, 8, 0)); // volta pro app de manhã, sem o Index desenhar de novo
+    fireEvent.change(screen.getByPlaceholderText("+ Novo gasto"), { target: { value: "Uber" } });
+    fireEvent.change(screen.getByPlaceholderText("Valor"), { target: { value: "25" } });
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar gasto" }));
+    // com 2026-11-01 a virada arquivava o Uber em novembro e ele sumia de dezembro
+    expect(controle.lista.map((g) => g.date)).toEqual(["2026-12-01"]);
   });
 });

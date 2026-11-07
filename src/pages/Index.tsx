@@ -1000,7 +1000,9 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
           monthlyInstallments,
           totalInvestments,
           totalDebts,
-          expenses,
+          // (07/11) a lista que CONTA no mês, a mesma dos LIMITES: "Como estão meus limites?" e "Onde tô
+          // vacilando?" somam as categorias por ela — sem isso o mesmo limite tinha dois números.
+          expenses: variaveisMes.noMes,
           fixedExpenses,
           dueDays,
           goals,

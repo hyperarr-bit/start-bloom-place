@@ -314,3 +314,23 @@ describe("dois-numeros (07/11): Dashboard — ÚLTIMAS TRANSAÇÕES e o elogio d
     expect(screen.queryByText(/Sua taxa de poupança é/)).toBeNull();
   });
 });
+
+/* ═══════════════ Pergunte ao CORE: o mesmo limite da aba LIMITES (crítica r1, 07/11) ═══════════════ */
+
+describe("dois-numeros (07/11): Pergunte ao CORE 'Como estão meus limites?' = aba LIMITES", () => {
+  it("Eletrônicos R$ 1.000 de R$ 500 (a TV de 28/10 é fatura de novembro), não 'R$ 0 … Tudo sob controle'", async () => {
+    const comLimite = { ...dados, "finance-category-budgets": { eletronicos: 500 } };
+    localStorage.setItem(lsKey("finance-category-budgets"), JSON.stringify({ eletronicos: 500 }));
+    render(
+      <MemoryRouter initialEntries={["/financas"]}>
+        <Provedor inicial={comLimite} loaded={false}>
+          <Routes><Route path="/financas" element={<Index />} /></Routes>
+        </Provedor>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Pergunte ao CORE" }));
+    fireEvent.click(screen.getByText(/Como estão meus limites/));
+    const resposta = await screen.findByText(/Eletrônicos: R\$/, {}, { timeout: 3000 });
+    expect(resposta.textContent).toMatch(/Eletrônicos: R\$ 1\.000(,00)? de R\$ 500/);
+  });
+});

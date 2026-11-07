@@ -40,6 +40,7 @@ export interface AskCtx {
   monthlyInstallments: number;
   totalInvestments: number;
   totalDebts: number;
+  /** Variáveis que CONTAM no mês (regra da fatura — Index `variaveisMes.noMes`), as mesmas dos LIMITES. */
   expenses: any[];
   fixedExpenses: any[];
   dueDays: any[];

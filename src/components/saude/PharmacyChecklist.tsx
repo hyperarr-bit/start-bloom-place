@@ -202,15 +202,19 @@ export const PharmacyChecklist = () => {
      O useLembretes reagenda sozinho a cada mudança de dado, mas ele roda no
      render seguinte — ANTES da permissão chegar no primeiro cadastro. Por isso
      o reagendamento explícito aqui, com um leitor que já enxerga a lista nova
-     (o `get` deste render ainda tem a lista antiga). */
-  const rearmarLembretes = async (lista: Supplement[], pedir: boolean) => {
+     (o `get` deste render ainda tem a lista antiga). `log`: o registro de "tomado"
+     novo, quando a mudança também mexeu nele (mudar a hora move as marcas) — senão o
+     rearme do toque lia o registro velho e, às 06:50 com 08:00 → 07:00, o aviso das
+     23:00 de hoje ficava fora da fila (crítica do conserto final 07/11). */
+  const rearmarLembretes = async (lista: Supplement[], pedir: boolean, log?: Record<string, string[]>) => {
     if (!isNativeShell()) return;
     if (pedir) {
       const ok = await pedirPermissao();
       trackEvent("lembrete_remedio_permissao", { concedida: ok, total: lista.length });
       if (!ok) return;
     } else if (!(await temPermissao())) return;
-    const leitor: Leitor = (k, fb) => (k === "core-saude-supplements" ? (lista as unknown as typeof fb) : get(k, fb));
+    const leitor: Leitor = (k, fb) => (k === "core-saude-supplements" ? (lista as unknown as typeof fb)
+      : log && k === "core-saude-supplement-log" ? (log as unknown as typeof fb) : get(k, fb));
     try { await reagendarTudo(leitor, lerPrefs(get<unknown>(CHAVE_PREFS, undefined))); } catch { /* sem plugin */ }
     await conferirAlarmeExato();
   };
@@ -297,22 +301,23 @@ export const PharmacyChecklist = () => {
     } else {
       lista = supplements.map(s => (s.id === id ? { ...s, time } : s));
     }
-    if (linha && doGrupo.length > 1) moverMarcas(linha.grupo!, lista);
+    const log = linha && doGrupo.length > 1 ? moverMarcas(linha.grupo!, lista) : undefined;
     setSupplements(lista);
-    void rearmarLembretes(lista, false);
+    void rearmarLembretes(lista, false, log);
   };
 
   /* 07/11 (4ª rodada da crítica): com as horas novas, a marca de "tomado" vai pro dia
      em que a dose acontece agora (lib/remedios, moverMarcasDoGrupo) — senão a das 00:00
      de ontem à noite, gravada hoje, aparecia como a das 23:00 de hoje e o aviso sumia.
-     A anotação de "marcado sem baixa" vai junto, pra desmarcar não criar comprimido. */
-  const moverMarcas = (grupo: string, lista: Supplement[]) => {
+     A anotação de "marcado sem baixa" vai junto, pra desmarcar não criar comprimido.
+     Devolve o registro novo (pro rearme dos avisos), ou nada se ele não mudou. */
+  const moverMarcas = (grupo: string, lista: Supplement[]): Record<string, string[]> | undefined => {
     const doGrupo = (l: Supplement[]) => agruparRemedios(l).find(g => g.chave === `g:${grupo}`);
     const antes = doGrupo(supplements);
     const depois = doGrupo(lista);
-    if (!antes || !depois) return;
+    if (!antes || !depois) return undefined;
     const { log, movidas } = moverMarcasDoGrupo(antes, depois, supplementLog, new Date());
-    if (!movidas.length && Object.keys(log).every(d => log[d] === supplementLog[d])) return;
+    if (!movidas.length && Object.keys(log).every(d => log[d] === supplementLog[d])) return undefined;
     setSupplementLog(log);
     let sb: SemBaixa = semBaixa?.dia && Array.isArray(semBaixa.ids) ? semBaixa : { dia: "", ids: [] };
     for (const m of movidas) {
@@ -321,6 +326,7 @@ export const PharmacyChecklist = () => {
       if (m.para && (sb.dia === m.para || !sb.ids.length)) sb = { dia: m.para, ids: [...(sb.dia === m.para ? sb.ids : []), m.id] };
     }
     if (sb !== semBaixa) setSemBaixa(sb);
+    return log;
   };
 
   /** "Até quando" do grupo inteiro; vazio = sem fim. */

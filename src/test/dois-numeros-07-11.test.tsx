@@ -106,6 +106,7 @@ const Provedor = ({ inicial, loaded = true, children }: { inicial: Record<string
 
 beforeAll(() => {
   Element.prototype.scrollIntoView = () => {};
+  (Element.prototype as unknown as { scrollTo: () => void }).scrollTo = () => {}; // o chat do Pergunte ao CORE rola sozinho
   Element.prototype.hasPointerCapture = () => false;
   Element.prototype.setPointerCapture = () => {};
   Element.prototype.releasePointerCapture = () => {};
@@ -269,5 +270,47 @@ describe("dois-numeros (07/11): variaveisDoMesLidas / configOfDe / chaveDeGastos
       expect(variaveisDoMesLidas("2026-11", lerPj, "acme", "2026-11").total).toBe(1000); // só a TV da empresa (02/11, antes do fechamento)
       expect(variaveisDoMesLidas("2026-11", lerPj, undefined, "2026-11").total).toBe(2000);
     } finally { esquecerPerfis(); }
+  });
+});
+
+/* ═══════════════ Dashboard: o que CONTA × o que ela LANÇOU (crítica r1, 07/11) ═══════════════ */
+
+/* O Index passa ao Dashboard `variaveisMes.noMes` (o que conta na fatura) — certo pro gráfico por categoria,
+   top 5 e forma de pagamento. Mas ÚLTIMAS TRANSAÇÕES e o "mês em uso" do elogio da poupança são pela DATA da
+   compra: a compra no crédito de ontem, depois do fechamento, sumia das últimas e a TV de outubro aparecia como
+   recente; e no começo do mês a data da TV de outubro já "provava" o mês em uso. Conserto: prop `lancados`
+   (a lista crua do mês), a mesma separação da retrospectiva. */
+describe("dois-numeros (07/11): Dashboard — ÚLTIMAS TRANSAÇÕES e o elogio da poupança seguem o que ela lançou", () => {
+  const itau = { nubank: { closingDay: 25, dueDay: 5 }, itau: { closingDay: 5, dueDay: 12 } };
+  // lançada ONTEM no Itaú, depois do fechamento (5) → fatura de dezembro
+  const farmacia = { id: "farmacia", description: "Farmácia", category: "farmacia", value: 80, date: "2026-11-06", paymentMethod: "credito", cardName: "itau" };
+  const padaria = { id: "padaria", description: "Padaria", category: "alimentacao", value: 15, date: "2026-11-06", paymentMethod: "pix" };
+  const abrir = (inicial: Record<string, unknown>) => {
+    localStorage.clear();
+    for (const [k, v] of Object.entries(inicial)) localStorage.setItem(lsKey(k), JSON.stringify(v));
+    return render(
+      <MemoryRouter initialEntries={["/financas"]}>
+        <Provedor inicial={inicial} loaded={false}>
+          <Routes><Route path="/financas" element={<Index />} /></Routes>
+        </Provedor>
+      </MemoryRouter>,
+    );
+  };
+
+  it("a Farmácia de ontem no crédito (fatura de dezembro) aparece em ÚLTIMAS TRANSAÇÕES; a TV de outubro não", () => {
+    abrir({ ...dados, "finance-card-config": itau, "finance-expenses": [farmacia, padaria] });
+    const card = screen.getByText(/ÚLTIMAS TRANSAÇÕES/).closest(".bg-card") as HTMLElement;
+    const nomes = Array.from(card.querySelectorAll("span.truncate")).map((s) => s.textContent);
+    expect(nomes).toContain("Farmácia");
+    expect(nomes).toContain("Padaria");
+    expect(nomes).not.toContain("TV");
+  });
+
+  it("dia 03/11 sem gasto lançado em novembro: a TV de 26/10 (fatura de novembro) não faz aparecer o 'Excelente! Você está poupando'", () => {
+    vi.setSystemTime(new Date(2026, 10, 3, 10));
+    const tv26 = { ...tv, date: "2026-10-26" };
+    abrir({ ...dados, "finance-2026-outubro-expenses": [mercado, tv26], "finance-expenses": [] });
+    expect(screen.queryByText(/Excelente! Você está poupando/)).toBeNull();
+    expect(screen.queryByText(/Sua taxa de poupança é/)).toBeNull();
   });
 });

@@ -58,7 +58,14 @@ interface DashboardProps {
   totalExpenses: number;
   totalDebts: number;
   totalInvestments: number;
+  /** Gastos variáveis que CONTAM no mês (regra da fatura — Index `variaveisMes.noMes`): categorias, top 5,
+   *  forma de pagamento, fixos × variáveis. */
   expenses: Expense[];
+  /** (07/11, crítica do "dois-numeros") O que ela LANÇOU no mês, pela data da compra (Index `expenses` cru):
+   *  ÚLTIMAS TRANSAÇÕES e o "mês em uso" do elogio da poupança. A compra no crédito de ontem, depois do
+   *  fechamento, é da fatura seguinte mas é a transação mais recente; a TV de outubro que vence agora não é.
+   *  Mesma separação da retrospectiva (`lancados`). Sem ela, usa `expenses`. */
+  lancados?: Expense[];
   fixedExpenses: FixedExpense[];
   dueDays: DueDay[];
   savingsRate: number;
@@ -185,6 +192,7 @@ export const Dashboard = ({
   totalDebts,
   totalInvestments,
   expenses,
+  lancados: lancadosProp,
   fixedExpenses,
   dueDays,
   savingsRate,
@@ -200,6 +208,7 @@ export const Dashboard = ({
   gastoDeHoje,
 }: DashboardProps) => {
   const { cores: COLORS, positivo: COR_RECEITA, negativo: COR_DESPESA } = usePaletaGrafico();
+  const lancados = lancadosProp ?? expenses;
   const { user } = useAuth();
   // categorias personalizadas: resolve nome/cor no gráfico e no top de gastos
   const { labelOf, barOf } = useFinanceCategories();
@@ -246,7 +255,7 @@ export const Dashboard = ({
   const lastTransactions = useMemo(() => {
     const hoje = new Date();
     const allTransactions = [
-      ...expenses.map((e) => ({ ...e, type: "variable" as const })),
+      ...lancados.map((e) => ({ ...e, type: "variable" as const })),
       ...fixedExpenses
         .filter((e) => Number.isInteger(e.day) && (e.day as number) >= 1 && (e.day as number) <= hoje.getDate())
         .map((e) => ({ ...e, date: localDayKey(new Date(hoje.getFullYear(), hoje.getMonth(), e.day as number)), type: "fixed" as const })),
@@ -254,7 +263,7 @@ export const Dashboard = ({
     return allTransactions
       .sort((a, b) => b.date.localeCompare(a.date))
       .slice(0, 5);
-  }, [expenses, fixedExpenses]);
+  }, [lancados, fixedExpenses]);
 
   // Payment method breakdown
   const paymentBreakdown = useMemo(() => {
@@ -386,9 +395,11 @@ export const Dashboard = ({
     // Finanças (renda + contas fixas, zero ou um gasto variável) via "Excelente! Você está poupando 50% da sua
     // renda" no dia 1 — um elogio vazio, antes de qualquer gasto. O elogio/dica da poupança espera pelo menos
     // 5 gastos variáveis no mês ou 7 dias desde o primeiro; o aviso de "despesas maiores que a renda" não espera.
-    const datasDosGastos = expenses.map((e) => String(e?.date ?? "")).filter((d) => /^\d{4}-\d{2}-\d{2}/.test(d)).sort();
+    // (07/11) Pelo que ela LANÇOU no mês (`lancados`), não pelo que conta na fatura: a TV de outubro que vence
+    // agora não prova que o mês de agora está em uso.
+    const datasDosGastos = lancados.map((e) => String(e?.date ?? "")).filter((d) => /^\d{4}-\d{2}-\d{2}/.test(d)).sort();
     const diasDesdeOPrimeiroGasto = datasDosGastos.length ? (Date.now() - new Date(`${datasDosGastos[0].slice(0, 10)}T12:00:00`).getTime()) / 86_400_000 : 0;
-    const mesEmUso = expenses.length >= 5 || diasDesdeOPrimeiroGasto >= 7;
+    const mesEmUso = lancados.length >= 5 || diasDesdeOPrimeiroGasto >= 7;
     if (totalIncome === 0 && totalExpenses === 0) {
       // Sem dados — não mostra alerta
     } else if (savingsRate >= 20) {
@@ -404,7 +415,7 @@ export const Dashboard = ({
     }
 
     return list.slice(0, 4);
-  }, [dueDays, totalIncome, totalExpenses, savingsRate, totalDebts, expenses]);
+  }, [dueDays, totalIncome, totalExpenses, savingsRate, totalDebts, lancados]);
 
   const balance = totalIncome - totalExpenses;
 

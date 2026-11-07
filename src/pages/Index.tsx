@@ -430,7 +430,8 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   const variaveisMes = variaveisDoMes(expenses, expensesAnterior, mesAgora, configOf);
   // (07/11, bug "dois-numeros") `variaveisMes.noMes` é a lista que CONTA no mês: vai pro Dashboard (gráfico por
   // categoria, top 5, por pagamento) e pros LIMITES, pra fechar com o "Despesas". `expenses` cru segue só pras
-  // listas que EDITAM (tabela, importação, relatórios) e pras que são por DATA (calendário, desafio da semana).
+  // listas que EDITAM (tabela, importação, relatórios) e pras que são por DATA (calendário, desafio da semana,
+  // e no Dashboard `lancados`: ÚLTIMAS TRANSAÇÕES e o "mês em uso" do elogio da poupança).
   const totalVariableExpenses = variaveisMes.total;
   /* 17/10 — o que ela gastou HOJE (variáveis que contam neste mês): a linha "Sobram R$ X pra hoje" do card
      QUANTO POSSO GASTAR HOJE (Dashboard `gastoDeHoje`; no de sempre só aparece com gasto hoje). */
@@ -644,6 +645,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 totalDebts={totalDebts}
                 totalInvestments={totalInvestments}
                 expenses={variaveisMes.noMes}
+                lancados={expenses}
                 fixedExpenses={fixedExpenses}
                 dueDays={dueDaysComFaturas as any[]}
                 savingsRate={savingsRate}
@@ -719,6 +721,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 totalDebts={totalDebts}
                 totalInvestments={totalInvestments}
                 expenses={variaveisMes.noMes}
+                lancados={expenses}
                 fixedExpenses={fixedExpenses}
                 dueDays={dueDaysComFaturas as any[]}
                 savingsRate={savingsRate}

@@ -12,8 +12,14 @@
  *    cadastrava "Aluguel" nos dois lugares;
  *  - fixo removido → conta vinculada some; dia/nome/valor mudou → conta
  *    acompanha (estado de "pago" é preservado);
- *  - retorna null quando nada mudou (guarda contra loop de render).
+ *  - retorna null quando nada mudou (guarda contra loop de render);
+ *  - (07/11) a conta criada aqui nasce com `nasceuEm`: o id `fx-<id do fixo>`
+ *    diz quando nasceu o FIXO, e sem isso a virada apagava o primeiro ✓ da
+ *    conta de um fixo antigo (lib/virada-contas, cabeçalho, item 4). Conta que
+ *    já existe não ganha o campo: não dá pra saber de quando ela é.
  */
+
+import { mesCorrenteId } from "@/lib/virada-contas";
 
 interface Bill {
   id: string;
@@ -24,6 +30,8 @@ interface Bill {
   /** 03/09: a conta carrega o perfil (PF/PJ) do custo fixo que a gerou. Sem
    *  isso o aluguel da empresa aparecia no calendário pessoal. */
   perfil?: string;
+  /** 07/11: "YYYY-MM" em que esta conta foi criada — ver o cabeçalho. */
+  nasceuEm?: string;
 }
 
 interface DueDay {
@@ -34,7 +42,7 @@ interface DueDay {
 
 const norm = (s: unknown) => String(s ?? "").trim().toLowerCase();
 
-export function syncFixedExpensesToBills(fixedExpenses: any[], dueDays: DueDay[]): DueDay[] | null {
+export function syncFixedExpensesToBills(fixedExpenses: any[], dueDays: DueDay[], hoje: Date = new Date()): DueDay[] | null {
   let changed = false;
   const days: DueDay[] = (dueDays ?? []).map((d) => ({ ...d, bills: [...(d.bills ?? [])] }));
   const dayFor = (n: number): DueDay => {
@@ -68,7 +76,7 @@ export function syncFixedExpensesToBills(fixedExpenses: any[], dueDays: DueDay[]
       }
     }
     if (!bill) {
-      dayFor(f.day).bills.push({ id: `fx-${f.id}`, name: f.description, paid: false, value: f.value, fixedId: f.id, ...(f.perfil ? { perfil: f.perfil } : {}) });
+      dayFor(f.day).bills.push({ id: `fx-${f.id}`, name: f.description, paid: false, value: f.value, fixedId: f.id, nasceuEm: mesCorrenteId(hoje), ...(f.perfil ? { perfil: f.perfil } : {}) });
       changed = true;
       continue;
     }

@@ -62,6 +62,25 @@
  * 3. O retrato dos CUSTOS FIXOS do mês que acabou mora no hook
  *    (use-virada-do-mes + lib/virada-do-mes `viradaDeFixos`), com carimbo
  *    próprio — não aqui: este carimbo só existe pra quem tem conta do mês.
+ *
+ * ═══ O PRIMEIRO ✓ DE CONTA NASCIDA DE FIXO ANTIGO (07/11, bug "primeiro-check") ═══
+ *
+ * 4. O item 1 lia o nascimento da conta pelo id — e o id `fx-<id do fixo>`
+ *    carrega o nascimento do FIXO, não da conta. Aluguel cadastrado em
+ *    outubro sem Dia; em novembro a pessoa dá o Dia (a conta nasce aí), marca
+ *    ✓, fecha e reabre: o balde estava VAZIO nas aberturas de antes, então
+ *    ninguém carimbou (regra do convidado, `temContas`), o carimbo está
+ *    ausente ou parado, a virada roda e vê "nasceu em outubro" → zera o ✓.
+ *    O fixo do "Vamos montar" (13/10) tem id `mf-<ms>-n`, que o leitor nem
+ *    entendia: `fx-mf-…` = "não sei" = zera — e, com carimbo parado, a conta
+ *    ainda entrava no retrato do mês velho como paga.
+ *    Agora a conta que o finance-sync cria nasce com `nasceuEm` ("YYYY-MM",
+ *    campo NOVO e opcional na conta — o app antigo ignora e carrega adiante
+ *    no `...b` do ✓), e `mesDeNascimentoDaConta` prefere ele ao id. Conta
+ *    gravada antes de 07/11 não ganha carimbo retroativo: dizer "nasceu
+ *    agora" pra quem está parado há meses devolveria o ✓ de julho vivendo em
+ *    agosto (o bug de 08/08). O leitor do id passou a entender o `mf-` do
+ *    Montar, o que salva essas contas antigas no mesmo mês do Montar.
  */
 
 import { chaveArquivada } from "@/lib/virada-do-mes";
@@ -78,6 +97,9 @@ export interface Conta {
   paid: boolean;
   value?: number;
   fixedId?: string;
+  /** (07/11) "YYYY-MM" em que o finance-sync criou esta conta. Opcional: conta
+   *  mais antiga não tem, e aí o nascimento sai do id (cabeçalho, item 4). */
+  nasceuEm?: string;
 }
 
 export interface DiaDeContas {
@@ -117,17 +139,30 @@ const UM_DIA_MS = 24 * 60 * 60 * 1000;
  * Todo escritor de conta grava `Date.now()` no id: MonthCalendar e
  * BillsDueCards direto, o finance-sync como `fx-<id do custo fixo>` (o fixo
  * também nasce com `Date.now()`, e a conta não existe antes dele), a cópia
- * do mês como `Date.now() + Math.random()`. Qualquer outra coisa — id de
- * seed, id digitado, relógio absurdo — devolve null, e quem chama trata
- * como "não sei de quando é".
+ * do mês como `Date.now() + Math.random()`. (07/11) O fixo do "Vamos montar"
+ * é `mf-<Date.now()>-n`, então a conta dele é `fx-mf-…`. Qualquer outra coisa
+ * — id de seed, id digitado, relógio absurdo — devolve null, e quem chama
+ * trata como "não sei de quando é".
  */
 export const mesDeNascimento = (id: unknown, hoje: Date = new Date()): string | null => {
   if (typeof id !== "string" && typeof id !== "number") return null;
-  const m = /^(?:fx-)?(\d{13})/.exec(String(id));
+  const m = /^(?:fx-)?(?:mf-)?(\d{13})/.exec(String(id));
   if (!m) return null;
   const ms = Number(m[1]);
   if (!Number.isFinite(ms) || ms < INICIO_PLAUSIVEL || ms > hoje.getTime() + UM_DIA_MS) return null;
   return mesCorrenteId(new Date(ms));
+};
+
+/**
+ * Mês em que a CONTA nasceu (07/11): o `nasceuEm` dela e, sem ele, o id. O id
+ * `fx-<id do fixo>` diz quando nasceu o FIXO, que pode ser meses mais velho
+ * (cabeçalho, item 4). `nasceuEm` à frente do relógio não vale — é o mesmo
+ * caso do carimbo do futuro (item 2) — e cai no id.
+ */
+export const mesDeNascimentoDaConta = (conta: Conta | undefined, hoje: Date = new Date()): string | null => {
+  const carimbo = conta?.nasceuEm;
+  if (ehCarimbo(carimbo) && carimbo <= mesCorrenteId(hoje)) return carimbo;
+  return mesDeNascimento(conta?.id, hoje);
 };
 
 /** Tem pelo menos uma conta cadastrada? (dia vazio não conta) */
@@ -165,7 +200,7 @@ export const viradaDeContas = (
   // (26/09) Conta que NASCEU neste mês não tem ✓ de mês passado pra expirar:
   // o ✓ dela é deste mês e fica. Era o que apagava o primeiro "paguei" de
   // toda pessoa nova (ver o cabeçalho, item 1).
-  const expira = (b: Conta | undefined) => !!b?.paid && mesDeNascimento(b?.id, hoje) !== mesAgora;
+  const expira = (b: Conta | undefined) => !!b?.paid && mesDeNascimentoDaConta(b, hoje) !== mesAgora;
   const zeradas = dias.map((d) => ({
     ...d,
     bills: d.bills.map((b) => (expira(b) ? { ...b, paid: false } : b)),
@@ -181,7 +216,7 @@ export const viradaDeContas = (
     const doMes = dias.map((d) => ({
       ...d,
       bills: d.bills.filter((b) => {
-        const nasceu = mesDeNascimento(b?.id, hoje);
+        const nasceu = mesDeNascimentoDaConta(b, hoje);
         return nasceu === null || nasceu <= carimboAtual;
       }),
     }));

@@ -506,6 +506,9 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
    *  "O ENVIO QUE SAIU DEPOIS DO PEDIDO" na hidratação. */
   const envioDaChave = useRef<Map<string, number>>(new Map());
   const enviosNoAr = useRef<Map<string, number>>(new Map());
+  /** (07/11, bug "envio-velho") O número do último envio de cada chave (sobe a cada envio NOVO, não a cada nova
+   *  tentativa) — ver "A NOVA TENTATIVA DO VALOR VELHO" no persistKey. */
+  const ultimoEnvio = useRef<Map<string, number>>(new Map());
   /** (revisão 2, 17/10) a leitura da conta no ar — ver PRAZO DE CADA LEITURA DA CONTA */
   const leituraAtual = useRef<LeituraNoAr | null>(null);
   /** quantas vezes o prazo da leitura já dobrou enquanto a conta não chega */
@@ -621,6 +624,7 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       ultimaEscrita.current.clear();
       envioDaChave.current.clear();
       enviosNoAr.current.clear();
+      ultimoEnvio.current.clear();
       // revisão 2 (17/10): a leitura no ar e a tentativa marcada também — o efeito da hidratação
       // não corta mais leitura ao rodar de novo, então quem corta na troca de conta é aqui
       if (leituraAtual.current) { cancelarLeitura(leituraAtual.current); leituraAtual.current = null; }
@@ -1154,10 +1158,23 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     return p;
   }, [store]);
 
-  const persistKey = useCallback(async (userId: string, key: string, value: any, attempt = 0) => {
+  /*
+   * A NOVA TENTATIVA DO VALOR VELHO (07/11, bug "envio-velho"). Rede piscando: o envio de [t0,t1] cai; 300 ms depois
+   * [t0,t1,t2] sobe na hora; aos 500 ms a nova tentativa de [t0,t1] subia POR CIMA — a tela com o t2, o servidor
+   * sem ele, e a próxima leitura (ou reabrir) apagava o t2. Agora cada envio NOVO de uma chave ganha um número
+   * (`ultimoEnvio`); a nova tentativa e o "não subiu" só seguem se o número dela ainda for o último. Havendo um
+   * envio mais novo, a tentativa velha desiste calada — o mais novo tem o próprio envio e as próprias tentativas. E
+   * o envio velho que dá certo depois de sair um mais novo não vira `doServidor` nem tira a chave de `naoSubiram` /
+   * da cópia do aparelho: quem confirma é o mais novo. (Dois envios no ar ao mesmo tempo chegando fora de ordem no
+   * servidor não se resolvem aqui; o caso real é a nova tentativa, que espera 0,5–1 s.)
+   */
+  const persistKey = useCallback(async (userId: string, key: string, value: any, attempt = 0, numero?: number) => {
     if (userRef.current?.id !== userId) return;
     // 21/10: conteúdo pago (kit, "Seu 2027") só o SERVIDOR grava — o banco recusa a escrita do cliente (lib/conteudo-pago)
     if (chaveSoDoServidor(key)) return;
+    const meu = numero ?? (ultimoEnvio.current.get(key) ?? 0) + 1;
+    if (numero === undefined) ultimoEnvio.current.set(key, meu);
+    else if (ultimoEnvio.current.get(key) !== meu) return; // (07/11) já saiu um envio mais novo desta chave
     // (07/11) a hidratação precisa saber o que ia pro servidor enquanto o retrato era tirado — ver "O ENVIO QUE SAIU DEPOIS DO PEDIDO"
     envioDaChave.current.set(key, Date.now());
     enviosNoAr.current.set(key, (enviosNoAr.current.get(key) ?? 0) + 1);
@@ -1173,13 +1190,14 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     if (error) {
       console.error(`[user-data] upsert failed for "${key}" (attempt ${attempt + 1}):`, error);
       if (attempt < 2) {
-        setTimeout(() => persistKey(userId, key, value, attempt + 1), 500 * Math.pow(2, attempt));
-      } else if (userRef.current?.id === userId) {
+        setTimeout(() => persistKey(userId, key, value, attempt + 1, meu), 500 * Math.pow(2, attempt));
+      } else if (userRef.current?.id === userId && ultimoEnvio.current.get(key) === meu) {
         marcarQueNaoSubiu(userId, key, value);
       }
       return;
     }
     if (userRef.current?.id !== userId) return;
+    if (ultimoEnvio.current.get(key) !== meu) return; // (07/11) um envio mais novo confirma — ver acima
     doServidor.current.set(key, value);
     naoSubiram.current.delete(key);
     if (aConfirmar.current.has(key)) {
@@ -1411,6 +1429,7 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     diasPendentes.current.clear(); // 07/11: e o dia esperando a releitura
     naoSubiram.current.clear(); // 07/11: e o envio que desistiu
     doServidor.current.clear();
+    ultimoEnvio.current.clear();
     aConfirmar.current.clear();
     apagarSeguradasGuardadas({ daConta: userId });
     purgeUserLocalCache();

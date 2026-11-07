@@ -34,6 +34,10 @@ let leiturasTotais = 0;
 /** (07/11, bug "offline-some") rede caída também pros envios */
 let upsertFalha = false;
 const ERRO_REDE = { message: "TypeError: Load failed", details: "", hint: "", code: "" };
+/** (07/11, bug "envio-velho") só os próximos N envios caem (rede piscando) */
+let falharProximos = 0;
+/** (07/11, bug "recusa-laco") o SERVIDOR responde e recusa esta chave (não é rede caída) */
+let recusa: { key: string; error: Record<string, string>; status?: number } | null = null;
 
 const auth: { user: { id: string } | null; loading: boolean } = { user: { id: "u1" }, loading: false };
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => auth }));
@@ -70,7 +74,9 @@ vi.mock("@/integrations/supabase/client", () => {
       from: () => ({
         select: () => consulta(),
         upsert: (linha: Linha) => {
+          if (falharProximos > 0) { falharProximos--; return Promise.resolve({ error: ERRO_REDE, status: 0 }); }
           if (upsertFalha) return Promise.resolve({ error: ERRO_REDE });
+          if (recusa && linha.key === recusa.key) return Promise.resolve({ error: recusa.error, status: recusa.status });
           upserts.push(clonar(linha));
           doServidor(linha.user_id).set(linha.key, clonar(linha.value));
           return Promise.resolve({ error: null });
@@ -157,6 +163,8 @@ beforeEach(() => {
   soltarLeitura = null;
   leiturasTotais = 0;
   upsertFalha = false;
+  falharProximos = 0;
+  recusa = null;
   auth.user = { id: "u1" };
   auth.loading = false;
   toastFn.mockClear();
@@ -619,5 +627,44 @@ describe("A e B lançando na mesma lista depois da meia-noite", () => {
     expect(ids(gastosNaTela)).toEqual(["mercado", "padaria-b", "farmacia-a"]);
     // e o dia 08 entra na sequência (sobe na liberação, depois do gasto juntado)
     await waitFor(() => expect(servidor().get(CHAVE_DIAS_ANOTADOS)).toEqual(["2026-11-07", "2026-11-08"]));
+  });
+});
+
+/* Crítica dos dados r3 (07/11, bug "envio-velho", achado em scratchpad/critico-dados-r3, R5). Rede piscando: o 1º envio
+   de [t0,t1] cai; 300 ms depois [t0,t1,t2] sobe na hora; aos 500 ms a nova tentativa de [t0,t1] subia POR CIMA. A tela
+   ficava com o t2 e o servidor sem ele — na próxima leitura ou ao reabrir, o t2 sumia. Já existia antes do ramo. */
+describe("rede piscando: a nova tentativa do valor velho não passa por cima do novo", () => {
+  it("[t0,t1] cai, [t0,t1,t2] sobe: o servidor termina com o t2, e a reabertura também", async () => {
+    vi.setSystemTime(em(2026, 11, 6, 9, 0));
+    servidor().set("todo-list", [{ id: "t0" }]);
+    const r = montar();
+    await waitFor(() => expect(api.loaded).toBe(true));
+    await esperar(400);
+    falharProximos = 1;
+    act(() => api.set("todo-list", [{ id: "t0" }, { id: "t1" }]));
+    await esperar(300);
+    act(() => api.set("todo-list", [{ id: "t0" }, { id: "t1" }, { id: "t2" }]));
+    for (let i = 0; i < 8; i++) await esperar(300);
+    expect(servidor().get("todo-list")).toEqual([{ id: "t0" }, { id: "t1" }, { id: "t2" }]);
+    expect(api.get("todo-list", [])).toEqual([{ id: "t0" }, { id: "t1" }, { id: "t2" }]);
+    // a tentativa velha desistiu calada: nenhum envio de [t0,t1] depois do [t0,t1,t2]
+    const gravados = gravacoesDe("todo-list").map((v) => (v as { id: string }[]).length);
+    expect(gravados).toEqual([3]);
+    r.unmount();
+    montar();
+    await waitFor(() => expect(api.loaded).toBe(true));
+    expect(api.get("todo-list", [])).toEqual([{ id: "t0" }, { id: "t1" }, { id: "t2" }]);
+  }, 20000);
+
+  it("controle: um envio só que cai uma vez sobe na 2ª tentativa", async () => {
+    vi.setSystemTime(em(2026, 11, 6, 9, 0));
+    servidor().set("todo-list", [{ id: "t0" }]);
+    montar();
+    await waitFor(() => expect(api.loaded).toBe(true));
+    falharProximos = 1;
+    act(() => api.set("todo-list", [{ id: "t0" }, { id: "t1" }]));
+    for (let i = 0; i < 4; i++) await esperar(300);
+    expect(servidor().get("todo-list")).toEqual([{ id: "t0" }, { id: "t1" }]);
+    expect(leiturasTotais).toBe(1);
   });
 });

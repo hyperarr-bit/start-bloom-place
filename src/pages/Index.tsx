@@ -66,7 +66,7 @@ import { TotalPorCartao } from "@/components/finance/TotalPorCartao";
 import { usePainelLimpo } from "@/hooks/use-painel-limpo";
 import { useFinanceCards } from "@/lib/finance-cards";
 import { chaveArquivada } from "@/lib/virada-do-mes";
-import { guardarReceitaNoMes } from "@/lib/finance-receita-futura";
+import { guardarGastoNoMes, guardarReceitaNoMes } from "@/lib/finance-receita-futura";
 import { mesCorrenteId } from "@/lib/virada-contas";
 import { useVersaoDaVirada } from "@/hooks/use-virada-do-mes";
 import { SeletorDePerfil } from "@/components/finance/SeletorDePerfil";
@@ -243,6 +243,8 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   // receita com data de mês futuro vai pra planilha daquele mês (01/11, lib/finance-receita-futura)
   const guardarReceitaFutura = (receita: any) => guardarReceitaNoMes(receita, new Date(), getUserData, setUserData, perfilValido);
   const [expenses, setExpenses] = usarListaDoPerfil(expensesTodos, setExpensesTodos, perfilValido);
+  // gasto também (07/11, bug "gasto-futuro"): no balde ele somava no mês do cadastro e, no dia 1º, sumia dele
+  const guardarGastoFuturo = (gasto: any) => guardarGastoNoMes(gasto, new Date(), getUserData, setUserData, perfilValido);
   const [fixedExpenses, setFixedExpenses] = usarListaDoPerfil(fixedExpensesTodos, setFixedExpensesTodos, perfilValido);
   const [installments, setInstallments] = usarListaDoPerfil(installmentsAvancados as any[], setInstallmentsTodos, perfilValido);
   const expensesAnterior = doPerfil(expensesAnteriorTodos, perfilValido);
@@ -819,7 +821,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 <div className="grid lg:grid-cols-[1fr_280px] gap-4 min-w-0">
                   <div className="min-w-0">
                     <TrackedCard cardKey="expenses" tab="financeiro">
-                      <ExpenseTable expenses={expenses} setExpenses={setExpenses} onPrimeiroGasto={aoPrimeiroGasto} mes={mesAgora} />
+                      <ExpenseTable expenses={expenses} setExpenses={setExpenses} onPrimeiroGasto={aoPrimeiroGasto} guardarEmOutroMes={guardarGastoFuturo} mes={mesAgora} />
                     </TrackedCard>
                   </div>
                   <TrackedCard cardKey="notes" tab="financeiro">

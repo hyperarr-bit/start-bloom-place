@@ -343,7 +343,7 @@ export function FolhaOrganizarAbas<T extends AbaOcultavel>({ abas, aberta, onFec
                 return (
                   <li key={tab.id} data-testid="abas-organizar-linha" data-aba={tab.id} data-oculta={visivel ? "0" : "1"} className="flex items-center gap-2.5 min-h-[56px] px-1 border-t border-border/60 first:border-t-0">
                     <span className={`w-10 h-10 rounded-xl grid place-items-center shrink-0 text-[18px] ${icone ? "" : "bg-muted"} ${visivel ? "" : "opacity-45"}`} aria-hidden>{icone ? icone(tab) : (tab.icon ?? "•")}</span>
-                    <span className={`flex-1 min-w-0 text-[13px] font-bold uppercase tracking-wide truncate ${visivel ? "" : "text-muted-foreground"}`}>{tab.label}</span>
+                    <span className={`flex-1 min-w-0 text-[13px] font-bold truncate ${icone ? "" : "uppercase tracking-wide"} ${visivel ? "" : "text-muted-foreground"}`}>{tab.label}</span>
                     {mover && (
                       <span className="flex flex-col">
                         <button type="button" onClick={() => mover(tab.id, -1)} disabled={i === 0} aria-label={`Mover ${tab.label} pra cima`} data-track="aba-mover-frente" className="w-9 h-7 grid place-items-center text-muted-foreground disabled:opacity-25"><ChevronUp className="w-4 h-4" strokeWidth={2.2} /></button>

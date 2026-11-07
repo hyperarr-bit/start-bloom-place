@@ -474,7 +474,7 @@ export const DividasEntrePessoas = ({ perfil = PERFIL_PESSOAL, perfis = [], onRe
                         type="button"
                         onClick={() => definirVencimento(d.id, "")}
                         aria-label="Tirar o prazo"
-                        className="underline underline-offset-2 shrink-0 hover:text-foreground"
+                        className="h-8 px-2.5 rounded-md text-[11px] font-semibold shrink-0 hover:bg-muted hover:text-foreground"
                       >
                         tirar
                       </button>

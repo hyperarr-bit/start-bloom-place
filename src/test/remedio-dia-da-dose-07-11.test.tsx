@@ -683,3 +683,65 @@ describe("'Começa amanhã' e uma 1ª dose à noite", () => {
     expect(fmt(planoDe(store)[0].quando)).toBe("08/21:00");
   });
 });
+
+/* Crítica do conserto final (07/11): o campo de hora manda valores no meio da digitação (2,0,0,0 passa
+   por 02:00 antes de 20:00; no iPhone a roda também pode mandar). A conta do começo e das marcas era
+   feita a partir do valor do meio, e o resultado dependia do caminho. Agora parte sempre de como o
+   remédio estava quando a fileira de edição abriu. */
+describe("digitar a 1ª dose (valores no meio do caminho)", () => {
+  const digitarPrimeira = (store: ReturnType<typeof criarStore>, ...valores: string[]) => {
+    const { unmount } = montar(store);
+    fireEvent.click(screen.getByRole("button", { name: "Editar horários de Amoxicilina" }));
+    for (const v of valores) fireEvent.change(screen.getByLabelText("Horário de Amoxicilina (1ª dose)"), { target: { value: v } });
+    unmount();
+  };
+  const amanha = (primeira: string, quando: Date) =>
+    montarLinhas({ name: "Amoxicilina", stock: 21 }, gerarHorarios(primeira, 3), undefined, quando.getTime(), `2026-11-08T${primeira}`);
+
+  it("às 10:00, amanhã 08:00 digitado 02:00 → 20:00: continua amanhã 20:00, sem aviso hoje", () => {
+    const store = criarStore({ [CHAVE]: amanha("08:00", agoraEm(7, 9, 50)) });
+    agoraEm(7, 10);
+    digitarPrimeira(store, "02:00", "20:00");
+    expect(linhas(store).map((l) => l.inicio)).toEqual(["2026-11-08T20:00", "2026-11-08T20:00", "2026-11-08T20:00"]);
+    expect(fmt(planoDe(store)[0].quando)).toBe("08/20:00");
+  });
+
+  it("às 22:15, amanhã 08:00 digitado 02:00 → 23:00: amanhã 23:00 (o mesmo que ir direto), não hoje 23:00", () => {
+    const direto = criarStore({ [CHAVE]: amanha("08:00", agoraEm(7, 22, 10)) });
+    const digitado = criarStore({ [CHAVE]: amanha("08:00", new Date(2026, 10, 7, 22, 10)) });
+    agoraEm(7, 22, 15);
+    digitarPrimeira(direto, "23:00");
+    digitarPrimeira(digitado, "02:00", "23:00");
+    expect(linhas(direto)[0].inicio).toBe("2026-11-08T23:00");
+    expect(linhas(digitado).map((l) => l.inicio)).toEqual(linhas(direto).map((l) => l.inicio));
+    expect(fmt(planoDe(digitado)[0].quando)).toBe("08/23:00");
+  });
+
+  it("registro cheio, às 15:00 digitado 00:00 → 07:00: as marcas ficam como indo direto pra 07:00", () => {
+    const novas = cadastro(agoraEm(5, 10), "08:00");
+    const [d1, d2, d3] = novas.map((l) => l.id);
+    const log = { "2026-11-05": [d1, d2], "2026-11-06": [d3, d1, d2], "2026-11-07": [d3, d1] };
+    const direto = criarStore({ [CHAVE]: novas, [LOG]: log });
+    const digitado = criarStore({ [CHAVE]: novas, [LOG]: log });
+    agoraEm(7, 15);
+    digitarPrimeira(direto, "07:00");
+    digitarPrimeira(digitado, "00:00", "07:00");
+    expect(linhas(digitado).map((l) => [l.time, l.inicio])).toEqual(linhas(direto).map((l) => [l.time, l.inicio]));
+    const ordenar = (v: unknown) => Object.fromEntries(Object.entries(v as Record<string, string[]>).map(([d, ids]) => [d, [...ids].sort()]).filter(([, ids]) => ids.length));
+    expect(ordenar(digitado.estado.dados[LOG])).toEqual(ordenar(direto.estado.dados[LOG]));
+    expect(planoDe(digitado).map((a) => fmt(a.quando)).slice(0, 3)).toEqual(planoDe(direto).map((a) => fmt(a.quando)).slice(0, 3));
+  });
+
+  it("às 07:30, 08:00 → 17:00 e de volta pra 08:00 (mudou de ideia, ou a roda passou do ponto): o registro volta igual", () => {
+    const novas = cadastro(agoraEm(5, 7, 50), "08:00");
+    const [d1, d2, d3] = novas.map((l) => l.id);
+    const log = { "2026-11-05": [d1, d2], "2026-11-06": [d3, d1, d2], "2026-11-07": [d3] };
+    const store = criarStore({ [CHAVE]: novas, [LOG]: log });
+    agoraEm(7, 7, 30);
+    digitarPrimeira(store, "17:00", "08:00");
+    expect(linhas(store).map((l) => [l.time, l.inicio])).toEqual(novas.map((l) => [l.time, l.inicio]));
+    const doDia = (d: string) => [...(((store.estado.dados[LOG] as Record<string, string[]>)[d]) ?? [])].sort();
+    expect(doDia("2026-11-06")).toEqual([d1, d2, d3].sort());
+    expect(doDia("2026-11-07")).toEqual([d3]); // a das 00:00 de hoje cedo, tomada, continua tomada
+  });
+});

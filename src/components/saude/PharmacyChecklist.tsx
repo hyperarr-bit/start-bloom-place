@@ -131,6 +131,14 @@ export const PharmacyChecklist = () => {
   const [comecaAmanha, setComecaAmanha] = useState<boolean | null>(null);
   /** o grupo com os horários/data abertos pra editar na tabela */
   const [editando, setEditando] = useState<string | null>(null);
+  /* A FOTO DE QUANDO A FILEIRA DE EDIÇÃO ABRIU (crítica do conserto final 07/11): o campo de
+     hora manda valores no meio da digitação (2,0,0,0 passa por 02:00 antes de 20:00; a roda do
+     iPhone também pode mandar), e cada um já mexia no começo e nas marcas. A conta partia do
+     valor do meio, e o resultado dependia do caminho: "amanhã 08:00" digitado 23:00 às 22:15
+     virava hoje 23:00; ir de 08:00 a 17:00 e voltar pra 08:00 apagava a marca da das 00:00.
+     Agora o começo e as marcas saem sempre desta foto. Marcar uma dose (ou mudar o "até")
+     vale como a foto nova, tirada na próxima mudança de hora. */
+  const fotoDaEdicao = useRef<{ chave: string; itens: Supplement[]; log: Record<string, string[]>; semBaixa: SemBaixa } | null>(null);
   // 07/11: alarme exato do Android (ver `estadoAlarmeExato`) — "indisponivel" no iPhone e na web
   const [alarmeExato, setAlarmeExato] = useState<EstadoAlarmeExato>("indisponivel");
   const [dependentes, setDependentes] = usePersistedState<string[]>(CHAVE_DEPENDENTES, []);
@@ -149,6 +157,7 @@ export const PharmacyChecklist = () => {
   const toggleTaken = (id: string, dia: string = today) => {
     const linha = supplements.find(s => s.id === id);
     if (!linha) return;
+    fotoDaEdicao.current = null;
     const juntas = mesmoGrupo(linha);
     const doDia = supplementLog[dia] || [];
     const semBaixaDoDia = semBaixa?.dia === dia && Array.isArray(semBaixa.ids) ? semBaixa.ids : [];
@@ -285,6 +294,7 @@ export const PharmacyChecklist = () => {
     if (!time) return;
     const linha = supplements.find(s => s.id === id);
     const doGrupo = linha?.grupo ? supplements.filter(s => s.grupo === linha.grupo) : [];
+    const foto = linha && doGrupo.length > 1 ? fotoDoGrupo(linha.grupo!, doGrupo) : null;
     let lista: Supplement[];
     if (linha && doGrupo.length > 1 && doGrupo[0].id === id) {
       /* 07/11 (retomada): a 1ª dose ajusta as outras, como no cadastro, e o `inicio`
@@ -292,7 +302,7 @@ export const PharmacyChecklist = () => {
          08:00 → 07:00 depois de começado fazia a das 07:00 virar "dose da noite":
          gravava no dia seguinte e o aviso da manhã sumia todo dia. */
       const novos = gerarHorarios(time, doGrupo.length);
-      const inicio = inicioAoMudarPrimeira(linha.inicio, time, new Date(), novos);
+      const inicio = inicioAoMudarPrimeira((foto?.itens[0] ?? linha).inicio, time, new Date(), novos);
       const posicao = new Map(doGrupo.map((s, i) => [s.id, i]));
       lista = supplements.map(s => {
         const i = posicao.get(s.id);
@@ -301,7 +311,7 @@ export const PharmacyChecklist = () => {
     } else {
       lista = supplements.map(s => (s.id === id ? { ...s, time } : s));
     }
-    const log = linha && doGrupo.length > 1 ? moverMarcas(linha.grupo!, lista) : undefined;
+    const log = foto ? moverMarcas(foto, lista) : undefined;
     setSupplements(lista);
     void rearmarLembretes(lista, false, log);
   };
@@ -310,27 +320,53 @@ export const PharmacyChecklist = () => {
      em que a dose acontece agora (lib/remedios, moverMarcasDoGrupo) — senão a das 00:00
      de ontem à noite, gravada hoje, aparecia como a das 23:00 de hoje e o aviso sumia.
      A anotação de "marcado sem baixa" vai junto, pra desmarcar não criar comprimido.
+     A conta parte da foto de quando a fileira de edição abriu (`fotoDaEdicao`); só as marcas
+     DESTE remédio saem dela — as dos outros ficam como estão agora.
      Devolve o registro novo (pro rearme dos avisos), ou nada se ele não mudou. */
-  const moverMarcas = (grupo: string, lista: Supplement[]): Record<string, string[]> | undefined => {
-    const doGrupo = (l: Supplement[]) => agruparRemedios(l).find(g => g.chave === `g:${grupo}`);
-    const antes = doGrupo(supplements);
-    const depois = doGrupo(lista);
+  const moverMarcas = (foto: NonNullable<typeof fotoDaEdicao.current>, lista: Supplement[]): Record<string, string[]> | undefined => {
+    const grupo = foto.itens[0]?.grupo;
+    const antes = agruparRemedios(foto.itens)[0];
+    const depois = agruparRemedios(lista).find(g => g.chave === `g:${grupo}`);
     if (!antes || !depois) return undefined;
-    const { log, movidas } = moverMarcasDoGrupo(antes, depois, supplementLog, new Date());
-    if (!movidas.length && Object.keys(log).every(d => log[d] === supplementLog[d])) return undefined;
-    setSupplementLog(log);
-    let sb: SemBaixa = semBaixa?.dia && Array.isArray(semBaixa.ids) ? semBaixa : { dia: "", ids: [] };
+    const { log: calculado, movidas } = moverMarcasDoGrupo(antes, depois, foto.log, new Date());
+    const ids = new Set(depois.itens.map(s => s.id));
+    const log: Record<string, string[]> = { ...supplementLog };
+    let mudou = false;
+    for (const d of new Set([...Object.keys(supplementLog), ...Object.keys(calculado)])) {
+      const atual = Array.isArray(supplementLog[d]) ? supplementLog[d] : [];
+      const novo = [...atual.filter(x => !ids.has(x)), ...(Array.isArray(calculado[d]) ? calculado[d] : []).filter(x => ids.has(x))];
+      if (novo.length === atual.length && novo.every((x, i) => x === atual[i])) continue;
+      log[d] = novo;
+      mudou = true;
+    }
+    if (mudou) setSupplementLog(log);
+    let sb: SemBaixa = foto.semBaixa?.dia && Array.isArray(foto.semBaixa.ids) ? foto.semBaixa : { dia: "", ids: [] };
     for (const m of movidas) {
       if (sb.dia !== m.de || !sb.ids.includes(m.id)) continue;
       sb = { dia: sb.dia, ids: sb.ids.filter(x => x !== m.id) };
       if (m.para && (sb.dia === m.para || !sb.ids.length)) sb = { dia: m.para, ids: [...(sb.dia === m.para ? sb.ids : []), m.id] };
     }
-    if (sb !== semBaixa) setSemBaixa(sb);
-    return log;
+    if (JSON.stringify(sb) !== JSON.stringify(semBaixa ?? { dia: "", ids: [] })) setSemBaixa(sb);
+    return mudou ? log : undefined;
+  };
+
+  /** A foto do grupo pra conta da mudança de hora: a de quando a fileira abriu, ou (sem ela) a de agora. */
+  const fotoDoGrupo = (grupo: string, doGrupo: Supplement[]) => {
+    const chave = `g:${grupo}`;
+    if (fotoDaEdicao.current?.chave !== chave) {
+      fotoDaEdicao.current = { chave, itens: doGrupo, log: supplementLog, semBaixa };
+    }
+    return fotoDaEdicao.current;
+  };
+  const abrirOuFecharEdicao = (g: GrupoDeRemedio) => {
+    const abrir = editando !== g.chave;
+    setEditando(abrir ? g.chave : null);
+    fotoDaEdicao.current = abrir ? { chave: g.chave, itens: g.itens, log: supplementLog, semBaixa } : null;
   };
 
   /** "Até quando" do grupo inteiro; vazio = sem fim. */
   const changeAte = (g: GrupoDeRemedio, ate: string) => {
+    fotoDaEdicao.current = null;
     const ids = new Set(g.itens.map(s => s.id));
     const lista = supplements.map(s => {
       if (!ids.has(s.id)) return s;
@@ -452,7 +488,7 @@ export const PharmacyChecklist = () => {
                             {!simples && (
                               <button
                                 type="button"
-                                onClick={() => setEditando(abertoPraEditar ? null : g.chave)}
+                                onClick={() => abrirOuFecharEdicao(g)}
                                 aria-label={`Editar horários de ${g.nome}`}
                                 aria-pressed={abertoPraEditar}
                                 className={`h-8 w-8 -my-1.5 shrink-0 rounded-md flex items-center justify-center hover:text-foreground ${abertoPraEditar ? "text-foreground bg-muted" : "text-muted-foreground/60"}`}
@@ -559,7 +595,7 @@ export const PharmacyChecklist = () => {
                               className={`${campoPequeno} w-[8.5rem]`}
                             />
                           </>)}
-                          <button type="button" onClick={() => setEditando(null)} className="h-8 px-3 rounded-lg bg-primary/10 text-primary text-[11px] font-semibold">Pronto</button>
+                          <button type="button" onClick={() => { setEditando(null); fotoDaEdicao.current = null; }} className="h-8 px-3 rounded-lg bg-primary/10 text-primary text-[11px] font-semibold">Pronto</button>
                         </div>
                       </td>
                     </motion.tr>,

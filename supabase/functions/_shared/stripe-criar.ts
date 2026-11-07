@@ -14,7 +14,7 @@ export type PedidoStripe = {
   cpf: string | null;
 };
 const t = (v: unknown, n: number): string | null => (typeof v === "string" && v.trim() ? v.trim().slice(0, n) : null);
-const ATRIB = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "c_id", "as_id", "ad_id", "pl"];
+const ATRIB = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "c_id", "as_id", "ad_id", "pl", "braco_lp_oferta"]; // 06/11: o braço da página (AB_OFERTA_LP) vira metadata do PI
 const SITES = ["https://www.coreaplicativo.com.br/", "https://coreaplicativo.com.br/"];
 const EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 

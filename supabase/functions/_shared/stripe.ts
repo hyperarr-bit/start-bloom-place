@@ -202,7 +202,7 @@ export async function tratarStripe(deps: DepsStripe, req: { assinatura: string |
     if (await reservar(admin, `stripe-venda:${pi.id}`, "venda") === "ok") {
       let erroVenda: string | null = null;
       try {
-        const { error } = await admin.from("analytics_events").insert({ event_name: "stripe_venda", user_id: conta.userId, event_data: { pi: pi.id, pagina: PAGINA_STRIPE, valor_cents: valor, metodo: cob?.metodo ?? null, parcelas: cob?.parcelas ?? null, via: conta.via, ref: md.ref ?? null } });
+        const { error } = await admin.from("analytics_events").insert({ event_name: "stripe_venda", user_id: conta.userId, event_data: { pi: pi.id, pagina: PAGINA_STRIPE, valor_cents: valor, metodo: cob?.metodo ?? null, parcelas: cob?.parcelas ?? null, via: conta.via, ref: md.ref ?? null, ...(md.braco_lp_oferta ? { braco_lp_oferta: md.braco_lp_oferta } : {}) } });
         if (error) erroVenda = String((error as Erro)?.message ?? error);
       } catch (e) { erroVenda = String((e as Error)?.message ?? e); }
       if (erroVenda) { await soltar(admin, `stripe-venda:${pi.id}`); log("stripe_venda não gravou — tenta no próximo reenvio", { pi: pi.id, msg: erroVenda.replace(/[^\s@]+@[^\s@]+/g, "***").slice(0, 120) }); }

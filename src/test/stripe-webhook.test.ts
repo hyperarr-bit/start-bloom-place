@@ -125,6 +125,18 @@ describe("payment_intent.succeeded", () => {
     expect(m.saida.logs.join("\n")).not.toContain("maria@exemplo.com");
   });
 
+  it("06/11: o braço da página da /oferta (metadata do PI) vai pro stripe_venda; sem ele, o stripe_venda não ganha o campo", async () => {
+    for (const [md, esperado] of [[{ braco_lp_oferta: "nova" }, "nova"], [{}, undefined]] as const) {
+      const m = montar();
+      m.db.users.set("u_anon", { id: "u_anon", email: null });
+      await mandar(m, evento("payment_intent.succeeded", pi({ metadata: { user_id: "u_anon", ...md } })));
+      const v = m.db.analytics_events.find((e) => e.event_name === "stripe_venda")!;
+      expect((v.event_data as Record<string, unknown>).braco_lp_oferta).toBe(esperado);
+      expect(m.saida.capi).toHaveLength(1);
+      expect(JSON.stringify(m.saida.capi[0])).not.toContain("braco_lp_oferta"); // a CAPI não muda
+    }
+  });
+
   it("repetido (mesmo evento) e reenvio com outro id de evento → nada em dobro", async () => {
     const m = montar();
     const c = evento("payment_intent.succeeded", pi(), "evt_fixo");

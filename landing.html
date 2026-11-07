@@ -59,6 +59,10 @@
                               (HOTMART_CHECKOUT_URL + sck/src) por R$ 97,90 (HOTMART_PRECO_CENTAVOS). URL no placeholder = Pix.
                               QA: ?hotmart=on|off (fica: localStorage), ?hotmart=auto desfaz. Vira html[data-pagina="vida"] +
                               html[data-checkout-ext="hotmart"|"pix"]; pagina + braco_checkout_ext em todo evento. Obrigado: /vida/obrigado.
+        AB_OFERTA_LP "off"  → (06/11) só na /oferta: todos na página de hoje. "on" = 50/50 estável por aparelho (bit 12 de "lpo:"+id) entre "atual" e
+                              "nova" (o template #lpo-nova, no começo do corpo). QA: ?lpo=nova|atual (fica: localStorage + cookie), ?lpo=auto
+                              desfaz. Vira html[data-lpo]; braco_lp_oferta em todo evento da /oferta. Com o teste ativo também vai na metadata do PI e
+                              no Purchase do navegador. Rollback: "off".
         AB_VIDA      "off"  → (04/11) só na /vida: todos no "v3" (a LP v3, data-lp v2). "on" = 50/50 estável por aparelho (bit 24 de
                               "vida:"+id) entre "v3" e "atual" (a página do /organizar, data-lp atual, com R$ 97,90 e a mesma Hotmart:
                               os pares data-so-ext="hotmart"|"pix" dos textos de preço/Pix + #lp-hotmart-atual). QA: ?vida=v3|atual
@@ -88,6 +92,11 @@
         // parcelado), sem sair do site. "off" (ou STRIPE_PK no placeholder) = a /oferta manda pro /organizar. O /organizar e a
         // /vida não leem nada disto. Ver src/landing/stripe-checkout.ts. Rollback: "off".
         var CHECKOUT_STRIPE = "on";
+        // 06/11 (dono): A/B DA PÁGINA da /oferta — "off" = todos na página de hoje · "on" = 50/50 estável por aparelho entre "atual" e "nova"
+        // (o <template id="lpo-nova">). Só a /oferta lê. QA: ?lpo=nova|atual (fica: localStorage + cookie), ?lpo=auto desfaz. Rollback: "off".
+        var AB_OFERTA_LP = "off";
+        // 06/11: no braço "nova", baixar o Stripe.js em momento ocioso (a tela do checkout é a mesma). "off" até o dono confirmar (BRIEF §13.4).
+        var LPO_STRIPE_CEDO = "off";
         var STRIPE_PK = "pk_live_51TJnAQQdjmrIbUhHDSWqG1trOT6mFfV87AC4Vv47kFJTAFOhYsNmvryGRnf3x824Ke3mXSsWiFCovKPIR6Kqx0IX00VcuAawhC"; // a chave PUBLICÁVEL (pk_live_…); com "PREENCHER" = comportamento off
         var STRIPE_PRECO_CENTAVOS = 6790; // só pra exibir — o valor cobrado vem SEMPRE do servidor (stripe-criar)
         var STRIPE_PARCELAS_MAX = 1; // 05/11 (dono): só aparece 1x no cartão; volta pra 12 quando a Stripe liberar parcelas
@@ -227,6 +236,26 @@
         // 2× e avisava "preloaded but not used"; medido na r2: 1 pedido e 0 avisos nos 2 motores com esta receita.
         if (lp === "v2") { try { var prel = document.createElement("link"); prel.rel = "preload"; prel.as = "image"; prel.href = "/landing/v3-home.webp"; prel.setAttribute("fetchpriority", "high"); document.head.appendChild(prel); } catch (e) {} }
         mem.lp = lp; mem.ab_lp = AB_LP;
+        // 06/11: o braço da PÁGINA da /oferta (AB_OFERTA_LP): "atual" | "nova". Bit 12 de "lpo:"+id — independente do checkout (0), da tela do
+        // Pix (8), da página do /organizar (16) e da /vida (24). Fora da /oferta nada disto existe. Conta igual à bracoLpOfertaDoAparelho (regras.ts).
+        if (OFERTA) {
+          var plo = pega("lpo"), cko = null;
+          try { var cso = String(document.cookie || "").split(";"); for (var io = 0; io < cso.length; io++) { var jo = cso[io].indexOf("="); if (jo > 0 && cso[io].slice(0, jo).trim() === "landing_lpo_force") cko = cso[io].slice(jo + 1).trim(); } } catch (eo0) {}
+          if (plo === "nova" || plo === "atual" || plo === "auto") {
+            grava("landing-lpo-force", plo === "auto" ? null : plo);
+            try { document.cookie = "landing_lpo_force=" + (plo === "auto" ? "; Max-Age=0" : plo + "; Max-Age=2592000") + "; Path=/; SameSite=Lax"; } catch (eo1) {}
+          }
+          var blo = (plo === "nova" || plo === "atual") ? plo : plo === "auto" ? null : (le("landing-lpo-force") || cko);
+          mem.lpo_forcado = (blo === "nova" || blo === "atual");
+          if (!mem.lpo_forcado) {
+            blo = "atual";
+            if (AB_OFERTA_LP === "on") blo = ((hash("lpo:" + pegaId()) >>> 12) & 1) === 0 ? "atual" : "nova";
+          }
+          d.setAttribute("data-lpo", blo);
+          mem.lpo = blo; mem.ab_lp_oferta = AB_OFERTA_LP; mem.lpo_stripe_cedo = LPO_STRIPE_CEDO;
+          // o celular da 1ª tela sai junto com a fonte (a mesma receita do braço v2)
+          if (blo === "nova") { try { var prelo = document.createElement("link"); prelo.rel = "preload"; prelo.as = "image"; prelo.href = "/landing/v3-home.webp"; prelo.setAttribute("fetchpriority", "high"); document.head.appendChild(prelo); } catch (eo2) {} }
+        }
         // 04/11: /vida — a chave CHECKOUT_HOTMART ("on" = Hotmart R$ 97,90 · "off" = o Pix próprio de 27,90). Com a URL no
         // placeholder, cai no Pix (nunca um botão quebrado). QA: ?hotmart=on|off (fica: localStorage), ?hotmart=auto desfaz.
         // A MESMA conta de URL válida do src/landing/hotmart.ts (urlHotmartValida). Fora da /vida nada disto existe.
@@ -811,6 +840,230 @@
     </script>
   </head>
   <body>
+    <!-- ═════════ /oferta · PÁGINA NOVA (06/11, AB_OFERTA_LP) ═════════
+         Fica num <template>: o braço "atual", o /organizar e a /vida não pintam, não estilizam e não baixam nada daqui. Só com
+         html[data-lpo="nova"] o script logo abaixo põe isto no começo da página; o <main> de hoje fica escondido (o landing.ts
+         e o checkout continuam iguais). Telas = print real. Preço e copy: scratchpad lp-oferta/BRIEF.md. -->
+    <template id="lpo-nova">
+      <style>
+        html[data-lpo="nova"] main.lp, html[data-lpo="nova"] #fim, html[data-lpo="nova"] .lp-rodape, html[data-lpo="nova"] #lp-fixo { display: none !important; }
+        .lpo { max-width: 440px; margin: 0 auto; background: #fff; overflow: hidden; overflow: clip; }
+        .lpo h1, .lpo h2, .lpo h3, .lpo p, .lpo figure, .lpo ol, .lpo blockquote { margin: 0; padding: 0; }
+        .lpo img { display: block; width: 100%; height: auto; }
+        .lpo .lp-promo { width: 100%; }
+        .lpo-hero { display: flex; flex-direction: column; height: calc(100vh - 34px); height: calc(100svh - 34px); min-height: 540px; max-height: 860px; }
+        .lpo-marca { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 20px 0; }
+        .lpo-marca b { font-size: 15px; font-weight: 900; letter-spacing: .14em; }
+        .lpo-lojas { display: inline-flex; align-items: center; gap: 9px; font-size: 12px; font-weight: 600; color: var(--suave); white-space: nowrap; }
+        .lpo-lojas span { display: inline-flex; align-items: center; gap: 3px; }
+        .lpo-lojas svg { width: 12px; height: 12px; fill: currentColor; flex: none; }
+        .lpo-titulo { padding: 11px 20px 0; }
+        .lpo-h1 { font-size: clamp(25px, 7.9vw, 31px); line-height: 1.08; font-weight: 850; letter-spacing: -.035em; }
+        .lpo-h1 em, .lpo-h2 em, .lpo-frase em { font-style: normal; color: var(--magenta); }
+        .lpo-areas { margin-top: 7px !important; font-size: 14px; line-height: 1.3; font-weight: 600; letter-spacing: -.01em; color: var(--suave); text-wrap: balance; }
+        .lpo-fone-area { position: relative; flex: 1 1 0; min-height: 72px; margin-top: 12px; padding: 0 34px; overflow: hidden; }
+        .lpo-fone { border: 7px solid #1c1a1f; border-bottom: 0; border-radius: 30px 30px 0 0; overflow: hidden; background: #fff; box-shadow: 0 10px 30px rgba(38,38,38,.16); }
+        .lpo-compra { position: relative; z-index: 2; padding: 11px 20px calc(10px + env(safe-area-inset-bottom)); background: #fff; box-shadow: 0 -10px 18px -8px rgba(38,38,38,.12); }
+        .lpo-aval1 { font-size: clamp(11.5px, 3.3vw, 13px); line-height: 1.3; font-weight: 650; text-align: center; }
+        .lpo-aval1 span { font-weight: 600; color: var(--suave); white-space: nowrap; }
+        .lpo-uma-vez { margin-top: 7px !important; font-size: 15.5px; line-height: 1.25; font-weight: 800; letter-spacing: -.01em; text-align: center; }
+        .lpo-uma-vez small { display: block; font-size: 13px; font-weight: 600; letter-spacing: 0; color: var(--suave); }
+        .lpo-cta { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 54px; padding: 6px 12px; border: 0; border-radius: 14px; background: var(--magenta); color: #fff; font-family: inherit; font-size: 17px; line-height: 1.15; font-weight: 800; letter-spacing: -.01em; box-shadow: 0 8px 20px -8px rgba(214,51,138,.65); touch-action: manipulation; }
+        .lpo-cta:active { background: var(--magenta-escuro); }
+        .lpo-compra .lpo-cta { margin-top: 9px; }
+        .lpo-miudo { margin-top: 7px !important; text-align: center; font-size: 12px; font-weight: 600; color: var(--suave); }
+        .lpo-bloco { padding: 44px 20px 0; }
+        .lpo-h2 { font-size: 26px; line-height: 1.1; font-weight: 850; letter-spacing: -.03em; text-wrap: balance; }
+        .lpo-leve { margin-top: 8px !important; font-size: 16px; line-height: 1.38; color: var(--suave); }
+        .lpo-print { margin-top: 16px; border-radius: var(--raio); overflow: hidden; border: 1px solid var(--borda); background: #fff; }
+        .lpo-virada { margin-top: 18px; border: 1px solid var(--borda); border-radius: var(--raio); overflow: hidden; background: #fff; }
+        .lpo-virada + .lpo-virada { margin-top: 14px; }
+        .lpo-virada header { padding: 9px 14px; font-size: 14px; font-weight: 650; color: var(--suave); background: var(--papel); }
+        .lpo-virada s { text-decoration-color: var(--magenta); text-decoration-thickness: 1.5px; }
+        .lpo-virada h3 { padding: 13px 14px 11px; font-size: 19px; line-height: 1.18; font-weight: 800; letter-spacing: -.02em; }
+        .lpo-virada img { padding: 0 6px 6px; }
+        .lpo-nota { margin-top: 10px !important; font-size: 12px; font-weight: 500; color: var(--suave); text-align: center; }
+        .lpo-papel { margin-top: 44px; padding: 36px 20px; background: var(--papel); }
+        .lpo-passos { list-style: none; margin-top: 16px !important; }
+        .lpo-passos li { display: flex; align-items: center; gap: 12px; padding: 11px 0; font-size: 16px; font-weight: 650; line-height: 1.28; letter-spacing: -.01em; }
+        .lpo-passos li + li { border-top: 1px solid var(--borda); }
+        .lpo-passos i { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--grafite); color: #fff; font-style: normal; font-size: 14px; font-weight: 800; }
+        .lpo-selos { display: flex; gap: 10px; margin-top: 14px; }
+        .lpo-selos a { display: block; }
+        .lpo .lpo-selos img { width: auto; height: 42px; }
+        .lpo-aval { margin-top: 12px !important; padding: 14px 16px !important; border-radius: 14px; background: var(--papel); }
+        .lpo-aval blockquote { font-size: 16px; line-height: 1.32; font-weight: 650; letter-spacing: -.01em; }
+        .lpo-aval figcaption { margin-top: 6px; font-size: 12px; font-weight: 600; color: var(--suave); }
+        .lpo-oferta { margin: 44px 16px 0; border-radius: 22px; overflow: hidden; border: 1.5px solid var(--grafite); scroll-margin-top: 16px; }
+        .lpo-oferta-faixa { padding: 11px 18px; background: var(--grafite); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+        .lpo-oferta-corpo { padding: 20px 18px 18px; }
+        .lpo-preco { font-size: 46px; line-height: 1; font-weight: 850; letter-spacing: -.04em; white-space: nowrap; }
+        .lpo-frase { margin-top: 6px !important; font-size: 19px; font-weight: 800; letter-spacing: -.02em; }
+        .lpo-comp { width: 100%; margin-top: 16px; border-collapse: collapse; font-size: 14px; }
+        .lpo-comp td { padding: 9px 0; border-top: 1px solid var(--borda); font-weight: 600; color: var(--suave); }
+        .lpo-comp td:last-child { text-align: right; white-space: nowrap; }
+        .lpo-comp tr.nos td { color: var(--tx); font-weight: 800; }
+        .lpo-texto { margin-top: 10px !important; font-size: 14px; line-height: 1.36; color: var(--suave); }
+        .lpo-texto b { color: var(--tx); font-weight: 700; }
+        .lpo-oferta .lpo-cta { margin-top: 16px; }
+        .lpo-oferta-aval { margin-top: 16px !important; padding-top: 14px !important; border-top: 1px solid var(--borda); font-size: 15px; line-height: 1.32; font-weight: 650; }
+        .lpo-oferta-aval small { display: block; margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--suave); }
+        .lpo-confia { margin-top: 12px !important; font-size: 12px; line-height: 1.5; font-weight: 600; color: var(--suave); text-align: center; }
+        .lpo details { border-bottom: 1px solid var(--borda); }
+        .lpo summary { list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 15px 2px; font-size: 16px; font-weight: 700; letter-spacing: -.01em; cursor: pointer; }
+        .lpo summary::-webkit-details-marker { display: none; }
+        .lpo summary::after { content: "+"; font-size: 22px; font-weight: 500; color: var(--suave); line-height: 1; }
+        .lpo details[open] summary::after { content: "–"; }
+        .lpo details p { padding: 0 2px 15px; font-size: 15px; line-height: 1.42; color: var(--suave); }
+        .lpo-duvidas { margin-top: 10px; }
+        .lpo-fim { margin-top: 44px; padding: 36px 20px; background: var(--grafite); color: #fff; text-align: center; }
+        .lpo-fim .lpo-h2 { color: #fff; }
+        .lpo-fim p { margin: 8px 0 18px; font-size: 15px; font-weight: 600; color: #d9d6dc; }
+        .lpo-rodape { padding: 20px 20px 112px; text-align: center; font-size: 12px; line-height: 1.7; color: var(--suave); }
+        .lpo-rodape a { color: inherit; }
+        .lpo-fixo { position: fixed; z-index: 50; left: 0; right: 0; bottom: 0; max-width: 440px; margin: 0 auto; padding: 9px 16px calc(7px + env(safe-area-inset-bottom)); background: #fff; border-top: 1px solid var(--borda); transform: translateY(110%); transition: transform .2s; }
+        .lpo-fixo[data-on] { transform: none; }
+        .lpo-fixo-linha { display: flex; align-items: center; gap: 12px; }
+        .lpo-fixo-p { flex: none; line-height: 1.1; }
+        .lpo-fixo-p b { display: block; font-size: 17px; font-weight: 850; letter-spacing: -.02em; white-space: nowrap; }
+        .lpo-fixo-p span { font-size: 12px; font-weight: 600; color: var(--suave); white-space: nowrap; }
+        .lpo-fixo .lpo-cta { flex: 1; min-width: 0; min-height: 48px; font-size: 15.5px; padding: 4px 10px; }
+        .lpo-fixo-m { margin: 5px 0 0; text-align: center; font-size: 12px; font-weight: 600; color: var(--suave); }
+        @media (min-height: 800px) { .lpo-fone-area { padding: 0 22px; } } /* tela alta: o celular cresce e encosta no bloco de compra, sem vão embaixo */
+        @media (max-height: 600px) { .lpo-hero { min-height: 480px; } .lpo-aval1 { display: none; } } /* tela baixa: a citação cede a altura e o botão cabe inteiro */
+        @media (max-width: 374px) { .lpo-lojas { gap: 7px; font-size: 11.5px; } .lpo-lojas svg { display: none; } .lpo-cta { font-size: 16px; } }
+      </style>
+      <div class="lpo" id="lpo">
+        <div class="lp-promo" role="note"><b>🔥 ACESSO VITALÍCIO</b> <span>· só hoje<b id="lpo-promo-data"></b></span></div>
+        <section class="lpo-hero" data-bloco="topo">
+          <div class="lpo-marca">
+            <b>CORE</b>
+            <div class="lpo-lojas" aria-label="Na App Store, na Google Play e no computador">
+              <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.7c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9s-2-.9-3.3-.8C6.1 7 4.6 8 3.7 9.5c-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.3.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.8-1.1-2.9-4.2zM13.9 5.3c.7-.8 1.2-2 1-3.2-1 0-2.3.7-3 1.5-.6.7-1.2 1.9-1.1 3.1 1.2.1 2.3-.6 3.1-1.4z"/></svg>App Store</span>
+              <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 2.2 13.8 12 3.6 21.8c-.4-.2-.6-.6-.6-1.1V3.3c0-.5.2-.9.6-1.1zm11.7 11.3 2.8 2.8-10.4 6c-.6.3-1.2.3-1.7 0zM18.1 8.6l3.1 1.8c1 .6 1 1.6 0 2.2l-3.1 1.8L15.3 12zM5.8 1.9l10.3 6-2.8 2.8L5.8 2c.5-.3 1.2-.3 1.7 0z"/></svg>Google Play</span>
+              <span>Computador</span>
+            </div>
+          </div>
+          <div class="lpo-titulo">
+            <h1 class="lpo-h1">Um app pra <em>vida inteira.</em><br />R$&nbsp;67,90. Uma vez só.</h1>
+            <p class="lpo-areas">Organize dinheiro, rotina, treino e mais 13 áreas.</p>
+          </div>
+          <div class="lpo-fone-area"><div class="lpo-fone"><img src="/landing/v3-home.webp" width="720" height="1070" alt="Tela inicial do app CORE: próxima conta, orçamento, treino e sono" fetchpriority="high" decoding="async" /></div></div>
+          <div class="lpo-compra">
+            <p class="lpo-aval1">“Tem tudo que eu preciso em um só lugar.” <span>Google Play</span></p>
+            <p class="lpo-uma-vez">Paga 1 vez. É seu pra sempre.<small>Vitalício, sem mensalidade. Pix ou cartão.</small></p>
+            <button type="button" class="lpo-cta" data-lpo-abre="topo">Organizar minha vida por R$&nbsp;67,90</button>
+            <p class="lpo-miudo">Nada é cobrado depois · 7 dias de garantia</p>
+          </div>
+        </section>
+
+        <section class="lpo-bloco" data-bloco="modulos" style="padding-top:36px">
+          <h2 class="lpo-h2">Comece por uma área. <em>Esconda o resto.</em></h2>
+          <p class="lpo-leve">São 16 áreas. Use só as que quiser.</p>
+          <div class="lpo-print"><img src="/landing/lpo-organizar.webp" width="760" height="373" loading="lazy" decoding="async" alt="Tela real do app: Beleza e Casa escondidas, Dev. Pessoal visível" /></div>
+        </section>
+
+        <section class="lpo-bloco" data-bloco="antes">
+          <h2 class="lpo-h2">O que muda <em>no seu dia.</em></h2>
+          <article class="lpo-virada">
+            <header><s>Dinheiro que some</s></header>
+            <h3>Lance o que entra e o que sai e veja quanto pode gastar hoje.</h3>
+            <img src="/landing/lpo-gastar.webp" width="760" height="276" loading="lazy" decoding="async" alt="Tela real: quanto posso gastar hoje, R$ 146 por dia" />
+          </article>
+          <article class="lpo-virada">
+            <header><s>Conta que vence</s></header>
+            <h3>A conta aparece antes de vencer.</h3>
+            <img src="/landing/lpo-alertas.webp" width="760" height="478" loading="lazy" decoding="async" alt="Tela real: alertas de contas que vencem hoje e nos próximos dias" />
+          </article>
+          <article class="lpo-virada">
+            <header><s>Rotina que não dura</s></header>
+            <h3>Você marca o dia e vê a sequência crescer.</h3>
+            <img src="/landing/lpo-sequencia.webp" width="760" height="363" loading="lazy" decoding="async" alt="Tela real: consistência, 41 dias seguidos" />
+          </article>
+          <p class="lpo-nota">Telas reais do app, com dados de exemplo.</p>
+        </section>
+
+        <section class="lpo-papel">
+          <h2 class="lpo-h2">E o resto da vida também.</h2>
+          <div class="lpo-print"><img src="/landing/v3-modulos.webp" width="900" height="1045" loading="lazy" decoding="async" alt="Tela real: as 16 áreas do app" /></div>
+        </section>
+
+        <section class="lpo-bloco" data-bloco="como" style="padding-top:36px">
+          <h2 class="lpo-h2">Como funciona</h2>
+          <ol class="lpo-passos">
+            <li><i>1</i>Você paga uma vez.</li>
+            <li><i>2</i>Baixa na App Store ou na Google Play.</li>
+            <li><i>3</i>Toca em Entrar, com o mesmo e-mail.</li>
+          </ol>
+        </section>
+
+        <section class="lpo-bloco" data-bloco="avaliacoes">
+          <h2 class="lpo-h2">Está na App Store e na Google Play.</h2>
+          <div class="lpo-selos"><a href="https://apps.apple.com/br/app/id6806913181" data-loja="ios"><img src="/selos/app-store.svg" width="126" height="42" loading="lazy" alt="Ver o CORE na App Store" /></a><a href="https://play.google.com/store/apps/details?id=br.com.coreaplicativo.app&amp;referrer=utm_source%3Dweb%26utm_medium%3Doferta_lp%26utm_campaign%3Dweb_oferta_lp" data-loja="android"><img src="/selos/google-play.png" width="141" height="42" loading="lazy" alt="Ver o CORE na Google Play" /></a></div>
+          <figure class="lpo-aval" style="margin-top:16px"><blockquote>“O melhor organizador que já tive.”</blockquote><figcaption>Avaliação na App Store</figcaption></figure>
+          <figure class="lpo-aval"><blockquote>“Muito bom pra quem quer se organizar em todas as áreas da vida.”</blockquote><figcaption>Avaliação na App Store</figcaption></figure>
+        </section>
+
+        <section class="lpo-oferta" data-bloco="oferta">
+          <div class="lpo-oferta-faixa">Vitalício · as 16 áreas da vida</div>
+          <div class="lpo-oferta-corpo">
+            <p class="lpo-preco">R$&nbsp;67,90</p>
+            <p class="lpo-frase">Uma vez. <em>É seu pra sempre.</em></p>
+            <!-- o R$ 97,90 é o anual das lojas: mudou o anual, muda esta linha -->
+            <table class="lpo-comp">
+              <tr><td>Nas lojas: assinatura</td><td>R$&nbsp;97,90 todo ano</td></tr>
+              <tr class="nos"><td>Aqui: mesmo app</td><td>R$&nbsp;67,90 uma vez</td></tr>
+            </table>
+            <p class="lpo-texto">Tem app só de finanças por R$&nbsp;249,90 por ano. No CORE você paga R$&nbsp;67,90 uma vez e leva os 16 módulos pra sempre: finanças, rotina, treino e mais.</p>
+            <p class="lpo-texto"><b>Pix ou cartão.</b></p>
+            <button type="button" class="lpo-cta" data-lpo-abre="oferta">Organizar minha vida por R$&nbsp;67,90</button>
+            <p class="lpo-miudo">Nada é cobrado depois · 7 dias de garantia</p>
+            <p class="lpo-oferta-aval">“É maravilhoso pra se organizar e motivar. Vale cada centavo.”<small>Avaliação na Google Play</small></p>
+            <p class="lpo-confia">CORE · CNPJ 55.041.112/0001-82<br />contato@coreaplicativo.com.br</p>
+          </div>
+        </section>
+
+        <section class="lpo-bloco" data-bloco="duvidas">
+          <h2 class="lpo-h2">Dúvidas</h2>
+          <div class="lpo-duvidas">
+            <details><summary>É mensalidade?</summary><p>Não. Você paga uma vez. Nada é cobrado depois.</p></details>
+            <details><summary>É app de verdade?</summary><p>Sim. Está na App Store e na Google Play, e abre no computador com a mesma conta.</p></details>
+            <details><summary>Como entro depois de pagar?</summary><p>Baixe o app e toque em Entrar, com o e-mail da compra.</p></details>
+            <details><summary>Por que nas lojas é outro preço?</summary><p>Nas lojas é assinatura. Aqui é pagamento único, com o mesmo app.</p></details>
+            <details><summary>Conecta no banco?</summary><p>Não. Você lança em segundos ou importa o extrato.</p></details>
+            <details><summary>Tem teste grátis?</summary><p>Nesta oferta, não. Tem 7 dias de garantia: não gostou, devolvemos 100%.</p></details>
+          </div>
+        </section>
+
+        <section class="lpo-fim" data-bloco="fim">
+          <h2 class="lpo-h2">Sua vida inteira num app só.</h2>
+          <p>R$&nbsp;67,90, uma vez. Pix ou cartão.</p>
+          <button type="button" class="lpo-cta" data-lpo-abre="fim">Organizar minha vida por R$&nbsp;67,90</button>
+        </section>
+        <footer class="lpo-rodape">CORE · CNPJ 55.041.112/0001-82<br /><a href="mailto:contato@coreaplicativo.com.br">contato@coreaplicativo.com.br</a> · <a href="/termos">Termos</a> · <a href="/privacidade">Privacidade</a></footer>
+      </div>
+      <div class="lpo-fixo" id="lpo-fixo" aria-hidden="true">
+        <div class="lpo-fixo-linha">
+          <span class="lpo-fixo-p"><b>R$&nbsp;67,90</b><span>Paga 1 vez</span></span>
+          <button type="button" class="lpo-cta" data-lpo-abre="fixo" tabindex="-1">Organizar minha vida</button>
+        </div>
+        <p class="lpo-fixo-m">Sem mensalidade · 7 dias de garantia</p>
+      </div>
+    </template>
+    <script>
+      // só no braço "nova": a página entra aqui, antes do <main> (que fica escondido). Toque antes do landing.ts chegar fica na fila.
+      if (document.documentElement.getAttribute("data-lpo") === "nova") {
+        (function () {
+          var tpl = document.getElementById("lpo-nova");
+          document.body.insertBefore(tpl.content.cloneNode(true), tpl);
+          try { document.getElementById("lpo-promo-data").textContent = ", " + new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" }).format(new Date()); } catch (e) {}
+          document.addEventListener("click", function (e) {
+            var b = e.target && e.target.closest ? e.target.closest("[data-lpo-abre]") : null;
+            if (b && !window.__lpoPronta) window.__lpoFila = b.getAttribute("data-lpo-abre");
+          }, true);
+        })();
+      }
+    </script>
     <main class="lp" id="lp">
       <!-- ═════════ 1. TOPO ═════════ -->
       <div class="lp-promo" role="note" data-so-lp="atual"><b data-so-oferta="sempre">🔥 ACESSO VITALÍCIO</b><b data-so-oferta="ano">🔥 OFERTA ESPECIAL</b> <span>· só hoje<b id="lp-promo-data"></b></span></div>

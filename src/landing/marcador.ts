@@ -132,6 +132,12 @@ const novoId = (): string => {
 };
 const ID_OK = /^[A-Za-z0-9-]{8,64}$/;
 
+/** Regrava o id que a página já tem no heap (o navegador do Instagram zera cookie e storage com a página viva). */
+export function fixarAparelho(id: string): void {
+  if (lerLs(CHAVE_APARELHO) !== id) gravarLs(CHAVE_APARELHO, id);
+  if (lerCookie(COOKIE_APARELHO) !== id) gravarCookie(COOKIE_APARELHO, id);
+}
+
 /** O id estável do aparelho (cookie + localStorage; um socorre o outro). */
 export function idDoAparelho(): string {
   const doLs = lerLs(CHAVE_APARELHO);

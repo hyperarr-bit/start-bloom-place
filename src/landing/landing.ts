@@ -63,6 +63,10 @@
  *   "Sua conta está pronta" (nunca no "Você já tem o CORE"); "Agora não"/Continuar → a conta pronta de sempre, com as lojas. O módulo
  *   (./upsell-2027.ts) só baixa com a chave ligada ou pelo link do e-mail de compra confirmada (?r=u2027, que reabre o MESMO Pix).
  *   Com a chave desligada e sem ?r=u2027, nada aqui roda (o braço atual fica igual). Sem pixel no upsell.
+ * (06/11) A/B DA PÁGINA DA /oferta (AB_OFERTA_LP no <head> → html[data-lpo="atual"|"nova"]): todo evento da /oferta leva braco_lp_oferta +
+ * lpo_forcado. "nova" = <template id="lpo-nova"> + ./oferta-nova.ts: blocos com os mesmos data-bloco, todo botão abre o checkout direto
+ * (landing_cta {onde:"stripe", de:"topo"|"oferta"|"fim"|"fixo"}), sem demo. O checkout e o pós-compra são os mesmos.
+ *
  * (02/11) A/B DA TELA DO PIX (AB_PIX no <head> → html[data-pix="atual"|"b"]; todo evento leva braco_pix). Braço "b" = "Recibo da
  *   marca" (htmlPixB; só a fase `qr`): marca + nº do pedido, preço, passo acima do botão, pílula de status, recibo (No banco aparece /
  *   Garantia / Acesso), QR dobrado, estado "voltou do banco" (landing_pix_volta_vista {order_id, via}; chips landing_pix_motivo
@@ -75,13 +79,14 @@
 import {
 
   EMAIL_OK, MODULO_DA_AREA, NOME_DO_MODULO, ROTULO_OFERTA, VALOR_OFERTA, URL_APP_STORE,
-  bracoCheckoutDoHtml, bracoLpDoHtml, bracoPixDoHtml, motivoPixDoHtml, NOME_NO_BANCO, CNPJ_NO_BANCO, checarEmailAntes, sugestaoDeEmail, voltaDoLembrete, upsell2027DoHtml, voltaDoEmailU2027, upsellPosDoHtml, ehPraSempreOferta,
+  bracoCheckoutDoHtml, bracoLpDoHtml, bracoLpOfertaDoHtml, bracoPixDoHtml, motivoPixDoHtml, NOME_NO_BANCO, CNPJ_NO_BANCO, checarEmailAntes, sugestaoDeEmail, voltaDoLembrete, upsell2027DoHtml, voltaDoEmailU2027, upsellPosDoHtml, ehPraSempreOferta,
   ESTADO_VAZIO, bracoOfertaDoHtml, bracoTituloDoHtml, ehArea, ehModuloLanding, estadoQueVolta, mmss, ofertaEscolhida, reais, urlPlay, venceEm,
   type Area, type EstadoLanding, type MensagemDaDemo, type ModuloLanding, type OfertaLanding, type PixLanding, type PixU2027,
 } from "./regras";
+import { ligarOfertaNova, preaquecerStripe, sairDaOfertaNova } from "./oferta-nova";
 import { lerEstadoU2027, lerU2027Guardado } from "./u2027-estado";
 import { lerEstadoPresenteLp } from "./presente-estado";
-import { esquecerCompra, esquecerPixVivo, gravarCookie, gravarPixVivo, idDoAparelho, lerCompra, lerCookie, lerPixVivo, marcarCompra, temSessaoNoStorage, type MarcaCompra } from "./marcador";
+import { esquecerCompra, esquecerPixVivo, fixarAparelho, gravarCookie, gravarPixVivo, idDoAparelho, lerCompra, lerCookie, lerPixVivo, marcarCompra, temSessaoNoStorage, type MarcaCompra } from "./marcador";
 import { carregarComRetry, limparMarcaDeRecarga } from "./carregar";
 import { REF_OK, checkoutExtDoHtml, paginaDoHtml, pkStripeValida, reaisDeCentavos, urlCheckoutHotmart, urlHotmartValida } from "./hotmart";
 
@@ -110,7 +115,7 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 const agora = () => Math.round(performance.now());
 type Janela = Window & {
   __landingSimularJaTem?: boolean;
-  __landing?: { pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null };
+  __landing?: { lpo_forcado?: boolean; ab_lp_oferta?: string; lpo_stripe_cedo?: string; pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null };
   __eventosLanding?: Record<string, unknown>[];
   /** 02/11 (dev/testes): voltou() = "voltei do banco" (≥ 5 s fora) sem trocar de aba; vencer() = o QR vence em 1,5 s */
   __landingSimular?: { pagar: () => void; pagarU2027?: () => void; voltou?: () => void; vencer?: () => void };
@@ -173,6 +178,12 @@ const BRACO_VIDA = PAGINA === "vida" ? (document.documentElement.getAttribute("d
 /** o botão da Hotmart do braço na tela (v2: "Quero organizar minha vida"; atual: "Quero organizar tudo") */
 const ID_BOTAO_HM = V2 ? "lp-hotmart" : "lp-hotmart-atual";
 const ROTULO_BOTAO_HM = V2 ? "Quero organizar minha vida" : "Quero organizar tudo";
+/** 06/11: o braço da PÁGINA da /oferta (AB_OFERTA_LP no <head>). LPO_ATIVO = o teste está valendo (chave on ou ?lpo=): só aí o braço vai
+ *  pra metadata do PI e pro Purchase do navegador. Com a chave off, a /oferta só ganha os 2 campos nos eventos landing_*. */
+const BRACO_LP_OFERTA = PAGINA === "oferta" ? bracoLpOfertaDoHtml() : null;
+const LPO_NOVA = STRIPE && BRACO_LP_OFERTA === "nova";
+const LPO_FORCADO = !!w.__landing?.lpo_forcado;
+const LPO_ATIVO = STRIPE && (w.__landing?.ab_lp_oferta === "on" || LPO_FORCADO);
 const PIX_MOTIVO = motivoPixDoHtml(); // 02/11: chips "O que te travou?" no estado "voltou" do b (PIX_MOTIVO, padrão off)
 const U2027 = upsell2027DoHtml(); // 31/10: o "Seu 2027" no pós-pago (chave UPSELL_2027 / ?u2027=on)
 const VOLTA_U2027 = voltaDoEmailU2027(BUSCA); // 31/10: chegou pelo bloco do 2027 no e-mail de compra confirmada
@@ -221,7 +232,7 @@ for (const k of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm
 if (BUSCA.get("fbclid")) atrib.tem_fbclid = "1";
 
 export function evento(nome: string, dados: Record<string, unknown> = {}): void {
-  const corpo = { ...dados, ...(PAGINA ? { pagina: PAGINA, braco_checkout_ext: EXT, braco_vida: BRACO_VIDA } : {}), landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, braco_pix: brPix, pix_forcado: pixForcado, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
+  const corpo = { ...dados, ...(PAGINA ? { pagina: PAGINA, braco_checkout_ext: EXT, braco_vida: BRACO_VIDA } : {}), ...(BRACO_LP_OFERTA ? { braco_lp_oferta: BRACO_LP_OFERTA, lpo_forcado: LPO_FORCADO } : {}), landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, braco_pix: brPix, pix_forcado: pixForcado, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
   listaDeEventos.push({ nome, ...corpo });
   if (!PRODUCAO) return;
   try {
@@ -372,7 +383,7 @@ const depoisDoLoad = (f: () => void) => { if (document.readyState === "complete"
 /* crítica r2 do upsell 2027 (técnico MEDIA 1, só com o 2027 ligado): quem já está no Pix/pago não precisa da demo de 4–5 MB — e,
  * no WebKit, o iframe navegando depois do pushState da página do 2027 comia o 1º Voltar. Com a chave off, igual a antes. */
 const demoDeFundoServe = () => !(U2027 && estado.fase !== "oferta");
-if (!V2) {
+if (!V2 && !LPO_NOVA) { // 06/11: a página nova da /oferta não tem demo
   depoisDoPixel(() => depoisDoLoad(() => ocioso(() => { if (demoDeFundoServe()) iniciarDemo("fundo"); }, 1500)));
   if ("IntersectionObserver" in window) {
     const perto = new IntersectionObserver((ens) => { if (ens.some((e) => e.isIntersecting) && demoDeFundoServe()) { iniciarDemo("perto"); perto.disconnect(); } }, { threshold: 0.25 });
@@ -626,7 +637,7 @@ document.querySelectorAll<HTMLElement>("[data-ir]").forEach((b) => b.addEventLis
   if (alvo === "dentro-v2") evento("landing_lojas_topo", {}); // r1: "App Store · Google Play · Computador" da 1ª tela → rola até "Sim, é um app de verdade"
   rolarAte($(alvo));
 }));
-document.querySelectorAll<HTMLAnchorElement>("a[data-loja]").forEach((a) => a.addEventListener("click", () => evento("landing_loja", { loja: a.dataset.loja, onde: a.closest("#lp-pix") ? "pos_compra" : "como" })));
+document.querySelectorAll<HTMLAnchorElement>("a[data-loja]").forEach((a) => a.addEventListener("click", () => evento("landing_loja", { loja: a.dataset.loja, onde: a.closest("#lp-pix") ? "pos_compra" : a.closest("#lpo") ? "prova" : "como" })));
 
 /* ───────────────────────── o estado da compra (guardado: o banco fecha/recarrega a aba) ───────────────────────── */
 const CHAVE_ESTADO = "landing-estado-v1";
@@ -843,6 +854,7 @@ const salvar = (novo: Partial<EstadoLanding>) => {
 /* r3 (pix 2): o navegador do Instagram zera o localStorage com a página viva (~5 s depois da chegada). O heap segura a
  * página, mas uma recarga depois disso voltava pra oferta. A cada volta pra aba (e a cada render do v2) a chave é re-semeada. */
 const reSemear = () => {
+  if (LPO_ATIVO) fixarAparelho(aparelho); // 06/11: com o A/B da /oferta ativo, o id zerado voltaria sorteado de novo (a pessoa contaria 2× e poderia trocar de braço)
   if (!V2 || (estado.fase !== "qr" && estado.fase !== "pago")) return; // só onde há dinheiro em jogo (a conta pronta já vive no marcador)
   try { if (localStorage.getItem(CHAVE_ESTADO) === null) localStorage.setItem(CHAVE_ESTADO, JSON.stringify(estado)); } catch { /* sem storage */ }
 };
@@ -1791,14 +1803,52 @@ if (HOTMART) document.getElementById(ID_BOTAO_HM)?.addEventListener("click", () 
 type ModStripe = typeof import("./stripe-checkout");
 let modStripe: Promise<ModStripe> | null = null;
 const carregarStripeCheckout = () => (modStripe ??= import("./stripe-checkout"));
+/** 06/11: com o teste ativo, o braço da página vai no Purchase do navegador (mesmo eventID) e na metadata do PI (pelo atrib, sem mexer no checkout) */
+const pixelStripe: typeof pixel = LPO_ATIVO ? (ev, p = {}, id) => pixel(ev, ev === "Purchase" ? { ...p, braco_lp_oferta: BRACO_LP_OFERTA } : p, id) : pixel;
+/** o navegador devolve a rolagem salva depois do Voltar e da recarga: sem o "manual" e a 2ª passada, ela ficaria no topo, longe do cartão */
+const levarAoJaTem = () => {
+  try { history.scrollRestoration = "manual"; } catch { /* noop */ }
+  rolarAte($("oferta"), "start", false);
+  requestAnimationFrame(() => rolarAte($("oferta"), "start", false));
+};
+/** 06/11: com o teste ativo, quem pagou fica marcada nos 2 braços (o checkout não marca). O "Você já tem o CORE" entra atrás da camada, e o X leva até ele. */
+/** o e-mail da compra: guardado ao tocar em Pagar, porque na hora do "pago" o campo já saiu da tela (Pix: fase do QR; 3DS: a página recarregou). A aba guarda pra volta do banco e pra recarga com o QR na tela. */
+const CHAVE_EMAIL_PAGANDO = "oferta-email-pagando";
+let emailPagando: string | null = null;
+const guardarEmailPagando = () => {
+  emailPagando = document.querySelector<HTMLInputElement>("#oc-email")?.value.trim().toLowerCase() || null;
+  try { if (emailPagando) sessionStorage.setItem(CHAVE_EMAIL_PAGANDO, emailPagando); } catch { /* fica no heap */ }
+};
+const lerEmailPagando = () => { if (emailPagando) return emailPagando; try { return sessionStorage.getItem(CHAVE_EMAIL_PAGANDO); } catch { return null; } };
+const aoPagarStripe = () => {
+  marcarCompra({ oferta: "stripe", email: lerEmailPagando() });
+  try { sessionStorage.removeItem(CHAVE_EMAIL_PAGANDO); } catch { /* noop */ }
+  jaTem = lerCompra();
+  render();
+  sairDaOfertaNova();
+  const oc = document.getElementById("oc");
+  if (!oc) return;
+  const obs = new MutationObserver(() => { if (oc.hidden) { obs.disconnect(); levarAoJaTem(); } });
+  obs.observe(oc, { attributes: true, attributeFilter: ["hidden"] });
+};
+const eventoStripe: typeof evento = LPO_NOVA || LPO_ATIVO
+  ? (nome, dados) => { evento(nome, dados); if (nome === "landing_stripe_pagar") guardarEmailPagando(); if (nome === "landing_stripe_pago") { try { aoPagarStripe(); } catch { /* o Purchase vem logo depois: nada aqui pode impedir */ } } }
+  : evento;
+const opcoesStripe = () => ({
+  pk: ST_PK, precoCentavos: ST_PRECO, parcelasMax: Number(w.__landing?.stripe_parcelas_max) || 12, producao: PRODUCAO, pedeCpf: w.__landing?.stripe_pede_cpf === true,
+  evento: eventoStripe, pixel: pixelStripe, atrib: LPO_ATIVO ? { ...atrib, braco_lp_oferta: String(BRACO_LP_OFERTA) } : atrib, sessao, aparelho, urlChegada: URL_DE_CHEGADA, fbclid: BUSCA.get("fbclid"),
+});
 if (STRIPE) {
-  document.getElementById(ID_BOTAO_HM)?.addEventListener("click", () => {
-    evento("landing_cta", { onde: "stripe", fase: estado.fase });
-    void carregarStripeCheckout().then((m) => m.abrirCheckout({
-      pk: ST_PK, precoCentavos: ST_PRECO, parcelasMax: Number(w.__landing?.stripe_parcelas_max) || 12, producao: PRODUCAO, pedeCpf: w.__landing?.stripe_pede_cpf === true,
-      evento, pixel, atrib, sessao, aparelho, urlChegada: URL_DE_CHEGADA, fbclid: BUSCA.get("fbclid"),
-    }));
-  });
+  const abrirStripe = (de?: string) => {
+    evento("landing_cta", { onde: "stripe", fase: estado.fase, ...(de ? { de } : {}) });
+    void carregarStripeCheckout().then((m) => m.abrirCheckout(opcoesStripe()));
+  };
+  document.getElementById(ID_BOTAO_HM)?.addEventListener("click", () => abrirStripe());
+  if (LPO_NOVA) {
+    ligarOfertaNova({ abrir: abrirStripe });
+    // 06/11 (só com LPO_STRIPE_CEDO "on"): só o download, nunca antes do load; a tag <script> continua sendo a do checkout, que não muda
+    if (PRODUCAO && w.__landing?.lpo_stripe_cedo === "on") depoisDoPixel(() => depoisDoLoad(() => ocioso(preaquecerStripe, 1000)));
+  }
   // voltou de um 3DS por redirecionamento (?payment_intent=…&redirect_status=…): reabre o checkout no estado certo
   if (BUSCA.get("payment_intent") && BUSCA.get("redirect_status")) {
     // 3 (revisão): lido o retorno do banco, a URL fica limpa (recarregar não reabre a "volta" de novo)
@@ -1807,11 +1857,8 @@ if (STRIPE) {
       for (const k of ["payment_intent", "payment_intent_client_secret", "redirect_status"]) limpa.searchParams.delete(k);
       history.replaceState(history.state, "", `${limpa.pathname}${limpa.search}${limpa.hash}`);
     } catch { /* noop */ }
-    void carregarStripeCheckout().then((m) => m.abrirCheckout({
-      pk: ST_PK, precoCentavos: ST_PRECO, parcelasMax: Number(w.__landing?.stripe_parcelas_max) || 12, producao: PRODUCAO, pedeCpf: w.__landing?.stripe_pede_cpf === true,
-      evento, pixel, atrib, sessao, aparelho, urlChegada: URL_DE_CHEGADA, fbclid: BUSCA.get("fbclid"),
-      voltaDoBanco: { pi: String(BUSCA.get("payment_intent")), status: String(BUSCA.get("redirect_status")) },
-    }));
+    const voltaDoBanco = { pi: String(BUSCA.get("payment_intent")), status: String(BUSCA.get("redirect_status")) };
+    void carregarStripeCheckout().then((m) => m.abrirCheckout({ ...opcoesStripe(), voltaDoBanco }));
   }
   // pré-aquece o módulo quando a oferta aparece (o toque abre na hora)
   ocioso(() => { void carregarStripeCheckout(); }, 4000);
@@ -2042,6 +2089,8 @@ if (U2027 && !VOLTA_U2027 && !estado.pago && (estado.fase === "oferta" || estado
 
 /* 29/10: o aparelho já comprou (cookie/localStorage) e a página voltou na oferta → "Você já tem o CORE" */
 if (estado.fase === "oferta") { const m = lerCompra(); if (m) { jaTem = m; mostrarJaTem("marcador"); } }
+/* 06/11: quem já comprou neste aparelho vê o "Você já tem o CORE" da página de hoje (o braço nos eventos continua o sorteado). Chave off e braço atual: igual ao ar */
+if ((LPO_NOVA || LPO_ATIVO) && jaTem) { sairDaOfertaNova(); levarAoJaTem(); }
 if (u27Retomada) {
   evento("landing_u2027_retomado", { etapa: u27Retomada.etapa, order_id: u27Retomada.compra });
   try { history.scrollRestoration = "manual"; } catch { /* noop */ }

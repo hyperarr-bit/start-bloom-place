@@ -231,6 +231,19 @@ export function bracoLpDoAparelho(id: string): BracoLp {
   return ((h >>> 16) & 1) === 0 ? "atual" : "v2";
 }
 
+/** 06/11: o braço da PÁGINA da /oferta (AB_OFERTA_LP no <head> → html[data-lpo]). Fora da /oferta: sempre "atual". */
+export type BracoLpOferta = "atual" | "nova";
+export function bracoLpOfertaDoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): BracoLpOferta {
+  return el.getAttribute("data-lpo") === "nova" ? "nova" : "atual";
+}
+/** A conta do <head> (bit 12 do djb2-xor de "lpo:" + id — independente dos bits 0, 8, 16 e 24 dos outros sorteios), pros testes. */
+export function bracoLpOfertaDoAparelho(id: string): BracoLpOferta {
+  const s = `lpo:${id}`;
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return ((h >>> 12) & 1) === 0 ? "atual" : "nova";
+}
+
 /** Os erros de domínio que mais aparecem (sugestão tocável embaixo do campo; nunca bloqueia). */
 const DOMINIO_ERRADO: Record<string, string> = {
   "gmial.com": "gmail.com", "gmal.com": "gmail.com", "gmai.com": "gmail.com", "gamil.com": "gmail.com", "gnail.com": "gmail.com",

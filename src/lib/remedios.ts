@@ -111,6 +111,9 @@ export const momentoDoInicio = (inicio: unknown): Date | null =>
  * relógio (até 12 h pra trás ou pra frente). 10:00 com 1ª dose 20:00 → hoje 20:00;
  * 10:00 com 1ª dose 08:00 → hoje 08:00 (já começou, como sempre foi); 23:00 com
  * 1ª dose 00:30 → amanhã 00:30 (é a de daqui a pouco, não a de ontem).
+ * Nunca ONTEM (07/11, 4ª rodada da crítica): às 06:00, um 12 em 12 com 1ª dose
+ * 20:00 começava ontem 20:00 e a dose das 08:00 de hoje já aparecia devida; agora
+ * é hoje 20:00. É a SUGESTÃO do cadastro — a pessoa vê "Começa hoje/amanhã" e troca.
  */
 export function inicioDoCadastro(primeira: string, agora: Date = new Date(), horarios: string[] = []): string | undefined {
   if (!ehHora(primeira)) return undefined;
@@ -123,9 +126,24 @@ export function inicioDoCadastro(primeira: string, agora: Date = new Date(), hor
   const aindaFaltaHoje = horarios.some((h) => ehHora(h) && momentoDe(h < primeira ? diaSeguinte(hoje) : hoje, h).getTime() > t);
   if (momentoDe(hoje, primeira).getTime() <= t && aindaFaltaHoje) return `${hoje}T${primeira}`;
   const meioDia = 12 * 3600_000;
-  const dia = [somarDias(hoje, -1), hoje, somarDias(hoje, 1)]
+  const dia = [hoje, somarDias(hoje, 1)]
     .find((d) => Math.abs(momentoDe(d, primeira).getTime() - agora.getTime()) <= meioDia) ?? hoje;
   return `${dia}T${primeira}`;
+}
+
+/**
+ * "Começa hoje 08:00" / "Começa amanhã 08:00" (07/11, 4ª rodada da crítica): o
+ * cadastro mostra o começo calculado e um toque troca entre hoje e amanhã. Quem
+ * cadastra às 23:30 um 8 em 8 desde 08:00 e só vai começar amanhã escolhe
+ * "amanhã" — e não recebe aviso à meia-noite de uma dose que não vai tomar.
+ * `amanha` ausente = a sugestão (`inicioDoCadastro`).
+ */
+export function inicioEscolhido(primeira: string, horarios: string[], amanha?: boolean, agora: Date = new Date()): { inicio: string; amanha: boolean } | undefined {
+  const sugerido = inicioDoCadastro(primeira, agora, horarios);
+  if (!sugerido) return undefined;
+  const diaDeAmanha = somarDias(localDayKey(agora), 1);
+  const ehAmanha = amanha ?? sugerido.slice(0, 10) === diaDeAmanha;
+  return { inicio: `${ehAmanha ? diaDeAmanha : localDayKey(agora)}T${primeira}`, amanha: ehAmanha };
 }
 
 /**
@@ -356,16 +374,20 @@ export function ultimasDosesDoGrupo(g: GrupoDeRemedio): DoseMarcavel[] {
   });
 }
 
-/** As linhas de um cadastro: uma por horário; com 2+ horários, todas levam o mesmo `grupo` e o `inicio` (a 1ª dose). */
+/**
+ * As linhas de um cadastro: uma por horário; com 2+ horários, todas levam o mesmo `grupo` e o `inicio` (a 1ª dose).
+ * `inicio`: o que a pessoa escolheu em "Começa hoje/amanhã" (`inicioEscolhido`); sem ele, a sugestão.
+ */
 export function montarLinhas(
   base: { name: string; quem?: string; stock: number },
   horarios: string[],
   ate?: string,
   agora: number = Date.now(),
+  inicioDaPessoa?: string,
 ): Remedio[] {
   const lista = horarios.length ? horarios : [""];
   const grupo = lista.length > 1 ? String(agora) : undefined;
-  const inicio = grupo ? inicioDoCadastro(lista[0], new Date(agora), lista) : undefined;
+  const inicio = !grupo ? undefined : ehInicio(inicioDaPessoa) ? inicioDaPessoa : inicioDoCadastro(lista[0], new Date(agora), lista);
   const quem = base.quem?.trim();
   return lista.map((time, i) => ({
     id: i === 0 ? String(agora) : `${agora}-${i}`,

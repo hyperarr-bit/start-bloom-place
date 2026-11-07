@@ -13,7 +13,7 @@ import { reagendarTudo, type Leitor } from "@/lib/reagendar";
 import { trackEvent } from "@/lib/analytics";
 import { avisarApagado } from "@/lib/desfazer";
 import {
-  OPCOES_VEZES, agruparRemedios, doseDaHora, dosesDoGrupoAgora, ehDia, gerarHorarios, inicioAoMudarPrimeira, montarLinhas, moverMarcasDoGrupo, rotuloDosHorarios,
+  OPCOES_VEZES, agruparRemedios, doseDaHora, dosesDoGrupoAgora, ehDia, gerarHorarios, inicioAoMudarPrimeira, inicioEscolhido, montarLinhas, moverMarcasDoGrupo, rotuloDosHorarios,
   tratamentoTerminou, ultimasDosesDoGrupo, type DoseMarcavel, type GrupoDeRemedio, type Remedio as Supplement, type VezesAoDia,
 } from "@/lib/remedios";
 
@@ -115,6 +115,8 @@ export const PharmacyChecklist = () => {
   const [newVezes, setNewVezes] = useState<VezesAoDia>(1);
   const [horariosEditados, setHorariosEditados] = useState<string[] | null>(null);
   const [newAte, setNewAte] = useState("");
+  /** "Começa hoje/amanhã" (07/11, 4ª rodada): null = a sugestão; true/false = o que a pessoa tocou */
+  const [comecaAmanha, setComecaAmanha] = useState<boolean | null>(null);
   /** o grupo com os horários/data abertos pra editar na tabela */
   const [editando, setEditando] = useState<string | null>(null);
   // 07/11: alarme exato do Android (ver `estadoAlarmeExato`) — "indisponivel" no iPhone e na web
@@ -126,6 +128,7 @@ export const PharmacyChecklist = () => {
   const grupos = agruparRemedios(supplements);
   const horariosGerados = gerarHorarios(newTime, newVezes);
   const horarios = horariosEditados ?? (horariosGerados.length ? horariosGerados : [newTime]);
+  const comeco = newVezes > 1 && horarios.length > 1 ? inicioEscolhido(horarios[0], horarios, comecaAmanha ?? undefined) : undefined;
 
   /** as linhas que andam juntas com esta: o grupo inteiro, ou só ela */
   const mesmoGrupo = (linha: Supplement) => (s: Supplement) => (linha.grupo ? s.grupo === linha.grupo : s.id === linha.id);
@@ -211,7 +214,7 @@ export const PharmacyChecklist = () => {
     const quem = newQuem.trim();
     const stock = lerEstoque(newStock) ?? ESTOQUE_PADRAO;
     const ate = ehDia(newAte) && newAte >= today ? newAte : undefined; // data no passado = sem fim
-    const novas = montarLinhas({ name: newName.trim(), quem, stock }, horarios, ate);
+    const novas = montarLinhas({ name: newName.trim(), quem, stock }, horarios, ate, Date.now(), comeco?.inicio);
     const lista = [...supplements, ...novas];
     setSupplements(lista);
     if (quem && !dependentes.includes(quem)) setDependentes([...dependentes, quem]);
@@ -221,6 +224,7 @@ export const PharmacyChecklist = () => {
     setNewVezes(1);
     setHorariosEditados(null);
     setNewAte("");
+    setComecaAmanha(null);
     if (novas.length > 1 || ate) trackEvent("remedio_vezes_cadastro", { vezes: novas.length, ate: !!ate });
     void rearmarLembretes(lista, true);
   };
@@ -629,9 +633,24 @@ export const PharmacyChecklist = () => {
         </div>
         {newVezes > 1 && (
           <div className="space-y-1.5" data-testid="remedio-horarios">
-            <p className="text-[11px] text-muted-foreground">
-              Horários · {rotuloDosHorarios(horarios)} <span className="opacity-70">(a 1ª dose ajusta as outras)</span>
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-x-2">
+              <p className="text-[11px] text-muted-foreground">
+                Horários · {rotuloDosHorarios(horarios)} <span className="opacity-70">(a 1ª dose ajusta as outras)</span>
+              </p>
+              {/* 07/11 (4ª rodada da crítica): o começo do tratamento à vista, só texto — um toque troca
+                  hoje/amanhã. Quem cadastra às 23:30 e começa amanhã não ganha aviso à meia-noite. */}
+              {comeco && (
+                <button
+                  type="button"
+                  onClick={() => setComecaAmanha(!comeco.amanha)}
+                  aria-label={`Começa ${comeco.amanha ? "amanhã" : "hoje"} às ${horarios[0]}. Tocar muda pra ${comeco.amanha ? "hoje" : "amanhã"}`}
+                  className="h-8 -my-1.5 shrink-0 text-[11px] font-semibold text-foreground underline decoration-dotted underline-offset-2"
+                  data-testid="remedio-comeca"
+                >
+                  Começa {comeco.amanha ? "amanhã" : "hoje"} {horarios[0]}
+                </button>
+              )}
+            </div>
             <div className={`grid gap-1.5 ${horarios.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
               {horarios.map((h, i) => (
                 <input

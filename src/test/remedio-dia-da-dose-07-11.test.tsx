@@ -418,3 +418,61 @@ describe("mudar a hora com o registro cheio: a marca vai junto com a dose", () =
     expect(linhas(store).map((l) => l.stock)).toEqual([0, 0, 0]);
   });
 });
+
+/* 4ª rodada da crítica (07/11): o começo do tratamento aparece no cadastro, numa linha curta da
+   fileira "Horários" — "Começa hoje 08:00" / "Começa amanhã 08:00" — e um toque troca o dia. */
+describe("cadastro: 'Começa hoje/amanhã'", () => {
+  const cadastrarNaTela = (store: ReturnType<typeof criarStore>, vezes: string, primeira?: string) => {
+    montar(store);
+    fireEvent.change(screen.getByPlaceholderText("Novo remédio ou suplemento..."), { target: { value: "Amoxicilina" } });
+    fireEvent.click(screen.getByRole("button", { name: vezes }));
+    if (primeira) fireEvent.change(within(screen.getByTestId("remedio-horarios")).getByLabelText("1ª dose"), { target: { value: primeira } });
+  };
+
+  it("a 1ª dose depois do relógio começa hoje, nunca ontem (06:00 com 20:00; 09:00 com 22:00)", () => {
+    expect(inicioDoCadastro("20:00", new Date(2026, 10, 7, 6), gerarHorarios("20:00", 2))).toBe("2026-11-07T20:00");
+    expect(inicioDoCadastro("22:00", new Date(2026, 10, 7, 9), gerarHorarios("22:00", 3))).toBe("2026-11-07T22:00");
+  });
+
+  it("23:30, 8 em 8 desde 08:00: mostra 'Começa hoje 08:00'; um toque vira amanhã, e não há aviso à meia-noite", () => {
+    agoraEm(7, 23, 30);
+    const store = criarStore({});
+    cadastrarNaTela(store, "8 em 8");
+    const linha = screen.getByTestId("remedio-comeca");
+    expect(linha.textContent).toBe("Começa hoje 08:00");
+    expect(within(screen.getByTestId("remedio-horarios")).getByTestId("remedio-comeca")).toBe(linha); // na fileira Horários
+    fireEvent.click(linha);
+    expect(screen.getByTestId("remedio-comeca").textContent).toBe("Começa amanhã 08:00");
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar remédio" }));
+    expect(linhas(store).map((l) => l.inicio)).toEqual(["2026-11-08T08:00", "2026-11-08T08:00", "2026-11-08T08:00"]);
+    expect(fmt(planoDe(store)[0].quando)).toBe("08/08:00");
+  });
+
+  it("20:30, 8 em 8 desde 08:00: continua 'hoje' sem tocar (a das 00:00 desta noite tem aviso)", () => {
+    agoraEm(7, 20, 30);
+    const store = criarStore({});
+    cadastrarNaTela(store, "8 em 8");
+    expect(screen.getByTestId("remedio-comeca").textContent).toBe("Começa hoje 08:00");
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar remédio" }));
+    expect(linhas(store)[0].inicio).toBe("2026-11-07T08:00");
+    expect(fmt(planoDe(store)[0].quando)).toBe("08/00:00");
+  });
+
+  it("06:00, 12 em 12 com 1ª dose 20:00: sugere 'hoje 20:00' — a das 08:00 de hoje não aparece como devida", () => {
+    agoraEm(7, 6);
+    const store = criarStore({});
+    cadastrarNaTela(store, "12 em 12", "20:00");
+    expect(screen.getByTestId("remedio-comeca").textContent).toBe("Começa hoje 20:00");
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar remédio" }));
+    expect(linhas(store)[0].inicio).toBe("2026-11-07T20:00");
+    const g = agruparRemedios(linhas(store))[0];
+    expect(dosesDoGrupoAgora(g).map((d) => `${d.time}@${d.dia}`)).toEqual(["20:00@2026-11-07", "08:00@2026-11-08"]);
+    expect(fmt(planoDe(store)[0].quando)).toBe("07/20:00");
+  });
+
+  it("1× ao dia não mostra a linha (a linha de sempre, sem início)", () => {
+    agoraEm(7, 10);
+    montar(criarStore({}));
+    expect(screen.queryByTestId("remedio-comeca")).toBeNull();
+  });
+});

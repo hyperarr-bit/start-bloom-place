@@ -149,25 +149,33 @@ export function inicioEscolhido(primeira: string, horarios: string[], amanha?: b
 /**
  * Mudou a hora da 1ª dose na edição (as outras são geradas de novo a partir dela,
  * como no cadastro — `horarios` é a lista nova). O `inicio` acompanha:
- *  - tratamento que AINDA NÃO começou: a hora nova na ocorrência mais perto do
- *    início antigo (até 12 h antes ou depois), se ela ainda não passou — quem
- *    escolheu "Começa amanhã 08:00" e acerta pra 09:00 continua começando AMANHÃ
- *    09:00 (conserto final 07/11: refazia como cadastro agora, voltava pra hoje e
- *    saía aviso de madrugada). Às 23:00, 00:30 de amanhã → 23:30 começa hoje 23:30.
- *    Se essa ocorrência já passou, aí sim é refeito como num cadastro agora;
+ *  - tratamento que AINDA NÃO começou: o DIA que a pessoa escolheu fica, se a hora
+ *    nova nesse dia ainda não passou — quem escolheu "Começa amanhã 08:00" e acerta
+ *    pra 09:00 (ou 21:00) continua começando AMANHÃ (conserto final 07/11: refazia
+ *    como cadastro agora e saía aviso de madrugada; crítica do conserto final: a
+ *    "ocorrência mais perto" levava 21:00, 22:00 e 23:00 pra hoje à noite). O dia
+ *    vizinho só ganha quando a troca atravessa a meia-noite por poucas horas (até 3 h):
+ *    às 23:00, 00:30 de amanhã → 23:30 começa hoje 23:30. Se a hora nova no dia
+ *    escolhido já passou, vale a ocorrência mais perto (até 12 h) que ainda vem, e
+ *    senão é refeito como num cadastro agora;
  *  - já começado: a data fica e só a hora muda (07/11, retomada). Com a hora
  *    velha, adiantar 08:00 → 07:00 deixava a 1ª dose "antes do início do dia".
  */
+const VIRADA_PERTO_MIN = 3 * 60;
 export function inicioAoMudarPrimeira(inicio: unknown, hora: string, agora: Date = new Date(), horarios: string[] = []): string | undefined {
   const quando = momentoDoInicio(inicio);
   if (!quando || !ehHora(hora)) return undefined;
   if (quando.getTime() > agora.getTime()) {
     const diaAntigo = String(inicio).slice(0, 10);
     const distancia = (d: string) => Math.abs(momentoDe(d, hora).getTime() - quando.getTime());
-    // o mesmo dia do início antigo ganha no empate (08:00 → 20:00 de amanhã fica amanhã)
-    const dia = [diaAntigo, somarDias(diaAntigo, -1), somarDias(diaAntigo, 1)]
-      .reduce((melhor, d) => (distancia(d) < distancia(melhor) ? d : melhor));
-    if (momentoDe(dia, hora).getTime() > agora.getTime()) return `${dia}T${hora}`;
+    const aindaVem = (d: string) => momentoDe(d, hora).getTime() > agora.getTime();
+    const vizinhos = [somarDias(diaAntigo, -1), somarDias(diaAntigo, 1)];
+    const cruzouAMeiaNoite = vizinhos.find((d) => distancia(d) <= VIRADA_PERTO_MIN * 60_000 && distancia(d) < distancia(diaAntigo) && aindaVem(d));
+    if (cruzouAMeiaNoite) return `${cruzouAMeiaNoite}T${hora}`;
+    if (aindaVem(diaAntigo)) return `${diaAntigo}T${hora}`;
+    // o mesmo dia do início antigo ganha no empate
+    const dia = [diaAntigo, ...vizinhos].reduce((melhor, d) => (distancia(d) < distancia(melhor) ? d : melhor));
+    if (aindaVem(dia)) return `${dia}T${hora}`;
     return inicioDoCadastro(hora, agora, horarios.length ? horarios : [hora]);
   }
   return `${String(inicio).slice(0, 10)}T${hora}`;

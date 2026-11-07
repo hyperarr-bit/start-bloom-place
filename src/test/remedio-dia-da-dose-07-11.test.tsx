@@ -649,3 +649,37 @@ describe("a caixa não troca a dose esquecida pela que ainda vem", () => {
     expect(doseDaHora(dosesDoGrupoAgora(g, as1545), as1545)?.time).toBe("16:00");
   });
 });
+
+/* Crítica do conserto final (07/11): "Começa amanhã 08:00" acertado às 21:35 pra 21:00, 22:00 ou 23:00
+   virava HOJE (a ocorrência mais perto do início antigo era a de hoje à noite). Enquanto não começou, o
+   DIA escolhido fica; a de perto só vale quando a troca atravessa a meia-noite por poucas horas. */
+describe("'Começa amanhã' e uma 1ª dose à noite", () => {
+  it("às 21:35, amanhã 08:00 → 06:00 … 23:00: todas continuam em 08/11", () => {
+    const agora = new Date(2026, 10, 7, 21, 35);
+    for (const hora of ["06:00", "09:00", "12:00", "19:00", "20:00", "21:00", "22:00", "23:00"]) {
+      expect([hora, inicioAoMudarPrimeira("2026-11-08T08:00", hora, agora, gerarHorarios(hora, 3))]).toEqual([hora, `2026-11-08T${hora}`]);
+    }
+    // atravessar a meia-noite por pouco continua valendo: às 23:00, amanhã 00:30 → 23:30 começa hoje 23:30
+    expect(inicioAoMudarPrimeira("2026-11-08T00:30", "23:30", new Date(2026, 10, 7, 23), gerarHorarios("23:30", 3))).toBe("2026-11-07T23:30");
+    // e de hoje à noite pra logo depois da meia-noite: às 20:00, hoje 23:00 → 01:00 começa amanhã 01:00
+    expect(inicioAoMudarPrimeira("2026-11-07T23:00", "01:00", new Date(2026, 10, 7, 20), gerarHorarios("01:00", 3))).toBe("2026-11-08T01:00");
+  });
+
+  it("na tela: amanhã 08:00 mudado pra 21:00 às 21:35 → começa amanhã 21:00 e nenhum aviso antes de 08/11", () => {
+    agoraEm(7, 21, 30);
+    const store = criarStore({});
+    montar(store);
+    fireEvent.change(screen.getByPlaceholderText("Novo remédio ou suplemento..."), { target: { value: "Amoxicilina" } });
+    fireEvent.click(screen.getByRole("button", { name: "8 em 8" }));
+    fireEvent.click(screen.getByTestId("remedio-comeca"));
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar remédio" }));
+    cleanup();
+    agoraEm(7, 21, 35);
+    montar(store);
+    fireEvent.click(screen.getByRole("button", { name: "Editar horários de Amoxicilina" }));
+    fireEvent.change(screen.getByLabelText("Horário de Amoxicilina (1ª dose)"), { target: { value: "21:00" } });
+    expect(screen.getByTestId("remedio-editar-comeca").textContent).toBe(" · começa amanhã 21:00");
+    expect(linhas(store).map((l) => l.inicio)).toEqual(["2026-11-08T21:00", "2026-11-08T21:00", "2026-11-08T21:00"]);
+    expect(fmt(planoDe(store)[0].quando)).toBe("08/21:00");
+  });
+});

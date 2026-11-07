@@ -224,21 +224,24 @@ export function dosesEmVigor<T extends { time?: string; ate?: string; grupo?: st
  * nenhuma chegou, a próxima. Pela ordem de cadastro, às 00:10 a caixa marcava a
  * das 08:00, e o aviso dela sumia sem ela ter sido tomada.
  *
- * "Já chegou" inclui a que vence em até 1 h (o mesmo "tomar um pouco antes" do
- * dia do tratamento; menos, se as doses estão a menos de 2 h uma da outra) —
- * conserto final 07/11: às 23:55, com a das 16:00 esquecida, a caixa marcava a
- * das 16:00 e o aviso das 00:00 tocava 5 minutos depois de a pessoa tomar.
+ * "Já chegou" inclui a que vence em até 15 min (menos, se as doses estão a menos
+ * de 30 min uma da outra) — conserto final 07/11: às 23:55, com a das 16:00
+ * esquecida, a caixa marcava a das 16:00 e o aviso das 00:00 tocava 5 minutos
+ * depois de a pessoa tomar. Era 1 h, e aí às 15:05, com a das 08:00 esquecida, o
+ * toque marcava a das 16:00 (que ainda vinha), o aviso dela sumia e a pessoa podia
+ * pular uma dose (crítica do conserto final). Quem quer marcar a outra toca a pílula.
  *
  * Com `quando` (o momento daquela dose, de `dosesDoGrupoAgora`) a conta é pelo
  * momento de verdade, não pela hora do relógio: às 23:50 a das 00:00 é a de
  * daqui a 10 minutos (amanhã), e às 07:55 do 1º dia a das 00:00 nem existe.
  */
+const FOLGA_DA_CAIXA_MIN = 15;
 export function doseDaHora<T extends { time: string; quando?: number }>(doses: T[], agora: Date = new Date()): T | undefined {
   const hoje = localDayKey(agora);
   const quandoDe = (d: T) => d.quando ?? (ehHora(d.time) ? momentoDe(hoje, d.time).getTime() : 0);
   const emOrdem = [...doses].sort((a, b) => quandoDe(a) - quandoDe(b));
   const intervalos = emOrdem.slice(1).map((d, i) => quandoDe(d) - quandoDe(emOrdem[i])).filter((x) => x > 0);
-  const folga = Math.min(ANTECEDENCIA_MIN * 60_000, intervalos.length ? Math.floor(Math.min(...intervalos) / 2) : Infinity);
+  const folga = Math.min(FOLGA_DA_CAIXA_MIN * 60_000, intervalos.length ? Math.floor(Math.min(...intervalos) / 2) : Infinity);
   const t = agora.getTime() + folga;
   return [...emOrdem].reverse().find((d) => quandoDe(d) <= t) ?? emOrdem.find((d) => quandoDe(d) > t);
 }

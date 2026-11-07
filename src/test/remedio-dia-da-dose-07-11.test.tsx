@@ -619,3 +619,33 @@ describe("a caixa e a dose que vence em minutos", () => {
     expect(planoDe(store).map((a) => fmt(a.quando))).not.toContain("08/00:00");
   });
 });
+
+/* Crítica do conserto final (07/11): com a folga de 1 h, às 15:05 a caixa trocava a das 08:00 esquecida
+   pela das 16:00 (que ainda vem) — o toque marcava a das 16:00, o aviso dela sumia e a pessoa podia
+   pular uma dose. A folga da caixa agora é de 15 min: pega a das 00:00 às 23:55, não a de 55 min depois. */
+describe("a caixa não troca a dose esquecida pela que ainda vem", () => {
+  it("cadastro às 07:50, a das 08:00 em aberto: às 15:05 a caixa marca a das 08:00 e o aviso das 16:00 continua", () => {
+    const novas = cadastro(agoraEm(7, 7, 50), "08:00");
+    const [d08, d16] = novas.map((l) => l.id);
+    const store = criarStore({ [CHAVE]: novas });
+    agoraEm(7, 14, 55);
+    const { unmount } = montar(store);
+    expect(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (08:00)" })).toBeInTheDocument();
+    unmount();
+    agoraEm(7, 15, 5);
+    montar(store);
+    expect(screen.getByTestId(`dose-${d08}`)).toHaveAttribute("data-da-vez", "true");
+    expect(screen.getByTestId(`dose-${d16}`)).not.toHaveAttribute("data-da-vez");
+    fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (08:00)" }));
+    expect(store.estado.dados[LOG]).toEqual({ "2026-11-07": [d08] });
+    expect(planoDe(store).map((a) => fmt(a.quando)).slice(0, 2)).toEqual(["07/16:00", "08/00:00"]);
+  });
+
+  it("15 min antes, a da vez já é a que vence (15:50 → a das 16:00); 16 min antes ainda não", () => {
+    const g = agruparRemedios(cadastro(agoraEm(7, 7, 50), "08:00"))[0];
+    const as1544 = agoraEm(7, 15, 44);
+    expect(doseDaHora(dosesDoGrupoAgora(g, as1544), as1544)?.time).toBe("08:00");
+    const as1545 = agoraEm(7, 15, 45);
+    expect(doseDaHora(dosesDoGrupoAgora(g, as1545), as1545)?.time).toBe("16:00");
+  });
+});

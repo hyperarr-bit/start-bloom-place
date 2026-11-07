@@ -1,6 +1,6 @@
 import {
   agendarAniversarios, agendarCabelo, agendarCompromissos, agendarCuidados, agendarValidade, agendarContas, agendarDieta, agendarLeitura, agendarLembreteSequencia, agendarLimiteDoDia, agendarManutencao, agendarRemedios,
-  agendarRetrospectiva, agendarRotina, agendarSkincare, agendarTarefas, agendarTreino, type ManutencaoAgendavel, type PessoaAgendavel,
+  agendarRetrospectiva, agendarRotina, agendarSkincare, agendarTarefas, agendarTreino, comRodadaDoTeto, type ManutencaoAgendavel, type PessoaAgendavel,
   type RemedioAgendavel,
 } from "@/lib/notificacoes";
 import { agendarPet } from "@/lib/notificacoes";
@@ -29,7 +29,7 @@ import { mesCorrenteId } from "@/lib/virada-contas";
 import { chaveArquivada } from "@/lib/virada-do-mes";
 import type { PrefsNotificacoes } from "@/lib/prefs-notificacoes";
 import { nomeComQuem } from "@/lib/saude-dependentes";
-import { ehDia as ehDiaDeRemedio, remedioValeNoDia } from "@/lib/remedios";
+import { dosesEmVigor, ehDia as ehDiaDeRemedio } from "@/lib/remedios";
 import { localDayKey } from "@/lib/utils";
 import { algumLigado, lerDadosDoSkincare, type DadosDoSkincare } from "@/lib/beleza-lembrete";
 // 17/10 (1.0.16, "Rotina pronta em 3 toques"): o lembrete de manhã da Rotina — prefs na chave própria
@@ -158,13 +158,11 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
   const diarioDieta = get<Record<string, { meals?: Record<string, unknown> }>>("dieta-diary-v2", {}) ?? {};
 
   // Remédios (07/09): a lista do PharmacyChecklist + o log de "tomado hoje"
-  type Suplemento = { id?: string; name?: string; time?: string; quem?: string; ate?: string };
+  type Suplemento = { id?: string; name?: string; time?: string; quem?: string; ate?: string; grupo?: string };
   const suplementos = get<Suplemento[]>("core-saude-supplements", []) ?? [];
   const tomadosHoje = (get<Record<string, string[]>>("core-saude-supplement-log", {}) ?? {})[hoje] ?? [];
-  const remedios: RemedioAgendavel[] = (Array.isArray(suplementos) ? suplementos : [])
-    .filter((s) => s?.name && s?.time)
-    // (07/11) tratamento com data de fim já passada: não entra no plano (lib/remedios)
-    .filter((s) => remedioValeNoDia(s, hoje))
+  // (07/11) tratamento com data de fim já passada não entra no plano; a dose da noite do último dia, sim (lib/remedios)
+  const remedios: RemedioAgendavel[] = dosesEmVigor((Array.isArray(suplementos) ? suplementos : []).filter((s) => s?.name && s?.time))
     .map((s) => ({
       id: String(s.id ?? ""),
       // remédio do dependente leva o nome dele no aviso (22/09): "Hora do Ômega 3 (Mãe)"
@@ -339,16 +337,22 @@ export function assinaturaDos(dados: DadosDosLembretes, prefs: PrefsNotificacoes
 /**
  * Aplica as preferências no agendador do sistema. Devolve quantos de cada tipo.
  *
- * A ORDEM É A PRIORIDADE (07/11): no iPhone só cabem 64 avisos pendentes
- * (TETO_IPHONE, lib/notificacoes) e cada série recebe o que sobrou. Primeiro o
- * que tem data marcada e é pouco (conta, consulta, compromisso, tarefa,
- * aniversário, casa); depois as séries diárias, com o remédio na frente — é o
- * único que pode ter 3–4 avisos por dia.
+ * No iPhone só cabem 64 avisos pendentes (TETO_IPHONE, lib/notificacoes): as
+ * séries daqui só dizem o que querem e a rodada reparte as vagas no fim, sem
+ * contar os avisos velhos de ninguém. Na frente vêm o remédio e o que tem data
+ * marcada (ver repartirVagas).
+ *
+ * UMA RODADA POR VEZ (07/11): o cadastro rearma na hora e o useLembretes rearma
+ * logo depois. Duas ao mesmo tempo se atropelavam na conta das vagas.
  */
-export async function reagendarTudo(
-  get: Leitor,
-  prefs: PrefsNotificacoes,
-): Promise<Record<string, number>> {
+let rodadaEmCurso: Promise<unknown> = Promise.resolve();
+export function reagendarTudo(get: Leitor, prefs: PrefsNotificacoes): Promise<Record<string, number>> {
+  const vez = rodadaEmCurso.then(() => comRodadaDoTeto(() => agendarCadaSerie(get, prefs)));
+  rodadaEmCurso = vez.catch(() => { /* quem chamou trata; a fila segue */ });
+  return vez;
+}
+
+async function agendarCadaSerie(get: Leitor, prefs: PrefsNotificacoes): Promise<Record<string, number>> {
   const d = lerDadosDosLembretes(get);
   return {
     contas: await agendarContas(d.dueDays, { hora: prefs.horaContas, ligado: prefs.contas }, d.dueDaysProximoMes),

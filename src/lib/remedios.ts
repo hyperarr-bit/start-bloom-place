@@ -8,13 +8,16 @@
  * novo mostra o grupo como UMA linha, com os horários pra marcar, e anda o
  * estoque das linhas juntas.
  *
- * `ate` (opcional) é o último dia do tratamento: depois dele o lembrete para
- * (lib/notificacoes planejarRemedios) e a linha aparece como "terminou".
+ * `ate` (opcional) é o último dia do tratamento: depois dele (e da dose da noite
+ * dele, ver `ultimoDiaDaDose`) o lembrete para (lib/notificacoes planejarRemedios)
+ * e a linha aparece como "terminou".
  *
  * Por que não o "repetir" do sistema de notificações: ele não sabe que a
  * pessoa já tomou (o aviso de hoje some pra quem marcou) nem conhece a data
  * de fim — e cada dia é um aviso só, com os nomes do mesmo horário juntos.
  */
+
+import { localDayKey } from "@/lib/utils";
 
 export type VezesAoDia = 1 | 2 | 3 | 4;
 
@@ -68,6 +71,60 @@ export function rotuloDosHorarios(horarios: string[]): string {
 /** O tratamento ainda vale neste dia? (sem `ate` = sempre) */
 export const remedioValeNoDia = (r: { ate?: string }, dia: string): boolean => !ehDia(r.ate) || r.ate >= dia;
 
+const horaDoRelogio = (agora: Date) => horaDe(agora.getHours() * 60 + agora.getMinutes());
+const diaSeguinte = (dia: string) => {
+  const [a, m, d] = dia.split("-").map(Number);
+  return localDayKey(new Date(a, m - 1, d + 1));
+};
+
+/**
+ * O DIA DO TRATAMENTO COMEÇA NA 1ª DOSE (07/11). Em "8 em 8" a partir das 08:00,
+ * a dose das 00:00 é a última de hoje, não a primeira de amanhã: com `ate` = dia
+ * 13 ela cai à 0h do dia 14, e ainda é dose do tratamento. Vale pra toda dose com
+ * horário antes da 1ª do grupo. O formato da chave não muda: `ate` continua sendo
+ * o dia que a pessoa digitou, e é esta conta que acha a dose da noite.
+ */
+export function ultimoDiaDaDose(linha: { time?: string; ate?: string }, primeira: string): string | undefined {
+  if (!ehDia(linha.ate)) return undefined;
+  const daNoiteAnterior = ehHora(linha.time) && ehHora(primeira) && linha.time < primeira;
+  return daNoiteAnterior ? diaSeguinte(linha.ate) : linha.ate;
+}
+
+/** Esta dose ainda existe agora? No dia seguinte ao `ate`, a dose da noite vale até a hora da 1ª dose. */
+function doseVale(linha: { time?: string; ate?: string }, primeira: string, agora: Date): boolean {
+  const ultimo = ultimoDiaDaDose(linha, primeira);
+  if (!ultimo) return true;
+  const dia = localDayKey(agora);
+  if (dia > ultimo) return false;
+  return !(dia > String(linha.ate) && horaDoRelogio(agora) >= primeira);
+}
+
+/** A hora da 1ª dose de cada grupo: a da primeira linha dele, que é a ordem do cadastro. */
+const primeiraDoGrupo = <T extends { time?: string; grupo?: string }>(lista: T[]) => {
+  const primeiras = new Map<string, string>();
+  for (const r of lista) if (r?.grupo && !primeiras.has(r.grupo)) primeiras.set(r.grupo, String(r.time ?? ""));
+  return (r: T) => (r.grupo && primeiras.get(r.grupo)) || String(r.time ?? "");
+};
+
+/** As linhas que ainda valem agora, com o `ate` trocado pelo último dia daquela dose (é o que o plano dos avisos compara). */
+export function dosesEmVigor<T extends { time?: string; ate?: string; grupo?: string }>(lista: T[], agora: Date = new Date()): T[] {
+  const primeira = primeiraDoGrupo(lista);
+  return lista
+    .filter((r) => r && doseVale(r, primeira(r), agora))
+    .map((r) => (ehDia(r.ate) ? { ...r, ate: ultimoDiaDaDose(r, primeira(r)) } : r));
+}
+
+/**
+ * A dose que a caixa da linha marca (07/11): a mais recente que já passou no
+ * relógio; se nenhuma passou, a próxima do dia. Pela ordem de cadastro, às 00:10
+ * a caixa marcava a das 08:00, e o aviso dela sumia sem ela ter sido tomada.
+ */
+export function doseDaHora<T extends { time: string }>(doses: T[], agora: Date = new Date()): T | undefined {
+  const hora = horaDoRelogio(agora);
+  const noDia = [...doses].sort((a, b) => a.time.localeCompare(b.time));
+  return [...noDia].reverse().find((d) => d.time <= hora) ?? noDia[0];
+}
+
 export interface GrupoDeRemedio {
   /** id do grupo — ou o id da própria linha, quando é um remédio simples */
   chave: string;
@@ -97,6 +154,15 @@ export function agruparRemedios(lista: Remedio[]): GrupoDeRemedio[] {
     estoque: Math.min(...itens.map((i) => (Number.isFinite(Number(i.stock)) ? Number(i.stock) : 0))),
   }));
 }
+
+/** Tratamento encerrado: já passou a última dose dele (a da noite, quando há). */
+export function tratamentoTerminou(g: GrupoDeRemedio, agora: Date = new Date()): boolean {
+  return !!g.ate && g.itens.every((s) => !doseVale({ time: s.time, ate: g.ate }, g.itens[0].time, agora));
+}
+
+/** As doses que existem agora, pra marcar: as do dia e, depois do `ate`, só a da noite. */
+export const dosesDoGrupoAgora = (g: GrupoDeRemedio, agora: Date = new Date()): Remedio[] =>
+  g.itens.filter((s) => doseVale({ time: s.time, ate: g.ate }, g.itens[0].time, agora));
 
 /** As linhas de um cadastro: uma por horário; com 2+ horários, todas levam o mesmo `grupo`. */
 export function montarLinhas(

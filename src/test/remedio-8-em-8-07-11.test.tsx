@@ -8,7 +8,8 @@
  *    valem pro grupo inteiro; o formato da chave segue o de sempre;
  *  - Android com alarme exato negado: aviso no cadastro e reagenda ao liberar
  *    (no card e na central);
- *  - iPhone: o teto de 64 avisos pendentes corta os de longe, nunca os outros tipos.
+ *  - iPhone: o teto de 64 avisos pendentes corta os de longe, nunca os outros tipos
+ *    (a fila cheia de séries diárias mora em remedio-fila-cheia-07-11).
  */
 process.env.TZ = "America/Sao_Paulo";
 
@@ -71,8 +72,8 @@ vi.mock("sonner", () => ({
 }));
 
 import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
-import { agruparRemedios, gerarHorarios, montarLinhas, remedioValeNoDia, rotuloDosHorarios } from "@/lib/remedios";
-import { BASES_LEMBRETES, TETO_AVISOS_REMEDIOS, TETO_IPHONE, agendarRemedios, planejarRemedios } from "@/lib/notificacoes";
+import { agruparRemedios, dosesEmVigor, gerarHorarios, montarLinhas, remedioValeNoDia, rotuloDosHorarios } from "@/lib/remedios";
+import { BASES_LEMBRETES, TETO_IPHONE, agendarRemedios, planejarRemedios } from "@/lib/notificacoes";
 import { lerDadosDosLembretes } from "@/lib/reagendar";
 import { PharmacyChecklist } from "@/components/saude/PharmacyChecklist";
 import Notificacoes from "@/pages/Notificacoes";
@@ -164,11 +165,15 @@ describe("planejarRemedios: 8 em 8, data de fim e o teto", () => {
     expect(ids.every((id) => id >= BASES_LEMBRETES.saude && id < BASES_LEMBRETES.saude + 10000)).toBe(true);
   });
 
-  it("'até quando' é o último dia: nada depois dele, e o remédio sem fim continua", () => {
-    const avisos = planejarRemedios([...amox("2026-11-09"), { id: "o", nome: "Ômega 3", hora: "08:00", tomadoHoje: false }], agora);
+  it("'até quando' é o último dia: a dose das 0h dele ainda avisa (cai no dia 10), nada depois; o remédio sem fim continua", () => {
+    // as linhas como estão gravadas (mesmo grupo); dosesEmVigor acha a dose da noite do último dia
+    const gravadas = ["08:00", "16:00", "00:00"].map((time, i) => ({ id: `a${i}`, time, grupo: "g1", ate: "2026-11-09" }));
+    const comFimDaDose = dosesEmVigor(gravadas, agora).map((l, i) => ({ ...amox()[i], ate: l.ate }));
+    expect(comFimDaDose.map((l) => l.ate)).toEqual(["2026-11-09", "2026-11-09", "2026-11-10"]);
+    const avisos = planejarRemedios([...comFimDaDose, { id: "o", nome: "Ômega 3", hora: "08:00", tomadoHoje: false }], agora);
     const ultimoAmox = avisos.filter((a) => a.title.includes("Amoxicilina")).map((a) => a.quando.getTime()).sort((a, b) => b - a)[0];
-    expect(new Date(ultimoAmox).getDate()).toBe(9);
-    expect(new Date(ultimoAmox).getHours()).toBe(16); // a dose das 0h do dia 10 já é depois do fim
+    expect(new Date(ultimoAmox).getDate()).toBe(10);
+    expect(new Date(ultimoAmox).getHours()).toBe(0); // a 3ª dose do dia 9 (00:00 do dia 10)
     const dia10as8 = avisos.find((a) => a.quando.getDate() === 10 && a.quando.getHours() === 8)!;
     expect(dia10as8.title).toBe("💊 Hora do Ômega 3"); // só o que não acabou
     expect(avisos.some((a) => a.quando.getDate() === 17 && a.title === "💊 Hora do Ômega 3")).toBe(true);
@@ -182,12 +187,12 @@ describe("planejarRemedios: 8 em 8, data de fim e o teto", () => {
     expect(d.remedios.map((r) => [r.nome, r.ate])).toEqual([["Atual", dia(2)], ["Sempre", undefined]]);
   });
 
-  it("teto: 6 em 6 h × 11 dias seriam 44 — ficam os 30 mais próximos, em ordem; 1× ao dia continua com os 11 de sempre", () => {
+  it("sem teto fixo (o corte é só do iPhone, na rodada): 6 em 6 h cobre os 10 dias, em ordem; 1× ao dia continua com os 11 de sempre", () => {
     const seis = ["06:00", "12:00", "18:00", "00:00"].map((hora, i) => ({ id: `s${i}`, nome: "Prednisona", hora, tomadoHoje: false }));
     const avisos = planejarRemedios(seis, agora);
-    expect(avisos.length).toBe(TETO_AVISOS_REMEDIOS);
+    expect(avisos.length).toBe(42); // 44 menos as 00:00 e 06:00 de hoje, que já passaram
     for (let i = 1; i < avisos.length; i++) expect(avisos[i].quando.getTime()).toBeGreaterThan(avisos[i - 1].quando.getTime());
-    expect(avisos[avisos.length - 1].quando.getDate()).toBe(14); // 7 dias e meio à frente, não 17
+    expect(avisos[avisos.length - 1].quando.getDate()).toBe(17);
     expect(planejarRemedios([{ id: "o", nome: "Ômega 3", hora: "08:00", tomadoHoje: false }], agora).length).toBe(11);
   });
 });
@@ -220,8 +225,9 @@ describe("Vitaminas e Remédios: cadastro de 8 em 8 h", () => {
     expect(within(caixa).getByLabelText("3ª dose")).toHaveValue("00:00");
     expect(caixa.textContent).toContain("8 em 8 h");
 
-    // a primeira dose muda → os três nascem de novo
-    fireEvent.change(screen.getByLabelText("Primeira dose"), { target: { value: "07:00" } });
+    // com 2+ doses o horário do topo some: a 1ª dose é a 1ª da linha "Horários", e mudar ela gera os três de novo
+    expect(screen.queryByLabelText("Horário")).toBeNull();
+    fireEvent.change(within(caixa).getByLabelText("1ª dose"), { target: { value: "07:00" } });
     expect(within(caixa).getByLabelText("2ª dose")).toHaveValue("15:00");
     // a pessoa ajusta a 3ª à mão → fica
     fireEvent.change(within(caixa).getByLabelText("3ª dose"), { target: { value: "22:00" } });
@@ -281,18 +287,22 @@ describe("Vitaminas e Remédios: o grupo na tabela", () => {
     expect(screen.queryByTestId("remedio-doses-feitas")).toBeNull();
   });
 
-  it("a caixa da linha marca a PRÓXIMA dose pendente; com todas marcadas, risca o nome e a caixa desmarca a última", () => {
-    const store = criarStore({ [CHAVE]: grupo() });
-    montar(store);
-    fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina" }));
-    expect(store.estado.dados[LOG]).toEqual({ [HOJE]: ["a0"] });
-    fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina" }));
-    fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina" }));
-    expect(store.estado.dados[LOG]).toEqual({ [HOJE]: ["a0", "a1", "a2"] });
-    expect(linhas(store).map((x) => x.stock)).toEqual([18, 18, 18]);
-    expect(screen.getByText("Amoxicilina").className).toContain("line-through");
-    fireEvent.click(screen.getByRole("button", { name: "Desmarcar Amoxicilina" }));
-    expect(store.estado.dados[LOG]).toEqual({ [HOJE]: ["a0", "a1"] });
+  it("a caixa da linha marca a dose DA HORA (a mais recente que passou); com todas marcadas, risca o nome e a caixa desmarca a da hora", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 7, 23, 0));
+    try {
+      const store = criarStore({ [CHAVE]: grupo() });
+      montar(store);
+      fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (16:00)" }));
+      expect(store.estado.dados[LOG]).toEqual({ "2026-11-07": ["a1"] });
+      fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (08:00)" }));
+      fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (00:00)" }));
+      expect(store.estado.dados[LOG]).toEqual({ "2026-11-07": ["a1", "a0", "a2"] });
+      expect(linhas(store).map((x) => x.stock)).toEqual([18, 18, 18]);
+      expect(screen.getByText("Amoxicilina").className).toContain("line-through");
+      fireEvent.click(screen.getByRole("button", { name: "Desmarcar Amoxicilina" }));
+      expect(store.estado.dados[LOG]).toEqual({ "2026-11-07": ["a0", "a2"] });
+    } finally { vi.useRealTimers(); }
   });
 
   it("estoque editado vale pras 3 linhas; linhas que o app antigo desencontrou mostram a menor", () => {
@@ -332,11 +342,12 @@ describe("Vitaminas e Remédios: o grupo na tabela", () => {
   });
 
   it("tratamento encerrado: 'terminou dd/mm', pílulas e caixa travadas, lixeira livre", () => {
-    const store = criarStore({ [CHAVE]: grupo(dia(-1)) });
+    // dia -2: a dose das 0h do último dia também já passou (a véspera, pela manhã, ainda é dela — remedio-fila-cheia)
+    const store = criarStore({ [CHAVE]: grupo(dia(-2)) });
     montar(store);
-    expect(screen.getByTestId("remedio-detalhe").textContent).toBe(`8 em 8 h · terminou ${dia(-1).slice(8, 10)}/${dia(-1).slice(5, 7)}`);
+    expect(screen.getByTestId("remedio-detalhe").textContent).toBe(`8 em 8 h · terminou ${dia(-2).slice(8, 10)}/${dia(-2).slice(5, 7)}`);
     expect(screen.getByRole("button", { name: "Marcar dose das 08:00 de Amoxicilina" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^Marcar próxima dose de Amoxicilina/ })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Apagar Amoxicilina" })).toBeEnabled();
   });
 
@@ -425,15 +436,16 @@ describe("iPhone: teto de 64 avisos pendentes", () => {
     id: base + i, title: "outro", schedule: { at: new Date(Date.now() + (i + 1) * 3_600_000) },
   }));
 
-  it("com 60 avisos de outros tipos só cabem 4 — os 4 mais próximos; os outros tipos ficam intactos", async () => {
+  it("com 60 avisos de outros tipos sobram 4 vagas, mas as próximas 48 h do remédio entram sempre; os outros tipos ficam intactos", async () => {
     plataforma.nativo = true; plataforma.android = false;
     ln.agendados = outros(60, BASES_LEMBRETES.rotina);
     const n = await agendarRemedios(amox, { ligado: true });
-    expect(n).toBe(TETO_IPHONE - 60);
+    const piso = planejarRemedios(amox).filter((a) => a.quando.getTime() - Date.now() <= 48 * 3600e3).length;
+    expect(n).toBe(Math.max(TETO_IPHONE - 60, piso));
     const meus = ln.agendados.filter((a) => a.id >= BASES_LEMBRETES.saude && a.id < BASES_LEMBRETES.saude + 10000);
-    expect(meus).toHaveLength(4);
+    expect(meus).toHaveLength(n);
     expect(ln.agendados.filter((a) => a.id >= BASES_LEMBRETES.rotina && a.id < BASES_LEMBRETES.rotina + 10000)).toHaveLength(60);
-    const plano = planejarRemedios(amox).sort((a, b) => a.quando.getTime() - b.quando.getTime()).slice(0, 4).map((a) => a.id);
+    const plano = planejarRemedios(amox).slice(0, n).map((a) => a.id); // os mais próximos
     expect(meus.map((a) => a.id).sort()).toEqual([...plano].sort());
     expect(eventos.some(([n, d]) => n === "notif_teto_iphone" && d?.tipo === "saude")).toBe(true);
   });

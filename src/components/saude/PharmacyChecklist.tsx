@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { localDayKey } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Trash2, Check, Package, Pencil, AlarmClock } from "lucide-react";
@@ -13,7 +13,7 @@ import { reagendarTudo, type Leitor } from "@/lib/reagendar";
 import { trackEvent } from "@/lib/analytics";
 import { avisarApagado } from "@/lib/desfazer";
 import {
-  OPCOES_VEZES, agruparRemedios, ehDia, gerarHorarios, montarLinhas, rotuloDosHorarios,
+  OPCOES_VEZES, agruparRemedios, doseDaHora, dosesDoGrupoAgora, ehDia, gerarHorarios, montarLinhas, rotuloDosHorarios, tratamentoTerminou,
   type GrupoDeRemedio, type Remedio as Supplement, type VezesAoDia,
 } from "@/lib/remedios";
 
@@ -157,9 +157,22 @@ export const PharmacyChecklist = () => {
   const conferirAlarmeExato = async () => {
     try { setAlarmeExato(await estadoAlarmeExato()); } catch { /* sem plugin */ }
   };
+  const temRemedio = supplements.length > 0;
   useEffect(() => {
-    if (isNativeShell() && supplements.length > 0) void conferirAlarmeExato();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // depende de "tem remédio": a lista pode chegar um instante depois da montagem (hidratação)
+    if (isNativeShell() && temRemedio) void conferirAlarmeExato();
+  }, [temRemedio]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* A caixa e as doses seguem o RELÓGIO (07/11): com o card aberto, a tela se
+     refaz a cada minuto, pra dose destacada ser a da hora. Só quando há remédio
+     de várias doses ou com data de fim — o resto não muda com a hora. */
+  const [, passarMinuto] = useReducer((x: number) => x + 1, 0);
+  const segueORelogio = supplements.some(s => !!s?.grupo || !!s?.ate);
+  useEffect(() => {
+    if (!segueORelogio) return;
+    const t = window.setInterval(passarMinuto, 60_000);
+    return () => window.clearInterval(t);
+  }, [segueORelogio]);
 
   /* Notificação na hora do remédio (07/09, avaliação da Play: "adicionem
      notificação pra tomar remédio"). A permissão do Android é pedida AQUI, no
@@ -213,6 +226,7 @@ export const PharmacyChecklist = () => {
   const mudarPrimeiraDose = (time: string) => { setNewTime(time); setHorariosEditados(null); };
   const editarHorarioNovo = (i: number, time: string) => {
     if (!time) return;
+    if (i === 0) { mudarPrimeiraDose(time); return; } // a 1ª dose é a de cima de antes: gera as outras de novo
     setHorariosEditados(horarios.map((h, j) => (j === i ? time : h)));
   };
 
@@ -294,19 +308,24 @@ export const PharmacyChecklist = () => {
             </thead>
             <tbody>
               <AnimatePresence>
-                {grupos.map((g, idx) => {
+                {grupos.flatMap((g, idx) => {
                   const simples = g.itens.length === 1 && !g.ate;
                   const linha = g.itens[0];
-                  const encerrado = !!g.ate && g.ate < today;
-                  const tomadas = g.itens.filter(s => takenToday.includes(s.id));
-                  const taken = tomadas.length === g.itens.length;
-                  const proxima = g.itens.find(s => !takenToday.includes(s.id));
+                  const agora = new Date();
+                  // 07/11: "terminou" só depois da última dose, e a da noite do último dia ainda conta (lib/remedios)
+                  const encerrado = tratamentoTerminou(g, agora);
+                  const doses = encerrado ? g.itens : dosesDoGrupoAgora(g, agora);
+                  const tomadas = doses.filter(s => takenToday.includes(s.id));
+                  const taken = doses.length > 0 && tomadas.length === doses.length;
+                  // a caixa marca a dose DA HORA (a mais recente que já passou), nunca a 1ª do cadastro
+                  const proxima = doseDaHora(doses.filter(s => !takenToday.includes(s.id)), agora);
+                  const ultimaTomada = doseDaHora(tomadas, agora);
                   const lowStock = g.estoque <= 5;
                   const color = nameColors[idx % nameColors.length];
                   const rotulo = g.itens.length > 1 ? rotuloDosHorarios(g.itens.map(s => s.time)) : "";
                   const detalhe = [rotulo, g.ate ? (encerrado ? `terminou ${diaCurto(g.ate)}` : `até ${diaCurto(g.ate)}`) : ""].filter(Boolean).join(" · ");
                   const abertoPraEditar = editando === g.chave;
-                  return (
+                  const linhas = [
                     <motion.tr
                       key={g.chave}
                       layout
@@ -317,23 +336,23 @@ export const PharmacyChecklist = () => {
                       data-testid={`remedio-linha-${g.chave}`}
                     >
                       <td className="pl-3 pr-1 py-3 align-top">
-                        {/* remédio de várias doses: a caixa marca a PRÓXIMA dose (e desmarca a última, quando todas foram) */}
+                        {/* remédio de várias doses: a caixa marca a dose da hora (a pílula com contorno verde) e, com todas marcadas, desmarca a última */}
                         <button
                           onClick={() => {
                             if (g.itens.length === 1) toggleTaken(linha.id);
-                            else if (taken) toggleTaken(tomadas[tomadas.length - 1].id);
+                            else if (taken) { if (ultimaTomada) toggleTaken(ultimaTomada.id); }
                             else if (proxima) toggleTaken(proxima.id);
                           }}
                           disabled={encerrado}
                           aria-label={g.itens.length === 1
                             ? (taken ? `Desmarcar ${g.nome}` : `Marcar ${g.nome} como tomado`)
-                            : (taken ? `Desmarcar ${g.nome}` : `Marcar próxima dose de ${g.nome}`)}
+                            : (taken ? `Desmarcar ${g.nome}` : `Marcar próxima dose de ${g.nome}${proxima ? ` (${proxima.time})` : ""}`)}
                           className={`w-5 h-5 mt-0.5 rounded border-2 flex items-center justify-center transition-all disabled:cursor-not-allowed ${taken ? "bg-[hsl(var(--saude-green))] border-[hsl(var(--saude-green))]" : "border-muted-foreground/30 hover:border-[hsl(var(--saude-green)/0.5)]"}`}
                         >
                           {taken && <Check className="w-3 h-3 text-white" />}
                         </button>
                         {g.itens.length > 1 && tomadas.length > 0 && !taken && (
-                          <span className="block mt-1 text-[9px] font-semibold text-muted-foreground tabular-nums text-center" data-testid="remedio-doses-feitas">{tomadas.length}/{g.itens.length}</span>
+                          <span className="block mt-1 text-[10px] font-semibold text-muted-foreground tabular-nums text-center" data-testid="remedio-doses-feitas">{tomadas.length}/{doses.length}</span>
                         )}
                       </td>
                       <td className="px-2 py-3 align-top">
@@ -358,45 +377,24 @@ export const PharmacyChecklist = () => {
                             onChange={e => changeTime(linha.id, e.target.value)}
                             className="bg-transparent text-xs text-muted-foreground min-w-[5.5rem] w-auto focus:outline-none focus:text-foreground"
                           />
-                        ) : abertoPraEditar ? (
-                          /* horários e data de fim do grupo, pra corrigir sem recadastrar */
-                          <div className="flex flex-col gap-1" data-testid="remedio-editar">
-                            {g.itens.map((s, i) => (
-                              <input
-                                key={s.id}
-                                type="time"
-                                value={s.time}
-                                aria-label={g.itens.length > 1 ? `Horário de ${g.nome} (${i + 1}ª dose)` : `Horário de ${g.nome}`}
-                                onChange={e => changeTime(s.id, e.target.value)}
-                                className={`${campoPequeno} w-[6.25rem]`}
-                              />
-                            ))}
-                            <input
-                              type="date"
-                              value={g.ate ?? ""}
-                              aria-label={`Até quando de ${g.nome}`}
-                              onChange={e => changeAte(g, e.target.value)}
-                              className={`${campoPequeno} w-[8.5rem]`}
-                            />
-                            <button type="button" onClick={() => setEditando(null)} className="h-7 rounded-lg bg-primary/10 text-primary text-[11px] font-semibold">Pronto</button>
-                          </div>
                         ) : (
-                          /* uma pílula por dose: toque marca aquela dose */
-                          /* justas de propósito (10 px, 2 por linha): com a lixeira grudada à direita, a
-                             coluna do estoque tem que continuar inteira a 390 px */
-                          <div className="flex flex-wrap items-center gap-1 max-w-[6.25rem]">
+                          /* uma pílula por dose: toque marca aquela dose. 32 px de altura (07/11,
+                             crítica: com 24 px o dedo marcava a vizinha e o estoque descia junto) */
+                          <div className="flex flex-wrap items-center gap-1.5 max-w-[7.5rem]">
                             {g.itens.map(s => {
                               const t = takenToday.includes(s.id);
+                              const daVez = !encerrado && !t && proxima?.id === s.id;
                               return (
                                 <button
                                   key={s.id}
                                   type="button"
-                                  disabled={encerrado}
+                                  disabled={encerrado || !doses.includes(s)}
                                   onClick={() => toggleTaken(s.id)}
                                   aria-pressed={t}
                                   aria-label={t ? `Desmarcar dose das ${s.time} de ${g.nome}` : `Marcar dose das ${s.time} de ${g.nome}`}
                                   data-testid={`dose-${s.id}`}
-                                  className={`h-6 px-1 rounded-md border text-[10px] font-semibold tabular-nums transition-colors disabled:cursor-not-allowed ${t ? "bg-[hsl(var(--saude-green))] border-[hsl(var(--saude-green))] text-white" : "border-border text-muted-foreground hover:border-[hsl(var(--saude-green)/0.5)]"}`}
+                                  data-da-vez={daVez || undefined}
+                                  className={`h-8 min-w-[3.4rem] px-2 rounded-md border text-[11px] font-semibold tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${t ? "bg-[hsl(var(--saude-green))] border-[hsl(var(--saude-green))] text-white" : daVez ? "border-[hsl(var(--saude-green))] text-foreground" : "border-border text-muted-foreground hover:border-[hsl(var(--saude-green)/0.5)]"}`}
                                 >
                                   {t && <Check className="inline w-2.5 h-2.5 mr-0.5 -mt-px" aria-hidden />}{s.time}
                                 </button>
@@ -404,9 +402,10 @@ export const PharmacyChecklist = () => {
                             })}
                             <button
                               type="button"
-                              onClick={() => setEditando(g.chave)}
+                              onClick={() => setEditando(abertoPraEditar ? null : g.chave)}
                               aria-label={`Editar horários de ${g.nome}`}
-                              className="h-6 w-5 rounded-md flex items-center justify-center text-muted-foreground/60 hover:text-foreground"
+                              aria-pressed={abertoPraEditar}
+                              className={`h-8 w-7 rounded-md flex items-center justify-center hover:text-foreground ${abertoPraEditar ? "text-foreground bg-muted" : "text-muted-foreground/60"}`}
                             >
                               <Pencil className="w-3 h-3" />
                             </button>
@@ -425,8 +424,39 @@ export const PharmacyChecklist = () => {
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </td>
-                    </motion.tr>
+                    </motion.tr>,
+                  ];
+                  /* horários e data de fim do grupo, pra corrigir sem recadastrar — numa linha
+                     PRÓPRIA embaixo (07/11, crítica: dentro da célula os campos apertavam a
+                     coluna do estoque e o número aparecia cortado) */
+                  if (abertoPraEditar && !simples) linhas.push(
+                    <motion.tr key={`${g.chave}-editar`} className="bg-muted/30">
+                      <td colSpan={5} className="px-3 pb-3 pt-1">
+                        <div className="flex flex-wrap items-center gap-1.5" data-testid="remedio-editar">
+                          {g.itens.map((s, i) => (
+                            <input
+                              key={s.id}
+                              type="time"
+                              value={s.time}
+                              aria-label={g.itens.length > 1 ? `Horário de ${g.nome} (${i + 1}ª dose)` : `Horário de ${g.nome}`}
+                              onChange={e => changeTime(s.id, e.target.value)}
+                              className={`${campoPequeno} w-[5.75rem]`}
+                            />
+                          ))}
+                          <span className="text-[11px] text-muted-foreground">até</span>
+                          <input
+                            type="date"
+                            value={g.ate ?? ""}
+                            aria-label={`Até quando de ${g.nome}`}
+                            onChange={e => changeAte(g, e.target.value)}
+                            className={`${campoPequeno} w-[8.5rem]`}
+                          />
+                          <button type="button" onClick={() => setEditando(null)} className="h-8 px-3 rounded-lg bg-primary/10 text-primary text-[11px] font-semibold">Pronto</button>
+                        </div>
+                      </td>
+                    </motion.tr>,
                   );
+                  return linhas;
                 })}
               </AnimatePresence>
               {/* Empty rows for visual padding */}
@@ -458,13 +488,16 @@ export const PharmacyChecklist = () => {
             placeholder="Novo remédio ou suplemento..."
             className="text-xs h-9 flex-1"
           />
-          <Input
-            type="time"
-            value={newTime}
-            onChange={e => mudarPrimeiraDose(e.target.value)}
-            aria-label={newVezes > 1 ? "Primeira dose" : "Horário"}
-            className="text-xs h-9 w-24"
-          />
+          {/* com 2+ doses o horário mora só na linha "Horários" embaixo (a 1ª de lá é a 1ª dose) — dois 08:00 sem rótulo confundiam */}
+          {newVezes === 1 && (
+            <Input
+              type="time"
+              value={newTime}
+              onChange={e => mudarPrimeiraDose(e.target.value)}
+              aria-label="Horário"
+              className="text-xs h-9 w-24"
+            />
+          )}
           <button
             onClick={addSupplement}
             aria-label="Adicionar remédio"
@@ -519,19 +552,22 @@ export const PharmacyChecklist = () => {
           </div>
         </div>
         {newVezes > 1 && (
-          <div className="flex flex-wrap items-center gap-1.5" data-testid="remedio-horarios">
-            <span className="text-[11px] text-muted-foreground">Horários</span>
-            {horarios.map((h, i) => (
-              <input
-                key={i}
-                type="time"
-                value={h}
-                aria-label={`${i + 1}ª dose`}
-                onChange={e => editarHorarioNovo(i, e.target.value)}
-                className={`${campoPequeno} min-w-[4.6rem]`}
-              />
-            ))}
-            <span className="text-[11px] text-muted-foreground">· {rotuloDosHorarios(horarios)}</span>
+          <div className="space-y-1.5" data-testid="remedio-horarios">
+            <p className="text-[11px] text-muted-foreground">
+              Horários · {rotuloDosHorarios(horarios)} <span className="opacity-70">(a 1ª dose ajusta as outras)</span>
+            </p>
+            <div className={`grid gap-1.5 ${horarios.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+              {horarios.map((h, i) => (
+                <input
+                  key={i}
+                  type="time"
+                  value={h}
+                  aria-label={`${i + 1}ª dose`}
+                  onChange={e => editarHorarioNovo(i, e.target.value)}
+                  className={`${campoPequeno} w-full min-w-0`}
+                />
+              ))}
+            </div>
           </div>
         )}
         <label className="flex items-center gap-2 text-[11px] text-muted-foreground">

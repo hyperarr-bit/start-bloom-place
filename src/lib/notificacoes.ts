@@ -276,17 +276,15 @@ async function limparLegado(base: number, rota: string, emoji: string): Promise<
   } catch { /* nada pendente */ }
 }
 
-/** Devolve quantos avisos de OUTRAS faixas continuam pendentes (07/11: é a conta do teto do iPhone). */
-async function limparFaixa(base: number): Promise<number> {
+async function limparFaixa(base: number): Promise<void> {
   const p = await plugin();
-  if (!p) return 0;
+  if (!p) return;
   const { LN } = p;
   try {
-    const pendentes = (await LN.getPending()).notifications ?? [];
-    const nossas = pendentes.filter((n) => n.id >= base && n.id < base + 10000);
+    const pendentes = await LN.getPending();
+    const nossas = (pendentes.notifications ?? []).filter((n) => n.id >= base && n.id < base + 10000);
     if (nossas.length) await LN.cancel({ notifications: nossas.map((n) => ({ id: n.id })) });
-    return pendentes.length - nossas.length;
-  } catch { return 0; /* nada pendente */ }
+  } catch { /* nada pendente */ }
 }
 
 /**
@@ -294,25 +292,121 @@ async function limparFaixa(base: number): Promise<number> {
  * pendentes por app — o que passa disso é descartado em silêncio, e o app nunca
  * fica sabendo. Até aqui ninguém somava: um remédio de 6 em 6 h (44 avisos em 11
  * dias) mais três séries diárias (33) já estourava, e o que caía podia ser a conta
- * a vencer ou a consulta. Agora cada série recebe só as vagas que sobraram, com
- * os avisos MAIS PRÓXIMOS primeiro — os de longe voltam no próximo reagendamento,
- * que acontece a cada abertura do app. A ordem do reagendarTudo (lib/reagendar) é
- * a prioridade: contas e avisos com data antes, as séries diárias depois, e o
- * remédio primeiro entre elas. No Android o limite é 500 por app: nada a cortar.
- * No iPhone de verdade o corte é raro; é a rede de segurança.
+ * a vencer ou a consulta.
+ *
+ * As vagas são repartidas UMA vez, no fim da rodada, com o plano de todas as
+ * séries na mão (comRodadaDoTeto). Contar o que estava pendente série a série
+ * não funciona: com a fila cheia, os avisos velhos da rotina e do skincare
+ * ocupavam as vagas e o remédio novo ficava com zero. Os avisos de longe que
+ * ficam de fora voltam no próximo reagendamento, a cada abertura do app.
+ * No Android o limite é 500 por app: não há rodada e nada é cortado.
  */
 export const TETO_IPHONE = 64;
+/** Remédio tem aviso garantido pelas próximas 48 h, aconteça o que acontecer com as vagas. */
+export const PISO_REMEDIO_HORAS = 48;
+/** O que tem data marcada e é pouco. O resto (fora o remédio) são as séries diárias. */
+const TIPOS_COM_DATA: ReadonlySet<string> = new Set(["consulta", "compromisso", "tarefa", "aniversario", "casa"]);
 const noIphone = (): boolean => { try { return isIOS(); } catch { return false; } };
+
+export type PedidoDeAvisos = { tipo: Exclude<TipoDeLembrete, "outro">; rota: string; avisos: Planejado[] };
+
+/**
+ * Quem entra nas vagas, nesta ordem:
+ *  1. o remédio das próximas 48 h (entra mesmo sem vaga: são os avisos mais
+ *     próximos, e o iPhone guarda os 64 mais próximos);
+ *  2. o que tem data marcada, o mais próximo primeiro (conta e retrospectiva
+ *     são agendadas antes e já contam como ocupadas);
+ *  3. o resto do remédio;
+ *  4. o próximo aviso de cada série diária (reservado desde o começo, pra
+ *     nenhuma delas calar por inteiro) e depois as séries diárias juntas, o mais
+ *     próximo primeiro. É aqui que o corte cai: nos avisos mais distantes.
+ *
+ * PURA pra ser testável sem plugin.
+ */
+export function repartirVagas(pedidos: PedidoDeAvisos[], vagas: number, agora = new Date()): Map<string, Planejado[]> {
+  type Item = { tipo: string; aviso: Planejado };
+  const fila = (entra: (tipo: string) => boolean): Item[] => pedidos
+    .filter((p) => entra(p.tipo))
+    .flatMap((p) => p.avisos.map((aviso) => ({ tipo: p.tipo as string, aviso })))
+    .sort((a, b) => a.aviso.quando.getTime() - b.aviso.quando.getTime());
+  const remedios = fila((t) => t === "saude");
+  const comData = fila((t) => TIPOS_COM_DATA.has(t));
+  const diarias = fila((t) => t !== "saude" && !TIPOS_COM_DATA.has(t));
+  const proximoDeCada = diarias.filter((item, i) => diarias.findIndex((x) => x.tipo === item.tipo) === i);
+
+  const limitePiso = agora.getTime() + PISO_REMEDIO_HORAS * 3600e3;
+  const piso = remedios.filter((r) => r.aviso.quando.getTime() <= limitePiso).slice(0, TETO_IPHONE);
+  const escolhidos = new Set<Item>(piso);
+  let livres = vagas - piso.length;
+  const entrar = (lista: Item[], quantos: number) => {
+    for (const item of lista) {
+      if (quantos <= 0) break;
+      if (escolhidos.has(item)) continue;
+      escolhidos.add(item);
+      quantos--;
+      livres--;
+    }
+  };
+  const reserva = Math.min(proximoDeCada.length, Math.max(0, livres));
+  entrar(comData, livres - reserva);
+  entrar(remedios, livres - reserva);
+  entrar(proximoDeCada, livres);
+  entrar(diarias, livres);
+
+  const porTipo = new Map<string, Planejado[]>();
+  for (const { tipo, aviso } of escolhidos) porTipo.set(tipo, [...(porTipo.get(tipo) ?? []), aviso]);
+  return porTipo;
+}
+
+/** A rodada aberta: enquanto existe, as séries só anotam o pedido aqui. */
+let pedidosDaRodada: PedidoDeAvisos[] | null = null;
 const cortesRegistrados = new Set<string>();
-function cortarNoTeto(tipo: string, avisos: Planejado[], outrosPendentes: number): Planejado[] {
-  if (!noIphone()) return avisos;
-  const vagas = Math.max(0, TETO_IPHONE - outrosPendentes);
-  if (avisos.length <= vagas) return avisos;
-  if (!cortesRegistrados.has(tipo)) {
-    cortesRegistrados.add(tipo);
-    try { trackEvent("notif_teto_iphone", { tipo, cortados: avisos.length - vagas, pendentes: outrosPendentes }); } catch { /* telemetria nunca derruba o agendamento */ }
+
+/** Fecha a conta: troca os avisos das séries pedidas pelo que coube. Devolve quantos ficaram de cada tipo. */
+async function armarPedidos(pedidos: PedidoDeAvisos[]): Promise<Record<string, number>> {
+  const p = await plugin();
+  if (!p || !pedidos.length) return {};
+  const { LN } = p;
+  const entregues: Record<string, number> = {};
+  try {
+    const pendentes = (await LN.getPending()).notifications ?? [];
+    const nossas = pendentes.filter((n) => pedidos.some((x) => n.id >= BASES[x.tipo] && n.id < BASES[x.tipo] + 10000));
+    const ocupadas = pendentes.length - nossas.length;
+    const repartidos = repartirVagas(pedidos, TETO_IPHONE - ocupadas);
+    if (nossas.length) await LN.cancel({ notifications: nossas.map((n) => ({ id: n.id })) });
+    for (const { tipo, rota, avisos } of pedidos) {
+      const lista = repartidos.get(tipo) ?? [];
+      if (lista.length < avisos.length && !cortesRegistrados.has(tipo)) {
+        cortesRegistrados.add(tipo);
+        try { trackEvent("notif_teto_iphone", { tipo, cortados: avisos.length - lista.length, pendentes: ocupadas }); } catch { /* telemetria nunca derruba o agendamento */ }
+      }
+      entregues[tipo] = await armarSerie(p, tipo, rota, lista);
+    }
+  } catch (e) {
+    registrarFalhaDeAgendamento("rodada", e);
   }
-  return [...avisos].sort((a, b) => a.quando.getTime() - b.quando.getTime()).slice(0, vagas);
+  return entregues;
+}
+
+/**
+ * Roda o `planejar` (o reagendarTudo) com as séries só anotando o que querem e,
+ * no fim, reparte as 64 vagas de uma vez. Nada é cancelado antes da conta: se
+ * uma série estourar no meio, as que não chegaram a pedir seguem como estavam.
+ * Fora do iPhone não faz nada: cada série agenda na hora, como sempre.
+ */
+export async function comRodadaDoTeto<T extends Record<string, number>>(planejar: () => Promise<T>): Promise<T> {
+  if (!noIphone()) return planejar();
+  const pedidos: PedidoDeAvisos[] = [];
+  pedidosDaRodada = pedidos;
+  try {
+    const contagem = await planejar();
+    pedidosDaRodada = null;
+    return { ...contagem, ...(await armarPedidos(pedidos)) };
+  } catch (e) {
+    pedidosDaRodada = null;
+    await armarPedidos(pedidos);
+    throw e;
+  }
 }
 
 /**
@@ -511,19 +605,21 @@ const indiceSemana = (d: Date) => (d.getDay() === 0 ? 6 : d.getDay() - 1);
  *  inteiro que o Android mostra ao expandir a notificação. */
 type Planejado = { quando: Date; title: string; body: string; id?: number; rota?: string; largeBody?: string };
 
-/** Agenda uma série já pronta na faixa do tipo, substituindo a anterior. */
+/** Agenda uma série já pronta na faixa do tipo, substituindo a anterior. No iPhone, passa pela conta das vagas. */
 async function agendarSerie(tipo: Exclude<TipoDeLembrete, "outro">, rota: string, avisos: Planejado[]): Promise<number> {
   const p = await plugin();
   if (!p) return 0;
-  const { LN } = p;
   if (!(await temPermissao())) return 0;
   await garantirCanal();
-  const outros = await limparFaixa(BASES[tipo]);
-  if (!avisos.length) return 0;
-  // (07/11) no iPhone só cabe o que sobrou das 64 vagas — ver cortarNoTeto
-  const lista = cortarNoTeto(tipo, avisos, outros);
-  if (!lista.length) return 0;
+  const pedido = { tipo, rota, avisos };
+  if (pedidosDaRodada) { pedidosDaRodada.push(pedido); return avisos.length; }
+  if (noIphone()) return (await armarPedidos([pedido]))[tipo] ?? 0;
+  await limparFaixa(BASES[tipo]);
+  return armarSerie(p, tipo, rota, avisos);
+}
 
+async function armarSerie({ LN }: PluginLN, tipo: Exclude<TipoDeLembrete, "outro">, rota: string, lista: Planejado[]): Promise<number> {
+  if (!lista.length) return 0;
   try {
     await LN.schedule({
       notifications: lista.map((a) => ({
@@ -763,17 +859,10 @@ export async function agendarLembreteSequencia(
 
 export type RemedioAgendavel = {
   id: string; nome: string; hora: string; tomadoHoje: boolean;
-  /** 07/11: último dia do tratamento ("AAAA-MM-DD") — depois dele o aviso não existe (lib/remedios) */
+  /** 07/11: último dia desta dose ("AAAA-MM-DD") — depois dele o aviso não existe (lib/remedios, ultimoDiaDaDose) */
   ate?: string;
 };
 
-/**
- * 07/11: quantos avisos de remédio cabem de uma vez, os mais próximos primeiro.
- * 8 em 8 h por 10 dias = 30; 6 em 6 h cobre 7 dias e meio — e o reagendamento a
- * cada abertura do app repõe. É o que deixa o teto de 64 do iPhone (TETO_IPHONE)
- * com espaço pros outros lembretes.
- */
-export const TETO_AVISOS_REMEDIOS = 30;
 const diaValido = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 /** "Ômega 3", "Ômega 3 e Vitamina D", "A, B e C", "A, B, C e mais 2". */
@@ -819,7 +908,7 @@ export function planejarRemedios(lista: RemedioAgendavel[], agora = new Date()):
       if (quando.getTime() <= agora.getTime()) continue;
       const dia = localDia(quando);
       const ehHoje = dia === hoje;
-      // (07/11) `ate` é o último dia do tratamento: depois dele o remédio sai do aviso
+      // (07/11) `ate` aqui é o último dia DESTA dose (lib/remedios, dosesEmVigor): depois dele ela sai do aviso
       const nomes = (porHorario.get(hora) ?? [])
         .filter((r) => !(ehHoje && r.tomadoHoje) && !(diaValido(r.ate) && dia > r.ate))
         .map((r) => r.nome);
@@ -834,8 +923,8 @@ export function planejarRemedios(lista: RemedioAgendavel[], agora = new Date()):
       });
     }
   });
-  // (07/11) os mais próximos primeiro, até o teto: 6 em 6 h × 11 dias seriam 44 avisos só de remédio
-  return avisos.sort((a, b) => a.quando.getTime() - b.quando.getTime()).slice(0, TETO_AVISOS_REMEDIOS);
+  // (07/11) sem teto fixo: no Android cabe tudo; no iPhone a rodada dá ao remédio as vagas que sobrarem (repartirVagas)
+  return avisos.sort((a, b) => a.quando.getTime() - b.quando.getTime());
 }
 
 export async function agendarRemedios(lista: RemedioAgendavel[], opcoes: { ligado: boolean }): Promise<number> {

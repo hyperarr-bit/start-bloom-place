@@ -266,6 +266,9 @@ const HEAVY_KEY_BYTES = 50_000;
 const WRITE_WARN_BYTES = 100_000;
 /** Leitura da conta no ar há mais que isto: o aviso "conexão lenta" aparece (a leitura segue). */
 const MS_LEITURA_LENTA = 8_000;
+/** (07/11, bug "retrato-minutos") Conta lida há mais que isto (no mesmo dia): o 1º gesto é juntado com o servidor e a
+ *  volta pra aba/app relê — ver "O RETRATO VELHO NO MESMO DIA". */
+const MS_RETRATO_VELHO = 10 * 60_000;
 /** Espera entre as tentativas de ler a conta depois de uma falha (a última se repete). */
 const ESPERAS_NOVA_TENTATIVA = [2_000, 5_000, 10_000, 20_000, 30_000];
 /*
@@ -599,6 +602,21 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   const releituraPedida = useRef(false);
   /** dias anotados esperando a releitura pra entrar na lista (localDayKey) */
   const diasPendentes = useRef<Set<string>>(new Set());
+  /*
+   * O RETRATO VELHO NO MESMO DIA (07/11, bug "retrato-minutos"). A régua do "retrato-velho" só olhava o DIA. No mesmo
+   * dia, a aba do PC lida às 8h00 e o celular lançando a Padaria: às 8h40 a aba voltava (a volta não relia — quem já
+   * está sincronizado sai cedo de `tentarDeNovo`) e o gesto mandava a chave inteira do retrato das 8h00; a Padaria
+   * sumia. A releitura só vinha com a renovação do token (~1 h) ou com o auth reemitindo a sessão. Agora o retrato
+   * lido há mais de MS_RETRATO_VELHO também é "velho" pro gesto (entra pelas SEGURADAS e pede `relerConta`, o mesmo
+   * caminho do outro dia), e a volta pra aba/app com ele pede `relerConta`. A régua do DIA ANOTADO segue só o dia
+   * (`retratoDeOutroDia`): a lista de dias só muda de um dia pro outro. Custo aceito: o 1º gesto depois de 10 min
+   * sem leitura espera uma leitura (centenas de ms).
+   */
+  const retratoPassouDoPrazo = (): boolean => {
+    const l = ultimaLeituraRef.current;
+    if (!userRef.current || !l) return false;
+    return localDayKey(new Date(l.pedidaEm)) !== localDayKey() || Date.now() - l.pedidaEm > MS_RETRATO_VELHO;
+  };
   /*
    * O QUE NÃO SUBIU (07/11, bug "offline-some"). O envio tenta 3 vezes (~1,5 s) e desistia. Sem rede (metrô), o
    * que ela anotou ficava só na tela e no cache — e a próxima leitura da conta (a rede voltando, o dia novo, a
@@ -1051,7 +1069,12 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   const relerContaRef = useRef(relerConta);
   relerContaRef.current = relerConta;
   useEffect(() => {
-    const aoVoltarPraTela = () => { if (document.visibilityState !== "hidden") tentarDeNovo(); };
+    const aoVoltarPraTela = () => {
+      if (document.visibilityState === "hidden") return;
+      // (07/11, bug "retrato-minutos") sincronizado com o retrato velho: relê (o celular pode ter lançado nesse meio-tempo)
+      if (sincronizadoRef.current && retratoPassouDoPrazo()) relerConta();
+      else tentarDeNovo();
+    };
     // (07/11, bug "recusa-laco") a rede voltou com envio que não subiu: zera a trava de uma leitura por chave e junta
     const aoVoltarARede = () => {
       if (sincronizadoRef.current && naoSubiram.current.size > 0) {
@@ -1301,7 +1324,8 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   // Escopo do "marcar outro dia": enquanto a função roda, as escritas valem pro dia dito.
   const escopoDiaRef = useRef<{ dia: string | null; feito?: boolean } | null>(null);
   /** (07/11) O retrato do servidor na memória é de OUTRO DIA (sessão viva que atravessou a meia-noite)? Convidado e
-   *  conta ainda não lida: não. A régua do dia anotado e do gesto em cima do retrato velho — ver "SESSÃO VIVA". */
+   *  conta ainda não lida: não. A régua do dia anotado — ver "SESSÃO VIVA". (O gesto em cima do retrato velho usa
+   *  `retratoPassouDoPrazo`, que também conta os minutos — bug "retrato-minutos".) */
   const retratoDeOutroDia = (): boolean => {
     const l = ultimaLeituraRef.current;
     return !!userRef.current && !!l && localDayKey(new Date(l.pedidaEm)) !== localDayKey();
@@ -1374,8 +1398,9 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     if (userId) {
       safeSetItem(userKey(userId, key), JSON.stringify(value));
       ultimaEscrita.current.set(key, Date.now());
-      // (07/11) a conta na memória foi lida noutro dia — ver "O GESTO EM CIMA DO RETRATO VELHO"
-      const retratoVelho = sincronizadoRef.current && retratoDeOutroDia();
+      // (07/11) a conta na memória foi lida noutro dia — ver "O GESTO EM CIMA DO RETRATO VELHO" — ou há mais de
+      // 10 min (bug "retrato-minutos") — ver "O RETRATO VELHO NO MESMO DIA"
+      const retratoVelho = sincronizadoRef.current && retratoPassouDoPrazo();
       if (!sincronizadoRef.current || retratoVelho) {
         // 16/10: a conta ainda não chegou do servidor — NÃO sobe (apagaria o que está
         // lá). Fica segurada e é juntada com o servidor quando a leitura der certo.

@@ -733,3 +733,67 @@ describe("envio recusado pelo servidor não vira laço de leitura", () => {
     expect(servidor().get("todo-list")).toEqual([{ id: "t0" }, { id: "t1" }]);
   }, 30000);
 });
+
+/* Crítica dos dados r3 (07/11, bug "retrato-minutos", achado em scratchpad/critico-dados-r3, R2). A régua do
+   "retrato-velho" só olhava o DIA. No MESMO dia, a aba do PC lida às 8h00 e o celular lançando a Padaria: às 8h40 a
+   aba volta e lança a Farmácia — a volta pra aba não relia (sincronizado = sai cedo) e o gesto mandava a chave
+   inteira do retrato das 8h00. O servidor ficava ['a','farmacia'] e a Padaria sumia. Já existia antes do ramo. */
+describe("mesmo dia: a conta lida há mais de 10 min não grava por cima do celular", () => {
+  const A = { id: "a", date: "2026-11-06", value: 10, description: "A" };
+  const FARMACIA = { id: "farmacia", date: "2026-11-06", value: 30, description: "Farmácia" };
+
+  it("aba lida às 8h00, celular lança Padaria, a aba VOLTA às 8h40 e lança Farmácia: as duas ficam", async () => {
+    vi.setSystemTime(em(2026, 11, 6, 8, 0));
+    servidor().set("finance-expenses", [A]);
+    montar();
+    await waitFor(() => expect(api.loaded).toBe(true));
+    servidor().set("finance-expenses", [A, PADARIA]); // o celular
+    vi.setSystemTime(em(2026, 11, 6, 8, 40));
+    await voltarPraAba();
+    act(() => api.set("finance-expenses", [...api.get<Gasto[]>("finance-expenses", []), FARMACIA]));
+    await esperar(600);
+    expect(ids(servidor().get("finance-expenses"))).toEqual(["a", "padaria", "farmacia"]);
+    expect(ids(api.get("finance-expenses", []))).toEqual(["a", "padaria", "farmacia"]);
+  });
+
+  it("sem voltar pra aba (aba sempre visível): o 1º gesto às 8h40 é juntado com o servidor", async () => {
+    vi.setSystemTime(em(2026, 11, 6, 8, 0));
+    servidor().set("finance-expenses", [A]);
+    montar();
+    await waitFor(() => expect(api.loaded).toBe(true));
+    servidor().set("finance-expenses", [A, PADARIA]);
+    vi.setSystemTime(em(2026, 11, 6, 8, 40));
+    act(() => api.set("finance-expenses", [...api.get<Gasto[]>("finance-expenses", []), FARMACIA]));
+    await esperar(600);
+    expect(ids(servidor().get("finance-expenses"))).toEqual(["a", "padaria", "farmacia"]);
+    expect(ids(api.get("finance-expenses", []))).toEqual(["a", "padaria", "farmacia"]);
+  });
+
+  it("na tela de Finanças (usePersistedState): a tela mostra as duas", async () => {
+    vi.setSystemTime(em(2026, 11, 6, 8, 0));
+    servidor().set(CHAVE_CARIMBO_CONTAS, "2026-11");
+    servidor().set("finance-expenses", [A]);
+    montar(true);
+    await waitFor(() => expect(api.loaded).toBe(true));
+    await waitFor(() => expect(ids(gastosNaTela)).toEqual(["a"]));
+    servidor().set("finance-expenses", [A, PADARIA]);
+    vi.setSystemTime(em(2026, 11, 6, 8, 40));
+    act(() => setGastosNaTela((p) => [...p, FARMACIA]));
+    await esperar(600);
+    expect(ids(servidor().get("finance-expenses"))).toEqual(["a", "padaria", "farmacia"]);
+    expect(ids(gastosNaTela)).toEqual(["a", "padaria", "farmacia"]);
+  });
+
+  it("controle: lida há 5 min, a volta pra aba não relê e o gesto grava na hora", async () => {
+    vi.setSystemTime(em(2026, 11, 6, 8, 0));
+    servidor().set("finance-expenses", [A]);
+    montar();
+    await waitFor(() => expect(api.loaded).toBe(true));
+    vi.setSystemTime(em(2026, 11, 6, 8, 5));
+    await voltarPraAba();
+    act(() => api.set("finance-expenses", [A, FARMACIA]));
+    await esperar(400);
+    expect(leiturasTotais).toBe(1);
+    expect(ids(servidor().get("finance-expenses"))).toEqual(["a", "farmacia"]);
+  });
+});

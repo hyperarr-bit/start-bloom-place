@@ -55,6 +55,12 @@ vi.mock("@/lib/native-shell", async (orig) => ({
   isIOS: () => plataforma.nativo && !plataforma.android,
   plataformaApp: () => (plataforma.nativo ? (plataforma.android ? "android" : "ios") : "web"),
 }));
+// o cadastro de várias doses está atrás da chave REMEDIO_VEZES (desligada no site até a build nova
+// sair; ver remedio-chave-site-07-11.test.tsx): aqui ela fica LIGADA, como no app e no site depois
+vi.mock("@/lib/remedio-vezes", async (orig) => ({
+  ...(await orig<typeof import("@/lib/remedio-vezes")>()),
+  remedioVezesLigado: () => true,
+}));
 const eventos = vi.hoisted(() => [] as Array<[string, Record<string, unknown> | undefined]>);
 vi.mock("@/lib/analytics", async (orig) => ({
   ...(await orig<typeof import("@/lib/analytics")>()),

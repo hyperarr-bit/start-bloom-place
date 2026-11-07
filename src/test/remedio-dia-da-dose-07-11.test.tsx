@@ -41,6 +41,12 @@ vi.mock("@/lib/native-shell", async (orig) => ({
   isIOS: () => false,
   plataformaApp: () => "web",
 }));
+// o cadastro de várias doses está atrás da chave REMEDIO_VEZES (desligada no site até a build nova
+// sair; ver remedio-chave-site-07-11.test.tsx): aqui ela fica LIGADA, como no app e no site depois
+vi.mock("@/lib/remedio-vezes", async (orig) => ({
+  ...(await orig<typeof import("@/lib/remedio-vezes")>()),
+  remedioVezesLigado: () => true,
+}));
 vi.mock("@/lib/analytics", async (orig) => ({
   ...(await orig<typeof import("@/lib/analytics")>()),
   trackEvent: vi.fn(),

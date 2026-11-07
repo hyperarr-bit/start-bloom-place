@@ -7,6 +7,7 @@ import { CHAVE_DEPENDENTES } from "@/lib/saude-dependentes";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
 import { isNativeShell } from "@/lib/native-shell";
+import { remedioVezesLigado } from "@/lib/remedio-vezes";
 import { abrirAjusteDeAlarmeExato, estadoAlarmeExato, pedirPermissao, temPermissao, type EstadoAlarmeExato } from "@/lib/notificacoes";
 import { CHAVE_PREFS, lerPrefs } from "@/lib/prefs-notificacoes";
 import { reagendarTudo, type Leitor } from "@/lib/reagendar";
@@ -113,6 +114,10 @@ export const PharmacyChecklist = () => {
      00:00) e ficam editáveis antes de salvar; mexer na primeira dose ou no
      "quantas vezes" gera de novo. */
   const [newVezes, setNewVezes] = useState<VezesAoDia>(1);
+  /* 07/11 (4ª rodada): "Quantas vezes" e "Até quando" atrás da chave (lib/remedio-vezes) — ligada no
+     app das lojas, DESLIGADA no site até a build nova estar na loja: o app antigo do celular avisaria
+     um tratamento com fim todo dia, pra sempre. Sem ela, o cadastro é o de sempre (1 horário). */
+  const vezesLigado = remedioVezesLigado();
   const [horariosEditados, setHorariosEditados] = useState<string[] | null>(null);
   const [newAte, setNewAte] = useState("");
   /** "Começa hoje/amanhã" (07/11, 4ª rodada): null = a sugestão; true/false = o que a pessoa tocou */
@@ -213,8 +218,8 @@ export const PharmacyChecklist = () => {
     if (!newName.trim()) return;
     const quem = newQuem.trim();
     const stock = lerEstoque(newStock) ?? ESTOQUE_PADRAO;
-    const ate = ehDia(newAte) && newAte >= today ? newAte : undefined; // data no passado = sem fim
-    const novas = montarLinhas({ name: newName.trim(), quem, stock }, horarios, ate, Date.now(), comeco?.inicio);
+    const ate = vezesLigado && ehDia(newAte) && newAte >= today ? newAte : undefined; // data no passado = sem fim
+    const novas = montarLinhas({ name: newName.trim(), quem, stock }, vezesLigado ? horarios : [newTime], ate, Date.now(), comeco?.inicio);
     const lista = [...supplements, ...novas];
     setSupplements(lista);
     if (quem && !dependentes.includes(quem)) setDependentes([...dependentes, quem]);
@@ -523,14 +528,17 @@ export const PharmacyChecklist = () => {
                               className={`${campoPequeno} w-[5.75rem]`}
                             />
                           ))}
-                          <span className="text-[11px] text-muted-foreground">até</span>
-                          <input
-                            type="date"
-                            value={g.ate ?? ""}
-                            aria-label={`Até quando de ${g.nome}`}
-                            onChange={e => changeAte(g, e.target.value)}
-                            className={`${campoPequeno} w-[8.5rem]`}
-                          />
+                          {/* sem a chave (site), só mexe no fim de quem já tem — não nasce tratamento com fim aqui */}
+                          {(vezesLigado || !!g.ate) && (<>
+                            <span className="text-[11px] text-muted-foreground">até</span>
+                            <input
+                              type="date"
+                              value={g.ate ?? ""}
+                              aria-label={`Até quando de ${g.nome}`}
+                              onChange={e => changeAte(g, e.target.value)}
+                              className={`${campoPequeno} w-[8.5rem]`}
+                            />
+                          </>)}
                           <button type="button" onClick={() => setEditando(null)} className="h-8 px-3 rounded-lg bg-primary/10 text-primary text-[11px] font-semibold">Pronto</button>
                         </div>
                       </td>
@@ -569,7 +577,7 @@ export const PharmacyChecklist = () => {
             className="text-xs h-9 flex-1"
           />
           {/* com 2+ doses o horário mora só na linha "Horários" embaixo (a 1ª de lá é a 1ª dose) — dois 08:00 sem rótulo confundiam */}
-          {newVezes === 1 && (
+          {(newVezes === 1 || !vezesLigado) && (
             <Input
               type="time"
               value={newTime}
@@ -615,76 +623,78 @@ export const PharmacyChecklist = () => {
           </label>
         </div>
         {/* 07/11: quantas vezes ao dia — o horário de cima é a PRIMEIRA dose; as outras nascem daqui */}
-        <div className="flex items-center gap-2" role="group" aria-label="Quantas vezes por dia">
-          <span className="text-[11px] text-muted-foreground shrink-0">Quantas vezes</span>
-          <div className="flex-1 grid grid-cols-4 gap-1">
-            {OPCOES_VEZES.map(o => (
-              <button
-                type="button"
-                key={o.vezes}
-                aria-pressed={newVezes === o.vezes}
-                onClick={() => escolherVezes(o.vezes)}
-                className={`h-8 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-colors ${newVezes === o.vezes ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" : "bg-muted/60 text-muted-foreground hover:bg-muted"}`}
-              >
-                {o.rotulo}
-              </button>
-            ))}
-          </div>
-        </div>
-        {newVezes > 1 && (
-          <div className="space-y-1.5" data-testid="remedio-horarios">
-            <div className="flex flex-wrap items-center justify-between gap-x-2">
-              <p className="text-[11px] text-muted-foreground">
-                Horários · {rotuloDosHorarios(horarios)} <span className="opacity-70">(a 1ª dose ajusta as outras)</span>
-              </p>
-              {/* 07/11 (4ª rodada da crítica): o começo do tratamento à vista, só texto — um toque troca
-                  hoje/amanhã. Quem cadastra às 23:30 e começa amanhã não ganha aviso à meia-noite. */}
-              {comeco && (
+        {vezesLigado && (<>
+          <div className="flex items-center gap-2" role="group" aria-label="Quantas vezes por dia">
+            <span className="text-[11px] text-muted-foreground shrink-0">Quantas vezes</span>
+            <div className="flex-1 grid grid-cols-4 gap-1">
+              {OPCOES_VEZES.map(o => (
                 <button
                   type="button"
-                  onClick={() => setComecaAmanha(!comeco.amanha)}
-                  aria-label={`Começa ${comeco.amanha ? "amanhã" : "hoje"} às ${horarios[0]}. Tocar muda pra ${comeco.amanha ? "hoje" : "amanhã"}`}
-                  className="h-8 -my-1.5 shrink-0 text-[11px] font-semibold text-foreground underline decoration-dotted underline-offset-2"
-                  data-testid="remedio-comeca"
+                  key={o.vezes}
+                  aria-pressed={newVezes === o.vezes}
+                  onClick={() => escolherVezes(o.vezes)}
+                  className={`h-8 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-colors ${newVezes === o.vezes ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" : "bg-muted/60 text-muted-foreground hover:bg-muted"}`}
                 >
-                  Começa {comeco.amanha ? "amanhã" : "hoje"} {horarios[0]}
+                  {o.rotulo}
                 </button>
-              )}
-            </div>
-            <div className={`grid gap-1.5 ${horarios.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
-              {horarios.map((h, i) => (
-                <input
-                  key={i}
-                  type="time"
-                  value={h}
-                  aria-label={`${i + 1}ª dose`}
-                  onChange={e => editarHorarioNovo(i, e.target.value)}
-                  className={`${campoPequeno} w-full min-w-0`}
-                />
               ))}
             </div>
           </div>
-        )}
-        <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
-          <span className="shrink-0">Até quando <span className="opacity-70">(opcional)</span></span>
-          <input
-            type="date"
-            value={newAte}
-            min={today}
-            onChange={e => setNewAte(e.target.value)}
-            aria-label="Até quando (opcional)"
-            data-testid="remedio-ate"
-            className={`${campoPequeno} flex-1 min-w-0`}
-          />
-        </label>
-        {/* 07/11 (retomada): o lembrete do celular é agendado pelo app do celular — a versão
-            antiga não conhece "até quando" nem o começo do tratamento e avisaria todo dia,
-            pra sempre. Só no site, só quando a pessoa usa o que é novo. */}
-        {!isNativeShell() && (newVezes > 1 || !!newAte) && (
-          <p className="text-[10px] leading-snug text-muted-foreground" data-testid="remedio-aviso-app">
-            No celular, atualize o app do CORE pro lembrete seguir estes horários e parar na data.
-          </p>
-        )}
+          {newVezes > 1 && (
+            <div className="space-y-1.5" data-testid="remedio-horarios">
+              <div className="flex flex-wrap items-center justify-between gap-x-2">
+                <p className="text-[11px] text-muted-foreground">
+                  Horários · {rotuloDosHorarios(horarios)} <span className="opacity-70">(a 1ª dose ajusta as outras)</span>
+                </p>
+                {/* 07/11 (4ª rodada da crítica): o começo do tratamento à vista, só texto — um toque troca
+                    hoje/amanhã. Quem cadastra às 23:30 e começa amanhã não ganha aviso à meia-noite. */}
+                {comeco && (
+                  <button
+                    type="button"
+                    onClick={() => setComecaAmanha(!comeco.amanha)}
+                    aria-label={`Começa ${comeco.amanha ? "amanhã" : "hoje"} às ${horarios[0]}. Tocar muda pra ${comeco.amanha ? "hoje" : "amanhã"}`}
+                    className="h-8 -my-1.5 shrink-0 text-[11px] font-semibold text-foreground underline decoration-dotted underline-offset-2"
+                    data-testid="remedio-comeca"
+                  >
+                    Começa {comeco.amanha ? "amanhã" : "hoje"} {horarios[0]}
+                  </button>
+                )}
+              </div>
+              <div className={`grid gap-1.5 ${horarios.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+                {horarios.map((h, i) => (
+                  <input
+                    key={i}
+                    type="time"
+                    value={h}
+                    aria-label={`${i + 1}ª dose`}
+                    onChange={e => editarHorarioNovo(i, e.target.value)}
+                    className={`${campoPequeno} w-full min-w-0`}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+          <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+            <span className="shrink-0">Até quando <span className="opacity-70">(opcional)</span></span>
+            <input
+              type="date"
+              value={newAte}
+              min={today}
+              onChange={e => setNewAte(e.target.value)}
+              aria-label="Até quando (opcional)"
+              data-testid="remedio-ate"
+              className={`${campoPequeno} flex-1 min-w-0`}
+            />
+          </label>
+          {/* 07/11 (retomada): o lembrete do celular é agendado pelo app do celular — a versão
+              antiga não conhece "até quando" nem o começo do tratamento e avisaria todo dia,
+              pra sempre. Só no site, só quando a pessoa usa o que é novo. */}
+          {!isNativeShell() && (newVezes > 1 || !!newAte) && (
+            <p className="text-[10px] leading-snug text-muted-foreground" data-testid="remedio-aviso-app">
+              No celular, atualize o app do CORE pro lembrete seguir estes horários e parar na data.
+            </p>
+          )}
+        </>)}
         {alarmeExato === "denied" && (
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3" data-testid="remedio-alarme-exato">
             <p className="flex items-center gap-1.5 text-xs font-semibold">

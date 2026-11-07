@@ -1,5 +1,6 @@
 import { type Badge, type BadgeCategoria, type Raridade, XP_RARIDADE } from "./types";
 import { chaveArquivada } from "@/lib/virada-do-mes";
+import { memoPorLeituras, novoCacheDeLeituras } from "@/lib/memo-por-leituras";
 import { medirVida, recordeDeSequencia } from "./badges-vida";
 import { CHAVE_ACOES_CONQUISTAS, mapa, itens, texto, numero, diaValido } from "@/lib/conquistas-acoes";
 import { localDayKey, parseLocalDay } from "@/lib/utils";
@@ -76,6 +77,14 @@ const maxGrupo = (dias: string[], chave: (d: string) => string) => {
 };
 const semana = (d: string) => localDayKey(segundaDe(parseLocalDay(d)));
 
+/* 07/11 (desempenho, lente "toque"): os dois blocos CAROS do caderno guardam o resultado pelas chaves que leem
+ * (lib/memo-por-leituras) — o histórico do Treino (varrer 270 KB numa conta de 1 ano + recordes mês a mês) e os 24
+ * meses de gastos arquivados (50 listas). Este `medirCaderno` roda em TODA escrita no store, em toda tela (os Momentos
+ * montam em cada módulo), e quase toda escrita muda alguma chave que ele lê (ações, dias anotados) — mas quase nenhuma
+ * muda ESTAS. Medido na conta cheia com a CPU 4× mais lenta: ~30 ms por toque só nesses dois blocos. */
+const cacheTreino = novoCacheDeLeituras<{ carga: boolean; recorde: number }>();
+const cacheFinancas = novoCacheDeLeituras<number>();
+
 export function medirCaderno(get: LeitorCatalogo, hoje = localDayKey()): Record<string, number> {
   const vida = medirVida(get, hoje);
   const acoes = mapa(get(CHAVE_ACOES_CONQUISTAS, {}));
@@ -90,19 +99,23 @@ export function medirCaderno(get: LeitorCatalogo, hoje = localDayKey()): Record<
     ...diasRegistro(get("dieta-diary-v2", {}), v => Object.values(mapa(v?.meals)).some((m: any) => typeof m?.followed === "boolean" || texto(m?.note)), hoje),
     ...diasRegistro(get("core-dieta-log", {}), v => Object.values(mapa(v)).some(x => x && typeof x === "object"), hoje),
   ]);
-  const historico = lerLista("treino-exercise-history").filter(h => diaValido(h.date) && h.date <= hoje && h.tipo !== "cardio");
-  const porExercicio = new Map<string, Map<string, number>>();
-  for (const h of historico) {
-    if (!texto(h.exercise)) continue;
-    const nome = normalizarNome(h.exercise);
-    const cargas = seriesDaEntrada(h).filter(s => s.reps > 0).map(s => s.carga);
-    if (!cargas.length) continue;
-    const ds = porExercicio.get(nome) ?? new Map<string, number>();
-    ds.set(h.date, Math.max(ds.get(h.date) ?? 0, ...cargas)); porExercicio.set(nome, ds);
-  }
-  const carga = [...porExercicio.values()].some(ds => {
-    let anterior: number | undefined;
-    return [...ds.entries()].sort(([a], [b]) => a.localeCompare(b)).some(([,v]) => { const subiu = anterior !== undefined && v > anterior; anterior = v; return subiu; });
+  const { carga, recorde } = memoPorLeituras(cacheTreino, get, hoje, (ler) => {
+    const historico = itens(ler("treino-exercise-history", [])).filter(h => diaValido(h.date) && h.date <= hoje && h.tipo !== "cardio");
+    const porExercicio = new Map<string, Map<string, number>>();
+    for (const h of historico) {
+      if (!texto(h.exercise)) continue;
+      const nome = normalizarNome(h.exercise);
+      const cargas = seriesDaEntrada(h).filter(s => s.reps > 0).map(s => s.carga);
+      if (!cargas.length) continue;
+      const ds = porExercicio.get(nome) ?? new Map<string, number>();
+      ds.set(h.date, Math.max(ds.get(h.date) ?? 0, ...cargas)); porExercicio.set(nome, ds);
+    }
+    const carga = [...porExercicio.values()].some(ds => {
+      let anterior: number | undefined;
+      return [...ds.entries()].sort(([a], [b]) => a.localeCompare(b)).some(([,v]) => { const subiu = anterior !== undefined && v > anterior; anterior = v; return subiu; });
+    });
+    const recorde = [...new Set(historico.map(h => h.date.slice(0, 7)))].some(m => recordesDoMes(historico, Number(m.slice(0,4)), Number(m.slice(5,7)) - 1).length > 0) ? 1 : 0;
+    return { carga, recorde };
   });
   const treinos = datasLista(get("saude-workout-log", []), hoje);
   const dias = datasLista(get("core-dias-anotados", []), hoje).sort();
@@ -110,13 +123,17 @@ export function medirCaderno(get: LeitorCatalogo, hoje = localDayKey()): Record<
   const limites = mapa(get("finance-category-budgets", {}));
   const limitesPJ = mapa(get("finance-category-budgets-perfis", {}));
   const tarefas = lerLista("rotina-day-tasks").filter(t => texto(t.texto));
-  const despesas = [...lerLista("finance-expenses"), ...lerLista("finance-incomes")];
-  // A virada do mês move os lançamentos; o progresso continua atravessando meses.
-  const referencia = parseLocalDay(hoje);
-  for (let i = 1; i <= 24; i++) {
-    const mes = new Date(referencia.getFullYear(), referencia.getMonth() - i, 1);
-    despesas.push(...lerLista(chaveArquivada(mes.getFullYear(), mes.getMonth(), "expenses")), ...lerLista(chaveArquivada(mes.getFullYear(), mes.getMonth(), "incomes")));
-  }
+  const diasFinancas = memoPorLeituras(cacheFinancas, get, hoje, (ler) => {
+    const lista = (k: string) => itens(ler(k, []));
+    const despesas = [...lista("finance-expenses"), ...lista("finance-incomes")];
+    // A virada do mês move os lançamentos; o progresso continua atravessando meses.
+    const referencia = parseLocalDay(hoje);
+    for (let i = 1; i <= 24; i++) {
+      const mes = new Date(referencia.getFullYear(), referencia.getMonth() - i, 1);
+      despesas.push(...lista(chaveArquivada(mes.getFullYear(), mes.getMonth(), "expenses")), ...lista(chaveArquivada(mes.getFullYear(), mes.getMonth(), "incomes")));
+    }
+    return new Set(despesas.map(d => d.date).filter(d => diaValido(d) && d <= hoje)).size;
+  });
   const viagem = mapa(get("travel-trips-v2", {}));
   const metas = lerLista("goals-board-v2");
   return {
@@ -136,7 +153,7 @@ export function medirCaderno(get: LeitorCatalogo, hoje = localDayKey()): Record<
     planoTreino: acao("plano-treino"), completo: acao("treino-completo"),
     notaTreino: Object.values(mapa(get("treino-notas-sessoes", {}))).filter(texto).length,
     carga: carga ? 1 : 0,
-    recorde: [...new Set(historico.map(h => h.date.slice(0, 7)))].some(m => recordesDoMes(historico, Number(m.slice(0,4)), Number(m.slice(5,7)) - 1).length > 0) ? 1 : 0,
+    recorde,
     semanaTreino: maxGrupo(treinos, semana) >= vida.metaSemanal ? 1 : 0, treinos: treinos.length,
     tarefa: tarefas.length, tarefaFeita: tarefas.filter(t => t.feito === true).length,
     compromisso: lerLista("rotina-compromissos").filter(c => texto(c.titulo) && diaValido(c.data) && /^\d{2}:\d{2}$/.test(c.hora ?? "")).length,
@@ -145,7 +162,7 @@ export function medirCaderno(get: LeitorCatalogo, hoje = localDayKey()): Record<
     semanaRotina: acao("agenda-rotina") ? maxGrupo(diasHabitos, semana) : 0,
     revisaoSemana: Object.values(mapa(get("weekly-reviews", {}))).filter(r => texto(r?.wins) || texto(r?.improve) || texto(r?.focus)).length,
     contaPaga: lerLista("finance-dueDays").flatMap(d => itens(d.bills)).filter(b => b.paid === true).length,
-    diasFinancas: new Set(despesas.map(d => d.date).filter(d => diaValido(d) && d <= hoje)).size,
+    diasFinancas,
     poupou: lerLista("finance-wishlist").some(w => numero(w.savedAmount) > 0) || acao("poupar") ? 1 : 0,
     diasPoupando: acao("poupar"), investiu: lerLista("finance-investments").filter(i => numero(i.currentValue) > 0 || numero(i.value) > 0).length,
     remedio: lerLista("core-saude-supplements").filter(s => texto(s.name)).length,

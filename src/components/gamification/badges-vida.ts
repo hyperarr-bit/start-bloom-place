@@ -1,5 +1,6 @@
 import { Badge, Raridade, XP_RARIDADE } from "./types";
 import { localDayKey, parseLocalDay } from "@/lib/utils";
+import { memoPorLeituras, novoCacheDeLeituras } from "@/lib/memo-por-leituras";
 import { DIAS, metaPadrao, segundaDe, somarDias as somarDiasData } from "@/lib/treino-constancia";
 import { CHAVE_TOUR_FEITO, tourHomeLigado } from "@/lib/tour-home";
 
@@ -88,8 +89,15 @@ export const semanasSeguidasNaMeta = (treinos: string[], meta: number, hoje: str
   return n;
 };
 
+/* 07/11 (desempenho, lente "toque"): esta medição roda 2× por `useConquistas` (caderno + adesivos de vida), em toda
+ * escrita no store, em toda tela — ~10 ms na conta cheia (CPU 4×). Guarda o resultado pelas ~20 chaves que lê
+ * (lib/memo-por-leituras): só refaz quando uma delas muda; um gasto em Finanças não refaz nada daqui. */
+const cacheVida = novoCacheDeLeituras<ReturnType<typeof medirVidaCru>>();
 /** As medidas de vida que os adesivos e as insígnias usam. */
 export function medirVida(get: Leitor, hoje: string = localDayKey()) {
+  return memoPorLeituras(cacheVida, get, hoje, (ler) => medirVidaCru(ler, hoje));
+}
+function medirVidaCru(get: Leitor, hoje: string) {
   // ---------- rotina ----------
   const diasAtivos = diasDe(get<unknown>("heatmap-log", {}), (v) => (typeof v === "number" ? v > 0 : v === true));
   const recordeRotina = recordeDeSequencia(diasAtivos);

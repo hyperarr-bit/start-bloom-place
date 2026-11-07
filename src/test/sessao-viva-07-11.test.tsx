@@ -335,11 +335,14 @@ describe("a releitura não volta atrás o gesto que estava na fila", () => {
     api.set("todo-list", [{ id: "t0" }, { id: "t1" }]);
     vi.setSystemTime(new Date(em(2026, 11, 6, 0, 10).getTime() + 20));
     await act(async () => {}); // a releitura sai antes do envio do gesto
-    await esperar(400); // o envio do gesto sai (o retrato da releitura foi tirado ANTES dele)
-    expect(servidor().get("todo-list")).toEqual([{ id: "t0" }, { id: "t1" }]);
+    await esperar(400);
+    // (07/11, bug "retrato-velho") o gesto com a conta lida noutro dia não sobe mais na hora: espera a releitura
+    // pra ser juntado com o que o servidor tem hoje (a cópia fica guardada no aparelho enquanto isso)
+    expect(servidor().get("todo-list")).toEqual([{ id: "t0" }]);
     expect(leiturasTotais).toBe(2);
     await act(async () => { soltarLeitura?.(); });
     await esperar(400);
+    expect(servidor().get("todo-list")).toEqual([{ id: "t0" }, { id: "t1" }]);
     expect(api.get("todo-list", [])).toEqual([{ id: "t0" }, { id: "t1" }]);
     // quem lê pelo `get` (Pet, Conquistas, widgets da Home) e grava em cima: o t1 fica
     act(() => api.set("todo-list", [...api.get<{ id: string }[]>("todo-list", []), { id: "t2" }]));
@@ -479,4 +482,93 @@ describe("o que ela anotou sem rede não some quando a rede volta", () => {
     await esperar(600);
     expect(servidor().get("todo-list")).toEqual([{ id: "t0" }, { id: "t1-sem-rede" }]);
   }, 15000);
+});
+
+/* Crítica dos dados r2 (07/11, bug "retrato-velho"): a sessão viva protegia só a virada e a lista de dias. O 1º gesto
+   numa aba com a conta lida NOUTRO DIA mandava a chave INTEIRA a partir do retrato velho e apagava o que o celular
+   lançou na mesma chave — e a releitura que chegava depois mantinha o valor do aparelho. */
+describe("o 1º gesto com a conta lida noutro dia não apaga o que o celular lançou", () => {
+  const A = { id: "a", date: "2026-11-03", value: 10, description: "A" };
+  const FARMACIA = { id: "farmacia", date: "2026-11-06", value: 30, description: "Farmácia" };
+
+  it("DOIS APARELHOS: aba de 03/11, o celular lança Padaria em 05/11, a aba lança Farmácia em 06/11: os dois ficam", async () => {
+    vi.setSystemTime(em(2026, 11, 3, 10, 0));
+    servidor().set("finance-expenses", [A]);
+    montar();
+    await waitFor(() => expect(api.loaded).toBe(true));
+    servidor().set("finance-expenses", [A, PADARIA]); // o celular, em 05/11
+    vi.setSystemTime(em(2026, 11, 6, 9, 0));
+    await voltarPraAba();
+    act(() => api.set("finance-expenses", [...api.get<Gasto[]>("finance-expenses", []), FARMACIA]));
+    await esperar(600);
+    expect(ids(servidor().get("finance-expenses"))).toEqual(["a", "padaria", "farmacia"]);
+    expect(ids(api.get("finance-expenses", []))).toEqual(["a", "padaria", "farmacia"]);
+    expect(gravacoesDe("finance-expenses").map(ids)).not.toContainEqual(["a", "farmacia"]); // nada por cima, nem por um instante
+  });
+
+  it("na tela de Finanças (o mesmo gesto pelo usePersistedState): a tela mostra os dois", async () => {
+    vi.setSystemTime(em(2026, 11, 3, 10, 0));
+    servidor().set("finance-expenses", [A]);
+    servidor().set(CHAVE_CARIMBO_CONTAS, "2026-11");
+    montar(true);
+    await waitFor(() => expect(ids(gastosNaTela)).toEqual(["a"]));
+    servidor().set("finance-expenses", [A, PADARIA]);
+    vi.setSystemTime(em(2026, 11, 6, 9, 0));
+    act(() => setGastosNaTela((p) => [...p, FARMACIA]));
+    await esperar(600);
+    expect(ids(servidor().get("finance-expenses"))).toEqual(["a", "padaria", "farmacia"]);
+    expect(ids(gastosNaTela)).toEqual(["a", "padaria", "farmacia"]);
+  });
+
+  it("o 1º gesto foi noutra chave: a releitura avisa a tela de Finanças, e o gasto seguinte não apaga a Padaria", async () => {
+    vi.setSystemTime(em(2026, 11, 3, 10, 0));
+    servidor().set("finance-expenses", [A]);
+    servidor().set(CHAVE_CARIMBO_CONTAS, "2026-11");
+    montar(true);
+    await waitFor(() => expect(ids(gastosNaTela)).toEqual(["a"]));
+    servidor().set("finance-expenses", [A, PADARIA]);
+    vi.setSystemTime(em(2026, 11, 6, 9, 0));
+    act(() => api.set("todo-list", [{ id: "t1" }]));
+    await esperar(600);
+    expect(ids(gastosNaTela)).toEqual(["a", "padaria"]); // a tela adotou o que o servidor tem hoje
+    act(() => setGastosNaTela((p) => [...p, FARMACIA]));
+    await esperar(400);
+    expect(ids(servidor().get("finance-expenses"))).toEqual(["a", "padaria", "farmacia"]);
+  });
+
+  it("Finanças aberta enquanto a virada espera a releitura (rede lenta): o gasto novo junta com o novembro do celular", async () => {
+    for (const [k, v] of Object.entries(OUTUBRO)) servidor().set(k, v);
+    montar(true);
+    await waitFor(() => expect(api.loaded).toBe(true));
+    await waitFor(() => expect(ids(gastosNaTela)).toEqual(["mercado"]));
+    celularEmNovembro();
+    leituraTotal = "segurar";
+    vi.setSystemTime(em(2026, 11, 6, 9, 0));
+    await voltarPraAba();
+    await esperar(300);
+    expect(ids(gastosNaTela)).toEqual(["mercado"]); // a tela ainda mostra outubro: a leitura não chegou
+    act(() => setGastosNaTela((p) => [...p, FARMACIA]));
+    await esperar(400);
+    expect(gravacoesDe("finance-expenses")).toHaveLength(0); // nada sobe em cima do novembro do celular
+    expect(ids(servidor().get("finance-expenses"))).toEqual(["padaria"]);
+    leituraTotal = "ok";
+    await act(async () => { soltarLeitura?.(); });
+    await esperar(800);
+    expect(ids(servidor().get("finance-expenses"))).toEqual(["padaria", "farmacia"]);
+    expect(ids(servidor().get("finance-2026-outubro-expenses"))).toEqual(["mercado"]);
+    expect(ids(servidor().get("finance-incomes"))).toEqual(["sal-nov"]);
+    expect(luzPaga(servidor().get("finance-dueDays"))).toBe(true);
+    expect(ids(gastosNaTela)).toEqual(["padaria", "farmacia"]);
+  });
+
+  it("controle: conta lida HOJE grava na hora, sem leitura extra", async () => {
+    vi.setSystemTime(em(2026, 11, 6, 8, 0));
+    servidor().set("finance-expenses", [A]);
+    montar();
+    await waitFor(() => expect(api.loaded).toBe(true));
+    act(() => api.set("finance-expenses", [A, FARMACIA]));
+    await esperar(400);
+    expect(leiturasTotais).toBe(1);
+    expect(ids(servidor().get("finance-expenses"))).toEqual(["a", "farmacia"]);
+  });
 });

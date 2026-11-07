@@ -561,6 +561,21 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
    * não tem servidor: segue como antes. Limite conhecido: o dia pendente mora só na memória —
    * fechar a aba antes de a rede voltar perde o registro daquele dia neste aparelho (a anotação em
    * si, offline, também não sobe). Teste: src/test/sessao-viva-07-11.test.tsx.
+   *
+   * O GESTO EM CIMA DO RETRATO VELHO (07/11, bug "retrato-velho"). A virada e o dia anotado eram os
+   * únicos protegidos. O gesto comum — a aba do PC lida em 03/11 lançando a Farmácia em 06/11 — mandava
+   * a chave INTEIRA a partir do retrato de 03/11 e apagava a Padaria que o celular lançou em 05/11; a
+   * releitura chegava depois e o valor do aparelho ganhava. Agora, com o retrato de OUTRO DIA (a mesma
+   * régua do diaEsperaReleitura), a escrita entra pelo caminho das SEGURADAS — base = o que o servidor
+   * tinha na última confirmação (`doServidor`), guardada no aparelho — e pede `relerConta`. A
+   * releitura junta com mesclar3 (o que ela acrescentou entra, o que o celular lançou fica; o aviso de
+   * conflito já existe) e a liberação avisa as telas abertas. Isso vale também durante a espera da
+   * virada (rede lenta): a tela de Finanças ainda mostra outubro e aceita toques — o gasto novo junta
+   * com o novembro do celular em vez de ir por cima. E na 2ª rodada a liberação avisa as telas de
+   * TODA chave que mudou no servidor (não só as juntadas): a tela que não foi tocada também adota o
+   * que o celular lançou, senão o gesto seguinte, já com o retrato de hoje, gravava a lista velha dela.
+   * Custo aceito: no 1º gesto de um dia novo a gravação espera a releitura (centenas de ms; offline,
+   * até a rede voltar — a cópia no aparelho segura se o app fechar).
    */
   const ultimaLeituraRef = useRef<{ vez: number; pedidaEm: number } | null>(null);
   const [ultimaLeitura, setUltimaLeitura] = useState<{ vez: number; pedidaEm: number } | undefined>(undefined);
@@ -896,6 +911,13 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
         }
         // (07/11) dias anotados que esperavam esta releitura — ver "SESSÃO VIVA"
         for (const d of diasPendentes.current) dias.add(d);
+        // (07/11, bug "retrato-velho") 2ª rodada: o que mudou no servidor desde o retrato anterior (outro aparelho)
+        // também vai pras telas abertas — ver "O GESTO EM CIMA DO RETRATO VELHO". A escrita daqui que ainda vai
+        // pro servidor (recentes, fila) não: a tela já mostra a dela.
+        const mudaramNoServidor = eraSincronizado
+          ? Object.keys(map).filter((k) => !(k in mesclados) && !recentes.has(k) && !(k in pendingWrites.current)
+            && !iguais(storeRef.current[k], map[k]))
+          : [];
         if (!eraSincronizado) {
           // 17/10: a escrita só volta a subir direto na liberação (efeito do provider, depois que
           // as telas adotaram o valor juntado) — ver `aLiberar`.
@@ -915,12 +937,12 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
               : null,
           };
           setLiberacao((n) => n + 1);
-        } else if (dias.size > 0 || Object.keys(mesclados).length > 0) {
+        } else if (dias.size > 0 || Object.keys(mesclados).length > 0 || mudaramNoServidor.length > 0) {
           // (07/11) 2ª rodada com dia anotado esperando a releitura: a MESMA liberação da 1ª leitura
           // registra o dia em cima da lista que o servidor tem AGORA — ver "SESSÃO VIVA".
           // (07/11, bug "offline-some") e com escrita juntada (o envio que desistiu): a liberação avisa as telas
           // abertas do valor juntado — sem isso a tela seguia com o dela e o próximo toque gravava por cima.
-          aLiberar.current = { uid, confirmado: { ...map, ...mesclados }, servidor: map, juntadasNaLeitura: Object.keys(mesclados), dias, perdidas, medida: null };
+          aLiberar.current = { uid, confirmado: { ...map, ...mesclados }, servidor: map, juntadasNaLeitura: [...Object.keys(mesclados), ...mudaramNoServidor], dias, perdidas, medida: null };
           setLiberacao((n) => n + 1);
         }
         diasPendentes.current.clear();
@@ -1118,6 +1140,7 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       // passa por cima dele (antes o store voltava pro valor velho e a tela ficava com o
       // novo; quem lesse pelo `get` via outra coisa e gravava em cima).
       const escreveuNoMeio = (ultimaEscrita.current.get(key) ?? 0) >= pedidoEm || key in seguradas.current;
+      if (value !== null && userRef.current?.id === userId) doServidor.current.set(key, value); // (07/11) base das junções
       if (value !== null && userRef.current?.id === userId && !escreveuNoMeio) {
         setStore(prev => ({ ...prev, [key]: value }));
         safeSetItem(userKey(userId, key), JSON.stringify(value));
@@ -1214,6 +1237,12 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
    */
   // Escopo do "marcar outro dia": enquanto a função roda, as escritas valem pro dia dito.
   const escopoDiaRef = useRef<{ dia: string | null; feito?: boolean } | null>(null);
+  /** (07/11) O retrato do servidor na memória é de OUTRO DIA (sessão viva que atravessou a meia-noite)? Convidado e
+   *  conta ainda não lida: não. A régua do dia anotado e do gesto em cima do retrato velho — ver "SESSÃO VIVA". */
+  const retratoDeOutroDia = (): boolean => {
+    const l = ultimaLeituraRef.current;
+    return !!userRef.current && !!l && localDayKey(new Date(l.pedidaEm)) !== localDayKey();
+  };
   /**
    * (07/11) A lista de dias no store veio do servidor NOUTRO DIA? Sessão viva que atravessou a
    * meia-noite: outro aparelho pode ter anotado dias desde então, e gravar a lista daqui por cima
@@ -1221,8 +1250,7 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
    * da sequência sai lá) — ver "SESSÃO VIVA". Convidado e conta lida hoje: não espera.
    */
   const diaEsperaReleitura = useCallback((dia: string): boolean => {
-    const l = ultimaLeituraRef.current;
-    if (!userRef.current || !l || localDayKey(new Date(l.pedidaEm)) === localDayKey()) return false;
+    if (!retratoDeOutroDia()) return false;
     diasPendentes.current.add(dia);
     relerConta();
     return true;
@@ -1283,7 +1311,9 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     if (userId) {
       safeSetItem(userKey(userId, key), JSON.stringify(value));
       ultimaEscrita.current.set(key, Date.now());
-      if (!sincronizadoRef.current) {
+      // (07/11) a conta na memória foi lida noutro dia — ver "O GESTO EM CIMA DO RETRATO VELHO"
+      const retratoVelho = sincronizadoRef.current && retratoDeOutroDia();
+      if (!sincronizadoRef.current || retratoVelho) {
         // 16/10: a conta ainda não chegou do servidor — NÃO sobe (apagaria o que está
         // lá). Fica segurada e é juntada com o servidor quando a leitura der certo.
         // 17/10: e fica guardada no aparelho — fechar o app antes da conta chegar não perde.
@@ -1294,11 +1324,15 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
           h.sistema = h.sistema && !!opts?.system;
           if (!opts?.system) h.dia = diaDaEscrita;
         } else {
-          const base = opts && "base" in opts ? opts.base : key in antes ? antes[key] : undefined;
+          // retrato velho: a base é o que o SERVIDOR tinha da última vez (a tela e o store podem ter coisa que
+          // ainda está subindo — base com ela faria a junção achar que o servidor apagou)
+          const base = retratoVelho ? doServidor.current.get(key)
+            : opts && "base" in opts ? opts.base : key in antes ? antes[key] : undefined;
           seguradas.current[key] = { base, valor: value, sistema: !!opts?.system, dia: diaDaEscrita };
         }
         const e = seguradas.current[key];
         guardarSegurada(userId, key, aConfirmar.current.has(key) ? { ...e, base: aConfirmar.current.get(key) } : e);
+        if (retratoVelho) relerContaRef.current();
       } else {
         pendingWrites.current[key] = value;
         if (flushTimer.current) clearTimeout(flushTimer.current);

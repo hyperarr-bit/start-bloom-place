@@ -88,8 +88,13 @@ const mesDaData = (date: unknown): string | null => {
 /**
  * Em que mês este gasto CONTA. Só crédito muda de mês: em cartão com
  * fechamento, pela regra do fechamento; em cartão sem fechamento que marcou
- * "conta no mês do vencimento", no mês seguinte ao da compra (nunca mais de
- * 1 mês à frente da chave — é até onde o mês seguinte lê pra trás).
+ * "conta no mês do vencimento", no mês seguinte ao da compra. Nas duas
+ * regras, nunca mais de 1 mês à frente da chave — é até onde o mês seguinte
+ * lê pra trás (`variaveisDoMes`). Fatura 2+ meses à frente não contaria em
+ * mês nenhum: foi o bug "credito-sem-data" (07/11) — gasto sem data numa
+ * planilha de setembro ganhava a data de hoje (novembro) e, com fechamento
+ * 25, a fatura ia pra novembro; setembro adiava, outubro não achava e
+ * novembro lê outubro. A trava já existia no "mês do vencimento".
  */
 export const mesDoGasto = (
   gasto: GastoDeCartao,
@@ -99,7 +104,10 @@ export const mesDoGasto = (
   if (gasto?.paymentMethod !== "credito" || !gasto.cardName) return mesDaChave;
   const cfg = configOf(gasto.cardName);
   if (!cfg) return mesDaChave;
-  if (diaValido(cfg.closingDay)) return mesDaFatura(gasto.date, cfg.closingDay) ?? mesDaChave;
+  if (diaValido(cfg.closingDay)) {
+    const mes = mesDaFatura(gasto.date, cfg.closingDay) ?? mesDaChave;
+    return mesesEntre(mesDaChave, mes) > 1 ? somarMeses(mesDaChave, 1) : mes;
+  }
   if (contaNoMesDoVencimento(cfg)) {
     const mes = mesDaData(gasto.date) ?? mesDaChave;
     return somarMeses(mesesEntre(mesDaChave, mes) > 0 ? mesDaChave : mes, 1);

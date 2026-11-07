@@ -91,6 +91,18 @@ export const erroDoGasto = (descricao: string, valorDigitado: string): string | 
   return null;
 };
 
+/**
+ * Data do gasto lançado SEM data (07/11, bug "credito-sem-data"): hoje, como
+ * sempre — menos quando a planilha é de OUTRO mês. Lá "hoje" cai fora do mês:
+ * a planilha de setembro, aberta em 07/11, gravava 2026-11-07 na chave de
+ * setembro, e no cartão com fechamento a fatura ia parar 2 meses à frente —
+ * onde nenhum mês lê (lib/finance-fatura). Sem data, o gasto ganha o dia 1
+ * daquele mês: conta no mês da planilha, que é onde a pessoa lançou. Quem
+ * quer outro dia (depois do fechamento, por exemplo) digita a data.
+ */
+export const dataDoGastoSemData = (mesDaChave: string, hoje: string = localDayKey()): string =>
+  !/^\d{4}-(0[1-9]|1[0-2])$/.test(mesDaChave) || hoje.startsWith(`${mesDaChave}-`) ? hoje : `${mesDaChave}-01`;
+
 export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: ExpenseTableProps) => {
   const { labelOf: getCategoryLabel, styleOf: getCategoryStyle } = useFinanceCategories();
   const { labelOf: getCardLabel, styleOf: getCardStyle, configOf } = useFinanceCards();
@@ -232,7 +244,7 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
       description: newExpense.description.trim(),
       category: newExpense.category || "outros",
       value: numeroBR(newExpense.value),
-      date: newExpense.date || localDayKey(),
+      date: newExpense.date || dataDoGastoSemData(mesDaChave),
       paymentMethod: newExpense.paymentMethod || "pix",
       cardName: isCardPayment(newExpense.paymentMethod) ? (newExpense.cardName || "outro") : undefined,
       ...(!isCardPayment(newExpense.paymentMethod) && newExpense.conta ? { conta: newExpense.conta } : {}),

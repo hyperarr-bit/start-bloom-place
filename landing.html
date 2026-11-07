@@ -136,7 +136,7 @@
         }
 
         // 05/11: na /vida a oferta é sempre "sempre" (vitalício) — ignora ?oferta=ano e a força guardada (nenhum 27,90 do "ano" lá)
-        var naVida = /^\/(vida|oferta)\/?$/.test(location.pathname || ""); // 04/11: a /oferta também (vitalício, nada de 27,90)
+        var naVida = /^\/(vida|oferta|vitalicio)\/?$/.test(location.pathname || ""); // 04/11: a /oferta também (vitalício, nada de 27,90); 07/11: e o /vitalicio
         var po = naVida ? null : pega("oferta");
         if (po === "ano" || po === "sempre") grava("landing-oferta-force", po);
         var o = naVida ? "sempre" : (po === "ano" || po === "sempre") ? po : le("landing-oferta-force");
@@ -187,7 +187,10 @@
         // 04/11: /vida = a v3 num link próprio (sem sorteio, sem ler/gravar a força do /organizar): sempre o braço v2
         var VIDA = /^\/vida\/?$/.test(location.pathname || "");
         // 04/11: /oferta = a página atual do /organizar (sem sorteio, sem ler/gravar a força do ?lp), com a Stripe — ou vai pro /organizar
-        var OFERTA = /^\/oferta\/?$/.test(location.pathname || "");
+        // 07/11 (dono): /vitalicio = a página NOVA da /oferta num link próprio (sempre o braço "nova", sem sorteio e sem ler/gravar a
+        // força do ?lpo); a /oferta segue com a página de hoje. Mesmo preço, mesmo checkout e pagina "oferta" pro Stripe.
+        var LINK_NOVA = /^\/vitalicio\/?$/.test(location.pathname || "");
+        var OFERTA = LINK_NOVA || /^\/oferta\/?$/.test(location.pathname || "");
         if (OFERTA) {
           var stOk = CHECKOUT_STRIPE === "on" && /^pk_(live|test)_[A-Za-z0-9]+$/.test(STRIPE_PK) && !/PREENCHER/i.test(STRIPE_PK);
           if (!stOk) {
@@ -239,15 +242,16 @@
         // 06/11: o braço da PÁGINA da /oferta (AB_OFERTA_LP): "atual" | "nova". Bit 12 de "lpo:"+id — independente do checkout (0), da tela do
         // Pix (8), da página do /organizar (16) e da /vida (24). Fora da /oferta nada disto existe. Conta igual à bracoLpOfertaDoAparelho (regras.ts).
         if (OFERTA) {
-          var plo = pega("lpo"), cko = null;
+          var plo = LINK_NOVA ? null : pega("lpo"), cko = null;
           try { var cso = String(document.cookie || "").split(";"); for (var io = 0; io < cso.length; io++) { var jo = cso[io].indexOf("="); if (jo > 0 && cso[io].slice(0, jo).trim() === "landing_lpo_force") cko = cso[io].slice(jo + 1).trim(); } } catch (eo0) {}
           if (plo === "nova" || plo === "atual" || plo === "auto") {
             grava("landing-lpo-force", plo === "auto" ? null : plo);
             try { document.cookie = "landing_lpo_force=" + (plo === "auto" ? "; Max-Age=0" : plo + "; Max-Age=2592000") + "; Path=/; SameSite=Lax"; } catch (eo1) {}
           }
-          var blo = (plo === "nova" || plo === "atual") ? plo : plo === "auto" ? null : (le("landing-lpo-force") || cko);
-          mem.lpo_forcado = (blo === "nova" || blo === "atual");
-          if (!mem.lpo_forcado) {
+          var blo = LINK_NOVA ? "nova" : (plo === "nova" || plo === "atual") ? plo : plo === "auto" ? null : (le("landing-lpo-force") || cko);
+          mem.lpo_forcado = !LINK_NOVA && (blo === "nova" || blo === "atual");
+          mem.lpo_link = LINK_NOVA;
+          if (!mem.lpo_forcado && !LINK_NOVA) {
             blo = "atual";
             if (AB_OFERTA_LP === "on") blo = ((hash("lpo:" + pegaId()) >>> 12) & 1) === 0 ? "atual" : "nova";
           }

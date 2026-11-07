@@ -61,7 +61,7 @@ describe("o <head>", () => {
       const id = randomUUID();
       const novo = rodar(comChave("off"), url, { "landing-device-id": id }), antes = rodar(semOBloco, url, { "landing-device-id": id });
       const { "data-lpo": _a, ...attrs } = novo.attrs;
-      const { lpo: _b, ab_lp_oferta: _c, lpo_forcado: _d, lpo_stripe_cedo: _e, ...mem } = novo.mem;
+      const { lpo: _b, ab_lp_oferta: _c, lpo_forcado: _d, lpo_stripe_cedo: _e, lpo_link: _f, ...mem } = novo.mem;
       expect(attrs).toEqual(antes.attrs);
       expect(mem).toEqual(antes.mem);
       expect(novo.store).toEqual(antes.store);
@@ -116,6 +116,24 @@ describe("o <head>", () => {
     expect(rodar(comChave("on"), "/oferta?lpo=atual", { "landing-device-id": id }).attrs["data-lpo"]).toBe("atual");
     expect(rodar(comChave("on"), "/oferta?lpo=lixo", { "landing-device-id": id }).attrs["data-lpo"]).toBe(bracoLpOfertaDoAparelho(id));
   });
+  it("07/11 /vitalicio: sempre a nova, com a chave off, sem ler nem gravar a força; a /oferta segue na de hoje", () => {
+    const store: Record<string, string> = {};
+    for (const url of ["/vitalicio", "/vitalicio/", "/vitalicio?lpo=atual", "/vitalicio?utm_content=c7"]) {
+      const r = rodar(comChave("off"), url, store);
+      expect(r.attrs["data-lpo"]).toBe("nova");
+      expect(r.attrs["data-pagina"]).toBe("oferta");
+      expect(r.attrs["data-checkout-ext"]).toBe("stripe");
+      expect(r.mem.lpo_link).toBe(true);
+      expect(r.mem.lpo_forcado).toBe(false);
+      expect(r.mem.oferta).toBe("sempre");
+      expect(r.replace).not.toHaveBeenCalled();
+      expect(r.cookie).not.toContain("landing_lpo_force");
+    }
+    expect(store["landing-lpo-force"]).toBeUndefined();
+    const oferta = rodar(comChave("off"), "/oferta", store);
+    expect(oferta.attrs["data-lpo"]).toBe("atual");
+    expect(oferta.mem.lpo_link).toBe(false);
+  });
   it("CHECKOUT_STRIPE off: a /oferta vai pro /organizar e o braço nem é sorteado", () => {
     const r = rodar(comChave("on").replace(/var CHECKOUT_STRIPE = "on"/, 'var CHECKOUT_STRIPE = "off"'), "/oferta?lpo=nova");
     expect(r.replace).toHaveBeenCalled();
@@ -167,8 +185,11 @@ async function abrirPagina(o: { braco?: "atual" | "nova"; ativo?: boolean; antes
     criar: async (c: Record<string, unknown>) => { criadas.push(c); return { ok: true, clientSecret: "pi_123_secret_abc", pi: "pi_123" }; },
     status: async () => ({ ok: true, status: "requires_action", pago: false, metodo: null }),
   };
+  // 0170f5ce (main): o cartão espera o "ready" do elemento e cria o método antes de confirmar
+  const cbs: Record<string, (x: Record<string, unknown>) => void> = {};
   janela.__stripeFalso = {
-    elements: () => ({ create: () => ({ mount: (el: HTMLElement) => { el.innerHTML = '<div data-testid="pe-falso">PE</div>'; }, on: () => {} }), submit: async () => ({}) }),
+    elements: () => ({ create: () => ({ mount: (el: HTMLElement) => { el.innerHTML = '<div data-testid="pe-falso">PE</div>'; setTimeout(() => cbs.ready?.({}), 0); }, on: (e: string, cb: (x: Record<string, unknown>) => void) => { cbs[e] = cb; } }), submit: async () => ({}) }),
+    createPaymentMethod: async () => ({ paymentMethod: { id: "pm_1" } }),
     confirmPayment: async () => ({ paymentIntent: { id: "pi_123", status: "succeeded" } }),
     confirmPixPayment: async () => ({}),
   };
@@ -189,6 +210,7 @@ async function abrirPagina(o: { braco?: "atual" | "nova"; ativo?: boolean; antes
 const peNaTela = () => vi.waitFor(() => { if (!document.querySelector('[data-testid="pe-falso"]')) throw new Error("sem PE"); }, { timeout: 3000, interval: 20 });
 const fechar = async () => { (document.getElementById("oc-x") as HTMLButtonElement).click(); await vi.waitFor(() => { if (!document.querySelector<HTMLElement>("#oc")?.hidden) throw new Error("aberta"); }, { timeout: 2000, interval: 20 }); };
 async function pagarNoCartao() {
+  document.querySelector<HTMLButtonElement>('[data-metodo="card"]')!.click(); // 0170f5ce (main): o checkout ganhou os botões Pix e Cartão
   const campo = document.getElementById("oc-email") as HTMLInputElement;
   campo.value = "maria@gmail.com"; campo.dispatchEvent(new Event("input"));
   (document.getElementById("oc-pagar") as HTMLButtonElement).click();

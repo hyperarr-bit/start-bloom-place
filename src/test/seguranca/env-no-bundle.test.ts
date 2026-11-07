@@ -75,7 +75,8 @@ describe("cabeçalhos de segurança do site (vercel.json)", () => {
     // 29/10: + /vendas e /vendas/ → /vendas.html (o painel e o aviso de venda do dono, PWA própria)
     // 04/11: + /vida e /vida/ → /landing.html, /vida/obrigado e /vida/obrigado/ → /vida-obrigado.html (a LP v3 com checkout Hotmart)
     // 04/11: + /oferta e /oferta/ → /landing.html (a página atual a R$ 67,90 com o checkout Stripe)
-    expect(cfg.rewrites).toHaveLength(12);
+    // 07/11: + /vitalicio e /vitalicio/ → /landing.html (a página nova da /oferta num link próprio)
+    expect(cfg.rewrites).toHaveLength(14);
     expect((cfg.rewrites as Array<{ source: string }>).map((r) => r.source)).toContain("/organizar");
     expect((cfg.rewrites as Array<{ source: string }>).map((r) => r.source)).toContain("/vendas");
   });

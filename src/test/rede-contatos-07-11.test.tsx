@@ -150,7 +150,13 @@ describe("Rede de contatos — a tela, em conta vazia", () => {
     expect(screen.getByText("→ IA nas empresas, marcar reunião")).toBeInTheDocument();
     const tel = screen.getByText("📞 (11) 99999-0000");
     expect(tel.closest("a")).toHaveAttribute("href", "tel:11999990000");
-    expect(screen.getByText("último contato 07/11")).toBeInTheDocument();
+    // abaixo de 380 px só a data fica à vista (07/11, 4ª rodada: a 360 px a lixeira passava da linha);
+    // "último contato" continua no title e pro leitor de tela
+    const ultimo = screen.getByTestId("rede-ultimo-contato");
+    expect(ultimo.textContent).toBe("último contato 07/11");
+    expect(ultimo).toHaveAttribute("title", "último contato 07/11");
+    expect(within(ultimo).getByText("último contato").className).toContain("sr-only min-[380px]:not-sr-only");
+    expect(ultimo.className).not.toContain("whitespace-nowrap"); // a data sozinha não estoura; o texto todo pode quebrar se precisar
     // a lixeira está à vista (antes: opacity-0 até o hover — que não existe no celular)
     const lixeira = screen.getByRole("button", { name: "Apagar João" });
     expect(lixeira.className).not.toContain("opacity-0");

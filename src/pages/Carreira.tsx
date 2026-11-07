@@ -631,9 +631,16 @@ const Networking = () => {
                 </div>
               </div>
               <div className="mt-1 pl-6 flex items-center justify-between gap-2">
-                <span className="text-[10px] text-muted-foreground whitespace-nowrap">último contato {dataCurtaCarreira(c.lastContact)}</span>
+                {/* abaixo de 380 px só a data (com o relógio), "último contato" fica no title e pro leitor de tela
+                    (07/11, 4ª rodada da crítica: a 360 px, com "Reunião" escrito, a linha de quem tem LinkedIn
+                    precisava de 320 px em 302 — a lixeira passava da borda e saía da coluna da lixeira de baixo) */}
+                <span className="min-w-0 inline-flex items-center gap-1 text-[10px] text-muted-foreground" title={`último contato ${dataCurtaCarreira(c.lastContact)}`} data-testid="rede-ultimo-contato">
+                  <Clock className="w-3 h-3 shrink-0 min-[380px]:hidden" aria-hidden />
+                  <span className="sr-only min-[380px]:not-sr-only">último contato </span>
+                  <span className="whitespace-nowrap">{dataCurtaCarreira(c.lastContact)}</span>
+                </span>
                 {/* 32 px por botão e a lixeira afastada (07/11, crítica: com 24 px colados, apagava querendo editar) */}
-                <div className="flex gap-1">
+                <div className="flex gap-1 shrink-0">
                   {c.linkedin && <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`LinkedIn de ${c.name}`} onClick={() => window.open(c.linkedin, "_blank")}><Link2 className="w-3 h-3" /></Button>}
                   {/* com palavra (07/11, retomada): só o ícone de calendário, no meio de 3 ícones, ninguém achava a reunião */}
                   <Button variant="ghost" size="sm" className="h-8 px-2 gap-1 text-[11px] font-semibold text-sky-700 dark:text-sky-300" aria-label={`Marcar reunião com ${c.name}`} aria-pressed={marcando === c.id} onClick={() => setMarcando(marcando === c.id ? null : c.id)}><CalendarPlus className="w-3.5 h-3.5" />Reunião</Button>

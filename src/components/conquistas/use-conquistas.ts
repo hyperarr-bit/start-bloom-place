@@ -1,6 +1,7 @@
 import { aplicarCatalogoCaderno } from "@/components/gamification/catalogo-caderno";
 import { useEffect, useMemo } from "react";
 import { useUserData } from "@/hooks/use-user-data";
+import { useMemoPorChaves } from "@/hooks/use-memo-por-chaves";
 import { useAuth } from "@/hooks/use-auth";
 import { localDayKey, parseLocalDay } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
@@ -41,7 +42,8 @@ export function useSequencia(): Sequencia {
   const hub = get<unknown>(CHAVE_HUB_STREAK, null);
   const efetivos = useMemo(() => diasEfetivos(lista, hub, hoje), [lista, hub, hoje]);
   const estado = useMemo(() => calcularSequencia(efetivos, hoje), [efetivos, hoje]);
-  const acao = useMemo(() => acaoDoDia(get, hoje), [get, hoje]);
+  // 07/11 (desempenho): só refaz quando uma chave que a ação do dia LÊ muda — não a cada escrita no store
+  const acao = useMemoPorChaves(get, (ler) => acaoDoDia(ler, hoje), [hoje]);
   const faixa = useMemo(() => faixaDoFogo(estado.dias), [estado.dias]);
   return { ...estado, hoje, lista: efetivos, acao, faixa, protegidoOntem: estado.usados.includes(somarDias(hoje, -1)) };
 }
@@ -146,17 +148,20 @@ export function useConquistas(): EstadoConquistas {
   // 26/10: "1 Dia Anotado" pra quem JÁ usava o app cola em silêncio, datada do 1º registro (lib/conquistas-registro)
   const dataDoDiaUm = useMemo(() => dataDoDiaUmSilencioso(diasEfetivos(lista, hub, hoje), lerDesbloqueadas(gravadas), hoje), [lista, hub, hoje, gravadas]);
 
-  const r = useMemo(() => {
+  /* 07/11 (desempenho, lente "toque"): este cálculo varre ~40 chaves (o histórico do Treino inteiro, 24 meses de
+   * gastos arquivados…) e rodava em TODA escrita no store, em toda tela (os Momentos montam em cada módulo):
+   * 35–70 ms por toque na conta cheia com a CPU 4× mais lenta. Agora só refaz quando uma chave LIDA muda. */
+  const r = useMemoPorChaves(get, (ler) => {
     const daSequencia = buildBadgesSequencia(seq.recorde, { protetoresUsados: seq.usados.length, diasAnotados: seq.diasAnotados });
     let calculadas: Badge[] = [];
     try {
-      calculadas = [...daSequencia, ...buildBadgesFinancas(get), ...buildBadgesVida(get, hoje)];
+      calculadas = [...daSequencia, ...buildBadgesFinancas(ler), ...buildBadgesVida(ler, hoje)];
     } catch (e) {
       console.error("[conquistas] cálculo falhou:", e);
       calculadas = daSequencia;
     }
-    return mesclarDesbloqueios(aplicarCatalogoCaderno(calculadas, get, lerDesbloqueadas(gravadas), hoje), gravadas, hoje);
-  }, [get, gravadas, seq, hoje]);
+    return mesclarDesbloqueios(aplicarCatalogoCaderno(calculadas, ler, lerDesbloqueadas(gravadas), hoje), gravadas, hoje);
+  }, [gravadas, seq, hoje]);
 
   /*
    * Grava o que abriu agora. Na 1ª vez (sem registro) grava tudo em silêncio:

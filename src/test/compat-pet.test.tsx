@@ -557,6 +557,32 @@ describe("achados de compatibilidade — consertados na integração de 30/09 (e
   });
 
   /*
+   * BUG — pesagem errada (07/11, chamado 18cc19fe): o app novo agora apaga, e o `weight` de sempre
+   * acompanha. O app ANTIGO só lê `weight`: tem que mostrar o peso anterior, e nada com a única
+   * pesagem apagada (sem " kg" solto).
+   */
+  it("pesagem apagada no novo: o PetList antigo mostra o peso anterior, ou nenhum", () => {
+    const nuvem = criarNuvem({
+      ...ANTIGO,
+      "pet-pesos": { [THOR]: [{ dia: "2026-09-01", kg: 28 }, { dia: "2026-09-20", kg: 280 }], [MIA]: [{ dia: "2026-09-20", kg: 42 }] },
+      "pet-list": (ANTIGO["pet-list"] as { id: string }[]).map((p) => (p.id === THOR ? { ...p, weight: "280" } : p.id === MIA ? { ...p, weight: "42" } : p)),
+    });
+    const novo = nuvem.montar(<Pet />, "/pet");
+    fireEvent.click(screen.getByTestId("aba-saude"));
+    fireEvent.click(screen.getByTestId("peso-ver-pesagens"));
+    fireEvent.click(screen.getByRole("button", { name: "Apagar a pesagem de 20/09/2026" }));
+    fireEvent.click(screen.getByTestId(`pet-seletor-${MIA}`));
+    fireEvent.click(screen.getByRole("button", { name: "Apagar a pesagem de 20/09/2026" }));
+    novo.unmount();
+
+    nuvem.montar(<PetList />);
+    expect(screen.getByText("28 kg")).toBeInTheDocument();
+    expect(screen.queryByText("280 kg")).toBeNull();
+    expect(screen.queryByText("42 kg")).toBeNull();
+    expect(lista<{ id: string; weight: unknown }>(nuvem, "pet-list").find((p) => p.id === MIA)?.weight).toBe("");
+  });
+
+  /*
    * ERA DIVERGÊNCIA — rotina de pet SEM `pet-routine-tasks-<id>` (todo pet cadastrado no app antigo
    * que nunca teve hábito editado): o app antigo mostra as 6 de sempre (Comida, Água, Passeio,
    * Banho, Brincar, Escovar — PetRoutine.defaultTasks); o novo mostra a rotina da espécie.

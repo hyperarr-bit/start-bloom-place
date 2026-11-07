@@ -224,6 +224,9 @@ export const pesoTexto = (kg: number): string => (Math.round(kg * 1000) / 1000).
 /** Pra mostrar: "18,4 kg" · "65 g" (abaixo de 1 kg, em gramas — ninguém fala "0,065 kg" de calopsita). */
 export const pesoComUnidade = (kg: number): string => (kg < 1 ? `${Math.round(kg * 1000)} g` : `${pesoTexto(Math.round(kg * 100) / 100)} kg`);
 
+/** Tolerância do arredondamento de `comPeso` e `pesoTexto` (3 casas). */
+const mesmoPeso = (a: number, b: number) => Math.abs(a - b) <= 0.0005;
+
 /** Histórico de peso do pet, do mais antigo pro mais novo. Sem histórico, o
  *  `weight` antigo vira um ponto só (sem data) — nada é gravado por isso. */
 export function pesosDoPet(pet: Pet, todos: unknown): { dia: string; kg: number }[] {
@@ -241,7 +244,7 @@ export function pesosDoPet(pet: Pet, todos: unknown): { dia: string; kg: number 
        o app ANTIGO só grava `weight`: esse é o peso atual (30/09, teste de compatibilidade).
        Entra no fim, sem data (não vira ponto do gráfico, que só usa os datados). */
     const ultimo = limpos[limpos.length - 1];
-    if (antigo !== null && Math.abs(antigo - ultimo.kg) > 0.0005) return [...limpos, { dia: "", kg: antigo }];
+    if (antigo !== null && !mesmoPeso(antigo, ultimo.kg)) return [...limpos, { dia: "", kg: antigo }];
     return limpos;
   }
   return antigo !== null ? [{ dia: "", kg: antigo }] : [];
@@ -253,6 +256,32 @@ export function comPeso(todos: unknown, petId: string, dia: string, kg: number):
   const lista = Array.isArray(mapa[petId]) ? mapa[petId].filter((x) => x?.dia !== dia) : [];
   mapa[petId] = [...lista, { dia, kg: Math.round(kg * 1000) / 1000 }].sort((a, b) => a.dia.localeCompare(b.dia)).slice(-120);
   return mapa;
+}
+
+/**
+ * Tira a pesagem de um dia (07/11, chamado 18cc19fe). Sem isso, pesagem digitada errada em outro
+ * dia ficava pra sempre: pesar de novo só troca a do mesmo dia.
+ *
+ * `weight` ACOMPANHA quando sai a pesagem mais nova e ele era ela: se ficasse, `pesosDoPet` leria
+ * a diferença como "mudou no app antigo" e o valor apagado voltaria como peso atual. Sem pesagem
+ * nenhuma, fica "" (o app antigo já esconde o peso vazio). Se ele já era OUTRO número, a pessoa
+ * mudou no app antigo depois de pesar: não é a pesagem apagada, fica como está.
+ *
+ * Devolve o mapa novo, o `weight` que o pet fica e, pro Desfazer, o `kg` tirado (undefined se não
+ * havia pesagem no dia) e `acompanhava`. Só tira do bruto o item daquele dia: o que não se lê
+ * (lixo, versão futura) continua lá.
+ */
+export function semPeso(pet: Pet, todos: unknown, dia: string): { pesos: PesosPorPet; weight: string; kg?: number; acompanhava: boolean } {
+  const mapa: PesosPorPet = todos && typeof todos === "object" && !Array.isArray(todos) ? { ...(todos as PesosPorPet) } : {};
+  const datados = pesosDoPet(pet, todos).filter((p) => p.dia);
+  const ultimo = datados[datados.length - 1];
+  const atual = lerPeso(pet.weight);
+  const acompanhava = ultimo?.dia === dia && atual !== null && mesmoPeso(atual, ultimo.kg);
+  const resto = datados.filter((p) => p.dia !== dia);
+  const novoUltimo = resto[resto.length - 1];
+  if (Array.isArray(mapa[pet.id])) mapa[pet.id] = mapa[pet.id].filter((x) => x?.dia !== dia);
+  const kg = datados.find((p) => p.dia === dia)?.kg;
+  return { pesos: mapa, weight: !acompanhava ? pet.weight : novoUltimo ? pesoTexto(novoUltimo.kg) : "", kg, acompanhava };
 }
 
 /* ─────────────────────────────── rotina do dia ─────────────────────────────── */

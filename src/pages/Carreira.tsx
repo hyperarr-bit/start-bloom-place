@@ -635,7 +635,8 @@ const Networking = () => {
                 {/* 32 px por botão e a lixeira afastada (07/11, crítica: com 24 px colados, apagava querendo editar) */}
                 <div className="flex gap-1">
                   {c.linkedin && <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`LinkedIn de ${c.name}`} onClick={() => window.open(c.linkedin, "_blank")}><Link2 className="w-3 h-3" /></Button>}
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-sky-700 dark:text-sky-300" aria-label={`Marcar reunião com ${c.name}`} aria-pressed={marcando === c.id} onClick={() => setMarcando(marcando === c.id ? null : c.id)}><CalendarPlus className="w-3.5 h-3.5" /></Button>
+                  {/* com palavra (07/11, retomada): só o ícone de calendário, no meio de 3 ícones, ninguém achava a reunião */}
+                  <Button variant="ghost" size="sm" className="h-8 px-2 gap-1 text-[11px] font-semibold text-sky-700 dark:text-sky-300" aria-label={`Marcar reunião com ${c.name}`} aria-pressed={marcando === c.id} onClick={() => setMarcando(marcando === c.id ? null : c.id)}><CalendarPlus className="w-3.5 h-3.5" />Reunião</Button>
                   <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Editar ${c.name}`} onClick={() => editar(c)}><Edit2 className="w-3 h-3" /></Button>
                   <Button variant="ghost" size="icon" className="h-8 w-8 ml-1 text-destructive/70 hover:text-destructive" aria-label={`Apagar ${c.name}`} onClick={() => apagar(c)}><Trash2 className="w-3 h-3" /></Button>
                 </div>

@@ -15,8 +15,12 @@
  * `inicio` (07/11, 3ª rodada da crítica; só em grupo de 2+ horários) é o
  * momento da 1ª dose ("AAAA-MM-DDTHH:MM"). Antes dele não existe dose: quem
  * cadastra às 10:00 um 8 em 8 com 1ª dose às 20:00 não recebe aviso às 12:00.
- * A hora dele é também onde o DIA DO TRATAMENTO começa (ver `ultimoDiaDaDose`),
- * sem depender da ordem das linhas. O app antigo ignora o campo.
+ * O app antigo ignora o campo.
+ *
+ * Onde o DIA DO TRATAMENTO começa (ver `ultimoDiaDaDose`) é a hora ATUAL da 1ª
+ * linha do grupo, não a hora gravada no `inicio` (07/11, retomada): quem adiantava
+ * a 1ª dose de 08:00 pra 07:00 depois de começado ficava com a das 07:00 tratada
+ * como "dose da noite" — gravava no dia seguinte e o aviso da manhã sumia todo dia.
  *
  * O DIA DO REGISTRO DE "TOMADO": cada dose é gravada em
  * `core-saude-supplement-log` no dia do calendário em que ela ACONTECE. A das
@@ -108,9 +112,16 @@ export const momentoDoInicio = (inicio: unknown): Date | null =>
  * 10:00 com 1ª dose 08:00 → hoje 08:00 (já começou, como sempre foi); 23:00 com
  * 1ª dose 00:30 → amanhã 00:30 (é a de daqui a pouco, não a de ontem).
  */
-export function inicioDoCadastro(primeira: string, agora: Date = new Date()): string | undefined {
+export function inicioDoCadastro(primeira: string, agora: Date = new Date(), horarios: string[] = []): string | undefined {
   if (!ehHora(primeira)) return undefined;
   const hoje = localDayKey(agora);
+  /* A 1ª dose já passou hoje, mas ainda falta dose deste dia do tratamento
+     (07/11, retomada): às 20:30, um 8 em 8 desde as 08:00 começou HOJE — a das
+     00:00 desta noite tem aviso e dá pra marcar. Antes, depois das 20:00 o
+     tratamento pulava pra amanhã e a dose da madrugada sumia. */
+  const t = agora.getTime();
+  const aindaFaltaHoje = horarios.some((h) => ehHora(h) && momentoDe(h < primeira ? diaSeguinte(hoje) : hoje, h).getTime() > t);
+  if (momentoDe(hoje, primeira).getTime() <= t && aindaFaltaHoje) return `${hoje}T${primeira}`;
   const meioDia = 12 * 3600_000;
   const dia = [somarDias(hoje, -1), hoje, somarDias(hoje, 1)]
     .find((d) => Math.abs(momentoDe(d, primeira).getTime() - agora.getTime()) <= meioDia) ?? hoje;
@@ -118,13 +129,17 @@ export function inicioDoCadastro(primeira: string, agora: Date = new Date()): st
 }
 
 /**
- * Mudou a hora da 1ª dose na edição: se o tratamento AINDA NÃO começou, o início
- * vai junto (mesmo dia, hora nova). Depois de começado, o início fica — mudar a
- * dose das 08:00 pras 17:00 não faz a das 16:00 virar "da noite anterior".
+ * Mudou a hora da 1ª dose na edição (as outras são geradas de novo a partir dela,
+ * como no cadastro — `horarios` é a lista nova). O `inicio` acompanha:
+ *  - tratamento que AINDA NÃO começou: é refeito como num cadastro agora
+ *    (às 23:00, 00:30 → 23:30 começa hoje 23:30, não amanhã);
+ *  - já começado: a data fica e só a hora muda (07/11, retomada). Com a hora
+ *    velha, adiantar 08:00 → 07:00 deixava a 1ª dose "antes do início do dia".
  */
-export function inicioAoMudarPrimeira(inicio: unknown, hora: string, agora: Date = new Date()): string | undefined {
+export function inicioAoMudarPrimeira(inicio: unknown, hora: string, agora: Date = new Date(), horarios: string[] = []): string | undefined {
   const quando = momentoDoInicio(inicio);
-  if (!quando || !ehHora(hora) || quando.getTime() <= agora.getTime()) return undefined;
+  if (!quando || !ehHora(hora)) return undefined;
+  if (quando.getTime() > agora.getTime()) return inicioDoCadastro(hora, agora, horarios.length ? horarios : [hora]);
   return `${String(inicio).slice(0, 10)}T${hora}`;
 }
 
@@ -150,11 +165,18 @@ function doseVale(linha: { time?: string; ate?: string }, primeira: string, agor
   return !(dia > String(linha.ate) && horaDoRelogio(agora) >= primeira);
 }
 
-/** A hora da 1ª dose de cada grupo: a do `inicio` gravado; sem ele, a da primeira linha (a ordem do cadastro). */
+/**
+ * A hora da 1ª dose de cada grupo: a hora ATUAL da primeira linha (a ordem do
+ * cadastro), que é a que a pessoa vê e edita. O `inicio` só entra se essa linha
+ * estiver sem hora válida. (Antes valia a hora do `inicio`, que não acompanhava a
+ * edição depois de começado — 07/11, retomada.)
+ */
 const primeiraDoGrupo = <T extends { time?: string; grupo?: string; inicio?: string }>(lista: T[]) => {
   const primeiras = new Map<string, string>();
-  for (const r of lista) if (r?.grupo && ehInicio(r.inicio) && !primeiras.has(r.grupo)) primeiras.set(r.grupo, r.inicio.slice(11, 16));
-  for (const r of lista) if (r?.grupo && !primeiras.has(r.grupo)) primeiras.set(r.grupo, String(r.time ?? ""));
+  for (const r of lista) {
+    if (!r?.grupo || primeiras.has(r.grupo)) continue;
+    primeiras.set(r.grupo, ehHora(r.time) ? r.time : ehInicio(r.inicio) ? r.inicio.slice(11, 16) : String(r.time ?? ""));
+  }
   return (r: T) => (r.grupo && primeiras.get(r.grupo)) || String(r.time ?? "");
 };
 const primeiraDe = (g: GrupoDeRemedio) => primeiraDoGrupo(g.itens)(g.itens[0]);
@@ -222,16 +244,26 @@ export function tratamentoTerminou(g: GrupoDeRemedio, agora: Date = new Date()):
 /** Uma dose pra marcar: a linha + o dia do registro (o dia em que ela acontece) + o momento dela. */
 export type DoseMarcavel = Remedio & { dia: string; quando: number };
 
-/** Quanto antes da 1ª dose o dia do tratamento já vira (tomar a 1ª dose um pouco adiantado). */
-const ANTECEDENCIA_MS = 60 * 60_000;
+/**
+ * Quanto antes da 1ª dose o dia do tratamento já vira (tomar a 1ª dose um pouco
+ * adiantado): 1 h — ou menos, se a última dose do dia (a da noite) cai a menos de
+ * 2 h da 1ª. Com 07:30 e 08:00, às 07:20 a das 07:30 ainda é a de hoje à noite
+ * (07/11, retomada: com 1 h fixa ela pulava pro dia seguinte).
+ */
+const ANTECEDENCIA_MIN = 60;
+function antecedenciaMin(horas: string[], primeira: string): number {
+  const p = minutosDe(primeira);
+  const folgas = horas.filter(ehHora).map((h) => (p - minutosDe(h) + 24 * 60) % (24 * 60)).filter((d) => d > 0);
+  return folgas.length ? Math.min(ANTECEDENCIA_MIN, Math.floor(Math.min(...folgas) / 2)) : ANTECEDENCIA_MIN;
+}
 
 /**
  * As doses que existem agora, pra marcar — cada linha UMA vez, a do DIA DO
  * TRATAMENTO de agora (07/11, 3ª rodada da crítica).
  *
  * Remédio simples (1 linha): a de hoje, como sempre.
- * Grupo (8 em 8…): o dia do tratamento começa na 1ª dose e vira 1 h antes dela
- * (tomar um pouco adiantado). Em 8 em 8 desde as 08:00, das 07:00 de hoje às
+ * Grupo (8 em 8…): o dia do tratamento começa na 1ª dose (a hora atual da 1ª
+ * linha) e vira até 1 h antes dela (tomar um pouco adiantado; `antecedenciaMin`). Em 8 em 8 desde as 08:00, das 07:00 de hoje às
  * 07:00 de amanhã as pílulas são 08:00 e 16:00 de hoje e 00:00 de amanhã — às
  * 23:50 a das 00:00 é a de daqui a 10 minutos (grava em amanhã), e às 00:10
  * continua sendo ela, já marcada. Antes do `inicio` o dia é o do início (às
@@ -250,7 +282,8 @@ export function dosesDoGrupoAgora(g: GrupoDeRemedio, agora: Date = new Date()): 
   const p = ehHora(primeira) ? primeira : "00:00";
   const inicioGravado = g.itens.find((s) => ehInicio(s.inicio))?.inicio;
   const inicio = momentoDoInicio(inicioGravado)?.getTime() ?? -Infinity;
-  let dia = localDayKey(new Date(agora.getTime() - minutosDe(p) * 60_000 + ANTECEDENCIA_MS));
+  const antes = antecedenciaMin(g.itens.map((s) => s.time), p);
+  let dia = localDayKey(new Date(agora.getTime() - (minutosDe(p) - antes) * 60_000));
   if (ehInicio(inicioGravado) && dia < inicioGravado.slice(0, 10)) dia = inicioGravado.slice(0, 10);
   if (ehDia(g.ate) && dia > g.ate) dia = g.ate;
   const out: DoseMarcavel[] = [];
@@ -281,7 +314,7 @@ export function montarLinhas(
 ): Remedio[] {
   const lista = horarios.length ? horarios : [""];
   const grupo = lista.length > 1 ? String(agora) : undefined;
-  const inicio = grupo ? inicioDoCadastro(lista[0], new Date(agora)) : undefined;
+  const inicio = grupo ? inicioDoCadastro(lista[0], new Date(agora), lista) : undefined;
   const quem = base.quem?.trim();
   return lista.map((time, i) => ({
     id: i === 0 ? String(agora) : `${agora}-${i}`,

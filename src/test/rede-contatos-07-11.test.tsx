@@ -234,6 +234,8 @@ describe("Rede de contatos — a tela, em conta vazia", () => {
     // 48 dias sem contato: está no follow-up (com o assunto embaixo do nome)
     const followUp = screen.getByText("⏰ FOLLOW-UP PENDENTE").closest("div")!.parentElement!;
     expect(within(followUp).getByText("→ IA nas empresas")).toBeInTheDocument();
+    // o botão tem a palavra à vista, não só o ícone (07/11, retomada)
+    expect(screen.getByRole("button", { name: "Marcar reunião com João" }).textContent).toBe("Reunião");
     fireEvent.click(screen.getByRole("button", { name: "Marcar reunião com João" }));
     const form = screen.getByTestId("form-reuniao");
     expect(within(form).getByLabelText("Nome da reunião")).toHaveValue("Reunião com João");

@@ -263,14 +263,24 @@ export const PharmacyChecklist = () => {
    *  pra 20h exigia apagar e recadastrar (perdendo o estoque). */
   const changeTime = (id: string, time: string) => {
     if (!time) return;
-    // 07/11: a 1ª dose de um tratamento que ainda não começou leva o `inicio` junto (lib/remedios)
     const linha = supplements.find(s => s.id === id);
-    const primeiraDoGrupo = linha?.grupo ? supplements.find(s => s.grupo === linha.grupo) : undefined;
-    const inicio = primeiraDoGrupo?.id === id ? inicioAoMudarPrimeira(linha?.inicio, time) : undefined;
-    const lista = supplements.map(s => {
-      const comHora = s.id === id ? { ...s, time } : s;
-      return inicio && linha?.grupo && s.grupo === linha.grupo ? { ...comHora, inicio } : comHora;
-    });
+    const doGrupo = linha?.grupo ? supplements.filter(s => s.grupo === linha.grupo) : [];
+    let lista: Supplement[];
+    if (linha && doGrupo.length > 1 && doGrupo[0].id === id) {
+      /* 07/11 (retomada): a 1ª dose ajusta as outras, como no cadastro, e o `inicio`
+         acompanha (lib/remedios, inicioAoMudarPrimeira). Mudando só ela, adiantar
+         08:00 → 07:00 depois de começado fazia a das 07:00 virar "dose da noite":
+         gravava no dia seguinte e o aviso da manhã sumia todo dia. */
+      const novos = gerarHorarios(time, doGrupo.length);
+      const inicio = inicioAoMudarPrimeira(linha.inicio, time, new Date(), novos);
+      const posicao = new Map(doGrupo.map((s, i) => [s.id, i]));
+      lista = supplements.map(s => {
+        const i = posicao.get(s.id);
+        return i === undefined ? s : { ...s, time: novos[i] ?? s.time, ...(inicio ? { inicio } : {}) };
+      });
+    } else {
+      lista = supplements.map(s => (s.id === id ? { ...s, time } : s));
+    }
     setSupplements(lista);
     void rearmarLembretes(lista, false);
   };
@@ -312,7 +322,10 @@ export const PharmacyChecklist = () => {
                 <th className="w-9 pl-3 pr-1 py-3" />
                 <th className="text-left px-2 py-3 text-xs font-semibold text-muted-foreground">Nome</th>
                 <th className="text-left px-1 py-3 text-xs font-semibold text-muted-foreground">Horário</th>
-                <th className="text-left pl-2 pr-1 py-3 text-xs font-semibold text-muted-foreground">Estoque</th>
+                <th className="text-left pl-2 pr-1 py-3 text-xs font-semibold text-muted-foreground">
+                  {/* abaixo de 380 px "Qtd", a palavra do cadastro (07/11, retomada: a 360 px "Estoque" saía cortado) */}
+                  <span className="min-[380px]:hidden">Qtd</span><span className="hidden min-[380px]:inline">Estoque</span>
+                </th>
                 <th className="sticky right-0 bg-card pl-0 pr-1.5 py-3"><span aria-hidden className="absolute inset-0 bg-muted/50" /></th>
               </tr>
             </thead>
@@ -417,10 +430,12 @@ export const PharmacyChecklist = () => {
                           /* uma pílula por dose: toque marca aquela dose. 32 px de altura (07/11,
                              crítica: com 24 px o dedo marcava a vizinha e o estoque descia junto).
                              GRADE FIXA de 2 colunas (1 em tela de menos de 380 px, pra tabela caber),
-                             largura igual pra todas e 8 px entre as linhas
+                             largura igual pra todas (48 px abaixo de 380 px, 52 acima) e 8 px entre as linhas
                              (07/11, 3ª rodada): o ✓ largo mudava a arrumação debaixo do dedo; agora
                              marcar só pinta a pílula e põe um selinho no canto, nada se mexe — e a
-                             área de toque de 44 px do app não chega na pílula de cima/baixo. */
+                             área de toque de 44 px do app não chega na pílula de cima/baixo.
+                             Marcada = fundo verde claro com a hora em verde escuro (07/11, retomada:
+                             branco sobre verde dava contraste 2,0 no escuro e 2,9 no claro). */
                           <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-x-1 gap-y-2 w-max" data-testid={`remedio-doses-${g.chave}`}>
                             {g.itens.map(s => {
                               const dose = doses.find(d => d.id === s.id);
@@ -436,7 +451,7 @@ export const PharmacyChecklist = () => {
                                   aria-label={t ? `Desmarcar dose das ${s.time} de ${g.nome}` : `Marcar dose das ${s.time} de ${g.nome}`}
                                   data-testid={`dose-${s.id}`}
                                   data-da-vez={daVez || undefined}
-                                  className={`relative h-8 w-[3.25rem] rounded-md border text-[11px] font-semibold tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${t ? "bg-[hsl(var(--saude-green))] border-[hsl(var(--saude-green))] text-white" : daVez ? "border-[hsl(var(--saude-green))] text-foreground" : "border-border text-muted-foreground hover:border-[hsl(var(--saude-green)/0.5)]"}`}
+                                  className={`relative h-8 w-12 min-[380px]:w-[3.25rem] rounded-md border text-[11px] font-semibold tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${t ? "bg-[hsl(var(--saude-green)/0.15)] border-[hsl(var(--saude-green))] text-emerald-800 dark:text-emerald-300" : daVez ? "border-[hsl(var(--saude-green))] text-foreground" : "border-border text-muted-foreground hover:border-[hsl(var(--saude-green)/0.5)]"}`}
                                 >
                                   {s.time}
                                   {t && (
@@ -471,6 +486,7 @@ export const PharmacyChecklist = () => {
                     <motion.tr key={`${g.chave}-editar`} className="bg-muted/30">
                       <td colSpan={5} className="px-3 pb-3 pt-1">
                         <div className="flex flex-wrap items-center gap-1.5" data-testid="remedio-editar">
+                          <span className="w-full text-[10px] text-muted-foreground">A 1ª dose ajusta as outras</span>
                           {g.itens.map((s, i) => (
                             <input
                               key={s.id}
@@ -620,6 +636,14 @@ export const PharmacyChecklist = () => {
             className={`${campoPequeno} flex-1 min-w-0`}
           />
         </label>
+        {/* 07/11 (retomada): o lembrete do celular é agendado pelo app do celular — a versão
+            antiga não conhece "até quando" nem o começo do tratamento e avisaria todo dia,
+            pra sempre. Só no site, só quando a pessoa usa o que é novo. */}
+        {!isNativeShell() && (newVezes > 1 || !!newAte) && (
+          <p className="text-[10px] leading-snug text-muted-foreground" data-testid="remedio-aviso-app">
+            No celular, atualize o app do CORE pro lembrete seguir estes horários e parar na data.
+          </p>
+        )}
         {alarmeExato === "denied" && (
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3" data-testid="remedio-alarme-exato">
             <p className="flex items-center gap-1.5 text-xs font-semibold">

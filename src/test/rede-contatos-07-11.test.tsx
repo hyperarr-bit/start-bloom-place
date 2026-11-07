@@ -38,7 +38,7 @@ vi.mock("@/lib/avaliacao", () => ({ pedirAvaliacaoSePuder: async () => false }))
 vi.mock("@/hooks/use-life-hub-data", () => ({ useLifeHubData: () => ({ tasksCompleted: 0, tasksTotal: 1 }) }));
 
 import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
-import Carreira, { contatoCasaBusca, reuniaoDoContato } from "@/pages/Carreira";
+import Carreira, { contatoCasaBusca, linkDoLinkedin, reuniaoDoContato } from "@/pages/Carreira";
 import { VoltaDaDemoProvider } from "@/lib/volta-da-demo";
 import { CHAVE_COMPROMISSOS, compromissosValidos, ocorrencias, type Compromisso } from "@/lib/compromissos";
 import { compromissosValidos as compromissosValidosAntigo } from "./app-antigo/home/compromissos-antigo";
@@ -332,5 +332,36 @@ describe("Rede de contatos — a tela, em conta vazia", () => {
     expect(screen.queryByTestId("form-reuniao")).toBeNull();
     expect(compromissosDe(store)).toHaveLength(1);
     expect(compromissosDe(store)[0]).toMatchObject({ titulo: "Reunião com João", data: "2026-11-10", hora: "09:00", ref: lista(store)[0].id });
+  });
+});
+
+/* 07/11 (conserto final da crítica): o LinkedIn digitado como a maioria digita, sem https://,
+   abria o endereço DENTRO do CORE (a página 404). Só acerta na hora de abrir: o que está gravado
+   em career-contacts fica igual, pro app antigo das lojas continuar lendo do mesmo jeito. */
+describe("Rede de contatos — o botão do LinkedIn", () => {
+  it("linkDoLinkedin: sem https:// ganha https://; só o usuário vira o endereço do perfil", () => {
+    expect(linkDoLinkedin("linkedin.com/in/maria-teste")).toBe("https://linkedin.com/in/maria-teste");
+    expect(linkDoLinkedin("www.linkedin.com/in/maria-teste/")).toBe("https://www.linkedin.com/in/maria-teste/");
+    expect(linkDoLinkedin("https://www.linkedin.com/in/maria-teste")).toBe("https://www.linkedin.com/in/maria-teste");
+    expect(linkDoLinkedin("HTTP://linkedin.com/in/maria")).toBe("HTTP://linkedin.com/in/maria");
+    expect(linkDoLinkedin("maria-teste")).toBe("https://www.linkedin.com/in/maria-teste");
+    expect(linkDoLinkedin(" @maria-teste ")).toBe("https://www.linkedin.com/in/maria-teste");
+    expect(linkDoLinkedin("")).toBe("");
+  });
+
+  it("tocar no ícone abre o LinkedIn de verdade (não a 404 do CORE) e não muda o que está gravado", () => {
+    const abrir = vi.spyOn(window, "open").mockImplementation(() => null);
+    try {
+      const store = criarStore({ "career-contacts": [contato({ name: "Maria", linkedin: "linkedin.com/in/maria-teste" }), contato({ id: "c2", name: "Pedro", linkedin: "@pedro" })] });
+      montar(store);
+      abrirRede();
+      fireEvent.click(screen.getByRole("button", { name: "LinkedIn de Maria" }));
+      expect(abrir).toHaveBeenLastCalledWith("https://linkedin.com/in/maria-teste", "_blank");
+      fireEvent.click(screen.getByRole("button", { name: "LinkedIn de Pedro" }));
+      expect(abrir).toHaveBeenLastCalledWith("https://www.linkedin.com/in/pedro", "_blank");
+      expect(lista(store).map(c => c.linkedin)).toEqual(["linkedin.com/in/maria-teste", "@pedro"]);
+    } finally {
+      abrir.mockRestore();
+    }
   });
 });

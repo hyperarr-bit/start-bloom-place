@@ -401,6 +401,20 @@ export const contatoCasaBusca = (c: Contact, busca: string): boolean => {
     .some((v) => typeof v === "string" && semAcento(v).includes(q));
 };
 
+/**
+ * O endereço que o botão do LinkedIn abre (conserto final 07/11): quase todo mundo
+ * digita "linkedin.com/in/maria", sem https://, e o navegador abria isso DENTRO do
+ * CORE (a página 404). Sem http(s):// ganha https://; só o usuário ("maria" ou
+ * "@maria") vira o perfil. Só na hora de abrir: o que está gravado fica igual.
+ */
+export const linkDoLinkedin = (valor: string): string => {
+  const v = (valor ?? "").trim();
+  if (!v) return "";
+  if (/^https?:\/\//i.test(v)) return v;
+  if (/^@?[\w-]+$/.test(v)) return `https://www.linkedin.com/in/${v.replace(/^@/, "")}`;
+  return `https://${v.replace(/^\/+/, "")}`;
+};
+
 /** Os três campos novos só ficam no objeto com texto (editar pra vazio tira o campo — o app antigo não os conhece). */
 const comOpcionais = (c: Contact, form: Partial<Contact>): Contact => {
   const r: Contact = { ...c };
@@ -641,7 +655,7 @@ const Networking = () => {
                 </span>
                 {/* 32 px por botão e a lixeira afastada (07/11, crítica: com 24 px colados, apagava querendo editar) */}
                 <div className="flex gap-1 shrink-0">
-                  {c.linkedin && <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`LinkedIn de ${c.name}`} onClick={() => window.open(c.linkedin, "_blank")}><Link2 className="w-3 h-3" /></Button>}
+                  {c.linkedin && <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`LinkedIn de ${c.name}`} onClick={() => window.open(linkDoLinkedin(c.linkedin), "_blank")}><Link2 className="w-3 h-3" /></Button>}
                   {/* com palavra (07/11, retomada): só o ícone de calendário, no meio de 3 ícones, ninguém achava a reunião */}
                   <Button variant="ghost" size="sm" className="h-8 px-2 gap-1 text-[11px] font-semibold text-sky-700 dark:text-sky-300" aria-label={`Marcar reunião com ${c.name}`} aria-pressed={marcando === c.id} onClick={() => setMarcando(marcando === c.id ? null : c.id)}><CalendarPlus className="w-3.5 h-3.5" />Reunião</Button>
                   <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Editar ${c.name}`} onClick={() => editar(c)}><Edit2 className="w-3 h-3" /></Button>

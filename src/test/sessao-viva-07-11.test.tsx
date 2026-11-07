@@ -361,3 +361,30 @@ describe("a releitura não volta atrás o gesto que estava na fila", () => {
     expect(JSON.parse(localStorage.getItem("u:u1:todo-list") ?? "null")).toEqual([{ id: "t0" }, { id: "t1" }]);
   });
 });
+
+/* Crítica (07/11): a virada pede a releitura UMA vez por alvo e "a leitura no ar serve". Se essa leitura estava no ar
+   desde ANTES da meia-noite, ela chega com `pedidaEm` ainda em outubro: a virada voltava sem virar e não pedia outra.
+   Numa aba sempre visível nada mais dispara leitura — o mês não virava até reabrir. */
+describe("a leitura no ar desde antes da virada não trava o mês", () => {
+  it("leitura pedida 31/10 23:59:58, volta pra aba 01/11 00:00:01, a leitura chega: pede outra e vira", async () => {
+    vi.setSystemTime(em(2026, 10, 31, 22, 0));
+    for (const [k, v] of Object.entries(OUTUBRO)) servidor().set(k, v);
+    montar();
+    await waitFor(() => expect(api.loaded).toBe(true));
+
+    leituraTotal = "segurar";
+    vi.setSystemTime(new Date(em(2026, 11, 1, 0, 0).getTime() - 2000)); // 31/10 23:59:58
+    await act(async () => { api.relerConta?.(); });
+    expect(leiturasTotais).toBe(2);
+    vi.setSystemTime(new Date(em(2026, 11, 1, 0, 0).getTime() + 1000)); // 01/11 00:00:01
+    await voltarPraAba();
+    expect(leiturasTotais).toBe(2); // a do ar serve (dentro do prazo)
+    const soltarAntiga = soltarLeitura;
+    leituraTotal = "ok";
+    await act(async () => { soltarAntiga?.(); });
+    await esperar(800);
+    expect(leiturasTotais).toBe(3); // a virada pediu uma leitura deste mês
+    expect(ids(servidor().get("finance-2026-outubro-expenses"))).toEqual(["mercado"]);
+    expect(servidor().get(CHAVE_CARIMBO_CONTAS)).toBe("2026-11");
+  });
+});

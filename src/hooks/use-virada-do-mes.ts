@@ -147,8 +147,9 @@ export const useViradaDoMes = () => {
    * um novo alvo e o arquivamento roda com os dados certos na mão.
    */
   const feitoPara = useRef<string | null>(null);
-  /** (07/11) Alvo pra que a releitura da conta já foi pedida — ver "SESSÃO VIVA ATRAVESSA O MÊS". */
-  const releituraPedidaPara = useRef<string | null>(null);
+  /** (07/11) Alvo pra que a releitura da conta já foi pedida, e a `vez` da última leitura quando ela foi pedida —
+   *  ver "SESSÃO VIVA ATRAVESSA O MÊS". */
+  const releituraPedidaPara = useRef<{ alvo: string; vez: number } | null>(null);
 
   // (26/09) useLayoutEffect de propósito — ver "A TELA DE FINANÇAS RELÊ
   // DEPOIS DA VIRADA": as gravações e a versão precisam sair no mesmo passe.
@@ -183,14 +184,21 @@ export const useViradaDoMes = () => {
      * mês velho em memória e o 1º toque gravaria outubro por cima de novembro.
      * Convidado (sem servidor) e provider sem `ultimaLeitura` (mocks): como antes.
      */
+    /*
+     * (07/11, crítica) "A leitura no ar serve" — mas a do ar pode ter sido PEDIDA antes da meia-noite: ela chega com
+     * `pedidaEm` ainda no mês velho e, sem outro pedido, a virada voltava calada e o mês não virava até reabrir
+     * (numa aba sempre visível nada mais dispara leitura). Chegou leitura NOVA (`vez` maior que a do pedido) e ela
+     * ainda é de outro mês: pede outra. Falha não muda `ultimaLeitura` — quem tenta de novo é o provider.
+     */
     if (user?.id && ultimaLeitura && mesCorrenteId(new Date(ultimaLeitura.pedidaEm)) !== agora) {
-      if (releituraPedidaPara.current !== alvo) {
-        releituraPedidaPara.current = alvo;
+      const pedida = releituraPedidaPara.current;
+      if (pedida?.alvo !== alvo || ultimaLeitura.vez > pedida.vez) {
+        releituraPedidaPara.current = { alvo, vez: ultimaLeitura.vez };
         relerConta?.();
       }
       return;
     }
-    const relida = releituraPedidaPara.current === alvo;
+    const relida = releituraPedidaPara.current?.alvo === alvo;
     releituraPedidaPara.current = null;
 
     let movidosTotal = 0;

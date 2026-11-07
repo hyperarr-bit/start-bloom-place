@@ -33,12 +33,22 @@
  * a mesma mecânica das despesas e pelo mesmo motivo: apagar uma dívida no
  * Pessoal não pode levar junto a dívida da empresa. Em "Tudo junto" aparece
  * tudo, com um selo discreto dizendo de quem é cada uma.
+ *
+ * ── VENCIMENTO (07/11) ───────────────────────────────────────────────────
+ * Dono: "vencimento opcional na dívida entre pessoas". A dívida PODE ter um
+ * prazo combinado (`vencimento`, "AAAA-MM-DD"): "ele me paga até 15/12". É um
+ * campo opcional a mais no MESMO objeto, na MESMA chave — dívida antiga não
+ * tem e segue igual; só entra no objeto quando a pessoa escolhe a data, e
+ * tirar a data tira o campo (nunca grava ""). A linha diz "vence em 3 dias",
+ * "vence hoje" ou "venceu há 2 dias" com o selo ATRASADA; dívida quitada não
+ * cobra prazo nenhum. Continua caderno à parte: o prazo não vira conta no
+ * MEU MÊS nem lembrete no celular.
  */
 import { useState } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { localDayKey, parseLocalDay } from "@/lib/utils";
 import { numeroBR } from "@/lib/data-normalizers";
-import { Plus, Trash2, ArrowDownLeft, ArrowUpRight, HandCoins, ChevronDown, Check } from "lucide-react";
+import { Plus, Trash2, ArrowDownLeft, ArrowUpRight, HandCoins, ChevronDown, Check, CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -74,6 +84,8 @@ export interface DividaPessoal {
   parcelas?: ParcelaPrevista[];
   /** Juros combinados, % ao mês sobre o saldo (22/09). Ausente = sem juros. */
   jurosMes?: number;
+  /** Prazo combinado pra quitar, "AAAA-MM-DD" (07/11). Ausente = sem prazo, como sempre foi. */
+  vencimento?: string;
 }
 
 interface Props {
@@ -129,14 +141,38 @@ const dataCurta = (k: string) => {
   }
 };
 
+/* ── VENCIMENTO (07/11) ─────────────────────────────────────────────────── */
+const ehDia = (s: unknown): s is string => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+
+export interface SituacaoDoVencimento {
+  /** "vence em 3 dias", "vence hoje", "venceu há 2 dias", "vence 15/12/26" */
+  texto: string;
+  tom: "atrasada" | "hoje" | "perto" | "longe";
+  /** Dias até o prazo (negativo = já passou). */
+  dias: number;
+}
+
+/** O que a linha da dívida diz do prazo. null = sem prazo (ou prazo ilegível): a linha fica como sempre foi. */
+export const situacaoDoVencimento = (vencimento: unknown, hoje: string = localDayKey()): SituacaoDoVencimento | null => {
+  if (!ehDia(vencimento) || !ehDia(hoje)) return null;
+  const dias = Math.round((parseLocalDay(vencimento).getTime() - parseLocalDay(hoje).getTime()) / 86_400_000);
+  if (!Number.isFinite(dias)) return null;
+  if (dias < 0) return { texto: dias === -1 ? "venceu ontem" : `venceu há ${-dias} dias`, tom: "atrasada", dias };
+  if (dias === 0) return { texto: "vence hoje", tom: "hoje", dias };
+  if (dias === 1) return { texto: "vence amanhã", tom: "perto", dias };
+  if (dias <= 7) return { texto: `vence em ${dias} dias`, tom: "perto", dias };
+  return { texto: `vence ${dataCurta(vencimento)}`, tom: "longe", dias };
+};
+
 export const DividasEntrePessoas = ({ perfil = PERFIL_PESSOAL, perfis = [], onReceita }: Props) => {
   const [dividasTodas, setDividasTodas] = usePersistedState<DividaPessoal[]>("finance-dividas-pessoas", []);
   /* A tela só enxerga o perfil ativo; a escrita volta mesclada com as dívidas
      dos outros perfis (finance-perfil.ts). */
   const [dividas, setDividas] = usarListaDoPerfil(dividasTodas, setDividasTodas, perfil);
   const consolidado = perfil === PERFIL_TODOS;
+  const diaDeHoje = localDayKey();
   const [aberta, setAberta] = useState<string | null>(null);
-  const [nova, setNova] = useState({ pessoa: "", valor: "", direcao: "devo" as DividaPessoal["direcao"], parcelas: "", primeira: "", juros: "" });
+  const [nova, setNova] = useState({ pessoa: "", valor: "", direcao: "devo" as DividaPessoal["direcao"], parcelas: "", primeira: "", juros: "", vencimento: "" });
   const [combinado, setCombinado] = useState(false);
   const [movimento, setMovimento] = useState<{ id: string; valor: string; sinal: 1 | -1 } | null>(null);
 
@@ -163,9 +199,11 @@ export const DividasEntrePessoas = ({ perfil = PERFIL_PESSOAL, perfis = [], onRe
         lancamentos: [{ id: novoId(), data: hoje, valor, nota: "Valor inicial" }],
         ...(parcelas.length ? { parcelas } : {}),
         ...(combinado && Number.isFinite(juros) && juros > 0 ? { jurosMes: juros } : {}),
+        // Prazo (07/11): só entra com data escolhida — sem ela o objeto fica como sempre foi.
+        ...(combinado && ehDia(nova.vencimento) ? { vencimento: nova.vencimento } : {}),
       }, perfil),
     ]);
-    setNova({ pessoa: "", valor: "", direcao: nova.direcao, parcelas: "", primeira: "", juros: "" });
+    setNova({ pessoa: "", valor: "", direcao: nova.direcao, parcelas: "", primeira: "", juros: "", vencimento: "" });
     setCombinado(false);
   };
 
@@ -208,6 +246,15 @@ export const DividasEntrePessoas = ({ perfil = PERFIL_PESSOAL, perfis = [], onRe
   const apagarLancamento = (dividaId: string, lancId: string) =>
     setDividas(dividas.map((d) => d.id !== dividaId ? d : {
       ...d, lancamentos: d.lancamentos.filter((l) => l.id !== lancId),
+    }));
+
+  /** Prazo (07/11): dá pra pôr ou trocar depois; "" TIRA o campo do objeto — nunca grava vencimento vazio. */
+  const definirVencimento = (id: string, valor: string) =>
+    setDividas(dividas.map((d) => {
+      if (d.id !== id) return d;
+      const semPrazo = { ...d };
+      delete semPrazo.vencimento;
+      return ehDia(valor) ? { ...semPrazo, vencimento: valor } : semPrazo;
     }));
 
   const totalDevo = dividas.filter(d => d.direcao === "devo").reduce((s, d) => s + Math.max(0, saldoDaDivida(d)), 0);
@@ -280,10 +327,11 @@ export const DividasEntrePessoas = ({ perfil = PERFIL_PESSOAL, perfis = [], onRe
           className="text-[11px] text-muted-foreground underline underline-offset-2"
           data-testid="divida-combinado"
         >
-          {combinado ? "Sem parcelas nem juros" : "Parcelado? Com juros?"}
+          {combinado ? "Sem parcelas, juros nem prazo" : "Parcelado? Com juros? Tem prazo?"}
         </button>
         {combinado && (
-          <div className="grid grid-cols-3 gap-1.5" data-testid="divida-combinado-campos">
+          /* 2 colunas (07/11): em 390 px a data não cabia em 3 ("dd/mm/yyy" cortado) e entrou o 4º campo, o prazo */
+          <div className="grid grid-cols-2 gap-1.5" data-testid="divida-combinado-campos">
             <label className="text-[10px] text-muted-foreground flex flex-col gap-0.5">
               Parcelas
               <Input type="number" inputMode="numeric" min={2} max={99} placeholder="Ex: 10" value={nova.parcelas} onChange={(e) => setNova({ ...nova, parcelas: e.target.value })} className="h-8 text-xs" aria-label="Número de parcelas" />
@@ -295,6 +343,11 @@ export const DividasEntrePessoas = ({ perfil = PERFIL_PESSOAL, perfis = [], onRe
             <label className="text-[10px] text-muted-foreground flex flex-col gap-0.5">
               Juros % ao mês
               <Input type="number" inputMode="decimal" min={0} step="0.1" placeholder="Ex: 2" value={nova.juros} onChange={(e) => setNova({ ...nova, juros: e.target.value })} className="h-8 text-xs" aria-label="Juros ao mês em porcento" />
+            </label>
+            {/* PRAZO (07/11): opcional; o rótulo segue a direção ("Pagar até" / "Receber até") */}
+            <label className="text-[10px] text-muted-foreground flex flex-col gap-0.5">
+              {nova.direcao === "devo" ? "Pagar até" : "Receber até"}
+              <Input type="date" value={nova.vencimento} onChange={(e) => setNova({ ...nova, vencimento: e.target.value })} className="h-8 text-xs" aria-label={nova.direcao === "devo" ? "Pagar até" : "Receber até"} />
             </label>
           </div>
         )}
@@ -317,6 +370,8 @@ export const DividasEntrePessoas = ({ perfil = PERFIL_PESSOAL, perfis = [], onRe
           const quitada = saldo <= 0.005;
           const devo = d.direcao === "devo";
           const expandida = aberta === d.id;
+          // Prazo (07/11): quitada não cobra prazo; sem o campo (dívida antiga) é null e a linha fica como era
+          const prazo = quitada ? null : situacaoDoVencimento(d.vencimento, diaDeHoje);
 
           return (
             <div key={d.id} className="border-b border-border/50">
@@ -339,6 +394,13 @@ export const DividasEntrePessoas = ({ perfil = PERFIL_PESSOAL, perfis = [], onRe
                           <Check className="w-3 h-3 inline -mt-0.5" /> quitada
                         </span>
                       )}
+                      {/* Prazo (07/11): o selo só nos dois casos que pedem ação hoje; o resto vai na linha de baixo */}
+                      {prazo?.tom === "atrasada" && (
+                        <span className="category-badge bg-rose-500 text-white" data-testid="selo-atrasada">⚠ atrasada</span>
+                      )}
+                      {prazo?.tom === "hoje" && (
+                        <span className="category-badge bg-amber-500/15 text-amber-700 dark:text-amber-400" data-testid="selo-vence-hoje">vence hoje</span>
+                      )}
                       {/* Só no consolidado: em Pessoal ou numa empresa o
                           próprio chip do topo já diz de quem é. */}
                       {consolidado && (
@@ -349,6 +411,14 @@ export const DividasEntrePessoas = ({ perfil = PERFIL_PESSOAL, perfis = [], onRe
                     </div>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
                       {pago > 0 ? `R$ ${brl(pago)} de R$ ${brl(inicial)} já ${devo ? "pagos" : "devolvidos"}` : `desde ${dataCurta(d.criadaEm)}`}
+                      {prazo && prazo.tom !== "hoje" && (
+                        <span
+                          className={prazo.tom === "atrasada" ? "text-rose-600 dark:text-rose-400 font-semibold" : prazo.tom === "perto" ? "text-amber-600 dark:text-amber-400 font-semibold" : ""}
+                          data-testid="prazo-da-divida"
+                        >
+                          {" · "}{prazo.texto}
+                        </span>
+                      )}
                     </p>
                   </button>
                   <div className="text-right shrink-0">
@@ -386,6 +456,29 @@ export const DividasEntrePessoas = ({ perfil = PERFIL_PESSOAL, perfis = [], onRe
                     >
                       Aumentou
                     </Button>
+                  </div>
+
+                  {/* PRAZO (07/11): opcional e editável aqui — dívida antiga nasce sem e segue igual */}
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground" data-testid="prazo-editar">
+                    <CalendarClock className="w-3.5 h-3.5 shrink-0" />
+                    <span className="shrink-0">{devo ? "Pagar até" : "Receber até"}</span>
+                    <Input
+                      type="date"
+                      value={d.vencimento ?? ""}
+                      onChange={(e) => definirVencimento(d.id, e.target.value)}
+                      className="h-8 text-xs flex-1 min-w-0"
+                      aria-label={devo ? "Prazo: pagar até" : "Prazo: receber até"}
+                    />
+                    {d.vencimento && (
+                      <button
+                        type="button"
+                        onClick={() => definirVencimento(d.id, "")}
+                        aria-label="Tirar o prazo"
+                        className="underline underline-offset-2 shrink-0 hover:text-foreground"
+                      >
+                        tirar
+                      </button>
+                    )}
                   </div>
 
                   {/* Calendário combinado (22/09): cada parcela vira abatimento com um toque */}

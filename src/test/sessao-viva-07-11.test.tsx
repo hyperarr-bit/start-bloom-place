@@ -98,6 +98,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useViradaDoMes, useVersaoDaVirada } from "@/hooks/use-virada-do-mes";
 import { CHAVE_CARIMBO_CONTAS, type DiaDeContas } from "@/lib/virada-contas";
 import { CHAVE_DIAS_ANOTADOS } from "@/lib/sequencia";
+import { trackEvent } from "@/lib/analytics";
 
 type Gasto = { id: string; date: string; value: number; description: string };
 let api: UserDataContextType;
@@ -667,4 +668,68 @@ describe("rede piscando: a nova tentativa do valor velho não passa por cima do 
     expect(servidor().get("todo-list")).toEqual([{ id: "t0" }, { id: "t1" }]);
     expect(leiturasTotais).toBe(1);
   });
+});
+
+/* Crítica r3 (07/11, bug "recusa-laco", achado por três críticos: scratchpad/critico-dados-r3 R1,
+   scratchpad/ciclo-bugs-r3/critico-ciclo-r3-recusa-loop e scratchpad/critico-r3-loop). O 7884fd5d (offline-some)
+   fazia o 3º envio que desiste pedir `relerConta` pra QUALQUER erro. Com o servidor RECUSANDO a chave (não é rede:
+   texto com \u0000 → 22P05, 413 de corpo grande, 42501 da RLS, 503 numa queda), a leitura dava certo, juntava, o envio
+   era recusado de novo e pedia outra leitura: uma leitura da conta inteira a cada ~2 s, sem fim, com o app aberto.
+   Antes do ramo: 3 tentativas e parava. O relógio anda em passos (o React segura os efeitos do provider até o act
+   acabar: um act só de 12 s esconde o laço). */
+describe("envio recusado pelo servidor não vira laço de leitura", () => {
+  const andar = async (segundos: number, desde: Date) => {
+    for (let i = 1; i <= segundos * 2; i++) {
+      vi.setSystemTime(new Date(desde.getTime() + i * 500));
+      await esperar(500);
+    }
+  };
+  const recusas: [string, { error: Record<string, string>; status?: number }][] = [
+    ["22P05 (texto colado com \\u0000), sem status", { error: { message: "unsupported Unicode escape sequence", code: "22P05", details: "", hint: "" } }],
+    ["413 (corpo grande demais)", { error: { message: "Payload Too Large", code: "", details: "", hint: "" }, status: 413 }],
+    ["42501 da RLS (chave que o servidor não aceita)", { error: { message: "new row violates row-level security policy", code: "42501", details: "", hint: "" }, status: 403 }],
+    ["503 numa queda da Supabase", { error: { message: "Service Unavailable", code: "", details: "", hint: "" }, status: 503 }],
+  ];
+  for (const [nome, r] of recusas) {
+    it(`${nome}: 3 tentativas, nenhuma releitura; o que ela anotou fica na tela e no aparelho`, async () => {
+      const inicio = em(2026, 11, 7, 10, 0);
+      vi.setSystemTime(inicio);
+      servidor().set("todo-list", [{ id: "t0" }]);
+      servidor().set(CHAVE_DIAS_ANOTADOS, ["2026-11-07"]);
+      montar();
+      await waitFor(() => expect(api.loaded).toBe(true));
+      const antes = leiturasTotais;
+      recusa = { key: "todo-list", ...r };
+      const upsertsAntes = upserts.length;
+      act(() => api.set("todo-list", [{ id: "t0" }, { id: "t1" }]));
+      await andar(10, inicio);
+      expect(leiturasTotais - antes).toBe(0);
+      expect(api.get("todo-list", [])).toEqual([{ id: "t0" }, { id: "t1" }]);
+      expect(servidor().get("todo-list")).toEqual([{ id: "t0" }]);
+      expect(upserts.length).toBe(upsertsAntes); // o mock só guarda o que o servidor aceitou
+      expect(vi.mocked(trackEvent)).toHaveBeenCalledWith("dados_envio_recusado", expect.objectContaining({ key: "todo-list" }));
+      // a cópia fica no aparelho: a próxima abertura tenta de novo (3 envios, sem laço)
+      expect(localStorage.getItem("u:u1:todo-list")).toContain("t1");
+    }, 20000);
+  }
+
+  it("2ª trava: erro com cara de rede numa chave só, com a leitura funcionando: no máximo 1 releitura", async () => {
+    const inicio = em(2026, 11, 7, 10, 0);
+    vi.setSystemTime(inicio);
+    servidor().set("todo-list", [{ id: "t0" }]);
+    servidor().set(CHAVE_DIAS_ANOTADOS, ["2026-11-07"]);
+    montar();
+    await waitFor(() => expect(api.loaded).toBe(true));
+    const antes = leiturasTotais;
+    recusa = { key: "todo-list", error: ERRO_REDE, status: 0 };
+    act(() => api.set("todo-list", [{ id: "t0" }, { id: "t1" }]));
+    await andar(12, inicio);
+    expect(leiturasTotais - antes).toBeLessThanOrEqual(1);
+    expect(api.get("todo-list", [])).toEqual([{ id: "t0" }, { id: "t1" }]);
+    // a rede "volta" (evento online): junta e sobe
+    recusa = null;
+    await act(async () => { window.dispatchEvent(new Event("online")); });
+    await andar(2, new Date(inicio.getTime() + 12_000));
+    expect(servidor().get("todo-list")).toEqual([{ id: "t0" }, { id: "t1" }]);
+  }, 30000);
 });

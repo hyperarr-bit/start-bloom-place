@@ -329,6 +329,19 @@ type EscritaSegurada = { base: unknown; valor: unknown; sistema: boolean; dia: s
  * volta. Daqui é indistinguível de "o envio não chegou" (mesmo servidor, mesma cópia) — sem
  * versão no servidor, a escolha é não perder registro.
  */
+/**
+ * (07/11, bug "recusa-laco") O envio caiu por falta de REDE (o pedido nem chegou ao servidor)? O postgrest-js
+ * devolve `status: 0` quando o fetch falha; quando o servidor responde e recusa, vem o HTTP (≥ 400) e, do Postgres,
+ * o `code` (22P05, 42501…). Sem status (dublês de teste, cliente antigo): `code` preenchido = recusa; sem nada,
+ * na dúvida é rede — o caminho que não perde o que ela anotou.
+ */
+const ehFalhaDeRede = (error: unknown, status: unknown): boolean => {
+  if (status === 0) return true;
+  if (typeof status === "number" && status >= 400) return false;
+  const code = (error as { code?: unknown } | null)?.code;
+  return !(typeof code === "string" && code.trim() !== "");
+};
+
 const PREFIXO_SEGURADAS = "core-seguradas-";
 const prefixoSeguradasDe = (uid: string) => `${PREFIXO_SEGURADAS}${uid}:`;
 const guardarSegurada = (uid: string, key: string, e: EscritaSegurada) =>
@@ -604,6 +617,20 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
    */
   const naoSubiram = useRef<Set<string>>(new Set());
   const doServidor = useRef<Map<string, unknown>>(new Map());
+  /*
+   * O ENVIO RECUSADO NÃO VIRA LAÇO (07/11, bug "recusa-laco"). O "não subiu" acima pedia `relerConta` pra QUALQUER
+   * erro. Com o servidor RECUSANDO a chave — texto colado com \u0000 (22P05), corpo grande demais (413), RLS (42501),
+   * 503/429 numa queda — a leitura dava certo, juntava, o envio era recusado de novo e pedia outra leitura: uma
+   * leitura da conta inteira a cada ~2 s, sem fim, enquanto o app estivesse aberto. Antes do 7884fd5d eram 3
+   * tentativas e parava. Agora:
+   *  - recusa do servidor (`ehFalhaDeRede` = não): a chave fica em `naoSubiram` e com a cópia no aparelho (a próxima
+   *    leitura, a rede voltando e a próxima abertura juntam e tentam de novo — 3 envios, sem laço), sai um
+   *    `dados_envio_recusado` e NÃO pede leitura;
+   *  - falha de rede: pede `relerConta` uma vez por chave (`releuPorFalha`) até um envio dela dar certo. Se a mesma
+   *    chave cai de novo depois de uma leitura que deu certo (a rede está viva), ela segue em `naoSubiram` e no
+   *    aparelho, mas não pede outra leitura. O evento `online` zera a trava e junta o que não subiu.
+   */
+  const releuPorFalha = useRef<Set<string>>(new Set());
 
   // Sync ref + react to user changes (login/logout/switch).
   useEffect(() => {
@@ -640,6 +667,7 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       releituraPedida.current = false;
       diasPendentes.current.clear();
       naoSubiram.current.clear(); // (07/11) e o que não subiu era da outra conta — ver "O QUE NÃO SUBIU"
+      releuPorFalha.current.clear();
       doServidor.current.clear();
       setSemConexao(null);
       setContaCompleta(false);
@@ -1024,13 +1052,20 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   relerContaRef.current = relerConta;
   useEffect(() => {
     const aoVoltarPraTela = () => { if (document.visibilityState !== "hidden") tentarDeNovo(); };
-    window.addEventListener("online", tentarDeNovo);
+    // (07/11, bug "recusa-laco") a rede voltou com envio que não subiu: zera a trava de uma leitura por chave e junta
+    const aoVoltarARede = () => {
+      if (sincronizadoRef.current && naoSubiram.current.size > 0) {
+        releuPorFalha.current.clear();
+        relerConta();
+      } else tentarDeNovo();
+    };
+    window.addEventListener("online", aoVoltarARede);
     document.addEventListener("visibilitychange", aoVoltarPraTela);
     return () => {
-      window.removeEventListener("online", tentarDeNovo);
+      window.removeEventListener("online", aoVoltarARede);
       document.removeEventListener("visibilitychange", aoVoltarPraTela);
     };
-  }, [tentarDeNovo]);
+  }, [tentarDeNovo, relerConta]);
 
   /*
    * LIBERAÇÃO (17/10): roda no commit em que o store juntado e o `loaded` chegam às telas,
@@ -1179,8 +1214,9 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     envioDaChave.current.set(key, Date.now());
     enviosNoAr.current.set(key, (enviosNoAr.current.get(key) ?? 0) + 1);
     let error: unknown;
+    let status: unknown;
     try {
-      ({ error } = await (supabase as any)
+      ({ error, status } = await (supabase as any)
         .from("user_data")
         .upsert({ user_id: userId, key, value }, { onConflict: "user_id,key" }));
     } finally {
@@ -1192,7 +1228,8 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       if (attempt < 2) {
         setTimeout(() => persistKey(userId, key, value, attempt + 1, meu), 500 * Math.pow(2, attempt));
       } else if (userRef.current?.id === userId && ultimoEnvio.current.get(key) === meu) {
-        marcarQueNaoSubiu(userId, key, value);
+        // (07/11, bug "recusa-laco") recusa do servidor não pede leitura — ver "O ENVIO RECUSADO NÃO VIRA LAÇO"
+        marcarQueNaoSubiu(userId, key, value, ehFalhaDeRede(error, status) ? null : { code: (error as { code?: unknown })?.code, status });
       }
       return;
     }
@@ -1200,6 +1237,7 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     if (ultimoEnvio.current.get(key) !== meu) return; // (07/11) um envio mais novo confirma — ver acima
     doServidor.current.set(key, value);
     naoSubiram.current.delete(key);
+    releuPorFalha.current.delete(key);
     if (aConfirmar.current.has(key)) {
       // 17/10: o servidor tem o juntado (ou algo feito em cima dele): a cópia guardada no aparelho sai
       aConfirmar.current.delete(key);
@@ -1207,14 +1245,21 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
   /** (07/11) O 3º envio da chave desistiu — ver "O QUE NÃO SUBIU". Só se o valor ainda é o da tela: um mais novo
-   *  tem o próprio envio. */
-  const marcarQueNaoSubiu = (userId: string, key: string, value: unknown) => {
+   *  tem o próprio envio. `recusa` = o servidor respondeu e recusou: não pede leitura (ver "O ENVIO RECUSADO NÃO VIRA
+   *  LAÇO"); falha de rede pede uma vez por chave até um envio dela dar certo. */
+  const marcarQueNaoSubiu = (userId: string, key: string, value: unknown, recusa: { code: unknown; status: unknown } | null = null) => {
     const naTela = key in pendingWrites.current ? pendingWrites.current[key] : storeRef.current[key];
     if (naTela !== value && !iguais(naTela, value)) return;
     naoSubiram.current.add(key);
     const base = aConfirmar.current.has(key) ? aConfirmar.current.get(key) : doServidor.current.get(key);
     aConfirmar.current.set(key, base);
     guardarSegurada(userId, key, { base, valor: value, sistema: true, dia: null });
+    if (recusa) {
+      trackEvent("dados_envio_recusado", { key, code: typeof recusa.code === "string" ? recusa.code : "", status: typeof recusa.status === "number" ? recusa.status : null });
+      return;
+    }
+    if (releuPorFalha.current.has(key)) return;
+    releuPorFalha.current.add(key);
     relerContaRef.current();
   };
 
@@ -1428,6 +1473,7 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     seguradas.current = {}; // o que estava esperando a conta chegar também sai
     diasPendentes.current.clear(); // 07/11: e o dia esperando a releitura
     naoSubiram.current.clear(); // 07/11: e o envio que desistiu
+    releuPorFalha.current.clear();
     doServidor.current.clear();
     ultimoEnvio.current.clear();
     aConfirmar.current.clear();

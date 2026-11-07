@@ -502,6 +502,10 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   const seguradas = useRef<Record<string, EscritaSegurada>>({});
   /** Hora da última escrita de cada chave: escrita feita DEPOIS do pedido de leitura ganha do retrato. */
   const ultimaEscrita = useRef<Map<string, number>>(new Map());
+  /** (07/11) Hora em que o último envio de cada chave SAIU pro servidor, e quantos envios dela estão no ar — ver
+   *  "O ENVIO QUE SAIU DEPOIS DO PEDIDO" na hidratação. */
+  const envioDaChave = useRef<Map<string, number>>(new Map());
+  const enviosNoAr = useRef<Map<string, number>>(new Map());
   /** (revisão 2, 17/10) a leitura da conta no ar — ver PRAZO DE CADA LEITURA DA CONTA */
   const leituraAtual = useRef<LeituraNoAr | null>(null);
   /** quantas vezes o prazo da leitura já dobrou enquanto a conta não chega */
@@ -582,6 +586,8 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       // 16/10: o que estava segurado/sincronizado era da outra conta (ou de ninguém)
       sincronizadoRef.current = false;
       ultimaEscrita.current.clear();
+      envioDaChave.current.clear();
+      enviosNoAr.current.clear();
       // revisão 2 (17/10): a leitura no ar e a tentativa marcada também — o efeito da hidratação
       // não corta mais leitura ao rodar de novo, então quem corta na troca de conta é aqui
       if (leituraAtual.current) { cancelarLeitura(leituraAtual.current); leituraAtual.current = null; }
@@ -742,6 +748,9 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       // Step 2: refresh from Supabase (server wins for non-heavy keys).
       if (!vale()) return;
       const pedidoEm = Date.now();
+      // (07/11) o que ainda vai pro servidor NA HORA DO PEDIDO — na fila (o envio espera 250 ms) ou no ar: o retrato
+      // não tem isto. Ver "O ENVIO QUE SAIU DEPOIS DO PEDIDO" abaixo.
+      const aCaminhoNoPedido = new Set<string>([...Object.keys(pendingWrites.current), ...enviosNoAr.current.keys()]);
       // revisão 2 (17/10): sem corrida com o prazo — a leitura vai até o fim (ou até ser trocada
       // depois do prazo, que a cancela; aí o `vale()` abaixo descarta a resposta dela)
       // revisão S1 (17/10): TODAS as páginas da conta, ou falha — ver LEITURA DA CONTA EM PÁGINAS
@@ -804,6 +813,20 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
          */
         const recentes = new Set<string>();
         for (const [k, t] of ultimaEscrita.current) {
+          if (t >= pedidoEm && !(k in mesclados)) recentes.add(k);
+        }
+        /*
+         * O ENVIO QUE SAIU DEPOIS DO PEDIDO (07/11, crítica do "sessão viva"). A releitura que a
+         * sessão viva pede (1º gesto depois da meia-noite, virada do mês na volta pra aba) sai
+         * poucos ms DEPOIS do gesto que a disparou — e o envio do gesto espera 250 ms. Com a
+         * resposta chegando depois do envio (rede de celular, conta em várias páginas), a chave
+         * não estava mais na fila nem era "escrita depois do pedido": o aparelho voltava pro
+         * valor velho (memória e cache) e a próxima gravação feita em cima dele apagava o que
+         * ela anotou. Escrita que ainda ia pro servidor no pedido, ou que saiu depois dele,
+         * também é mais nova que o retrato.
+         */
+        for (const k of aCaminhoNoPedido) if (!(k in mesclados)) recentes.add(k);
+        for (const [k, t] of envioDaChave.current) {
           if (t >= pedidoEm && !(k in mesclados)) recentes.add(k);
         }
         for (const [k, v] of Object.entries(mesclados)) {
@@ -1077,9 +1100,18 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     if (userRef.current?.id !== userId) return;
     // 21/10: conteúdo pago (kit, "Seu 2027") só o SERVIDOR grava — o banco recusa a escrita do cliente (lib/conteudo-pago)
     if (chaveSoDoServidor(key)) return;
-    const { error } = await (supabase as any)
-      .from("user_data")
-      .upsert({ user_id: userId, key, value }, { onConflict: "user_id,key" });
+    // (07/11) a hidratação precisa saber o que ia pro servidor enquanto o retrato era tirado — ver "O ENVIO QUE SAIU DEPOIS DO PEDIDO"
+    envioDaChave.current.set(key, Date.now());
+    enviosNoAr.current.set(key, (enviosNoAr.current.get(key) ?? 0) + 1);
+    let error: unknown;
+    try {
+      ({ error } = await (supabase as any)
+        .from("user_data")
+        .upsert({ user_id: userId, key, value }, { onConflict: "user_id,key" }));
+    } finally {
+      const n = (enviosNoAr.current.get(key) ?? 1) - 1;
+      if (n > 0) enviosNoAr.current.set(key, n); else enviosNoAr.current.delete(key);
+    }
     if (error) {
       console.error(`[user-data] upsert failed for "${key}" (attempt ${attempt + 1}):`, error);
       if (attempt < 2) {

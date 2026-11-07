@@ -313,3 +313,51 @@ describe("irmã: dia anotado com a conta lida noutro dia", () => {
     expect(servidor().get(CHAVE_DIAS_ANOTADOS)).toEqual([...DIAS_DO_CELULAR, "2026-11-06"]);
   });
 });
+
+/* Crítica dos dados (07/11): a releitura que o próprio conserto pede não pode desfazer o gesto que a disparou. O
+   retrato do servidor é tirado no PEDIDO, e o envio do gesto espera 250 ms: se a resposta chega depois do envio, a
+   chave já saiu da fila e a escrita é poucos ms ANTERIOR ao pedido — a memória e o cache voltavam pro valor velho, e
+   a próxima gravação feita em cima do `get` apagava o que ela anotou. */
+describe("a releitura não volta atrás o gesto que estava na fila", () => {
+  it("o 1º gesto depois da meia-noite não volta atrás quando a releitura chega depois do envio", async () => {
+    vi.setSystemTime(em(2026, 11, 5, 22, 0));
+    servidor().set("todo-list", [{ id: "t0" }]);
+    servidor().set(CHAVE_DIAS_ANOTADOS, ["2026-11-05"]);
+    montar();
+    await waitFor(() => expect(api.loaded).toBe(true));
+    vi.setSystemTime(em(2026, 11, 6, 0, 10));
+    leituraTotal = "segurar"; // rede de celular: a resposta demora mais que o debounce de 250 ms
+    // o gesto às 00:10:00.000; o React roda o efeito da releitura uns ms depois (no aparelho, 5–30 ms)
+    api.set("todo-list", [{ id: "t0" }, { id: "t1" }]);
+    vi.setSystemTime(new Date(em(2026, 11, 6, 0, 10).getTime() + 20));
+    await act(async () => {}); // a releitura sai antes do envio do gesto
+    await esperar(400); // o envio do gesto sai (o retrato da releitura foi tirado ANTES dele)
+    expect(servidor().get("todo-list")).toEqual([{ id: "t0" }, { id: "t1" }]);
+    expect(leiturasTotais).toBe(2);
+    await act(async () => { soltarLeitura?.(); });
+    await esperar(400);
+    expect(api.get("todo-list", [])).toEqual([{ id: "t0" }, { id: "t1" }]);
+    // quem lê pelo `get` (Pet, Conquistas, widgets da Home) e grava em cima: o t1 fica
+    act(() => api.set("todo-list", [...api.get<{ id: string }[]>("todo-list", []), { id: "t2" }]));
+    await esperar(400);
+    expect(servidor().get("todo-list")).toEqual([{ id: "t0" }, { id: "t1" }, { id: "t2" }]);
+  });
+
+  it("um gesto qualquer 20 ms antes da releitura da virada (volta pra aba em 01/11) não volta atrás", async () => {
+    vi.setSystemTime(em(2026, 10, 31, 22, 0));
+    servidor().set("todo-list", [{ id: "t0" }]);
+    montar();
+    await waitFor(() => expect(api.loaded).toBe(true));
+    vi.setSystemTime(em(2026, 11, 1, 9, 0));
+    leituraTotal = "segurar";
+    api.set("todo-list", [{ id: "t0" }, { id: "t1" }]); // gesto às 09:00:00.000
+    vi.setSystemTime(new Date(em(2026, 11, 1, 9, 0).getTime() + 20));
+    await voltarPraAba(); // a virada pede a releitura 20 ms depois
+    await esperar(400);
+    await act(async () => { soltarLeitura?.(); });
+    await esperar(400);
+    expect(servidor().get("todo-list")).toEqual([{ id: "t0" }, { id: "t1" }]); // o servidor tem
+    expect(api.get("todo-list", [])).toEqual([{ id: "t0" }, { id: "t1" }]); // e esta aba também
+    expect(JSON.parse(localStorage.getItem("u:u1:todo-list") ?? "null")).toEqual([{ id: "t0" }, { id: "t1" }]);
+  });
+});

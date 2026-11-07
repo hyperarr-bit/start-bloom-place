@@ -568,6 +568,24 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   const releituraPedida = useRef(false);
   /** dias anotados esperando a releitura pra entrar na lista (localDayKey) */
   const diasPendentes = useRef<Set<string>>(new Set());
+  /*
+   * O QUE NÃO SUBIU (07/11, bug "offline-some"). O envio tenta 3 vezes (~1,5 s) e desistia. Sem rede (metrô), o
+   * que ela anotou ficava só na tela e no cache — e a próxima leitura da conta (a rede voltando, o dia novo, a
+   * virada) punha o valor do servidor no lugar, na tela e no cache. A gravação seguinte partia desse valor velho
+   * e a perda ficava de vez; fechar o app antes da rede voltar também perdia (a vassoura da abertura apaga o
+   * cache). Agora:
+   *  - `naoSubiram`: chaves cujo último envio desistiu com o valor ainda na tela. Na próxima leitura que dá
+   *    certo elas viram escrita SEGURADA (base = `doServidor`, o que o servidor tinha da última vez que
+   *    confirmou) e são JUNTADAS com o servidor por mesclar3, como a escrita feita antes de a conta chegar: o
+   *    que ela anotou fica, o que outro aparelho lançou nesse meio-tempo também — e o juntado sobe;
+   *  - o envio que desiste pede `relerConta`: a escada de tentativas, a rede voltando e a volta pro app
+   *    trazem a conta de novo sem ninguém tocar em nada;
+   *  - e guarda uma cópia no aparelho (`guardarSegurada`, sem dia nem aviso — escrita de sistema): o app
+   *    fechado antes de a rede voltar junta na próxima abertura. Sai quando um envio da chave dá certo.
+   * `doServidor` só guarda referências que já estão na memória (o retrato lido e o que subiu).
+   */
+  const naoSubiram = useRef<Set<string>>(new Set());
+  const doServidor = useRef<Map<string, unknown>>(new Map());
 
   // Sync ref + react to user changes (login/logout/switch).
   useEffect(() => {
@@ -602,6 +620,8 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       setUltimaLeitura(undefined);
       releituraPedida.current = false;
       diasPendentes.current.clear();
+      naoSubiram.current.clear(); // (07/11) e o que não subiu era da outra conta — ver "O QUE NÃO SUBIU"
+      doServidor.current.clear();
       setSemConexao(null);
       setContaCompleta(false);
       setLoaded(false);
@@ -781,6 +801,17 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
           map[row.key] = row.value;
         });
 
+        // (07/11) o envio que desistiu vira escrita segurada e é juntado abaixo, como o que foi escrito antes de a
+        // conta chegar — ver "O QUE NÃO SUBIU". A base é o último valor que o servidor confirmou.
+        for (const k of naoSubiram.current) {
+          if (k in seguradas.current) continue;
+          const local = k in pendingWrites.current ? pendingWrites.current[k] : storeRef.current[k];
+          if (local === undefined) continue;
+          seguradas.current[k] = { base: doServidor.current.get(k), valor: local, sistema: true, dia: null };
+        }
+        naoSubiram.current.clear();
+        for (const [k, v] of Object.entries(map)) doServidor.current.set(k, v);
+
         /*
          * 16/10 — O QUE FOI ESCRITO ANTES DE A CONTA CHEGAR É JUNTADO, NÃO SOBRESCRITO.
          * A escrita segurada partiu de uma base que não era o dado da pessoa (o vazio da
@@ -884,10 +915,12 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
               : null,
           };
           setLiberacao((n) => n + 1);
-        } else if (dias.size > 0) {
+        } else if (dias.size > 0 || Object.keys(mesclados).length > 0) {
           // (07/11) 2ª rodada com dia anotado esperando a releitura: a MESMA liberação da 1ª leitura
           // registra o dia em cima da lista que o servidor tem AGORA — ver "SESSÃO VIVA".
-          aLiberar.current = { uid, confirmado: { ...map, ...mesclados }, servidor: map, juntadasNaLeitura: Object.keys(mesclados), dias, perdidas: [], medida: null };
+          // (07/11, bug "offline-some") e com escrita juntada (o envio que desistiu): a liberação avisa as telas
+          // abertas do valor juntado — sem isso a tela seguia com o dela e o próximo toque gravava por cima.
+          aLiberar.current = { uid, confirmado: { ...map, ...mesclados }, servidor: map, juntadasNaLeitura: Object.keys(mesclados), dias, perdidas, medida: null };
           setLiberacao((n) => n + 1);
         }
         diasPendentes.current.clear();
@@ -961,6 +994,8 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     releituraPedida.current = true;
     tentarDeNovo();
   }, [tentarDeNovo]);
+  const relerContaRef = useRef(relerConta);
+  relerContaRef.current = relerConta;
   useEffect(() => {
     const aoVoltarPraTela = () => { if (document.visibilityState !== "hidden") tentarDeNovo(); };
     window.addEventListener("online", tentarDeNovo);
@@ -1116,13 +1151,31 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       console.error(`[user-data] upsert failed for "${key}" (attempt ${attempt + 1}):`, error);
       if (attempt < 2) {
         setTimeout(() => persistKey(userId, key, value, attempt + 1), 500 * Math.pow(2, attempt));
+      } else if (userRef.current?.id === userId) {
+        marcarQueNaoSubiu(userId, key, value);
       }
-    } else if (aConfirmar.current.has(key) && userRef.current?.id === userId) {
+      return;
+    }
+    if (userRef.current?.id !== userId) return;
+    doServidor.current.set(key, value);
+    naoSubiram.current.delete(key);
+    if (aConfirmar.current.has(key)) {
       // 17/10: o servidor tem o juntado (ou algo feito em cima dele): a cópia guardada no aparelho sai
       aConfirmar.current.delete(key);
       esquecerSegurada(userId, key);
     }
   }, []);
+  /** (07/11) O 3º envio da chave desistiu — ver "O QUE NÃO SUBIU". Só se o valor ainda é o da tela: um mais novo
+   *  tem o próprio envio. */
+  const marcarQueNaoSubiu = (userId: string, key: string, value: unknown) => {
+    const naTela = key in pendingWrites.current ? pendingWrites.current[key] : storeRef.current[key];
+    if (naTela !== value && !iguais(naTela, value)) return;
+    naoSubiram.current.add(key);
+    const base = aConfirmar.current.has(key) ? aConfirmar.current.get(key) : doServidor.current.get(key);
+    aConfirmar.current.set(key, base);
+    guardarSegurada(userId, key, { base, valor: value, sistema: true, dia: null });
+    relerContaRef.current();
+  };
 
   const flush = useCallback(() => {
     const userId = userRef.current?.id;
@@ -1322,6 +1375,8 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     pendingWrites.current = {};
     seguradas.current = {}; // o que estava esperando a conta chegar também sai
     diasPendentes.current.clear(); // 07/11: e o dia esperando a releitura
+    naoSubiram.current.clear(); // 07/11: e o envio que desistiu
+    doServidor.current.clear();
     aConfirmar.current.clear();
     apagarSeguradasGuardadas({ daConta: userId });
     purgeUserLocalCache();

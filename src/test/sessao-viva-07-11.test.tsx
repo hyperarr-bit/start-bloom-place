@@ -31,6 +31,8 @@ const upserts: Linha[] = [];
 let leituraTotal: "ok" | "erro" | "segurar" = "ok";
 let soltarLeitura: (() => void) | null = null;
 let leiturasTotais = 0;
+/** (07/11, bug "offline-some") rede caída também pros envios */
+let upsertFalha = false;
 const ERRO_REDE = { message: "TypeError: Load failed", details: "", hint: "", code: "" };
 
 const auth: { user: { id: string } | null; loading: boolean } = { user: { id: "u1" }, loading: false };
@@ -68,6 +70,7 @@ vi.mock("@/integrations/supabase/client", () => {
       from: () => ({
         select: () => consulta(),
         upsert: (linha: Linha) => {
+          if (upsertFalha) return Promise.resolve({ error: ERRO_REDE });
           upserts.push(clonar(linha));
           doServidor(linha.user_id).set(linha.key, clonar(linha.value));
           return Promise.resolve({ error: null });
@@ -153,6 +156,7 @@ beforeEach(() => {
   leituraTotal = "ok";
   soltarLeitura = null;
   leiturasTotais = 0;
+  upsertFalha = false;
   auth.user = { id: "u1" };
   auth.loading = false;
   toastFn.mockClear();
@@ -387,4 +391,92 @@ describe("a leitura no ar desde antes da virada não trava o mês", () => {
     expect(ids(servidor().get("finance-2026-outubro-expenses"))).toEqual(["mercado"]);
     expect(servidor().get(CHAVE_CARIMBO_CONTAS)).toBe("2026-11");
   });
+});
+
+/* Crítica dos dados r2 (07/11, bug "offline-some"): o envio que falha 3 vezes desistia, e a releitura seguinte (a rede
+   voltando, o dia novo) punha o valor do servidor no lugar do que ela anotou — na tela e no cache. A próxima gravação
+   partia desse valor velho e a perda ficava de vez. */
+describe("o que ela anotou sem rede não some quando a rede volta", () => {
+  it("OFFLINE: app aberto desde ontem, metrô sem sinal; a rede volta 20 min depois: o t1 fica na tela e sobe", async () => {
+    vi.setSystemTime(em(2026, 11, 5, 22, 0));
+    servidor().set("todo-list", [{ id: "t0" }]);
+    servidor().set(CHAVE_DIAS_ANOTADOS, ["2026-11-05"]);
+    montar();
+    await waitFor(() => expect(api.loaded).toBe(true));
+
+    vi.setSystemTime(em(2026, 11, 6, 8, 0));
+    leituraTotal = "erro";
+    upsertFalha = true;
+    act(() => api.set("todo-list", [{ id: "t0" }, { id: "t1-sem-rede" }]));
+    await esperar(2500); // o envio tenta 3 vezes (0,5 s + 1 s) e desiste
+    expect(api.get("todo-list", [])).toEqual([{ id: "t0" }, { id: "t1-sem-rede" }]);
+
+    vi.setSystemTime(em(2026, 11, 6, 8, 20));
+    leituraTotal = "ok";
+    upsertFalha = false;
+    await act(async () => { window.dispatchEvent(new Event("online")); });
+    await esperar(600);
+    expect(api.get("todo-list", [])).toEqual([{ id: "t0" }, { id: "t1-sem-rede" }]);
+    expect(servidor().get("todo-list")).toEqual([{ id: "t0" }, { id: "t1-sem-rede" }]);
+    expect(JSON.parse(localStorage.getItem("u:u1:todo-list") ?? "null")).toEqual([{ id: "t0" }, { id: "t1-sem-rede" }]);
+  }, 15000);
+
+  it("mesmo dia: o envio desiste, outro aparelho lança na mesma lista, a rede volta: os dois ficam", async () => {
+    vi.setSystemTime(em(2026, 11, 6, 7, 0));
+    servidor().set("todo-list", [{ id: "t0" }]);
+    servidor().set(CHAVE_DIAS_ANOTADOS, ["2026-11-06"]);
+    montar();
+    await waitFor(() => expect(api.loaded).toBe(true));
+    upsertFalha = true;
+    leituraTotal = "erro";
+    act(() => api.set("todo-list", [{ id: "t0" }, { id: "t1-sem-rede" }]));
+    await esperar(2500);
+    servidor().set("todo-list", [{ id: "t0" }, { id: "do-celular" }]); // o celular, com rede
+    upsertFalha = false;
+    leituraTotal = "ok";
+    await act(async () => { window.dispatchEvent(new Event("online")); });
+    await esperar(600);
+    expect(ids(servidor().get("todo-list"))).toEqual(["t0", "do-celular", "t1-sem-rede"]);
+    expect(ids(api.get("todo-list", []))).toEqual(["t0", "do-celular", "t1-sem-rede"]);
+  }, 15000);
+
+  it("na tela de Finanças: o gasto sem rede e o do celular aparecem os dois, e o próximo gasto não apaga nenhum", async () => {
+    vi.setSystemTime(em(2026, 11, 6, 7, 0));
+    servidor().set("finance-expenses", [PADARIA]);
+    servidor().set(CHAVE_CARIMBO_CONTAS, "2026-11");
+    montar(true);
+    await waitFor(() => expect(api.loaded).toBe(true));
+    await waitFor(() => expect(ids(gastosNaTela)).toEqual(["padaria"]));
+    upsertFalha = true;
+    leituraTotal = "erro";
+    act(() => setGastosNaTela((p) => [...p, { id: "farmacia", date: "2026-11-06", value: 30, description: "Farmácia" }]));
+    await esperar(2500);
+    servidor().set("finance-expenses", [PADARIA, { id: "uber", date: "2026-11-06", value: 18, description: "Uber" }]); // o celular
+    upsertFalha = false;
+    leituraTotal = "ok";
+    await act(async () => { window.dispatchEvent(new Event("online")); });
+    await esperar(600);
+    expect(ids(gastosNaTela)).toEqual(["padaria", "uber", "farmacia"]);
+    act(() => setGastosNaTela((p) => [...p, { id: "cafe", date: "2026-11-06", value: 8, description: "Café" }]));
+    await esperar(400);
+    expect(ids(servidor().get("finance-expenses"))).toEqual(["padaria", "uber", "farmacia", "cafe"]);
+  }, 15000);
+
+  it("o app é fechado antes de a rede voltar: o t1 volta na próxima abertura e sobe", async () => {
+    vi.setSystemTime(em(2026, 11, 6, 7, 0));
+    servidor().set("todo-list", [{ id: "t0" }]);
+    const r = montar();
+    await waitFor(() => expect(api.loaded).toBe(true));
+    upsertFalha = true;
+    leituraTotal = "erro";
+    act(() => api.set("todo-list", [{ id: "t0" }, { id: "t1-sem-rede" }]));
+    await esperar(2500);
+    r.unmount();
+    upsertFalha = false;
+    leituraTotal = "ok";
+    montar();
+    await waitFor(() => expect(api.loaded).toBe(true));
+    await esperar(600);
+    expect(servidor().get("todo-list")).toEqual([{ id: "t0" }, { id: "t1-sem-rede" }]);
+  }, 15000);
 });

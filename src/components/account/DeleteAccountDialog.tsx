@@ -90,7 +90,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: {
             disabled={texto.trim().toUpperCase() !== "EXCLUIR" || excluindo}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            {excluindo ? <Loader2 className="w-4 h-4 animate-spin-rapido" /> : "Excluir conta"}
+            {excluindo ? <Loader2 className="w-4 h-4 animate-spin" /> : "Excluir conta"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

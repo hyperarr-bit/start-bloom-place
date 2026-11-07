@@ -242,7 +242,7 @@ export const ImportExtrato = ({ expenses, incomes, setExpenses, setIncomes }: Pr
     <>
       <input type="file" accept=".ofx,.csv,.txt" ref={fileRef} onChange={handleFile} className="hidden" />
       <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={busy}>
-        {busy ? <Loader2 className="w-4 h-4 mr-1 animate-spin-rapido" /> : <Upload className="w-4 h-4 mr-1" />}
+        {busy ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
         Importar extrato
       </Button>
       {importadosNaTela > 0 && (

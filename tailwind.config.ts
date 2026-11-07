@@ -184,8 +184,6 @@ export default {
         "accordion-up": "accordion-up 0.2s ease-out",
         "fade-in": "fade-in 0.3s ease-out",
         "arrow-nudge": "arrow-nudge 1.4s ease-in-out infinite",
-        // 07/11: o spinner do app girando mais rápido (Emil Kowalski) — só nas telas logadas, fora das superfícies de venda
-        "spin-rapido": "spin 0.7s linear infinite",
       },
 
     },

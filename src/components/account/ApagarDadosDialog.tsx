@@ -76,7 +76,7 @@ export function ApagarDadosDialog({ open, onOpenChange }: {
             disabled={!pronto || apagando}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            {apagando ? <Loader2 className="w-4 h-4 animate-spin-rapido" /> : "Apagar tudo"}
+            {apagando ? <Loader2 className="w-4 h-4 animate-spin" /> : "Apagar tudo"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

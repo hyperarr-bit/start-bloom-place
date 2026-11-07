@@ -253,7 +253,7 @@ const Retrospectiva = () => {
         aria-busy="true"
         aria-label="Carregando a retrospectiva"
       >
-        <Loader2 className="w-7 h-7 animate-spin-rapido" style={{ color: espera.spinner }} />
+        <Loader2 className="w-7 h-7 animate-spin" style={{ color: espera.spinner }} />
       </div>
     );
   }
@@ -275,7 +275,7 @@ const Retrospectiva = () => {
       <div className="px-4 py-5 space-y-3 pb-[max(1.5rem,var(--app-safe-bottom))]">
         {meses.length === 0 && !loaded ? (
           <div className="pt-24 grid place-items-center" aria-busy="true">
-            <Loader2 className="w-6 h-6 animate-spin-rapido text-muted-foreground" />
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
         ) : meses.length === 0 ? (
           <div className="pt-16 text-center px-6">

@@ -517,7 +517,7 @@ function TelaDoCard({ pele, c, card, estilos, onEstilo, temDinheiro, valores, on
           disabled={!!enviando}
           style={{ height: 48, borderRadius: 12, fontSize: 14, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, background: pele.salvar.bg, color: pele.salvar.fg, border: pele.salvar.borda, cursor: "pointer", fontFamily: "inherit" }}
         >
-          {enviando === "salvar" && <Loader2 className="animate-spin-rapido" style={{ width: 16, height: 16 }} />}
+          {enviando === "salvar" && <Loader2 className="animate-spin" style={{ width: 16, height: 16 }} />}
           Salvar
         </button>
         <button
@@ -526,7 +526,7 @@ function TelaDoCard({ pele, c, card, estilos, onEstilo, temDinheiro, valores, on
           disabled={!!enviando}
           style={{ height: 48, borderRadius: 12, fontSize: 14, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, background: pele.postar.bg, color: pele.postar.fg, border: 0, cursor: "pointer", fontFamily: "inherit" }}
         >
-          {enviando === "stories" ? <Loader2 className="animate-spin-rapido" style={{ width: 16, height: 16 }} /> : <Instagram style={{ width: 18, height: 18 }} />}
+          {enviando === "stories" ? <Loader2 className="animate-spin" style={{ width: 16, height: 16 }} /> : <Instagram style={{ width: 18, height: 18 }} />}
           Postar nos Stories
         </button>
       </div>

@@ -66,7 +66,7 @@ export const BuscaAlimento = ({ onAdicionar, onFechar }: { onAdicionar: (e: Entr
 
       {erro && <p className="text-[11px] text-destructive">Não consegui carregar a tabela de alimentos. Tenta de novo com internet.</p>}
       {!tabela && !erro && consulta.length >= 2 && (
-        <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin-rapido" /> carregando a tabela…</p>
+        <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> carregando a tabela…</p>
       )}
 
       {!escolhido && tabela && consulta.length >= 2 && (

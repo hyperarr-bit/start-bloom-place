@@ -125,7 +125,7 @@ const ImportFromUrl = ({ onImport }: { onImport: (data: { title: string; image: 
         <Input value={url} onChange={e => setUrl(e.target.value)} placeholder="Cole o link do produto aqui..."
           className="h-8 text-xs flex-1" onKeyDown={e => e.key === "Enter" && fetchMetadata()} />
         <Button size="sm" className="h-8 px-3 bg-pink-500 hover:bg-pink-600 text-white" onClick={fetchMetadata} disabled={loading || !url.trim()}>
-          {loading ? <Loader2 className="w-3 h-3 animate-spin-rapido" /> : <Link className="w-3 h-3" />}
+          {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link className="w-3 h-3" />}
         </Button>
       </div>
     </div>

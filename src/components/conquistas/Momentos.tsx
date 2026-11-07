@@ -310,7 +310,7 @@ export const MomentoAdesivo = ({ badge, nome, membroDesde, onContinuar, onVerAde
           <div className={`grid gap-2.5 ${semCompartilhar ? "grid-cols-1" : "grid-cols-2"}`}>
             {!semCompartilhar && (
               <button type="button" onClick={compartilhar} disabled={enviando} className={botaoSecundario}>
-                {enviando ? <Loader2 className="w-4 h-4 animate-spin-rapido" /> : <Share2 className="w-4 h-4" />}
+                {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
                 Compartilhar
               </button>
             )}
@@ -362,13 +362,13 @@ export const MomentoMarco = ({ dias, nome, membroDesde, nivel, onContinuar }: {
       rodape={
         <>
           <button type="button" onClick={() => postar(false)} disabled={!!enviando} className={`${botaoPrimario} w-full`}>
-            {enviando === "cor" ? <Loader2 className="w-4 h-4 animate-spin-rapido" /> : <Share2 className="w-4 h-4" />}
+            {enviando === "cor" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
             Postar nos Stories
           </button>
           <div className="grid grid-cols-2 gap-2.5">
             <button type="button" onClick={() => postar(true)} disabled={!!enviando} className={`${botaoSecundario} flex-col gap-0 leading-tight`}>
               <span className="inline-flex items-center gap-1.5">
-                {enviando === "transparente" ? <Loader2 className="w-3.5 h-3.5 animate-spin-rapido" /> : <Sparkles className="w-3.5 h-3.5" />}
+                {enviando === "transparente" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                 Fundo transparente
               </span>
               <span className="text-[10.5px] font-medium text-muted-foreground">pra colar na sua foto</span>

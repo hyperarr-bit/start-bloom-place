@@ -13,7 +13,7 @@ import { reagendarTudo, type Leitor } from "@/lib/reagendar";
 import { trackEvent } from "@/lib/analytics";
 import { avisarApagado } from "@/lib/desfazer";
 import {
-  OPCOES_VEZES, agruparRemedios, doseDaHora, dosesDoGrupoAgora, ehDia, gerarHorarios, inicioAoMudarPrimeira, montarLinhas, rotuloDosHorarios,
+  OPCOES_VEZES, agruparRemedios, doseDaHora, dosesDoGrupoAgora, ehDia, gerarHorarios, inicioAoMudarPrimeira, montarLinhas, moverMarcasDoGrupo, rotuloDosHorarios,
   tratamentoTerminou, ultimasDosesDoGrupo, type DoseMarcavel, type GrupoDeRemedio, type Remedio as Supplement, type VezesAoDia,
 } from "@/lib/remedios";
 
@@ -281,8 +281,30 @@ export const PharmacyChecklist = () => {
     } else {
       lista = supplements.map(s => (s.id === id ? { ...s, time } : s));
     }
+    if (linha && doGrupo.length > 1) moverMarcas(linha.grupo!, lista);
     setSupplements(lista);
     void rearmarLembretes(lista, false);
+  };
+
+  /* 07/11 (4ª rodada da crítica): com as horas novas, a marca de "tomado" vai pro dia
+     em que a dose acontece agora (lib/remedios, moverMarcasDoGrupo) — senão a das 00:00
+     de ontem à noite, gravada hoje, aparecia como a das 23:00 de hoje e o aviso sumia.
+     A anotação de "marcado sem baixa" vai junto, pra desmarcar não criar comprimido. */
+  const moverMarcas = (grupo: string, lista: Supplement[]) => {
+    const doGrupo = (l: Supplement[]) => agruparRemedios(l).find(g => g.chave === `g:${grupo}`);
+    const antes = doGrupo(supplements);
+    const depois = doGrupo(lista);
+    if (!antes || !depois) return;
+    const { log, movidas } = moverMarcasDoGrupo(antes, depois, supplementLog, new Date());
+    if (!movidas.length && Object.keys(log).every(d => log[d] === supplementLog[d])) return;
+    setSupplementLog(log);
+    let sb: SemBaixa = semBaixa?.dia && Array.isArray(semBaixa.ids) ? semBaixa : { dia: "", ids: [] };
+    for (const m of movidas) {
+      if (sb.dia !== m.de || !sb.ids.includes(m.id)) continue;
+      sb = { dia: sb.dia, ids: sb.ids.filter(x => x !== m.id) };
+      if (m.para && (sb.dia === m.para || !sb.ids.length)) sb = { dia: m.para, ids: [...(sb.dia === m.para ? sb.ids : []), m.id] };
+    }
+    if (sb !== semBaixa) setSemBaixa(sb);
   };
 
   /** "Até quando" do grupo inteiro; vazio = sem fim. */

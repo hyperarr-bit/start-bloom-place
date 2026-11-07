@@ -296,6 +296,57 @@ export function dosesDoGrupoAgora(g: GrupoDeRemedio, agora: Date = new Date()): 
   return out;
 }
 
+/** Uma marca de "tomado" que saiu de um dia do registro: foi pra `para`, ou sumiu (`null`). */
+export interface MarcaMovida { id: string; de: string; para: string | null }
+
+/**
+ * MUDOU A HORA, A MARCA VAI JUNTO (07/11, 4ª rodada da crítica). O registro de
+ * "tomado" é "id da linha no dia do calendário"; mudar a 1ª dose refaz as horas
+ * do grupo, e a mesma linha passa a acontecer noutro dia — ou uma marca velha passa
+ * a cair nela. Em 8 em 8 desde 08:00, com 00:00 (de ontem à noite, gravada hoje) e
+ * 08:00 tomadas, mudar pra 07:00 às 15:00 fazia a das 23:00 de hoje aparecer
+ * tomada e o aviso dela sumia: a pessoa pulava uma dose de antibiótico.
+ *
+ * Compara as doses do dia do tratamento de agora com as horas velhas (`antes`) e
+ * com as novas (`depois`):
+ *  - a dose marcada leva a marca pro dia em que ela acontece agora — só se a dose
+ *    nova já chegou (ou chega em até 1 h, o "tomar um pouco antes"). Atrasar 08:00
+ *    (tomada) pra 20:00 às 15:00 não deixa a das 20:00 marcada: ela ainda vai ser tomada;
+ *  - uma marca de OUTRA ocorrência que agora cairia na dose (a das 00:00 de ontem
+ *    à noite virando a das 23:00 de hoje) sai.
+ * O estoque não muda (o comprimido foi tomado), e o formato da chave é o mesmo.
+ */
+export function moverMarcasDoGrupo(
+  antes: GrupoDeRemedio,
+  depois: GrupoDeRemedio,
+  log: Record<string, string[]>,
+  agora: Date = new Date(),
+): { log: Record<string, string[]>; movidas: MarcaMovida[] } {
+  const velhas = new Map(dosesDoGrupoAgora(antes, agora).map((d) => [d.id, d]));
+  const novas = new Map(dosesDoGrupoAgora(depois, agora).map((d) => [d.id, d]));
+  const limite = agora.getTime() + ANTECEDENCIA_MIN * 60_000;
+  const out: Record<string, string[]> = { ...log };
+  const tem = (dia: string, id: string) => Array.isArray(out[dia]) && out[dia].includes(id);
+  const movidas: MarcaMovida[] = [];
+  for (const s of depois.itens) {
+    const velha = velhas.get(s.id);
+    const nova = novas.get(s.id);
+    const marcada = !!velha && Array.isArray(log[velha.dia]) && log[velha.dia].includes(s.id);
+    const vai = marcada && !!nova && nova.quando <= limite;
+    if (marcada && velha && (!vai || velha.dia !== nova?.dia)) {
+      out[velha.dia] = out[velha.dia].filter((x) => x !== s.id);
+      movidas.push({ id: s.id, de: velha.dia, para: vai && nova ? nova.dia : null });
+    }
+    if (!nova) continue;
+    if (vai && !tem(nova.dia, s.id)) out[nova.dia] = [...(out[nova.dia] ?? []), s.id];
+    else if (!vai && tem(nova.dia, s.id)) {
+      out[nova.dia] = out[nova.dia].filter((x) => x !== s.id); // a marca de outra dose que cairia nesta
+      movidas.push({ id: s.id, de: nova.dia, para: null });
+    }
+  }
+  return { log: out, movidas };
+}
+
 /** Tratamento encerrado: a última ocorrência de cada linha (o dia em que ela foi registrada, se foi). */
 export function ultimasDosesDoGrupo(g: GrupoDeRemedio): DoseMarcavel[] {
   const primeira = primeiraDe(g);

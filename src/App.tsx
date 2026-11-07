@@ -32,7 +32,8 @@ import { FunilAposentado } from "@/components/site/FunilAposentado";
 import { TrilhoLateral } from "@/components/TrilhoLateral";
 import { BarraDeAbas } from "@/components/nav/BarraDeAbas";
 import { guardarForcaNavDaUrl, navAbasLigada } from "@/lib/nav-abas";
-import { guardarForcaHomeNova, homeNovaLigadaSincrona } from "@/lib/home-nova";
+import { EVENTO_ESCOLHA_HOME, EVENTO_ORIGEM_HOME_NOVA, guardarForcaHomeNova, homeNovaLigadaSincrona } from "@/lib/home-nova";
+import { homeJaPronta, quandoHomePronta, quandoHomeProntaEOciosa } from "@/lib/home-pronta";
 import { guardarForcaVidro } from "@/lib/vidro-calai";
 import { guardarForcaMenuNovoDaUrl } from "@/lib/menu-novo";
 import { testeLiberado } from "@/lib/teste-gratis";
@@ -334,7 +335,16 @@ const ROTAS_DOS_MOMENTOS = ["/home", "/conquistas", "/financas", "/rotina", "/tr
 const MomentosNoApp = () => {
   const { user } = useAuth();
   const { pathname } = useLocation();
-  if (!user || !ROTAS_DOS_MOMENTOS.some((r) => pathname === r || pathname.startsWith(`${r}/`))) return null;
+  // 07/11 (desempenho, lente "abertura"): os Momentos montavam junto com a sessão, antes da Home existir — e o cálculo
+  // de todas as figurinhas sobre a conta inteira (≈0,5 s na conta cheia com a CPU 4× mais lenta) entrava no MESMO
+  // commit da 1ª pintura da Home. Agora montam depois que a Home pintou (lib/home-pronta; teto de 6 s sem Home, ex.:
+  // deep link direto num módulo). A festa de um adesivo novo aparece do mesmo jeito, logo depois de a Home assentar.
+  const [depoisDaHome, setDepoisDaHome] = useState(homeJaPronta);
+  useEffect(() => {
+    if (depoisDaHome) return;
+    return quandoHomePronta(() => setDepoisDaHome(true), 6000);
+  }, [depoisDaHome]);
+  if (!depoisDaHome || !user || !ROTAS_DOS_MOMENTOS.some((r) => pathname === r || pathname.startsWith(`${r}/`))) return null;
   // conta com menos de 24 h: 1 festa por vez (o 1º dia já tem tutorial e a Missão do teste)
   const contaNova = !!user.created_at && Date.now() - Date.parse(user.created_at) < 24 * 3600e3;
   return <Suspense fallback={null}><MomentosConquistas contaNova={contaNova} /></Suspense>;
@@ -603,16 +613,43 @@ const usarPreCarregamentoDosModulos = (ligado: boolean) => {
       () => import("./pages/Dieta"),
       () => import("./pages/Biblioteca"),
     ];
-    const agendar: (cb: () => void) => number =
-      typeof window.requestIdleCallback === "function"
-        ? (cb) => window.requestIdleCallback(cb, { timeout: 4000 })
-        : (cb) => window.setTimeout(cb, 1500);
-    const id = agendar(() => { chunks.forEach((carregar) => { carregar().catch(() => {}); }); });
-    return () => {
-      if (typeof window.cancelIdleCallback === "function") window.cancelIdleCallback(id);
-      else window.clearTimeout(id);
-    };
+    // 07/11 (desempenho, lente "abertura"): o requestIdleCallback disparava aos ~0,5 s da abertura, ANTES de a Home
+    // chegar — na 1ª visita pela rede de celular os 792 KB dos 5 módulos disputavam a banda com o pedaço da Home (55 KB
+    // que levavam 1 s pra chegar), e no app da loja o compilar deles caía no meio da montagem da Home. Agora a pré-carga
+    // espera a Home PINTAR (lib/home-pronta) e só então o tempo ocioso; sem Home em 8 s (deep link direto num módulo,
+    // notificação), vai mesmo assim.
+    return quandoHomeProntaEOciosa(() => { chunks.forEach((carregar) => { carregar().catch(() => {}); }); }, { maxMs: 8000, ociosoMs: 4000 });
   }, [ligado]);
+};
+
+/**
+ * 07/11 (desempenho, lente "abertura"): pede o pedaço da HOME NOVA (HomeE 61 KB + use-novato 30 KB) assim que a sessão
+ * existe, em paralelo com o pedaço da Home. Antes ele só era pedido DEPOIS de a Home chegar e rodar — fila de três
+ * downloads (entrada → Home → HomeE) que, na conta nova na 1ª visita pela rede de celular, custava 2 s a mais. Quem vai
+ * ver a nova: a decisão síncrona de sempre (lib/home-nova: espelho do aparelho, escolha da conta, força de QA) ou conta
+ * criada há menos de 48 h (a régua da origem "nova" — errar o palpite custa só um pedaço a mais no cache). Reage também
+ * ao aviso da origem/escolha, que chega quando a conta carrega. Só PEDE o pedaço: a decisão de mostrar segue em pages/Home.
+ */
+let homeEPedida = false;
+const pedirHomeE = () => {
+  if (homeEPedida) return;
+  homeEPedida = true;
+  import("@/components/home-nova/e/HomeE").catch(() => { homeEPedida = false; });
+};
+const PreparaHomeNova = () => {
+  const { user } = useAuth();
+  const uid = user?.id;
+  const criadoEm = user?.created_at;
+  useEffect(() => {
+    if (!uid) return;
+    const recente = !!criadoEm && Math.abs(Date.now() - Date.parse(criadoEm)) < 48 * 3600e3;
+    const conferir = () => { if (recente || homeNovaLigadaSincrona(uid)) pedirHomeE(); };
+    conferir();
+    window.addEventListener(EVENTO_ORIGEM_HOME_NOVA, conferir);
+    window.addEventListener(EVENTO_ESCOLHA_HOME, conferir);
+    return () => { window.removeEventListener(EVENTO_ORIGEM_HOME_NOVA, conferir); window.removeEventListener(EVENTO_ESCOLHA_HOME, conferir); };
+  }, [uid, criadoEm]);
+  return null;
 };
 
 /**
@@ -973,6 +1010,8 @@ const App = () => {
                 <DonoDaMissaoNaSessao />
                 {/* 1.0.19 (26/10): a origem da conta (nova × antiga) pro modo "novas" da Home nova — depois do dono da missão, antes das rotas */}
                 <OrigemDaContaNaSessao />
+                {/* 07/11 (desempenho): pede o pedaço da Home nova junto com o da Home, pra quem vai vê-la (ver PreparaHomeNova) */}
+                <PreparaHomeNova />
                 <Routes>
                   <Route path="/acesso" element={<Acesso />} />
                   {/* URL limpa do funil vitrine (criativo "app pra vida inteira").

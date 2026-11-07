@@ -339,12 +339,18 @@ const MomentosNoApp = () => {
   // de todas as figurinhas sobre a conta inteira (≈0,5 s na conta cheia com a CPU 4× mais lenta) entrava no MESMO
   // commit da 1ª pintura da Home. Agora montam depois que a Home pintou (lib/home-pronta; teto de 6 s sem Home, ex.:
   // deep link direto num módulo). A festa de um adesivo novo aparece do mesmo jeito, logo depois de a Home assentar.
-  const [depoisDaHome, setDepoisDaHome] = useState(homeJaPronta);
+  // Crítica r1 (07/11): SÓ quando a abertura é na Home. Quem abre direto num módulo (link, notificação, atalho) monta na
+  // hora, como antes — esperar ali fazia a linha de base do Momentos.tsx (que marca como vista, em silêncio, toda
+  // figurinha já conquistada ao montar) engolir a festa de quem ganhou uma figurinha nos primeiros segundos (medido:
+  // /saude + "+1 copo" aos 3 s, a festa sumia e `conquistas-vistas` vinha com sequencia-1 e agua-1).
+  const naHome = pathname === "/home" || pathname === "/";
+  const [depoisDaHome, setDepoisDaHome] = useState(() => homeJaPronta() || !naHome);
   useEffect(() => {
     if (depoisDaHome) return;
+    if (!naHome) { setDepoisDaHome(true); return; }
     return quandoHomePronta(() => setDepoisDaHome(true), 6000);
-  }, [depoisDaHome]);
-  if (!depoisDaHome || !user || !ROTAS_DOS_MOMENTOS.some((r) => pathname === r || pathname.startsWith(`${r}/`))) return null;
+  }, [depoisDaHome, naHome]);
+  if ((!depoisDaHome && naHome) || !user || !ROTAS_DOS_MOMENTOS.some((r) => pathname === r || pathname.startsWith(`${r}/`))) return null;
   // conta com menos de 24 h: 1 festa por vez (o 1º dia já tem tutorial e a Missão do teste)
   const contaNova = !!user.created_at && Date.now() - Date.parse(user.created_at) < 24 * 3600e3;
   return <Suspense fallback={null}><MomentosConquistas contaNova={contaNova} /></Suspense>;
@@ -603,6 +609,21 @@ const queryClient = new QueryClient();
  * tempo por pessoa). requestIdleCallback garante que isso nunca dispute banda
  * com o que está na tela.
  */
+/**
+ * Crítica r1 (07/11): as pré-cargas da lente "abertura" (os 5 módulos e o pedaço da Home nova) só rodam numa tela DO
+ * APP e com acesso. Nunca em paywall, funil, checkout, login (/planos, /assinar, /missao, /comece, /oferta, /inicio,
+ * /hoje, /auth…: nenhuma delas está na lista abaixo) nem por baixo do bloqueio de quem está sem acesso (o paywall do app
+ * e o "Assine no app" da web cobrem a /home). Lista de PERMITIDAS de propósito: rota nova nasce sem pré-carga.
+ * Assinatura ainda não conferida (subLoaded false) conta como "com acesso" — o bloqueio, se vier, cancela o que ainda
+ * não disparou.
+ */
+const ROTAS_DO_APP = [...ROTAS_DOS_MOMENTOS, "/modulos", "/voce", "/plano-30", "/retrospectiva", "/ajuda", "/conta"];
+const naRotaDoApp = (pathname: string) => ROTAS_DO_APP.some((r) => pathname === r || pathname.startsWith(`${r}/`));
+const useSemBloqueioDeVenda = (): boolean => {
+  const { subLoaded, isSubscribed, noTrial, trialExpired } = useAuth();
+  return !(subLoaded && !isSubscribed && (noTrial || trialExpired));
+};
+
 const usarPreCarregamentoDosModulos = (ligado: boolean) => {
   useEffect(() => {
     if (!ligado) return;
@@ -638,17 +659,22 @@ const pedirHomeE = () => {
 };
 const PreparaHomeNova = () => {
   const { user } = useAuth();
+  const { pathname } = useLocation();
+  const semBloqueio = useSemBloqueioDeVenda();
   const uid = user?.id;
   const criadoEm = user?.created_at;
+  // crítica r1 (07/11): só na Home ("/" ou "/home") e sem o bloqueio de venda por cima — antes rodava em toda rota,
+  // e a conta nova (< 48 h) baixava e EXECUTAVA a Home nova no meio do paywall/funil/checkout
+  const naHome = (pathname === "/" || pathname === "/home") && semBloqueio;
   useEffect(() => {
-    if (!uid) return;
+    if (!uid || !naHome) return;
     const recente = !!criadoEm && Math.abs(Date.now() - Date.parse(criadoEm)) < 48 * 3600e3;
     const conferir = () => { if (recente || homeNovaLigadaSincrona(uid)) pedirHomeE(); };
     conferir();
     window.addEventListener(EVENTO_ORIGEM_HOME_NOVA, conferir);
     window.addEventListener(EVENTO_ESCOLHA_HOME, conferir);
     return () => { window.removeEventListener(EVENTO_ORIGEM_HOME_NOVA, conferir); window.removeEventListener(EVENTO_ESCOLHA_HOME, conferir); };
-  }, [uid, criadoEm]);
+  }, [uid, criadoEm, naHome]);
   return null;
 };
 
@@ -732,7 +758,9 @@ const AnimatedRoutes = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  usarPreCarregamentoDosModulos(!!user);
+  // crítica r1 (07/11): só numa tela do app e sem o bloqueio de venda por cima (ver ROTAS_DO_APP)
+  const semBloqueio = useSemBloqueioDeVenda();
+  usarPreCarregamentoDosModulos(!!user && semBloqueio && naRotaDoApp(location.pathname));
   // Lembretes de conta a vencer: reagendam sozinhos quando o módulo de
   // Finanças muda. Aqui dentro porque precisa do Router (o toque no aviso
   // navega) e do UserDataProvider.

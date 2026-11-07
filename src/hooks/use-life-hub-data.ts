@@ -14,6 +14,7 @@ import {
 import { moduloOcultaPendenciasLigado } from "@/lib/tour-home";
 import { CHAVE_ORIGEM_CONTA, contaEhNova, criadoEmDaContaHomeNova, homeNovaLigada, lerMarcadorOrigem } from "@/lib/home-nova";
 import { modulosDaMissaoQueContam, pendenciasDeNovato, tiposAdotados, tiposDoNovato } from "@/lib/pendencias-novato";
+import { remedioValeNoDia } from "@/lib/remedios";
 import { EVENTO_MISSAO_DOSES, lerMissao } from "@/lib/missao-doses";
 import { TIPOS_DO_SCORE_SITE_NOVO, scoreDaContaNovaNoSite, webHomeNovaLigada } from "@/lib/web-home-nova";
 
@@ -293,7 +294,9 @@ export function useLifeHubData(): LifeHubData {
     const sleepLog = get<any>("core-saude-sleep", {});
     const sleepLogModulo = get<any>("sleep-log", {});
     const sleepHours = sleepLog[tStr] || sleepLogModulo[tStr] || null;
-    const supplements = get<any[]>("core-saude-supplements", []);
+    // 07/11: remédio de 8 em 8 são 3 linhas (3 doses do dia); tratamento com "até quando" já passado não conta
+    const supplementsBrutos = get<any[]>("core-saude-supplements", []);
+    const supplements = (Array.isArray(supplementsBrutos) ? supplementsBrutos : []).filter((s) => remedioValeNoDia(s ?? {}, tStr));
     const supplementLog = get<any>("core-saude-supplement-log", {});
     const todaySups = supplementLog[tStr] || [];
     const supplementsTaken = Array.isArray(todaySups) ? todaySups.length : 0;

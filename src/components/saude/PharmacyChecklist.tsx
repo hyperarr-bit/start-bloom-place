@@ -1,28 +1,26 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { localDayKey } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Trash2, Check, Package, Pencil } from "lucide-react";
+import { Plus, Trash2, Check, Package, Pencil, AlarmClock } from "lucide-react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { CHAVE_DEPENDENTES } from "@/lib/saude-dependentes";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
 import { isNativeShell } from "@/lib/native-shell";
-import { pedirPermissao, temPermissao } from "@/lib/notificacoes";
+import { abrirAjusteDeAlarmeExato, estadoAlarmeExato, pedirPermissao, temPermissao, type EstadoAlarmeExato } from "@/lib/notificacoes";
 import { CHAVE_PREFS, lerPrefs } from "@/lib/prefs-notificacoes";
 import { reagendarTudo, type Leitor } from "@/lib/reagendar";
 import { trackEvent } from "@/lib/analytics";
 import { avisarApagado } from "@/lib/desfazer";
+import {
+  OPCOES_VEZES, agruparRemedios, ehDia, gerarHorarios, montarLinhas, rotuloDosHorarios,
+  type GrupoDeRemedio, type Remedio as Supplement, type VezesAoDia,
+} from "@/lib/remedios";
 
-interface Supplement {
-  id: string;
-  name: string;
-  time: string;
-  stock: number;
-  dosesPerDay: number;
-  /** De quem é o remédio (22/09, mesmo chamado das consultas: "qual medicação
-   *  seria meu ou do dependente"). Ausente = seu. Vai no texto do lembrete. */
-  quem?: string;
-}
+/* O tipo da linha (`Remedio`, lib/remedios) é o de sempre — id, name, time,
+ * stock, dosesPerDay, quem — mais `grupo` e `ate` (07/11), os dois opcionais:
+ * um remédio de 8 em 8 h são 3 linhas normais ligadas pelo `grupo`, e o app
+ * antigo continua lendo e marcando cada linha. */
 
 const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
 
@@ -36,6 +34,8 @@ const lerEstoque = (v: string): number | null => {
   const n = parseInt(v, 10);
   return Number.isFinite(n) && n >= 0 ? Math.min(9999, n) : null;
 };
+/** "2026-11-12" → "12/11" */
+const diaCurto = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
 
 const EstoqueEditavel = ({ nome, valor, baixo, onSalvar }: { nome: string; valor: number; baixo: boolean; onSalvar: (n: number) => void }) => {
   const [editando, setEditando] = useState(false);
@@ -97,6 +97,8 @@ const nameColors = [
   "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
 ];
 
+const campoPequeno = "h-8 rounded-lg border border-input bg-background px-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary";
+
 export const PharmacyChecklist = () => {
   const today = todayStr();
   const { get } = useUserData();
@@ -106,26 +108,58 @@ export const PharmacyChecklist = () => {
   const [newTime, setNewTime] = useState("08:00");
   const [newQuem, setNewQuem] = useState("");
   const [newStock, setNewStock] = useState(String(ESTOQUE_PADRAO));
+  /* 07/11 (pedido de cliente): "Quantas vezes" + primeira dose + "até quando".
+     Os horários são gerados da primeira dose (08:00 de 8 em 8 → 08:00, 16:00,
+     00:00) e ficam editáveis antes de salvar; mexer na primeira dose ou no
+     "quantas vezes" gera de novo. */
+  const [newVezes, setNewVezes] = useState<VezesAoDia>(1);
+  const [horariosEditados, setHorariosEditados] = useState<string[] | null>(null);
+  const [newAte, setNewAte] = useState("");
+  /** o grupo com os horários/data abertos pra editar na tabela */
+  const [editando, setEditando] = useState<string | null>(null);
+  // 07/11: alarme exato do Android (ver `estadoAlarmeExato`) — "indisponivel" no iPhone e na web
+  const [alarmeExato, setAlarmeExato] = useState<EstadoAlarmeExato>("indisponivel");
   const [dependentes, setDependentes] = usePersistedState<string[]>(CHAVE_DEPENDENTES, []);
   const [semBaixa, setSemBaixa] = usePersistedState<SemBaixa>(CHAVE_SEM_BAIXA, { dia: "", ids: [] });
   const takenToday = supplementLog[today] || [];
   const semBaixaHoje = semBaixa?.dia === today && Array.isArray(semBaixa.ids) ? semBaixa.ids : [];
+  const grupos = agruparRemedios(supplements);
+  const horariosGerados = gerarHorarios(newTime, newVezes);
+  const horarios = horariosEditados ?? (horariosGerados.length ? horariosGerados : [newTime]);
+
+  /** as linhas que andam juntas com esta: o grupo inteiro, ou só ela */
+  const mesmoGrupo = (linha: Supplement) => (s: Supplement) => (linha.grupo ? s.grupo === linha.grupo : s.id === linha.id);
 
   const toggleTaken = (id: string) => {
+    const linha = supplements.find(s => s.id === id);
+    if (!linha) return;
+    const juntas = mesmoGrupo(linha);
     const alreadyTaken = takenToday.includes(id);
     const newTaken = alreadyTaken ? takenToday.filter(x => x !== id) : [...takenToday, id];
     setSupplementLog(prev => ({ ...prev, [today]: newTaken }));
-    const semEstoque = (supplements.find(s => s.id === id)?.stock ?? 0) <= 0;
+    // o estoque de um remédio de 8 em 8 é um só: as linhas do grupo sobem e descem juntas (vale a menor)
+    const semEstoque = Math.min(...supplements.filter(juntas).map(s => s.stock ?? 0)) <= 0;
     if (!alreadyTaken && semEstoque) {
       setSemBaixa({ dia: today, ids: [...semBaixaHoje.filter(x => x !== id), id] });
     } else if (!alreadyTaken) {
-      setSupplements(prev => prev.map(s => s.id === id ? { ...s, stock: Math.max(0, s.stock - 1) } : s));
+      setSupplements(prev => prev.map(s => juntas(s) ? { ...s, stock: Math.max(0, s.stock - 1) } : s));
     } else if (semBaixaHoje.includes(id)) {
       setSemBaixa({ dia: today, ids: semBaixaHoje.filter(x => x !== id) }); // não tirou, não devolve
     } else {
-      setSupplements(prev => prev.map(s => s.id === id ? { ...s, stock: s.stock + 1 } : s));
+      setSupplements(prev => prev.map(s => juntas(s) ? { ...s, stock: s.stock + 1 } : s));
     }
   };
+
+  /* 07/11: no Android 14 o alarme EXATO nasce negado pro app e o lembrete das
+     8h pode chegar às 10h. A central já avisa; aqui o aviso aparece onde a
+     pessoa acabou de pedir o lembrete — e, ao liberar, os avisos são REFEITOS:
+     o que já estava armado continua inexato até ser agendado de novo. */
+  const conferirAlarmeExato = async () => {
+    try { setAlarmeExato(await estadoAlarmeExato()); } catch { /* sem plugin */ }
+  };
+  useEffect(() => {
+    if (isNativeShell() && supplements.length > 0) void conferirAlarmeExato();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Notificação na hora do remédio (07/09, avaliação da Play: "adicionem
      notificação pra tomar remédio"). A permissão do Android é pedida AQUI, no
@@ -147,19 +181,39 @@ export const PharmacyChecklist = () => {
     } else if (!(await temPermissao())) return;
     const leitor: Leitor = (k, fb) => (k === "core-saude-supplements" ? (lista as unknown as typeof fb) : get(k, fb));
     try { await reagendarTudo(leitor, lerPrefs(get<unknown>(CHAVE_PREFS, undefined))); } catch { /* sem plugin */ }
+    await conferirAlarmeExato();
+  };
+
+  const liberarAlarmeExato = async () => {
+    const estado = await abrirAjusteDeAlarmeExato();
+    setAlarmeExato(estado);
+    if (estado === "granted") void rearmarLembretes(listaAtual.current, false);
   };
 
   const addSupplement = () => {
     if (!newName.trim()) return;
     const quem = newQuem.trim();
     const stock = lerEstoque(newStock) ?? ESTOQUE_PADRAO;
-    const lista = [...supplements, { id: Date.now().toString(), name: newName.trim(), time: newTime, stock, dosesPerDay: 1, ...(quem ? { quem } : {}) }];
+    const ate = ehDia(newAte) && newAte >= today ? newAte : undefined; // data no passado = sem fim
+    const novas = montarLinhas({ name: newName.trim(), quem, stock }, horarios, ate);
+    const lista = [...supplements, ...novas];
     setSupplements(lista);
     if (quem && !dependentes.includes(quem)) setDependentes([...dependentes, quem]);
     setNewName("");
     setNewQuem("");
     setNewStock(String(ESTOQUE_PADRAO));
+    setNewVezes(1);
+    setHorariosEditados(null);
+    setNewAte("");
+    if (novas.length > 1 || ate) trackEvent("remedio_vezes_cadastro", { vezes: novas.length, ate: !!ate });
     void rearmarLembretes(lista, true);
+  };
+
+  const escolherVezes = (vezes: VezesAoDia) => { setNewVezes(vezes); setHorariosEditados(null); };
+  const mudarPrimeiraDose = (time: string) => { setNewTime(time); setHorariosEditados(null); };
+  const editarHorarioNovo = (i: number, time: string) => {
+    if (!time) return;
+    setHorariosEditados(horarios.map((h, j) => (j === i ? time : h)));
   };
 
   // lista mais recente pro "Desfazer" do toast, que roda segundos depois
@@ -168,19 +222,21 @@ export const PharmacyChecklist = () => {
 
   /* APAGAR COM DESFAZER (26/09, varredura): um toque na lixeira sumia com o
      remédio, o horário e o estoque, sem volta. Agora apaga já e o toast
-     oferece desfazer — volta no mesmo lugar e o lembrete é reagendado. */
-  const removeSupplement = (id: string) => {
-    const pos = supplements.findIndex(s => s.id === id);
+     oferece desfazer — volta no mesmo lugar e o lembrete é reagendado.
+     07/11: um remédio de 8 em 8 sai (e volta) inteiro, com as 3 linhas. */
+  const removeGrupo = (g: GrupoDeRemedio) => {
+    const ids = new Set(g.itens.map(s => s.id));
+    const pos = supplements.findIndex(s => ids.has(s.id));
     if (pos < 0) return;
-    const removido = supplements[pos];
-    const lista = supplements.filter(s => s.id !== id);
+    const removidos = supplements.filter(s => ids.has(s.id));
+    const lista = supplements.filter(s => !ids.has(s.id));
     setSupplements(lista);
     void rearmarLembretes(lista, false); // cancela o aviso do que foi apagado
-    avisarApagado(`${removido.name} apagado`, () => {
+    avisarApagado(`${g.nome} apagado`, () => {
       const atual = listaAtual.current;
-      if (atual.some(s => s.id === removido.id)) return;
+      if (atual.some(s => ids.has(s.id))) return;
       const volta = [...atual];
-      volta.splice(Math.min(pos, volta.length), 0, removido);
+      volta.splice(Math.min(pos, volta.length), 0, ...removidos);
       setSupplements(volta);
       void rearmarLembretes(volta, false);
     });
@@ -195,8 +251,21 @@ export const PharmacyChecklist = () => {
     void rearmarLembretes(lista, false);
   };
 
-  const changeStock = (id: string, stock: number) => {
-    setSupplements(prev => prev.map(s => s.id === id ? { ...s, stock } : s));
+  /** "Até quando" do grupo inteiro; vazio = sem fim. */
+  const changeAte = (g: GrupoDeRemedio, ate: string) => {
+    const ids = new Set(g.itens.map(s => s.id));
+    const lista = supplements.map(s => {
+      if (!ids.has(s.id)) return s;
+      const { ate: _antiga, ...resto } = s;
+      return ehDia(ate) ? { ...resto, ate } : resto;
+    });
+    setSupplements(lista);
+    void rearmarLembretes(lista, false);
+  };
+
+  const changeStock = (g: GrupoDeRemedio, stock: number) => {
+    const ids = new Set(g.itens.map(s => s.id));
+    setSupplements(prev => prev.map(s => ids.has(s.id) ? { ...s, stock } : s));
   };
 
   return (
@@ -211,7 +280,7 @@ export const PharmacyChecklist = () => {
           da largura e a lixeira ficava escondida numa rolagem lateral. Colunas
           mais justas cabem no celular; se um nome comprido ainda estourar, a
           coluna da lixeira gruda na direita com o fundo do card. */}
-      {supplements.length > 0 ? (
+      {grupos.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -225,55 +294,133 @@ export const PharmacyChecklist = () => {
             </thead>
             <tbody>
               <AnimatePresence>
-                {supplements.map((s, idx) => {
-                  const taken = takenToday.includes(s.id);
-                  const lowStock = s.stock <= 5;
+                {grupos.map((g, idx) => {
+                  const simples = g.itens.length === 1 && !g.ate;
+                  const linha = g.itens[0];
+                  const encerrado = !!g.ate && g.ate < today;
+                  const tomadas = g.itens.filter(s => takenToday.includes(s.id));
+                  const taken = tomadas.length === g.itens.length;
+                  const proxima = g.itens.find(s => !takenToday.includes(s.id));
+                  const lowStock = g.estoque <= 5;
                   const color = nameColors[idx % nameColors.length];
+                  const rotulo = g.itens.length > 1 ? rotuloDosHorarios(g.itens.map(s => s.time)) : "";
+                  const detalhe = [rotulo, g.ate ? (encerrado ? `terminou ${diaCurto(g.ate)}` : `até ${diaCurto(g.ate)}`) : ""].filter(Boolean).join(" · ");
+                  const abertoPraEditar = editando === g.chave;
                   return (
                     <motion.tr
-                      key={s.id}
+                      key={g.chave}
                       layout
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className={`border-t border-border/50 transition-colors ${taken ? "bg-[hsl(var(--saude-green)/0.05)]" : "hover:bg-muted/30"}`}
+                      className={`border-t border-border/50 transition-colors ${taken ? "bg-[hsl(var(--saude-green)/0.05)]" : "hover:bg-muted/30"} ${encerrado ? "opacity-60" : ""}`}
+                      data-testid={`remedio-linha-${g.chave}`}
                     >
-                      <td className="pl-3 pr-1 py-3">
+                      <td className="pl-3 pr-1 py-3 align-top">
+                        {/* remédio de várias doses: a caixa marca a PRÓXIMA dose (e desmarca a última, quando todas foram) */}
                         <button
-                          onClick={() => toggleTaken(s.id)}
-                          aria-label={taken ? `Desmarcar ${s.name}` : `Marcar ${s.name} como tomado`}
-                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${taken ? "bg-[hsl(var(--saude-green))] border-[hsl(var(--saude-green))]" : "border-muted-foreground/30 hover:border-[hsl(var(--saude-green)/0.5)]"}`}
+                          onClick={() => {
+                            if (g.itens.length === 1) toggleTaken(linha.id);
+                            else if (taken) toggleTaken(tomadas[tomadas.length - 1].id);
+                            else if (proxima) toggleTaken(proxima.id);
+                          }}
+                          disabled={encerrado}
+                          aria-label={g.itens.length === 1
+                            ? (taken ? `Desmarcar ${g.nome}` : `Marcar ${g.nome} como tomado`)
+                            : (taken ? `Desmarcar ${g.nome}` : `Marcar próxima dose de ${g.nome}`)}
+                          className={`w-5 h-5 mt-0.5 rounded border-2 flex items-center justify-center transition-all disabled:cursor-not-allowed ${taken ? "bg-[hsl(var(--saude-green))] border-[hsl(var(--saude-green))]" : "border-muted-foreground/30 hover:border-[hsl(var(--saude-green)/0.5)]"}`}
                         >
                           {taken && <Check className="w-3 h-3 text-white" />}
                         </button>
-                      </td>
-                      <td className="px-2 py-3">
-                        <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-semibold ${taken ? "line-through opacity-60" : ""} ${color}`}>
-                          {s.name}
-                        </span>
-                        {s.quem?.trim() && (
-                          <span className="ml-1 inline-block px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300" data-testid="remedio-de">
-                            👤 {s.quem.trim()}
-                          </span>
+                        {g.itens.length > 1 && tomadas.length > 0 && !taken && (
+                          <span className="block mt-1 text-[9px] font-semibold text-muted-foreground tabular-nums text-center" data-testid="remedio-doses-feitas">{tomadas.length}/{g.itens.length}</span>
                         )}
                       </td>
-                      <td className="px-1 py-3 text-xs text-muted-foreground">
-                        <input
-                          type="time"
-                          value={s.time}
-                          aria-label={`Horário de ${s.name}`}
-                          onChange={e => changeTime(s.id, e.target.value)}
-                          className="bg-transparent text-xs text-muted-foreground min-w-[5.5rem] w-auto focus:outline-none focus:text-foreground"
-                        />
+                      <td className="px-2 py-3 align-top">
+                        <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-semibold ${taken ? "line-through opacity-60" : ""} ${color}`}>
+                          {g.nome}
+                        </span>
+                        {g.quem?.trim() && (
+                          <span className="ml-1 inline-block px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300" data-testid="remedio-de">
+                            👤 {g.quem.trim()}
+                          </span>
+                        )}
+                        {detalhe && (
+                          <span className="block mt-1 text-[10px] text-muted-foreground" data-testid="remedio-detalhe">{detalhe}</span>
+                        )}
                       </td>
-                      <td className="pl-2 pr-1 py-3">
-                        <EstoqueEditavel nome={s.name} valor={s.stock} baixo={lowStock} onSalvar={n => changeStock(s.id, n)} />
+                      <td className="px-1 py-3 text-xs text-muted-foreground align-top">
+                        {simples ? (
+                          <input
+                            type="time"
+                            value={linha.time}
+                            aria-label={`Horário de ${g.nome}`}
+                            onChange={e => changeTime(linha.id, e.target.value)}
+                            className="bg-transparent text-xs text-muted-foreground min-w-[5.5rem] w-auto focus:outline-none focus:text-foreground"
+                          />
+                        ) : abertoPraEditar ? (
+                          /* horários e data de fim do grupo, pra corrigir sem recadastrar */
+                          <div className="flex flex-col gap-1" data-testid="remedio-editar">
+                            {g.itens.map((s, i) => (
+                              <input
+                                key={s.id}
+                                type="time"
+                                value={s.time}
+                                aria-label={g.itens.length > 1 ? `Horário de ${g.nome} (${i + 1}ª dose)` : `Horário de ${g.nome}`}
+                                onChange={e => changeTime(s.id, e.target.value)}
+                                className={`${campoPequeno} w-[6.25rem]`}
+                              />
+                            ))}
+                            <input
+                              type="date"
+                              value={g.ate ?? ""}
+                              aria-label={`Até quando de ${g.nome}`}
+                              onChange={e => changeAte(g, e.target.value)}
+                              className={`${campoPequeno} w-[8.5rem]`}
+                            />
+                            <button type="button" onClick={() => setEditando(null)} className="h-7 rounded-lg bg-primary/10 text-primary text-[11px] font-semibold">Pronto</button>
+                          </div>
+                        ) : (
+                          /* uma pílula por dose: toque marca aquela dose */
+                          /* justas de propósito (10 px, 2 por linha): com a lixeira grudada à direita, a
+                             coluna do estoque tem que continuar inteira a 390 px */
+                          <div className="flex flex-wrap items-center gap-1 max-w-[6.25rem]">
+                            {g.itens.map(s => {
+                              const t = takenToday.includes(s.id);
+                              return (
+                                <button
+                                  key={s.id}
+                                  type="button"
+                                  disabled={encerrado}
+                                  onClick={() => toggleTaken(s.id)}
+                                  aria-pressed={t}
+                                  aria-label={t ? `Desmarcar dose das ${s.time} de ${g.nome}` : `Marcar dose das ${s.time} de ${g.nome}`}
+                                  data-testid={`dose-${s.id}`}
+                                  className={`h-6 px-1 rounded-md border text-[10px] font-semibold tabular-nums transition-colors disabled:cursor-not-allowed ${t ? "bg-[hsl(var(--saude-green))] border-[hsl(var(--saude-green))] text-white" : "border-border text-muted-foreground hover:border-[hsl(var(--saude-green)/0.5)]"}`}
+                                >
+                                  {t && <Check className="inline w-2.5 h-2.5 mr-0.5 -mt-px" aria-hidden />}{s.time}
+                                </button>
+                              );
+                            })}
+                            <button
+                              type="button"
+                              onClick={() => setEditando(g.chave)}
+                              aria-label={`Editar horários de ${g.nome}`}
+                              className="h-6 w-5 rounded-md flex items-center justify-center text-muted-foreground/60 hover:text-foreground"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                      <td className="pl-2 pr-1 py-3 align-top">
+                        <EstoqueEditavel nome={g.nome} valor={g.estoque} baixo={lowStock} onSalvar={n => changeStock(g, n)} />
                       </td>
                       {/* célula grudada precisa de fundo opaco: o do card, com o
                           verde de "tomado" por cima (a zebra do escuro, mais
                           específica, troca este fundo igual troca o das vizinhas) */}
-                      <td className={`sticky right-0 pl-0 pr-1.5 py-1 ${taken ? "[background:linear-gradient(hsl(var(--saude-green)/0.05),hsl(var(--saude-green)/0.05)),hsl(var(--card))]" : "bg-card"}`}>
-                        <button onClick={() => removeSupplement(s.id)} aria-label={`Apagar ${s.name}`}
+                      <td className={`sticky right-0 pl-0 pr-1.5 py-1 align-top ${taken ? "[background:linear-gradient(hsl(var(--saude-green)/0.05),hsl(var(--saude-green)/0.05)),hsl(var(--card))]" : "bg-card"}`}>
+                        <button onClick={() => removeGrupo(g)} aria-label={`Apagar ${g.nome}`}
                           className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-destructive transition-colors">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -283,7 +430,7 @@ export const PharmacyChecklist = () => {
                 })}
               </AnimatePresence>
               {/* Empty rows for visual padding */}
-              {supplements.length < 4 && Array.from({ length: 4 - supplements.length }).map((_, i) => (
+              {grupos.length < 4 && Array.from({ length: 4 - grupos.length }).map((_, i) => (
                 <tr key={`empty-${i}`} className="border-t border-border/50">
                   <td className="px-3 py-3" />
                   <td className="px-4 py-3" />
@@ -308,17 +455,19 @@ export const PharmacyChecklist = () => {
             value={newName}
             onChange={e => setNewName(e.target.value)}
             onKeyDown={e => e.key === "Enter" && addSupplement()}
-            placeholder="Novo suplemento..."
+            placeholder="Novo remédio ou suplemento..."
             className="text-xs h-9 flex-1"
           />
           <Input
             type="time"
             value={newTime}
-            onChange={e => setNewTime(e.target.value)}
+            onChange={e => mudarPrimeiraDose(e.target.value)}
+            aria-label={newVezes > 1 ? "Primeira dose" : "Horário"}
             className="text-xs h-9 w-24"
           />
           <button
             onClick={addSupplement}
+            aria-label="Adicionar remédio"
             className="h-9 w-9 rounded-xl bg-primary/10 hover:bg-primary/15 text-primary flex items-center justify-center flex-shrink-0 transition-colors"
           >
             <Plus className="w-4 h-4" />
@@ -352,6 +501,68 @@ export const PharmacyChecklist = () => {
             />
           </label>
         </div>
+        {/* 07/11: quantas vezes ao dia — o horário de cima é a PRIMEIRA dose; as outras nascem daqui */}
+        <div className="flex items-center gap-2" role="group" aria-label="Quantas vezes por dia">
+          <span className="text-[11px] text-muted-foreground shrink-0">Quantas vezes</span>
+          <div className="flex-1 grid grid-cols-4 gap-1">
+            {OPCOES_VEZES.map(o => (
+              <button
+                type="button"
+                key={o.vezes}
+                aria-pressed={newVezes === o.vezes}
+                onClick={() => escolherVezes(o.vezes)}
+                className={`h-8 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-colors ${newVezes === o.vezes ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" : "bg-muted/60 text-muted-foreground hover:bg-muted"}`}
+              >
+                {o.rotulo}
+              </button>
+            ))}
+          </div>
+        </div>
+        {newVezes > 1 && (
+          <div className="flex flex-wrap items-center gap-1.5" data-testid="remedio-horarios">
+            <span className="text-[11px] text-muted-foreground">Horários</span>
+            {horarios.map((h, i) => (
+              <input
+                key={i}
+                type="time"
+                value={h}
+                aria-label={`${i + 1}ª dose`}
+                onChange={e => editarHorarioNovo(i, e.target.value)}
+                className={`${campoPequeno} min-w-[4.6rem]`}
+              />
+            ))}
+            <span className="text-[11px] text-muted-foreground">· {rotuloDosHorarios(horarios)}</span>
+          </div>
+        )}
+        <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+          <span className="shrink-0">Até quando <span className="opacity-70">(opcional)</span></span>
+          <input
+            type="date"
+            value={newAte}
+            min={today}
+            onChange={e => setNewAte(e.target.value)}
+            aria-label="Até quando (opcional)"
+            data-testid="remedio-ate"
+            className={`${campoPequeno} flex-1 min-w-0`}
+          />
+        </label>
+        {alarmeExato === "denied" && (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3" data-testid="remedio-alarme-exato">
+            <p className="flex items-center gap-1.5 text-xs font-semibold">
+              <AlarmClock className="w-3.5 h-3.5 shrink-0" /> O aviso do remédio pode atrasar
+            </p>
+            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+              O Android só entrega na hora certa com <strong className="text-foreground">Alarmes e lembretes</strong> liberado pro CORE.
+            </p>
+            <button
+              type="button"
+              onClick={() => void liberarAlarmeExato()}
+              className="mt-2 h-8 w-full rounded-lg bg-primary text-primary-foreground text-xs font-semibold active:scale-[.99] transition-transform"
+            >
+              Liberar na hora certa
+            </button>
+          </div>
+        )}
         <datalist id="saude-dependentes-remedio">
           {dependentes.map(d => <option key={d} value={d} />)}
         </datalist>

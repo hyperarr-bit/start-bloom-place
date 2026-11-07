@@ -29,6 +29,7 @@ import { mesCorrenteId } from "@/lib/virada-contas";
 import { chaveArquivada } from "@/lib/virada-do-mes";
 import type { PrefsNotificacoes } from "@/lib/prefs-notificacoes";
 import { nomeComQuem } from "@/lib/saude-dependentes";
+import { ehDia as ehDiaDeRemedio, remedioValeNoDia } from "@/lib/remedios";
 import { localDayKey } from "@/lib/utils";
 import { algumLigado, lerDadosDoSkincare, type DadosDoSkincare } from "@/lib/beleza-lembrete";
 // 17/10 (1.0.16, "Rotina pronta em 3 toques"): o lembrete de manhã da Rotina — prefs na chave própria
@@ -157,17 +158,20 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
   const diarioDieta = get<Record<string, { meals?: Record<string, unknown> }>>("dieta-diary-v2", {}) ?? {};
 
   // Remédios (07/09): a lista do PharmacyChecklist + o log de "tomado hoje"
-  type Suplemento = { id?: string; name?: string; time?: string; quem?: string };
+  type Suplemento = { id?: string; name?: string; time?: string; quem?: string; ate?: string };
   const suplementos = get<Suplemento[]>("core-saude-supplements", []) ?? [];
   const tomadosHoje = (get<Record<string, string[]>>("core-saude-supplement-log", {}) ?? {})[hoje] ?? [];
   const remedios: RemedioAgendavel[] = (Array.isArray(suplementos) ? suplementos : [])
     .filter((s) => s?.name && s?.time)
+    // (07/11) tratamento com data de fim já passada: não entra no plano (lib/remedios)
+    .filter((s) => remedioValeNoDia(s, hoje))
     .map((s) => ({
       id: String(s.id ?? ""),
       // remédio do dependente leva o nome dele no aviso (22/09): "Hora do Ômega 3 (Mãe)"
       nome: nomeComQuem(String(s.name), s.quem),
       hora: String(s.time),
       tomadoHoje: Array.isArray(tomadosHoje) && tomadosHoje.includes(String(s.id)),
+      ...(ehDiaDeRemedio(s.ate) ? { ate: s.ate } : {}),
     }));
 
   /* FATURA DO CARTÃO no aviso de conta a vencer (22/09): a mesma conta da
@@ -332,7 +336,15 @@ export function assinaturaDos(dados: DadosDosLembretes, prefs: PrefsNotificacoes
   ]);
 }
 
-/** Aplica as preferências no agendador do sistema. Devolve quantos de cada tipo. */
+/**
+ * Aplica as preferências no agendador do sistema. Devolve quantos de cada tipo.
+ *
+ * A ORDEM É A PRIORIDADE (07/11): no iPhone só cabem 64 avisos pendentes
+ * (TETO_IPHONE, lib/notificacoes) e cada série recebe o que sobrou. Primeiro o
+ * que tem data marcada e é pouco (conta, consulta, compromisso, tarefa,
+ * aniversário, casa); depois as séries diárias, com o remédio na frente — é o
+ * único que pode ter 3–4 avisos por dia.
+ */
 export async function reagendarTudo(
   get: Leitor,
   prefs: PrefsNotificacoes,
@@ -341,6 +353,16 @@ export async function reagendarTudo(
   return {
     contas: await agendarContas(d.dueDays, { hora: prefs.horaContas, ligado: prefs.contas }, d.dueDaysProximoMes),
     retrospectiva: await agendarRetrospectiva(prefs.retrospectiva),
+    consulta: await agendarConsultas(d.consultas ?? [], { ligado: d.consultasLigado !== false }),
+    compromisso: await agendarCompromissos(d.compromissos, { ligado: prefs.compromissos }),
+    tarefa: await agendarTarefas(d.tarefas, { ligado: prefs.tarefas }),
+    aniversario: await agendarAniversarios(d.pessoas, { hora: prefs.horaAniversario, ligado: prefs.aniversario }),
+    casa: await agendarManutencao(d.manutencao, { hora: prefs.horaCasa, ligado: prefs.casa }),
+    saude: await agendarRemedios(d.remedios, { ligado: d.remediosLigado }),
+    limite: await agendarLimiteDoDia(
+      { temFinancas: d.temFinancas, abriuFinancasHoje: d.abriuFinancasHoje },
+      { hora: prefs.horaLimite, ligado: prefs.limite },
+    ),
     rotina: await agendarRotina(
       { marcados: d.marcados, sequencia: d.sequencia },
       { hora: prefs.horaRotina, ligado: prefs.rotina },
@@ -351,16 +373,6 @@ export async function reagendarTudo(
     ),
     leitura: await agendarLeitura(d.leitura, { hora: prefs.horaLeitura, ligado: prefs.leitura }),
     dieta: await agendarDieta({ jaPreencheuHoje: d.jaPreencheuHoje }, { hora: prefs.horaDieta, ligado: prefs.dieta }),
-    saude: await agendarRemedios(d.remedios, { ligado: d.remediosLigado }),
-    consulta: await agendarConsultas(d.consultas ?? [], { ligado: d.consultasLigado !== false }),
-    aniversario: await agendarAniversarios(d.pessoas, { hora: prefs.horaAniversario, ligado: prefs.aniversario }),
-    casa: await agendarManutencao(d.manutencao, { hora: prefs.horaCasa, ligado: prefs.casa }),
-    compromisso: await agendarCompromissos(d.compromissos, { ligado: prefs.compromissos }),
-    tarefa: await agendarTarefas(d.tarefas, { ligado: prefs.tarefas }),
-    limite: await agendarLimiteDoDia(
-      { temFinancas: d.temFinancas, abriuFinancasHoje: d.abriuFinancasHoje },
-      { hora: prefs.horaLimite, ligado: prefs.limite },
-    ),
     sequencia: await agendarLembreteSequencia(d.seqAnotada, { hora: prefs.horaSequencia, ligado: prefs.sequencia }),
     pet: d.pet ? await agendarPet(d.pet) : 0,
     relacoes: d.relacoes ? await agendarRelacoes(d.relacoes) : 0,

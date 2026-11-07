@@ -1,4 +1,4 @@
-import { isAndroid, isNativeShell } from "./native-shell";
+import { isAndroid, isIOS, isNativeShell } from "./native-shell";
 import { modo1012 } from "@/lib/modo-1012";
 import { trackEvent } from "./analytics";
 import { planejarCompromissos, type Compromisso } from "./compromissos";
@@ -276,15 +276,43 @@ async function limparLegado(base: number, rota: string, emoji: string): Promise<
   } catch { /* nada pendente */ }
 }
 
-async function limparFaixa(base: number): Promise<void> {
+/** Devolve quantos avisos de OUTRAS faixas continuam pendentes (07/11: é a conta do teto do iPhone). */
+async function limparFaixa(base: number): Promise<number> {
   const p = await plugin();
-  if (!p) return;
+  if (!p) return 0;
   const { LN } = p;
   try {
-    const pendentes = await LN.getPending();
-    const nossas = (pendentes.notifications ?? []).filter((n) => n.id >= base && n.id < base + 10000);
+    const pendentes = (await LN.getPending()).notifications ?? [];
+    const nossas = pendentes.filter((n) => n.id >= base && n.id < base + 10000);
     if (nossas.length) await LN.cancel({ notifications: nossas.map((n) => ({ id: n.id })) });
-  } catch { /* nada pendente */ }
+    return pendentes.length - nossas.length;
+  } catch { return 0; /* nada pendente */ }
+}
+
+/**
+ * TETO DO IPHONE (07/11, remédio de 8 em 8 h). O iOS guarda no máximo 64 avisos
+ * pendentes por app — o que passa disso é descartado em silêncio, e o app nunca
+ * fica sabendo. Até aqui ninguém somava: um remédio de 6 em 6 h (44 avisos em 11
+ * dias) mais três séries diárias (33) já estourava, e o que caía podia ser a conta
+ * a vencer ou a consulta. Agora cada série recebe só as vagas que sobraram, com
+ * os avisos MAIS PRÓXIMOS primeiro — os de longe voltam no próximo reagendamento,
+ * que acontece a cada abertura do app. A ordem do reagendarTudo (lib/reagendar) é
+ * a prioridade: contas e avisos com data antes, as séries diárias depois, e o
+ * remédio primeiro entre elas. No Android o limite é 500 por app: nada a cortar.
+ * No iPhone de verdade o corte é raro; é a rede de segurança.
+ */
+export const TETO_IPHONE = 64;
+const noIphone = (): boolean => { try { return isIOS(); } catch { return false; } };
+const cortesRegistrados = new Set<string>();
+function cortarNoTeto(tipo: string, avisos: Planejado[], outrosPendentes: number): Planejado[] {
+  if (!noIphone()) return avisos;
+  const vagas = Math.max(0, TETO_IPHONE - outrosPendentes);
+  if (avisos.length <= vagas) return avisos;
+  if (!cortesRegistrados.has(tipo)) {
+    cortesRegistrados.add(tipo);
+    try { trackEvent("notif_teto_iphone", { tipo, cortados: avisos.length - vagas, pendentes: outrosPendentes }); } catch { /* telemetria nunca derruba o agendamento */ }
+  }
+  return [...avisos].sort((a, b) => a.quando.getTime() - b.quando.getTime()).slice(0, vagas);
 }
 
 /**
@@ -490,12 +518,15 @@ async function agendarSerie(tipo: Exclude<TipoDeLembrete, "outro">, rota: string
   const { LN } = p;
   if (!(await temPermissao())) return 0;
   await garantirCanal();
-  await limparFaixa(BASES[tipo]);
+  const outros = await limparFaixa(BASES[tipo]);
   if (!avisos.length) return 0;
+  // (07/11) no iPhone só cabe o que sobrou das 64 vagas — ver cortarNoTeto
+  const lista = cortarNoTeto(tipo, avisos, outros);
+  if (!lista.length) return 0;
 
   try {
     await LN.schedule({
-      notifications: avisos.map((a) => ({
+      notifications: lista.map((a) => ({
         id: a.id ?? BASES[tipo] + Number(`${doisDigitos(a.quando.getMonth() + 1)}${doisDigitos(a.quando.getDate())}`),
         title: a.title,
         body: a.body,
@@ -510,7 +541,7 @@ async function agendarSerie(tipo: Exclude<TipoDeLembrete, "outro">, rota: string
         extra: { rota: a.rota ?? rota },
       })),
     });
-    return avisos.length;
+    return lista.length;
   } catch (e) {
     registrarFalhaDeAgendamento(tipo, e);
     return 0;
@@ -730,7 +761,20 @@ export async function agendarLembreteSequencia(
 
 /* ------------------------------------------------------ remédios (07/09) */
 
-export type RemedioAgendavel = { id: string; nome: string; hora: string; tomadoHoje: boolean };
+export type RemedioAgendavel = {
+  id: string; nome: string; hora: string; tomadoHoje: boolean;
+  /** 07/11: último dia do tratamento ("AAAA-MM-DD") — depois dele o aviso não existe (lib/remedios) */
+  ate?: string;
+};
+
+/**
+ * 07/11: quantos avisos de remédio cabem de uma vez, os mais próximos primeiro.
+ * 8 em 8 h por 10 dias = 30; 6 em 6 h cobre 7 dias e meio — e o reagendamento a
+ * cada abertura do app repõe. É o que deixa o teto de 64 do iPhone (TETO_IPHONE)
+ * com espaço pros outros lembretes.
+ */
+export const TETO_AVISOS_REMEDIOS = 30;
+const diaValido = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 /** "Ômega 3", "Ômega 3 e Vitamina D", "A, B e C", "A, B, C e mais 2". */
 const listarNomes = (nomes: string[]) => {
@@ -773,8 +817,12 @@ export function planejarRemedios(lista: RemedioAgendavel[], agora = new Date()):
     for (let i = 0; i <= HORIZONTE_DIAS; i++) {
       const quando = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + i, h, m, 0, 0);
       if (quando.getTime() <= agora.getTime()) continue;
-      const ehHoje = localDia(quando) === hoje;
-      const nomes = (porHorario.get(hora) ?? []).filter((r) => !(ehHoje && r.tomadoHoje)).map((r) => r.nome);
+      const dia = localDia(quando);
+      const ehHoje = dia === hoje;
+      // (07/11) `ate` é o último dia do tratamento: depois dele o remédio sai do aviso
+      const nomes = (porHorario.get(hora) ?? [])
+        .filter((r) => !(ehHoje && r.tomadoHoje) && !(diaValido(r.ate) && dia > r.ate))
+        .map((r) => r.nome);
       if (!nomes.length) continue;
       avisos.push({
         id: BASES.saude + idx * 100 + i,
@@ -786,7 +834,8 @@ export function planejarRemedios(lista: RemedioAgendavel[], agora = new Date()):
       });
     }
   });
-  return avisos;
+  // (07/11) os mais próximos primeiro, até o teto: 6 em 6 h × 11 dias seriam 44 avisos só de remédio
+  return avisos.sort((a, b) => a.quando.getTime() - b.quando.getTime()).slice(0, TETO_AVISOS_REMEDIOS);
 }
 
 export async function agendarRemedios(lista: RemedioAgendavel[], opcoes: { ligado: boolean }): Promise<number> {

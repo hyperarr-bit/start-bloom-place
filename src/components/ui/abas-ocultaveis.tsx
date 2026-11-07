@@ -16,7 +16,7 @@
  * aparece na fileira (tracejada) enquanto estiver aberta — o "+" da Home, o "Ver tutorial" e os lembretes não quebram.
  * Quando a pessoa oculta a aba em que está, cai na primeira visível (nunca uma tela vazia).
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ChevronDown, ChevronUp, SlidersHorizontal, X } from "lucide-react";
@@ -255,15 +255,40 @@ export function AbasOcultaveis<T extends AbaOcultavel>({ abas, ativa, onTrocar, 
 
 /* ------------------------------------------------------------------ a folha "Organizar abas" */
 
+/** Os textos da folha. A fileira de abas usa os padrões; as Ações rápidas da Home de hoje (07/11) falam em "ação". */
+export interface TextosDaFolhaOrganizar {
+  titulo: string;
+  descricao: string;
+  /** O rodapé com mais de uma visível; null = sem rodapé (a fileira de ações não tem o "segurar"). */
+  dica: string | null;
+  /** O rodapé quando só resta uma visível. */
+  minimo: string;
+  mostrarTodas: string;
+}
+const TEXTOS_ABAS: TextosDaFolhaOrganizar = {
+  titulo: "Organizar abas",
+  descricao: "Deixe à vista só o que você usa. Ocultar não apaga nada — a aba volta quando você liga.",
+  dica: "Dica: segurar uma aba na fileira também oculta.",
+  minimo: "Pelo menos uma aba fica sempre à vista.",
+  mostrarTodas: "Mostrar todas as abas",
+};
+
 interface FolhaProps<T extends AbaOcultavel> {
   abas: AbasOcultas<T>;
   aberta: boolean;
   onFechar: () => void;
   ocultarAba: (id: string) => boolean;
+  /** Outra lista que não é de abas (as Ações rápidas da Home): troca os textos. */
+  textos?: Partial<TextosDaFolhaOrganizar>;
+  /** O quadrado da linha quando não é o emoji da aba (as Ações rápidas desenham o ícone da ação na cor dela). */
+  icone?: (item: T) => ReactNode;
 }
 
-function FolhaOrganizarAbas<T extends AbaOcultavel>({ abas, aberta, onFechar, ocultarAba }: FolhaProps<T>) {
+/** A folha, sozinha (07/11): as Ações rápidas da Home de hoje montam a MESMA folha sem a fileira de abas. */
+export function FolhaOrganizarAbas<T extends AbaOcultavel>({ abas, aberta, onFechar, ocultarAba, textos, icone }: FolhaProps<T>) {
   const { todas, visiveis, ocultas, mostrar, mostrarTodas, mover, modulo } = abas;
+  const t = { ...TEXTOS_ABAS, ...textos };
+  const rodape = visiveis.length === 1 ? t.minimo : t.dica;
   const semMovimento = !!useReducedMotion();
   /* 01/11 (chamado 00f3064c): o X das "Dicas para começar" grava `core-tip-seen-<módulo>` e não tinha volta. Linha
      discreta no fim da folha: só quando o módulo tem dicas e a marca existe; apaga a marca e fecha a folha.
@@ -298,7 +323,7 @@ function FolhaOrganizarAbas<T extends AbaOcultavel>({ abas, aberta, onFechar, oc
           <FaixaDoRelogioSobFolha />
           <motion.button type="button" aria-label="Fechar" tabIndex={-1} onClick={onFechar} className={CLASSE_FUNDO_FOLHA} {...propsDoFundo(semMovimento)} />
           <motion.div
-            role="dialog" aria-modal="true" aria-label="Organizar abas" data-testid="abas-organizar-folha"
+            role="dialog" aria-modal="true" aria-label={t.titulo} data-testid="abas-organizar-folha"
             className="fixed inset-x-0 bottom-0 z-[71] max-w-lg mx-auto rounded-t-[28px] bg-card text-foreground border-t border-border max-h-[85dvh] overflow-y-auto overscroll-contain px-4 pt-2.5 pb-[calc(var(--app-safe-bottom,0px)+16px)]"
             style={{ y: arrasto.y }} {...arrasto.folha}
             {...propsDaFolha(semMovimento)}
@@ -306,10 +331,8 @@ function FolhaOrganizarAbas<T extends AbaOcultavel>({ abas, aberta, onFechar, oc
             <Alca arrasto={arrasto} className="mb-0.5" />
             <div className="flex items-start justify-between gap-3 px-1 mb-1">
               <div className="min-w-0">
-                <h3 className="text-[19px] font-bold tracking-tight">Organizar abas</h3>
-                <p className="text-[12.5px] text-muted-foreground leading-snug">
-                  Deixe à vista só o que você usa. Ocultar não apaga nada — a aba volta quando você liga.
-                </p>
+                <h3 className="text-[19px] font-bold tracking-tight">{t.titulo}</h3>
+                <p className="text-[12.5px] text-muted-foreground leading-snug">{t.descricao}</p>
               </div>
               <button type="button" onClick={onFechar} data-testid="abas-organizar-pronto" className="h-9 px-3.5 rounded-full text-[13px] font-bold shrink-0 bg-foreground text-background">Pronto</button>
             </div>
@@ -319,7 +342,7 @@ function FolhaOrganizarAbas<T extends AbaOcultavel>({ abas, aberta, onFechar, oc
                 const ultima = visivel && visiveis.length === 1;
                 return (
                   <li key={tab.id} data-testid="abas-organizar-linha" data-aba={tab.id} data-oculta={visivel ? "0" : "1"} className="flex items-center gap-2.5 min-h-[56px] px-1 border-t border-border/60 first:border-t-0">
-                    <span className={`w-10 h-10 rounded-xl grid place-items-center shrink-0 bg-muted text-[18px] ${visivel ? "" : "opacity-45"}`} aria-hidden>{tab.icon ?? "•"}</span>
+                    <span className={`w-10 h-10 rounded-xl grid place-items-center shrink-0 text-[18px] ${icone ? "" : "bg-muted"} ${visivel ? "" : "opacity-45"}`} aria-hidden>{icone ? icone(tab) : (tab.icon ?? "•")}</span>
                     <span className={`flex-1 min-w-0 text-[13px] font-bold uppercase tracking-wide truncate ${visivel ? "" : "text-muted-foreground"}`}>{tab.label}</span>
                     {mover && (
                       <span className="flex flex-col">
@@ -338,12 +361,10 @@ function FolhaOrganizarAbas<T extends AbaOcultavel>({ abas, aberta, onFechar, oc
                 );
               })}
             </ul>
-            <p className="px-1 pt-2 text-[11.5px] text-muted-foreground">
-              {visiveis.length === 1 ? "Pelo menos uma aba fica sempre à vista." : "Dica: segurar uma aba na fileira também oculta."}
-            </p>
+            {rodape && <p className="px-1 pt-2 text-[11.5px] text-muted-foreground">{rodape}</p>}
             {ocultas.length > 0 && (
               <button type="button" onClick={() => mostrarTodas()} data-testid="abas-organizar-mostrar-todas" className="w-full h-12 mt-3 rounded-2xl text-[14px] font-bold border border-border">
-                Mostrar todas as abas
+                {t.mostrarTodas}
               </button>
             )}
             {podeVerDicas && (

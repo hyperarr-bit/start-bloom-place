@@ -56,7 +56,7 @@ export function CompartilharFigurinha({ badge, onFechar }: {badge:Badge;onFechar
       </div>
       <footer>
         <p role="status">{erro ? "A imagem não ficou pronta. Tente novamente." : pronto ? recorte ? "PNG sem fundo, para usar na sua foto." : "Pronta para compartilhar · 1080 × 1920" : "Preparando sua imagem…"}</p>
-        {erro ? <button type="button" className="share-fig-principal" onClick={()=>setTentativa(t=>t+1)}>Tentar novamente</button> : <button type="button" className="share-fig-principal" data-testid="postar-imagem" disabled={!pronto||enviando} onClick={compartilhar}>{enviando||!pronto?<Loader2 size={18} className="animate-spin"/>:<Share2 size={18}/>}Compartilhar {recorte?"figurinha":"story"}</button>}
+        {erro ? <button type="button" className="share-fig-principal" onClick={()=>setTentativa(t=>t+1)}>Tentar novamente</button> : <button type="button" className="share-fig-principal" data-testid="postar-imagem" disabled={!pronto||enviando} onClick={compartilhar}>{enviando||!pronto?<Loader2 size={18} className="animate-spin-rapido"/>:<Share2 size={18}/>}Compartilhar {recorte?"figurinha":"story"}</button>}
         {!isNativeShell() && urlPronta && !enviando && <a className="share-fig-salvar" href={urlPronta} download={`core-${badge.id}-${recorte?"recorte":"story"}.png`} onClick={event=>{
           // O rastreador de UTMs pode alterar links locais; blob não aceita esses parâmetros.
           event.currentTarget.href=urlPronta;

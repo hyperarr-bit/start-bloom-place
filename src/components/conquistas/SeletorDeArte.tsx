@@ -252,25 +252,25 @@ export const Previa = ({ titulo, elemento, transparente, video, acoes, onPostar,
           <>
             <button type="button" onClick={postarVideo} disabled={!!enviando} className="h-11 rounded-xl bg-foreground text-background font-bold text-[13.5px] inline-flex items-center justify-center gap-2 disabled:opacity-70" data-testid="postar-video">
               {enviando === "video" ? (
-                <><Loader2 className="w-[18px] h-[18px] animate-spin" /> Preparando o vídeo… {Math.round(progresso * 100)}%</>
+                <><Loader2 className="w-[18px] h-[18px] animate-spin-rapido" /> Preparando o vídeo… {Math.round(progresso * 100)}%</>
               ) : (
                 <><Clapperboard className="w-[18px] h-[18px]" aria-hidden /> Postar vídeo nos Stories</>
               )}
             </button>
             <button type="button" onClick={() => postar(false)} disabled={!!enviando} className="h-11 rounded-xl border border-border bg-card text-[13.5px] font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60" data-testid="postar-imagem">
-              {enviando === "cor" ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagemIcone className="w-4 h-4" aria-hidden />}
+              {enviando === "cor" ? <Loader2 className="w-4 h-4 animate-spin-rapido" /> : <ImagemIcone className="w-4 h-4" aria-hidden />}
               Postar imagem
             </button>
           </>
         ) : (
           <button type="button" onClick={() => postar(false)} disabled={!!enviando} className="h-11 rounded-xl bg-foreground text-background font-bold text-[13.5px] inline-flex items-center justify-center gap-2 disabled:opacity-70" data-testid="postar-imagem">
-            {enviando === "cor" ? <Loader2 className="w-[18px] h-[18px] animate-spin" /> : <Instagram className="w-[18px] h-[18px]" aria-hidden />}
+            {enviando === "cor" ? <Loader2 className="w-[18px] h-[18px] animate-spin-rapido" /> : <Instagram className="w-[18px] h-[18px]" aria-hidden />}
             Postar nos Stories
           </button>
         )}
         {transparente && (
           <button type="button" onClick={() => postar(true)} disabled={!!enviando} className="h-11 rounded-xl border border-border bg-card text-[13.5px] font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60">
-            {enviando === "transparente" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            {enviando === "transparente" ? <Loader2 className="w-4 h-4 animate-spin-rapido" /> : <Sparkles className="w-4 h-4" />}
             Fundo transparente <span className="font-medium text-muted-foreground">· pra colar na sua foto</span>
           </button>
         )}

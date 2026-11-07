@@ -60,7 +60,7 @@ const Miniatura = ({ caminho, onRemover, rotulo }: { caminho: string; onRemover?
           <img src={url} alt={rotulo} className="w-full h-full object-cover" />
         </a>
       ) : (
-        <div className="w-full h-full flex items-center justify-center"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>
+        <div className="w-full h-full flex items-center justify-center"><Loader2 className="w-4 h-4 animate-spin-rapido text-muted-foreground" /></div>
       )}
       {onRemover && (
         <button type="button" onClick={onRemover} aria-label={`Remover ${rotulo}`}
@@ -107,7 +107,7 @@ export const AnexosDeSaude = ({ caminhos, onChange, rotulo }: {
         <button type="button" onClick={() => (estaNaDemo() ? avisarFotoNaDemo() : inputRef.current?.click())} disabled={subindo}
           aria-label={subindo ? "Enviando anexo" : "Anexar foto ou PDF"}
           className="w-20 h-20 rounded-lg border border-dashed border-border text-muted-foreground flex flex-col items-center justify-center gap-1 text-[10px] hover:bg-muted/50 disabled:opacity-60">
-          {subindo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+          {subindo ? <Loader2 className="w-4 h-4 animate-spin-rapido" /> : <Paperclip className="w-4 h-4" />}
           {subindo ? "Enviando" : "Anexar"}
           {!subindo && <span className="text-[9px] leading-none opacity-70">foto ou PDF</span>}
         </button>

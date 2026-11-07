@@ -113,7 +113,7 @@ export class RouteErrorBoundary extends React.Component<Props, State> {
     if (this.state.reloading) {
       return (
         <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3 p-6">
-          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          <Loader2 className="w-8 h-8 animate-spin-rapido text-muted-foreground" />
           <p className="text-sm text-muted-foreground">Atualizando o app…</p>
         </div>
       );

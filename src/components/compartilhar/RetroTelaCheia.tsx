@@ -933,10 +933,10 @@ const FolhaDeCompartilhar = ({ titulo, base, dados, formato, setFormato, valores
               </label>
             )}
             <button type="button" onClick={onPostar} disabled={!!enviando} className="h-12 rounded-xl bg-white text-black font-extrabold text-[14px] inline-flex items-center justify-center gap-2 disabled:opacity-70" data-testid="retro-postar">
-              {enviando === "video" ? <><Loader2 className="w-[18px] h-[18px] animate-spin" /> Preparando o vídeo… {Math.round(progresso * 100)}%</> : <><Clapperboard className="w-[18px] h-[18px]" aria-hidden /> {formato === "stories" ? "Postar nos Stories" : "Postar no feed"}</>}
+              {enviando === "video" ? <><Loader2 className="w-[18px] h-[18px] animate-spin-rapido" /> Preparando o vídeo… {Math.round(progresso * 100)}%</> : <><Clapperboard className="w-[18px] h-[18px]" aria-hidden /> {formato === "stories" ? "Postar nos Stories" : "Postar no feed"}</>}
             </button>
             <button type="button" onClick={onSalvar} disabled={!!enviando} className="h-11 rounded-xl text-[13.5px] font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60" style={{ background: "rgba(255,255,255,.1)" }} data-testid="retro-salvar">
-              {enviando === "imagem" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" aria-hidden />} Salvar
+              {enviando === "imagem" ? <Loader2 className="w-4 h-4 animate-spin-rapido" /> : <Download className="w-4 h-4" aria-hidden />} Salvar
             </button>
           </div>
         </div>

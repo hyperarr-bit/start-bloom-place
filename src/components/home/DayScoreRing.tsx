@@ -1,3 +1,4 @@
+import { useEntradaDaHome } from "@/components/home/entrada-da-home";
 import type { CSSProperties } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Fogo } from "@/components/conquistas/Fogo";
@@ -23,6 +24,7 @@ export const CHAVE_DIA_100_VISTO = "core-dia-100-visto";
 export const MENSAGEM_DIA_100 = "Dia 100%. Fecha o app em paz. 🌟";
 
 export const DayScoreRing = ({ score, streak, mostrarSequencia = true }: DayScoreRingProps) => {
+  const entrada = useEntradaDaHome(); // 07/11: o anel enche e o número salta só na 1ª montagem da sessão; na volta nascem prontos
   const radius = 52;
   const circumference = 2 * Math.PI * radius;
   const progress = (score / 100) * circumference;
@@ -77,7 +79,7 @@ export const DayScoreRing = ({ score, streak, mostrarSequencia = true }: DayScor
             strokeWidth="8"
             strokeLinecap="round"
             strokeDasharray={circumference}
-            initial={{ strokeDashoffset: circumference }}
+            initial={entrada ? { strokeDashoffset: circumference } : false}
             animate={{ strokeDashoffset: circumference - progress }}
             transition={{ duration: 1.2, ease: "easeOut", delay: 0.3 }}
           />
@@ -86,7 +88,7 @@ export const DayScoreRing = ({ score, streak, mostrarSequencia = true }: DayScor
           {/* text-success só em 100: mesmo token do anel, nada de cor nova. */}
           <motion.span
             className={`text-3xl font-bold${completo ? " text-success" : ""}`}
-            initial={{ scale: 0 }}
+            initial={entrada ? { scale: 0 } : false}
             animate={{ scale: 1 }}
             transition={{ type: "spring", delay: 0.5 }}
           >
@@ -99,7 +101,7 @@ export const DayScoreRing = ({ score, streak, mostrarSequencia = true }: DayScor
       <div className="flex-1 min-w-0">
         <motion.p
           className="text-lg font-bold mb-0.5"
-          initial={{ opacity: 0, y: 5 }}
+          initial={entrada ? { opacity: 0, y: 5 } : false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
         >
@@ -126,7 +128,7 @@ export const DayScoreRing = ({ score, streak, mostrarSequencia = true }: DayScor
             style={corDaFaixa}
             data-testid="anel-sequencia"
             data-faixa={faixa.id}
-            initial={{ opacity: 0, scale: 0.8 }}
+            initial={entrada ? { opacity: 0, scale: 0.8 } : false}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.7, type: "spring" }}
           >

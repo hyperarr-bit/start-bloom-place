@@ -1,3 +1,4 @@
+import { useEntradaDaHome } from "@/components/home/entrada-da-home";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Star, Settings, Eye, EyeOff, ChevronLeft, ChevronRight } from "lucide-react";
@@ -11,6 +12,7 @@ import { navAbasLigada } from "@/lib/nav-abas";
 const modules = MODULOS;
 
 export const ModuleDrawer = () => {
+  const entrada = useEntradaDaHome(); // 07/11: a grade entra um a um só na 1ª montagem da sessão
   const navigate = useNavigate();
   const { toggleFavorite, toggleHidden, isFavorite, isHidden, ordenar, moveModule } = useModulePreferences();
   const [editMode, setEditMode] = useState(false);
@@ -60,7 +62,7 @@ export const ModuleDrawer = () => {
           <motion.div
             key={m.id}
             className="relative"
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={entrada ? { opacity: 0, scale: 0.9 } : false}
             animate={{ opacity: isHidden(m.id) ? 0.4 : 1, scale: 1 }}
             transition={{ delay: i * 0.03 }}
           >

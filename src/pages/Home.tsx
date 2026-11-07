@@ -23,6 +23,7 @@ import { useSequencia } from "@/components/conquistas/use-conquistas";
 import { QuickActions } from "@/components/home/QuickActions";
 import { ModuleDrawer } from "@/components/home/ModuleDrawer";
 import { NextHoursTimeline } from "@/components/home/NextHoursTimeline";
+import { EntradaDaHome, marcarEntradaDaHomeAntiga } from "@/components/home/entrada-da-home";
 import { WidgetPicker } from "@/components/home/WidgetPicker";
 import { SortableWidget } from "@/components/home/SortableWidget";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
@@ -108,6 +109,8 @@ const HomeE = lazy(() => carregarHomeE().then((m) => ({ default: m.HomeE })));
 
 const HomePage = () => {
   const [data, setDataTrigger] = useState(0);
+  // 07/11: a 1ª montagem da sessão anima a abertura; voltar de um módulo mostra a Home já pronta (entrada-da-home.ts)
+  const [animarEntrada] = useState(marcarEntradaDaHomeAntiga);
   // 10/10 — as forças de QA do tour/cartões/módulo-oculta (`?tour-home=on`…): só no navegador, antes do hub ler
   guardarForcasDaUrl();
 
@@ -415,7 +418,7 @@ const HomePage = () => {
   }
 
   return (
-    <>
+    <EntradaDaHome.Provider value={animarEntrada}>
       <DailyNudge />
       {/* Adesivo novo / marco de sequência (26/09): um de cada vez, uma vez cada */}
 
@@ -536,7 +539,7 @@ const HomePage = () => {
         onToggle={handleWidgetToggle}
         onToggleSize={toggleSize}
       />
-    </>
+    </EntradaDaHome.Provider>
   );
 };
 

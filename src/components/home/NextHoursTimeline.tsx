@@ -1,3 +1,4 @@
+import { useEntradaDaHome } from "@/components/home/entrada-da-home";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Clock, ChevronRight, ChevronDown, MoreHorizontal, SlidersHorizontal } from "lucide-react";
@@ -291,6 +292,7 @@ export function pendenciasDeHoje(data: LifeHubData, compromissos: Compromisso[],
 }
 
 export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
+  const entrada = useEntradaDaHome(); // 07/11: as linhas entram uma a uma só na 1ª montagem da sessão
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [menuAberto, setMenuAberto] = useState<TipoPendencia | null>(null);
@@ -365,7 +367,7 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
                 <motion.div
                   key={`p-${item.tipo ?? i}`}
                   className="rounded-xl border border-border/50 bg-card overflow-hidden"
-                  initial={{ opacity: 0, x: -10 }}
+                  initial={entrada ? { opacity: 0, x: -10 } : false}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.03 * i }}
                 >
@@ -484,7 +486,7 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
                     <motion.div
                       key={`d-${item.tipo ?? i}`}
                       className="flex items-center gap-3 px-3 py-2 rounded-xl opacity-50"
-                      initial={{ opacity: 0 }}
+                      initial={entrada ? { opacity: 0 } : false}
                       animate={{ opacity: 0.5 }}
                       transition={{ delay: 0.03 * (pending.length + i) }}
                     >

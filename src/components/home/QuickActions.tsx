@@ -1,3 +1,4 @@
+import { useEntradaDaHome } from "@/components/home/entrada-da-home";
 import { CHAVE_ACOES_CONQUISTAS, registrarAcao } from "@/lib/conquistas-acoes";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { localDayKey } from "@/lib/utils";
@@ -109,6 +110,7 @@ export const QuickActions = ({ apenasFormularios = false, titulo, onAtivaChange,
   onFeito?: (id: ActionId) => void;
   onFolhaPropriaChange?: (id: ActionId | null) => void;
 } = {}) => {
+  const entrada = useEntradaDaHome(); // 07/11: os botões entram um a um só na 1ª montagem da sessão
   const { get, set } = useUserData();
   // Água: o botão diz o tamanho do copo/garrafa que a pessoa escolheu em Saúde.
   const copoMlAgua = normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO));
@@ -345,7 +347,7 @@ export const QuickActions = ({ apenasFormularios = false, titulo, onAtivaChange,
                 ? "border-green-400 bg-green-50 dark:bg-green-500/10" 
                 : "border-border/50 bg-card hover:bg-muted/50"
             }`}
-            initial={{ opacity: 0, x: 10 }}
+            initial={entrada ? { opacity: 0, x: 10 } : false}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.05 * i }}
             whileTap={{ scale: 0.95 }}

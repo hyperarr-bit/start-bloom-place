@@ -187,7 +187,7 @@ export const PreviaDoCard = ({ dados, origem, titulo, onFechar, formatos = ["sto
         {formato === "adesivo" ? (
           <>
             <button type="button" onClick={postarImagem} disabled={!!enviando} className="h-11 rounded-xl bg-foreground text-background font-bold text-[13.5px] inline-flex items-center justify-center gap-2 disabled:opacity-70" data-testid="postar-adesivo">
-              {enviando ? <Loader2 className="w-[18px] h-[18px] animate-spin" /> : <Sticker className="w-[18px] h-[18px]" aria-hidden />} Salvar o adesivo
+              {enviando ? <Loader2 className="w-[18px] h-[18px] animate-spin-rapido" /> : <Sticker className="w-[18px] h-[18px]" aria-hidden />} Salvar o adesivo
             </button>
             <p className="text-[11.5px] text-muted-foreground text-center leading-snug px-2">No Instagram: abra o Stories com a sua foto e cole o adesivo por cima (fundo transparente).</p>
           </>
@@ -195,11 +195,11 @@ export const PreviaDoCard = ({ dados, origem, titulo, onFechar, formatos = ["sto
           <>
             {video && (
               <button type="button" onClick={postarVideo} disabled={!!enviando} className="h-11 rounded-xl bg-foreground text-background font-bold text-[13.5px] inline-flex items-center justify-center gap-2 disabled:opacity-70" data-testid="postar-card-video">
-                {enviando === "video" ? <><Loader2 className="w-[18px] h-[18px] animate-spin" /> Preparando o vídeo… {Math.round(progresso * 100)}%</> : <><Clapperboard className="w-[18px] h-[18px]" aria-hidden /> Postar vídeo{formato === "stories" ? " nos Stories" : ""}</>}
+                {enviando === "video" ? <><Loader2 className="w-[18px] h-[18px] animate-spin-rapido" /> Preparando o vídeo… {Math.round(progresso * 100)}%</> : <><Clapperboard className="w-[18px] h-[18px]" aria-hidden /> Postar vídeo{formato === "stories" ? " nos Stories" : ""}</>}
               </button>
             )}
             <button type="button" onClick={postarImagem} disabled={!!enviando} className={`h-11 rounded-xl text-[13.5px] font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60 ${video ? "border border-border bg-card" : "bg-foreground text-background"}`} data-testid="postar-card-imagem">
-              {enviando === "imagem" ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagemIcone className="w-4 h-4" aria-hidden />} Postar imagem
+              {enviando === "imagem" ? <Loader2 className="w-4 h-4 animate-spin-rapido" /> : <ImagemIcone className="w-4 h-4" aria-hidden />} Postar imagem
             </button>
             {/* 23/10: no app do iPhone, nada de link do site (regra da loja: sem link de site/Pix no iOS) */}
             {formato === "stories" && !(isNativeShell() && isIOS()) && (

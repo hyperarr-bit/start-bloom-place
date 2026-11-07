@@ -262,7 +262,7 @@ export default function Ajuda() {
                            text-muted-foreground hover:bg-muted/50 transition-colors disabled:opacity-60"
                 aria-label="Anexar print"
               >
-                {subindo ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImagePlus className="w-5 h-5" />}
+                {subindo ? <Loader2 className="w-5 h-5 animate-spin-rapido" /> : <ImagePlus className="w-5 h-5" />}
               </button>
             )}
           </div>
@@ -306,7 +306,7 @@ export default function Ajuda() {
           className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground
                      px-4 py-3.5 text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
         >
-          {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          {enviando ? <Loader2 className="w-4 h-4 animate-spin-rapido" /> : <Send className="w-4 h-4" />}
           {enviando ? "Enviando..." : "Enviar"}
         </button>
 

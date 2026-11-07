@@ -128,7 +128,7 @@ export const BadgeDetailSheet = ({ badge, onClose, desbloqueadoEm, diasDeSequenc
                 </p>
               )}
               <Button onClick={() => compartilhar(false)} disabled={!!enviando} size="lg" className="w-full h-12 mt-5 gap-2 font-bold">
-                {enviando === "cor" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
+                {enviando === "cor" ? <Loader2 className="w-4 h-4 animate-spin-rapido" /> : <Share2 className="w-4 h-4" />}
                 Compartilhar nos Stories
               </Button>
               {ehSequencia && (
@@ -138,7 +138,7 @@ export const BadgeDetailSheet = ({ badge, onClose, desbloqueadoEm, diasDeSequenc
                   disabled={!!enviando}
                   className="mt-2 w-full h-11 rounded-xl border border-border text-sm font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60"
                 >
-                  {enviando === "transparente" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                  {enviando === "transparente" ? <Loader2 className="w-4 h-4 animate-spin-rapido" /> : <Sparkles className="w-4 h-4" />}
                   Fundo transparente <span className="font-normal text-muted-foreground">· pra colar na sua foto</span>
                 </button>
               )}

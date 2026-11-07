@@ -209,7 +209,7 @@ export const PlannerAberto = ({ capa, nome, membroDesde, dias, nivel, onSelo, pa
               className="w-full h-11 rounded-xl bg-foreground text-background font-bold text-[13.5px] inline-flex items-center justify-center gap-2 active:scale-[0.99] transition-transform disabled:opacity-70"
               data-testid="postar-conquista"
             >
-              {compartilhando ? <Loader2 className="w-[18px] h-[18px] animate-spin" /> : <Clapperboard className="w-[18px] h-[18px]" aria-hidden />}
+              {compartilhando ? <Loader2 className="w-[18px] h-[18px] animate-spin-rapido" /> : <Clapperboard className="w-[18px] h-[18px]" aria-hidden />}
               Postar minha conquista
             </button>
             <button type="button" onClick={onFechar} className="py-2 text-[12px] font-semibold text-muted-foreground">

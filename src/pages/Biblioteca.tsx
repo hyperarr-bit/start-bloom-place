@@ -203,7 +203,7 @@ const ImportFromUrl = ({ onImport }: { onImport: (data: { title: string; author:
         <Input value={url} onChange={e => setUrl(e.target.value)} placeholder="Cole o link do livro aqui..."
           className="h-8 text-xs flex-1" onKeyDown={e => e.key === "Enter" && fetchMetadata()} />
         <Button size="sm" className="h-8 px-3 bg-orange-500 hover:bg-orange-600 text-white" onClick={fetchMetadata} disabled={loading || !url.trim()} aria-label="Importar dados do link">
-          {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link className="w-3 h-3" />}
+          {loading ? <Loader2 className="w-3 h-3 animate-spin-rapido" /> : <Link className="w-3 h-3" />}
         </Button>
       </div>
     </div>
@@ -481,7 +481,7 @@ const Biblioteca = () => {
         <div className="flex gap-1.5">
           <Input placeholder="URL da capa (opcional)" value={form.cover || ""} onChange={e => setForm(p => ({ ...p, cover: e.target.value }))} className="h-9 text-sm flex-1" />
           <Button type="button" size="sm" variant="outline" className="h-9 px-2.5 text-xs whitespace-nowrap" onClick={() => capaInputRef.current?.click()} disabled={subindoCapa} aria-label="Tirar ou escolher foto da capa">
-            {subindoCapa ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+            {subindoCapa ? <Loader2 className="w-3.5 h-3.5 animate-spin-rapido" /> : <Camera className="w-3.5 h-3.5" />}
             <span className="ml-1">{subindoCapa ? "Subindo..." : "Foto"}</span>
           </Button>
           <input ref={capaInputRef} type="file" accept="image/*" className="hidden" onChange={subirCapa} aria-label="Escolher foto da capa" />

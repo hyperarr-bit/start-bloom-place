@@ -154,6 +154,13 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      // 07/11 (sensação de velocidade, vídeo do Emil Kowalski): as curvas do app (lib/movimento.ts) também como classes —
+      // `ease-sai` pra quem ENTRA (chega rápido e assenta), `ease-entra` pra quem SAI (acelera e some). O tailwindcss-animate
+      // lê transitionTimingFunction, então valem tanto pra `transition` quanto pra `animate-in/out`.
+      transitionTimingFunction: {
+        sai: "cubic-bezier(0.22, 1, 0.36, 1)",
+        entra: "cubic-bezier(0.4, 0, 1, 1)",
+      },
       keyframes: {
         "accordion-down": {
           from: { height: "0" },
@@ -177,6 +184,8 @@ export default {
         "accordion-up": "accordion-up 0.2s ease-out",
         "fade-in": "fade-in 0.3s ease-out",
         "arrow-nudge": "arrow-nudge 1.4s ease-in-out infinite",
+        // 07/11: o spinner do app girando mais rápido (Emil Kowalski) — só nas telas logadas, fora das superfícies de venda
+        "spin-rapido": "spin 0.7s linear infinite",
       },
 
     },

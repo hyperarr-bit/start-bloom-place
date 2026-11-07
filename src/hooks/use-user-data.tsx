@@ -227,6 +227,21 @@ interface UserDataContextType {
    */
   tentarDeNovo?: () => void;
   /**
+   * A última leitura INTEIRA da conta que deu certo nesta sessão (07/11): quantas já deram certo
+   * e quando o PEDIDO saiu — o retrato do servidor que está no store é desse instante. Quem decide
+   * com o store na mão e grava a chave inteira por cima (virada do mês, dia anotado) confere se o
+   * retrato é deste mês/dia; não sendo, pede `relerConta` antes. Objeto novo a cada leitura, pra
+   * entrar em deps. Ausente no convidado e nos mocks de teste (vale como "não sei": segue como antes).
+   * Ver "SESSÃO VIVA" no provider.
+   */
+  ultimaLeitura?: { vez: number; pedidaEm: number };
+  /**
+   * Pede uma leitura inteira da conta AGORA, mesmo já sincronizado (07/11). Leitura no ar dentro
+   * do prazo: a que está chegando serve. Falhou: tenta de novo sozinha (escada de esperas, rede
+   * voltando, volta pro app) até dar certo — sem a faixa, a pessoa tem a conta e segue usando.
+   */
+  relerConta?: () => void;
+  /**
    * Marcar OUTRO dia (02/10): roda `fn` (uma ou várias escritas, SÍNCRONAS) dizendo
    * a que dia elas pertencem. `dia` = ontem/anteontem → a anotação entra na
    * sequência NAQUELE dia, não em hoje; `null` → não anota dia nenhum (ex.:
@@ -517,6 +532,38 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
    * abertura junta de novo contra o servidor (que ainda não tem o juntado) e nada se perde.
    */
   const aConfirmar = useRef<Map<string, unknown>>(new Map());
+  /*
+   * SESSÃO VIVA (07/11): O STORE PODE SER UM RETRATO DE OUTRO DIA — OU DE OUTRO MÊS.
+   *
+   * A conta chega do servidor uma vez por sessão (e de novo na volta pro app, quando o auth
+   * reemite a sessão — mas essa leitura é ASSÍNCRONA, e numa aba sempre visível nem acontece).
+   * Aba do PC aberta dias seguidos, app do celular vivo em segundo plano: o que OUTRO aparelho
+   * gravou nesse meio-tempo não está aqui, e o `set` manda a chave INTEIRA. Quem decide em cima do
+   * store e grava a chave inteira por cima do servidor apagava o que o celular fez:
+   *  - a virada do mês (use-virada-do-mes): aba de 31/10 voltando em 06/11 deixava o servidor com
+   *    gastos [], receitas [] e a Luz "não paga" — arquivava outubro e zerava os ✓ em cima do
+   *    novembro que o celular já tinha lançado;
+   *  - o dia anotado (registrarDiaAnotado/registrarDiaRetro): a lista de dias velha + hoje ia por
+   *    cima dos dias que o celular anotou desde a leitura — a sequência perdia esses dias.
+   *
+   * Saída: `ultimaLeitura` diz de QUANDO é o retrato (o instante do pedido). Quem vai gravar em
+   * cima confere se o retrato é do mesmo mês (virada) ou do mesmo dia (dia anotado); não sendo,
+   * pede `relerConta` e só grava depois que a leitura dá certo — a virada reavalia quando
+   * `ultimaLeitura` muda; o dia fica em `diasPendentes` e entra na lista nova pela MESMA liberação
+   * da 1ª leitura (já sabe registrar hoje e ontem/anteontem). Leitura que falha com releitura
+   * pedida: tenta de novo sozinha (a escada de esperas, a rede voltando, a volta pro app), sem a
+   * faixa — a pessoa tem a conta e segue usando. Offline por muito tempo: a virada e o dia esperam
+   * a rede, a tela segue com o que tem (melhor do que apagar o que outro aparelho fez). Convidado
+   * não tem servidor: segue como antes. Limite conhecido: o dia pendente mora só na memória —
+   * fechar a aba antes de a rede voltar perde o registro daquele dia neste aparelho (a anotação em
+   * si, offline, também não sobe). Teste: src/test/sessao-viva-07-11.test.tsx.
+   */
+  const ultimaLeituraRef = useRef<{ vez: number; pedidaEm: number } | null>(null);
+  const [ultimaLeitura, setUltimaLeitura] = useState<{ vez: number; pedidaEm: number } | undefined>(undefined);
+  /** alguém pediu a conta de novo e ela ainda não chegou — a falha tenta de novo mesmo sincronizado */
+  const releituraPedida = useRef(false);
+  /** dias anotados esperando a releitura pra entrar na lista (localDayKey) */
+  const diasPendentes = useRef<Set<string>>(new Set());
 
   // Sync ref + react to user changes (login/logout/switch).
   useEffect(() => {
@@ -544,6 +591,11 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       inicioDaEspera.current = null;
       aLiberar.current = null;
       aConfirmar.current.clear();
+      // 07/11: o retrato, a releitura pedida e os dias esperando eram da outra conta — ver "SESSÃO VIVA"
+      ultimaLeituraRef.current = null;
+      setUltimaLeitura(undefined);
+      releituraPedida.current = false;
+      diasPendentes.current.clear();
       setSemConexao(null);
       setContaCompleta(false);
       setLoaded(false);
@@ -788,6 +840,8 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
           if (flushTimer.current) clearTimeout(flushTimer.current);
           flushTimer.current = setTimeout(() => flushRef.current(), DEBOUNCE_MS);
         }
+        // (07/11) dias anotados que esperavam esta releitura — ver "SESSÃO VIVA"
+        for (const d of diasPendentes.current) dias.add(d);
         if (!eraSincronizado) {
           // 17/10: a escrita só volta a subir direto na liberação (efeito do provider, depois que
           // as telas adotaram o valor juntado) — ver `aLiberar`.
@@ -807,7 +861,17 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
               : null,
           };
           setLiberacao((n) => n + 1);
+        } else if (dias.size > 0) {
+          // (07/11) 2ª rodada com dia anotado esperando a releitura: a MESMA liberação da 1ª leitura
+          // registra o dia em cima da lista que o servidor tem AGORA — ver "SESSÃO VIVA".
+          aLiberar.current = { uid, confirmado: { ...map, ...mesclados }, servidor: map, juntadasNaLeitura: Object.keys(mesclados), dias, perdidas: [], medida: null };
+          setLiberacao((n) => n + 1);
         }
+        diasPendentes.current.clear();
+        releituraPedida.current = false;
+        // (07/11) de quando é o retrato que está no store, no mesmo lote do store e do `loaded` — ver "SESSÃO VIVA"
+        ultimaLeituraRef.current = { vez: (ultimaLeituraRef.current?.vez ?? 0) + 1, pedidaEm: pedidoEm };
+        setUltimaLeitura(ultimaLeituraRef.current);
         falhasSeguidas.current = 0;
         degrauDoPrazo.current = 0;
         inicioDaEspera.current = null;
@@ -825,15 +889,19 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       // Já sincronizado nesta sessão (2ª rodada, ex.: volta pro app): segue com o que tem.
       if (sincronizadoRef.current) {
         setLoaded(true);
-        return;
+        // (07/11) ...mas a releitura PEDIDA (virada do mês em sessão viva, dia anotado com a conta
+        // lida noutro dia) não desiste: tenta de novo sozinha, pela mesma escada abaixo — sem a
+        // faixa, a pessoa tem a conta e segue usando. Ver "SESSÃO VIVA".
+        if (!releituraPedida.current) return;
+      } else {
+        // 16/10: a conta NÃO chegou — `loaded` fica false (nada de tela "carregada" com o
+        // store vazio), o aviso aparece e tenta de novo sozinho.
+        setSemConexao("sem");
       }
-      // 16/10: a conta NÃO chegou — `loaded` fica false (nada de tela "carregada" com o
-      // store vazio), o aviso aparece e tenta de novo sozinho.
       falhasSeguidas.current += 1;
       // revisão 2: falhou DEPOIS do prazo (ex.: o sistema desistiu da conexão lenta) — a próxima
       // ganha o dobro; falha rápida (sem rede) não mexe no prazo
       if (Date.now() - leitura.desde >= leitura.prazo) degrauDoPrazo.current += 1;
-      setSemConexao("sem");
       const espera = ESPERAS_NOVA_TENTATIVA[Math.min(falhasSeguidas.current - 1, ESPERAS_NOVA_TENTATIVA.length - 1)];
       timerNovaTentativa.current = setTimeout(() => {
         timerNovaTentativa.current = null;
@@ -858,11 +926,18 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   // que está chegando nem zera o prazo); sem leitura no ar (esperando a tentativa marcada) ou
   // com a do ar vencida, o efeito da hidratação começa outra.
   const tentarDeNovo = useCallback(() => {
-    if (!userRef.current || sincronizadoRef.current) return;
+    // (07/11) sincronizado COM releitura pedida também entra — ver "SESSÃO VIVA"
+    if (!userRef.current || (sincronizadoRef.current && !releituraPedida.current)) return;
     const l = leituraAtual.current;
     if (l && Date.now() - l.desde < l.prazo) return;
     setTentativa((t) => t + 1);
   }, []);
+  /** (07/11) Pede a conta de novo AGORA, mesmo sincronizado — ver "SESSÃO VIVA" e `relerConta` no tipo. */
+  const relerConta = useCallback(() => {
+    if (!userRef.current) return;
+    releituraPedida.current = true;
+    tentarDeNovo();
+  }, [tentarDeNovo]);
   useEffect(() => {
     const aoVoltarPraTela = () => { if (document.visibilityState !== "hidden") tentarDeNovo(); };
     window.addEventListener("online", tentarDeNovo);
@@ -1054,16 +1129,30 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
    */
   // Escopo do "marcar outro dia": enquanto a função roda, as escritas valem pro dia dito.
   const escopoDiaRef = useRef<{ dia: string | null; feito?: boolean } | null>(null);
+  /**
+   * (07/11) A lista de dias no store veio do servidor NOUTRO DIA? Sessão viva que atravessou a
+   * meia-noite: outro aparelho pode ter anotado dias desde então, e gravar a lista daqui por cima
+   * os apagaria. O dia fica esperando a releitura e entra na lista nova quando ela chegar (o aviso
+   * da sequência sai lá) — ver "SESSÃO VIVA". Convidado e conta lida hoje: não espera.
+   */
+  const diaEsperaReleitura = useCallback((dia: string): boolean => {
+    const l = ultimaLeituraRef.current;
+    if (!userRef.current || !l || localDayKey(new Date(l.pedidaEm)) === localDayKey()) return false;
+    diasPendentes.current.add(dia);
+    relerConta();
+    return true;
+  }, [relerConta]);
   const registrarDiaRetro = useCallback((key: string, value: any, dia: string | null) => {
     if (!dia || !loadedRef.current || escopoDiaRef.current?.feito) return;
     if (!contaComoAnotacao(key) || !temConteudo(value)) return;
     try { if (JSON.stringify(value) === JSON.stringify(storeRef.current[key])) return; } catch { return; }
+    if (diaEsperaReleitura(dia)) { if (escopoDiaRef.current) escopoDiaRef.current.feito = true; return; }
     const nova = registrarDiaRetroativo(storeRef.current[CHAVE_DIAS_ANOTADOS], dia, localDayKey(), storeRef.current[CHAVE_HUB_STREAK]);
     if (!nova) return; // o dia já estava na lista (ou fora da janela de 2 dias)
     // um gesto que grava várias chaves (Treino: histórico, registro, volume…) anota o dia UMA vez
     if (escopoDiaRef.current) escopoDiaRef.current.feito = true;
     setRef.current(CHAVE_DIAS_ANOTADOS, nova, { system: true });
-  }, []);
+  }, [diaEsperaReleitura]);
   const comDia = useCallback(<T,>(dia: string | null, fn: () => T): T => {
     const antes = escopoDiaRef.current;
     escopoDiaRef.current = { dia };
@@ -1076,12 +1165,13 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     if (!contaComoAnotacao(key) || !temConteudo(value)) return;
     try { if (JSON.stringify(value) === JSON.stringify(storeRef.current[key])) return; } catch { return; }
     diaAnotadoRef.current = hoje;
+    if (diaEsperaReleitura(hoje)) return; // (07/11) entra na lista nova quando a conta chegar
     const nova = registrarDia(storeRef.current[CHAVE_DIAS_ANOTADOS], hoje, storeRef.current[CHAVE_HUB_STREAK]);
     if (!nova) return; // hoje já estava na lista (outra sessão/aparelho)
     setRef.current(CHAVE_DIAS_ANOTADOS, nova, { system: true });
     const { dias } = calcularSequencia(nova, hoje);
     import("@/components/conquistas/aviso-sequencia").then((m) => m.avisarSequencia(dias)).catch(() => {});
-  }, []);
+  }, [diaEsperaReleitura]);
   // Lista apagada ("começar do zero"): o próximo registro de hoje entra de novo.
   useEffect(() => {
     if (!(CHAVE_DIAS_ANOTADOS in store)) diaAnotadoRef.current = null;
@@ -1199,6 +1289,7 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     if (flushTimer.current) { clearTimeout(flushTimer.current); flushTimer.current = null; }
     pendingWrites.current = {};
     seguradas.current = {}; // o que estava esperando a conta chegar também sai
+    diasPendentes.current.clear(); // 07/11: e o dia esperando a releitura
     aConfirmar.current.clear();
     apagarSeguradasGuardadas({ daConta: userId });
     purgeUserLocalCache();
@@ -1207,7 +1298,7 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   return (
-    <UserDataContext.Provider value={{ get, set, comDia, loaded, fetchKey, isGuest: !user, apagarTudo, semConexao: user ? semConexao : null, contaCompleta: user ? contaCompleta : false, tentarDeNovo }}>
+    <UserDataContext.Provider value={{ get, set, comDia, loaded, fetchKey, isGuest: !user, apagarTudo, semConexao: user ? semConexao : null, contaCompleta: user ? contaCompleta : false, tentarDeNovo, ultimaLeitura: user ? ultimaLeitura : undefined, relerConta }}>
       {children}
     </UserDataContext.Provider>
   );

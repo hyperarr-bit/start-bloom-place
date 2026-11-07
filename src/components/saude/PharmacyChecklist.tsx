@@ -14,7 +14,7 @@ import { reagendarTudo, type Leitor } from "@/lib/reagendar";
 import { trackEvent } from "@/lib/analytics";
 import { avisarApagado } from "@/lib/desfazer";
 import {
-  OPCOES_VEZES, agruparRemedios, doseDaHora, dosesDoGrupoAgora, ehDia, gerarHorarios, inicioAoMudarPrimeira, inicioEscolhido, momentoDoInicio, montarLinhas, moverMarcasDoGrupo, rotuloDosHorarios,
+  OPCOES_VEZES, agruparRemedios, doseADesmarcar, doseDaHora, dosesDoGrupoAgora, ehDia, gerarHorarios, inicioAoMudarPrimeira, inicioEscolhido, momentoDoInicio, montarLinhas, moverMarcasDoGrupo, rotuloDosHorarios,
   tratamentoTerminou, ultimasDosesDoGrupo, type DoseMarcavel, type GrupoDeRemedio, type Remedio as Supplement, type VezesAoDia,
 } from "@/lib/remedios";
 
@@ -423,7 +423,8 @@ export const PharmacyChecklist = () => {
                   const taken = doses.length > 0 && tomadas.length === doses.length;
                   // a caixa marca a dose DA HORA (a mais recente que já passou), nunca a 1ª do cadastro
                   const proxima = doseDaHora(doses.filter(d => !foiTomada(d)), agora);
-                  const ultimaTomada = doseDaHora(tomadas, agora);
+                  // desmarcar desfaz primeiro a marcada que ainda não chegou (a das 00:00 marcada às 23:30), não a das 16:00
+                  const ultimaTomada = doseADesmarcar(tomadas, agora);
                   const lowStock = g.estoque <= 5;
                   const color = nameColors[idx % nameColors.length];
                   const rotulo = g.itens.length > 1 ? rotuloDosHorarios(g.itens.map(s => s.time)) : "";

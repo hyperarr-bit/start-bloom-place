@@ -296,7 +296,7 @@ describe("Vitaminas e Remédios: o grupo na tabela", () => {
     expect(screen.queryByTestId("remedio-doses-feitas")).toBeNull();
   });
 
-  it("a caixa da linha marca a dose DA HORA (a mais recente que passou); com todas marcadas, risca o nome e a caixa desmarca a da hora", () => {
+  it("a caixa da linha marca a dose DA HORA (a mais recente que passou); com todas marcadas, risca o nome e a caixa desfaz a que ainda não chegou (a das 00:00), não a das 16:00", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     // 22:30: a das 00:00 ainda está a mais de 1 h (até 1 h antes ela já é "a da hora" — conserto final 07/11,
     // remedio-dia-da-dose-07-11: "a caixa e a dose que vence em minutos")
@@ -313,7 +313,9 @@ describe("Vitaminas e Remédios: o grupo na tabela", () => {
       expect(linhas(store).map((x) => x.stock)).toEqual([18, 18, 18]);
       expect(screen.getByText("Amoxicilina").className).toContain("line-through");
       fireEvent.click(screen.getByRole("button", { name: "Desmarcar Amoxicilina" }));
-      expect(store.estado.dados[LOG]).toEqual({ "2026-11-07": ["a0"], "2026-11-08": ["a2"] });
+      // crítica de fora 07/11: tirar a das 16:00 fazia o aviso das 00:00 sumir e a caixa pedir a das 16:00 de novo
+      expect(store.estado.dados[LOG]).toEqual({ "2026-11-07": ["a1", "a0"], "2026-11-08": [] });
+      expect(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (00:00)" })).toBeInTheDocument();
     } finally { vi.useRealTimers(); }
   });
 

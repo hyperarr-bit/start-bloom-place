@@ -254,6 +254,21 @@ export function doseDaHora<T extends { time: string; quando?: number }>(doses: T
   return [...emOrdem].reverse().find((d) => quandoDe(d) <= t) ?? emOrdem.find((d) => quandoDe(d) > t);
 }
 
+/**
+ * A dose que a caixa DESMARCA (crítica de fora, 07/11). Com a folga de 15 min,
+ * `doseDaHora` das tomadas às 23:30 é a das 16:00 — e o 2º toque, pra desfazer a
+ * das 00:00 que o 1º acabou de marcar, tirava a das 16:00: o aviso das 00:00
+ * sumia e a caixa pedia a das 16:00 de novo (2× a das 16:00, nenhuma das 00:00).
+ * Desfaz primeiro a dose marcada que ainda não chegou (a mais cedo delas, a que a
+ * caixa marcaria); só sem nenhuma assim vale a da hora.
+ */
+export function doseADesmarcar<T extends { time: string; quando?: number }>(tomadas: T[], agora: Date = new Date()): T | undefined {
+  const t = agora.getTime();
+  const quandoDe = (d: T) => d.quando ?? (ehHora(d.time) ? momentoDe(localDayKey(agora), d.time).getTime() : 0);
+  const aindaVem = tomadas.filter((d) => quandoDe(d) > t).sort((a, b) => quandoDe(a) - quandoDe(b));
+  return aindaVem[0] ?? doseDaHora(tomadas, agora);
+}
+
 export interface GrupoDeRemedio {
   /** id do grupo — ou o id da própria linha, quando é um remédio simples */
   chave: string;

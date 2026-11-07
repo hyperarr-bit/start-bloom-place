@@ -62,7 +62,7 @@ import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data
 import { planejarRemedios } from "@/lib/notificacoes";
 import { lerDadosDosLembretes } from "@/lib/reagendar";
 import {
-  agruparRemedios, doseDaHora, dosesDoGrupoAgora, dosesEmVigor, gerarHorarios, inicioAoMudarPrimeira, inicioDoCadastro, montarLinhas,
+  agruparRemedios, doseADesmarcar, doseDaHora, dosesDoGrupoAgora, dosesEmVigor, gerarHorarios, inicioAoMudarPrimeira, inicioDoCadastro, montarLinhas,
   tratamentoTerminou, type Remedio,
 } from "@/lib/remedios";
 import { PharmacyChecklist } from "@/components/saude/PharmacyChecklist";
@@ -743,5 +743,44 @@ describe("digitar a 1ª dose (valores no meio do caminho)", () => {
     const doDia = (d: string) => [...(((store.estado.dados[LOG] as Record<string, string[]>)[d]) ?? [])].sort();
     expect(doDia("2026-11-06")).toEqual([d1, d2, d3].sort());
     expect(doDia("2026-11-07")).toEqual([d3]); // a das 00:00 de hoje cedo, tomada, continua tomada
+  });
+});
+
+/* Crítica de fora (07/11): com a folga da caixa em 15 min, o 2º toque (pra desfazer o 1º) tirava a das
+   16:00 em vez da das 00:00 que acabou de ser marcada — o aviso das 00:00 sumia e a caixa pedia de novo
+   a das 16:00 (a pessoa podia tomar 2× a das 16:00 e nenhuma das 00:00). Desmarcar pela caixa desfaz
+   primeiro a dose marcada que ainda não chegou. */
+describe("a caixa desfaz o que acabou de marcar", () => {
+  it("8 em 8 desde 06/11, às 23:30 de 07/11: marcar a das 00:00 e tocar de novo → o registro volta ao de antes e 08/00:00 volta à fila", () => {
+    const novas = cadastro(agoraEm(6, 7, 50), "08:00");
+    const [d08, d16, d00] = novas.map((l) => l.id);
+    const antes = { "2026-11-06": [d08, d16], "2026-11-07": [d00, d08, d16] };
+    const store = criarStore({ [CHAVE]: novas.map((l) => ({ ...l, stock: 16 })), [LOG]: antes });
+    agoraEm(7, 23, 30);
+    montar(store);
+    expect(planoDe(store).map((a) => fmt(a.quando))[0]).toBe("08/00:00");
+    fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (00:00)" }));
+    expect((store.estado.dados[LOG] as Record<string, string[]>)["2026-11-08"]).toEqual([d00]);
+    expect(planoDe(store).map((a) => fmt(a.quando))).not.toContain("08/00:00");
+
+    fireEvent.click(screen.getByRole("button", { name: "Desmarcar Amoxicilina" }));
+    const log = store.estado.dados[LOG] as Record<string, string[]>;
+    expect(log["2026-11-08"] ?? []).toEqual([]);
+    expect(Object.fromEntries(Object.entries(log).filter(([, ids]) => ids.length))).toEqual(antes);
+    expect(linhas(store).map((l) => l.stock)).toEqual([16, 16, 16]);
+    expect(planoDe(store).map((a) => fmt(a.quando))[0]).toBe("08/00:00");
+    // a caixa volta a pedir a das 00:00, não a das 16:00
+    expect(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (00:00)" })).toBeInTheDocument();
+  });
+
+  it("sem dose marcada que ainda vem, desmarca a da hora (às 00:10, a das 00:00 já tomada)", () => {
+    const g = agruparRemedios(cadastro(agoraEm(6, 7, 50), "08:00"))[0];
+    const as0010 = agoraEm(8, 0, 10);
+    expect(doseADesmarcar(dosesDoGrupoAgora(g, as0010), as0010)?.time).toBe("00:00");
+    const as2330 = agoraEm(7, 23, 30);
+    expect(doseADesmarcar(dosesDoGrupoAgora(g, as2330), as2330)?.time).toBe("00:00");
+    const as1500 = agoraEm(7, 15, 0);
+    expect(doseADesmarcar(dosesDoGrupoAgora(g, as1500).filter((d) => d.time !== "00:00"), as1500)?.time).toBe("16:00");
+    expect(doseADesmarcar(dosesDoGrupoAgora(g, as1500).filter((d) => d.time === "08:00"), as1500)?.time).toBe("08:00");
   });
 });

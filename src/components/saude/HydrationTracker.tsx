@@ -4,12 +4,13 @@ import { motion } from "framer-motion";
 import { localDayKey } from "@/lib/utils";
 import { Droplets, Minus, Pencil, Plus } from "lucide-react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useHoje } from "@/hooks/use-hoje";
 import { SerieHistorico } from "@/components/historico/SerieHistorico";
 
 const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
 
 export const HydrationTracker = () => {
-  const today = todayStr();
+  const today = useHoje();
   const [waterLog, setWaterLog] = usePersistedState<Record<string, number>>("core-saude-water", {});
   const [waterGoalRaw, setWaterGoal] = usePersistedState<number>("core-saude-water-goal", 8);
   const waterGoal = Math.min(20, Math.max(1, Math.round(Number(waterGoalRaw) || 8)));
@@ -50,15 +51,20 @@ export const HydrationTracker = () => {
    * As duas chaves andam juntas (a Rotina conta pela `water-log`) — mexer só
    * numa fazia o `Math.max` do `current` ressuscitar o valor antigo, que é
    * exatamente por que o "−" do widget da Home não funcionava.
+   *
+   * O DIA É O DO TOQUE (07/11): com o app aberto de noite, o `today` do último
+   * desenho ainda é ontem às 8h. O "+" somava em ontem, o "−" e o "Zerar"
+   * tiravam de ontem, e a tela redesenhada no dia novo dizia 0ml.
    */
-  const setPorcoes = (n: number) => {
-    const v = Math.min(20, Math.max(0, n));
-    setWaterLog(prev => ({ ...prev, [today]: v }));
-    setWaterLogRotina(prev => ({ ...prev, [today]: v }));
+  const setPorcoes = (proximo: (atual: number) => number) => {
+    const dia = todayStr();
+    const v = Math.min(20, Math.max(0, proximo(Math.max(waterLog[dia] || 0, waterLogRotina[dia] || 0))));
+    setWaterLog(prev => ({ ...prev, [dia]: v }));
+    setWaterLogRotina(prev => ({ ...prev, [dia]: v }));
   };
-  const addWater = () => setPorcoes(current + 1);
-  const removeWater = () => setPorcoes(current - 1);
-  const zerarDia = () => setPorcoes(0);
+  const addWater = () => setPorcoes(n => n + 1);
+  const removeWater = () => setPorcoes(n => n - 1);
+  const zerarDia = () => setPorcoes(() => 0);
   const ajustaMeta = (delta: number) => setWaterGoal(Math.min(20, Math.max(1, waterGoal + delta)));
 
   return (

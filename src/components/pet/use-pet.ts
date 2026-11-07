@@ -7,8 +7,9 @@
  * antigo ou uma versão futura puser num item continua lá depois que o app novo
  * mexe nele. E nada é gravado só por abrir a tela.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { useUserData } from "@/hooks/use-user-data";
+import { useHoje } from "@/hooks/use-hoje";
 import { localDayKey } from "@/lib/utils";
 import {
   CHAVE_CUIDADOS, CHAVE_DICAS, CHAVE_LEMBRETE, CHAVE_PESOS, CHAVE_PETS, CHAVE_REGISTROS, chaveRotinaDoDia, chaveTarefasDoPet, comPeso, marcarNaRotina,
@@ -16,20 +17,6 @@ import {
 } from "@/lib/pet";
 import { comCuidado, registrarAplicacao, type Cuidado, type LinhaDaCarteirinha, type Registro } from "@/lib/pet-cuidados";
 import { lerPrefsLembretePet, type PrefsLembretePet } from "@/lib/pet-avisos";
-
-/** "Hoje" que acompanha a virada do dia com a tela aberta (celular mantém a aba viva). */
-export function useHoje(): string {
-  const [hoje, setHoje] = useState(localDayKey());
-  useEffect(() => {
-    const sync = () => setHoje((h) => (h === localDayKey() ? h : localDayKey()));
-    const visivel = () => { if (document.visibilityState === "visible") sync(); };
-    document.addEventListener("visibilitychange", visivel);
-    window.addEventListener("focus", sync);
-    const id = window.setInterval(sync, 60_000);
-    return () => { document.removeEventListener("visibilitychange", visivel); window.removeEventListener("focus", sync); window.clearInterval(id); };
-  }, []);
-  return hoje;
-}
 
 const lista = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 

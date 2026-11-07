@@ -1,5 +1,8 @@
 import { FileText, Download, FileSpreadsheet, Printer, Calendar, TrendingUp, TrendingDown, PieChart } from "lucide-react";
+import { toast } from "sonner";
 import { dataSegura, localDayKey, mesAtualExtenso } from "@/lib/utils";
+import { compartilharHtml, compartilharPlanilha } from "@/lib/compartilhar";
+import { isNativeShell } from "@/lib/native-shell";
 import { Button } from "@/components/ui/button";
 import { computeMonthlyBalance, computeSavingsRate } from "@/lib/finance-totals";
 import { ImportExtrato } from "@/components/finance/ImportExtrato";
@@ -151,6 +154,35 @@ export const montarCSV = (
   return "\uFEFF" + linhas.join("\r\n") + "\r\n";
 };
 
+/**
+ * A folha do relatório, a mesma na impressão do site e no arquivo do app. O charset vem antes do título (07/11): no app
+ * ela vira um arquivo .html, e quem abre o arquivo não sabe que é UTF-8 — sem isso "Relatório" vira "RelatÃ³rio".
+ */
+export const montarHtmlDoRelatorio = (mes: string, corpo: string) => `
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Relatório Financeiro - ${mes}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { color: #333; border-bottom: 2px solid #8b5cf6; padding-bottom: 10px; }
+            h2 { color: #666; margin-top: 20px; }
+            table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f5f5f5; }
+            .positive { color: green; }
+            .negative { color: red; }
+            .summary { display: flex; gap: 20px; margin: 20px 0; }
+            .summary-card { background: #f5f5f5; padding: 15px; border-radius: 8px; flex: 1; }
+          </style>
+        </head>
+        <body>
+          ${corpo}
+        </body>
+      </html>
+    `;
+
 export const Reports = ({
   incomes,
   expenses,
@@ -197,47 +229,43 @@ export const Reports = ({
   }, {} as Record<string, number>);
 
   // Export to CSV
-  const exportToCSV = (type: "incomes" | "expenses" | "all") => {
+  const exportToCSV = async (type: "incomes" | "expenses" | "all") => {
     const csvContent = montarCSV(type, incomes, despesas, rotuloCategoria);
+    const nome = `financas_${type}_${localDayKey()}.csv`;
+    /* No app (07/11): o <a download> não faz nada no WebView, o botão ficava morto. O site segue baixando direto, sem
+       passar pelo Web Share: no PC com Windows a folha do sistema não tem "Salvar". */
+    if (isNativeShell()) {
+      const r = await compartilharPlanilha(csvContent, nome, "Relatório financeiro", "financas_relatorio_csv");
+      if (r === "failed") toast.error("Não deu pra exportar neste aparelho.");
+      return;
+    }
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `financas_${type}_${localDayKey()}.csv`;
+    link.download = nome;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   };
 
   // Print report
-  const printReport = () => {
+  const printReport = async () => {
     const printContent = document.getElementById("monthly-report");
     if (!printContent) return;
+    const html = montarHtmlDoRelatorio(currentMonth, printContent.innerHTML);
+
+    /* No app (07/11): no iPhone o window.open devolve null e a função saía calada. Vira arquivo na folha nativa. No site,
+       a janela tem que abrir no mesmo toque (sem await antes), senão o bloqueador de pop-up segura. */
+    if (isNativeShell()) {
+      const r = await compartilharHtml(html, `financas_relatorio_${localDayKey()}.html`, "Relatório financeiro", "financas_relatorio_html");
+      if (r === "failed") toast.error("Não deu pra exportar neste aparelho.");
+      return;
+    }
 
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Relatório Financeiro - ${currentMonth}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            h1 { color: #333; border-bottom: 2px solid #8b5cf6; padding-bottom: 10px; }
-            h2 { color: #666; margin-top: 20px; }
-            table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f5f5f5; }
-            .positive { color: green; }
-            .negative { color: red; }
-            .summary { display: flex; gap: 20px; margin: 20px 0; }
-            .summary-card { background: #f5f5f5; padding: 15px; border-radius: 8px; flex: 1; }
-          </style>
-        </head>
-        <body>
-          ${printContent.innerHTML}
-        </body>
-      </html>
-    `);
+    printWindow.document.write(html);
     printWindow.document.close();
     printWindow.print();
   };

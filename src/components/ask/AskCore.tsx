@@ -5,8 +5,9 @@ import { Sparkles } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
-import { getMonthTotals } from "@/components/finance/storage-keys";
+import { parPadrao, totaisDoMes } from "@/components/finance/MonthComparison";
 import { computeDailyBudget } from "@/lib/finance-totals";
+import { perfilAtivoLocal } from "@/lib/finance-perfil";
 import { trackEvent } from "@/lib/analytics";
 
 /**
@@ -204,9 +205,13 @@ const QUESTIONS: Question[] = [
     emoji: "📊",
     label: "Tô melhor que mês passado?",
     answer: (ctx, { userId }) => {
-      const prevMonth = MONTHS[(new Date().getMonth() + 11) % 12];
-      const prev = getMonthTotals(prevMonth, userId);
-      const prevOutflow = prev.custosFixos + prev.custosVariaveis;
+      // (07/11, bug "pergunte-janeiro") o mês passado com o ANO dele (em janeiro, o dezembro do ano passado; sem ano
+      // lia o dezembro vazio do ano corrente) e a mesma soma do `monthlyOutflow` deste mês: fixos + variáveis +
+      // parcelas + avulsas. Só fixos + variáveis comparava dois números diferentes.
+      const [anterior] = parPadrao();
+      const prevMonth = MONTHS[anterior.idx];
+      const prev = totaisDoMes(anterior, userId, perfilAtivoLocal(userId));
+      const prevOutflow = prev.despesas;
       if (prevOutflow <= 0 && prev.receitas <= 0) {
         return `Ainda não tenho ${prevMonth} registrado pra comparar. A partir do mês que vem essa resposta fica boa.`;
       }

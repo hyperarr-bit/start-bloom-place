@@ -238,8 +238,15 @@ describe("Rede de contatos — a tela, em conta vazia", () => {
     const form = screen.getByTestId("form-reuniao");
     expect(within(form).getByLabelText("Nome da reunião")).toHaveValue("Reunião com João");
     expect(within(form).getByLabelText("Notas da reunião")).toHaveValue("IA nas empresas\nTel: (11) 99999-0000");
-    expect(within(form).getByLabelText("Data da reunião")).toHaveValue("2026-11-07");
+    // sábado 10:00: abre no próximo dia útil às 09:00 (hoje 09:00 já passou)
+    expect(within(form).getByLabelText("Data da reunião")).toHaveValue("2026-11-09");
     expect(within(form).getByLabelText("Hora da reunião")).toHaveValue("09:00");
+    // horário que já passou não grava: avisa antes, sem toast de sucesso
+    fireEvent.change(within(form).getByLabelText("Data da reunião"), { target: { value: "2026-11-07" } });
+    fireEvent.click(screen.getByRole("button", { name: "Marcar na Rotina" }));
+    expect(toasts.some(t => t.tipo === "erro" && t.msg === "Esse horário já passou")).toBe(true);
+    expect(toasts.some(t => t.tipo === "ok")).toBe(false);
+    expect(compromissosDe(store)).toHaveLength(1);
     fireEvent.change(within(form).getByLabelText("Data da reunião"), { target: { value: "2026-11-10" } });
     fireEvent.change(within(form).getByLabelText("Hora da reunião"), { target: { value: "10:30" } });
     fireEvent.change(within(form).getByLabelText("Antecedência do aviso"), { target: { value: "1440" } });

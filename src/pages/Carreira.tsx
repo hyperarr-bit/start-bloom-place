@@ -437,10 +437,19 @@ export const reuniaoDoContato = (
 const notasDaReuniao = (c: Contact): string =>
   [c.assunto?.trim() ?? "", c.phone?.trim() ? `Tel: ${c.phone.trim()}` : ""].filter((x) => x).join("\n");
 
+/** O dia em que a reunião nasce (07/11): o próximo dia útil em que 09:00 ainda não passou — abrir com hoje 09:00 à tarde marcava no passado. */
+export const diaPadraoDaReuniao = (agora: Date = new Date()): string => {
+  for (let i = 0; i < 8; i++) {
+    const d = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + i, 9, 0, 0, 0);
+    if (d.getTime() > agora.getTime() && d.getDay() !== 0 && d.getDay() !== 6) return localDayKey(d);
+  }
+  return localDayKey(agora);
+};
+
 /** O formulário da reunião, debaixo da linha do contato — os mesmos campos do compromisso da Rotina, sem repetição. */
 const FormReuniao = ({ contato, onMarcar, onCancelar }: { contato: Contact; onMarcar: (c: Compromisso) => void; onCancelar: () => void }) => {
   const [titulo, setTitulo] = useState(`Reunião com ${contato.name}`);
-  const [data, setData] = useState(localDayKey());
+  const [data, setData] = useState(() => diaPadraoDaReuniao());
   const [hora, setHora] = useState("09:00");
   const [aviso, setAviso] = useState<number>(AVISO_PADRAO);
   const [local, setLocal] = useState("");
@@ -448,13 +457,17 @@ const FormReuniao = ({ contato, onMarcar, onCancelar }: { contato: Contact; onMa
   const marcar = () => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) { toast.error("Escolhe o dia da reunião"); return; }
     if (!/^\d{1,2}:\d{2}$/.test(hora)) { toast.error("Escolhe a hora"); return; }
+    // horário no passado não vira aviso: avisa antes de gravar, em vez do toast de sucesso
+    const [a, m, d] = data.split("-").map(Number);
+    const [h, min] = hora.split(":").map(Number);
+    if (new Date(a, m - 1, d, h, min).getTime() <= Date.now()) { toast.error("Esse horário já passou"); return; }
     onMarcar(reuniaoDoContato(contato, { titulo, data, hora, aviso, local, notas }, genId()));
   };
   return (
     <div className="mt-2 p-3 rounded-md border border-sky-200 dark:border-sky-900/60 bg-sky-50/60 dark:bg-sky-950/20 space-y-2" data-testid="form-reuniao">
       <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">📅 Reunião — vai pra Rotina, com aviso</p>
       <Input value={titulo} onChange={e => setTitulo(e.target.value)} onKeyDown={e => e.key === "Enter" && marcar()} className="h-8 text-xs" aria-label="Nome da reunião" />
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-[3fr_2fr] gap-2">
         <CampoData rotulo="Data" value={data} onChange={e => setData(e.target.value)} className="h-8 text-xs" aria-label="Data da reunião" />
         <Input type="time" value={hora} onChange={e => setHora(e.target.value)} className="h-8 text-xs" aria-label="Hora da reunião" />
       </div>
@@ -559,10 +572,10 @@ const Networking = () => {
           <Select value={form.category || "profissional"} onValueChange={v => setForm(p => ({ ...p, category: v }))}><SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger><SelectContent>{categories.map(c => <SelectItem key={c} value={c}>{catEmoji[c]} {c}</SelectItem>)}</SelectContent></Select>
           {/* 07/11 (dono): onde conheceu, quando, e o assunto/próximo passo — opcionais */}
           <div className="grid grid-cols-2 gap-2">
-            <Input placeholder="Onde conheceu (ex.: evento em SP)" value={form.onde || ""} onChange={e => setForm(p => ({ ...p, onde: e.target.value }))} className="h-9 text-sm" />
+            <Input placeholder="Onde conheceu" value={form.onde || ""} onChange={e => setForm(p => ({ ...p, onde: e.target.value }))} className="h-9 text-sm" />
             <CampoData rotulo="Data" value={form.conheceuEm || ""} onChange={e => setForm(p => ({ ...p, conheceuEm: e.target.value }))} className="h-9 text-sm" aria-label="Data em que conheceu" />
           </div>
-          <Input placeholder="Assunto / próximo passo (ex.: marcar reunião)" value={form.assunto || ""} onChange={e => setForm(p => ({ ...p, assunto: e.target.value }))} className="h-9 text-sm" />
+          <Input placeholder="Assunto ou próximo passo" value={form.assunto || ""} onChange={e => setForm(p => ({ ...p, assunto: e.target.value }))} className="h-9 text-sm" />
           <Input placeholder="LinkedIn URL" value={form.linkedin || ""} onChange={e => setForm(p => ({ ...p, linkedin: e.target.value }))} className="h-9 text-sm" />
           <div className="grid grid-cols-2 gap-2"><Input placeholder="Email" value={form.email || ""} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} className="h-9 text-sm" /><Input placeholder="Telefone" value={form.phone || ""} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} className="h-9 text-sm" /></div>
           <Textarea placeholder="Notas..." value={form.notes || ""} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} className="text-sm min-h-[50px]" />
@@ -611,15 +624,16 @@ const Networking = () => {
                   {(c.role || c.company) && <p className="text-[10px] text-muted-foreground truncate">{[c.role, c.company].filter(Boolean).join(" @ ")}</p>}
                   {(c.onde || c.conheceuEm) && <p className="text-[10px] text-muted-foreground truncate">📍 {[c.onde, c.conheceuEm ? dataCurtaCarreira(c.conheceuEm) : ""].filter(Boolean).join(" · ")}</p>}
                   {c.assunto && <p className="text-[10px] text-primary truncate">→ {c.assunto}</p>}
-                  {c.phone && <a href={`tel:${c.phone.replace(/[^\d+]/g, "")}`} className="block text-[10px] text-muted-foreground truncate">📞 {c.phone}</a>}
+                  {c.phone && <a href={`tel:${c.phone.replace(/[^\d+]/g, "")}`} className="block text-[10px] text-primary underline decoration-dotted underline-offset-2 truncate">📞 {c.phone}</a>}
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">
-                  <span className="text-[9px] text-muted-foreground whitespace-nowrap">último contato {dataCurtaCarreira(c.lastContact)}</span>
-                  <div className="flex gap-0.5">
-                    {c.linkedin && <Button variant="ghost" size="icon" className="h-6 w-6" aria-label={`LinkedIn de ${c.name}`} onClick={() => window.open(c.linkedin, "_blank")}><Link2 className="w-3 h-3" /></Button>}
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-sky-700 dark:text-sky-300" aria-label={`Marcar reunião com ${c.name}`} aria-pressed={marcando === c.id} onClick={() => setMarcando(marcando === c.id ? null : c.id)}><CalendarPlus className="w-3.5 h-3.5" /></Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" aria-label={`Editar ${c.name}`} onClick={() => editar(c)}><Edit2 className="w-3 h-3" /></Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/70 hover:text-destructive" aria-label={`Apagar ${c.name}`} onClick={() => apagar(c)}><Trash2 className="w-3 h-3" /></Button>
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">último contato {dataCurtaCarreira(c.lastContact)}</span>
+                  {/* 32 px por botão e a lixeira afastada (07/11, crítica: com 24 px colados, apagava querendo editar) */}
+                  <div className="flex gap-1">
+                    {c.linkedin && <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`LinkedIn de ${c.name}`} onClick={() => window.open(c.linkedin, "_blank")}><Link2 className="w-3 h-3" /></Button>}
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-sky-700 dark:text-sky-300" aria-label={`Marcar reunião com ${c.name}`} aria-pressed={marcando === c.id} onClick={() => setMarcando(marcando === c.id ? null : c.id)}><CalendarPlus className="w-3.5 h-3.5" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Editar ${c.name}`} onClick={() => editar(c)}><Edit2 className="w-3 h-3" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 ml-1 text-destructive/70 hover:text-destructive" aria-label={`Apagar ${c.name}`} onClick={() => apagar(c)}><Trash2 className="w-3 h-3" /></Button>
                   </div>
                 </div>
               </div>

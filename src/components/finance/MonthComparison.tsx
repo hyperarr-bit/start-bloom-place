@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { ArrowLeftRight, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SelectEnxuto } from "@/components/ui/select-enxuto";
 import { getMonthTotals, getFinanceStorageKeys, readMonthData, anosComLancamentos } from "@/components/finance/storage-keys";
 import { doPerfil, doPerfilDueDays, perfilAtivoLocal } from "@/lib/finance-perfil";
 import { useAuth } from "@/hooks/use-auth";
@@ -243,7 +243,8 @@ export const MonthComparison = ({ perfil }: Props) => {
   const [idB, setIdB] = useState(idDeMesAno(padraoB));
   const mA = mesAnoDeId(idA);
   const mB = mesAnoDeId(idB);
-  const opcoes = useMemo(() => opcoesDeMeses(anosComLancamentos(userId)), [userId]);
+  // 07/11 (desempenho): as ~94 opções só montam com a lista aberta (SelectEnxuto) — e a lista é montada 1x por conta
+  const opcoes = useMemo(() => opcoesDeMeses(anosComLancamentos(userId)).map((m) => ({ value: idDeMesAno(m), label: rotuloMesAno(m) })), [userId]);
 
   const totalsA = useMemo(() => totaisDoMes(mesAnoDeId(idA), userId, p), [idA, userId, p]);
   const totalsB = useMemo(() => totaisDoMes(mesAnoDeId(idB), userId, p), [idB, userId, p]);
@@ -290,27 +291,9 @@ export const MonthComparison = ({ perfil }: Props) => {
 
       {/* Month selectors */}
       <div className="flex items-center gap-2 mb-3">
-        <Select value={idA} onValueChange={setIdA}>
-          <SelectTrigger className="h-7 text-xs flex-1" aria-label="Primeiro mês">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {opcoes.map((m) => (
-              <SelectItem key={idDeMesAno(m)} value={idDeMesAno(m)} className="text-xs">{rotuloMesAno(m)}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SelectEnxuto value={idA} onValueChange={setIdA} opcoes={opcoes} rotulo={rotuloMesAno(mA)} ariaLabel="Primeiro mês" className="h-7 text-xs flex-1" classeItem="text-xs" />
         <ArrowLeftRight className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-        <Select value={idB} onValueChange={setIdB}>
-          <SelectTrigger className="h-7 text-xs flex-1" aria-label="Segundo mês">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {opcoes.map((m) => (
-              <SelectItem key={idDeMesAno(m)} value={idDeMesAno(m)} className="text-xs">{rotuloMesAno(m)}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SelectEnxuto value={idB} onValueChange={setIdB} opcoes={opcoes} rotulo={rotuloMesAno(mB)} ariaLabel="Segundo mês" className="h-7 text-xs flex-1" classeItem="text-xs" />
       </div>
 
       {!hasData ? (

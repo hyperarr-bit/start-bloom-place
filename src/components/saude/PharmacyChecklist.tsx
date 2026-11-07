@@ -143,6 +143,14 @@ export const PharmacyChecklist = () => {
   const [alarmeExato, setAlarmeExato] = useState<EstadoAlarmeExato>("indisponivel");
   const [dependentes, setDependentes] = usePersistedState<string[]>(CHAVE_DEPENDENTES, []);
   const [semBaixa, setSemBaixa] = usePersistedState<SemBaixa>(CHAVE_SEM_BAIXA, { dia: "", ids: [] });
+  /* A CAIXA DESFAZ O QUE ELA MARCOU (07/11, crítica de fora): a dose que a caixa marcou por último,
+     por grupo. Dois toques na caixa têm de deixar o registro como estava. Escolher só pelo relógio
+     (lib/remedios, doseADesmarcar) errava quando a caixa marcava uma dose ESQUECIDA mais cedo e uma
+     mais tarde já estava marcada pela pílula: o 2º toque tirava a mais tarde, que a pessoa tomou, e a
+     caixa pedia ela de novo (risco de tomar 2× o antibiótico). Fica só na memória da tela: não muda o
+     registro. Esquece quando a pílula ou a mudança de hora mexe no grupo, e ao remontar a tela —
+     aí vale o relógio, como antes. */
+  const marcadaPelaCaixa = useRef<Record<string, { id: string; dia: string }>>({});
   /** a dose foi marcada no dia em que ela acontece? (a das 00:00 tomada às 23:50 mora no dia seguinte) */
   const foiTomada = (d: { id: string; dia: string }) => (supplementLog[d.dia] || []).includes(d.id);
   const grupos = agruparRemedios(supplements);
@@ -340,6 +348,7 @@ export const PharmacyChecklist = () => {
       mudou = true;
     }
     if (mudou) setSupplementLog(log);
+    delete marcadaPelaCaixa.current[depois.chave]; // as marcas mudaram de dia: o que a caixa marcou não vale mais
     let sb: SemBaixa = foto.semBaixa?.dia && Array.isArray(foto.semBaixa.ids) ? foto.semBaixa : { dia: "", ids: [] };
     for (const m of movidas) {
       if (sb.dia !== m.de || !sb.ids.includes(m.id)) continue;
@@ -423,8 +432,10 @@ export const PharmacyChecklist = () => {
                   const taken = doses.length > 0 && tomadas.length === doses.length;
                   // a caixa marca a dose DA HORA (a mais recente que já passou), nunca a 1ª do cadastro
                   const proxima = doseDaHora(doses.filter(d => !foiTomada(d)), agora);
-                  // desmarcar desfaz primeiro a marcada que ainda não chegou (a das 00:00 marcada às 23:30), não a das 16:00
-                  const ultimaTomada = doseADesmarcar(tomadas, agora);
+                  // desmarcar desfaz a dose que a própria caixa marcou por último (se ela ainda está marcada);
+                  // sem isso, a marcada que ainda não chegou (a das 00:00 marcada às 23:30), senão a da hora
+                  const daCaixa = marcadaPelaCaixa.current[g.chave];
+                  const ultimaTomada = (daCaixa && tomadas.find(d => d.id === daCaixa.id && d.dia === daCaixa.dia)) || doseADesmarcar(tomadas, agora);
                   const lowStock = g.estoque <= 5;
                   const color = nameColors[idx % nameColors.length];
                   const rotulo = g.itens.length > 1 ? rotuloDosHorarios(g.itens.map(s => s.time)) : "";
@@ -449,8 +460,13 @@ export const PharmacyChecklist = () => {
                         <button
                           onClick={() => {
                             if (g.itens.length === 1) toggleTaken(linha.id, doses[0]?.dia ?? today);
-                            else if (taken) { if (ultimaTomada) toggleTaken(ultimaTomada.id, ultimaTomada.dia); }
-                            else if (proxima) toggleTaken(proxima.id, proxima.dia);
+                            else if (taken) {
+                              delete marcadaPelaCaixa.current[g.chave];
+                              if (ultimaTomada) toggleTaken(ultimaTomada.id, ultimaTomada.dia);
+                            } else if (proxima) {
+                              marcadaPelaCaixa.current[g.chave] = { id: proxima.id, dia: proxima.dia };
+                              toggleTaken(proxima.id, proxima.dia);
+                            }
                           }}
                           disabled={encerrado}
                           aria-label={g.itens.length === 1
@@ -529,7 +545,11 @@ export const PharmacyChecklist = () => {
                                   key={s.id}
                                   type="button"
                                   disabled={encerrado || !dose}
-                                  onClick={() => dose && toggleTaken(s.id, dose.dia)}
+                                  onClick={() => {
+                                    if (!dose) return;
+                                    delete marcadaPelaCaixa.current[g.chave]; // a pílula mexeu: a caixa volta a escolher pelo relógio
+                                    toggleTaken(s.id, dose.dia);
+                                  }}
                                   aria-pressed={t}
                                   aria-label={t ? `Desmarcar dose das ${s.time} de ${g.nome}` : `Marcar dose das ${s.time} de ${g.nome}`}
                                   data-testid={`dose-${s.id}`}

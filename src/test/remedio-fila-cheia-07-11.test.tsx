@@ -230,9 +230,10 @@ describe("a caixa da linha marca a dose da hora", () => {
     // a pílula das 20:00, às 08:05, é a de ONTEM à noite (o dia do tratamento começa às 20:00): grava em 07/11
     fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Dipirona (20:00)" }));
     expect(store.estado.dados[LOG]).toEqual({ "2026-11-08": ["b1"], "2026-11-07": ["b0"] });
-    // com as duas marcadas, a caixa desmarca a da hora (a das 08:00), não a do cadastro
+    // com as duas marcadas, a caixa desfaz o que ELA marcou por último (a das 20:00 de ontem) — tirar a
+    // das 08:00, tomada de fato, fazia a caixa pedir ela de novo (crítica de fora 07/11)
     fireEvent.click(screen.getByRole("button", { name: "Desmarcar Dipirona" }));
-    expect(store.estado.dados[LOG]).toEqual({ "2026-11-08": [], "2026-11-07": ["b0"] });
+    expect(store.estado.dados[LOG]).toEqual({ "2026-11-08": ["b1"], "2026-11-07": [] });
   });
 });
 

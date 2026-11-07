@@ -433,6 +433,13 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   // `expenses` cru segue só pras listas que EDITAM (tabela, importação) e pras que são por DATA (calendário, desafio da semana,
   // e no Dashboard `lancados`: ÚLTIMAS TRANSAÇÕES e o "mês em uso" do elogio da poupança).
   const totalVariableExpenses = variaveisMes.total;
+  /* (07/11, bug "previsao-fatura") A parte das variáveis que veio da FATURA DO MÊS PASSADO (crédito depois do
+     fechamento de lá): valor fechado, entra uma vez. A PREVISÃO DO FIM DO MÊS (Dashboard, Pergunte ao CORE, lista
+     de desejos) a deixa fora do ritmo do dia. Sem cartão com fechamento é 0. */
+  const faturaDoMesAnterior = variaveisMes.doMesAnterior.reduce((s: number, g: any) => {
+    const v = Number(g?.value);
+    return s + (g?.value !== null && Number.isFinite(v) ? v : 0);
+  }, 0);
   /* 17/10 — o que ela gastou HOJE (variáveis que contam neste mês): a linha "Sobram R$ X pra hoje" do card
      QUANTO POSSO GASTAR HOJE (Dashboard `gastoDeHoje`; no de sempre só aparece com gasto hoje). */
   const gastoDeHoje = gastoDoDia(variaveisMes.noMes);
@@ -642,6 +649,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 totalIncome={totalIncome}
                 totalExpenses={monthlyOutflow}
                 monthlyInstallments={monthlyInstallments}
+                faturaDoMesAnterior={faturaDoMesAnterior}
                 totalDebts={totalDebts}
                 totalInvestments={totalInvestments}
                 expenses={variaveisMes.noMes}
@@ -718,6 +726,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 totalIncome={totalIncome}
                 totalExpenses={monthlyOutflow}
                 monthlyInstallments={monthlyInstallments}
+                faturaDoMesAnterior={faturaDoMesAnterior}
                 totalDebts={totalDebts}
                 totalInvestments={totalInvestments}
                 expenses={variaveisMes.noMes}
@@ -921,6 +930,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
               monthlyInstallments={monthlyInstallments}
               fixedExpenses={fixedExpenses}
               dueDays={dueDays}
+              faturaDoMesAnterior={faturaDoMesAnterior}
             />
           </TrackedCard>
         )}
@@ -1002,6 +1012,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
           monthlyOutflow,
           savingsRate,
           monthlyInstallments,
+          faturaDoMesAnterior,
           totalInvestments,
           totalDebts,
           // (07/11) a lista que CONTA no mês, a mesma dos LIMITES: "Como estão meus limites?" e "Onde tô

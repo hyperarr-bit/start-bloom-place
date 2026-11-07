@@ -163,9 +163,14 @@ export const statusDoPodeGastar = (
  * Só as VARIÁVEIS seguem o ritmo do dia. Fixos, parcelas (valor fixo do mês) e contas avulsas com valor
  * (17/10) já estão inteiros em `monthlyOutflow` e entram uma vez. A avulsa SEM valor ainda não está na
  * saída: entra pela estimativa de computeUnpaidOutsideOutflow (o mesmo número do "quanto posso gastar").
+ *
+ * (07/11, bug "previsao-fatura") A FATURA QUE VEIO DO MÊS PASSADO (lib/finance-fatura, variaveisMes.doMesAnterior:
+ * a compra no crédito depois do fechamento do mês anterior) também é valor fechado: entra uma vez, não é ritmo.
+ * Sem tirá-la, em 1º/11 a TV de R$ 1.000 de 28/10 virava "R$ 1.000 por dia" e o mês "fechava em R$ 30.000".
+ * Sem cartão com fechamento/vencimento ela é 0 e a conta é a de sempre.
  */
 export const previsaoDoMes = ({
-  totalIncome, monthlyOutflow, fixedExpenses, monthlyInstallments, dueDays, agora = new Date(),
+  totalIncome, monthlyOutflow, fixedExpenses, monthlyInstallments, dueDays, faturaDoMesAnterior = 0, agora = new Date(),
 }: {
   totalIncome: number;
   /** A saída do mês (computeMonthlyOutflow) — fixos + variáveis + parcelas + avulsas. */
@@ -173,13 +178,17 @@ export const previsaoDoMes = ({
   fixedExpenses: any[];
   monthlyInstallments: number;
   dueDays: any[];
+  /** A parte das variáveis que veio da fatura do mês anterior (soma de variaveisMes.doMesAnterior) — já dentro de
+   *  monthlyOutflow; fica fora do ritmo do dia. */
+  faturaDoMesAnterior?: number;
   agora?: Date;
 }) => {
   const day = agora.getDate();
   const daysInMonth = new Date(agora.getFullYear(), agora.getMonth() + 1, 0).getDate();
   const remainingDays = daysInMonth - day;
   const fixedCostsRecorded = (fixedExpenses ?? []).reduce((s: number, e: any) => s + (e?.value || 0), 0);
-  const variableSpent = Math.max(0, monthlyOutflow - fixedCostsRecorded - monthlyInstallments - computeLooseBillsOutflow(dueDays, fixedExpenses));
+  const faturaAnterior = Number.isFinite(faturaDoMesAnterior) ? Math.max(0, faturaDoMesAnterior) : 0;
+  const variableSpent = Math.max(0, monthlyOutflow - fixedCostsRecorded - monthlyInstallments - computeLooseBillsOutflow(dueDays, fixedExpenses) - faturaAnterior);
   const dailyVariableRate = day > 0 ? variableSpent / day : 0;
   const projectedVariableRemaining = dailyVariableRate * remainingDays;
   const unpaidBillsEstimate = computeUnpaidOutsideOutflow(dueDays, fixedExpenses);

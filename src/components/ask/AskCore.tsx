@@ -38,6 +38,9 @@ export interface AskCtx {
   monthlyOutflow: number;
   savingsRate: number;
   monthlyInstallments: number;
+  /** (07/11, bug "previsao-fatura") A fatura do mês anterior que cai neste (Index variaveisMes.doMesAnterior) — já
+   *  dentro de monthlyOutflow; fica fora do ritmo da previsão. Ausente = 0. */
+  faturaDoMesAnterior?: number;
   totalInvestments: number;
   totalDebts: number;
   /** Variáveis que CONTAM no mês (regra da fatura — Index `variaveisMes.noMes`), as mesmas dos LIMITES. */
@@ -221,7 +224,7 @@ const QUESTIONS: Question[] = [
       // projetava o aluguel de novo a cada semana ("fecha em ~R$ 9.000" no dia 7 com R$ 100 de gasto).
       const paceOutflow = previsaoDoMes({
         totalIncome: ctx.totalIncome, monthlyOutflow: ctx.monthlyOutflow, fixedExpenses: ctx.fixedExpenses,
-        monthlyInstallments: ctx.monthlyInstallments, dueDays: ctx.dueDays,
+        monthlyInstallments: ctx.monthlyInstallments, dueDays: ctx.dueDays, faturaDoMesAnterior: ctx.faturaDoMesAnterior,
       }).saidaProjetada;
       const better = paceOutflow < prevOutflow;
       return `${prevMonth}: ${fmt(prevOutflow)} de gastos.\nEste mês até agora: ${fmt(ctx.monthlyOutflow)} — no ritmo atual, fecha em ~${fmt(paceOutflow)}.\n\n${better ? "✅ Sim! Nesse passo você gasta MENOS que mês passado." : `⚠️ No ritmo atual, passa ${fmt(paceOutflow - prevOutflow)} do mês anterior. Dá tempo de frear.`}`;

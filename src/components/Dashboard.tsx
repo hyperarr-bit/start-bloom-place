@@ -73,6 +73,9 @@ interface DashboardProps {
   /** Parcelas do mês — já dentro de totalExpenses; a previsão precisa do valor
    *  separado pra não projetar parcela fixa como gasto variável diário. */
   monthlyInstallments?: number;
+  /** (07/11, bug "previsao-fatura") A fatura do mês anterior que cai neste (Index variaveisMes.doMesAnterior) — já
+   *  dentro de totalExpenses; a previsão a deixa fora do ritmo do dia. Sem cartão com fechamento, 0. */
+  faturaDoMesAnterior?: number;
   onNavigate?: (tab: string) => void;
   /** Perfil ativo (PF/PJ): sem ele o gráfico anual não recalculava ao trocar o chip (13/09). */
   perfil?: string;
@@ -198,6 +201,7 @@ export const Dashboard = ({
   savingsRate,
   incomes,
   monthlyInstallments = 0,
+  faturaDoMesAnterior = 0,
   onNavigate,
   perfil,
   limpo = false,
@@ -427,8 +431,9 @@ export const Dashboard = ({
     // CORE. Só as variáveis seguem o ritmo do dia (parcelas são valor fixo do mês; 17/10: nem as contas avulsas
     // do MEU MÊS, que já estão em totalExpenses); as contas sem valor entram pela estimativa
     // (computeUnpaidOutsideOutflow — conta de fixo e fatura já estão em totalExpenses, 26/09).
-    return previsaoDoMes({ totalIncome, monthlyOutflow: totalExpenses, fixedExpenses, monthlyInstallments, dueDays });
-  }, [totalIncome, totalExpenses, fixedExpenses, dueDays, monthlyInstallments]);
+    // (07/11, bug "previsao-fatura") a fatura que veio do mês passado entra uma vez, não vira ritmo.
+    return previsaoDoMes({ totalIncome, monthlyOutflow: totalExpenses, fixedExpenses, monthlyInstallments, dueDays, faturaDoMesAnterior });
+  }, [totalIncome, totalExpenses, fixedExpenses, dueDays, monthlyInstallments, faturaDoMesAnterior]);
 
   // Daily budget: how much you can spend per day
   // Logic: saldo atual = income - totalExpenses (already spent, includes fixed recorded)

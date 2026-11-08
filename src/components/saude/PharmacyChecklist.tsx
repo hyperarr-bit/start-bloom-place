@@ -440,7 +440,12 @@ export const PharmacyChecklist = () => {
                   // desmarcar desfaz a dose que a própria caixa marcou por último (se ela ainda está marcada);
                   // sem isso, a marcada que ainda não chegou (a das 00:00 marcada às 23:30), senão a da hora
                   const daCaixa = marcadaPelaCaixa.get(g.chave);
-                  const ultimaTomada = (daCaixa && tomadas.find(d => d.id === daCaixa.id && d.dia === daCaixa.dia)) || doseADesmarcar(tomadas, agora);
+                  const marcadaAgoraPelaCaixa = daCaixa ? tomadas.find(d => d.id === daCaixa.id && d.dia === daCaixa.dia) : undefined;
+                  const ultimaTomada = marcadaAgoraPelaCaixa || doseADesmarcar(tomadas, agora);
+                  // a caixa acabou de marcar uma dose MAIS NOVA deste dia do tratamento (e ela segue marcada):
+                  // a que sobrou é uma esquecida, que já passou — o 2º toque não marca ela, só avisa
+                  // (crítica de fora, rodada 1, 07/11: 1 comprimido virava 2 doses, o estoque descia 2 e o furo sumia)
+                  const ficouPraTras = proxima && marcadaAgoraPelaCaixa && marcadaAgoraPelaCaixa.quando > proxima.quando ? proxima : undefined;
                   const lowStock = g.estoque <= 5;
                   const color = nameColors[idx % nameColors.length];
                   const rotulo = g.itens.length > 1 ? rotuloDosHorarios(g.itens.map(s => s.time)) : "";
@@ -468,6 +473,8 @@ export const PharmacyChecklist = () => {
                             else if (taken) {
                               marcadaPelaCaixa.delete(g.chave);
                               if (ultimaTomada) toggleTaken(ultimaTomada.id, ultimaTomada.dia);
+                            } else if (ficouPraTras) {
+                              toast(`A das ${ficouPraTras.time} ficou pra trás. Se tomou, toque no horário.`, { id: `remedio-pra-tras-${g.chave}`, duration: 4000 });
                             } else if (proxima) {
                               marcadaPelaCaixa.set(g.chave, { id: proxima.id, dia: proxima.dia });
                               toggleTaken(proxima.id, proxima.dia);
@@ -480,6 +487,7 @@ export const PharmacyChecklist = () => {
                             ? (taken ? `Desmarcar ${g.nome}` : `Marcar ${g.nome} como tomado`)
                             : (taken ? `Desmarcar ${g.nome}`
                               : aindaVem ? `Próxima dose de ${g.nome} às ${aindaVem.time}`
+                              : ficouPraTras ? `A dose de ${g.nome} das ${ficouPraTras.time} ficou pra trás`
                               : `Marcar próxima dose de ${g.nome}${proxima ? ` (${proxima.time})` : ""}`)}
                           className="group w-9 h-9 -mx-2 -mt-1.5 -mb-2 grid place-items-center rounded-lg disabled:cursor-not-allowed"
                           data-testid={`remedio-caixa-${g.chave}`}

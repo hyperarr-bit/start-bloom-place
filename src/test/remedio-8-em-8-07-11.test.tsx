@@ -307,7 +307,12 @@ describe("Vitaminas e Remédios: o grupo na tabela", () => {
       montar(store);
       fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (16:00)" }));
       expect(store.estado.dados[LOG]).toEqual({ "2026-11-07": ["a1"] });
-      fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (08:00)" }));
+      // crítica de fora, rodada 1 (07/11): a das 08:00 é esquecida e a caixa acabou de marcar a das 16:00 —
+      // o 2º toque não marca a esquecida (1 comprimido virava 2 doses), só avisa; se tomou, é pela pílula
+      fireEvent.click(screen.getByRole("button", { name: "A dose de Amoxicilina das 08:00 ficou pra trás" }));
+      expect(store.estado.dados[LOG]).toEqual({ "2026-11-07": ["a1"] });
+      expect(toast.ultimo?.texto).toBe("A das 08:00 ficou pra trás. Se tomou, toque no horário.");
+      fireEvent.click(screen.getByTestId("dose-a0"));
       // 2ª rodada da crítica de fora (07/11): a das 00:00 ainda não chegou (falta 1h30) — a caixa não grava
       // nada, só diz quando ela é; adiantar é pela pílula do horário
       fireEvent.click(screen.getByRole("button", { name: "Próxima dose de Amoxicilina às 00:00" }));

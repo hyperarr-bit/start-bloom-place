@@ -3,7 +3,9 @@
  * enquanto o app faz diferente: quando o conserto entrar, o caso passa a falhar aqui e vira `it`.
  *
  *  R1 (MEDIA) 2 toques na caixa com uma dose esquecida mais cedo: o 2º marca a esquecida (que não foi
- *     tomada) — registro mostra 2 doses pra 1 comprimido e o estoque desce 2.
+ *     tomada) — registro mostra 2 doses pra 1 comprimido e o estoque desce 2. CONSERTADO (07/11): com a
+ *     caixa tendo marcado uma dose mais nova deste dia do tratamento, o 2º toque só avisa
+ *     "A das 08:00 ficou pra trás. Se tomou, toque no horário."
  *  R2 (BAIXA) "Começa amanhã 08:00": às 15:00 a caixa diz "A das 08:00 ainda não chegou" (a de hoje já passou).
  *  R3 (BAIXA) horários editados a menos de 30 min (08:00 e 08:20): a folga sai só das doses em aberto, e o
  *     2º toque às 08:05 marca a das 08:20 — o aviso dela sai da fila.
@@ -101,7 +103,7 @@ afterEach(() => { cleanup(); vi.useRealTimers(); esquecerMarcasDaCaixa(); });
 const log = (s: Store) => limpo(s.estado.dados[LOG]);
 
 describe("crítica de fora, rodada 1", () => {
-  it.fails("R1 8 em 8, 16:05, a das 08:00 esquecida: 2 toques marcam só a das 16:00 (o 2º avisa), estoque desce 1", () => {
+  it("R1 8 em 8, 16:05, a das 08:00 esquecida: 2 toques marcam só a das 16:00 (o 2º avisa), estoque desce 1", () => {
     const novas = vezes(3, "08:00", agoraEm(6, 7, 50));
     const [d08, d16, d00] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas.map((l) => ({ ...l, stock: 16 })), [LOG]: { "2026-11-06": [d08, d16], "2026-11-07": [d00] } });
@@ -109,12 +111,19 @@ describe("crítica de fora, rodada 1", () => {
     montar(store);
     fireEvent.click(caixa());
     fireEvent.click(caixa());
-    // hoje: {"2026-11-07": [d00, d16, d08]} e estoque 14
+    // antes do conserto: {"2026-11-07": [d00, d16, d08]} e estoque 14
     expect(log(store)).toEqual({ "2026-11-06": [d08, d16], "2026-11-07": [d00, d16] });
     expect(linhas(store).map((l) => l.stock)).toEqual([15, 15, 15]);
+    expect(falas).toEqual(["A das 08:00 ficou pra trás. Se tomou, toque no horário."]);
+    expect(rotulo()).toBe("A dose de Amoxicilina das 08:00 ficou pra trás");
+    // se tomou mesmo, a pílula marca: o registro e o estoque contam 2 comprimidos; a caixa passa pra das 00:00
+    fireEvent.click(screen.getByTestId(`dose-${d08}`));
+    expect(log(store)).toEqual({ "2026-11-06": [d08, d16], "2026-11-07": [d00, d16, d08] });
+    expect(linhas(store).map((l) => l.stock)).toEqual([14, 14, 14]);
+    expect(rotulo()).toBe("Próxima dose de Amoxicilina às 00:00");
   });
 
-  it.fails("R1b 8 em 8, 23:50, a das 16:00 esquecida: 2 toques marcam só a das 00:00", () => {
+  it("R1b 8 em 8, 23:50, a das 16:00 esquecida: 2 toques marcam só a das 00:00", () => {
     const novas = vezes(3, "08:00", agoraEm(6, 7, 50));
     const [d08, , d00] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas.map((l) => ({ ...l, stock: 16 })), [LOG]: { "2026-11-07": [d00, d08] } });
@@ -123,6 +132,7 @@ describe("crítica de fora, rodada 1", () => {
     fireEvent.click(caixa());
     fireEvent.click(caixa());
     expect(log(store)).toEqual({ "2026-11-07": [d00, d08], "2026-11-08": [d00] });
+    expect(falas).toEqual(["A das 16:00 ficou pra trás. Se tomou, toque no horário."]);
   });
 
   it.fails("R2 'Começa amanhã 08:00' cadastrado às 10:00: às 15:00 o aviso e o rótulo dizem amanhã", () => {

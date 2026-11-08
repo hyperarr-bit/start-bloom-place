@@ -228,7 +228,14 @@ describe("a caixa da linha marca a dose da hora", () => {
     expect(store.estado.dados[LOG]).toEqual({ "2026-11-08": ["b1"] });
     const plano = planejarRemedios(lerDadosDosLembretes(store.get).remedios);
     expect(plano[0].quando.getTime()).toBe(new Date(2026, 10, 8, 20, 0).getTime());
-    // a pílula das 20:00, às 08:05, é a de ONTEM à noite (o dia do tratamento começa às 20:00): grava em 07/11
+    // a das 20:00 que sobra, às 08:05, é a de ONTEM à noite, esquecida: a caixa acabou de marcar a das 08:00
+    // (mais nova), então o 2º toque não marca a esquecida, só avisa (crítica de fora, rodada 1, 07/11)
+    fireEvent.click(screen.getByRole("button", { name: "A dose de Dipirona das 20:00 ficou pra trás" }));
+    expect(store.estado.dados[LOG]).toEqual({ "2026-11-08": ["b1"] });
+    // a pílula das 08:00 mexe (tira e põe de novo): a caixa esquece o que marcou e volta a escolher pelo relógio
+    fireEvent.click(screen.getByTestId("dose-b1"));
+    fireEvent.click(screen.getByTestId("dose-b1"));
+    // agora a das 08:00 foi a pílula: a caixa marca a esquecida das 20:00 de ontem — grava em 07/11
     fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Dipirona (20:00)" }));
     expect(store.estado.dados[LOG]).toEqual({ "2026-11-08": ["b1"], "2026-11-07": ["b0"] });
     // com as duas marcadas, a caixa desfaz o que ELA marcou por último (a das 20:00 de ontem) — tirar a

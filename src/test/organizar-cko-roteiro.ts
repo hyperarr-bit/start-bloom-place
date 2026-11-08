@@ -34,7 +34,7 @@ export const apagarCookies = () => {
   for (const c of document.cookie.split(";")) { const n = c.split("=")[0].trim(); if (n) { document.cookie = `${n}=; Max-Age=0; Path=/`; document.cookie = `${n}=; Max-Age=0; Path=/; Domain=.coreaplicativo.com.br`; } }
 };
 
-export type Abrir = { lp: Lp; pix: Pix; u2027?: boolean; limpar?: boolean; url?: string; cko?: "v2" | "atual" | null; ckoForcado?: boolean };
+export type Abrir = { lp: Lp; pix: Pix; u2027?: boolean; limpar?: boolean; url?: string; cko?: "v2" | "atual" | null; ckoForcado?: boolean; oferta?: "ano" | "sempre"; manterHist?: boolean };
 export let fbq = vi.fn();
 
 /** o observador de interseção como no navegador: avisa DEPOIS (o do setup.ts avisa dentro do observe(), antes de o landing.ts terminar
@@ -48,19 +48,20 @@ class ObservadorDepois {
   }
   unobserve() {} disconnect() {} takeRecords(): IntersectionObserverEntry[] { return []; }
 }
-(window as unknown as { IntersectionObserver: unknown }).IntersectionObserver = ObservadorDepois; // writable no setup.ts (não configurable)
+(window as unknown as { IntersectionObserver: unknown }).IntersectionObserver = ObservadorDepois;
+window.scrollTo = (() => {}) as typeof window.scrollTo; // o jsdom não rola (e avisa "Not implemented" a cada destravada de página) // writable no setup.ts (não configurable)
 
 /** abre a página como o <head> deixaria (data-* do <html>) e importa o landing.ts de novo */
 export async function abrirPagina(o: Abrir): Promise<void> {
   vi.resetModules();
   if (o.limpar !== false) { localStorage.clear(); sessionStorage.clear(); apagarCookies(); }
-  window.history.replaceState(null, "", o.url ?? "/organizar");
+  if (!o.manterHist) window.history.replaceState(null, "", o.url ?? "/organizar"); // manterHist: a recarga (a entrada do histórico continua a mesma)
   w().__eventosLanding = [];
   delete w().__landingSimularJaTem;
   const d = document.documentElement;
   for (const a of [...d.attributes]) if (a.name.startsWith("data-")) d.removeAttribute(a.name);
   d.setAttribute("data-t", "a");
-  d.setAttribute("data-oferta", "sempre");
+  d.setAttribute("data-oferta", o.oferta ?? "sempre");
   d.setAttribute("data-checkout", "email");
   d.setAttribute("data-lp", o.lp);
   d.setAttribute("data-pix", o.pix);
@@ -194,3 +195,113 @@ export async function roteiroHoje(lp: Lp, pix: Pix, extra: Partial<Abrir> = {}):
 
   return { estados, eventos: evs, pixel: px };
 }
+
+/* ───────────────────────── 08/11: o MESMO roteiro pela camada do checkout novo (data-cko="v2") ───────────────────────── */
+export const camadaAberta = () => { const c = document.getElementById("cko"); return !!c && !c.hidden; };
+export const esperaCamada = () => vi.waitFor(() => { if (!camadaAberta()) throw new Error("camada fechada"); }, { timeout: 4000, interval: 10 });
+export const esperaCamadaFechar = () => vi.waitFor(() => { if (camadaAberta()) throw new Error("camada aberta"); }, { timeout: 4000, interval: 10 });
+/** os eventos novos da camada saem da comparação com a fixture (o resto tem de ser IGUAL) */
+export const semCko = (l: Ev[]) => l.filter((e) => !/^landing_cko_/.test(e.nome));
+
+export type RoteiroV2 = Roteiro & { camada: Record<string, string>; eventosCko: Record<string, Ev[]> };
+/** A–E do roteiroHoje, mas pagando pela camada: o botão fixo abre a camada; erro, sugestão, gerando e código aparecem NELA; do QR em diante, o cartão */
+export async function roteiroV2(lp: Lp, pix: Pix): Promise<RoteiroV2> {
+  const estados: Record<string, string> = {};
+  const camada: Record<string, string> = {};
+  const evs: Record<string, Ev[]> = {};
+  const evsCko: Record<string, Ev[]> = {};
+  const px: Record<string, unknown[]> = {};
+  const fotoCamada = () => limparHtml(document.getElementById("cko-in")!.innerHTML);
+  const fechar = (k: string) => { evs[k] = semCko(limparEventos(eventos())); evsCko[k] = limparEventos(eventos(), false).filter((e) => /^landing_cko_/.test(e.nome)); px[k] = limparPixel(fbq.mock.calls); };
+  const abrir = (o: Partial<Abrir> = {}) => abrirPagina({ lp, pix, cko: "v2", ...o });
+
+  // A
+  await abrir();
+  estados.oferta = fotoCartao();
+  clicar(botaoFixo(lp));
+  await esperaCamada();
+  camada.aberta = fotoCamada();
+  clicar("#cko-gerar");
+  await dormir(30);
+  camada.erro_vazio = fotoCamada();
+  digitar("cko-email", "maria@gmial.com");
+  document.getElementById("cko-email")!.dispatchEvent(new Event("blur"));
+  camada.sugestao = fotoCamada();
+  clicar("#cko-sug");
+  clicar("#cko-gerar");
+  camada.gerando = fotoCamada();
+  await espera('#lp-card [data-testid="landing-codigo"]');
+  await esperaCamadaFechar();
+  estados.qr = fotoCartao();
+  simularPago();
+  await espera('[data-testid="landing-conta"]');
+  estados.conta = fotoCartao();
+  fechar("A");
+
+  // B
+  await abrir();
+  clicar("#lp-pagar"); // B–E: como no roteiro de hoje (sem o botão fixo), pelo botão do cartão — que agora abre a camada
+  await esperaCamada();
+  digitar("cko-email", "maria+existe@email.com");
+  clicar("#cko-gerar");
+  await espera('#cko [data-testid="landing-email-tem-conta"]');
+  camada.codigo = fotoCamada();
+  estados.cartao_no_codigo = fotoCartao();
+  digitar("lp-codigo-antes", "12345678");
+  clicar("#lp-entrar-pagar");
+  await espera('#lp-card [data-testid="landing-codigo"]');
+  await esperaCamadaFechar();
+  estados.qr_codigo = fotoCartao();
+  fechar("B");
+
+  // C
+  await abrir();
+  clicar("#lp-pagar"); // B–E: como no roteiro de hoje (sem o botão fixo), pelo botão do cartão — que agora abre a camada
+  await esperaCamada();
+  digitar("cko-email", "maria+jatem@email.com");
+  clicar("#cko-gerar");
+  await espera('#cko [data-testid="landing-email-tem-conta"]');
+  digitar("lp-codigo-antes", "12345678");
+  clicar("#lp-entrar-pagar");
+  await espera('#lp-card [data-testid="landing-ja-tem"]');
+  await esperaCamadaFechar();
+  estados.ja_tem = fotoCartao();
+  fechar("C");
+
+  // D
+  await abrir();
+  clicar("#lp-pagar"); // B–E: como no roteiro de hoje (sem o botão fixo), pelo botão do cartão — que agora abre a camada
+  await esperaCamada();
+  digitar("cko-email", "maria@email.com");
+  clicar("#cko-gerar");
+  await espera('#lp-card [data-testid="landing-codigo"]');
+  await abrir({ limpar: false });
+  await espera('[data-testid="landing-codigo"]');
+  estados.qr_reaberto = fotoCartao();
+  localStorage.clear(); sessionStorage.clear();
+  await abrir({ limpar: false });
+  await espera('[data-testid="landing-codigo"]');
+  estados.qr_cookie = fotoCartao();
+  fechar("D");
+
+  // E
+  await abrir({ u2027: true });
+  clicar("#lp-pagar"); // B–E: como no roteiro de hoje (sem o botão fixo), pelo botão do cartão — que agora abre a camada
+  await esperaCamada();
+  digitar("cko-email", "maria@email.com");
+  clicar("#cko-gerar");
+  await espera('#lp-card [data-testid="landing-codigo"]');
+  await esperaCamadaFechar();
+  simularPago();
+  await espera('[data-testid="presente-agora-nao"]');
+  await dormir(700);
+  estados.presente = fotoCartao();
+  clicar('[data-testid="presente-agora-nao"]');
+  await espera('[data-testid="landing-conta"]');
+  estados.conta_depois_presente = fotoCartao();
+  fechar("E");
+
+  return { estados, eventos: evs, pixel: px, camada, eventosCko: evsCko };
+}
+/** o campo de e-mail do cartão (escondido no checkout novo — o e-mail é pedido na camada): fora da comparação do cartão */
+export const semCampoDoCartao = (h: string) => h.replace(/<div class="lp-email-antes"[\s\S]*?<\/div>/, "<!--campo-->");

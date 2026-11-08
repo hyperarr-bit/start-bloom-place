@@ -389,8 +389,8 @@ export function abrirCko(o: OpcoesCko): void {
   opc = o;
   if (!raiz || !document.body.contains(raiz)) raiz = montar();
   focoAntes = document.activeElement as HTMLElement | null;
-  emailMemo = o.emailInicial;
-  emailDigitado = !!o.emailInicial;
+  if (!emailMemo) emailMemo = o.emailInicial; // fechou e reabriu: o que ela digitou continua lá
+  emailDigitado = !!emailMemo;
   duvidasVistas = new Set(); duvidasAberto = false; rodapeVisto = false; bannerMedido = false; saiuNestaAbertura = false;
   tela = null;
   aberta = true;
@@ -404,7 +404,7 @@ export function abrirCko(o: OpcoesCko): void {
   window.addEventListener("popstate", aoPop);
   document.addEventListener("visibilitychange", aoVisibilidade);
   mostrarFormulario(null);
-  o.evento("landing_cko_aberto", { de: o.de, vez: o.vez, email_pre: !!o.emailInicial, aviso_vencido: !!o.aviso, ms: o.ms });
+  o.evento("landing_cko_aberto", { de: o.de, vez: o.vez, email_pre: !!emailMemo, aviso_vencido: !!o.aviso, ms: o.ms });
   window.setTimeout(() => { if (aberta) raiz?.querySelector<HTMLElement>("#cko-email, #cko-gerar")?.focus({ preventScroll: true }); }, 30);
 }
 

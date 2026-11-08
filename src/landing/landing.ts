@@ -1829,6 +1829,11 @@ function aoFecharCko(via: string) {
   if (via === "x" || via === "esc" || via === "voltar") { if (estado.fase !== "oferta" && estado.fase !== "erro") rolarAte(card, "start", false); return; }
   rolarAte(card, "start", false);
   requestAnimationFrame(() => rolarAte(card, "start", false));
+  // a entrada da camada sai do histórico por baixo (history.back): se a restauração de rolagem do navegador estiver "auto" (ex.: a demo em
+  // tela cheia devolveu o "auto" com a camada aberta), o popstate pode jogar a página no y velho — o cartão volta pro topo depois dele
+  const deNovo = () => { rolarAte(card, "start", false); requestAnimationFrame(() => rolarAte(card, "start", false)); };
+  window.addEventListener("popstate", deNovo, { once: true });
+  window.setTimeout(() => window.removeEventListener("popstate", deNovo), 1500);
 }
 /** a cada render: a camada aberta mostra a fase de hoje — ou fecha. null = sem camada aberta (sempre, com a chave off) */
 function sincronizarCko(): "aberta" | "fechou" | null {

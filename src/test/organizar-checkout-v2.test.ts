@@ -323,6 +323,27 @@ describe("checkout novo (data-cko=\"v2\"): o mesmo Pix, a mesma tela do QR em di
     await esperaCamadaFechar();
   });
 
+  it.each(["atual", "v2"] as const)("'Usar outro e-mail' no CARTÃO (código, X, camada fechada) e reabrir: a camada volta com o campo vazio, não com o e-mail recusado — AB_LP %s", async (lp) => {
+    await abrirPagina({ lp, pix: "atual", cko: "v2" });
+    clicar("#lp-pagar");
+    await esperaCamada();
+    digitar("cko-email", "maria+existe@email.com");
+    clicar("#cko-gerar");
+    await espera('#cko [data-testid="landing-email-tem-conta"]');
+    clicar("#cko-x");
+    await esperaCamadaFechar();
+    await espera('#lp-card [data-testid="landing-email-tem-conta"]');
+    clicar("#lp-outro-email");
+    expect(document.getElementById("lp-card")!.getAttribute("data-fase")).toBe("oferta");
+    clicar("#lp-pagar");
+    await esperaCamada();
+    expect((document.getElementById("cko-email") as HTMLInputElement).value).toBe("");
+    expect(document.querySelector('#cko [data-testid="landing-email-tem-conta"]')).toBeNull();
+    expect(eventos().find((e) => e.nome === "landing_cko_aberto" && e.vez === 2)).toMatchObject({ email_pre: false });
+    clicar("#cko-x"); // não deixar a camada aberta pro próximo teste
+    await esperaCamadaFechar();
+  });
+
   it("com Pix vivo, conta pronta ou \"Você já tem o CORE\", os botões fazem o de hoje (rolam até o cartão), sem abrir a camada", async () => {
     // Pix vivo
     await abrirPagina({ lp: "v2", pix: "atual", cko: "v2" });

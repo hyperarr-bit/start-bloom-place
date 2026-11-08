@@ -1501,7 +1501,7 @@ function ligarCodigoAntes() {
   $("lp-outro-email").addEventListener("click", () => {
     evento("landing_cta", { onde: "outro_email" });
     antes = null; codigoAntes = "";
-    if (ckoAberto()) ckoMod!.definirEmail("");
+    ckoMod?.definirEmail(""); // com a camada fechada também: senão a próxima abertura volta com o e-mail recusado (revisão 08/11)
     render();
     const campo = campoEmailAgora();
     if (campo) { campo.value = ""; try { campo.focus(); } catch { /* noop */ } }

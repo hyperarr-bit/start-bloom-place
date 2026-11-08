@@ -22,8 +22,10 @@ const HTML = readFileSync(resolve(raiz, "landing.html"), "utf8");
 /* ───────── o script do <head>, rodado num ambiente falso (com cookie) ───────── */
 const scriptDaCabeca = HTML.match(/<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/)![1].replace(/var AB_PIX = "(on|off|b)"/, 'var AB_PIX = "off"'); // 03/11: o AB_PIX (ligado no código) cria o id do aparelho — aqui os sorteios antigos são testados sozinhos
 // 29/10: a chave foi LIGADA no código; o caminho "off" (rollback) segue testado trocando a linha
-const ligado = scriptDaCabeca.replace(/var AB_CHECKOUT = "(on|off|email)"/, 'var AB_CHECKOUT = "on"');
-const desligado = scriptDaCabeca.replace(/var AB_CHECKOUT = "(on|off|email)"/, 'var AB_CHECKOUT = "off"');
+// 07/11: AB_LP ligado no main sorteia por aparelho por cima; aqui ele fica "off" pra isolar só o sorteio do checkout
+const semLp = scriptDaCabeca.replace(/var AB_LP = "(on|off)"/, 'var AB_LP = "off"');
+const ligado = semLp.replace(/var AB_CHECKOUT = "(on|off|email)"/, 'var AB_CHECKOUT = "on"');
+const desligado = semLp.replace(/var AB_CHECKOUT = "(on|off|email)"/, 'var AB_CHECKOUT = "off"');
 
 function rodar(fonte: string, url: string, store: Record<string, string> = {}, cookie: { v: string; ultimo?: string } = { v: "" }) {
   const u = new URL(url, "https://www.coreaplicativo.com.br");
@@ -331,7 +333,7 @@ describe("a volta pelo e-mail de lembrete", () => {
 
 describe("31/10 noite: AB_CHECKOUT = \"email\" fixa todo mundo no e-mail antes do Pix", () => {
   it("sem força: braço email pra qualquer aparelho, sem criar id de aparelho; ?checkout=livre ainda força", () => {
-    const fixo = scriptDaCabeca.replace(/var AB_CHECKOUT = "(on|off|email)"/, 'var AB_CHECKOUT = "email"');
+    const fixo = semLp.replace(/var AB_CHECKOUT = "(on|off|email)"/, 'var AB_CHECKOUT = "email"');
     for (let i = 0; i < 5; i++) expect(rodar(fixo, "/organizar").attrs["data-checkout"]).toBe("email");
     expect(rodar(fixo, "/organizar").store["landing-device-id"]).toBeUndefined();
     expect(rodar(fixo, "/organizar?checkout=livre").attrs["data-checkout"]).toBe("livre");

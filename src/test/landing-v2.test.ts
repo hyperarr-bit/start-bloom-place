@@ -1,5 +1,5 @@
 /**
- * LANDING /organizar — BRAÇO v2 "vitrine" (30/10), o A/B "AB_LP" (braço "atual" × "v2"), DESLIGADO no código.
+ * LANDING /organizar — BRAÇO v2 "vitrine" (30/10), o A/B "AB_LP" (braço "atual" × "v2"), LIGADO no código desde 07/11 (antes desligado).
  *
  * Por quê (lp-web/funil 30/10 + lp-analise/topo 29/10): 61% não rolam a 1ª tela (75% somem em < 3 s); a oferta ficava
  * 4,7 telas abaixo; a pergunta de área era tocada por 1%; "É um app de verdade?" é a dúvida nº 1; quem volta do banco
@@ -59,8 +59,8 @@ function rodar(fonte: string, url: string, store: Record<string, string> = {}, c
 }
 
 describe("o sorteio da página (AB_LP, head do landing.html)", () => {
-  it("vem DESLIGADO no código: todo mundo no braço atual, sem criar id de aparelho quando o checkout também está off", () => {
-    expect(HTML).toMatch(/var AB_LP = "off";/);
+  it("07/11 LIGADO no código (dono); o rollback \"off\" põe todo mundo no braço atual, sem criar id de aparelho quando o checkout também está off", () => {
+    expect(HTML).toMatch(/var AB_LP = "on";/);
     const r = rodar(comChaves("off", "off"), "/organizar?utm_campaign=x");
     expect(r.attrs["data-lp"]).toBe("atual");
     expect(r.store["landing-device-id"]).toBeUndefined();

@@ -22,7 +22,7 @@ const HTML = readFileSync(resolve(raiz, "landing.html"), "utf8");
 const FIXTURE = readFileSync(resolve(__dirname, "fixtures/landing-atual-30-10.html"), "utf8");
 const scriptDaCabeca = HTML.match(/<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
 const comPix = (v: "on" | "off" | "b", motivo: "on" | "off" = "off") =>
-  scriptDaCabeca.replace(/var AB_PIX = "(on|off|b)"/, `var AB_PIX = "${v}"`).replace(/var PIX_MOTIVO = "(on|off)"/, `var PIX_MOTIVO = "${motivo}"`);
+  scriptDaCabeca.replace(/var AB_LP = "(on|off)"/, 'var AB_LP = "off"').replace(/var AB_PIX = "(on|off|b)"/, `var AB_PIX = "${v}"`).replace(/var PIX_MOTIVO = "(on|off)"/, `var PIX_MOTIVO = "${motivo}"`);
 
 function rodar(fonte: string, url: string, store: Record<string, string> = {}, ck: { v: string } = { v: "" }) {
   const u = new URL(url, "https://www.coreaplicativo.com.br");

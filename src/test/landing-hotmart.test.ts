@@ -69,10 +69,10 @@ describe("o <head>: /organizar intocado; /vida decide pela rota e pela chave CHE
       expect(on.mem.pagina).toBeUndefined();
       expect(on.mem.checkout_ext).toBeUndefined();
       expect(on.store["landing-hotmart-force"]).toBeUndefined();
-      const semId = (a: Record<string, string>) => { const { "data-pix": _sorteado, ...resto } = a; return resto; }; // o AB_PIX (ligado) sorteia por aparelho novo
+      const semId = (a: Record<string, string>) => { const { "data-pix": _sorteado, "data-lp": _lp, ...resto } = a; return resto; }; // o AB_PIX e o AB_LP (ligados) sorteiam por aparelho novo
       expect(semId(on.attrs)).toEqual(semId(off.attrs));
     }
-    expect(rodar(comChave("on"), "/organizar").attrs["data-lp"]).toBe("atual"); // AB_LP off: o /organizar segue no atual
+    expect(rodar(comChave("on"), "/organizar").attrs["data-lp"]).toMatch(/^(atual|v2)$/); // 07/11: AB_LP on = o /organizar sorteia atual × v2 (a chave Hotmart não mexe nisso)
   });
 
   it("/vida = sempre o braço v2, sem sorteio e sem ler nem gravar a força do ?lp do /organizar", () => {
@@ -370,7 +370,7 @@ describe("AB_VIDA no <head>", () => {
       expect(on.attrs["data-vida"]).toBeUndefined();
       expect(on.mem.vida).toBeUndefined();
       expect(on.store["landing-vida-force"]).toBeUndefined();
-      const sem = (a: Record<string, string>) => { const { "data-pix": _p, ...r } = a; return r; };
+      const sem = (a: Record<string, string>) => { const { "data-pix": _p, "data-lp": _l, ...r } = a; return r; }; // 07/11: AB_LP on também sorteia por aparelho novo
       expect(sem(on.attrs)).toEqual(sem(off.attrs));
     }
   });

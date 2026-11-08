@@ -112,7 +112,7 @@ const voltarProApp = () => {
 };
 
 describe("crítica de fora, rodada 3", () => {
-  it.fails("B1 1× ao dia: aberto na Saúde à noite, de manhã a caixa não mostra o ✓ de ontem e o toque marca a de hoje", () => {
+  it("B1 1× ao dia: aberto na Saúde à noite, de manhã a caixa não mostra o ✓ de ontem e o toque marca a de hoje", () => {
     const novas = montarLinhas({ name: "Losartana", stock: 30 }, ["08:00"], undefined, agoraEm(1, 10).getTime());
     const id = novas[0].id;
     const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-07": [id] } });
@@ -129,7 +129,7 @@ describe("crítica de fora, rodada 3", () => {
     expect(estoque(store)).toEqual([29]);
   });
 
-  it.fails("B1 8 em 8: vinda do aviso das 08:00, antes do relógio de 1 min rodar, a pílula 08:00 marca a de hoje (não desmarca a de ontem)", () => {
+  it("B1 8 em 8: vinda do aviso das 08:00, antes do relógio de 1 min rodar, a pílula 08:00 marca a de hoje (não desmarca a de ontem)", () => {
     const novas = vezes(3, "08:00", agoraEm(5, 7, 50));
     const [d08, d16, d00] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas.map((l) => ({ ...l, stock: 16 })), [LOG]: { "2026-11-07": [d08, d16] } });
@@ -146,7 +146,7 @@ describe("crítica de fora, rodada 3", () => {
     expect(avisos(store)[0]).toBe("08/16:00");
   });
 
-  it.fails("B1 8 em 8: no mesmo caso, a caixa às 08:02 marca a das 08:00 (não a das 00:00 esquecida do desenho velho)", () => {
+  it("B1 8 em 8: no mesmo caso, a caixa às 08:02 marca a das 08:00 (não a das 00:00 esquecida do desenho velho)", () => {
     const novas = vezes(3, "08:00", agoraEm(5, 7, 50));
     const [d08, d16, d00] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas.map((l) => ({ ...l, stock: 16 })), [LOG]: { "2026-11-07": [d08, d16] } });
@@ -158,6 +158,50 @@ describe("crítica de fora, rodada 3", () => {
     // hoje: marca a das 00:00 (que passou sem ser tomada) — o aviso das 08:00 já tocou, e às 08:03 a tela pede a das 08:00 de novo
     expect(log(store)["2026-11-08"]).toEqual([d08]);
     expect(log(store)["2026-11-08"]).not.toContain(d00);
+  });
+
+  it("B1 no toque: o dia virou sem nenhum aviso de volta (nem o relógio rodou) — a caixa do 1× ao dia só refaz a tela e não grava", () => {
+    const novas = montarLinhas({ name: "Losartana", stock: 30 }, ["08:00"], undefined, agoraEm(1, 10).getTime());
+    const id = novas[0].id;
+    const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-07": [id] } });
+    agoraEm(7, 22, 0);
+    montar(store);
+    agoraEm(8, 8, 5);
+    fireEvent.click(caixa()); // o desenho ainda é o de ontem (✓): o toque não desmarca a de ontem
+    expect(log(store)).toEqual({ "2026-11-07": [id] });
+    expect(estoque(store)).toEqual([30]);
+    expect(rotulo()).toBe("Marcar Losartana como tomado");
+    fireEvent.click(caixa()); // agora com a tela de hoje
+    expect(log(store)).toEqual({ "2026-11-07": [id], "2026-11-08": [id] });
+    expect(estoque(store)).toEqual([29]);
+  });
+
+  it("B1 no toque: 8 em 8 com o desenho das 23:58 e nenhum aviso de volta — a pílula 08:00 e a caixa às 08:02 só refazem a tela", () => {
+    const novas = vezes(3, "08:00", agoraEm(5, 7, 50));
+    const [d08, d16, d00] = novas.map((l) => l.id);
+    const store = criarStore({ [CHAVE]: novas.map((l) => ({ ...l, stock: 16 })), [LOG]: { "2026-11-07": [d08, d16] } });
+    agoraEm(7, 23, 58);
+    montar(store);
+    fireEvent.click(caixa()); // a das 00:00, tomada às 23:58
+    agoraEm(8, 8, 2);
+    fireEvent.click(pilula(d08)); // desenho velho: a 08:00 era a de ontem, marcada
+    expect(log(store)).toEqual({ "2026-11-07": [d08, d16], "2026-11-08": [d00] });
+    expect(estoque(store)).toEqual([15, 15, 15]);
+    fireEvent.click(pilula(d08)); // a tela já é a de hoje
+    expect(log(store)).toEqual({ "2026-11-07": [d08, d16], "2026-11-08": [d00, d08] });
+    expect(estoque(store)).toEqual([14, 14, 14]);
+  });
+
+  it("B1 no toque: dentro do mesmo dia do tratamento, a caixa decide pela hora do toque (desenho das 07:40, toque às 08:02 marca a das 08:00)", () => {
+    const novas = vezes(3, "08:00", agoraEm(5, 7, 50));
+    const [d08, d16, d00] = novas.map((l) => l.id);
+    const store = criarStore({ [CHAVE]: novas.map((l) => ({ ...l, stock: 16 })), [LOG]: { "2026-11-07": [d08, d16], "2026-11-08": [d00] } });
+    agoraEm(8, 7, 40); // às 07:40 nenhuma chegou: a caixa só diria "ainda não chegou"
+    montar(store);
+    agoraEm(8, 8, 2);
+    fireEvent.click(caixa());
+    expect(log(store)["2026-11-08"]).toEqual([d00, d08]);
+    expect(falas).toEqual([]);
   });
 
   it.fails("B2 a das 16:00 marcada pela PÍLULA, a das 08:00 esquecida: a caixa não marca a esquecida", () => {

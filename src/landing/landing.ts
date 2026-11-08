@@ -589,6 +589,17 @@ function devolverRestauracaoDaDemoJa() {
   try { history.scrollRestoration = restauracaoAntes; } catch { /* noop */ }
   restauracaoAntes = null;
 }
+/** 08/11 (revisão, WebKit medido): depois de demo → "Quero organizar" → camada → X, o popstate chega com state null, mas o history.state
+ *  da entrada em que a página fica ainda diz lpDemoCheia (a navegação do iframe da demo bagunça o histórico do WebKit). Com a demo fechada,
+ *  essa marca é sobra: sem tirar, uma recarga (o Instagram recarrega) reabria a demo sozinha. Tira a marca (e o y/m dela), fica o resto. */
+function limparSobraDaDemo() {
+  if (cheiaAberta) return;
+  const e = estadoHist();
+  if (!e?.[MARCA_CHEIA]) return;
+  const resto: Record<string, unknown> = { ...e };
+  delete resto[MARCA_CHEIA]; delete resto.y; delete resto.m;
+  try { history.replaceState(Object.keys(resto).length ? resto : null, ""); } catch { /* noop */ }
+}
 /** o back() nosso: espera o popstate (com teto de 3 s — um navegador que nunca o devolve não deixa a rolagem "manual" pra sempre) */
 let tetoDoPop: number | null = null;
 function voltarHistorico() {
@@ -1870,6 +1881,7 @@ function ligarCampoCko(campo: HTMLInputElement | null, sug: HTMLButtonElement | 
  *  landing (QR pronto, "já tem", pago) — o cartão no topo, já no quadro em que a camada some */
 function aoFecharCko(via: string) {
   if (!card.isConnected) return; // uma página que já saiu do documento (só nos testes, que trocam o body) não mexe em nada
+  limparSobraDaDemo();
   if (via === "x" || via === "esc" || via === "voltar") {
     if (antes && estado.fase === "oferta") {
       // fechou no código de 8 números (ou no "Entrando…"): o código — e o erro dele — volta pro cartão, e a página vai até ele
@@ -1884,7 +1896,7 @@ function aoFecharCko(via: string) {
   requestAnimationFrame(() => rolarAte(card, "start", false));
   // a entrada da camada sai do histórico por baixo (history.back): se a restauração de rolagem do navegador estiver "auto" (ex.: a demo em
   // tela cheia devolveu o "auto" com a camada aberta), o popstate pode jogar a página no y velho — o cartão volta pro topo depois dele
-  const deNovo = () => { rolarAte(card, "start", false); requestAnimationFrame(() => rolarAte(card, "start", false)); };
+  const deNovo = () => { limparSobraDaDemo(); rolarAte(card, "start", false); requestAnimationFrame(() => rolarAte(card, "start", false)); };
   window.addEventListener("popstate", deNovo, { once: true });
   window.setTimeout(() => window.removeEventListener("popstate", deNovo), 1500);
 }

@@ -541,6 +541,23 @@ describe("checkout novo (data-cko=\"v2\"): o mesmo Pix, a mesma tela do QR em di
     expect(eventos().filter((e) => e.nome === "landing_demo_aberta")).toHaveLength(1);
   });
 
+  it("WebKit: o X da camada cai numa entrada que ainda diz lpDemoCheia (popstate com state null): a marca sai e uma recarga não reabre a demo", async () => {
+    await abrirPagina({ lp: "v2", pix: "atual", cko: "v2" });
+    clicar(botaoFixo("v2"));
+    await esperaCamada();
+    // o que o WebKit faz (medido): o popstate do X chega com state null, mas o history.state já é o da demo
+    const quirk = () => { history.replaceState({ lpDemoCheia: 1, y: 4163, m: "financas" }, ""); };
+    window.addEventListener("popstate", quirk, { once: true, capture: true }); // capture: roda antes do ouvinte da camada (o aoPop)
+    clicar("#cko-x");
+    await esperaCamadaFechar();
+    await dormir(50);
+    expect(document.documentElement.hasAttribute("data-demo-cheia")).toBe(false);
+    expect((history.state as Record<string, unknown> | null)?.lpDemoCheia).toBeUndefined();
+    await abrirPagina({ lp: "v2", pix: "atual", cko: "v2", limpar: false, manterHist: true }); // a recarga
+    await dormir(300);
+    expect(document.documentElement.hasAttribute("data-demo-cheia")).toBe(false);
+  });
+
   it("a aba recarregou com a camada aberta (o Instagram recarrega): a marca sai do histórico e a camada não reabre", async () => {
     await abrirPagina({ lp: "atual", pix: "atual", cko: "v2" });
     clicar(botaoFixo("atual"));

@@ -192,6 +192,20 @@ const LPO_ATIVO = STRIPE && (w.__landing?.ab_lp_oferta === "on" || LPO_FORCADO |
  *  compartilhado com o /hoje e o app; a CAPI sai do servidor) — a venda se liga ao braço pelo order_id do landing_pix_gerado. */
 const BRACO_CKO = PAGINA ? null : bracoCkoDoHtml();
 const CKO_FORCADO = !!w.__landing?.cko_forcado;
+/* ───────── 08/11: o CHECKOUT NOVO do /organizar (./checkout-organizar.ts — SÓ TELA; o dinheiro inteiro continua neste arquivo) ─────────
+ * Com html[data-cko="v2"] (e a oferta "sempre"): os botões que rolavam até o cartão (topo do v2, fixo, fim, "Quero organizar minha vida" da
+ * demo em tela cheia) e o "Pagar R$ 27,90 no Pix" do cartão abrem uma camada com a cara do checkout v2. O botão "Gerar Pix" dela chama o
+ * MESMO gerar() (o e-mail antes do Pix, o código de 8 números, o gerarPix/asaas-pix LN_*, a cópia no toque, os mesmos eventos e pixel). A
+ * camada mostra o formulário, o código e o "Gerando…"; quando o QR fica pronto (ou "já tem", ou pago) ela FECHA e a página já está no cartão,
+ * com a tela de hoje (QR dos 2 braços do AB_PIX, confirmação, Purchase, conta, presente/2027) — o mesmo código, não uma cópia.
+ * Com a chave off (data-cko="atual"), nada disto roda: ckoMod fica null e todo caminho abaixo é o de hoje. */
+type ModCko = typeof import("./checkout-organizar");
+let ckoMod: ModCko | null = null;
+let carregandoCko: Promise<ModCko> | null = null;
+let ckoFalhou = false;
+let ckoVezes = 0;
+const CKO_V2 = BRACO_CKO === "v2" && brOferta === "sempre"; // o banner diz "vitalício": a oferta "ano" (só por ?oferta=ano) fica no cartão
+const ckoAberto = (): boolean => !!ckoMod && ckoMod.estaAberto();
 const PIX_MOTIVO = motivoPixDoHtml(); // 02/11: chips "O que te travou?" no estado "voltou" do b (PIX_MOTIVO, padrão off)
 const U2027 = upsell2027DoHtml(); // 31/10: o "Seu 2027" no pós-pago (chave UPSELL_2027 / ?u2027=on)
 const VOLTA_U2027 = voltaDoEmailU2027(BUSCA); // 31/10: chegou pelo bloco do 2027 no e-mail de compra confirmada
@@ -613,7 +627,8 @@ document.addEventListener("keydown", (e) => { if (cheiaAberta && e.key === "Esca
 cheiaVoltar?.addEventListener("click", () => pedirFechar("seta"));
 cheiaComprar?.addEventListener("click", () => {
   evento("landing_cta", { onde: "demo_tela_cheia", fase: estado.fase });
-  pedirFechar("comprar", () => rolarAte($("oferta"), "start", false));
+  // 08/11: com o checkout novo valendo, a demo fecha e a camada abre (a página fica no lugar, por baixo)
+  pedirFechar("comprar", () => { if (podeAbrirCko()) abrirCkoOrg("demo_tela_cheia"); else rolarAte($("oferta"), "start", false); });
 });
 document.getElementById("lp2-demo-cartao")?.addEventListener("click", () => { evento("landing_cta", { onde: "testar_app_cartao" }); abrirCheia("financas", "cartao"); });
 
@@ -641,8 +656,11 @@ document.querySelectorAll<HTMLButtonElement>(".lp-mod[data-m]").forEach((b) => b
 }));
 document.querySelectorAll<HTMLElement>("[data-ir]").forEach((b) => b.addEventListener("click", () => {
   const alvo = b.dataset.ir!;
-  if (alvo === "oferta") evento("landing_cta", { onde: b.closest("#lp-fixo") ? "fixo" : b.closest("#fim") ? "fim" : b.closest("#topo-v2") ? "topo" : "outro", fase: estado.fase });
+  const onde = b.closest("#lp-fixo") ? "fixo" : b.closest("#fim") ? "fim" : b.closest("#topo-v2") ? "topo" : "outro";
+  if (alvo === "oferta") evento("landing_cta", { onde, fase: estado.fase });
   if (alvo === "dentro-v2") evento("landing_lojas_topo", {}); // r1: "App Store · Google Play · Computador" da 1ª tela → rola até "Sim, é um app de verdade"
+  // 08/11: com o checkout novo valendo (e a pessoa ainda na oferta), o botão que rolava até o cartão abre a camada
+  if (alvo === "oferta" && podeAbrirCko()) { abrirCkoOrg(onde); return; }
   rolarAte($(alvo));
 }));
 document.querySelectorAll<HTMLAnchorElement>("a[data-loja]").forEach((a) => a.addEventListener("click", () => evento("landing_loja", { loja: a.dataset.loja, onde: a.closest("#lp-pix") ? "pos_compra" : a.closest("#lpo") ? "prova" : "como" })));
@@ -760,10 +778,10 @@ let aoVerOferta: (() => void) | null = null; // 06/11: a /oferta baixa o Stripe.
 /** "viu a oferta" (1x): o evento da régua + ViewContent + pré-aquecimento do Pix. Atual: 15% do bloco #oferta na tela (como hoje).
  *  v2 (crítica r1 8.1): o BOTÃO DE PAGAR ≥ 50% visível — no v2 a oferta começa em y 684 e, em telas de 844+, 15% do bloco
  *  aparecia sem rolar (a régua inflava e a Meta recebia ViewContent de quem só abriu). */
-const viuAOferta = () => {
+const viuAOferta = (via?: string) => {
   if (ofertaVista) return;
   ofertaVista = true;
-  evento("landing_oferta_vista", { via: V2 ? "botao_50" : "bloco_15" });
+  evento("landing_oferta_vista", { via: via ?? (V2 ? "botao_50" : "bloco_15") }); // 08/11: "checkout" = a camada do checkout novo abriu antes de o cartão aparecer
   if (brCheckout === "email" && !EXTERNO) evento("landing_email_antes_visto", {}); // 05/11: o braço Hotmart da /vida (e a /oferta) não tem a caixa de e-mail
   pixel("ViewContent", { content_name: STRIPE ? "oferta_stripe" : HOTMART ? "vida_oferta" : "landing_oferta", value: EXTERNO ? PRECO_EXT / 100 : 27.9, currency: "BRL" });
   if (PIX_REAL && !SIMULADO && !EXTERNO) void pg(false).catch(() => null); // pré-aquece o Pix de verdade (sem recarregar a página se falhar)
@@ -994,19 +1012,26 @@ const sugestaoEl = document.getElementById("lp-email-antes-sugestao") as HTMLBut
 /** e-mail que já tem conta: a pessoa entra com o código ANTES do Pix (nada pago ainda) */
 let antes: { fase: "codigo" | "entrando"; email: string; erro: string | null } | null = null;
 let codigoAntes = "";
+/* 08/11 (checkout novo do /organizar, CHECKOUT_ORG_V2): com a camada aberta, o campo de e-mail, o erro e a sugestão são os DELA (#cko-email,
+ * #cko-email-erro, #cko-sug); fechada (e sempre com a chave off), os do cartão de hoje. Mesmas regras, mesmas mensagens, mesmos eventos. */
+const campoEmailAgora = (): HTMLInputElement | null => (ckoAberto() ? document.getElementById("cko-email") as HTMLInputElement | null : campoAntes);
+const erroEmailAgora = (): HTMLElement | null => (ckoAberto() ? document.getElementById("cko-email-erro") : erroAntesEl);
+const sugestaoAgora = (): HTMLButtonElement | null => (ckoAberto() ? document.getElementById("cko-sug") as HTMLButtonElement | null : sugestaoEl);
 
 function mostrarErroAntes(msg: string | null) {
-  if (!erroAntesEl || !campoAntes) return;
-  erroAntesEl.textContent = msg ?? "";
-  erroAntesEl.hidden = !msg;
-  if (msg) campoAntes.setAttribute("aria-invalid", "true"); else campoAntes.removeAttribute("aria-invalid");
+  const erroEl = erroEmailAgora(), campo = campoEmailAgora();
+  if (!erroEl || !campo) return;
+  erroEl.textContent = msg ?? "";
+  erroEl.hidden = !msg;
+  if (msg) campo.setAttribute("aria-invalid", "true"); else campo.removeAttribute("aria-invalid");
 }
 function atualizarSugestao() {
-  if (!sugestaoEl || !campoAntes) return;
-  const s = sugestaoDeEmail(campoAntes.value);
-  sugestaoEl.hidden = !s;
-  sugestaoEl.dataset.v = s ?? "";
-  sugestaoEl.innerHTML = s ? `Você quis dizer <b>${esc(s)}</b>?` : "";
+  const sugEl = sugestaoAgora(), campo = campoEmailAgora();
+  if (!sugEl || !campo) return;
+  const s = sugestaoDeEmail(campo.value);
+  sugEl.hidden = !s;
+  sugEl.dataset.v = s ?? "";
+  sugEl.innerHTML = s ? `Você quis dizer <b>${esc(s)}</b>?` : "";
 }
 
 type FalhaEmail = { existe: true } | { erro: string; motivo: string };
@@ -1056,12 +1081,13 @@ async function gerar(comCodigo: string | null = null): Promise<void> {
   if (brCheckout === "email") {
     if (antes && comCodigo !== null) emailAntes = antes.email;
     else {
-      const ch = checarEmailAntes(campoAntes?.value ?? "");
+      const ch = checarEmailAntes(campoEmailAgora()?.value ?? "");
       if ("motivo" in ch) {
         // r2 (oferta 4, v2): o rótulo do campo já diz "é por onde você entra no CORE" — o erro do vazio não repete a frase (1 linha)
-        mostrarErroAntes(V2 && ch.motivo === "vazio" ? "Falta o seu e-mail pra gerar o Pix." : ch.msg);
+        // 08/11: na camada do checkout novo o rótulo é o mesmo nos 2 braços do AB_LP — a mesma frase curta nos 2
+        mostrarErroAntes((V2 || ckoAberto()) && ch.motivo === "vazio" ? "Falta o seu e-mail pra gerar o Pix." : ch.msg);
         evento("landing_email_antes_erro", { motivo: ch.motivo });
-        try { campoAntes?.focus(); } catch { /* noop */ }
+        try { campoEmailAgora()?.focus(); } catch { /* noop */ }
         return;
       }
       emailAntes = ch.email;
@@ -1073,7 +1099,7 @@ async function gerar(comCodigo: string | null = null): Promise<void> {
   const anteriores = estado.pix && venceEm(estado.pix) > Date.now() ? [...estado.anteriores, estado.pix] : estado.anteriores;
   let t0 = Date.now();
   if (antes && comCodigo !== null) { antes = { ...antes, fase: "entrando", erro: null }; render(); }
-  else { salvar({ fase: "gerando", anteriores }); rolarAte(card, "start"); }
+  else { salvar({ fase: "gerando", anteriores }); if (!ckoAberto()) rolarAte(card, "start"); } // 08/11: com a camada aberta a página está travada por baixo
   evento("landing_cta", { onde: comCodigo !== null ? "pagar_codigo" : "pagar", oferta });
   const emailConhecido = emailAntes ?? estado.email ?? estado.emailPix ?? lerCompra()?.email ?? null;
   const passo: Promise<PassoEmail> = emailAntes === null ? Promise.resolve({ ok: true as const, via: "livre" })
@@ -1081,7 +1107,7 @@ async function gerar(comCodigo: string | null = null): Promise<void> {
   const pedido: Promise<Gerado | FalhaEmail> = passo.then<Gerado | FalhaEmail>((p) => {
     if (!("ok" in p)) return p;
     if (emailAntes !== null) evento("landing_email_antes_ok", { via: p.via });
-    if (antes) { antes = null; salvar({ fase: "gerando", anteriores }); rolarAte(card, "start"); t0 = Date.now(); }
+    if (antes) { antes = null; salvar({ fase: "gerando", anteriores }); if (!ckoAberto()) rolarAte(card, "start"); t0 = Date.now(); }
     return criarPix(oferta, emailConhecido);
   });
   // o código vai pra área de transferência AINDA no toque (a promessa resolve quando o QR chegar)
@@ -1096,7 +1122,7 @@ async function gerar(comCodigo: string | null = null): Promise<void> {
     antes = { fase: "codigo", email: emailAntes, erro: foi ? null : "Não consegui mandar o código agora. Toque em “Mandar de novo”." };
     codigoAntes = "";
     salvar({ fase: "oferta" });
-    rolarAte(card, "start");
+    if (!ckoAberto()) rolarAte(card, "start"); // 08/11: na camada, o código aparece nela
     return;
   }
   if ("motivo" in r) {
@@ -1428,8 +1454,14 @@ function mostrarJaTem(via: "marcador" | "servidor" | "email_pix", email: string 
 /** 29/10 (braço "email"): o e-mail já tem conta → o código, ANTES do Pix. */
 function renderCodigoAntes(a: NonNullable<typeof antes>) {
   card.dataset.fase = "codigo"; // o CSS esconde a oferta (qualquer fase ≠ "oferta")
+  caixa.innerHTML = htmlCodigoAntes(a);
+  ligarCodigoAntes();
+  atualizarFixo();
+}
+/** 08/11: o HTML do código (o mesmo no cartão de hoje e na camada do checkout novo) */
+function htmlCodigoAntes(a: NonNullable<typeof antes>): string {
   const entrando = a.fase === "entrando";
-  caixa.innerHTML = `
+  return `
       <div class="lp-pago" data-testid="landing-email-tem-conta">
         <h3>Esse e-mail já tem conta</h3>
         <p>Mandamos um código pra <b>${esc(a.email)}</b>. Digite aqui e o Pix sai na sua conta.</p>
@@ -1441,6 +1473,9 @@ function renderCodigoAntes(a: NonNullable<typeof antes>) {
         </div>
         <div class="lp-links"><button type="button" class="lp-link" id="lp-outro-email">Usar outro e-mail</button><button type="button" class="lp-link" id="lp-reenviar">Mandar de novo</button></div>
       </div>`;
+}
+/** 08/11: os toques do código (no cartão ou na camada — os mesmos ids, nunca os 2 na tela ao mesmo tempo) */
+function ligarCodigoAntes() {
   const c = $<HTMLInputElement>("lp-codigo-antes"); const b = $<HTMLButtonElement>("lp-entrar-pagar");
   c.addEventListener("input", () => { codigoAntes = c.value.replace(/\D/g, "").slice(0, 8); b.disabled = codigoAntes.length < 8 || antes?.fase === "entrando"; });
   c.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !b.disabled) void gerar(codigoAntes); });
@@ -1448,8 +1483,10 @@ function renderCodigoAntes(a: NonNullable<typeof antes>) {
   $("lp-outro-email").addEventListener("click", () => {
     evento("landing_cta", { onde: "outro_email" });
     antes = null; codigoAntes = "";
+    if (ckoAberto()) ckoMod!.definirEmail("");
     render();
-    if (campoAntes) { campoAntes.value = ""; try { campoAntes.focus(); } catch { /* noop */ } }
+    const campo = campoEmailAgora();
+    if (campo) { campo.value = ""; try { campo.focus(); } catch { /* noop */ } }
   });
   $("lp-reenviar").addEventListener("click", async () => {
     if (!antes) return;
@@ -1457,7 +1494,6 @@ function renderCodigoAntes(a: NonNullable<typeof antes>) {
     const foi = await mandarCodigo(antes.email);
     if (antes) { antes = { ...antes, erro: foi ? null : "Não consegui mandar o código agora. Tenta de novo em alguns segundos." }; render(); }
   });
-  atualizarFixo();
 }
 
 /*
@@ -1535,12 +1571,14 @@ function htmlPixB(p: PixLanding): string {
 let telaRenderizada: string | null = null;
 function render() {
   renderDoCartao();
+  const camada = sincronizarCko(); // 08/11: a camada do checkout novo mostra a fase (ou fecha); null = sem camada (sempre, com a chave off)
   if (!V2) return;
   reSemear();
   const tela = `${estado.fase}|${antes ? "codigo" : ""}|${erroPix ? "erro" : ""}|${jaTem ? "jatem" : ""}|${avisoOferta ? "venceu" : ""}${u27Tela && u27 ? `|u27-${u27.etapa()}` : ""}`;
   if (tela === telaRenderizada) return;
   const primeira = telaRenderizada === null;
   telaRenderizada = tela;
+  if (camada === "aberta") return; // a página está travada por baixo da camada: nada a rolar (o cartão vai pro topo quando ela fechar)
   if (primeira && tela === "oferta||||") return; // a página abrindo na oferta: nada a rolar
   if (cheiaAberta) fecharCheiaJa("fase"); // a tela do cartão mudou (ex.: pagou no banco com a demo aberta) — a página precisa estar solta pra rolar
   rolarAte(card, "start", !primeira); // no arranque (Pix vivo / pago / conta): direto, sem a página "descendo" (r1 pix 4)
@@ -1552,14 +1590,14 @@ function renderDoCartao() {
   if (u27Tela) { atualizarFixo(); return; }
   if (u27) card.removeAttribute("data-u27");
   if (jaTem && (estado.fase === "oferta" || estado.fase === "erro")) { renderJaTem(jaTem); return; }
-  if (antes && estado.fase === "oferta") { renderCodigoAntes(antes); return; }
+  if (antes && estado.fase === "oferta" && !CKO_V2) { renderCodigoAntes(antes); return; } // 08/11: no checkout novo o código fica NA CAMADA (o cartão segue na oferta)
   card.dataset.fase = estado.fase === "erro" ? "oferta" : estado.fase;
   const f = estado.fase;
   if (V2) { erroNoBotao(f === "oferta" ? erroPix : null); avisoNoTopo(f === "oferta" ? avisoOferta : null); atualizarBotao(); }
   if (f === "oferta") {
     caixa.innerHTML = erroPix && !(V2 && document.getElementById("lp-pagar-erro")) ? `<p class="lp-erro" role="alert">${esc(erroPix)}</p>` : "";
   } else if (f === "gerando") {
-    caixa.innerHTML = `<div class="lp-pix-gerando" data-testid="landing-gerando"><span class="lp-pix-logo">${ICO_PIX}</span><b>Gerando o seu Pix…</b><div class="lp-progresso"><i></i></div><span>${V2 ? "Sem CPF. Leva 2 segundos." : "Sem CPF, sem cadastro. Leva 2 segundos."}</span></div>`;
+    caixa.innerHTML = htmlGerando();
   } else if (f === "qr" && estado.pix) {
     const p = estado.pix;
     if (U2027 && presenteNaTela()) void carregarPresente().catch(() => null); // 01/11: o módulo do presente já chega com o QR na tela
@@ -1729,9 +1767,96 @@ function renderDoCartao() {
   }
   atualizarFixo();
 }
+/** o "Gerando o seu Pix…" (o mesmo no cartão de hoje e na camada do checkout novo) */
+function htmlGerando(): string {
+  return `<div class="lp-pix-gerando" data-testid="landing-gerando"><span class="lp-pix-logo">${ICO_PIX}</span><b>Gerando o seu Pix…</b><div class="lp-progresso"><i></i></div><span>${V2 ? "Sem CPF. Leva 2 segundos." : "Sem CPF, sem cadastro. Leva 2 segundos."}</span></div>`;
+}
 const ehPraSempreTxt = () => (estado.pago && estado.pago.oferta !== "LN_ano279" ? (V2 ? "O CORE é seu pra sempre." : "Seu CORE é seu pra sempre.") : "Seu CORE está liberado por 1 ano.");
 
-$("lp-pagar").addEventListener("click", () => { void gerar(); });
+/* ───────── 08/11: a ligação com a camada do checkout novo (ver CKO_V2 lá em cima) ───────── */
+/** a camada só abre com a pessoa ainda na oferta (sem Pix vivo, sem pago/conta, sem "já tem", sem o presente/2027 na tela) */
+function podeAbrirCko(): boolean {
+  return CKO_V2 && !ckoFalhou && (estado.fase === "oferta" || estado.fase === "erro") && !jaTem && !u27Tela;
+}
+function carregarCko(): Promise<ModCko> {
+  if (ckoMod) return Promise.resolve(ckoMod);
+  if (!carregandoCko) {
+    carregandoCko = carregarComRetry(() => import("./checkout-organizar"), {
+      recarregar: false,
+      aoFalhar: (tentativa, erro) => evento("landing_erro", { onde: "chunk_cko", tentativa, msg: String(erro).slice(0, 120) }),
+    }).then((m) => { ckoMod = m; return m; }, (e) => { carregandoCko = null; throw e; });
+  }
+  return carregandoCko;
+}
+function abrirCkoOrg(de: string) {
+  const t0 = agora();
+  if (PIX_REAL && !SIMULADO) void pg(false).catch(() => null); // o Pix de verdade já vem baixando (sem recarregar a página se falhar)
+  void carregarCko().then((m) => {
+    if (!podeAbrirCko() || m.estaAberto() || cheiaAberta) return;
+    ckoVezes += 1;
+    viuAOferta("checkout"); // a camada mostra o preço: quem compra direto do botão fixo também "viu a oferta" (o ViewContent de hoje, 1×)
+    m.abrirCko({
+      de, vez: ckoVezes, ms: agora() - t0, precoTxt: reais(VALOR_OFERTA[ofertaAtual()]), pedeEmail: brCheckout === "email",
+      emailInicial: (campoAntes?.value ?? "").trim(), aviso: avisoOferta, nomeNoBanco: NOME_NO_BANCO, cnpj: CNPJ_NO_BANCO,
+      evento, aoGerar: () => { void gerar(); }, aoMontarForm: ligarCampoCko, aoFechar: aoFecharCko,
+    });
+    sincronizarCko(); // o código de 8 números volta se a pessoa fechou no meio dele
+  }, () => {
+    // o módulo não veio (2 tentativas): o cartão volta a ser o de hoje (com o campo de e-mail) e a página vai até ele
+    ckoFalhou = true;
+    document.documentElement.setAttribute("data-cko-falhou", "");
+    rolarAte($("oferta"));
+  });
+}
+/** o campo de e-mail da camada: as MESMAS regras do campo do cartão (erro some ao digitar, sugestão de domínio, "Ir" = gerar) */
+function ligarCampoCko(campo: HTMLInputElement | null, sug: HTMLButtonElement | null) {
+  if (!campo) return;
+  campo.addEventListener("input", () => { mostrarErroAntes(null); if (sug && !sug.hidden) atualizarSugestao(); });
+  campo.addEventListener("blur", atualizarSugestao);
+  campo.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); void gerar(); } });
+  sug?.addEventListener("click", () => {
+    const v = sug.dataset.v;
+    if (!v) return;
+    campo.value = v;
+    ckoMod?.definirEmail(v);
+    atualizarSugestao();
+    evento("landing_email_antes_sugestao", {});
+  });
+}
+/** a camada fechou: pela pessoa (X/Esc/voltar) — se o Pix já está sendo gerado, a página vai até o cartão, onde o QR vai aparecer; pela
+ *  landing (QR pronto, "já tem", pago) — o cartão no topo, já no quadro em que a camada some */
+function aoFecharCko(via: string) {
+  if (via === "x" || via === "esc" || via === "voltar") { if (estado.fase !== "oferta" && estado.fase !== "erro") rolarAte(card, "start", false); return; }
+  rolarAte(card, "start", false);
+  requestAnimationFrame(() => rolarAte(card, "start", false));
+}
+/** a cada render: a camada aberta mostra a fase de hoje — ou fecha. null = sem camada aberta (sempre, com a chave off) */
+function sincronizarCko(): "aberta" | "fechou" | null {
+  if (!ckoMod || !ckoMod.estaAberto()) return null;
+  const f = estado.fase;
+  if (jaTem || u27Tela || f === "qr" || f === "pago" || f === "conta") {
+    ckoMod.fecharCko(jaTem ? "ja_tem" : f === "qr" ? "pix" : "pago");
+    return "fechou";
+  }
+  if (f === "gerando") ckoMod.mostrarGerando(htmlGerando());
+  else if (antes) { ckoMod.mostrarCodigo(htmlCodigoAntes(antes)); ligarCodigoAntes(); }
+  else ckoMod.mostrarFormulario(erroPix);
+  return "aberta";
+}
+if (CKO_V2) {
+  // o módulo da camada e o print do banner: depois do pixel e do load, no ocioso (nunca antes da 1ª pintura; o braço "atual" não baixa nada novo)
+  depoisDoPixel(() => depoisDoLoad(() => ocioso(() => { void carregarCko().then((m) => m.preaquecerBannerCko(), () => null); }, 1500)));
+}
+/* a aba recarregou com a camada aberta (o Instagram recarrega): a marca sai do histórico e a camada NÃO reabre (a página volta onde estava) */
+{
+  const h = estadoHist() as (EstadoHist & { ckoOrg?: number }) | null;
+  if (h?.ckoOrg) { try { const resto: Record<string, unknown> = { ...h }; delete resto.ckoOrg; history.replaceState(resto, ""); } catch { /* noop */ } }
+}
+
+$("lp-pagar").addEventListener("click", () => {
+  if (podeAbrirCko()) { abrirCkoOrg("cartao"); return; } // 08/11: no checkout novo o botão do cartão abre a camada (o landing_cta "pagar" sai no "Gerar Pix" dela)
+  void gerar();
+});
 
 /* ───────────────────────── /vida: o checkout Hotmart (04/11, ./hotmart.ts) ───────────────────────── */
 /* O preço do braço Hotmart sai de HOTMART_PRECO_CENTAVOS (o HTML já vem com o mesmo número escrito — sem piscar) e a linha das

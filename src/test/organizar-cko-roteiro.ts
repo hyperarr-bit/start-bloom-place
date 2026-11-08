@@ -51,8 +51,50 @@ class ObservadorDepois {
 (window as unknown as { IntersectionObserver: unknown }).IntersectionObserver = ObservadorDepois;
 window.scrollTo = (() => {}) as typeof window.scrollTo; // o jsdom não rola (e avisa "Not implemented" a cada destravada de página) // writable no setup.ts (não configurable)
 
+/*
+ * 08/11 (revisão): A PÁGINA ANTERIOR MORRE, COMO NUMA NAVEGAÇÃO DE VERDADE. Cada abrirPagina importa o landing.ts de novo, mas o que a página
+ * velha pendurou no window/document (popstate, scroll, visibilitychange, pageshow…) e os timers dela (o relógio do QR a cada 1 s, o "deNovo"
+ * de 1,5 s do aoFecharCko, o timerAutoCko de 400 ms, o foco de 30 ms e o timerRestauracao da camada…) continuavam vivos por baixo das
+ * páginas seguintes. Num arquivo com dezenas de páginas isso deixava tudo lento (a rodada dos 2 arquivos levou 32 min) e deixava uma página
+ * velha mexer na atual (o erro solto depois do teste "?cko=atual"). Aqui, tudo o que o código da página (src/landing/*) registra no
+ * window/document e todo timer que ele cria fica anotado; encerrarPagina() desfaz — no começo de cada abrirPagina e no afterEach.
+ */
+type Registro = { alvo: EventTarget; tipo: string; f: EventListenerOrEventListenerObject; o?: boolean | AddEventListenerOptions };
+/** quem chamou é o código da página — e não o jsdom por dentro: o requestAnimationFrame do jsdom agenda UM timer só, compartilhado por todas as
+ *  páginas; cancelá-lo (o 1º rascunho deste conserto fez isso) parava todo rAF dali em diante e nenhuma página nova soltava o landing_html */
+const daPagina = (): boolean => { const s = new Error().stack ?? ""; return /[\\/]src[\\/]landing[\\/]/.test(s) && !/[\\/]node_modules[\\/]jsdom[\\/]/.test(s); };
+const registros: Registro[] = [];
+const timeouts = new Set<unknown>();
+const intervalos = new Set<unknown>();
+type Global = { setTimeout: typeof setTimeout; setInterval: typeof setInterval; clearTimeout: typeof clearTimeout; clearInterval: typeof clearInterval; __ckoAnotando?: boolean };
+const g = globalThis as unknown as Global;
+if (!g.__ckoAnotando) {
+  g.__ckoAnotando = true;
+  for (const alvo of [window, document] as EventTarget[]) {
+    const add = alvo.addEventListener.bind(alvo);
+    alvo.addEventListener = (tipo: string, f: EventListenerOrEventListenerObject | null, o?: boolean | AddEventListenerOptions) => {
+      if (f && daPagina()) registros.push({ alvo, tipo, f, o });
+      add(tipo, f, o);
+    };
+  }
+  const alvosDeTimer = new Set<Global>([g, window as unknown as Global]);
+  for (const t of alvosDeTimer) {
+    const st = t.setTimeout.bind(t), si = t.setInterval.bind(t);
+    t.setTimeout = ((f: (...a: unknown[]) => void, ms?: number, ...a: unknown[]) => { const id = st(f, ms, ...a); if (daPagina()) timeouts.add(id); return id; }) as typeof setTimeout;
+    t.setInterval = ((f: (...a: unknown[]) => void, ms?: number, ...a: unknown[]) => { const id = si(f, ms, ...a); if (daPagina()) intervalos.add(id); return id; }) as typeof setInterval;
+  }
+}
+/** a página atual "fecha": tira os ouvintes que ela pôs no window/document e cancela os timers dela (a próxima página começa limpa) */
+export function encerrarPagina(): void {
+  for (const r of registros.splice(0)) { try { r.alvo.removeEventListener(r.tipo, r.f, r.o); } catch { /* noop */ } }
+  for (const id of timeouts) { try { g.clearTimeout(id as ReturnType<typeof setTimeout>); } catch { /* noop */ } }
+  for (const id of intervalos) { try { g.clearInterval(id as ReturnType<typeof setInterval>); } catch { /* noop */ } }
+  timeouts.clear(); intervalos.clear();
+}
+
 /** abre a página como o <head> deixaria (data-* do <html>) e importa o landing.ts de novo */
 export async function abrirPagina(o: Abrir): Promise<void> {
+  encerrarPagina();
   vi.resetModules();
   if (o.limpar !== false) { localStorage.clear(); sessionStorage.clear(); apagarCookies(); }
   if (!o.manterHist) window.history.replaceState(null, "", o.url ?? "/organizar"); // manterHist: a recarga (a entrada do histórico continua a mesma)

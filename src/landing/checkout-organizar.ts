@@ -49,6 +49,9 @@ export type OpcoesCko = {
   aoMontarForm: (campo: HTMLInputElement | null, sugestao: HTMLButtonElement | null) => void;
   /** a camada fechou (qualquer via): a landing decide pra onde a página vai */
   aoFechar: (via: string, tela: Tela | null) => void;
+  /** a entrada ATUAL do histórico é uma sobra (a da demo em tela cheia que o WebKit não tirou): a camada toma o lugar dela (replaceState, sem as
+   *  marcas da demo) em vez de empilhar por cima — o X e o "voltar" caem na entrada da página, nunca na da demo */
+  trocarEntrada?: boolean;
 };
 
 /** "Pagamento processado pelo Asaas" em cima do CNPJ? Padrão: não (dono 02/11, sobre a tela "b" do Pix: "não precisa dessa mensagem"; no banco
@@ -419,7 +422,11 @@ export function abrirCko(o: OpcoesCko): void {
   raiz.hidden = false;
   raiz.querySelector<HTMLElement>(".cko-corpo")!.scrollTop = 0;
   // ckoY: onde a página estava (o body fica fixo com a camada aberta — numa recarga o navegador só veria y 0)
-  try { history.pushState({ ckoOrg: 1, ckoY: yAntes }, ""); comHistorico = true; } catch { comHistorico = false; }
+  try {
+    if (o.trocarEntrada) history.replaceState({ ckoOrg: 1, ckoY: yAntes }, ""); // a sobra da demo (WebKit) vira a entrada da camada
+    else history.pushState({ ckoOrg: 1, ckoY: yAntes }, "");
+    comHistorico = true;
+  } catch { comHistorico = false; }
   window.addEventListener("popstate", aoPop);
   document.addEventListener("visibilitychange", aoVisibilidade);
   mostrarFormulario(null);

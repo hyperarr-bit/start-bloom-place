@@ -12,12 +12,12 @@
  * A página roda de verdade (landing.html + landing.ts) no jsdom, com o Pix SIMULADO (fora do domínio de produção). O caminho do dinheiro de
  * verdade (asaas-pix, Purchase, atribuição) está em ./organizar-checkout-v2-asaas.test.ts.
  */
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import {
-  HTML, abrirPagina, botaoFixo, camadaAberta, clicar, digitar, dormir, espera, esperaCamada, esperaCamadaFechar, eventos, fbq, limparEventos, nomes,
+  HTML, abrirPagina, botaoFixo, camadaAberta, clicar, digitar, dormir, encerrarPagina, espera, esperaCamada, esperaCamadaFechar, eventos, fbq, limparEventos, nomes,
   roteiroHoje, roteiroV2, semCampoDoCartao, semCko, simularPago, type Lp, type Pix, type Roteiro,
 } from "./organizar-cko-roteiro";
 import { bracoCkoDoHtml } from "@/landing/regras";
@@ -32,6 +32,11 @@ const CODIGO_CAMADA = FONTE_CAMADA.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s
 /** o jsdom não tem scrollIntoView (o landing.ts engole o erro): aqui ele vira um espião */
 const espiarRolagem = () => { const f = vi.fn(); (Element.prototype as unknown as { scrollIntoView: unknown }).scrollIntoView = f; return f; };
 const soltarRolagem = () => { delete (Element.prototype as unknown as { scrollIntoView?: unknown }).scrollIntoView; };
+
+// 08/11 (revisão): a página de cada teste "fecha" no fim (ouvintes e timers dela saem) — nenhuma página velha mexe na do teste seguinte
+afterEach(() => { encerrarPagina(); soltarRolagem(); });
+/** os roteiros longos (5 páginas por par): 1 teste por par, com teto folgado — numa máquina carregada 4 pares num teste só passavam de 120 s */
+const TETO_PAR = 300_000;
 
 /* ───────── 1. a chave no <head> ───────── */
 const cabeca = HTML.match(/<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
@@ -128,41 +133,39 @@ describe("a chave CHECKOUT_ORG_V2 no <head>", () => {
 
 /* ───────── 2. chave off idêntica ───────── */
 describe("chave off idêntica: o /organizar de hoje, nos 2 braços do AB_LP × 2 do AB_PIX", () => {
-  it("o roteiro fixo dá exatamente a fixture gravada antes de mexer (cartão em cada estado, eventos e pixel)", async () => {
+  it.each(COMBOS)("o roteiro fixo dá exatamente a fixture gravada antes de mexer (cartão em cada estado, eventos e pixel) — AB_LP %s × AB_PIX %s", async (lp, pix) => {
+    const k = `${lp}|${pix}`;
     const gravar = process.env.GRAVAR_FIXTURE_CKO === "1";
     if (!gravar) expect(existsSync(FIXTURE)).toBe(true); // sem a fixture e sem pedir pra gravar: falha (nunca grava escondido)
-    const tudo: Record<string, Roteiro> = {};
-    for (const [lp, pix] of COMBOS) tudo[`${lp}|${pix}`] = await roteiroHoje(lp, pix);
+    const r = await roteiroHoje(lp, pix);
     if (gravar) {
       mkdirSync(resolve(__dirname, "fixtures"), { recursive: true });
+      const tudo = existsSync(FIXTURE) ? fixture() : {};
+      tudo[k] = r;
       writeFileSync(FIXTURE, JSON.stringify(tudo, null, 1) + "\n");
     }
     const fx = fixture();
-    for (const k of Object.keys(fx)) {
-      expect(tudo[k].estados, k).toEqual(fx[k].estados);
-      expect(tudo[k].eventos, k).toEqual(fx[k].eventos);
-      expect(tudo[k].pixel, k).toEqual(fx[k].pixel);
-    }
+    expect(r.estados, k).toEqual(fx[k].estados);
+    expect(r.eventos, k).toEqual(fx[k].eventos);
+    expect(r.pixel, k).toEqual(fx[k].pixel);
     expect(document.getElementById("cko")).toBeNull(); // a camada nem existe
-  }, 120_000);
-  it("com ?cko=atual (forçado) e o atributo \"atual\": o mesmo roteiro, a mesma fixture; os eventos só ganham braco_cko \"atual\"", async () => {
+  }, TETO_PAR);
+  it.each([["atual", "atual"], ["v2", "b"]] as Array<[Lp, Pix]>)("com ?cko=atual (forçado) e o atributo \"atual\": o mesmo roteiro, a mesma fixture; os eventos só ganham braco_cko \"atual\" — AB_LP %s × AB_PIX %s", async (lp, pix) => {
     const fx = fixture();
-    for (const [lp, pix] of [["atual", "atual"], ["v2", "b"]] as Array<[Lp, Pix]>) {
-      const r = await roteiroHoje(lp, pix, { cko: "atual", ckoForcado: true });
-      expect(r.estados).toEqual(fx[`${lp}|${pix}`].estados);
-      expect(r.eventos).toEqual(fx[`${lp}|${pix}`].eventos);
-      expect(r.pixel).toEqual(fx[`${lp}|${pix}`].pixel);
-      for (const e of eventos().filter((x) => x.nome.startsWith("landing_"))) expect(e).toMatchObject({ braco_cko: "atual", cko_forcado: true });
-    }
-  }, 60_000);
+    const r = await roteiroHoje(lp, pix, { cko: "atual", ckoForcado: true });
+    expect(r.estados).toEqual(fx[`${lp}|${pix}`].estados);
+    expect(r.eventos).toEqual(fx[`${lp}|${pix}`].eventos);
+    expect(r.pixel).toEqual(fx[`${lp}|${pix}`].pixel);
+    for (const e of eventos().filter((x) => x.nome.startsWith("landing_"))) expect(e).toMatchObject({ braco_cko: "atual", cko_forcado: true });
+  }, TETO_PAR);
 });
 
 /* ───────── 3. o checkout novo ───────── */
 describe("checkout novo (data-cko=\"v2\"): o mesmo Pix, a mesma tela do QR em diante, nos 2 braços do AB_LP × 2 do AB_PIX", () => {
-  it("o roteiro pela camada: o cartão do QR em diante, os eventos de hoje e o pixel = a fixture; a camada fecha sozinha no QR e não sobra entrada no histórico", async () => {
+  it.each(COMBOS)("o roteiro pela camada: o cartão do QR em diante, os eventos de hoje e o pixel = a fixture; a camada fecha sozinha no QR e não sobra entrada no histórico — AB_LP %s × AB_PIX %s", async (lp, pix) => {
     const fx = fixture();
     const cartao = ["qr", "conta", "qr_codigo", "ja_tem", "qr_reaberto", "qr_cookie", "presente", "conta_depois_presente", "oferta"];
-    for (const [lp, pix] of COMBOS) {
+    {
       const k = `${lp}|${pix}`;
       const r = await roteiroV2(lp, pix);
       for (const e of cartao) expect(semCampoDoCartao(r.estados[e]), `${k} ${e}`).toBe(semCampoDoCartao(fx[k].estados[e]));
@@ -187,7 +190,7 @@ describe("checkout novo (data-cko=\"v2\"): o mesmo Pix, a mesma tela do QR em di
     }
     expect(camadaAberta()).toBe(false);
     expect((history.state as { ckoOrg?: number } | null)?.ckoOrg).toBeUndefined();
-  }, 150_000);
+  }, TETO_PAR);
 
   it("a camada: banner, e-mail, Pix copia e cola, Gerar Pix de R$ 27,90, depois, garantia, Dúvidas e CNPJ + contato — nada de Stripe, Hubla, cartão, CPF ou order bump", async () => {
     await abrirPagina({ lp: "atual", pix: "atual", cko: "v2" });
@@ -474,6 +477,68 @@ describe("checkout novo (data-cko=\"v2\"): o mesmo Pix, a mesma tela do QR em di
     } finally {
       vi.doUnmock("@/landing/checkout-organizar");
     }
+  });
+
+  it("o módulo da camada pendurou (rede lenta): passados 3,5 s o botão solta, o cartão de hoje volta (com o campo) e a página vai até ele; chegando depois, a camada NÃO abre", async () => {
+    // o import não falha: só demora 5 s (o carregarComRetry não tem teto — só tenta de novo quando falha)
+    vi.doMock("@/landing/checkout-organizar", async () => { await dormir(5000); return await vi.importActual<object>("@/landing/checkout-organizar"); });
+    try {
+      await abrirPagina({ lp: "v2", pix: "atual", cko: "v2" });
+      const rolar = espiarRolagem();
+      const b = document.querySelector<HTMLElement>("#lp-cta-topo")!;
+      clicar("#lp-cta-topo");
+      expect(b.getAttribute("aria-busy")).toBe("true");
+      await dormir(3000);
+      expect(b.getAttribute("aria-busy")).toBe("true"); // antes do teto: ainda esperando
+      expect(document.documentElement.hasAttribute("data-cko-falhou")).toBe(false);
+      await vi.waitFor(() => { if (!document.documentElement.hasAttribute("data-cko-falhou")) throw new Error("ainda não"); }, { timeout: 1500, interval: 20 });
+      expect(b.hasAttribute("aria-busy")).toBe(false);
+      expect(eventos().filter((e) => e.nome === "landing_erro").map((e) => [e.onde, e.de])).toEqual([["chunk_cko_lento", "topo"]]);
+      expect(rolar.mock.contexts.some((el) => (el as Element).id === "oferta")).toBe(true);
+      // o módulo chega depois: nada abre por cima
+      await dormir(2200);
+      expect(camadaAberta()).toBe(false);
+      expect(eventos().filter((e) => e.nome === "landing_cko_aberto")).toHaveLength(0);
+      // dali em diante é o cartão de hoje: o botão fixo rola, o "Pagar" gera o Pix com o e-mail do campo
+      clicar(botaoFixo("v2"));
+      await dormir(30);
+      expect(camadaAberta()).toBe(false);
+      digitar("lp-email-antes", "ana@email.com");
+      clicar("#lp-pagar");
+      await espera('#lp-card [data-testid="landing-codigo"]');
+      expect(camadaAberta()).toBe(false);
+      expect(eventos().filter((e) => e.nome === "landing_erro")).toHaveLength(1); // o teto conta 1× só
+    } finally {
+      vi.doUnmock("@/landing/checkout-organizar");
+    }
+  }, 30_000);
+
+  it("WebKit: a demo em tela cheia fechou sem o popstate do back() dela (a entrada da demo sobrou): a camada toma o lugar dessa entrada; o X volta pra página e a demo não reabre", async () => {
+    await abrirPagina({ lp: "v2", pix: "atual", cko: "v2" });
+    clicar("#lp-demo-abrir");
+    await vi.waitFor(() => { if (!document.documentElement.hasAttribute("data-demo-cheia")) throw new Error("demo fechada"); }, { timeout: 2000 });
+    expect(history.state).toMatchObject({ lpDemoCheia: 1 });
+    const tamanho = history.length;
+    const back = vi.spyOn(history, "back").mockImplementation(() => {}); // o back() da demo se perde (medido no WebKit: nenhum popstate)
+    try {
+      clicar("#lp2-cheia-comprar");
+      await esperaCamada(); // a reserva de 700 ms da demo fecha e chama a camada
+    } finally {
+      back.mockRestore();
+    }
+    expect(document.documentElement.hasAttribute("data-demo-cheia")).toBe(false);
+    expect(history.length).toBe(tamanho); // nada empilhado por cima da sobra
+    const h = history.state as Record<string, unknown>;
+    expect(h.ckoOrg).toBe(1);
+    expect(h.lpDemoCheia).toBeUndefined(); // a marca da demo saiu: o X não cai nela
+    clicar("#cko-x");
+    await esperaCamadaFechar();
+    await dormir(150);
+    expect(document.documentElement.hasAttribute("data-demo-cheia")).toBe(false); // a demo NÃO reabriu
+    const depois = history.state as Record<string, unknown> | null;
+    expect(depois?.lpDemoCheia).toBeUndefined();
+    expect(depois?.ckoOrg).toBeUndefined();
+    expect(eventos().filter((e) => e.nome === "landing_demo_aberta")).toHaveLength(1);
   });
 
   it("a aba recarregou com a camada aberta (o Instagram recarrega): a marca sai do histórico e a camada não reabre", async () => {

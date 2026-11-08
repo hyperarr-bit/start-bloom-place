@@ -582,6 +582,13 @@ function devolverRestauracao() {
     if (!cheiaAberta && !esperandoPop && restauracaoAntes !== null) { try { history.scrollRestoration = restauracaoAntes; } catch { /* noop */ } restauracaoAntes = null; }
   }, 400);
 }
+/** a camada do checkout vai abrir com a demo já fechada: a restauração que a demo guardou volta agora, sem esperar o timer (ver abrirCkoOrg) */
+function devolverRestauracaoDaDemoJa() {
+  if (cheiaAberta || restauracaoAntes === null) return;
+  if (timerRestauracao !== null) { window.clearTimeout(timerRestauracao); timerRestauracao = null; }
+  try { history.scrollRestoration = restauracaoAntes; } catch { /* noop */ }
+  restauracaoAntes = null;
+}
 /** o back() nosso: espera o popstate (com teto de 3 s — um navegador que nunca o devolve não deixa a rolagem "manual" pra sempre) */
 let tetoDoPop: number | null = null;
 function voltarHistorico() {
@@ -1790,32 +1797,58 @@ function carregarCko(): Promise<ModCko> {
   }
   return carregandoCko;
 }
+/** 08/11 (revisão): o teto do toque antes de o módulo da camada chegar. Passou disso (rede lenta no Instagram, import pendurado — o
+ *  carregarComRetry só tenta de novo quando FALHA, nunca quando demora): o cartão de hoje volta, com o campo, e a página vai até ele. */
+const TETO_CKO_MS = 3500;
+/** desiste da camada nesta página: o cartão de hoje (com o campo de e-mail, pelo data-cko-falhou) vale até o fim; a página vai até ele */
+function cairNoCartao() {
+  ckoFalhou = true;
+  document.documentElement.setAttribute("data-cko-falhou", "");
+  rolarAte($("oferta"));
+}
 function abrirCkoOrg(de: string, botao: HTMLElement | null = null) {
   const t0 = agora();
   if (PIX_REAL && !SIMULADO) void pg(false).catch(() => null); // o Pix de verdade já vem baixando (sem recarregar a página se falhar)
   // o módulo ainda não chegou: o botão tocado responde NA HORA (aria-busy → o mesmo esmaecido do botão da Hotmart), até a camada abrir
   const ocupado = !ckoMod && botao ? botao : null;
   ocupado?.setAttribute("aria-busy", "true");
+  // ...mas nunca mais que TETO_CKO_MS: o botão solta, o cartão de hoje volta e, se o módulo chegar depois, a camada NÃO abre por cima
+  // (o podeAbrirCko() olha o ckoFalhou)
+  const teto = ckoMod ? null : window.setTimeout(() => {
+    ocupado?.removeAttribute("aria-busy");
+    if (ckoMod || ckoFalhou) return; // chegou no mesmo instante, ou outro toque já desistiu (1 evento só)
+    evento("landing_erro", { onde: "chunk_cko_lento", de, ms: agora() - t0 });
+    cairNoCartao();
+  }, TETO_CKO_MS);
   void carregarCko().then((m) => {
+    if (teto !== null) window.clearTimeout(teto);
     ocupado?.removeAttribute("aria-busy");
     if (!podeAbrirCko() || m.estaAberto() || cheiaAberta) return;
     ckoVezes += 1;
     devolverRestauracaoCko(); // uma recarga com a camada aberta deixou a entrada em "manual": volta o "auto" antes de a camada guardar o dela
     viuAOferta("checkout"); // a camada mostra o preço: quem compra direto do botão fixo também "viu a oferta" (o ViewContent de hoje, 1×)
+    // 08/11 (revisão, WebKit): a demo em tela cheia fechou pela reserva de 700 ms sem o popstate do back() dela — a entrada marcada da demo
+    // ficou sendo a atual. Empilhar a camada por cima deixava o X da camada voltar pra ELA (a demo reabria sozinha) e o "voltar" seguinte
+    // jogava a página pro topo. Aqui a camada TOMA o lugar dessa entrada (replaceState): o X e o voltar caem na entrada da página.
+    const sobra = !cheiaAberta && !!estadoHist()?.[MARCA_CHEIA];
+    // a demo acabou de fechar e ainda segura a restauração de rolagem em "manual" (devolve 400 ms depois do popstate — que no WebKit pode
+    // nem vir): devolve JÁ, antes de a camada guardar a dela. Senão a camada guardava o "manual" da demo e, ao fechar, deixava a página
+    // em "manual" pelo resto da sessão. A camada põe o "manual" dela logo em seguida.
+    devolverRestauracaoDaDemoJa();
     m.abrirCko({
       de, vez: ckoVezes, ms: agora() - t0, precoTxt: reais(VALOR_OFERTA[ofertaAtual()]), pedeEmail: brCheckout === "email",
       emailInicial: (campoAntes?.value ?? "").trim(), aviso: avisoOferta, nomeNoBanco: NOME_NO_BANCO, cnpj: CNPJ_NO_BANCO,
-      evento, aoGerar: () => { void gerar(); }, aoMontarForm: ligarCampoCko, aoFechar: aoFecharCko,
+      evento, aoGerar: () => { void gerar(); }, aoMontarForm: ligarCampoCko, aoFechar: aoFecharCko, trocarEntrada: sobra,
     });
     // render() inteiro (não só a camada): o cartão volta pra oferta ANTES de a camada mostrar o código de 8 números (fechou no meio dele) —
     // nunca 2 #lp-codigo-antes na página
     render();
   }, () => {
+    if (teto !== null) window.clearTimeout(teto);
     ocupado?.removeAttribute("aria-busy");
+    if (ckoFalhou) return; // o teto já devolveu o cartão (e já rolou até ele)
     // o módulo não veio (2 tentativas): o cartão volta a ser o de hoje (com o campo de e-mail) e a página vai até ele
-    ckoFalhou = true;
-    document.documentElement.setAttribute("data-cko-falhou", "");
-    rolarAte($("oferta"));
+    cairNoCartao();
   });
 }
 /** o campo de e-mail da camada: as MESMAS regras do campo do cartão (erro some ao digitar, sugestão de domínio, "Ir" = gerar) */

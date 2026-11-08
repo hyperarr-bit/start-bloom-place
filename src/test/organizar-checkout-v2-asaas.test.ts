@@ -9,7 +9,7 @@
  * A fixture src/test/fixtures/organizar-asaas-07-11.json foi gravada do HEAD 08bc1145 ANTES de mexer na página: o que vai pro asaas-pix
  * (cada corpo), o que vai pro pixel (InitiateCheckout + Purchase) e o que vai pra atribuição da conta, nos 2 braços do AB_LP.
  */
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -80,7 +80,12 @@ vi.mock("@/pages/venda/rastreio", () => ({ cookiesDaMeta: () => ({ fbp: "fb.1.17
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn() }));
 vi.mock("@/lib/google-ads", () => ({ firePurchaseConversion: vi.fn() }));
 
-import { abrirPagina, botaoFixo, camadaAberta, clicar, digitar, dormir, espera, esperaCamada, esperaCamadaFechar, eventos, fbq, limparEventos, semCko, type Ev, type Lp } from "./organizar-cko-roteiro";
+import { abrirPagina, botaoFixo, camadaAberta, clicar, digitar, dormir, encerrarPagina, espera, esperaCamada, esperaCamadaFechar, eventos, fbq, limparEventos, semCko, type Ev, type Lp } from "./organizar-cko-roteiro";
+
+// 08/11 (revisão): a página de cada teste "fecha" no fim (ouvintes e timers dela saem) — nenhuma página velha mexe na do teste seguinte
+afterEach(() => encerrarPagina());
+/** 3 compras por braço do AB_LP: 1 teste por braço, com teto folgado (máquina carregada) */
+const TETO_BRACO = 240_000;
 
 const FIXTURE = resolve(__dirname, "fixtures/organizar-asaas-07-11.json");
 type Rodada = { invoke: Array<{ fn: string; body: Record<string, unknown> }>; pixel: unknown[]; atribuicao: Array<Record<string, unknown>>; eventos: Ev[]; otp: string[] };
@@ -143,23 +148,25 @@ async function jaTemHoje(lp: Lp): Promise<Rodada> {
 }
 
 describe("Asaas falso: o caminho do dinheiro do /organizar de hoje", () => {
-  it("a fixture gravada antes de mexer: mesmas chamadas ao asaas-pix, mesmo pixel (1 Purchase, eventID = pedido, 27,90), mesma atribuição", async () => {
+  it.each(["atual", "v2"] as Lp[])("a fixture gravada antes de mexer: mesmas chamadas ao asaas-pix, mesmo pixel (1 Purchase, eventID = pedido, 27,90), mesma atribuição — AB_LP %s", async (lp) => {
     const gravar = process.env.GRAVAR_FIXTURE_CKO === "1";
     if (!gravar) expect(existsSync(FIXTURE)).toBe(true);
     const tudo: Record<string, Rodada> = {};
-    for (const lp of ["atual", "v2"] as Lp[]) {
-      tudo[`${lp}|compra`] = await compraHoje(lp);
-      tudo[`${lp}|codigo`] = await codigoHoje(lp);
-      tudo[`${lp}|ja_tem`] = await jaTemHoje(lp);
+    tudo[`${lp}|compra`] = await compraHoje(lp);
+    tudo[`${lp}|codigo`] = await codigoHoje(lp);
+    tudo[`${lp}|ja_tem`] = await jaTemHoje(lp);
+    if (gravar) {
+      mkdirSync(resolve(__dirname, "fixtures"), { recursive: true });
+      const antes = existsSync(FIXTURE) ? JSON.parse(readFileSync(FIXTURE, "utf8")) as Record<string, Rodada> : {};
+      writeFileSync(FIXTURE, JSON.stringify({ ...antes, ...tudo }, null, 1) + "\n");
     }
-    if (gravar) { mkdirSync(resolve(__dirname, "fixtures"), { recursive: true }); writeFileSync(FIXTURE, JSON.stringify(tudo, null, 1) + "\n"); }
     const fx = JSON.parse(readFileSync(FIXTURE, "utf8")) as Record<string, Rodada>;
-    for (const k of Object.keys(fx)) expect(tudo[k], k).toEqual(fx[k]);
-    for (const k of ["atual|compra", "v2|compra", "atual|codigo", "v2|codigo"]) {
+    for (const k of Object.keys(tudo)) expect(tudo[k], k).toEqual(fx[k]);
+    for (const k of [`${lp}|compra`, `${lp}|codigo`]) {
       const compras = tudo[k].pixel.filter((c) => (c as unknown[])[1] === "Purchase");
       expect(compras).toEqual([["track", "Purchase", { value: 27.9, currency: "BRL", content_name: "LN_sempre279" }, { eventID: "asaasfalso0001" }]]);
     }
-  }, 120_000);
+  }, TETO_BRACO);
 });
 
 /* ───────────────────────── 08/11: o MESMO caminho do dinheiro pela camada do checkout novo (data-cko="v2") ───────────────────────── */
@@ -212,9 +219,9 @@ async function jaTemV2(lp: Lp): Promise<Rodada> {
 }
 
 describe("Asaas falso: pela camada do checkout novo, o MESMO dinheiro", () => {
-  it("nos 2 braços do AB_LP: os mesmos corpos no asaas-pix (oferta LN_sempre279, a URL do anúncio, o e-mail), o mesmo pixel (1 Purchase, eventID = pedido, 27,90), a mesma atribuição + braco_cko \"v2\", os mesmos eventos de hoje", async () => {
+  it.each(["atual", "v2"] as Lp[])("os mesmos corpos no asaas-pix (oferta LN_sempre279, a URL do anúncio, o e-mail), o mesmo pixel (1 Purchase, eventID = pedido, 27,90), a mesma atribuição + braco_cko \"v2\", os mesmos eventos de hoje — AB_LP %s", async (lp) => {
     const fx = JSON.parse(readFileSync(FIXTURE, "utf8")) as Record<string, Rodada>;
-    for (const lp of ["atual", "v2"] as Lp[]) {
+    {
       // pelo botão fixo, a ordem dos eventos é a do roteiro de hoje (que também começou pelo fixo)
       const compra = await compraV2(lp, "fixo");
       expect(compra.invoke, `${lp} compra`).toEqual(fx[`${lp}|compra`].invoke);
@@ -229,7 +236,7 @@ describe("Asaas falso: pela camada do checkout novo, o MESMO dinheiro", () => {
       // o Purchase: 1 só, com o eventID do pedido (o mesmo id que a CAPI do servidor usa) e o valor da oferta
       for (const r of [compra, codigo]) expect(r.pixel.filter((c) => (c as unknown[])[1] === "Purchase")).toEqual([["track", "Purchase", { value: 27.9, currency: "BRL", content_name: "LN_sempre279" }, { eventID: "asaasfalso0001" }]]);
     }
-  }, 120_000);
+  }, TETO_BRACO);
 
   it("o servidor não gerou o Pix: a camada continua aberta com o erro de hoje acima do botão; tocar de novo gera", async () => {
     zerar();

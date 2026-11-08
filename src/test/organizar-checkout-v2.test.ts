@@ -316,6 +316,8 @@ describe("checkout novo (data-cko=\"v2\"): o mesmo Pix, a mesma tela do QR em di
     await esperaCamadaFechar();
     clicar("#lp-pagar");
     await espera('#cko [data-testid="landing-email-tem-conta"]');
+    clicar("#cko-x"); // não deixar a camada aberta pro próximo teste
+    await esperaCamadaFechar();
   });
 
   it("com Pix vivo, conta pronta ou \"Você já tem o CORE\", os botões fazem o de hoje (rolam até o cartão), sem abrir a camada", async () => {

@@ -1836,6 +1836,7 @@ function ligarCampoCko(campo: HTMLInputElement | null, sug: HTMLButtonElement | 
 /** a camada fechou: pela pessoa (X/Esc/voltar) — se o Pix já está sendo gerado, a página vai até o cartão, onde o QR vai aparecer; pela
  *  landing (QR pronto, "já tem", pago) — o cartão no topo, já no quadro em que a camada some */
 function aoFecharCko(via: string) {
+  if (!card.isConnected) return; // uma página que já saiu do documento (só nos testes, que trocam o body) não mexe em nada
   if (via === "x" || via === "esc" || via === "voltar") {
     if (antes && estado.fase === "oferta") {
       // fechou no código de 8 números (ou no "Entrando…"): o código — e o erro dele — volta pro cartão, e a página vai até ele

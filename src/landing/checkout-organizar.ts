@@ -12,7 +12,8 @@
  *   formulário → (código de 8 números, se o e-mail já tem conta: o MESMO HTML do cartão de hoje) → "Gerando o seu Pix…" (o MESMO HTML)
  *   → QR pronto: a landing FECHA a camada e a página já está no cartão, com o QR de hoje (AB_PIX "atual" ou "b"), a confirmação, o
  *     Purchase, a conta, o presente/2027 e o "Você já tem o CORE" de hoje — o mesmo código, não uma cópia.
- * Histórico: abrir empilha 1 entrada (mesma URL, marca `ckoOrg`); o "voltar" fecha; o X/Esc voltam essa entrada; fechar pela landing
+ * Histórico: abrir empilha 1 entrada (mesma URL, marca `ckoOrg` + `ckoY` = onde a página estava + `ckoEmail` = o e-mail digitado, pra uma
+ * recarga com a camada aberta — a landing lê e devolve a página ao cartão, com o e-mail); o "voltar" fecha; o X/Esc voltam essa entrada; fechar pela landing
  * (QR, "já tem", pago) tira a entrada sem sair do site. A rolagem do navegador fica "manual" enquanto a camada existe (o "voltar" não
  * pode jogar a página longe do cartão do QR).
  *
@@ -80,6 +81,7 @@ const CSS = `
 .cko-b-txt{position:relative;z-index:1;box-sizing:border-box;display:flex;flex-direction:column;min-height:124px;width:calc(100% - 122px);padding:13px 0 12px 16px}
 .cko-b-sobre{font-size:11.5px;line-height:1.2;font-weight:800;letter-spacing:.12em;color:#f6a8cf}
 .cko-b-tit{margin:3px 0 0;font-size:17px;line-height:1.12;font-weight:800;letter-spacing:-.02em;color:#fff}
+.cko-b-tit:focus{outline:none}
 .cko-b-tit em{font-style:normal;color:#ff7ab8}
 .cko-b-preco{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 7px;margin:7px 0 0}
 .cko-b-preco b{font-size:24px;line-height:1;font-weight:850;letter-spacing:-.025em;color:#fff;white-space:nowrap}
@@ -213,7 +215,7 @@ const banner = (o: OpcoesCko) => `
     <div class="cko-banner" data-testid="cko-banner">
       <div class="cko-b-txt">
         <span class="cko-b-sobre">ACESSO VITALÍCIO</span>
-        <h2 class="cko-b-tit" id="cko-tit">Um app pra <em>vida inteira.</em></h2>
+        <h2 class="cko-b-tit" id="cko-tit" tabindex="-1">Um app pra <em>vida inteira.</em></h2>
         <p class="cko-b-preco"><b>${esc(o.precoTxt)}</b><span>uma vez só</span></p>
         <p class="cko-b-lojas" aria-label="Na App Store e na Google Play"><span>${ICO_APPLE}App Store</span><span>${ICO_PLAY}Google Play</span></p>
       </div>
@@ -275,6 +277,7 @@ function ligarForm(corpo: HTMLElement) {
   const sug = corpo.querySelector<HTMLButtonElement>("#cko-sug");
   if (campo) campo.addEventListener("input", () => {
     emailMemo = campo.value;
+    guardarEmailNoHist();
     if (campo.value) emailDigitado = true;
     if (!emailComecou && campo.value) { emailComecou = true; opc?.evento("landing_cko_email_comecou", {}); }
   });
@@ -283,6 +286,18 @@ function ligarForm(corpo: HTMLElement) {
   ligarDuvidas(corpo);
   medirBanner();
   vigiarRodape();
+}
+
+/** o e-mail digitado vai junto na entrada da camada no histórico (só nesta aba; nunca em evento): se a aba recarregar com a camada aberta (o
+ *  Instagram recarrega, ou a volta do banco), a landing devolve o e-mail ao campo e a próxima abertura já vem preenchida */
+let timerEmailHist: number | null = null;
+function guardarEmailNoHist() {
+  if (timerEmailHist !== null) window.clearTimeout(timerEmailHist);
+  timerEmailHist = window.setTimeout(() => {
+    timerEmailHist = null;
+    if (!aberta || !marcaDoHist()) return;
+    try { history.replaceState({ ...(history.state as Record<string, unknown>), ckoEmail: emailMemo.trim().slice(0, 254) }, ""); } catch { /* noop */ }
+  }, 300);
 }
 
 /** a lista "Dúvidas": na 1ª vez que abre, "mensal" e "app" já abrem respondidas e o corpo rola até elas (como no v2 da /oferta) */
@@ -395,17 +410,21 @@ export function abrirCko(o: OpcoesCko): void {
   tela = null;
   aberta = true;
   abertoEm = Date.now();
-  try { if (restauracaoAntes === null) restauracaoAntes = history.scrollRestoration; history.scrollRestoration = "manual"; } catch { /* noop */ }
+  // a marca ainda no histórico = uma recarga com a camada aberta deixou esta entrada em "manual": o que volta ao fechar é o "auto"
+  try { if (restauracaoAntes === null) restauracaoAntes = marcaDoHist() ? "auto" : history.scrollRestoration; history.scrollRestoration = "manual"; } catch { /* noop */ }
   if (timerRestauracao !== null) { window.clearTimeout(timerRestauracao); timerRestauracao = null; }
   travar();
   raiz.hidden = false;
   raiz.querySelector<HTMLElement>(".cko-corpo")!.scrollTop = 0;
-  try { history.pushState({ ckoOrg: 1 }, ""); comHistorico = true; } catch { comHistorico = false; }
+  // ckoY: onde a página estava (o body fica fixo com a camada aberta — numa recarga o navegador só veria y 0)
+  try { history.pushState({ ckoOrg: 1, ckoY: yAntes }, ""); comHistorico = true; } catch { comHistorico = false; }
   window.addEventListener("popstate", aoPop);
   document.addEventListener("visibilitychange", aoVisibilidade);
   mostrarFormulario(null);
   o.evento("landing_cko_aberto", { de: o.de, vez: o.vez, email_pre: !!emailMemo, aviso_vencido: !!o.aviso, ms: o.ms });
-  window.setTimeout(() => { if (aberta) raiz?.querySelector<HTMLElement>("#cko-email, #cko-gerar")?.focus({ preventScroll: true }); }, 30);
+  // o foco vai pro título (sem anel), como o X do v2 da /oferta: o teclado só sobe quando ela tocar no campo — subindo sozinho, ele cobria
+  // o "Pix copia e cola", o botão, o "Depois, baixe o CORE…" e a garantia nos primeiros segundos
+  window.setTimeout(() => { if (aberta) raiz?.querySelector<HTMLElement>("#cko-tit")?.focus({ preventScroll: true }); }, 30);
 }
 
 /** X / Esc: fecha pelo histórico (o "voltar" do navegador também fecha, sem sair do site) */
@@ -441,9 +460,19 @@ function fecharJa(via: string) {
   if (reservaFechar !== null) { window.clearTimeout(reservaFechar); reservaFechar = null; }
   document.removeEventListener("visibilitychange", aoVisibilidade);
   obsRodape?.disconnect(); obsRodape = null;
-  if (raiz) raiz.hidden = true;
+  if (timerEmailHist !== null) { window.clearTimeout(timerEmailHist); timerEmailHist = null; }
+  // fechou pela pessoa (X/Esc/voltar): o foco volta pro botão que abriu. Fechou pela landing (QR, "já tem", pago): o foco SAI (um focus()
+  // por script depois de o campo de texto ter tido foco faria o próximo foco da página — o título do presente — ganhar o anel azul)
+  const pelaPessoa = via === "x" || via === "esc" || via === "voltar";
+  if (!pelaPessoa) { try { (document.activeElement as HTMLElement | null)?.blur?.(); } catch { /* noop */ } }
+  if (raiz) {
+    raiz.hidden = true;
+    // a camada fechada não guarda tela: o código de 8 números (#lp-codigo-antes…) nunca fica em 2 lugares (o cartão o mostra quando ela fecha)
+    const corpo = raiz.querySelector<HTMLElement>("#cko-in"); if (corpo) corpo.innerHTML = "";
+  }
+  tela = null;
   soltar();
-  try { focoAntes?.focus?.({ preventScroll: true }); } catch { /* noop */ }
+  if (pelaPessoa) { try { focoAntes?.focus?.({ preventScroll: true }); } catch { /* noop */ } }
   if (pularPop === 0) devolverRestauracao();
   opc?.aoFechar(via, t);
 }
@@ -452,6 +481,8 @@ function fecharJa(via: string) {
 export function _zerar(): void {
   if (reservaFechar !== null) window.clearTimeout(reservaFechar);
   if (timerRestauracao !== null) window.clearTimeout(timerRestauracao);
+  if (timerEmailHist !== null) window.clearTimeout(timerEmailHist);
+  timerEmailHist = null;
   window.removeEventListener("popstate", aoPop);
   document.removeEventListener("visibilitychange", aoVisibilidade);
   obsRodape?.disconnect();

@@ -121,7 +121,7 @@ describe("a chave CHECKOUT_ORG_V2 no <head>", () => {
     expect(bracoCkoDoHtml({ getAttribute: () => null })).toBe("atual");
   });
   it("o CSS que esconde o e-mail do cartão só pega com data-cko=\"v2\" (e volta se o módulo da camada falhar), fora do 1º <style>", () => {
-    expect(HTML).toContain('<style>html[data-cko="v2"]:not([data-cko-falhou]) .lp-email-antes { display: none !important; }</style>');
+    expect(HTML).toContain('<style>html[data-cko="v2"]:not([data-cko-falhou]) .lp-email-antes { display: none !important; } html[data-cko="v2"] [data-ir="oferta"][aria-busy="true"], html[data-cko="v2"] #lp-pagar[aria-busy="true"] { opacity: .75; pointer-events: none; }</style>');
     expect(HTML.match(/<style>([\s\S]*?)<\/style>/)![1]).not.toContain("data-cko");
   });
 });
@@ -380,15 +380,124 @@ describe("checkout novo (data-cko=\"v2\"): o mesmo Pix, a mesma tela do QR em di
     }
   });
 
+  it("o módulo da camada não carrega e o e-mail já tem conta: o código de 8 números aparece no cartão (1 e-mail de código, não 1 por toque)", async () => {
+    vi.doMock("@/landing/checkout-organizar", () => { throw new Error("chunk 404"); });
+    try {
+      await abrirPagina({ lp: "atual", pix: "atual", cko: "v2" });
+      clicar(botaoFixo("atual"));
+      await vi.waitFor(() => { if (!document.documentElement.hasAttribute("data-cko-falhou")) throw new Error("ainda não"); }, { timeout: 4000 });
+      digitar("lp-email-antes", "maria+existe@email.com");
+      clicar("#lp-pagar");
+      await espera('#lp-card [data-testid="landing-email-tem-conta"]');
+      expect(document.getElementById("lp-card")!.getAttribute("data-fase")).toBe("codigo");
+      expect(document.querySelectorAll("#lp-codigo-antes")).toHaveLength(1);
+    } finally {
+      vi.doUnmock("@/landing/checkout-organizar");
+    }
+  });
+
+  it("fechou pelo X no \"Gerando…\" com e-mail que já tem conta: o código aparece no cartão (como hoje)", async () => {
+    await abrirPagina({ lp: "atual", pix: "atual", cko: "v2" });
+    clicar(botaoFixo("atual"));
+    await esperaCamada();
+    digitar("cko-email", "maria+existe@email.com");
+    clicar("#cko-gerar");
+    clicar("#cko-x");
+    await esperaCamadaFechar();
+    await espera('#lp-card [data-testid="landing-email-tem-conta"]');
+    expect(eventos().find((e) => e.nome === "landing_cko_fechado")).toMatchObject({ via: "x", fase: "gerando" });
+    expect(document.querySelectorAll("#lp-codigo-antes")).toHaveLength(1);
+  });
+
+  it("fechou pelo X no código: o código volta pro cartão; reabriu: o código fica só na camada (nunca 2 #lp-codigo-antes)", async () => {
+    await abrirPagina({ lp: "v2", pix: "atual", cko: "v2" });
+    clicar("#lp-pagar");
+    await esperaCamada();
+    digitar("cko-email", "maria+existe@email.com");
+    clicar("#cko-gerar");
+    await espera('#cko [data-testid="landing-email-tem-conta"]');
+    expect(document.querySelectorAll("#lp-codigo-antes")).toHaveLength(1);
+    clicar("#cko-x");
+    await esperaCamadaFechar();
+    await espera('#lp-card [data-testid="landing-email-tem-conta"]');
+    expect(document.querySelectorAll("#lp-codigo-antes")).toHaveLength(1);
+    clicar(botaoFixo("v2"));
+    await espera('#cko [data-testid="landing-email-tem-conta"]');
+    expect(document.getElementById("lp-card")!.getAttribute("data-fase")).toBe("oferta");
+    expect(document.querySelectorAll("#lp-codigo-antes")).toHaveLength(1);
+    // o código digitado na camada entra pelo campo DELA
+    digitar("lp-codigo-antes", "12345678");
+    expect((document.getElementById("lp-entrar-pagar") as HTMLButtonElement).disabled).toBe(false);
+    clicar("#cko-x"); // não deixar a camada aberta pro próximo teste (o popstate dele chegaria a esta página)
+    await esperaCamadaFechar();
+  });
+
+  it("ao abrir, o foco vai pro título da camada (o teclado não sobe sozinho); fechou pela pessoa, volta pro botão; fechou no QR, o foco sai", async () => {
+    await abrirPagina({ lp: "atual", pix: "atual", cko: "v2" });
+    const botao = document.querySelector<HTMLElement>("#lp-pagar")!;
+    botao.focus();
+    clicar("#lp-pagar");
+    await esperaCamada();
+    await vi.waitFor(() => { if (document.activeElement?.id !== "cko-tit") throw new Error(String(document.activeElement?.id)); }, { timeout: 1000 });
+    expect(document.getElementById("cko-tit")!.getAttribute("tabindex")).toBe("-1");
+    clicar("#cko-x");
+    await esperaCamadaFechar();
+    expect(document.activeElement).toBe(botao);
+    botao.focus();
+    clicar("#lp-pagar");
+    await esperaCamada();
+    const campo = document.getElementById("cko-email") as HTMLInputElement;
+    campo.focus();
+    digitar("cko-email", "ana@email.com");
+    clicar("#cko-gerar");
+    await espera('#lp-card [data-testid="landing-codigo"]');
+    await esperaCamadaFechar();
+    expect(document.activeElement === botao).toBe(false);
+    expect(document.querySelector("#cko #cko-email")).toBeNull(); // a camada fechada não guarda tela
+  });
+
+  it("tocou no botão antes de o módulo da camada chegar: o botão fica aria-busy na hora e solta quando a camada abre", async () => {
+    // o módulo demora 400 ms pra chegar (4G): o toque logo depois do load cai antes dele
+    vi.doMock("@/landing/checkout-organizar", async () => { await dormir(400); return await vi.importActual<object>("@/landing/checkout-organizar"); });
+    try {
+      await abrirPagina({ lp: "v2", pix: "atual", cko: "v2" });
+      const b = document.querySelector<HTMLElement>("#lp-cta-topo")!;
+      expect(b.dataset.ir).toBe("oferta");
+      expect(camadaAberta()).toBe(false);
+      clicar("#lp-cta-topo");
+      expect(b.getAttribute("aria-busy")).toBe("true");
+      await esperaCamada();
+      expect(b.hasAttribute("aria-busy")).toBe(false);
+      expect(eventos().filter((e) => e.nome === "landing_cko_aberto")).toHaveLength(1);
+    } finally {
+      vi.doUnmock("@/landing/checkout-organizar");
+    }
+  });
+
   it("a aba recarregou com a camada aberta (o Instagram recarrega): a marca sai do histórico e a camada não reabre", async () => {
     await abrirPagina({ lp: "atual", pix: "atual", cko: "v2" });
     clicar(botaoFixo("atual"));
     await esperaCamada();
     expect((history.state as { ckoOrg?: number }).ckoOrg).toBe(1);
+    digitar("cko-email", "ana@email.com");
+    await dormir(400); // o e-mail vai pra entrada do histórico (300 ms depois de digitar)
+    expect(history.state).toMatchObject({ ckoOrg: 1, ckoEmail: "ana@email.com" });
+    expect(typeof (history.state as { ckoY?: number }).ckoY).toBe("number");
+    const rolar = espiarRolagem();
     await abrirPagina({ lp: "atual", pix: "atual", cko: "v2", limpar: false, manterHist: true }); // a recarga: a mesma entrada, com a marca
     await dormir(50);
-    expect((history.state as { ckoOrg?: number } | null)?.ckoOrg).toBeUndefined();
+    const h = history.state as { ckoOrg?: number; ckoY?: number; ckoEmail?: string } | null;
+    expect(h?.ckoOrg).toBeUndefined();
+    expect(h?.ckoY).toBeUndefined();
+    expect(h?.ckoEmail).toBeUndefined();
     expect(camadaAberta()).toBe(false);
+    // a página vai até o cartão (ela estava pagando) e o e-mail volta: a próxima abertura já vem preenchida
+    expect(rolar.mock.contexts.some((el) => (el as Element).id === "oferta")).toBe(true);
+    soltarRolagem();
+    expect((document.getElementById("lp-email-antes") as HTMLInputElement).value).toBe("ana@email.com");
+    clicar(botaoFixo("atual"));
+    await esperaCamada();
+    expect((document.getElementById("cko-email") as HTMLInputElement).value).toBe("ana@email.com");
   });
 
   it("v2 da página: o \"Quero organizar minha vida\" da demo em tela cheia fecha a demo e abre a camada", async () => {

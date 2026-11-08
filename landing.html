@@ -856,8 +856,9 @@
     </style>
     <!-- 08/11: o checkout novo do /organizar (CHECKOUT_ORG_V2): com a camada valendo, o e-mail é pedido NELA e o campo do cartão some. Fora do 1º <style>
          (os testes do braço atual comparam o 1º <style> com o de hoje); o resto do CSS da camada vem com src/landing/checkout-organizar.ts.
-         data-cko-falhou = o módulo da camada não carregou: o cartão volta a ser o de hoje, com o campo. -->
-    <style>html[data-cko="v2"]:not([data-cko-falhou]) .lp-email-antes { display: none !important; }</style>
+         data-cko-falhou = o módulo da camada não carregou: o cartão volta a ser o de hoje, com o campo.
+         aria-busy = tocou num botão que abre a camada antes de o módulo dela chegar: o botão esmaece na hora (como o da Hotmart). -->
+    <style>html[data-cko="v2"]:not([data-cko-falhou]) .lp-email-antes { display: none !important; } html[data-cko="v2"] [data-ir="oferta"][aria-busy="true"], html[data-cko="v2"] #lp-pagar[aria-busy="true"] { opacity: .75; pointer-events: none; }</style>
     <!-- Meta Pixel (só a fila aqui; o fbevents.js entra no carregador adiado do landing.ts, depois da 1ª pintura) -->
     <script>
       !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];}(window,document,'script');

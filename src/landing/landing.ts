@@ -660,7 +660,7 @@ document.querySelectorAll<HTMLElement>("[data-ir]").forEach((b) => b.addEventLis
   if (alvo === "oferta") evento("landing_cta", { onde, fase: estado.fase });
   if (alvo === "dentro-v2") evento("landing_lojas_topo", {}); // r1: "App Store · Google Play · Computador" da 1ª tela → rola até "Sim, é um app de verdade"
   // 08/11: com o checkout novo valendo (e a pessoa ainda na oferta), o botão que rolava até o cartão abre a camada
-  if (alvo === "oferta" && podeAbrirCko()) { abrirCkoOrg(onde); return; }
+  if (alvo === "oferta" && podeAbrirCko()) { abrirCkoOrg(onde, b); return; }
   rolarAte($(alvo));
 }));
 document.querySelectorAll<HTMLAnchorElement>("a[data-loja]").forEach((a) => a.addEventListener("click", () => evento("landing_loja", { loja: a.dataset.loja, onde: a.closest("#lp-pix") ? "pos_compra" : a.closest("#lpo") ? "prova" : "como" })));
@@ -1590,7 +1590,9 @@ function renderDoCartao() {
   if (u27Tela) { atualizarFixo(); return; }
   if (u27) card.removeAttribute("data-u27");
   if (jaTem && (estado.fase === "oferta" || estado.fase === "erro")) { renderJaTem(jaTem); return; }
-  if (antes && estado.fase === "oferta" && !CKO_V2) { renderCodigoAntes(antes); return; } // 08/11: no checkout novo o código fica NA CAMADA (o cartão segue na oferta)
+  // 08/11: com a camada do checkout novo ABERTA o código fica nela (o cartão segue na oferta). Fechada (X no "Gerando…" ou no código, ou o
+  // módulo da camada que não carregou), o código volta pro cartão como hoje — senão ele não aparecia em lugar nenhum
+  if (antes && estado.fase === "oferta" && !ckoAberto()) { renderCodigoAntes(antes); return; }
   card.dataset.fase = estado.fase === "erro" ? "oferta" : estado.fase;
   const f = estado.fase;
   if (V2) { erroNoBotao(f === "oferta" ? erroPix : null); avisoNoTopo(f === "oferta" ? avisoOferta : null); atualizarBotao(); }
@@ -1788,20 +1790,28 @@ function carregarCko(): Promise<ModCko> {
   }
   return carregandoCko;
 }
-function abrirCkoOrg(de: string) {
+function abrirCkoOrg(de: string, botao: HTMLElement | null = null) {
   const t0 = agora();
   if (PIX_REAL && !SIMULADO) void pg(false).catch(() => null); // o Pix de verdade já vem baixando (sem recarregar a página se falhar)
+  // o módulo ainda não chegou: o botão tocado responde NA HORA (aria-busy → o mesmo esmaecido do botão da Hotmart), até a camada abrir
+  const ocupado = !ckoMod && botao ? botao : null;
+  ocupado?.setAttribute("aria-busy", "true");
   void carregarCko().then((m) => {
+    ocupado?.removeAttribute("aria-busy");
     if (!podeAbrirCko() || m.estaAberto() || cheiaAberta) return;
     ckoVezes += 1;
+    devolverRestauracaoCko(); // uma recarga com a camada aberta deixou a entrada em "manual": volta o "auto" antes de a camada guardar o dela
     viuAOferta("checkout"); // a camada mostra o preço: quem compra direto do botão fixo também "viu a oferta" (o ViewContent de hoje, 1×)
     m.abrirCko({
       de, vez: ckoVezes, ms: agora() - t0, precoTxt: reais(VALOR_OFERTA[ofertaAtual()]), pedeEmail: brCheckout === "email",
       emailInicial: (campoAntes?.value ?? "").trim(), aviso: avisoOferta, nomeNoBanco: NOME_NO_BANCO, cnpj: CNPJ_NO_BANCO,
       evento, aoGerar: () => { void gerar(); }, aoMontarForm: ligarCampoCko, aoFechar: aoFecharCko,
     });
-    sincronizarCko(); // o código de 8 números volta se a pessoa fechou no meio dele
+    // render() inteiro (não só a camada): o cartão volta pra oferta ANTES de a camada mostrar o código de 8 números (fechou no meio dele) —
+    // nunca 2 #lp-codigo-antes na página
+    render();
   }, () => {
+    ocupado?.removeAttribute("aria-busy");
     // o módulo não veio (2 tentativas): o cartão volta a ser o de hoje (com o campo de e-mail) e a página vai até ele
     ckoFalhou = true;
     document.documentElement.setAttribute("data-cko-falhou", "");
@@ -1826,7 +1836,16 @@ function ligarCampoCko(campo: HTMLInputElement | null, sug: HTMLButtonElement | 
 /** a camada fechou: pela pessoa (X/Esc/voltar) — se o Pix já está sendo gerado, a página vai até o cartão, onde o QR vai aparecer; pela
  *  landing (QR pronto, "já tem", pago) — o cartão no topo, já no quadro em que a camada some */
 function aoFecharCko(via: string) {
-  if (via === "x" || via === "esc" || via === "voltar") { if (estado.fase !== "oferta" && estado.fase !== "erro") rolarAte(card, "start", false); return; }
+  if (via === "x" || via === "esc" || via === "voltar") {
+    if (antes && estado.fase === "oferta") {
+      // fechou no código de 8 números (ou no "Entrando…"): o código — e o erro dele — volta pro cartão, e a página vai até ele
+      render();
+      rolarAte(card, "start", false);
+      return;
+    }
+    if (estado.fase !== "oferta" && estado.fase !== "erro") rolarAte(card, "start", false);
+    return;
+  }
   rolarAte(card, "start", false);
   requestAnimationFrame(() => rolarAte(card, "start", false));
   // a entrada da camada sai do histórico por baixo (history.back): se a restauração de rolagem do navegador estiver "auto" (ex.: a demo em
@@ -1849,17 +1868,28 @@ function sincronizarCko(): "aberta" | "fechou" | null {
   return "aberta";
 }
 if (CKO_V2) {
-  // o módulo da camada e o print do banner: depois do pixel e do load, no ocioso (nunca antes da 1ª pintura; o braço "atual" não baixa nada novo)
-  depoisDoPixel(() => depoisDoLoad(() => ocioso(() => { void carregarCko().then((m) => m.preaquecerBannerCko(), () => null); }, 1500)));
+  // o módulo da camada e o print do banner: logo depois do load (nunca antes da 1ª pintura; o braço "atual" não baixa nada novo). Antes
+  // esperava também o pixel + 1,5 s de ócio e um toque no botão do topo do v2 (1ª tela) ficava ~1 s sem resposta.
+  depoisDoLoad(() => ocioso(() => { void carregarCko().then((m) => m.preaquecerBannerCko(), () => null); }, 300));
+  // o 1º dedo num botão que abre a camada já começa a baixar o módulo (o click vem ~100 ms depois)
+  const cedo = (e: Event) => {
+    const alvo = e.target as Element | null;
+    if (ckoMod || ckoFalhou || !alvo?.closest?.('[data-ir="oferta"], #lp-pagar, #lp2-cheia-comprar')) return;
+    void carregarCko().catch(() => null);
+  };
+  for (const ev of ["pointerdown", "touchstart"]) document.addEventListener(ev, cedo, { capture: true, passive: true });
 }
-/* a aba recarregou com a camada aberta (o Instagram recarrega): a marca sai do histórico e a camada NÃO reabre (a página volta onde estava) */
-{
-  const h = estadoHist() as (EstadoHist & { ckoOrg?: number }) | null;
-  if (h?.ckoOrg) { try { const resto: Record<string, unknown> = { ...h }; delete resto.ckoOrg; history.replaceState(resto, ""); } catch { /* noop */ } }
+/** a recarga com a camada aberta deixou a entrada em "manual" (ver o arranque, lá embaixo): o "auto" volta 400 ms depois do load — ou já, se a
+ *  camada abrir antes disso */
+let timerAutoCko: number | null = null;
+function devolverRestauracaoCko() {
+  if (timerAutoCko === null) return;
+  window.clearTimeout(timerAutoCko); timerAutoCko = null;
+  try { history.scrollRestoration = "auto"; } catch { /* noop */ }
 }
 
 $("lp-pagar").addEventListener("click", () => {
-  if (podeAbrirCko()) { abrirCkoOrg("cartao"); return; } // 08/11: no checkout novo o botão do cartão abre a camada (o landing_cta "pagar" sai no "Gerar Pix" dela)
+  if (podeAbrirCko()) { abrirCkoOrg("cartao", $("lp-pagar")); return; } // 08/11: no checkout novo o botão do cartão abre a camada (o landing_cta "pagar" sai no "Gerar Pix" dela)
   void gerar();
 });
 
@@ -2283,6 +2313,31 @@ if (estado.fase !== "oferta") {
   if (V2) window.addEventListener("load", () => rolarAte(card, "start", false), { once: true });
 }
 if (V2 && avisoOferta && estado.fase === "oferta" && !jaTem) { render(); conferirVencidoEmLoop(); } // o Pix venceu há pouco: o aviso fica, e a conferência segue
+
+/* 08/11: a aba recarregou com a camada do checkout novo aberta (o Instagram recarrega; a volta do banco no meio do "Gerando…"). A camada NÃO
+ * reabre e a marca sai do histórico. Com ela aberta o body estava fixo (o navegador guardou y 0) e a entrada estava em "manual": sem isto a
+ * página voltava no topo, longe do cartão, e ficava presa no "manual" pro resto da sessão. Agora: na oferta, a página vai até o cartão (ela
+ * estava pagando: o botão está ali); com Pix vivo/pago/conta/"já tem", até o cartão também. O e-mail digitado volta pro campo (a próxima
+ * abertura já vem preenchida). O "auto" volta 400 ms depois do load — menos quando a própria página quer o "manual" (cartão no arranque do v2,
+ * a retomada do 2027). */
+{
+  const h = estadoHist() as (EstadoHist & { ckoOrg?: number; ckoY?: number; ckoEmail?: string }) | null;
+  if (h?.ckoOrg) {
+    try { const resto: Record<string, unknown> = { ...h }; delete resto.ckoOrg; delete resto.ckoY; delete resto.ckoEmail; history.replaceState(resto, ""); } catch { /* noop */ }
+    if (typeof h.ckoEmail === "string" && h.ckoEmail && campoAntes && !campoAntes.value) campoAntes.value = h.ckoEmail.slice(0, 254);
+    const naOferta = (estado.fase === "oferta" || estado.fase === "erro") && !jaTem;
+    const alvo = naOferta ? $("oferta") : card;
+    const yVolta = typeof h.ckoY === "number" && h.ckoY > 0 ? h.ckoY : 0;
+    const paginaQuerManual = cartaoNoArranque || !!u27Retomada || VOLTA_U2027 || (V2 && estado.fase !== "oferta");
+    try { history.scrollRestoration = "manual"; } catch { /* noop */ } // nesta carga a posição é nossa (a do navegador seria y 0)
+    const levar = () => { if (ckoAberto() || cheiaAberta) return; if (alvo) rolarAte(alvo, "start", false); else window.scrollTo(0, yVolta); };
+    depoisDoLoad(() => {
+      levar();
+      requestAnimationFrame(levar);
+      if (!paginaQuerManual) timerAutoCko = window.setTimeout(() => { timerAutoCko = null; if (!ckoAberto()) { try { history.scrollRestoration = "auto"; } catch { /* noop */ } } }, 400);
+    });
+  }
+}
 
 /* v2 (30/10 noite): a aba recarregou com a demo em tela cheia aberta (o Instagram recarrega) → reabre no mesmo módulo, com a página
  * parada no mesmo y por baixo. Com Pix vivo, pago, aviso de vencido ou "já tem" o cartão manda (y 0): a marca sai do histórico. */

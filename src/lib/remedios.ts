@@ -136,14 +136,22 @@ export function inicioDoCadastro(primeira: string, agora: Date = new Date(), hor
  * cadastro mostra o começo calculado e um toque troca entre hoje e amanhã. Quem
  * cadastra às 23:30 um 8 em 8 desde 08:00 e só vai começar amanhã escolhe
  * "amanhã" — e não recebe aviso à meia-noite de uma dose que não vai tomar.
- * `amanha` ausente = a sugestão (`inicioDoCadastro`).
+ * `dia` ausente = a sugestão (`inicioDoCadastro`).
+ *
+ * O que a pessoa escolhe é o DIA ("AAAA-MM-DD"), guardado na hora do toque, não
+ * "amanhã" (crítica de fora, 08/11, F3): "amanhã" escolhido às 23:58 e o + tocado
+ * às 00:01 virava DEPOIS de amanhã — um dia inteiro sem aviso. `amanha` só diz como
+ * mostrar ("hoje"/"amanhã") comparando esse dia com o de agora. Um dia que já passou
+ * não vale: volta a sugestão (`passou: true`, pra tela avisar).
  */
-export function inicioEscolhido(primeira: string, horarios: string[], amanha?: boolean, agora: Date = new Date()): { inicio: string; amanha: boolean } | undefined {
+export function inicioEscolhido(primeira: string, horarios: string[], dia?: string, agora: Date = new Date()): { inicio: string; amanha: boolean; passou: boolean } | undefined {
   const sugerido = inicioDoCadastro(primeira, agora, horarios);
   if (!sugerido) return undefined;
-  const diaDeAmanha = somarDias(localDayKey(agora), 1);
-  const ehAmanha = amanha ?? sugerido.slice(0, 10) === diaDeAmanha;
-  return { inicio: `${ehAmanha ? diaDeAmanha : localDayKey(agora)}T${primeira}`, amanha: ehAmanha };
+  const hoje = localDayKey(agora);
+  const diaDeAmanha = somarDias(hoje, 1);
+  const passou = ehDia(dia) && dia < hoje;
+  const escolhido = ehDia(dia) && !passou ? dia : sugerido.slice(0, 10);
+  return { inicio: `${escolhido}T${primeira}`, amanha: escolhido === diaDeAmanha, passou };
 }
 
 /**
@@ -156,13 +164,13 @@ export function inicioEscolhido(primeira: string, horarios: string[], amanha?: b
  *    "ocorrência mais perto" levava 21:00, 22:00 e 23:00 pra hoje à noite). O dia
  *    vizinho só ganha quando a troca atravessa a meia-noite por poucas horas (até 3 h):
  *    às 23:00, 00:30 de amanhã → 23:30 começa hoje 23:30. Se a hora nova no dia
- *    escolhido já passou, vale a ocorrência mais perto (até 12 h) que ainda vem, e
- *    senão é refeito como num cadastro agora;
+ *    escolhido já passou, vale a ocorrência mais perto do início antigo entre as que
+ *    AINDA VÊM (08/11, F4) — nunca um começo no passado;
  *  - já começado: a data fica e só a hora muda (07/11, retomada). Com a hora
  *    velha, adiantar 08:00 → 07:00 deixava a 1ª dose "antes do início do dia".
  */
 const VIRADA_PERTO_MIN = 3 * 60;
-export function inicioAoMudarPrimeira(inicio: unknown, hora: string, agora: Date = new Date(), horarios: string[] = []): string | undefined {
+export function inicioAoMudarPrimeira(inicio: unknown, hora: string, agora: Date = new Date(), _horarios: string[] = []): string | undefined {
   const quando = momentoDoInicio(inicio);
   if (!quando || !ehHora(hora)) return undefined;
   if (quando.getTime() > agora.getTime()) {
@@ -173,10 +181,14 @@ export function inicioAoMudarPrimeira(inicio: unknown, hora: string, agora: Date
     const cruzouAMeiaNoite = vizinhos.find((d) => distancia(d) <= VIRADA_PERTO_MIN * 60_000 && distancia(d) < distancia(diaAntigo) && aindaVem(d));
     if (cruzouAMeiaNoite) return `${cruzouAMeiaNoite}T${hora}`;
     if (aindaVem(diaAntigo)) return `${diaAntigo}T${hora}`;
-    // o mesmo dia do início antigo ganha no empate
-    const dia = [diaAntigo, ...vizinhos].reduce((melhor, d) => (distancia(d) < distancia(melhor) ? d : melhor));
-    if (aindaVem(dia)) return `${dia}T${hora}`;
-    return inicioDoCadastro(hora, agora, horarios.length ? horarios : [hora]);
+    /* Só entre as ocorrências que AINDA VÊM (crítica de fora, 08/11, F4): um tratamento que não
+       começou nunca passa a ter começado no passado. "Começa hoje 20:00" cadastrado às 10:00 e a 1ª
+       dose mudada pra 08:00 às 10:30: hoje 08:00 e amanhã 08:00 ficavam a 12 h do início antigo, o
+       empate ia pra hoje (que já passou) e caía no "cadastro agora" — começava hoje 08:00, antes do
+       próprio cadastro, com dose devida e aviso hoje. Agora: amanhã 08:00. */
+    const futuros = [diaAntigo, ...vizinhos, somarDias(diaAntigo, 2)].filter(aindaVem);
+    const dia = futuros.reduce((melhor, d) => (distancia(d) < distancia(melhor) ? d : melhor));
+    return `${dia}T${hora}`;
   }
   return `${String(inicio).slice(0, 10)}T${hora}`;
 }
@@ -342,10 +354,40 @@ function antecedenciaMin(horas: string[], primeira: string): number {
 }
 
 /**
+ * O DIA DA DOSE DE UM REMÉDIO DE 1× AO DIA (crítica de fora, 08/11, F2 e A3): o dia do
+ * calendário da ocorrência da vez, que não é sempre o de hoje.
+ *  - ONTEM, se a de ontem está mais perto do relógio que a de hoje (até 12 h pra trás —
+ *    a mesma virada no meio do caminho do grupo): o remédio das 23:00 esquecido e tomado
+ *    às 00:30 é o de ontem. Gravava em hoje: o aviso das 23:00 de hoje sumia e a caixa
+ *    ficava ✓ o dia inteiro — a pessoa pulava a dose (anticoncepcional, remédio da noite).
+ *  - AMANHÃ, se a de amanhã vem em até 3 h e está mais perto que a de hoje: o das 00:30
+ *    tomado às 23:50 é o de daqui a 40 min (A3). Gravava em hoje, e o aviso das 00:30
+ *    tocava depois de a pessoa tomar.
+ *  - senão, a de hoje. Pra frente o limite é 3 h, e não 12 h, de propósito: o das 08:00
+ *    olhado às 22:00 continua mostrando o ✓ de hoje (rodada 3, B1). Com 12 h, às 20:01 a
+ *    caixa já seria a de amanhã, em aberto, e quem conferisse "já tomei hoje?" tomaria 2.
+ * O registro continua no dia do calendário em que a dose acontece (formato igual); o
+ * plano dos avisos já lê isso pelo tomadoHoje e pelo tomadoAmanha. Nunca passa do `ate`.
+ */
+const AMANHA_PERTO_MIN = 3 * 60;
+function diaDaDoseUnica(hora: string, agora: Date, ate?: string): string {
+  const hoje = localDayKey(agora);
+  const t = agora.getTime();
+  const longe = (d: string) => Math.abs(momentoDe(d, hora).getTime() - t);
+  const ontem = somarDias(hoje, -1);
+  const amanha = somarDias(hoje, 1);
+  if (longe(ontem) < longe(hoje)) return ontem;
+  const ateValido = !ehDia(ate) || amanha <= ate;
+  if (ateValido && momentoDe(amanha, hora).getTime() - t <= AMANHA_PERTO_MIN * 60_000 && longe(amanha) < longe(hoje)) return amanha;
+  return hoje;
+}
+
+/**
  * As doses que existem agora, pra marcar — cada linha UMA vez, a do DIA DO
  * TRATAMENTO de agora (07/11, 3ª rodada da crítica).
  *
- * Remédio simples (1 linha): a de hoje, como sempre.
+ * Remédio simples (1 linha): a de hoje — ou a de ontem/amanhã perto da meia-noite
+ * (`diaDaDoseUnica`, 08/11).
  * Grupo (8 em 8…): o dia do tratamento começa na 1ª dose (a hora atual da 1ª
  * linha) e vira no meio do caminho entre a dose da noite e ela (`antecedenciaMin`).
  * Em 8 em 8 desde as 08:00, das 04:00 de hoje às 04:00 de amanhã as pílulas são
@@ -362,7 +404,10 @@ export function dosesDoGrupoAgora(g: GrupoDeRemedio, agora: Date = new Date()): 
   if (g.itens.length <= 1) {
     return g.itens
       .filter((s) => doseVale({ time: s.time, ate: g.ate }, primeira, agora))
-      .map((s) => ({ ...s, dia: hoje, quando: ehHora(s.time) ? momentoDe(hoje, s.time).getTime() : 0 }));
+      .map((s) => {
+        const dia = ehHora(s.time) ? diaDaDoseUnica(s.time, agora, g.ate) : hoje;
+        return { ...s, dia, quando: ehHora(s.time) ? momentoDe(dia, s.time).getTime() : 0 };
+      });
   }
   const p = ehHora(primeira) ? primeira : "00:00";
   const inicioGravado = g.itens.find((s) => ehInicio(s.inicio))?.inicio;
@@ -393,8 +438,16 @@ function dosesDoDiaDoTratamento(g: GrupoDeRemedio, dia: string): DoseMarcavel[] 
   return out;
 }
 
-/** Uma marca de "tomado" que saiu de um dia do registro: foi pra `para`, ou sumiu (`null`). */
-export interface MarcaMovida { id: string; de: string; para: string | null }
+/** Uma marca de "tomado" que saiu de um dia do registro: foi pra `para` (na linha `paraId`, se mudou de linha), ou sumiu (`null`). */
+export interface MarcaMovida { id: string; de: string; para: string | null; paraId?: string }
+
+/** Metade do menor intervalo entre duas doses seguidas (a volta da meia-noite conta): 8 em 8 → 4 h. */
+function meioIntervaloMin(horas: string[]): number {
+  const m = [...new Set(horas.filter(ehHora).map(minutosDe))].sort((a, b) => a - b);
+  if (m.length < 2) return 12 * 60;
+  const folgas = m.map((x, i) => (i + 1 < m.length ? m[i + 1] - x : m[0] + 24 * 60 - x));
+  return Math.floor(Math.min(...folgas) / 2);
+}
 
 /**
  * MUDOU A HORA, A MARCA VAI JUNTO (07/11, 4ª rodada da crítica). O registro de
@@ -404,19 +457,22 @@ export interface MarcaMovida { id: string; de: string; para: string | null }
  * 08:00 tomadas, mudar pra 07:00 às 15:00 fazia a das 23:00 de hoje aparecer
  * tomada e o aviso dela sumia: a pessoa pulava uma dose de antibiótico.
  *
- * Emparelha a MESMA OCORRÊNCIA: a linha X do dia D do tratamento com as horas
- * velhas (`antes`) vira a linha X do mesmo dia D com as novas (`depois`), pros
- * dias D de anteontem a amanhã. (Conserto final 07/11: comparava "o dia do
- * tratamento de agora" de cada lado, e a troca feita ANTES da dose da manhã fazia
- * um lado ser ontem e o outro hoje — às 06:50, 08:00 → 07:00 levava a marca da
- * 08:00 de ontem pra 07:00 de hoje, e as marcas de ontem saíam do histórico.)
- *  - a dose marcada leva a marca pro dia em que ela acontece agora — só se a dose
- *    nova já chegou (ou chega em até 1 h, o "tomar um pouco antes"). Atrasar 08:00
- *    (tomada) pra 20:00 às 15:00 não deixa a das 20:00 marcada: ela ainda vai ser
- *    tomada. Dose que no desenho novo continua no passado sempre leva a marca;
- *  - uma marca de OUTRA ocorrência que agora cairia numa dose nova que ainda vem
- *    (a das 00:00 de ontem à noite virando a das 23:00 de hoje) sai.
- * O estoque não muda (o comprimido foi tomado), e o formato da chave é o mesmo.
+ * A MARCA VAI PRA DOSE MAIS PERTO NO RELÓGIO (crítica de fora, 08/11, F1): cada
+ * dose marcada do desenho velho (de anteontem a amanhã) leva a marca pra dose do
+ * desenho novo — de QUALQUER linha — cujo momento fica mais perto do momento dela,
+ * até a metade do menor intervalo entre as doses (4 h em 8 em 8, a mesma conta da
+ * virada do dia). Antes ia pra MESMA LINHA no mesmo dia do tratamento: 08:00 → 23:00
+ * às 15:00 (horários 23/07/15) levava a marca da 00:00 pra 15:00 de AGORA e apagava
+ * a das 08:00 tomada — a pessoa pulava uma dose; os mesmos horários digitados como
+ * 07:00 davam outra coisa. Agora o resultado só depende das horas: 08:00 → 23:00 e
+ * 08:00 → 07:00 dão 07 ✓ e 15 em aberto; 08:00 → 02:00 dá 02 ✓ e 10 ✓ (não pede a
+ * das 10:00 às 15:00, 3 h antes da das 18:00).
+ *  - cada dose nova recebe no máximo uma marca (empate: a dose mais cedo);
+ *  - a marca não vai pra uma dose que ainda vem (passa de agora + 1 h, o "tomar um
+ *    pouco antes"): o aviso dela sumiria. Sem dose perto o bastante, a marca sai;
+ *  - uma marca solta que cairia numa dose nova que ainda vem também sai.
+ * O estoque não muda (o comprimido foi tomado), e o formato da chave é o mesmo: id
+ * da linha no dia do calendário em que a dose acontece.
  */
 export function moverMarcasDoGrupo(
   antes: GrupoDeRemedio,
@@ -425,40 +481,53 @@ export function moverMarcasDoGrupo(
   agora: Date = new Date(),
 ): { log: Record<string, string[]>; movidas: MarcaMovida[] } {
   const hoje = localDayKey(agora);
-  const dias = [-2, -1, 0, 1].map((n) => somarDias(hoje, n)); // o dia do tratamento de agora é ontem ou hoje (ou o 1º, amanhã)
   const limite = agora.getTime() + ANTECEDENCIA_MIN * 60_000;
   const marcadoNoLog = (dia: string, id: string) => Array.isArray(log[dia]) && log[dia].includes(id);
-  type Par = { id: string; de?: DoseMarcavel; para?: DoseMarcavel; marcada: boolean; vai: boolean };
-  const pares: Par[] = [];
-  for (const dia of dias) {
-    const velhas = new Map(dosesDoDiaDoTratamento(antes, dia).map((d) => [d.id, d]));
-    const novas = new Map(dosesDoDiaDoTratamento(depois, dia).map((d) => [d.id, d]));
-    for (const s of depois.itens) {
-      const de = velhas.get(s.id);
-      const para = novas.get(s.id);
-      const marcada = !!de && marcadoNoLog(de.dia, s.id);
-      pares.push({ id: s.id, de, para, marcada, vai: marcada && !!para && para.quando <= limite });
+  // as doses marcadas do desenho velho: o dia do tratamento de agora é ontem ou hoje (ou o 1º, amanhã)
+  const marcas: DoseMarcavel[] = [];
+  for (const n of [-2, -1, 0, 1]) {
+    for (const d of dosesDoDiaDoTratamento(antes, somarDias(hoje, n))) if (marcadoNoLog(d.dia, d.id)) marcas.push(d);
+  }
+  // as doses do desenho novo em volta delas (um dia a mais de cada lado)
+  const novas: DoseMarcavel[] = [];
+  for (const n of [-3, -2, -1, 0, 1, 2]) novas.push(...dosesDoDiaDoTratamento(depois, somarDias(hoje, n)));
+  const raio = meioIntervaloMin(depois.itens.map((s) => s.time)) * 60_000;
+  const chave = (d: DoseMarcavel) => `${d.id}@${d.dia}`;
+  const pares: { m: DoseMarcavel; c: DoseMarcavel; dist: number }[] = [];
+  for (const m of marcas) {
+    for (const c of novas) {
+      const dist = Math.abs(c.quando - m.quando);
+      if (dist <= raio && c.quando <= limite) pares.push({ m, c, dist });
     }
+  }
+  pares.sort((x, y) => x.dist - y.dist || x.c.quando - y.c.quando || x.m.quando - y.m.quando);
+  const destino = new Map<DoseMarcavel, DoseMarcavel>();
+  const ocupada = new Set<string>();
+  for (const { m, c } of pares) {
+    if (destino.has(m) || ocupada.has(chave(c))) continue;
+    destino.set(m, c);
+    ocupada.add(chave(c));
   }
   const out: Record<string, string[]> = { ...log };
   const tem = (dia: string, id: string) => Array.isArray(out[dia]) && out[dia].includes(id);
-  const tirar = (dia: string, id: string) => { out[dia] = out[dia].filter((x) => x !== id); };
+  const tirar = (dia: string, id: string) => { out[dia] = (out[dia] ?? []).filter((x) => x !== id); };
   const movidas: MarcaMovida[] = [];
   // 1º tira toda marca que muda de lugar (ou não vai), 2º põe nos lugares novos — duas ocorrências
-  // diferentes podem trocar de dia entre si, e tirar depois de pôr apagaria a que acabou de chegar
-  for (const x of pares) {
-    if (!x.marcada || !x.de || (x.vai && x.para?.dia === x.de.dia)) continue;
-    tirar(x.de.dia, x.id);
-    movidas.push({ id: x.id, de: x.de.dia, para: x.vai && x.para ? x.para.dia : null });
+  // podem trocar de lugar entre si, e tirar depois de pôr apagaria a que acabou de chegar
+  for (const m of marcas) {
+    const c = destino.get(m);
+    if (c && chave(c) === chave(m)) continue;
+    tirar(m.dia, m.id);
+    movidas.push({ id: m.id, de: m.dia, para: c ? c.dia : null, ...(c && c.id !== m.id ? { paraId: c.id } : {}) });
   }
-  for (const x of pares) {
-    if (x.vai && x.para && !tem(x.para.dia, x.id)) out[x.para.dia] = [...(out[x.para.dia] ?? []), x.id];
+  for (const c of destino.values()) {
+    if (!tem(c.dia, c.id)) out[c.dia] = [...(out[c.dia] ?? []), c.id];
   }
-  // a marca de outra ocorrência que cairia numa dose nova que ainda vem
-  for (const x of pares) {
-    if (x.vai || !x.para || x.para.quando <= agora.getTime() || !tem(x.para.dia, x.id)) continue;
-    tirar(x.para.dia, x.id);
-    movidas.push({ id: x.id, de: x.para.dia, para: null });
+  // a marca solta que cairia numa dose nova que ainda vem
+  for (const c of novas) {
+    if (c.quando <= agora.getTime() || ocupada.has(chave(c)) || !tem(c.dia, c.id)) continue;
+    tirar(c.dia, c.id);
+    movidas.push({ id: c.id, de: c.dia, para: null });
   }
   return { log: out, movidas };
 }

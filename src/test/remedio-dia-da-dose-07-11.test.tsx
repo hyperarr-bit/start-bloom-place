@@ -569,8 +569,9 @@ describe("'Começa amanhã' e depois mudar a 1ª dose", () => {
     expect(inicioAoMudarPrimeira("2026-11-08T08:00", "09:00", new Date(2026, 10, 7, 21, 35), gerarHorarios("09:00", 3))).toBe("2026-11-08T09:00");
     expect(inicioAoMudarPrimeira("2026-11-08T08:00", "07:00", new Date(2026, 10, 7, 21, 35), gerarHorarios("07:00", 3))).toBe("2026-11-08T07:00");
     expect(inicioAoMudarPrimeira("2026-11-08T00:30", "23:30", new Date(2026, 10, 7, 23), gerarHorarios("23:30", 3))).toBe("2026-11-07T23:30");
-    // a ocorrência mais perto do início antigo já passou: aí vale o cadastro de agora
-    expect(inicioAoMudarPrimeira("2026-11-07T20:00", "09:00", new Date(2026, 10, 7, 10), gerarHorarios("09:00", 3))).toBe("2026-11-07T09:00");
+    // a de hoje já passou: vale a mais perto entre as que ainda vêm — amanhã (crítica de fora 08/11, F4:
+    // era o "cadastro de agora", e o tratamento que nem tinha começado passava a ter começado hoje 09:00)
+    expect(inicioAoMudarPrimeira("2026-11-07T20:00", "09:00", new Date(2026, 10, 7, 10), gerarHorarios("09:00", 3))).toBe("2026-11-08T09:00");
   });
 
   it("na tela: cadastrou às 21:30 com 'Começa amanhã 08:00' e às 21:35 mudou pra 09:00 → sem aviso de madrugada, 1º aviso amanhã 09:00", () => {

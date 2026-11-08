@@ -135,8 +135,10 @@ export const PharmacyChecklist = () => {
   const vezesLigado = remedioVezesLigado();
   const [horariosEditados, setHorariosEditados] = useState<string[] | null>(null);
   const [newAte, setNewAte] = useState("");
-  /** "Começa hoje/amanhã" (07/11, 4ª rodada): null = a sugestão; true/false = o que a pessoa tocou */
-  const [comecaAmanha, setComecaAmanha] = useState<boolean | null>(null);
+  /** "Começa hoje/amanhã" (07/11, 4ª rodada): null = a sugestão; senão o DIA que a pessoa tocou
+      ("AAAA-MM-DD", guardado na hora do toque — 08/11, F3: "amanhã" escolhido às 23:58 e o + às
+      00:01 virava depois de amanhã) */
+  const [diaDoComeco, setDiaDoComeco] = useState<string | null>(null);
   /** o grupo com os horários/data abertos pra editar na tabela */
   const [editando, setEditando] = useState<string | null>(null);
   /* A FOTO DE QUANDO A FILEIRA DE EDIÇÃO ABRIU (crítica do conserto final 07/11): o campo de
@@ -156,7 +158,7 @@ export const PharmacyChecklist = () => {
   const grupos = agruparRemedios(supplements);
   const horariosGerados = gerarHorarios(newTime, newVezes);
   const horarios = horariosEditados ?? (horariosGerados.length ? horariosGerados : [newTime]);
-  const comeco = newVezes > 1 && horarios.length > 1 ? inicioEscolhido(horarios[0], horarios, comecaAmanha ?? undefined) : undefined;
+  const comeco = newVezes > 1 && horarios.length > 1 ? inicioEscolhido(horarios[0], horarios, diaDoComeco ?? undefined) : undefined;
 
   /** as linhas que andam juntas com esta: o grupo inteiro, ou só ela */
   const mesmoGrupo = (linha: Supplement) => (s: Supplement) => (linha.grupo ? s.grupo === linha.grupo : s.id === linha.id);
@@ -263,7 +265,15 @@ export const PharmacyChecklist = () => {
     const quem = newQuem.trim();
     const stock = lerEstoque(newStock) ?? ESTOQUE_PADRAO;
     const ate = vezesLigado && ehDia(newAte) && newAte >= today ? newAte : undefined; // data no passado = sem fim
-    const novas = montarLinhas({ name: newName.trim(), quem, stock }, vezesLigado ? horarios : [newTime], ate, Date.now(), comeco?.inicio);
+    // o dia escolhido em "Começa" já passou (escolhido antes da meia-noite, + bem depois): não grava
+    // um começo que a pessoa não viu — volta a sugestão e avisa; o próximo + grava o que está na tela
+    const comecoNaHora = vezesLigado && newVezes > 1 && horarios.length > 1 ? inicioEscolhido(horarios[0], horarios, diaDoComeco ?? undefined) : undefined;
+    if (comecoNaHora?.passou) {
+      setDiaDoComeco(null);
+      toast(`O dia escolhido pra começar já passou. Agora começa ${comecoNaHora.amanha ? "amanhã" : "hoje"} ${horarios[0]}. Confira e toque no + de novo.`, { id: "remedio-comeco-passou", duration: 5000 });
+      return;
+    }
+    const novas = montarLinhas({ name: newName.trim(), quem, stock }, vezesLigado ? horarios : [newTime], ate, Date.now(), comecoNaHora?.inicio);
     const lista = [...supplements, ...novas];
     setSupplements(lista);
     if (quem && !dependentes.includes(quem)) setDependentes([...dependentes, quem]);
@@ -273,7 +283,7 @@ export const PharmacyChecklist = () => {
     setNewVezes(1);
     setHorariosEditados(null);
     setNewAte("");
-    setComecaAmanha(null);
+    setDiaDoComeco(null);
     if (novas.length > 1 || ate) trackEvent("remedio_vezes_cadastro", { vezes: novas.length, ate: !!ate });
     void rearmarLembretes(lista, true);
   };
@@ -365,11 +375,20 @@ export const PharmacyChecklist = () => {
     }
     if (mudou) setSupplementLog(log);
     marcadaPelaCaixa.delete(depois.chave); // as marcas mudaram de dia: o que a caixa marcou não vale mais
+    // a anotação "marcado sem baixa" vai com a marca — pro dia novo e, se a marca mudou de linha
+    // (08/11, F1: ela vai pra dose mais perto no relógio, de qualquer linha), pro id novo
     let sb: SemBaixa = foto.semBaixa?.dia && Array.isArray(foto.semBaixa.ids) ? foto.semBaixa : { dia: "", ids: [] };
-    for (const m of movidas) {
-      if (sb.dia !== m.de || !sb.ids.includes(m.id)) continue;
-      sb = { dia: sb.dia, ids: sb.ids.filter(x => x !== m.id) };
-      if (m.para && (sb.dia === m.para || !sb.ids.length)) sb = { dia: m.para, ids: [...(sb.dia === m.para ? sb.ids : []), m.id] };
+    const afetadas = movidas.filter(m => sb.dia === m.de && sb.ids.includes(m.id));
+    if (afetadas.length) {
+      let dia = sb.dia;
+      let idsSb = sb.ids.filter(x => !afetadas.some(m => m.id === x));
+      for (const m of afetadas) {
+        if (!m.para) continue;
+        const novoId = m.paraId ?? m.id;
+        if (m.para === dia) idsSb = [...idsSb.filter(x => x !== novoId), novoId];
+        else if (!idsSb.length) { dia = m.para; idsSb = [novoId]; }
+      }
+      sb = { dia, ids: idsSb };
     }
     if (JSON.stringify(sb) !== JSON.stringify(semBaixa ?? { dia: "", ids: [] })) setSemBaixa(sb);
     return mudou ? log : undefined;
@@ -791,7 +810,12 @@ export const PharmacyChecklist = () => {
                 {comeco && (
                   <button
                     type="button"
-                    onClick={() => setComecaAmanha(!comeco.amanha)}
+                    onClick={() => {
+                      // o DIA, pela hora do toque: hoje ↔ amanhã
+                      const agoraDoToque = new Date();
+                      const hojeDoToque = localDayKey(agoraDoToque);
+                      setDiaDoComeco(comeco.amanha ? hojeDoToque : localDayKey(new Date(agoraDoToque.getFullYear(), agoraDoToque.getMonth(), agoraDoToque.getDate() + 1)));
+                    }}
                     aria-label={`Começa ${comeco.amanha ? "amanhã" : "hoje"} às ${horarios[0]}. Tocar muda pra ${comeco.amanha ? "hoje" : "amanhã"}`}
                     className="h-8 -my-1.5 shrink-0 text-[11px] font-semibold text-foreground underline decoration-dotted underline-offset-2"
                     data-testid="remedio-comeca"

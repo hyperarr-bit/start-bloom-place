@@ -2,7 +2,7 @@
  * CRÍTICA DE FORA, RODADA 2 (07/11) — repro. Cada caso diz o que DEVIA acontecer e está em `it.fails`
  * enquanto o app faz diferente: quando o conserto entrar, o caso passa a falhar aqui e vira `it`.
  * A1/A1b/A1c/A1d/A2 consertados (conserto final, 07/11): o dia do tratamento vira no MEIO do caminho
- * entre a última dose do dia e a 1ª (04:00 em 8 em 8 desde 08:00), não 1 h antes. A3 segue aberto.
+ * entre a última dose do dia e a 1ª (04:00 em 8 em 8 desde 08:00), não 1 h antes. A3 consertado em 08/11 (F2 da crítica de fora 08/11).
  *
  *  A1 (ALTA) Antes de 1 h da 1ª dose a tela ainda é a de ONTEM (lib/remedios, ANTECEDENCIA_MIN). Quem toma
  *     a das 08:00 às 06:30 e toca a pílula 08:00 (ou a caixa, que aparece marcada) DESMARCA a de ontem:
@@ -199,13 +199,14 @@ describe("crítica de fora, rodada 2", () => {
     expect(avisos(store)[0]).toBe("07/08:00");
   });
 
-  it.fails("A3 1× ao dia às 00:30, tomado às 23:50: o aviso das 00:30 sai da fila e às 00:35 segue marcado", () => {
+  // consertado em 08/11 (crítica de fora 08/11, F2): o 1× ao dia usa a ocorrência mais perto da meia-noite (lib/remedios, diaDaDoseUnica)
+  it("A3 1× ao dia às 00:30, tomado às 23:50: o aviso das 00:30 sai da fila e às 00:35 segue marcado", () => {
     const novas = montarLinhas({ name: "Melatonina", stock: 10 }, ["00:30"], undefined, agoraEm(1, 10).getTime());
     const store = criarStore({ [CHAVE]: novas, [LOG]: {} });
     agoraEm(6, 23, 50);
     montar(store);
     fireEvent.click(caixa());
-    // hoje: grava em 06/11, o 1º aviso é 07/00:30 e às 00:35 a caixa diz "Marcar Melatonina como tomado"
+    // antes: gravava em 06/11, o 1º aviso era 07/00:30 e às 00:35 a caixa dizia "Marcar Melatonina como tomado"
     expect(avisos(store)[0]).toBe("08/00:30");
     cleanup();
     agoraEm(7, 0, 35);

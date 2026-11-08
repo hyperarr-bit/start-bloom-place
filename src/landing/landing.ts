@@ -79,7 +79,7 @@
 import {
 
   EMAIL_OK, MODULO_DA_AREA, NOME_DO_MODULO, ROTULO_OFERTA, VALOR_OFERTA, URL_APP_STORE,
-  bracoCheckoutDoHtml, bracoLpDoHtml, bracoLpOfertaDoHtml, bracoPixDoHtml, motivoPixDoHtml, NOME_NO_BANCO, CNPJ_NO_BANCO, checarEmailAntes, sugestaoDeEmail, voltaDoLembrete, upsell2027DoHtml, voltaDoEmailU2027, upsellPosDoHtml, ehPraSempreOferta,
+  bracoCheckoutDoHtml, bracoLpDoHtml, bracoLpOfertaDoHtml, bracoCkoDoHtml, bracoPixDoHtml, motivoPixDoHtml, NOME_NO_BANCO, CNPJ_NO_BANCO, checarEmailAntes, sugestaoDeEmail, voltaDoLembrete, upsell2027DoHtml, voltaDoEmailU2027, upsellPosDoHtml, ehPraSempreOferta,
   ESTADO_VAZIO, bracoOfertaDoHtml, bracoTituloDoHtml, ehArea, ehModuloLanding, estadoQueVolta, mmss, ofertaEscolhida, reais, urlPlay, venceEm,
   type Area, type EstadoLanding, type MensagemDaDemo, type ModuloLanding, type OfertaLanding, type PixLanding, type PixU2027,
 } from "./regras";
@@ -115,7 +115,7 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 const agora = () => Math.round(performance.now());
 type Janela = Window & {
   __landingSimularJaTem?: boolean;
-  __landing?: { lpo_forcado?: boolean; lpo_link?: boolean; ab_lp_oferta?: string; lpo_stripe_cedo?: string; pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null };
+  __landing?: { cko_forcado?: boolean; lpo_forcado?: boolean; lpo_link?: boolean; ab_lp_oferta?: string; lpo_stripe_cedo?: string; pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null };
   __eventosLanding?: Record<string, unknown>[];
   /** 02/11 (dev/testes): voltou() = "voltei do banco" (≥ 5 s fora) sem trocar de aba; vencer() = o QR vence em 1,5 s */
   __landingSimular?: { pagar: () => void; pagarU2027?: () => void; voltou?: () => void; vencer?: () => void };
@@ -186,6 +186,12 @@ const LPO_FORCADO = !!w.__landing?.lpo_forcado;
 /** 07/11: o /vitalicio é a página nova num link próprio (sempre "nova"): conta como teste ativo pra o braço ir pro PI e pro Purchase. */
 const LPO_LINK = !!w.__landing?.lpo_link;
 const LPO_ATIVO = STRIPE && (w.__landing?.ab_lp_oferta === "on" || LPO_FORCADO || LPO_LINK);
+/** 08/11: o braço do CHECKOUT do /organizar (CHECKOUT_ORG_V2 no <head> → html[data-cko]): "atual" (o Pix de hoje no cartão, idêntico) | "v2" (a camada
+ *  ./checkout-organizar.ts, o MESMO Pix). Só no /organizar (PAGINA null): vai em todo evento (braco_cko + cko_forcado) e na atribuição da conta
+ *  (finalizarConta). NÃO vai no Purchase nem na CAPI: o caminho de hoje não leva braço nenhum até lá (o Purchase sai do firePixPurchaseOnce,
+ *  compartilhado com o /hoje e o app; a CAPI sai do servidor) — a venda se liga ao braço pelo order_id do landing_pix_gerado. */
+const BRACO_CKO = PAGINA ? null : bracoCkoDoHtml();
+const CKO_FORCADO = !!w.__landing?.cko_forcado;
 const PIX_MOTIVO = motivoPixDoHtml(); // 02/11: chips "O que te travou?" no estado "voltou" do b (PIX_MOTIVO, padrão off)
 const U2027 = upsell2027DoHtml(); // 31/10: o "Seu 2027" no pós-pago (chave UPSELL_2027 / ?u2027=on)
 const VOLTA_U2027 = voltaDoEmailU2027(BUSCA); // 31/10: chegou pelo bloco do 2027 no e-mail de compra confirmada
@@ -234,7 +240,7 @@ for (const k of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm
 if (BUSCA.get("fbclid")) atrib.tem_fbclid = "1";
 
 export function evento(nome: string, dados: Record<string, unknown> = {}): void {
-  const corpo = { ...dados, ...(PAGINA ? { pagina: PAGINA, braco_checkout_ext: EXT, braco_vida: BRACO_VIDA } : {}), ...(BRACO_LP_OFERTA ? { braco_lp_oferta: BRACO_LP_OFERTA, lpo_forcado: LPO_FORCADO } : {}), landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, braco_pix: brPix, pix_forcado: pixForcado, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
+  const corpo = { ...dados, ...(PAGINA ? { pagina: PAGINA, braco_checkout_ext: EXT, braco_vida: BRACO_VIDA } : {}), ...(BRACO_LP_OFERTA ? { braco_lp_oferta: BRACO_LP_OFERTA, lpo_forcado: LPO_FORCADO } : {}), ...(BRACO_CKO ? { braco_cko: BRACO_CKO, cko_forcado: CKO_FORCADO } : {}), landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, braco_pix: brPix, pix_forcado: pixForcado, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
   listaDeEventos.push({ nome, ...corpo });
   if (!PRODUCAO) return;
   try {
@@ -1269,7 +1275,7 @@ async function prontoComEmail(email: string, via: string) {
   if (!p) return;
   if (SIMULADO && SIM_CONTA_MS) await espera(SIM_CONTA_MS);
   if (!SIMULADO) {
-    try { await (await pg()).finalizarConta(p.orderId, { attr: atrib, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, oferta: p.oferta, landing_session_id: sessao }); } catch { /* o e-mail é extra */ }
+    try { await (await pg()).finalizarConta(p.orderId, { attr: atrib, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, ...(BRACO_CKO ? { braco_cko: BRACO_CKO } : {}), oferta: p.oferta, landing_session_id: sessao }); } catch { /* o e-mail é extra */ }
   }
   // 31/10: a conta FINAL está pronta (a sessão já é a dela — código do e-mail + pix-vincular já passaram): o 2027 aparece no
   // render da "conta" e o Pix dele é pré-aquecido ali (./upsell-2027.ts) — depois do e-mail, nunca antes

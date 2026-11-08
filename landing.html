@@ -63,6 +63,12 @@
                               "nova" (o template #lpo-nova, no começo do corpo). QA: ?lpo=nova|atual (fica: localStorage + cookie), ?lpo=auto
                               desfaz. Vira html[data-lpo]; braco_lp_oferta em todo evento da /oferta. Com o teste ativo também vai na metadata do PI e
                               no Purchase do navegador. Rollback: "off".
+        CHECKOUT_ORG_V2 "off" → (08/11) só no /organizar, nos DOIS braços do AB_LP: "off" = o Pix de hoje no cartão, IDÊNTICO. "on" = TODO MUNDO
+                              no checkout novo (sem sorteio): os botões que rolavam até o cartão abrem uma camada com a cara do checkout v2
+                              (banner + e-mail + "Gerar Pix de R$ 27,90"; novidades-guardadas/2026-11-07/checkout-organizar/SPEC.md). O Pix é
+                              o MESMO (gerar/asaas-pix LN_*); do QR em diante, a tela de hoje no cartão. QA: ?cko=v2|atual (fica:
+                              localStorage + cookie), ?cko=auto desfaz. Vira html[data-cko]; braco_cko + cko_forcado em todo evento do
+                              /organizar. O servidor não muda. Rollback: "off". Sorteio, se um dia precisar: bit 4 de "cko:"+id.
         AB_VIDA      "off"  → (04/11) só na /vida: todos no "v3" (a LP v3, data-lp v2). "on" = 50/50 estável por aparelho (bit 24 de
                               "vida:"+id) entre "v3" e "atual" (a página do /organizar, data-lp atual, com R$ 97,90 e a mesma Hotmart:
                               os pares data-so-ext="hotmart"|"pix" dos textos de preço/Pix + #lp-hotmart-atual). QA: ?vida=v3|atual
@@ -97,6 +103,7 @@
         var AB_OFERTA_LP = "off";
         // 06/11: no braço "nova", baixar o Stripe.js em momento ocioso (a tela do checkout é a mesma). "off" até o dono confirmar (BRIEF §13.4).
         var LPO_STRIPE_CEDO = "off";
+        var CHECKOUT_ORG_V2 = "off"; // 08/11: checkout novo do /organizar (cara do checkout v2, o Pix do Asaas de hoje) construído e DESLIGADO — "on" = todo o /organizar, nos 2 braços do AB_LP (sem sorteio) · rollback "off"
         var STRIPE_PK = "pk_live_51TJnAQQdjmrIbUhHDSWqG1trOT6mFfV87AC4Vv47kFJTAFOhYsNmvryGRnf3x824Ke3mXSsWiFCovKPIR6Kqx0IX00VcuAawhC"; // a chave PUBLICÁVEL (pk_live_…); com "PREENCHER" = comportamento off
         var STRIPE_PRECO_CENTAVOS = 6790; // só pra exibir — o valor cobrado vem SEMPRE do servidor (stripe-criar)
         var STRIPE_PARCELAS_MAX = 1; // 05/11 (dono): só aparece 1x no cartão; volta pra 12 quando a Stripe liberar parcelas
@@ -326,6 +333,24 @@
         var pos = (pp === "presente" || pp === "2027") ? pp : pp === "auto" ? null : (le("landing-upsell-force") || ckp);
         if (pos !== "presente" && pos !== "2027") pos = UPSELL_POS === "presente" ? "presente" : "2027";
         if (pos === "presente") d.setAttribute("data-upsell-pos", "presente");
+        // 08/11: o CHECKOUT do /organizar (CHECKOUT_ORG_V2): "atual" = o Pix de hoje no cartão | "v2" = a camada com a cara do checkout v2,
+        // com o MESMO Pix. Sem sorteio: "on" = todo o /organizar, nos 2 braços do AB_LP. ?cko=v2|atual força (localStorage + cookie: o Instagram
+        // zera o storage), ?cko=auto desfaz. Na /vida, na /oferta e no /vitalicio nada disto existe; na oferta "ano", sempre o atual.
+        // Se um dia precisar de sorteio: bit 4 de "cko:"+id (os bits 0, 8, 12, 16, 20 e 24 já são de outros sorteios).
+        if (!VIDA && !OFERTA) {
+          var pko = pega("cko"), cookieCko = null;
+          try { var csc = String(document.cookie || "").split(";"); for (var ikc = 0; ikc < csc.length; ikc++) { var jkc = csc[ikc].indexOf("="); if (jkc > 0 && csc[ikc].slice(0, jkc).trim() === "landing_cko_force") cookieCko = csc[ikc].slice(jkc + 1).trim(); } } catch (ec0) {}
+          if (pko === "v2" || pko === "atual" || pko === "auto") {
+            grava("landing-cko-force", pko === "auto" ? null : pko);
+            try { document.cookie = "landing_cko_force=" + (pko === "auto" ? "; Max-Age=0" : pko + "; Max-Age=2592000") + "; Path=/; SameSite=Lax"; } catch (ec1) {}
+          }
+          var bko = (pko === "v2" || pko === "atual") ? pko : pko === "auto" ? null : (le("landing-cko-force") || cookieCko);
+          mem.cko_forcado = (bko === "v2" || bko === "atual");
+          if (!mem.cko_forcado) bko = CHECKOUT_ORG_V2 === "on" ? "v2" : "atual";
+          if (o !== "sempre") bko = "atual"; // o banner diz "vitalício": o "ano" (só por ?oferta=ano) fica no Pix de hoje
+          d.setAttribute("data-cko", bko);
+          mem.cko = bko; mem.ab_cko = CHECKOUT_ORG_V2;
+        }
         mem.t = t; mem.oferta = o; mem.ab_titulo = AB_TITULO; mem.ab_oferta = AB_OFERTA;
         mem.divisao = pega("ld") === "1" ? "inicio" : null;
         d.setAttribute("data-t", t);
@@ -829,6 +854,10 @@
       html[data-checkout-ext="hotmart"] .lp-preco-sub.lp2-hm-parcelas, html[data-checkout-ext="stripe"] .lp-preco-sub.lp2-hm-parcelas { margin-top: 2px; font-size: 13.5px; color: var(--suave); font-weight: 600; }
       html[data-checkout-ext="hotmart"] #lp-hotmart[aria-busy="true"], html[data-checkout-ext="hotmart"] #lp-hotmart-atual[aria-busy="true"] { opacity: .75; pointer-events: none; }
     </style>
+    <!-- 08/11: o checkout novo do /organizar (CHECKOUT_ORG_V2): com a camada valendo, o e-mail é pedido NELA e o campo do cartão some. Fora do 1º <style>
+         (os testes do braço atual comparam o 1º <style> com o de hoje); o resto do CSS da camada vem com src/landing/checkout-organizar.ts.
+         data-cko-falhou = o módulo da camada não carregou: o cartão volta a ser o de hoje, com o campo. -->
+    <style>html[data-cko="v2"]:not([data-cko-falhou]) .lp-email-antes { display: none !important; }</style>
     <!-- Meta Pixel (só a fila aqui; o fbevents.js entra no carregador adiado do landing.ts, depois da 1ª pintura) -->
     <script>
       !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];}(window,document,'script');

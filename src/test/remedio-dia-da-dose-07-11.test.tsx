@@ -66,6 +66,7 @@ import {
   tratamentoTerminou, type Remedio,
 } from "@/lib/remedios";
 import { PharmacyChecklist } from "@/components/saude/PharmacyChecklist";
+import { esquecerMarcasDaCaixa } from "@/lib/remedio-caixa";
 
 type Dados = Record<string, unknown>;
 function criarStore(inicial: Dados) {
@@ -94,7 +95,7 @@ const cadastro = (quando: Date, primeira: string, ate = "2026-11-13") =>
   montarLinhas({ name: "Amoxicilina", stock: 21 }, gerarHorarios(primeira, 3), ate, quando.getTime());
 
 beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); });
-afterEach(() => { cleanup(); vi.useRealTimers(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); esquecerMarcasDaCaixa(); });
 
 describe("o início do tratamento (`inicio`)", () => {
   it("cadastrado às 10:00 com 1ª dose 20:00 → 1º aviso às 20:00 e 21 avisos pras 21 doses", () => {
@@ -109,7 +110,7 @@ describe("o início do tratamento (`inicio`)", () => {
     expect(fmt(plano[plano.length - 1].quando)).toBe("14/12:00"); // a 3ª dose do dia 13 do tratamento
   });
 
-  it("às 13:00 do 1º dia a caixa oferece a das 20:00; a das 12:00 de hoje não existe (a pílula é a de amanhã)", () => {
+  it("às 13:00 do 1º dia a próxima é a das 20:00 (a pílula destacada; a caixa só avisa); a das 12:00 de hoje não existe (a pílula é a de amanhã)", () => {
     const novas = cadastro(agoraEm(7, 10), "20:00");
     agoraEm(7, 13);
     const g = agruparRemedios(novas)[0];
@@ -117,7 +118,10 @@ describe("o início do tratamento (`inicio`)", () => {
     const store = criarStore({ [CHAVE]: novas });
     montar(store);
     expect(screen.getByTestId(`dose-${novas[0].id}`)).toHaveAttribute("data-da-vez", "true");
-    fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (20:00)" }));
+    // 2ª rodada da crítica de fora: a das 20:00 ainda não chegou — a caixa não grava; a pílula marca adiantado
+    fireEvent.click(screen.getByRole("button", { name: "Próxima dose de Amoxicilina às 20:00" }));
+    expect(store.estado.dados[LOG]).toBeUndefined();
+    fireEvent.click(screen.getByTestId(`dose-${novas[0].id}`));
     expect(store.estado.dados[LOG]).toEqual({ "2026-11-07": [novas[0].id] });
   });
 
@@ -590,7 +594,7 @@ describe("'Começa amanhã' e depois mudar a 1ª dose", () => {
     expect(planoDe(store).map((a) => fmt(a.quando)).slice(0, 3)).toEqual(["08/09:00", "08/17:00", "09/01:00"]);
     agoraEm(7, 23);
     montar(store);
-    expect(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (09:00)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Próxima dose de Amoxicilina às 09:00" })).toBeInTheDocument();
   });
 });
 
@@ -759,6 +763,12 @@ describe("a caixa desfaz o que acabou de marcar", () => {
     agoraEm(7, 23, 30);
     montar(store);
     expect(planoDe(store).map((a) => fmt(a.quando))[0]).toBe("08/00:00");
+    // 2ª rodada: às 23:30 a das 00:00 ainda não chegou — a caixa não grava nada
+    fireEvent.click(screen.getByRole("button", { name: "Próxima dose de Amoxicilina às 00:00" }));
+    expect(store.estado.dados[LOG]).toEqual(antes);
+    cleanup();
+    agoraEm(7, 23, 50); // a 10 min, dentro da folga: a caixa marca a das 00:00
+    montar(store);
     fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (00:00)" }));
     expect((store.estado.dados[LOG] as Record<string, string[]>)["2026-11-08"]).toEqual([d00]);
     expect(planoDe(store).map((a) => fmt(a.quando))).not.toContain("08/00:00");
@@ -849,7 +859,7 @@ describe("2 toques na caixa = registro como antes (com dose esquecida)", () => {
     expect(planoDe(store).map((a) => fmt(a.quando))).not.toContain("08/02:00");
   });
 
-  it("a pílula mexeu depois da caixa (ou a tela abriu de novo): a caixa volta a escolher pelo relógio", () => {
+  it("a pílula mexeu depois da caixa: a caixa volta a escolher pelo relógio (também com a tela fechada e aberta)", () => {
     const novas = cadastro(agoraEm(6, 7, 50), "08:00");
     const [d08, d16, d00] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas.map((l) => ({ ...l, stock: 15 })), [LOG]: { "2026-11-07": [d08] } });
@@ -862,8 +872,11 @@ describe("2 toques na caixa = registro como antes (com dose esquecida)", () => {
     // o último toque foi da pílula: a caixa desfaz pelo relógio (a das 00:00, que ainda vem)
     fireEvent.click(screen.getByRole("button", { name: "Desmarcar Amoxicilina" }));
     expect(limpo(store.estado.dados[LOG])).toEqual({ "2026-11-07": [d08, d16] });
-    // caixa marca a das 00:00 de novo, a tela fecha e abre: sem memória, o relógio escolhe (a das 00:00)
-    fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (00:00)" }));
+    // a das 00:00 ainda não chegou: a caixa não marca (2ª rodada); a pílula marca, a tela fecha e abre,
+    // e a caixa desfaz pelo relógio (a das 00:00, que ainda vem)
+    fireEvent.click(screen.getByRole("button", { name: "Próxima dose de Amoxicilina às 00:00" }));
+    expect(limpo(store.estado.dados[LOG])).toEqual({ "2026-11-07": [d08, d16] });
+    fireEvent.click(screen.getByTestId(`dose-${d00}`));
     unmount();
     montar(store);
     fireEvent.click(screen.getByRole("button", { name: "Desmarcar Amoxicilina" }));

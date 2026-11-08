@@ -2,6 +2,7 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import { localDayKey } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Trash2, Check, Package, Pencil, AlarmClock } from "lucide-react";
+import { toast } from "sonner";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { CHAVE_DEPENDENTES } from "@/lib/saude-dependentes";
 import { useUserData } from "@/hooks/use-user-data";
@@ -13,8 +14,9 @@ import { CHAVE_PREFS, lerPrefs } from "@/lib/prefs-notificacoes";
 import { reagendarTudo, type Leitor } from "@/lib/reagendar";
 import { trackEvent } from "@/lib/analytics";
 import { avisarApagado } from "@/lib/desfazer";
+import { marcadaPelaCaixa } from "@/lib/remedio-caixa";
 import {
-  OPCOES_VEZES, agruparRemedios, doseADesmarcar, doseDaHora, dosesDoGrupoAgora, ehDia, gerarHorarios, inicioAoMudarPrimeira, inicioEscolhido, momentoDoInicio, montarLinhas, moverMarcasDoGrupo, rotuloDosHorarios,
+  OPCOES_VEZES, agruparRemedios, doseADesmarcar, doseDaHora, doseQueChegou, dosesDoGrupoAgora, ehDia, gerarHorarios, inicioAoMudarPrimeira, inicioEscolhido, momentoDoInicio, montarLinhas, moverMarcasDoGrupo, rotuloDosHorarios,
   tratamentoTerminou, ultimasDosesDoGrupo, type DoseMarcavel, type GrupoDeRemedio, type Remedio as Supplement, type VezesAoDia,
 } from "@/lib/remedios";
 
@@ -24,6 +26,11 @@ import {
  * antigo continua lendo e marcando cada linha. */
 
 const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
+
+/* A CAIXA DESFAZ O QUE ELA MARCOU (07/11, crítica de fora): o 2º toque desfaz a dose que a caixa
+   marcou por último (lib/remedio-caixa). A memória mora fora do componente (2ª rodada): num useRef
+   ela sumia ao trocar de tela entre os 2 toques. Esquece quando a pílula ou a mudança de hora mexe
+   no grupo, ou quando a caixa desmarca — aí vale o relógio (lib/remedios, doseADesmarcar). */
 
 /* ESTOQUE EDITÁVEL (25/09, cliente: "como alterar a quantidade de
  * medicamentos"). Todo remédio nascia com 30 e o número só descia marcando
@@ -143,14 +150,6 @@ export const PharmacyChecklist = () => {
   const [alarmeExato, setAlarmeExato] = useState<EstadoAlarmeExato>("indisponivel");
   const [dependentes, setDependentes] = usePersistedState<string[]>(CHAVE_DEPENDENTES, []);
   const [semBaixa, setSemBaixa] = usePersistedState<SemBaixa>(CHAVE_SEM_BAIXA, { dia: "", ids: [] });
-  /* A CAIXA DESFAZ O QUE ELA MARCOU (07/11, crítica de fora): a dose que a caixa marcou por último,
-     por grupo. Dois toques na caixa têm de deixar o registro como estava. Escolher só pelo relógio
-     (lib/remedios, doseADesmarcar) errava quando a caixa marcava uma dose ESQUECIDA mais cedo e uma
-     mais tarde já estava marcada pela pílula: o 2º toque tirava a mais tarde, que a pessoa tomou, e a
-     caixa pedia ela de novo (risco de tomar 2× o antibiótico). Fica só na memória da tela: não muda o
-     registro. Esquece quando a pílula ou a mudança de hora mexe no grupo, e ao remontar a tela —
-     aí vale o relógio, como antes. */
-  const marcadaPelaCaixa = useRef<Record<string, { id: string; dia: string }>>({});
   /** a dose foi marcada no dia em que ela acontece? (a das 00:00 tomada às 23:50 mora no dia seguinte) */
   const foiTomada = (d: { id: string; dia: string }) => (supplementLog[d.dia] || []).includes(d.id);
   const grupos = agruparRemedios(supplements);
@@ -348,7 +347,7 @@ export const PharmacyChecklist = () => {
       mudou = true;
     }
     if (mudou) setSupplementLog(log);
-    delete marcadaPelaCaixa.current[depois.chave]; // as marcas mudaram de dia: o que a caixa marcou não vale mais
+    marcadaPelaCaixa.delete(depois.chave); // as marcas mudaram de dia: o que a caixa marcou não vale mais
     let sb: SemBaixa = foto.semBaixa?.dia && Array.isArray(foto.semBaixa.ids) ? foto.semBaixa : { dia: "", ids: [] };
     for (const m of movidas) {
       if (sb.dia !== m.de || !sb.ids.includes(m.id)) continue;
@@ -430,11 +429,17 @@ export const PharmacyChecklist = () => {
                   const doses: DoseMarcavel[] = encerrado ? ultimasDosesDoGrupo(g) : dosesDoGrupoAgora(g, agora);
                   const tomadas = doses.filter(foiTomada);
                   const taken = doses.length > 0 && tomadas.length === doses.length;
-                  // a caixa marca a dose DA HORA (a mais recente que já passou), nunca a 1ª do cadastro
-                  const proxima = doseDaHora(doses.filter(d => !foiTomada(d)), agora);
+                  // a caixa marca só a dose que JÁ CHEGOU (até agora + 15 min), nunca uma que ainda vem
+                  // (2ª rodada, 07/11: o 2º toque marcava a das 16:00 às 08:05). Sem nenhuma, ela não grava
+                  // nada e só diz quando é a próxima; adiantar uma dose é pela pílula do horário.
+                  const faltam = doses.filter(d => !foiTomada(d));
+                  const proxima = doseQueChegou(faltam, agora);
+                  // a pílula com contorno verde: a que a caixa marca ou, se nenhuma chegou, a próxima
+                  const daVezDose = proxima ?? doseDaHora(faltam, agora);
+                  const aindaVem = !proxima && !taken ? daVezDose : undefined;
                   // desmarcar desfaz a dose que a própria caixa marcou por último (se ela ainda está marcada);
                   // sem isso, a marcada que ainda não chegou (a das 00:00 marcada às 23:30), senão a da hora
-                  const daCaixa = marcadaPelaCaixa.current[g.chave];
+                  const daCaixa = marcadaPelaCaixa.get(g.chave);
                   const ultimaTomada = (daCaixa && tomadas.find(d => d.id === daCaixa.id && d.dia === daCaixa.dia)) || doseADesmarcar(tomadas, agora);
                   const lowStock = g.estoque <= 5;
                   const color = nameColors[idx % nameColors.length];
@@ -461,17 +466,21 @@ export const PharmacyChecklist = () => {
                           onClick={() => {
                             if (g.itens.length === 1) toggleTaken(linha.id, doses[0]?.dia ?? today);
                             else if (taken) {
-                              delete marcadaPelaCaixa.current[g.chave];
+                              marcadaPelaCaixa.delete(g.chave);
                               if (ultimaTomada) toggleTaken(ultimaTomada.id, ultimaTomada.dia);
                             } else if (proxima) {
-                              marcadaPelaCaixa.current[g.chave] = { id: proxima.id, dia: proxima.dia };
+                              marcadaPelaCaixa.set(g.chave, { id: proxima.id, dia: proxima.dia });
                               toggleTaken(proxima.id, proxima.dia);
+                            } else if (aindaVem) {
+                              toast(`A das ${aindaVem.time} ainda não chegou. Pra marcar antes, toque no horário.`, { id: `remedio-ainda-nao-${g.chave}`, duration: 4000 });
                             }
                           }}
                           disabled={encerrado}
                           aria-label={g.itens.length === 1
                             ? (taken ? `Desmarcar ${g.nome}` : `Marcar ${g.nome} como tomado`)
-                            : (taken ? `Desmarcar ${g.nome}` : `Marcar próxima dose de ${g.nome}${proxima ? ` (${proxima.time})` : ""}`)}
+                            : (taken ? `Desmarcar ${g.nome}`
+                              : aindaVem ? `Próxima dose de ${g.nome} às ${aindaVem.time}`
+                              : `Marcar próxima dose de ${g.nome}${proxima ? ` (${proxima.time})` : ""}`)}
                           className="group w-9 h-9 -mx-2 -mt-1.5 -mb-2 grid place-items-center rounded-lg disabled:cursor-not-allowed"
                           data-testid={`remedio-caixa-${g.chave}`}
                         >
@@ -539,7 +548,7 @@ export const PharmacyChecklist = () => {
                             {g.itens.map(s => {
                               const dose = doses.find(d => d.id === s.id);
                               const t = !!dose && foiTomada(dose);
-                              const daVez = !encerrado && !t && proxima?.id === s.id;
+                              const daVez = !encerrado && !t && daVezDose?.id === s.id;
                               return (
                                 <button
                                   key={s.id}
@@ -547,7 +556,7 @@ export const PharmacyChecklist = () => {
                                   disabled={encerrado || !dose}
                                   onClick={() => {
                                     if (!dose) return;
-                                    delete marcadaPelaCaixa.current[g.chave]; // a pílula mexeu: a caixa volta a escolher pelo relógio
+                                    marcadaPelaCaixa.delete(g.chave); // a pílula mexeu: a caixa volta a escolher pelo relógio
                                     toggleTaken(s.id, dose.dia);
                                   }}
                                   aria-pressed={t}

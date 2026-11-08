@@ -228,8 +228,8 @@ export function dosesEmVigor<T extends { time?: string; ate?: string; grupo?: st
 }
 
 /**
- * A dose que a caixa da linha marca (07/11): a mais recente que já chegou; se
- * nenhuma chegou, a próxima. Pela ordem de cadastro, às 00:10 a caixa marcava a
+ * A dose DA VEZ (07/11): a mais recente que já chegou; se nenhuma chegou, a
+ * próxima. É a pílula destacada; a caixa usa `doseQueChegou` (só a que chegou). Pela ordem de cadastro, às 00:10 a caixa marcava a
  * das 08:00, e o aviso dela sumia sem ela ter sido tomada.
  *
  * "Já chegou" inclui a que vence em até 15 min (menos, se as doses estão a menos
@@ -244,14 +244,30 @@ export function dosesEmVigor<T extends { time?: string; ate?: string; grupo?: st
  * daqui a 10 minutos (amanhã), e às 07:55 do 1º dia a das 00:00 nem existe.
  */
 const FOLGA_DA_CAIXA_MIN = 15;
-export function doseDaHora<T extends { time: string; quando?: number }>(doses: T[], agora: Date = new Date()): T | undefined {
+function dosesPelaFolga<T extends { time: string; quando?: number }>(doses: T[], agora: Date): { chegou?: T; proxima?: T } {
   const hoje = localDayKey(agora);
   const quandoDe = (d: T) => d.quando ?? (ehHora(d.time) ? momentoDe(hoje, d.time).getTime() : 0);
   const emOrdem = [...doses].sort((a, b) => quandoDe(a) - quandoDe(b));
   const intervalos = emOrdem.slice(1).map((d, i) => quandoDe(d) - quandoDe(emOrdem[i])).filter((x) => x > 0);
   const folga = Math.min(FOLGA_DA_CAIXA_MIN * 60_000, intervalos.length ? Math.floor(Math.min(...intervalos) / 2) : Infinity);
   const t = agora.getTime() + folga;
-  return [...emOrdem].reverse().find((d) => quandoDe(d) <= t) ?? emOrdem.find((d) => quandoDe(d) > t);
+  return { chegou: [...emOrdem].reverse().find((d) => quandoDe(d) <= t), proxima: emOrdem.find((d) => quandoDe(d) > t) };
+}
+export function doseDaHora<T extends { time: string; quando?: number }>(doses: T[], agora: Date = new Date()): T | undefined {
+  const { chegou, proxima } = dosesPelaFolga(doses, agora);
+  return chegou ?? proxima;
+}
+
+/**
+ * A dose que a CAIXA marca (crítica de fora, 2ª rodada, 07/11 — decisão do dono):
+ * só uma que JÁ CHEGOU (até agora + a folga de 15 min). Sem nenhuma, `undefined`
+ * — nunca a próxima. Com `doseDaHora` (que cai na próxima), um 2º toque de quem
+ * achou que o 1º não pegou marcava a das 16:00 às 08:05, e às 23:55 um toque só
+ * marcava a das 02:00 de um 6 em 6: o aviso sumia e dava pra pular uma dose de
+ * antibiótico. Marcar adiantado continua possível, mas só pela pílula do horário.
+ */
+export function doseQueChegou<T extends { time: string; quando?: number }>(doses: T[], agora: Date = new Date()): T | undefined {
+  return dosesPelaFolga(doses, agora).chegou;
 }
 
 /**

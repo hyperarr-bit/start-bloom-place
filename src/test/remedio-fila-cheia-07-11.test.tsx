@@ -69,6 +69,7 @@ import { reagendarTudo, lerDadosDosLembretes } from "@/lib/reagendar";
 import { CHAVE_PREFS, lerPrefs } from "@/lib/prefs-notificacoes";
 import { agruparRemedios, doseDaHora, dosesDoGrupoAgora, dosesEmVigor, tratamentoTerminou, type Remedio } from "@/lib/remedios";
 import { PharmacyChecklist } from "@/components/saude/PharmacyChecklist";
+import { esquecerMarcasDaCaixa } from "@/lib/remedio-caixa";
 import { diaPadraoDaReuniao } from "@/pages/Carreira";
 import { localDayKey } from "@/lib/utils";
 
@@ -107,7 +108,7 @@ beforeEach(() => {
   plataforma.nativo = true; plataforma.android = false;
   toasts.erros.length = 0; toasts.sucessos.length = 0;
 });
-afterEach(() => { cleanup(); vi.useRealTimers(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); esquecerMarcasDaCaixa(); });
 
 /* ───────────────────────────── iPhone: a fila cheia ───────────────────────────── */
 describe("iPhone com a fila de avisos cheia", () => {

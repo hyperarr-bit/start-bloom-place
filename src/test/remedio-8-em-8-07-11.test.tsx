@@ -82,6 +82,7 @@ import { agruparRemedios, dosesEmVigor, gerarHorarios, montarLinhas, remedioVale
 import { BASES_LEMBRETES, TETO_IPHONE, agendarRemedios, planejarRemedios } from "@/lib/notificacoes";
 import { lerDadosDosLembretes } from "@/lib/reagendar";
 import { PharmacyChecklist } from "@/components/saude/PharmacyChecklist";
+import { esquecerMarcasDaCaixa } from "@/lib/remedio-caixa";
 import Notificacoes from "@/pages/Notificacoes";
 import { localDayKey } from "@/lib/utils";
 
@@ -111,7 +112,7 @@ beforeEach(() => {
   plataforma.nativo = false; plataforma.android = false;
   eventos.length = 0; toast.ultimo = null;
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); esquecerMarcasDaCaixa(); });
 
 /* ───────────────────────────── a conta pura ───────────────────────────── */
 describe("lib/remedios: horários de N em N horas", () => {
@@ -296,7 +297,7 @@ describe("Vitaminas e Remédios: o grupo na tabela", () => {
     expect(screen.queryByTestId("remedio-doses-feitas")).toBeNull();
   });
 
-  it("a caixa da linha marca a dose DA HORA (a mais recente que passou); com todas marcadas, risca o nome e a caixa desfaz a que ainda não chegou (a das 00:00), não a das 16:00", () => {
+  it("a caixa da linha marca a dose DA HORA (a mais recente que passou), nunca uma que ainda não chegou; com todas marcadas, risca o nome e a caixa desfaz a que ainda não chegou (a das 00:00), não a das 16:00", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     // 22:30: a das 00:00 ainda está a mais de 1 h (até 1 h antes ela já é "a da hora" — conserto final 07/11,
     // remedio-dia-da-dose-07-11: "a caixa e a dose que vence em minutos")
@@ -307,7 +308,11 @@ describe("Vitaminas e Remédios: o grupo na tabela", () => {
       fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (16:00)" }));
       expect(store.estado.dados[LOG]).toEqual({ "2026-11-07": ["a1"] });
       fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (08:00)" }));
-      fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (00:00)" }));
+      // 2ª rodada da crítica de fora (07/11): a das 00:00 ainda não chegou (falta 1h30) — a caixa não grava
+      // nada, só diz quando ela é; adiantar é pela pílula do horário
+      fireEvent.click(screen.getByRole("button", { name: "Próxima dose de Amoxicilina às 00:00" }));
+      expect(store.estado.dados[LOG]).toEqual({ "2026-11-07": ["a1", "a0"] });
+      fireEvent.click(screen.getByTestId("dose-a2"));
       // a das 00:00 marcada às 22:30 é a de daqui a 1h30: grava no dia em que ela acontece (08/11)
       expect(store.estado.dados[LOG]).toEqual({ "2026-11-07": ["a1", "a0"], "2026-11-08": ["a2"] });
       expect(linhas(store).map((x) => x.stock)).toEqual([18, 18, 18]);
@@ -315,7 +320,7 @@ describe("Vitaminas e Remédios: o grupo na tabela", () => {
       fireEvent.click(screen.getByRole("button", { name: "Desmarcar Amoxicilina" }));
       // crítica de fora 07/11: tirar a das 16:00 fazia o aviso das 00:00 sumir e a caixa pedir a das 16:00 de novo
       expect(store.estado.dados[LOG]).toEqual({ "2026-11-07": ["a1", "a0"], "2026-11-08": [] });
-      expect(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (00:00)" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Próxima dose de Amoxicilina às 00:00" })).toBeInTheDocument();
     } finally { vi.useRealTimers(); }
   });
 

@@ -270,16 +270,19 @@ describe("crítica de fora, 08/11, rodada 1", () => {
 
 /* Conserto 08/11: casos em volta dos 4 consertos. */
 describe("crítica de fora, 08/11, rodada 1 — em volta do conserto", () => {
-  it("F1 a marca não vai pra uma dose que ainda vem: às 08:30, 08:00 tomada e a 1ª dose mudada pra 10:00 → a das 10:00 fica em aberto", () => {
+  it("F1+G1 a marca da dose tomada vai pra dose nova mais perto mesmo que ela ainda venha: às 08:30, 08:00 tomada e a 1ª dose mudada pra 10:00 → 10:00 ✓, próximo aviso 18:00", () => {
     const novas = vezes(3, "08:00", agoraEm(3, 7, 50));
     const [d08, d16, d00] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-06": [d08, d16], "2026-11-07": [d00, d08] } });
     agoraEm(7, 8, 30);
     montar(store);
     mudarPrimeira("10:00");
-    // a 00:00 vira a 02:00 de hoje (já passou); a 08:00 não vira a 10:00 (que ainda vem): sai
-    expect(marcasNoRelogio(store)).toEqual(["06/10:00", "06/18:00", "07/02:00"]);
-    expect(avisos(store)[0]).toBe("07/10:00");
+    // a 00:00 vira a 02:00 de hoje (já passou); a 08:00 tomada vira a 10:00 (ainda vem, mas a 2 h, dentro
+    // de meio intervalo): o comprimido foi tomado, o aviso das 10:00 some (rodada 2, G1). Antes a marca saía
+    // e o aviso tocava às 10:00, 2 h depois do comprimido.
+    expect(marcasNoRelogio(store)).toEqual(["06/10:00", "06/18:00", "07/02:00", "07/10:00"]);
+    expect(avisos(store)[0]).toBe("07/18:00");
+    expect(falas).toContain("A das 08:00 que você marcou agora conta como a das 10:00. Próxima: 18:00.");
   });
 
   it("F1 a marca muda de linha e a anotação 'sem baixa' vai junto (desmarcar não cria comprimido)", () => {

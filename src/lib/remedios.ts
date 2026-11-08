@@ -441,6 +441,14 @@ function dosesDoDiaDoTratamento(g: GrupoDeRemedio, dia: string): DoseMarcavel[] 
 /** Uma marca de "tomado" que saiu de um dia do registro: foi pra `para` (na linha `paraId`, se mudou de linha), ou sumiu (`null`). */
 export interface MarcaMovida { id: string; de: string; para: string | null; paraId?: string }
 
+/**
+ * A marca de um comprimido tomado foi pra uma dose que ainda vem (G1, 08/11): as horas da dose
+ * tomada, da dose nova e da próxima em aberto, pra tela dizer
+ * "A das 08:00 que você marcou agora conta como a das 09:30. Próxima: 17:30."
+ * (A marca pode ficar na mesma linha e no mesmo dia — 08:00 → 09:30 é a mesma linha —, por isso não vem em `movidas`.)
+ */
+export interface MarcaContaComo { de: string; para: string; proxima: string | null }
+
 /** Metade do menor intervalo entre duas doses seguidas (a volta da meia-noite conta): 8 em 8 → 4 h. */
 function meioIntervaloMin(horas: string[]): number {
   const m = [...new Set(horas.filter(ehHora).map(minutosDe))].sort((a, b) => a - b);
@@ -468,8 +476,14 @@ function meioIntervaloMin(horas: string[]): number {
  * 08:00 → 07:00 dão 07 ✓ e 15 em aberto; 08:00 → 02:00 dá 02 ✓ e 10 ✓ (não pede a
  * das 10:00 às 15:00, 3 h antes da das 18:00).
  *  - cada dose nova recebe no máximo uma marca (empate: a dose mais cedo);
- *  - a marca não vai pra uma dose que ainda vem (passa de agora + 1 h, o "tomar um
- *    pouco antes"): o aviso dela sumiria. Sem dose perto o bastante, a marca sai;
+ *  - a marca de uma dose que JÁ ACONTECEU (até agora + 1 h, o "tomar um pouco antes")
+ *    pode ir pra dose mais perto mesmo que ela ainda venha, até meio intervalo (crítica
+ *    de fora, 08/11, rodada 2, G1): o comprimido foi tomado, o aviso daquela dose tem
+ *    que sumir. Antes a marca saía — 8 em 8, 08:00 tomada, às 08:20 a 1ª dose virava
+ *    09:30: a pílula 09:30 ficava em aberto e o aviso tocava 1 h 30 depois do
+ *    comprimido; a pessoa tomava de novo. Nunca passa de agora + meio intervalo;
+ *  - a marca de uma dose que ainda vem (marcada adiantado, mais de 1 h antes) só vai
+ *    pra uma dose nova até agora + 1 h. Sem dose perto o bastante, a marca sai;
  *  - uma marca solta que cairia numa dose nova que ainda vem também sai.
  * O estoque não muda (o comprimido foi tomado), e o formato da chave é o mesmo: id
  * da linha no dia do calendário em que a dose acontece.
@@ -479,7 +493,7 @@ export function moverMarcasDoGrupo(
   depois: GrupoDeRemedio,
   log: Record<string, string[]>,
   agora: Date = new Date(),
-): { log: Record<string, string[]>; movidas: MarcaMovida[] } {
+): { log: Record<string, string[]>; movidas: MarcaMovida[]; contaComo?: MarcaContaComo } {
   const hoje = localDayKey(agora);
   const limite = agora.getTime() + ANTECEDENCIA_MIN * 60_000;
   const marcadoNoLog = (dia: string, id: string) => Array.isArray(log[dia]) && log[dia].includes(id);
@@ -497,7 +511,8 @@ export function moverMarcasDoGrupo(
   for (const m of marcas) {
     for (const c of novas) {
       const dist = Math.abs(c.quando - m.quando);
-      if (dist <= raio && c.quando <= limite) pares.push({ m, c, dist });
+      const cabe = c.quando <= limite || (m.quando <= limite && c.quando <= agora.getTime() + raio);
+      if (dist <= raio && cabe) pares.push({ m, c, dist });
     }
   }
   pares.sort((x, y) => x.dist - y.dist || x.c.quando - y.c.quando || x.m.quando - y.m.quando);
@@ -529,7 +544,18 @@ export function moverMarcasDoGrupo(
     tirar(c.dia, c.id);
     movidas.push({ id: c.id, de: c.dia, para: null });
   }
-  return { log: out, movidas };
+  // a marca que foi pra uma dose que ainda vem: as horas pra frase da tela (G1)
+  let contaComo: MarcaContaComo | undefined;
+  for (const [m, c] of [...destino.entries()].sort((x, y) => x[1].quando - y[1].quando)) {
+    if (contaComo || c.quando <= agora.getTime() || c.quando === m.quando) continue;
+    const p = primeiraDe(depois);
+    const diaDoTratamento = (x: DoseMarcavel) => (ehHora(p) && x.time < p ? somarDias(x.dia, -1) : x.dia);
+    const proxima = novas
+      .filter((x) => x.quando > c.quando && !tem(x.dia, x.id) && !(ehDia(depois.ate) && diaDoTratamento(x) > depois.ate))
+      .sort((a, b) => a.quando - b.quando)[0];
+    contaComo = { de: m.time, para: c.time, proxima: proxima ? proxima.time : null };
+  }
+  return { log: out, movidas, ...(contaComo ? { contaComo } : {}) };
 }
 
 /** Tratamento encerrado: a última ocorrência de cada linha (o dia em que ela foi registrada, se foi). */

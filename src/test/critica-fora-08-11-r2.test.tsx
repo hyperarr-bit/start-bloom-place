@@ -1,7 +1,7 @@
 /**
  * CRÍTICA DE FORA, 08/11, RODADA 2 — repro. Cada caso diz o que DEVIA acontecer e está em `it.fails`
  * até o conserto (o comentário "hoje:" diz o que acontece agora). As varreduras do fim passam hoje
- * e ficam de guarda.
+ * e ficam de guarda. G1 consertado 08/11 (lib/remedios, moverMarcasDoGrupo): os 2 casos viraram `it`.
  *
  *  G1 (MÉDIA) Mudar a 1ª dose pra mais tarde logo depois de tomar: a marca da dose tomada SOME (a dose
  *     nova mais perto dela ainda vem, a mais de 1 h) e o aviso dela fica — 8 em 8, 08:00 tomada, às
@@ -132,29 +132,31 @@ const tomadas = (s: Store) => marcasNoRelogio(s);
 describe("crítica de fora, 08/11, rodada 2", () => {
   afterEach(() => { nativo.on = false; rearmes.n = 0; });
 
-  it.fails("G1 8 em 8: 08:00 tomada; às 08:20 a 1ª dose vira 09:30 — a marca vai pra 09:30 e o próximo aviso é 17:30", () => {
+  it("G1 8 em 8: 08:00 tomada; às 08:20 a 1ª dose vira 09:30 — a marca vai pra 09:30 e o próximo aviso é 17:30", () => {
     const novas = vezes(3, "08:00", agoraEm(3, 7, 50));
     const [d08, d16, d00] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-06": [d08, d16], "2026-11-07": [d00, d08] } });
     agoraEm(7, 8, 20);
     montar(store);
     mudarPrimeira("09:30");
-    // hoje: ["06/09:30", "06/17:30", "07/01:30"] — a 08:00 tomada sumiu; pílula 09:30 em aberto; 1º aviso 07/09:30
+    // antes do conserto: ["06/09:30", "06/17:30", "07/01:30"] — a 08:00 tomada sumia; pílula 09:30 em aberto; 1º aviso 07/09:30
     expect(tomadas(store)).toEqual(["06/09:30", "06/17:30", "07/01:30", "07/09:30"]);
     expect(pilulas()).toContain("09:30✓");
     expect(avisos(store)[0]).toBe("07/17:30");
+    expect(falas).toContain("A das 08:00 que você marcou agora conta como a das 09:30. Próxima: 17:30.");
   });
 
-  it.fails("G1 12 em 12: 08:00 tomada às 08:00; às 08:10 a 1ª dose vira 09:30 — sem aviso 1 h 30 depois do comprimido", () => {
+  it("G1 12 em 12: 08:00 tomada às 08:00; às 08:10 a 1ª dose vira 09:30 — sem aviso 1 h 30 depois do comprimido", () => {
     const novas = vezes(2, "08:00", agoraEm(3, 7, 50));
     const [d08, d20] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-06": [d08, d20], "2026-11-07": [d08] } });
     agoraEm(7, 8, 10);
     montar(store);
     mudarPrimeira("09:30");
-    // hoje: 1º aviso 07/09:30 e a caixa diz "Próxima dose de Amoxicilina às 09:30"
+    // antes do conserto: 1º aviso 07/09:30 e a caixa dizia "Próxima dose de Amoxicilina às 09:30"
     expect(avisos(store)[0]).toBe("07/21:30");
     expect(tomadas(store)).toHaveLength(3);
+    expect(falas).toContain("A das 08:00 que você marcou agora conta como a das 09:30. Próxima: 21:30.");
   });
 
   it.fails("G2 'Começa hoje 08:00' desenhado às 23:59 e tocado às 00:00:30: vira o dia 8 (o amanhã da tela), não o 9", () => {
@@ -236,7 +238,7 @@ describe("crítica de fora, 08/11, rodada 2 — varredura de guarda (passa hoje)
 
 /* ---------- guarda: mudar a 1ª dose de um remédio de várias doses nunca tira da fila a próxima dose em aberto ---------- */
 describe("crítica de fora, 08/11, rodada 2 — mudar a 1ª dose e a fila (passa hoje)", () => {
-  it("12/12, 8/8 e 6/6, em dia: de 30 em 30 min por um dia, toda 1ª dose nova de 30 em 30 min — o 1º aviso é a próxima dose sem marca, e nenhuma dose a mais de meio intervalo à frente fica marcada", () => {
+  it("12/12, 8/8 e 6/6, em dia: de 30 em 30 min por um dia, toda 1ª dose nova de 30 em 30 min — o 1º aviso é a próxima dose sem marca, nenhuma dose a mais de meio intervalo à frente fica marcada e o 1º aviso não cai a menos de meio intervalo do último comprimido (G1)", () => {
     const problemas: string[] = [];
     for (const [n, p] of [[2, "08:00"], [3, "08:00"], [4, "06:00"], [2, "20:00"]] as const) {
       const novas = montarLinhas({ name: "A", stock: 50 }, gerarHorarios(p, n), undefined, new Date(2026, 10, 3, 7, 0).getTime(), `2026-11-03T${p}`);
@@ -268,6 +270,13 @@ describe("crítica de fora, 08/11, rodada 2 — mudar a 1ª dose e a fila (passa
           if (prox && (!plano[0] || fmt(plano[0].quando) !== fmt(new Date(prox.quando)))) problemas.push(`${onde}: 1º aviso ${plano[0] ? fmt(plano[0].quando) : "nenhum"}, devia ${fmt(new Date(prox.quando))}`);
           // (vale também depois do conserto do G1: a marca de um comprimido tomado anda no máximo meio intervalo)
           for (const o of occ) if (o.quando > agora.getTime() + (12 * 60 / n) * 60_000 && marcadas.has(o.k)) problemas.push(`${onde}: marcada ${o.k}, que ainda vem`);
+          // G1 (conserto 08/11): o 1º aviso nunca cai a menos de meio intervalo do último comprimido (antes: 591 trocas)
+          const ultimo = Math.max(-Infinity, ...novas.flatMap((l) => Object.entries(log0).filter(([, ids]) => ids.includes(l.id)).map(([dia]) => {
+            const [a, me, d] = dia.split("-").map(Number);
+            const [h, m] = l.time.split(":").map(Number);
+            return new Date(a, me - 1, d, h, m).getTime();
+          })));
+          if (plano[0] && plano[0].quando.getTime() - ultimo < (12 * 60 / n) * 60_000) problemas.push(`${onde}: 1º aviso ${fmt(plano[0].quando)}, a menos de meio intervalo do comprimido das ${fmt(new Date(ultimo))}`);
         }
       }
     }

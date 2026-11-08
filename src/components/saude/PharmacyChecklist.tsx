@@ -362,7 +362,7 @@ export const PharmacyChecklist = () => {
     const antes = agruparRemedios(foto.itens)[0];
     const depois = agruparRemedios(lista).find(g => g.chave === `g:${grupo}`);
     if (!antes || !depois) return undefined;
-    const { log: calculado, movidas } = moverMarcasDoGrupo(antes, depois, foto.log, new Date());
+    const { log: calculado, movidas, contaComo: conta } = moverMarcasDoGrupo(antes, depois, foto.log, new Date());
     const ids = new Set(depois.itens.map(s => s.id));
     const log: Record<string, string[]> = { ...supplementLog };
     let mudou = false;
@@ -374,6 +374,11 @@ export const PharmacyChecklist = () => {
       mudou = true;
     }
     if (mudou) setSupplementLog(log);
+    /* 08/11 (crítica de fora, rodada 2, G1): a marca de um comprimido tomado foi pra uma dose
+       que ainda vem — a tela diz, pra pessoa não estranhar o ✓ adiantado nem tomar de novo. */
+    if (conta) {
+      toast(`A das ${conta.de} que você marcou agora conta como a das ${conta.para}.${conta.proxima ? ` Próxima: ${conta.proxima}.` : ""}`, { id: `remedio-conta-como-${depois.chave}`, duration: 6000 });
+    }
     marcadaPelaCaixa.delete(depois.chave); // as marcas mudaram de dia: o que a caixa marcou não vale mais
     // a anotação "marcado sem baixa" vai com a marca — pro dia novo e, se a marca mudou de linha
     // (08/11, F1: ela vai pra dose mais perto no relógio, de qualquer linha), pro id novo

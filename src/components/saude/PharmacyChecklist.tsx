@@ -30,7 +30,8 @@ const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanh�
 /* A CAIXA DESFAZ O QUE ELA MARCOU (07/11, crítica de fora): o 2º toque desfaz a dose que a caixa
    marcou por último (lib/remedio-caixa). A memória mora fora do componente (2ª rodada): num useRef
    ela sumia ao trocar de tela entre os 2 toques. Esquece quando a pílula ou a mudança de hora mexe
-   no grupo, ou quando a caixa desmarca — aí vale o relógio (lib/remedios, doseADesmarcar). */
+   no grupo, ou quando a caixa desmarca — aí vale o relógio (lib/remedios, doseADesmarcar).
+   Ela serve SÓ pra escolher qual desmarcar; "ficou pra trás" sai do registro (rodada 3, 08/11). */
 
 /* ESTOQUE EDITÁVEL (25/09, cliente: "como alterar a quantidade de
  * medicamentos"). Todo remédio nascia com 30 e o número só descia marcando
@@ -427,10 +428,14 @@ export const PharmacyChecklist = () => {
     const daCaixa = marcadaPelaCaixa.get(g.chave);
     const marcadaAgoraPelaCaixa = daCaixa ? tomadas.find(d => d.id === daCaixa.id && d.dia === daCaixa.dia) : undefined;
     const ultimaTomada = marcadaAgoraPelaCaixa || doseADesmarcar(tomadas, agora);
-    // a caixa acabou de marcar uma dose MAIS NOVA deste dia do tratamento (e ela segue marcada):
-    // a que sobrou é uma esquecida, que já passou — o 2º toque não marca ela, só avisa
-    // (crítica de fora, rodada 1, 07/11: 1 comprimido virava 2 doses, o estoque descia 2 e o furo sumia)
-    const ficouPraTras = proxima && marcadaAgoraPelaCaixa && marcadaAgoraPelaCaixa.quando > proxima.quando ? proxima : undefined;
+    // já está marcada uma dose MAIS NOVA deste dia do tratamento, que JÁ CHEGOU: a que sobrou é uma
+    // esquecida, que já passou — a caixa não marca ela, só avisa (crítica de fora, rodada 1, 07/11:
+    // 1 comprimido virava 2 doses, o estoque descia 2 e o furo sumia). PELO REGISTRO, não pela memória
+    // da caixa (rodada 3, 08/11): marcada pela pílula, com o app reaberto ou depois de mexer na 1ª dose,
+    // a memória faltava e a caixa marcava a esquecida. Uma dose marcada ADIANTADO (que ainda não chegou)
+    // não conta: às 08:05 com a das 16:00 marcada por engano, a caixa ainda marca a das 08:00.
+    const ultimaQueChegou = doseQueChegou(doses, agora);
+    const ficouPraTras = proxima && ultimaQueChegou && tomadas.some(d => d.quando > proxima.quando && d.quando <= ultimaQueChegou.quando) ? proxima : undefined;
     /* O DIA DESTE DESENHO (08/11, rodada 3): as doses que valem e o dia em que cada uma grava.
        Se no toque ele não bate com o do desenho, o dia do tratamento virou com a tela parada:
        o toque só refaz a tela e não grava (senão tirava o ✓ de ontem, ou marcava a dose velha). */

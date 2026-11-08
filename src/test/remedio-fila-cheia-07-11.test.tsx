@@ -232,16 +232,16 @@ describe("a caixa da linha marca a dose da hora", () => {
     // (mais nova), então o 2º toque não marca a esquecida, só avisa (crítica de fora, rodada 1, 07/11)
     fireEvent.click(screen.getByRole("button", { name: "A dose de Dipirona das 20:00 ficou pra trás" }));
     expect(store.estado.dados[LOG]).toEqual({ "2026-11-08": ["b1"] });
-    // a pílula das 08:00 mexe (tira e põe de novo): a caixa esquece o que marcou e volta a escolher pelo relógio
+    // a pílula das 08:00 mexe (tira e põe de novo): a caixa esquece o que marcou, mas "ficou pra trás" sai do
+    // REGISTRO (rodada 3, 08/11): a das 08:00 segue marcada e já chegou, então a caixa segue sem marcar a esquecida
     fireEvent.click(screen.getByTestId("dose-b1"));
     fireEvent.click(screen.getByTestId("dose-b1"));
-    // agora a das 08:00 foi a pílula: a caixa marca a esquecida das 20:00 de ontem — grava em 07/11
-    fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Dipirona (20:00)" }));
+    fireEvent.click(screen.getByRole("button", { name: "A dose de Dipirona das 20:00 ficou pra trás" }));
+    expect(store.estado.dados[LOG]).toEqual({ "2026-11-08": ["b1"] });
+    // quem tomou a das 20:00 de ontem marca pela pílula — grava em 07/11
+    fireEvent.click(screen.getByTestId("dose-b0"));
     expect(store.estado.dados[LOG]).toEqual({ "2026-11-08": ["b1"], "2026-11-07": ["b0"] });
-    // com as duas marcadas, a caixa desfaz o que ELA marcou por último (a das 20:00 de ontem) — tirar a
-    // das 08:00, tomada de fato, fazia a caixa pedir ela de novo (crítica de fora 07/11)
-    fireEvent.click(screen.getByRole("button", { name: "Desmarcar Dipirona" }));
-    expect(store.estado.dados[LOG]).toEqual({ "2026-11-08": ["b1"], "2026-11-07": [] });
+    expect(screen.getByRole("button", { name: "Desmarcar Dipirona" })).toBeInTheDocument();
   });
 });
 

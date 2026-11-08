@@ -1,6 +1,6 @@
 /**
- * CRÍTICA DE FORA, RODADA 3 (07/11) — repro. Cada caso diz o que DEVIA acontecer e está em `it.fails`
- * enquanto o app faz diferente: quando o conserto entrar, o caso passa a falhar aqui e vira `it`.
+ * CRÍTICA DE FORA, RODADA 3 (07/11) — repro. Cada caso diz o que DEVIA acontecer. Consertados em 08/11
+ * (B1 e B2): os casos que eram `it.fails` viraram `it`, mais 3 de "decidir no toque" (B1).
  * A varredura no fim (caixa com 1 e 2 toques, de 30 em 30 min, 8 desenhos de dose, meio do tratamento,
  * último dia e 1º dia) passa hoje: fica de guarda pro conserto.
  *
@@ -204,7 +204,7 @@ describe("crítica de fora, rodada 3", () => {
     expect(falas).toEqual([]);
   });
 
-  it.fails("B2 a das 16:00 marcada pela PÍLULA, a das 08:00 esquecida: a caixa não marca a esquecida", () => {
+  it("B2 a das 16:00 marcada pela PÍLULA, a das 08:00 esquecida: a caixa não marca a esquecida", () => {
     const novas = vezes(3, "08:00", agoraEm(5, 7, 50));
     const [d08, d16, d00] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas.map((l) => ({ ...l, stock: 16 })), [LOG]: { "2026-11-06": [d08, d16], "2026-11-07": [d00] } });
@@ -218,7 +218,7 @@ describe("crítica de fora, rodada 3", () => {
     expect(falas).toContain("A das 08:00 ficou pra trás. Se tomou, toque no horário.");
   });
 
-  it.fails("B2 a caixa marcou a das 16:00; o app foi fechado e aberto; o 2º toque não marca a das 08:00 esquecida", () => {
+  it("B2 a caixa marcou a das 16:00; o app foi fechado e aberto; o 2º toque não marca a das 08:00 esquecida", () => {
     const novas = vezes(3, "08:00", agoraEm(5, 7, 50));
     const [d08, d16, d00] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas.map((l) => ({ ...l, stock: 16 })), [LOG]: { "2026-11-06": [d08, d16], "2026-11-07": [d00] } });
@@ -236,7 +236,7 @@ describe("crítica de fora, rodada 3", () => {
     expect(estoque(store)).toEqual([15, 15, 15]);
   });
 
-  it.fails("B2 a caixa marcou a das 16:00; mexeu na 1ª dose e voltou (08:00 → 08:30 → 08:00); a caixa não marca a das 08:00 esquecida", () => {
+  it("B2 a caixa marcou a das 16:00; mexeu na 1ª dose e voltou (08:00 → 08:30 → 08:00); a caixa não marca a das 08:00 esquecida", () => {
     const novas = vezes(3, "08:00", agoraEm(5, 7, 50));
     const [d08, d16, d00] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas.map((l) => ({ ...l, stock: 16 })), [LOG]: { "2026-11-06": [d08, d16], "2026-11-07": [d00] } });

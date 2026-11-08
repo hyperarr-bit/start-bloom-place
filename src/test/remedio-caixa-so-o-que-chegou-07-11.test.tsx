@@ -199,7 +199,9 @@ describe("a caixa só marca a dose que já chegou (casos 1 a 5 da crítica)", ()
 });
 
 describe("a memória da caixa vale ao trocar de tela (caso 6 da crítica)", () => {
-  it("6) 8 em 8, 00:10 de 08/11, tela fechada e aberta entre os toques: o 2º tira a das 08:00 que a caixa marcou, não a das 00:00 tomada pela pílula", () => {
+  /* 08/11 (rodada 3, B2): a das 00:00 (mais nova) foi marcada pela pílula e já chegou — a das 08:00
+     esquecida ficou pra trás: a caixa não marca ela, antes nem depois de fechar e abrir a tela. */
+  it("6) 8 em 8, 00:10 de 08/11, a das 00:00 pela pílula: a caixa não marca a das 08:00 esquecida, também com a tela fechada e aberta entre os toques", () => {
     const novas = vezes(3, "08:00", agoraEm(6, 7, 50));
     const [d08, d16, d00] = novas.map((l) => l.id);
     const antes = { "2026-11-06": [d08, d16], "2026-11-07": [d00, d16], "2026-11-08": [d00] };
@@ -207,14 +209,13 @@ describe("a memória da caixa vale ao trocar de tela (caso 6 da crítica)", () =
     agoraEm(8, 0, 10);
     const { unmount } = montar(store);
     const fila = avisos(store);
-    fireEvent.click(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (08:00)" }));
+    fireEvent.click(screen.getByRole("button", { name: "A dose de Amoxicilina das 08:00 ficou pra trás" }));
     unmount();
     montar(store);
-    fireEvent.click(screen.getByRole("button", { name: "Desmarcar Amoxicilina" }));
+    fireEvent.click(screen.getByRole("button", { name: "A dose de Amoxicilina das 08:00 ficou pra trás" }));
     expect(limpo(store.estado.dados[LOG])).toEqual(antes);
     expect(linhas(store).map((l) => l.stock)).toEqual([15, 15, 15]);
-    expect(rotulo()).toBe("Marcar próxima dose de Amoxicilina (08:00)");
     expect(avisos(store)).toEqual(fila);
-    expect(falas).toEqual([]);
+    expect(falas).toEqual(["A das 08:00 ficou pra trás. Se tomou, toque no horário.", "A das 08:00 ficou pra trás. Se tomou, toque no horário."]);
   });
 });

@@ -82,6 +82,8 @@ const CSS = `
 .cko-b-sobre{font-size:11.5px;line-height:1.2;font-weight:800;letter-spacing:.12em;color:#f6a8cf}
 .cko-b-tit{margin:3px 0 0;font-size:17px;line-height:1.12;font-weight:800;letter-spacing:-.02em;color:#fff}
 .cko-b-tit:focus{outline:none}
+/* o WebKit dava o anel azul ao título do presente (h1 tabindex -1, focado por script) depois da camada; só com o checkout novo */
+html[data-cko="v2"] [tabindex="-1"]:focus{outline:none}
 .cko-b-tit em{font-style:normal;color:#ff7ab8}
 .cko-b-preco{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 7px;margin:7px 0 0}
 .cko-b-preco b{font-size:24px;line-height:1;font-weight:850;letter-spacing:-.025em;color:#fff;white-space:nowrap}

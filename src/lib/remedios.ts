@@ -324,16 +324,21 @@ export function tratamentoTerminou(g: GrupoDeRemedio, agora: Date = new Date()):
 export type DoseMarcavel = Remedio & { dia: string; quando: number };
 
 /**
- * Quanto antes da 1ª dose o dia do tratamento já vira (tomar a 1ª dose um pouco
- * adiantado): 1 h — ou menos, se a última dose do dia (a da noite) cai a menos de
- * 2 h da 1ª. Com 07:30 e 08:00, às 07:20 a das 07:30 ainda é a de hoje à noite
- * (07/11, retomada: com 1 h fixa ela pulava pro dia seguinte).
+ * Quanto antes da 1ª dose o dia do tratamento já vira: no MEIO do caminho entre a
+ * última dose do dia (a da noite) e a 1ª — metade da folga entre elas, sem teto.
+ * Em 8 em 8 desde 08:00 vira às 04:00; em 6 em 6, às 05:00; em 12 em 12 desde
+ * 20:00, às 14:00. Com 07:30 e 08:00, às 07:20 a das 07:30 ainda é a de hoje à noite.
+ * (Crítica de fora, rodada 2, 07/11: com teto de 1 h, às 06:30 a tela ainda era a de
+ * ONTEM, e quem tomava a das 08:00 adiantado e tocava a pílula ou a caixa desmarcava
+ * a dose de ontem — estoque +1, histórico sem uma dose tomada, aviso das 08:00
+ * tocando: 2 comprimidos em 1 h e meia.) `ANTECEDENCIA_MIN` segue só como o "tomar
+ * um pouco antes" de `moverMarcasDoGrupo` e pra quando não há folga (horas iguais).
  */
 const ANTECEDENCIA_MIN = 60;
 function antecedenciaMin(horas: string[], primeira: string): number {
   const p = minutosDe(primeira);
   const folgas = horas.filter(ehHora).map((h) => (p - minutosDe(h) + 24 * 60) % (24 * 60)).filter((d) => d > 0);
-  return folgas.length ? Math.min(ANTECEDENCIA_MIN, Math.floor(Math.min(...folgas) / 2)) : ANTECEDENCIA_MIN;
+  return folgas.length ? Math.floor(Math.min(...folgas) / 2) : ANTECEDENCIA_MIN;
 }
 
 /**
@@ -342,8 +347,9 @@ function antecedenciaMin(horas: string[], primeira: string): number {
  *
  * Remédio simples (1 linha): a de hoje, como sempre.
  * Grupo (8 em 8…): o dia do tratamento começa na 1ª dose (a hora atual da 1ª
- * linha) e vira até 1 h antes dela (tomar um pouco adiantado; `antecedenciaMin`). Em 8 em 8 desde as 08:00, das 07:00 de hoje às
- * 07:00 de amanhã as pílulas são 08:00 e 16:00 de hoje e 00:00 de amanhã — às
+ * linha) e vira no meio do caminho entre a dose da noite e ela (`antecedenciaMin`).
+ * Em 8 em 8 desde as 08:00, das 04:00 de hoje às 04:00 de amanhã as pílulas são
+ * 08:00 e 16:00 de hoje e 00:00 de amanhã — às
  * 23:50 a das 00:00 é a de daqui a 10 minutos (grava em amanhã), e às 00:10
  * continua sendo ela, já marcada. Antes do `inicio` o dia é o do início (às
  * 07:55 do 1º dia a das 00:00 é a da noite, não a de hoje); depois do `ate`,

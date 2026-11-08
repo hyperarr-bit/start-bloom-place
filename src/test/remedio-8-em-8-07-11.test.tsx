@@ -299,8 +299,8 @@ describe("Vitaminas e Remédios: o grupo na tabela", () => {
 
   it("a caixa da linha marca a dose DA HORA (a mais recente que passou), nunca uma que ainda não chegou; com todas marcadas, risca o nome e a caixa desfaz a que ainda não chegou (a das 00:00), não a das 16:00", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
-    // 22:30: a das 00:00 ainda está a mais de 1 h (até 1 h antes ela já é "a da hora" — conserto final 07/11,
-    // remedio-dia-da-dose-07-11: "a caixa e a dose que vence em minutos")
+    // 22:30: a das 00:00 ainda está longe (a caixa só marca a que já chegou, até agora + 15 min —
+    // remedio-caixa-so-o-que-chegou-07-11)
     vi.setSystemTime(new Date(2026, 10, 7, 22, 30));
     try {
       const store = criarStore({ [CHAVE]: grupo() });

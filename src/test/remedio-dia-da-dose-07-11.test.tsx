@@ -156,7 +156,7 @@ describe("a dose das 00:00 marcada antes da meia-noite", () => {
     expect(linhas(store).map((l) => l.stock)).toEqual([18, 18, 18]);
     expect(fmt(planoDe(store)[0].quando)).toBe("08/08:00");
 
-    agoraEm(8, 7, 30); // 1 h antes da 08:00 o dia do tratamento vira: 08:00 e 16:00 de hoje, 00:00 desta noite
+    agoraEm(8, 4, 30); // o dia do tratamento vira no meio do caminho entre a 00:00 e a 08:00 (04:00): 08:00 e 16:00 de hoje, 00:00 desta noite
     cleanup();
     montar(store);
     expect(screen.getByTestId(`dose-${d08}`)).toHaveAttribute("aria-pressed", "false");

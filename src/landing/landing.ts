@@ -88,6 +88,7 @@ import { lerEstadoU2027, lerU2027Guardado } from "./u2027-estado";
 import { lerEstadoPresenteLp } from "./presente-estado";
 import { esquecerCompra, esquecerPixVivo, fixarAparelho, gravarCookie, gravarPixVivo, idDoAparelho, lerCompra, lerCookie, lerPixVivo, marcarCompra, temSessaoNoStorage, type MarcaCompra } from "./marcador";
 import { carregarComRetry, criarCarregadorCompartilhado } from "./carregar";
+import { capturarAtribuicao, linkPlayAtribuido, linkAppleAtribuido, ondeLinkLoja } from "./atribuicao";
 import { REF_OK, checkoutExtDoHtml, paginaDoHtml, pkStripeValida, reaisDeCentavos, urlCheckoutHotmart, urlHotmartValida } from "./hotmart";
 
 // o Pix de verdade carrega sob demanda — declarado antes do observador dos blocos, que pode pré-aquecê-lo (com PIX_REAL).
@@ -105,6 +106,7 @@ const SIMULADO = !PRODUCAO;
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const agora = () => Math.round(performance.now());
 type Janela = Window & {
+  __landingCliqueLoja?: (e: MouseEvent) => void;
   __landingSimularJaTem?: boolean;
   __landing?: { lpo_forcado?: boolean; lpo_link?: boolean; ab_lp_oferta?: string; lpo_stripe_cedo?: string; pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null };
   __eventosLanding?: Record<string, unknown>[];
@@ -218,14 +220,15 @@ const ua = navigator.userAgent || "";
 const plataforma = /iPhone|iPad|iPod/i.test(ua) ? "ios" : /Android/i.test(ua) ? "android" : "web";
 const inApp = /FBAN|FBAV|FB_IAB|FBIOS|Instagram/i.test(ua);
 const pixForcado = !!w.__landing?.pix_forcado; // 02/11 r1: ?pix=b do dono/QA fica no aparelho — todo evento diz, não só o landing_html (a análise exclui)
-const atrib: Record<string, string> = {};
-for (const k of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "c_id", "as_id", "ad_id", "pl"]) {
-  const v = BUSCA.get(k); if (v) atrib[k] = v.slice(0, 200);
-}
-if (BUSCA.get("fbclid")) atrib.tem_fbclid = "1";
+const medicaoForçada = SIMULADO || ["lp_forcado", "pix_forcado", "oferta_forcada", "checkout_forcado", "t_forcado", "lpo_forcado"].some(k => (w.__landing as Record<string, unknown> | undefined)?.[k] === true);
+const storageAtrib = (() => { try { return localStorage; } catch { return null; } })();
+const atrib = capturarAtribuicao(location.search, storageAtrib, Date.now(), medicaoForçada);
+const contextoAtribuicao = () => ({ landing_session_id: sessao, landing_device_id: aparelho, braco_lp: brLp, braco_pix: brPix, forçado: medicaoForçada, atrib });
 
 export function evento(nome: string, dados: Record<string, unknown> = {}): void {
-  const corpo = { ...dados, ...(PAGINA ? { pagina: PAGINA, braco_checkout_ext: EXT, braco_vida: BRACO_VIDA } : {}), ...(BRACO_LP_OFERTA ? { braco_lp_oferta: BRACO_LP_OFERTA, lpo_forcado: LPO_FORCADO } : {}), landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, braco_pix: brPix, pix_forcado: pixForcado, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
+  // O listener delegado registra uma vez também os links criados pelo checkout/upsells.
+  if (nome === "landing_loja" && !dados.link_click_id) return;
+  const corpo = { landing_medicao_v: 2, medicao_forcada: medicaoForçada, ...dados, ...(PAGINA ? { pagina: PAGINA, braco_checkout_ext: EXT, braco_vida: BRACO_VIDA } : {}), ...(BRACO_LP_OFERTA ? { braco_lp_oferta: BRACO_LP_OFERTA, lpo_forcado: LPO_FORCADO } : {}), landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, braco_pix: brPix, pix_forcado: pixForcado, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
   listaDeEventos.push({ nome, ...corpo });
   if (!PRODUCAO) return;
   try {
@@ -630,7 +633,26 @@ document.querySelectorAll<HTMLElement>("[data-ir]").forEach((b) => b.addEventLis
   if (alvo === "dentro-v2") evento("landing_lojas_topo", {}); // r1: "App Store · Google Play · Computador" da 1ª tela → rola até "Sim, é um app de verdade"
   rolarAte($(alvo));
 }));
-document.querySelectorAll<HTMLAnchorElement>("a[data-loja]").forEach((a) => a.addEventListener("click", () => evento("landing_loja", { loja: a.dataset.loja, onde: a.closest("#lp-pix") ? "pos_compra" : a.closest("#lpo") ? "prova" : "como" })));
+// Captura antes dos listeners locais e da navegação; cobre links inseridos depois.
+const cliqueLoja = (e: MouseEvent) => {
+  if (e.type === "auxclick" && e.button !== 1) return;
+  const a = e.target instanceof Element ? e.target.closest<HTMLAnchorElement>("a[data-loja]") : null;
+  if (!a || !["android", "ios"].includes(a.dataset.loja || "")) return;
+  try {
+    const clickId = novoId(), onde = jaTem && a.closest("#lp-pix") ? "ja_tem" : ondeLinkLoja(a);
+    const original = a.href;
+    const contexto = { clickId, lp: brLp, pix: brPix, onde, path: location.pathname, forçado: medicaoForçada };
+    a.href = a.dataset.loja === "android" ? linkPlayAtribuido(original, contexto) : linkAppleAtribuido(original, contexto);
+    evento("landing_loja", { loja: a.dataset.loja, onde, link_click_id: clickId, referrer_medido: a.dataset.loja === "android" && a.href !== original, apple_campaign: a.dataset.loja === "ios" ? new URL(a.href).searchParams.get("ct") : undefined });
+  } catch { /* medição nunca bloqueia a loja */ }
+};
+if (w.__landingCliqueLoja) {
+  document.removeEventListener("click", w.__landingCliqueLoja, true);
+  document.removeEventListener("auxclick", w.__landingCliqueLoja, true);
+}
+w.__landingCliqueLoja = cliqueLoja;
+document.addEventListener("click", cliqueLoja, true);
+document.addEventListener("auxclick", cliqueLoja, true);
 
 /* ───────────────────────── o estado da compra (guardado: o banco fecha/recarrega a aba) ───────────────────────── */
 const CHAVE_ESTADO = "landing-estado-v1";
@@ -1017,7 +1039,7 @@ function criarPix(oferta: OfertaLanding, emailConhecido: string | null): Promise
       ? { jaTem: true as const, via: "servidor" }
       : { orderId: `simulado-${Date.now().toString(36)}`, qrCode: CODIGO_SIMULADO, qrCodeBase64: null, expiresAt: null, criadoEm: Date.now(), oferta }));
   }
-  return pg().then((m) => m.gerarPix(oferta, URL_DE_CHEGADA, emailConhecido)).catch((e) => ({ erro: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.", onde: String(e).slice(0, 120) }));
+  return pg().then((m) => m.gerarPix(oferta, URL_DE_CHEGADA, emailConhecido, contextoAtribuicao())).catch((e) => ({ erro: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.", onde: String(e).slice(0, 120) }));
 }
 async function mandarCodigo(email: string): Promise<boolean> {
   if (SIMULADO) { await espera(300); return true; }
@@ -1262,7 +1284,7 @@ async function prontoComEmail(email: string, via: string) {
   if (!p) return;
   if (SIMULADO && SIM_CONTA_MS) await espera(SIM_CONTA_MS);
   if (!SIMULADO) {
-    try { await (await pg()).finalizarConta(p.orderId, { attr: atrib, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, oferta: p.oferta, landing_session_id: sessao }); } catch { /* o e-mail é extra */ }
+    try { await (await pg()).finalizarConta(p.orderId, { attr: atrib, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, oferta: p.oferta, ...contextoAtribuicao() }); } catch { /* o e-mail é extra */ }
   }
   // 31/10: a conta FINAL está pronta (a sessão já é a dela — código do e-mail + pix-vincular já passaram): o 2027 aparece no
   // render da "conta" e o Pix dele é pré-aquecido ali (./upsell-2027.ts) — depois do e-mail, nunca antes

@@ -18,6 +18,7 @@
  *   URL:  https://<projeto>.supabase.co/functions/v1/revenuecat-webhook
  *   Auth: o mesmo valor de REVENUECAT_WEBHOOK_SECRET
  */
+import { linhaEventoRevenueCat } from "../_shared/registro-revenuecat.ts";
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { aplicarDecisao, classificarEvento, type EventoRC, type Venda } from "../_shared/afiliados.ts";
@@ -53,6 +54,17 @@ serve(async (req) => {
     // TEST envia app_user_id fictício — responde 200 pro painel ficar verde.
     if (ev.type === "TEST") return json({ received: true, test: true });
 
+    // Preserva inclusive o trial anônimo. Acesso continua sendo reconciliado pela API.
+    const registro = linhaEventoRevenueCat(ev);
+    let registroFalhou = false;
+    if (registro) {
+      try {
+        const { error } = await admin.from("revenuecat_events").upsert(registro, { onConflict: "id", ignoreDuplicates: true });
+        registroFalhou = !!error;
+      } catch { registroFalhou = true; }
+      if (registroFalhou) log("historico_rc_falhou");
+    }
+
     // PROGRAMA DE AFILIADOS (09/10): ANTES do filtro de anônimo, porque a
     // compra na App Store acontece antes da conta CORE existir — o evento do
     // teste chega com $RCAnonymousID e ainda assim é uma venda da afiliada.
@@ -73,13 +85,15 @@ serve(async (req) => {
       // a quem dar acesso — o revenuecat-sync resolve quando a pessoa abrir
       // o app logada (o RevenueCat mescla os perfis no logIn).
       log("sem user_id utilizável", { app_user_id: String(ev.app_user_id ?? "").slice(0, 24) });
-      return json({ received: true, ignored: "anonimo", afiliada });
+      return registroFalhou ? json({ error: "historico_rc_indisponivel" }, 500) : json({ received: true, ignored: "anonimo", afiliada });
     }
 
     const resultados: unknown[] = [];
+    const contasConfirmadas: string[] = [];
     for (const uid of [...new Set(candidatos)]) {
       const { data: u } = await admin.auth.admin.getUserById(uid);
       if (!u?.user) { log("user inexistente", { uid }); continue; }
+      contasConfirmadas.push(uid);
       const r = await reconciliarRevenueCat(admin, uid, u.user.email ?? null);
       log("reconciliado", { uid, ...r });
       resultados.push({ uid, ...r });
@@ -100,7 +114,15 @@ serve(async (req) => {
       if (Deno.env.get("PORTA_CAPI_TRIAL") === "on") await capiPortaDoSite(admin, ev as EventoRCPorta, u.user).catch((e) => log("porta capi ERRO", { msg: String(e).slice(0, 160) }));
     }
 
-    return json({ received: true, resultados, afiliada });
+    // Só liga o evento a uma conta verificada sem ambiguidade; não reatribui eventos antigos.
+    if (registro && !registroFalhou && contasConfirmadas.length === 1) {
+      try {
+        const { error } = await admin.from("revenuecat_events").update({ user_id: contasConfirmadas[0], ligado_em: new Date().toISOString() }).eq("id", registro.id).is("user_id", null);
+        registroFalhou = !!error;
+      } catch { registroFalhou = true; }
+    }
+    // A reconciliação acima ocorre mesmo quando o histórico falha. 500 pede reentrega ao RC.
+    return registroFalhou ? json({ error: "historico_rc_indisponivel" }, 500) : json({ received: true, resultados, afiliada });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     log("ERROR", { message });

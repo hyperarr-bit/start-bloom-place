@@ -18,6 +18,7 @@
  * As ofertas LN_* NÃO existem nas funções no ar: sem o deploy (ver _shared/ofertas-landing.ts) o `create` volta erro.
  * Por isso a landing só chama este arquivo com PIX_REAL ligado (./landing.ts); no protótipo o Pix é simulado.
  */
+import { limparAtribuicaoLanding } from "../../supabase/functions/_shared/atribuicao-landing";
 import { supabase } from "@/integrations/supabase/client";
 import { firePixPurchaseOnce, markPixPurchasePending } from "@/lib/purchase-tracking";
 import { cookiesDaMeta } from "@/pages/venda/rastreio";
@@ -29,12 +30,12 @@ import { gravarNomeDoPresente, meuPresente } from "@/presente/api";
 /** 29/10: o servidor recusou o Pix porque esta pessoa JÁ tem o CORE pra sempre (a página mostra "Você já tem o CORE"). */
 export type JaTem = { jaTem: true; via: string };
 
-export async function gerarPix(oferta: OfertaLanding, sourceUrl: string, emailConhecido: string | null = null): Promise<PixLanding | JaTem | { erro: string; onde: string }> {
+export async function gerarPix(oferta: OfertaLanding, sourceUrl: string, emailConhecido: string | null = null, atribuicao?: unknown): Promise<PixLanding | JaTem | { erro: string; onde: string }> {
   const s = await abrirSessaoParaPagar();
   if (s === "indisponivel") return { erro: "Não consegui abrir o pagamento agora. Tenta de novo em alguns segundos.", onde: "sessao" };
   const c = cookiesDaMeta();
   const { data, error } = await supabase.functions.invoke("asaas-pix", {
-    body: { action: "create", offer: oferta, fbp: c.fbp, fbc: c.fbc, sourceUrl: sourceUrl.slice(0, 300), ...(emailConhecido ? { email: emailConhecido } : {}) },
+    body: { action: "create", landing_attribution: limparAtribuicaoLanding(atribuicao), offer: oferta, fbp: c.fbp, fbc: c.fbc, sourceUrl: sourceUrl.slice(0, 300), ...(emailConhecido ? { email: emailConhecido } : {}) },
   });
   if ((data as { ja_tem?: boolean } | null)?.ja_tem) return { jaTem: true, via: String((data as { via?: string }).via ?? "servidor") };
   const d = data as { orderId?: string; qrCode?: string; qrCodeBase64?: string | null; expiresAt?: string | null } | null;

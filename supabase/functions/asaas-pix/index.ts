@@ -1,3 +1,4 @@
+import { limparAtribuicaoLanding } from "../_shared/atribuicao-landing.ts";
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { assuntoParceiro, assuntoVenda, ehOfertaHoje, emailVendaComLojas, htmlParceiro, htmlVenda, nomeDoProduto, periodoDoEmailVenda, planoUtmify } from "../_shared/email-venda.ts";
@@ -472,6 +473,7 @@ serve(async (req) => {
         user_id: user.id,
         event_data: {
           order_id: out.id, offer, amount_cents: amount, gateway: "asaas",
+          ...(limparAtribuicaoLanding(body.landing_attribution) ?? {}),
           ...(body.fbp ? { fbp: String(body.fbp).slice(0, 120) } : {}),
           ...(body.fbc ? { fbc: String(body.fbc).slice(0, 400) } : {}),
           ...(body.sourceUrl ? { source_url: String(body.sourceUrl).slice(0, 300) } : {}),

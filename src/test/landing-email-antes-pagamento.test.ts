@@ -33,7 +33,7 @@ vi.mock("@/lib/sessao-anonima", () => ({
 vi.mock("@/lib/purchase-tracking", () => ({ firePixPurchaseOnce: vi.fn(), markPixPurchasePending: vi.fn() }));
 vi.mock("@/pages/venda/rastreio", () => ({ cookiesDaMeta: () => ({ fbp: null, fbc: null }) }));
 
-import { conferirPix, emailAntesDoPix, entrarAntesDoPix } from "@/landing/pagamento";
+import { conferirPix, emailAntesDoPix, entrarAntesDoPix, gerarPix } from "@/landing/pagamento";
 
 beforeEach(() => {
   h.sessao = "ok"; h.emailAtual = null;
@@ -90,4 +90,15 @@ describe("conferirPix sem sessão (Pix reaberto pelo link do e-mail noutro naveg
     expect(await conferirPix(pix, "https://www.coreaplicativo.com.br/organizar")).toBe(false);
     expect(h.invoke).not.toHaveBeenCalled();
   });
+});
+
+it("leva o braço e o aparelho ao pedido autenticado sem aceitar valor/user_id do cliente", async () => {
+  h.invoke.mockResolvedValueOnce({ data: { orderId: 'order-fixture', qrCode: '000201...' }, error: null });
+  const id = '12345678-1234-1234-1234-123456789abc';
+  const r = await gerarPix('LN_sempre279', 'https://www.coreaplicativo.com.br/organizar', null,
+    { landing_session_id: id, landing_device_id: id, braco_lp: 'atual', braco_pix: 'b', user_id: 'other', amount_cents: 1, atrib: { utm_campaign: 'campaign' } });
+  expect(r).toMatchObject({ orderId: 'order-fixture' });
+  const body = h.invoke.mock.calls[0][1].body;
+  expect(body.landing_attribution).toMatchObject({ landing_device_id: id, braco_lp: 'atual', braco_pix: 'b' });
+  expect(body.landing_attribution).not.toHaveProperty('user_id'); expect(body.landing_attribution).not.toHaveProperty('amount_cents');
 });

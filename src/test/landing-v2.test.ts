@@ -59,8 +59,8 @@ function rodar(fonte: string, url: string, store: Record<string, string> = {}, c
 }
 
 describe("o sorteio da página (AB_LP, head do landing.html)", () => {
-  it("07/11 LIGADO no código (dono); o rollback \"off\" põe todo mundo no braço atual, sem criar id de aparelho quando o checkout também está off", () => {
-    expect(HTML).toMatch(/var AB_LP = "on";/);
+  it("10/11 desligado no código (dono); o rollback \"off\" põe todo mundo no braço atual, sem criar id de aparelho quando o checkout também está off", () => {
+    expect(HTML).toMatch(/var AB_LP = "off";/);
     const r = rodar(comChaves("off", "off"), "/organizar?utm_campaign=x");
     expect(r.attrs["data-lp"]).toBe("atual");
     expect(r.store["landing-device-id"]).toBeUndefined();

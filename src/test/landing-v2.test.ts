@@ -641,14 +641,27 @@ describe("a 2ª chance do chunk do Pix (src/landing/carregar.ts)", () => {
   });
   it("a landing usa o retry: o toque em pagar pode recarregar; o pré-aquecimento não; o erro vira landing_erro chunk_pagamento", () => {
     const src = readFileSync(resolve(raiz, "src/landing/landing.ts"), "utf8");
-    expect(src).toContain('carregarComRetry(() => import("./pagamento")');
+    expect(src).toContain('criarCarregadorCompartilhado(() => import("./pagamento")');
     expect(src).toContain("void pg(false).catch(() => null)");
     expect(src).toContain('onde: "chunk_pagamento"');
-    expect(src).toContain("limparMarcaDeRecarga");
+    expect(readFileSync(resolve(raiz, "src/landing/carregar.ts"), "utf8")).toContain("limparMarcaDeRecarga");
   });
 });
 
 describe("braço v2 + AB_CHECKOUT: o fluxo inteiro, nos dois braços do e-mail", () => {
+  it.each(["atual", "v2"] as const)("%s: guarda o email antes do carregamento e o restaura sem criar Pix automaticamente", async (lp) => {
+    await abrirPagina(lp, "email");
+    digitar("lp-email-antes", "cliente@example.com");
+    pagar();
+    const guardado = localStorage.getItem("landing-estado-v1")!;
+    expect(JSON.parse(guardado)).toMatchObject({ fase: "gerando", emailPix: "cliente@example.com", pix: null });
+    // Deixa a tentativa simulada terminar antes de reconstruir o documento.
+    await espera("#lp-copiar");
+    await abrirPagina(lp, "email", null, () => localStorage.setItem("landing-estado-v1", guardado));
+    expect((document.getElementById("lp-email-antes") as HTMLInputElement).value).toBe("cliente@example.com");
+    expect(document.getElementById("lp-copiar")).toBeNull();
+    expect(nomes()).not.toContain("landing_pix_gerado");
+  });
   it("v2 · livre: oferta → Pix (3 passos, QR e código lado a lado, 'Pagou? Volte aqui', e-mail sem '(opcional)') → 'Pronto! Falta o seu e-mail' → conta pronta: e-mail em caixa, selos das lojas de 48 px, site, 1º passo; sem 'Mudar o plano'", async () => {
     await abrirPagina("v2", "livre");
     pagar();

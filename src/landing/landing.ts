@@ -87,23 +87,14 @@ import { ligarOfertaNova, preaquecerStripe, sairDaOfertaNova } from "./oferta-no
 import { lerEstadoU2027, lerU2027Guardado } from "./u2027-estado";
 import { lerEstadoPresenteLp } from "./presente-estado";
 import { esquecerCompra, esquecerPixVivo, fixarAparelho, gravarCookie, gravarPixVivo, idDoAparelho, lerCompra, lerCookie, lerPixVivo, marcarCompra, temSessaoNoStorage, type MarcaCompra } from "./marcador";
-import { carregarComRetry, limparMarcaDeRecarga } from "./carregar";
+import { carregarComRetry, criarCarregadorCompartilhado } from "./carregar";
 import { REF_OK, checkoutExtDoHtml, paginaDoHtml, pkStripeValida, reaisDeCentavos, urlCheckoutHotmart, urlHotmartValida } from "./hotmart";
 
 // o Pix de verdade carrega sob demanda — declarado antes do observador dos blocos, que pode pré-aquecê-lo (com PIX_REAL).
 // 30/10: com 2ª chance; o pré-aquecimento (recarregar=false) nunca recarrega a página — só o toque em pagar.
-type Pagamento = typeof import("./pagamento");
-let pagamento: Promise<Pagamento> | null = null;
-const pg = (recarregar = true): Promise<Pagamento> => {
-  if (pagamento) return pagamento;
-  const p = carregarComRetry(() => import("./pagamento"), {
-    recarregar,
-    aoFalhar: (tentativa, erro) => evento("landing_erro", { onde: "chunk_pagamento", tentativa, msg: String(erro).slice(0, 120) }),
-  });
-  pagamento = p;
-  p.then(limparMarcaDeRecarga, () => { pagamento = null; }); // falhou: o próximo toque tenta do zero (e pode recarregar)
-  return p;
-};
+const pg = criarCarregadorCompartilhado(() => import("./pagamento"), {
+  aoFalhar: (tentativa, erro) => evento("landing_erro", { onde: "chunk_pagamento", tentativa, msg: String(erro).slice(0, 120) }),
+});
 
 /** O Pix de verdade (asaas-pix com as ofertas LN_*). Só ligar DEPOIS do deploy das funções (RELATORIO). */
 export const PIX_REAL = true; // 28/10 16h06: funções no ar com as ofertas LN_* (pix-reconcile v45, asaas-webhook v44, asaas-pix v46, pix-vincular v10)
@@ -1067,7 +1058,9 @@ async function gerar(comCodigo: string | null = null): Promise<void> {
   const anteriores = estado.pix && venceEm(estado.pix) > Date.now() ? [...estado.anteriores, estado.pix] : estado.anteriores;
   let t0 = Date.now();
   if (antes && comCodigo !== null) { antes = { ...antes, fase: "entrando", erro: null }; render(); }
-  else { salvar({ fase: "gerando", anteriores }); rolarAte(card, "start"); }
+  // Guarda o e-mail validado ANTES de importar o pagamento: uma recarga para
+  // recuperar um chunk antigo volta à oferta preenchida, sem gerar outro Pix.
+  else { salvar({ fase: "gerando", anteriores, ...(emailAntes ? { emailPix: emailAntes } : {}) }); rolarAte(card, "start"); }
   evento("landing_cta", { onde: comCodigo !== null ? "pagar_codigo" : "pagar", oferta });
   const emailConhecido = emailAntes ?? estado.email ?? estado.emailPix ?? lerCompra()?.email ?? null;
   const passo: Promise<PassoEmail> = emailAntes === null ? Promise.resolve({ ok: true as const, via: "livre" })

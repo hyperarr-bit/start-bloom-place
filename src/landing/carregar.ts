@@ -18,7 +18,7 @@ export type OpcoesRetry = {
   esperaMs?: number;
   espera?: (ms: number) => Promise<void>;
   /** pode recarregar a página se as 2 tentativas falharem? (o pré-aquecimento NÃO; o toque em pagar SIM) */
-  recarregar?: boolean;
+  recarregar?: boolean | (() => boolean);
   recarregarPagina?: () => void;
   jaRecarregou?: () => boolean;
   marcarRecarga?: () => void;
@@ -43,7 +43,8 @@ export async function carregarComRetry<T>(carrega: () => Promise<T>, o: OpcoesRe
     } catch (e2) {
       o.aoFalhar?.(2, e2);
       const ja = (o.jaRecarregou ?? leRecarga)();
-      if (o.recarregar && !ja) {
+      const podeRecarregar = typeof o.recarregar === "function" ? o.recarregar() : o.recarregar;
+      if (podeRecarregar && !ja) {
         (o.marcarRecarga ?? marcaRecarga)();
         o.aoFalhar?.("recarga", e2);
         (o.recarregarPagina ?? recarregaPadrao)();
@@ -51,6 +52,24 @@ export async function carregarComRetry<T>(carrega: () => Promise<T>, o: OpcoesRe
       throw e2;
     }
   }
+}
+
+/** O clique promove um preload ainda em voo a uma tentativa interativa.
+ * Compartilha o download, mas não herda para sempre o recarregar=false do preload.
+ * Falhas liberam uma nova tentativa; sucessos continuam em cache. */
+export function criarCarregadorCompartilhado<T>(carrega: () => Promise<T>, o: Omit<OpcoesRetry, "recarregar"> = {}): (interativo?: boolean) => Promise<T> {
+  let atual: { interativo: boolean; promessa: Promise<T> } | null = null;
+  return (interativo = true) => {
+    if (atual) {
+      atual.interativo ||= interativo;
+      return atual.promessa;
+    }
+    const tentativa = { interativo, promessa: null as unknown as Promise<T> };
+    tentativa.promessa = carregarComRetry(carrega, { ...o, recarregar: () => tentativa.interativo });
+    atual = tentativa;
+    tentativa.promessa.then(limparMarcaDeRecarga, () => { if (atual === tentativa) atual = null; });
+    return tentativa.promessa;
+  };
 }
 
 /** A página chegou viva depois da recarga: apaga a marca (a próxima falha de verdade pode recarregar de novo). */

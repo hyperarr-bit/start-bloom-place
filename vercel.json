@@ -80,7 +80,7 @@
       "destination": "/vendas.html"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!assets(?:/|$)).*)",
       "destination": "/index.html"
     }
   ]

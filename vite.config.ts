@@ -44,7 +44,9 @@ const versaoDoAppIos = (() => {
 const rotaDaMissao = () => {
   const reescrever = (req: { url?: string }, res: { writeHead: (status: number, headers: Record<string, string>) => void; end: () => void }, next: () => void) => {
     if (/^\/conhecer\/?(\?|$)/.test(req.url ?? "")) { res.writeHead(302, { Location: (req.url ?? "").replace(/^\/conhecer\/?/, "/vitalicio") }); res.end(); return; }
-    if (/^\/vitalicio\/demo\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/vitalicio\/demo\/?/, "/conhecer-demo.html");
+    if (/^\/instalar\/demo\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/instalar\/demo\/?/, "/instalar-demo.html");
+    else if (/^\/instalar\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/instalar\/?/, "/instalar.html");
+    else if (/^\/vitalicio\/demo\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/vitalicio\/demo\/?/, "/conhecer-demo.html");
     else if (/^\/vitalicio\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/vitalicio\/?/, "/conhecer.html");
     else if (req.url === "/missao" || req.url?.startsWith("/missao?")) req.url = req.url.replace("/missao", "/missao.html");
     // 28/10: a LANDING NOVA (/organizar → landing.html; a demo /organizar/demo continua no SPA)
@@ -136,6 +138,8 @@ export default defineConfig(({ mode }) => ({
         missao: path.resolve(__dirname, "missao.html"),
         // 28/10: a LANDING NOVA (/organizar, chave LANDING_NOVA "off" no próprio HTML) — HTML + CSS + src/landing/landing.ts
         landing: path.resolve(__dirname, "landing.html"),
+        instalar: path.resolve(__dirname, "instalar.html"),
+        instalarDemo: path.resolve(__dirname, "instalar-demo.html"),
         // 04/11: /vida/obrigado — a "página de obrigado" do checkout Hotmart da /vida (HTML estático, sem bundle)
         vidaObrigado: path.resolve(__dirname, "vida-obrigado.html"),
         // 29/10: /vendas — painel e aviso de venda do dono (PWA isolada: manifest e service worker só do /vendas)

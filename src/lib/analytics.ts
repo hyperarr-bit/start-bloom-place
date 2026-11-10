@@ -369,7 +369,7 @@ export const trackEvent = (
   opts: TrackOptions = {},
 ) => {
   // The parent journey owns measurement; the embedded app emits no analytics.
-  if (typeof window !== "undefined" && ["/vitalicio/demo", "/conhecer-demo.html"].includes(window.location.pathname.replace(/\/+$/, ""))) return;
+  if (typeof window !== "undefined" && ["/vitalicio/demo", "/conhecer-demo.html", "/instalar/demo", "/instalar-demo.html"].includes(window.location.pathname.replace(/\/+$/, ""))) return;
   try {
     const meta = getStoredMeta();
     // 10/10: a ficha do aparelho (device_id, versão, plataforma, turma, att) vai em
@@ -412,7 +412,7 @@ export const trackEvent = (
  */
 export const trackEventBeacon = (eventName: string, data: Record<string, unknown> = {}) => {
   // The parent journey owns measurement; the embedded app emits no analytics.
-  if (typeof window !== "undefined" && ["/vitalicio/demo", "/conhecer-demo.html"].includes(window.location.pathname.replace(/\/+$/, ""))) return;
+  if (typeof window !== "undefined" && ["/vitalicio/demo", "/conhecer-demo.html", "/instalar/demo", "/instalar-demo.html"].includes(window.location.pathname.replace(/\/+$/, ""))) return;
   try {
     const meta = getStoredMeta();
     const corpo = (userId: string | null) => JSON.stringify({
@@ -462,6 +462,8 @@ export const markActivation = async (
   actionKey: string,
   metadata: Record<string, unknown> = {},
 ) => {
+  // Installation demo edits are examples, never account activation.
+  if (typeof window !== "undefined" && ["/instalar/demo", "/instalar-demo.html"].includes(window.location.pathname.replace(/\/+$/, ""))) return;
   try {
     const { data: u } = await supabase.auth.getUser();
     const userId = u?.user?.id;

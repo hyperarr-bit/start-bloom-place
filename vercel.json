@@ -31,6 +31,10 @@
     { "source": "/conhecer/", "destination": "/vitalicio", "permanent": false }
   ],
   "rewrites": [
+    { "source": "/instalar", "destination": "/instalar.html" },
+    { "source": "/instalar/", "destination": "/instalar.html" },
+    { "source": "/instalar/demo", "destination": "/instalar-demo.html" },
+    { "source": "/instalar/demo/", "destination": "/instalar-demo.html" },
     { "source": "/vitalicio/demo", "destination": "/conhecer-demo.html" },
     { "source": "/vitalicio/demo/", "destination": "/conhecer-demo.html" },
     {

@@ -134,12 +134,14 @@ Object.values(paletteVars).forEach(modes => {
   });
 });
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
+export function ThemeProvider({ children, persist = true }: { children: ReactNode; persist?: boolean }) {
   const [mode, setMode] = useState<ThemeMode>(() => {
+    if (!persist) return "light";
     const saved = localStorage.getItem("core-theme-mode");
     return (saved as ThemeMode) || "light";
   });
   const [palette, setPaletteState] = useState<ThemePalette>(() => {
+    if (!persist) return "default";
     const saved = localStorage.getItem("core-theme-palette");
     return (saved as ThemePalette) || "default";
   });
@@ -148,7 +150,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const setPalette = (p: ThemePalette) => setPaletteState(p);
 
   useEffect(() => {
-    localStorage.setItem("core-theme-mode", mode);
+    if (persist) localStorage.setItem("core-theme-mode", mode);
     const root = document.documentElement;
     if (mode === "dark") root.classList.add("dark");
     else root.classList.remove("dark");
@@ -158,12 +160,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     // App da loja: a barra de status do Android tem que seguir o tema DO APP
     // (a classe .dark acima), não o do sistema. Import dinâmico pra não pesar
     // um grama no bundle da web.
-    import("@/lib/status-bar").then(m => m.aplicarBarraDeStatus(mode)).catch(() => {});
-  }, [mode]);
+    if (persist) import("@/lib/status-bar").then(m => m.aplicarBarraDeStatus(mode)).catch(() => {});
+  }, [mode, persist]);
 
 
   useEffect(() => {
-    localStorage.setItem("core-theme-palette", palette);
+    if (persist) localStorage.setItem("core-theme-palette", palette);
     const root = document.documentElement;
     const vars = paletteVars[palette]?.[mode] || {};
     
@@ -176,7 +178,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     Object.entries(vars).forEach(([key, val]) => {
       root.style.setProperty(key, val);
     });
-  }, [palette, mode]);
+  }, [palette, mode, persist]);
 
   return (
     <ThemeContext.Provider value={{ mode, palette, toggleMode, setPalette }}>

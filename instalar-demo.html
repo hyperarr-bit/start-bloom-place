@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta http-equiv="Content-Security-Policy" content="connect-src 'none'; form-action 'none'; object-src 'none'; base-uri 'self'" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Demonstração do CORE</title>
+    <!-- Keep scroll and focus inside the frame on iOS. No marketing bootstrap here. -->
+    <script>
+      (function () {
+        try {
+          if (location.pathname.replace(/\/+$/, "") !== "/instalar/demo" || window.top === window) return;
+          var raiz = function () { return document.scrollingElement || document.documentElement; };
+          window.scrollTo = function (a, b) {
+            var y = typeof a === "object" && a ? a.top : b;
+            var x = typeof a === "object" && a ? a.left : a;
+            var r = raiz();
+            if (typeof y === "number") r.scrollTop = y;
+            if (typeof x === "number") r.scrollLeft = x;
+          };
+          window.scroll = window.scrollTo;
+          var rolavel = function (el) {
+            for (var n = el.parentElement; n; n = n.parentElement) {
+              var cs = getComputedStyle(n);
+              if (/(auto|scroll)/.test(cs.overflowY + cs.overflowX) && (n.scrollHeight > n.clientHeight || n.scrollWidth > n.clientWidth)) return n;
+            }
+            return raiz();
+          };
+          Element.prototype.scrollIntoView = function () {
+            var c = rolavel(this), r = this.getBoundingClientRect(), cr = c === raiz() ? { top: 0, left: 0 } : c.getBoundingClientRect();
+            c.scrollTop += r.top - cr.top - 8;
+            if (r.left < cr.left || r.right > cr.left + c.clientWidth) c.scrollLeft += r.left - cr.left - 8;
+          };
+          var foco = HTMLElement.prototype.focus;
+          HTMLElement.prototype.focus = function (o) { return foco.call(this, Object.assign({}, o || {}, { preventScroll: true })); };
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-latin.woff2" crossorigin />
+    <style>
+      @font-face { font-family: 'Inter'; font-style: normal; font-weight: 300 900; font-display: swap; src: url(/fonts/inter-latin-ext.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+      @font-face { font-family: 'Inter'; font-style: normal; font-weight: 300 900; font-display: swap; src: url(/fonts/inter-latin.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+    </style>
+    <style>
+      html, body, #root {
+        margin: 0;
+        width: 100%;
+        max-width: 100%;
+        min-height: 100vh;
+        min-height: 100dvh;
+        /* clip (não hidden): hidden cria scroller aninhado → trava de scroll no
+           mobile. hidden antes = fallback pro WebView <90 (sem clip, caía em
+           visible e a página panorâmica na horizontal). */
+        overflow-x: hidden;
+        overflow-x: clip;
+        touch-action: auto;
+        background-color: #ffffff;
+        color: #1a1a1a;
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+      html.dark, html.dark body, html.dark #root {
+        background-color: #0f1115;
+        color: #f2f2f2;
+      }
+    </style>
+
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/instalar/demo-main.tsx"></script>
+  </body>
+</html>

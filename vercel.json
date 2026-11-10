@@ -26,7 +26,13 @@
       ]
     }
   ],
+  "redirects": [
+    { "source": "/conhecer", "destination": "/vitalicio", "permanent": false },
+    { "source": "/conhecer/", "destination": "/vitalicio", "permanent": false }
+  ],
   "rewrites": [
+    { "source": "/vitalicio/demo", "destination": "/conhecer-demo.html" },
+    { "source": "/vitalicio/demo/", "destination": "/conhecer-demo.html" },
     {
       "source": "/baixar",
       "destination": "/api/baixar"
@@ -49,11 +55,11 @@
     },
     {
       "source": "/vitalicio",
-      "destination": "/landing.html"
+      "destination": "/conhecer.html"
     },
     {
       "source": "/vitalicio/",
-      "destination": "/landing.html"
+      "destination": "/conhecer.html"
     },
     {
       "source": "/vida",

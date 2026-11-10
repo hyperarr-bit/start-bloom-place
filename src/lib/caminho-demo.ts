@@ -14,7 +14,7 @@ export const ehCaminhoDeDemo = (pathname: string | null | undefined): boolean =>
   return p.startsWith("/preview") || p === "/experimente" || p.startsWith("/experimente/") || p === "/liberar" || p.startsWith("/liberar/")
     || p === "/hoje/demo" || p.startsWith("/hoje/demo/")
     // 28/10: a demo dentro da landing nova (/organizar → iframe /organizar/demo)
-    || p === "/organizar/demo";
+    || (p === "/organizar/demo" || ["/vitalicio/demo", "/vitalicio/demo/", "/conhecer-demo.html"].includes(p));
 };
 
 /** O mesmo, lendo o endereço da página (fora de componente). Sem window = false. */
@@ -30,7 +30,7 @@ export const emCaminhoDeDemo = (): boolean => {
  */
 export const ehDemoDaVenda = (pathname: string | null | undefined): boolean => {
   const p = String(pathname ?? "");
-  return p === "/organizar/demo" || p === "/hoje/demo" || p.startsWith("/hoje/demo/");
+  return (p === "/organizar/demo" || ["/vitalicio/demo", "/vitalicio/demo/", "/conhecer-demo.html"].includes(p)) || p === "/hoje/demo" || p.startsWith("/hoje/demo/");
 };
 export const emDemoDaVenda = (): boolean => {
   try { return ehDemoDaVenda(window.location.pathname); } catch { return false; }

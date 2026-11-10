@@ -8,10 +8,18 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
+// This embedded preview must never load or refresh the real account session.
+const isolatedPreview = typeof window !== "undefined" && (
+  ["/vitalicio/demo", "/conhecer-demo.html"].includes(window.location.pathname.replace(/\/+$/, ""))
+  || (["/vitalicio", "/conhecer.html"].includes(window.location.pathname.replace(/\/+$/, ""))
+    && (new URLSearchParams(window.location.search).get("qa") === "1" || !/(^|\.)coreaplicativo\.com\.br$/.test(window.location.hostname)))
+);
+
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
+    storage: isolatedPreview ? undefined : localStorage,
+    persistSession: !isolatedPreview,
+    autoRefreshToken: !isolatedPreview,
+    ...(isolatedPreview ? { detectSessionInUrl: false } : {}),
   }
 });

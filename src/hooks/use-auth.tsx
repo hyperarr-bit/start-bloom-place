@@ -55,6 +55,21 @@ export const EVENTO_RELER_ASSINATURA = "core:reler-assinatura";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** Read-only guest boundary for the embedded demonstration. Never opens a real session. */
+const previewAuth: AuthContextType = Object.freeze({
+  user: null, session: null, loading: false, trialExpired: false, noTrial: false,
+  isSubscribed: false, subLoaded: true, trialDay: 1, trialHoursLeft: 0,
+  inGracePeriod: false, graceDaysLeft: null, paymentMethod: null,
+  billingPeriod: null, subscriptionEnd: null,
+  signUp: async () => ({ error: new Error("Entre na sua conta fora da demonstração."), session: null }),
+  signIn: async () => ({ error: new Error("Entre na sua conta fora da demonstração.") }),
+  signOut: async () => {},
+});
+
+export const PreviewAuthProvider = ({ children }: { children: ReactNode }) => (
+  <AuthContext.Provider value={previewAuth}>{children}</AuthContext.Provider>
+);
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);

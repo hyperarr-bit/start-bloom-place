@@ -42,8 +42,11 @@ const versaoDoAppIos = (() => {
 
 /** /missao → /missao.html no servidor de desenvolvimento e no `vite preview` (a Vercel faz pelo vercel.json). */
 const rotaDaMissao = () => {
-  const reescrever = (req: { url?: string }, _res: unknown, next: () => void) => {
-    if (req.url === "/missao" || req.url?.startsWith("/missao?")) req.url = req.url.replace("/missao", "/missao.html");
+  const reescrever = (req: { url?: string }, res: { writeHead: (status: number, headers: Record<string, string>) => void; end: () => void }, next: () => void) => {
+    if (/^\/conhecer\/?(\?|$)/.test(req.url ?? "")) { res.writeHead(302, { Location: (req.url ?? "").replace(/^\/conhecer\/?/, "/vitalicio") }); res.end(); return; }
+    if (/^\/vitalicio\/demo\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/vitalicio\/demo\/?/, "/conhecer-demo.html");
+    else if (/^\/vitalicio\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/vitalicio\/?/, "/conhecer.html");
+    else if (req.url === "/missao" || req.url?.startsWith("/missao?")) req.url = req.url.replace("/missao", "/missao.html");
     // 28/10: a LANDING NOVA (/organizar → landing.html; a demo /organizar/demo continua no SPA)
     else if (req.url === "/organizar" || req.url?.startsWith("/organizar?")) req.url = req.url.replace("/organizar", "/landing.html");
     // 04/11: /vida = a mesma landing (o <head> vê a rota e liga a v3 + o checkout da chave CHECKOUT_HOTMART); /vida/obrigado = a página de obrigado da Hotmart
@@ -128,6 +131,8 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, "index.html"),
+        conhecer: path.resolve(__dirname, "conhecer.html"),
+        conhecerDemo: path.resolve(__dirname, "conhecer-demo.html"),
         missao: path.resolve(__dirname, "missao.html"),
         // 28/10: a LANDING NOVA (/organizar, chave LANDING_NOVA "off" no próprio HTML) — HTML + CSS + src/landing/landing.ts
         landing: path.resolve(__dirname, "landing.html"),

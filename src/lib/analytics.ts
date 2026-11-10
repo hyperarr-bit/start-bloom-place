@@ -368,6 +368,8 @@ export const trackEvent = (
   data: Record<string, unknown> = {},
   opts: TrackOptions = {},
 ) => {
+  // The parent journey owns measurement; the embedded app emits no analytics.
+  if (typeof window !== "undefined" && ["/vitalicio/demo", "/conhecer-demo.html"].includes(window.location.pathname.replace(/\/+$/, ""))) return;
   try {
     const meta = getStoredMeta();
     // 10/10: a ficha do aparelho (device_id, versão, plataforma, turma, att) vai em
@@ -409,6 +411,8 @@ export const trackEvent = (
  * getSession (local) em vez de getUser (rede): na despedida não há tempo.
  */
 export const trackEventBeacon = (eventName: string, data: Record<string, unknown> = {}) => {
+  // The parent journey owns measurement; the embedded app emits no analytics.
+  if (typeof window !== "undefined" && ["/vitalicio/demo", "/conhecer-demo.html"].includes(window.location.pathname.replace(/\/+$/, ""))) return;
   try {
     const meta = getStoredMeta();
     const corpo = (userId: string | null) => JSON.stringify({

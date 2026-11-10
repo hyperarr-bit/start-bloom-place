@@ -1,5 +1,5 @@
 import { lazy,Suspense,useCallback,useEffect,useRef,useState } from 'react';
-import { ArrowLeft,ArrowRight,Check,ChevronRight,ShieldCheck,Smartphone,X,Play } from 'lucide-react';
+import { ArrowLeft,ArrowRight,Check,ChevronRight,ShieldCheck,Smartphone,X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { ALL_MODULE_ICONS } from '@/lib/funnel';
@@ -45,7 +45,7 @@ export default function Journey(){
     setStage(next);setNote('');
   },[]);
   useEffect(()=>{
-    initPixel();event('jornada_inicio',{visible:document.visibilityState==='visible'});
+    initPixel();event('jornada_inicio',{visible:document.visibilityState==='visible',entrada:'produto_inteiro_v2'});
     history.replaceState({conhecer:historyId.current,stage:checkpoint.current,position:0},'',location.href);
     const pop=(e:PopStateEvent)=>{
       if(e.state?.conhecer!==historyId.current)return;
@@ -90,19 +90,25 @@ export default function Journey(){
   const primary=(label:string,action:()=>void)=><Button className="j-cta" onClick={action}>{label}<ArrowRight size={18}/></Button>;
   const access=()=>go('offer');
   return <div className="j-root" data-testid="conhecer-journey" data-stage={stage}>
-    {stage!=='demo'&&<><header className="j-header"><a className="j-brand" href="/vitalicio">CORE</a><div className="j-header-actions"><a className="j-text-link" href="/entrar" onClick={()=>event('jornada_login_click')}>Já tenho acesso</a><ThemeToggle/></div></header><div className="j-progress" aria-label={`Etapa ${stepIndex[stage]+1} de 5`}>{['Conhecer','Seu começo','No app','Tudo incluído','Seu acesso'].map((s,i)=><span key={s} title={s} className={i<=stepIndex[stage]?'j-progress-done':''}/>)}</div></>}
+    {stage!=='demo'&&<><header className="j-header"><a className="j-brand" href="/vitalicio">CORE</a><div className="j-header-actions"><a className="j-text-link" href="/entrar" onClick={()=>event('jornada_login_click')}>Já tenho acesso</a><ThemeToggle/></div></header>{stage!=='entry'&&<div className="j-progress" aria-label={`Etapa ${stepIndex[stage]+1} de 5`}>{['Conhecer','Seu começo','No app','Tudo incluído','Seu acesso'].map((s,i)=><span key={s} title={s} className={i<=stepIndex[stage]?'j-progress-done':''}/>)}</div>}</>}
     <div ref={heading} tabIndex={-1} className={stage==='demo'?'j-main j-main-demo':'j-main'}>
       {!['entry','demo','checkout'].includes(stage)&&<button className="j-back" onClick={back}><ArrowLeft size={16}/>Voltar</button>}
       {note&&<p className="j-notice" role="status">{note}</p>}
       {legacyAttempt&&stage!=='demo'&&<p className="j-notice">Você já iniciou um pedido na página anterior. <a className="underline font-semibold" href="/oferta">Conferir meu pedido anterior</a> antes de começar outra compra.</p>}
       {stage==='entry'&&<section className="j-entry j-panel">
-        <h1>Um app pra<br/>vida inteira.</h1><p className="j-lead">Dinheiro, rotina e mais 14 áreas, no mesmo lugar.</p>
-        <button className="j-product-preview" onClick={()=>openDemo('financas','dashboard')} aria-label="Abrir demonstração de Finanças"><img src="/landing/demo-financas.webp" width="720" height="1274" alt="O painel de Finanças do CORE, com receitas, despesas e saldo de exemplo"/><span><Play size={15}/>Experimente o app</span></button>
-        {primary('Quero ver o app por dentro',()=>openDemo('financas','dashboard'))}<p className="j-preview-caption">Demonstração com dados de exemplo. Sem cadastro.</p>
-        <h2 className="j-question">Ou escolha por onde começar</h2>
-        <div className="j-options">{([['tudo','🎯','Tudo, sinceramente','Conhecer o app e o que vem junto.'],['financas','💰','Meu dinheiro','Gastos, contas e o mês inteiro.'],['rotina','📅','Minha rotina','Hábitos, tarefas e próximos dias.']] as const).map(([key,icon,title,desc])=><button key={key} onClick={()=>selectArea(key)}><span className={`j-area-icon j-area-${key}`}>{icon}</span><span><b>{title}</b><small>{desc}</small></span><ChevronRight size={19}/></button>)}</div>
-        <p className="j-included"><Check size={15}/>Os 16 módulos vêm juntos, em qualquer escolha.</p><div className="j-platforms"><Smartphone size={16}/>iPhone e Android<span>·</span>Computador</div>
-        <button className="j-text-link j-skip" onClick={access}>Já quero conhecer o acesso</button>
+        <p className="j-entry-kicker">16 módulos. Um só app.</p>
+        <h1>Seu dia inteiro,<br/>em um só app.</h1>
+        <p className="j-lead">Finanças, rotina, treino e muito mais.<br/>No iPhone, Android e computador.</p>
+        <figure className="j-product-overview">
+          <img src="/landing/v3-home.webp" width="720" height="1070" fetchPriority="high" alt="Tela inicial do CORE: próxima conta, orçamento, treino, sono e acesso aos módulos de Finanças, Rotina, Saúde e Treino"/>
+          <figcaption>Tela do CORE com dados de exemplo.</figcaption>
+        </figure>
+        <div className="j-entry-actions">
+          {primary('Conhecer o acesso completo',()=>go('value'))}
+          <p className="j-entry-included">Todos os 16 módulos no mesmo acesso.</p>
+          <button className="j-entry-explore" onClick={()=>openDemo('financas','dashboard')}>Experimentar Finanças e Rotina<ArrowRight size={15}/></button>
+          <p className="j-entry-demo-note">Demonstração opcional, sem cadastro.</p>
+        </div>
       </section>}
       {stage==='context'&&<section className="j-panel"><p className="j-eyebrow">SEU PONTO DE PARTIDA</p><h1>{area==='tudo'?'O que você quer ver primeiro?':area==='rotina'?'O que você quer organizar primeiro?':'O que você quer enxergar melhor?'}</h1><p className="j-lead">Experimente uma parte do app. Todos os 16 módulos estão incluídos no acesso completo.</p><div className="j-options">{area==='tudo'?(['financas','rotina'] as const).map(m=><button key={m} onClick={()=>openDemo(m,m==='financas'?'dashboard':'semana')}><span className={`j-area-icon j-area-${m}`}>{m==='financas'?'💰':'📅'}</span><span><b>{m==='financas'?'Ver meu mês financeiro':'Ver minha semana'}</b><small>{m==='financas'?'Um painel com gastos, receitas e saldo.':'Hábitos e tarefas nos dias da semana.'}</small></span><ChevronRight size={19}/></button>):choices[area].map(c=><button key={c.tab} onClick={()=>openDemo(area,c.tab)}><span><b>{c.title}</b><small>{c.sub}</small></span><ChevronRight size={19}/></button>)}</div><button className="j-text-link j-skip" onClick={()=>go('value')}>Prefiro conhecer o que está incluído</button></section>}
       {demoMounted&&<section hidden={stage!=='demo'} className="j-demo">

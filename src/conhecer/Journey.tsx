@@ -90,7 +90,7 @@ export default function Journey(){
   const primary=(label:string,action:()=>void)=><Button className="j-cta" onClick={action}>{label}<ArrowRight size={18}/></Button>;
   const access=()=>go('offer');
   return <div className="j-root" data-testid="conhecer-journey" data-stage={stage}>
-    {stage!=='demo'&&<><header className="j-header"><a className="j-brand" href="/vitalicio">CORE</a><div className="j-header-actions"><a className="j-text-link" href="/entrar" onClick={()=>event('jornada_login_click')}>Já tenho acesso</a><ThemeToggle/></div></header>{stage!=='entry'&&<div className="j-progress" aria-label={`Etapa ${stepIndex[stage]+1} de 5`}>{['Conhecer','Seu começo','No app','Tudo incluído','Seu acesso'].map((s,i)=><span key={s} title={s} className={i<=stepIndex[stage]?'j-progress-done':''}/>)}</div>}</>}
+    {stage!=='demo'&&<><header className="j-header"><a className="j-brand" href="/vitalicio">CORE</a><div className="j-header-actions"><a className="j-text-link" href="/entrar" onClick={()=>event('jornada_login_click')}>Já tenho acesso</a><ThemeToggle trackChanges={!QA}/></div></header>{stage!=='entry'&&<div className="j-progress" aria-label={`Etapa ${stepIndex[stage]+1} de 5`}>{['Conhecer','Seu começo','No app','Tudo incluído','Seu acesso'].map((s,i)=><span key={s} title={s} className={i<=stepIndex[stage]?'j-progress-done':''}/>)}</div>}</>}
     <div ref={heading} tabIndex={-1} className={stage==='demo'?'j-main j-main-demo':'j-main'}>
       {!['entry','demo','checkout'].includes(stage)&&<button className="j-back" onClick={back}><ArrowLeft size={16}/>Voltar</button>}
       {note&&<p className="j-notice" role="status">{note}</p>}

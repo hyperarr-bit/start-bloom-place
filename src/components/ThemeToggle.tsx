@@ -9,14 +9,14 @@ import { trackEvent } from "@/lib/analytics";
  * menu novo compara de onde o tema é trocado (o topo da Home com `menu_novo: off`, o cabeçalho dos módulos e
  * Conquistas, e a Aparência do menu).
  */
-export const ThemeToggle = ({ showPalette = false, origem = "cabecalho" }: { showPalette?: boolean; origem?: string }) => {
+export const ThemeToggle = ({ showPalette = false, origem = "cabecalho", trackChanges = true }: { showPalette?: boolean; origem?: string; trackChanges?: boolean }) => {
   const { mode, toggleMode, palette, setPalette } = useTheme();
   const alternarModo = () => {
-    trackEvent("tema_trocado", { modo: mode === "dark" ? "light" : "dark", paleta: palette, origem });
+    if (trackChanges) trackEvent("tema_trocado", { modo: mode === "dark" ? "light" : "dark", paleta: palette, origem });
     toggleMode();
   };
   const escolherPaleta = (p: ThemePalette) => {
-    if (p !== palette) trackEvent("tema_trocado", { modo: mode, paleta: p, origem });
+    if (trackChanges && p !== palette) trackEvent("tema_trocado", { modo: mode, paleta: p, origem });
     setPalette(p);
   };
   const [showPaletteMenu, setShowPaletteMenu] = useState(false);

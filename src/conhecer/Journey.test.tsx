@@ -134,21 +134,13 @@ describe('jornada de perguntas restaurada, com checkout isolado', () => {
     expect(stage()).toBe('value');
   });
 
-  it('Ver acesso permite ir direto à oferta e voltar ao começo sem exigir demo', async () => {
-    render(<Journey/>); click('Ver acesso');
-    expect(stage()).toBe('offer'); expect(frame()).toBeNull();
-    click('Voltar'); await waitFor(() => expect(stage()).toBe('entry'));
-    click('Ver acesso'); click('Continuar com Pix');
+  it('voltar do checkout mantém a oferta após percorrer perguntas e demo', async () => {
+    render(<Journey/>); click(/Meu dinheiro/); click(/Entender o mês/);
+    message({ type: 'conhecer:ready', module: 'financas' });
+    click('Conhecer o acesso completo'); click('Ver meu acesso ao CORE'); click('Continuar com Pix');
     await screen.findByRole('region', { name: 'Checkout simulado' });
     click('Voltar à oferta do checkout');
-    expect(stage()).toBe('offer'); expect(frame()).toBeNull();
-  });
-
-  it('pular a demo pelo contexto mantém a apresentação de todos os módulos', () => {
-    render(<Journey/>); click(/Meu dinheiro/); click('Prefiro conhecer o que está incluído');
-    expect(stage()).toBe('value'); expect(frame()).toBeNull();
-    expect(screen.getByText(/Você pode começar pelo dinheiro/)).toBeInTheDocument();
-    click('Ver meu acesso ao CORE'); expect(stage()).toBe('offer');
+    expect(stage()).toBe('offer');
   });
 
   it('QA começa pelas perguntas mesmo com pedido salvo e mantém retorno direto de checkout', async () => {

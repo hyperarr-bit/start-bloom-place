@@ -206,7 +206,7 @@ export function Checkout({ onBack, onStage, attribution = {}, event }: CheckoutP
         <label className="j-label" htmlFor="conhecer-email">Seu e-mail</label><Input id="conhecer-email" type="email" autoComplete="email" inputMode="email" required maxLength={254} value={email} disabled={busy || QA} onChange={e => setEmail(e.target.value)}/>
         <p className="j-help">Pagamento único no Pix. Sem mensalidade. A senha é opcional e fica para depois.</p>
         <Button type="submit" className="j-cta" disabled={busy || QA}>{busy ? <><Loader2 className="animate-spin" size={18}/>Preparando seu acesso…</> : 'Continuar para o Pix'}</Button>
-      </form><a className="j-text-link j-skip" href="/entrar">Já tenho acesso ao CORE</a>
+      </form>
     </>}
     {phase === 'code' && <>
       <Mail size={28}/><h1>{recovering ? 'Recupere seu pedido.' : 'Entre na sua conta.'}</h1>

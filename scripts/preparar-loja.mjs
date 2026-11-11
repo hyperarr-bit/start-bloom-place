@@ -53,8 +53,13 @@ const MORTO = ["v3-hero.mp4", "v3-hero-poster.jpg", "videos", "hero-phones.png",
   "landing.html", "vendas.html", "landing", "vendas",
   // 03/11: o guia em PDF de quem comprou no site (link do e-mail da compra e da /como-entrar) — só no site
   "guia",
+  // 11/11 (revisão da 1.0.25): a /vitalicio (conhecer.html, com o checkout Pix/cartão do vitalício), a /instalar e as
+  // duas demos entraram no build como entradas próprias (vite.config) em 09–10/11 — nenhuma rota do app chega nelas
+  "conhecer.html", "conhecer-demo.html", "instalar.html", "instalar-demo.html",
   // 04/11: a página de obrigado da Hotmart (/vida/obrigado) — só no site
   "vida-obrigado.html"];
+// as páginas do site que NUNCA podem ir no binário (a trava do fim confere)
+const SO_SITE = ["landing.html", "vendas.html", "vida-obrigado.html", "conhecer.html", "conhecer-demo.html", "instalar.html", "instalar-demo.html"];
 
 // Rastreadores de anúncio que moram no index.html da WEB e vinham de carona
 // pro binário (o Capacitor copia a pasta public inteira).
@@ -279,15 +284,39 @@ for (const alvo of MORTO) {
   console.log(`  − ${alvo} (${mb(tamanho(p))})`);
   rmSync(p, { recursive: true, force: true });
 }
-// os chunks de ENTRADA da página de venda e do painel (só eles: os compartilhados também servem o app)
+// os chunks de ENTRADA da página de venda, do painel, da /vitalicio e da /instalar (só eles: os compartilhados também
+// servem o app). Journey e Checkout são os pedaços da /vitalicio (src/conhecer) — só conhecer.html chega neles.
+const tirados = [];
 for (const f of readdirSync(join(ASSETS, "assets"))) {
-  if (!/^(landing|vendas)-[\w-]+\.(js|css)$/.test(f)) continue;
+  if (!/^(landing|vendas|conhecer|conhecerDemo|instalar|instalarDemo|Journey|Checkout)-[\w-]+\.(js|css)$/.test(f)) continue;
   console.log(`  − assets/${f}`);
   rmSync(join(ASSETS, "assets", f), { force: true });
+  tirados.push(f);
 }
-if (["landing.html", "vendas.html", "vida-obrigado.html"].some((f) => existsSync(join(ASSETS, f)))) {
-  console.error("\n✗ TRAVA: a página de venda/painel continua no bundle do app");
+if (SO_SITE.some((f) => existsSync(join(ASSETS, f)))) {
+  console.error("\n✗ TRAVA: página do site (venda/painel/vitalicio/instalar) continua no bundle do app");
   process.exit(1);
+}
+// 11/11: nenhum pedaço tirado pode ser alcançado pelo app — segue os nomes de arquivo a partir dos HTML que FICAM
+// (index.html, missao.html), de pedaço em pedaço. Se um dia um arquivo do app ganhar um desses nomes, o app quebraria
+// sem esta trava. (Pedaços que só a landing usava, como stripe-checkout-*, ainda citam landing-*, mas o app não chega neles.)
+{
+  const naPasta = [...readdirSync(join(ASSETS, "assets")), ...tirados]; // os tirados entram: é eles que a trava procura
+  const citados = (txt) => naPasta.filter((f) => txt.includes(f));
+  const fila = readdirSync(ASSETS).filter((f) => f.endsWith(".html")).flatMap((f) => citados(readFileSync(join(ASSETS, f), "utf8")));
+  const visto = new Set();
+  while (fila.length) {
+    const f = fila.pop();
+    if (visto.has(f)) continue;
+    visto.add(f);
+    if (f.endsWith(".js") && !tirados.includes(f)) fila.push(...citados(readFileSync(join(ASSETS, "assets", f), "utf8")));
+  }
+  const pedido = tirados.find((t) => visto.has(t));
+  if (pedido) {
+    console.error(`\n✗ TRAVA: assets/${pedido} foi tirado, mas o app (index.html/missao.html) chega nele`);
+    process.exit(1);
+  }
+  console.log(`  ✓ ${tirados.length} pedaços do site tirados; o app alcança ${visto.size} pedaços, nenhum deles tirado`);
 }
 console.log(`\n✓ assets do app: ${mb(antes)} → ${mb(tamanho(ASSETS))}`);
 if (alvoIOS) {

@@ -316,7 +316,22 @@ describe("hotmart.ts, rotas e obrigado", () => {
     expect(vite).toContain('replace(/^\\/vida\\/obrigado\\/?/, "/vida-obrigado.html")');
     const loja = readFileSync(resolve(raiz, "scripts/preparar-loja.mjs"), "utf8");
     expect(loja).toMatch(/"vida-obrigado\.html"\];/); // I (revisão): a página de obrigado não vai pro app de loja
-    expect(loja).toContain('["landing.html", "vendas.html", "vida-obrigado.html"].some');
+    // 11/11 (revisão da 1.0.25): a lista das páginas que a trava confere virou SO_SITE — com a /vitalicio e a /instalar
+    expect(loja).toContain('const SO_SITE = ["landing.html", "vendas.html", "vida-obrigado.html", "conhecer.html", "conhecer-demo.html", "instalar.html", "instalar-demo.html"];');
+    expect(loja).toContain("SO_SITE.some((f) => existsSync(join(ASSETS, f)))");
+  });
+  it("loja (11/11): a /vitalicio (checkout do vitalício), a /instalar e as duas demos ficam fora do binário, com os pedaços de entrada delas", () => {
+    const loja = readFileSync(resolve(raiz, "scripts/preparar-loja.mjs"), "utf8");
+    const morto = loja.slice(loja.indexOf("const MORTO = ["), loja.indexOf("const SO_SITE"));
+    for (const f of ["conhecer.html", "conhecer-demo.html", "instalar.html", "instalar-demo.html"]) expect(morto).toContain(`"${f}"`);
+    const re = loja.match(/if \(!(\/\^\([^)]*\)-\[\\w-\]\+\\\.\(js\|css\)\$\/)\.test\(f\)\) continue;/);
+    expect(re).not.toBeNull();
+    const pedacos = new RegExp(re![1].slice(1, -1));
+    for (const f of ["conhecer-Cw4TRT7V.js", "conhecerDemo-CryTxL3G.js", "instalar-CNDRUeYE.js", "instalar-DSP8jipj.css", "instalarDemo-sC2xIxeD.js", "Journey-fM64Gfex.js", "Journey-DzENsOTM.css", "Checkout-DYvEpR0L.js", "landing-BnaHTEAv.js", "vendas-CsaPVIIk.js"]) expect(pedacos.test(f)).toBe(true);
+    // pedaços que o app usa (index.html chega neles) NÃO podem casar
+    for (const f of ["index-abc123.js", "pagamento-XQpqw3wG.js", "carregar-Cfx5Yjbv.js", "atribuicao-Cava2mzG.js", "PaywallAssinatura-abc123.js"]) expect(pedacos.test(f)).toBe(false);
+    // e a trava que segue o app a partir dos HTML que ficam
+    expect(loja).toContain("foi tirado, mas o app (index.html/missao.html) chega nele");
   });
   it("obrigado: lojas primeiro, e-mail em até 1 minuto, 'Já tenho conta? Entrar' (não 'Começar'), guia, contato, e SEM pixel/Purchase", () => {
     const d = document.createElement("div");

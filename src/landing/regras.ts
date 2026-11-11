@@ -272,6 +272,14 @@ export function bracoTopoOfertaDoAparelho(id: string): BracoTopoOferta {
   return ((h >>> 4) & 1) === 0 ? "atual" : "anuncio";
 }
 
+/** 08/11: o CHECKOUT do /organizar (CHECKOUT_ORG_V2 no <head> → html[data-cko]). "atual" = o Pix de hoje no cartão (IDÊNTICO); "v2" = a camada
+ *  com a cara do checkout v2, o MESMO Pix (./checkout-organizar.ts; novidades-guardadas/2026-11-07/checkout-organizar/SPEC.md). Sem sorteio
+ *  (a chave "on" vale pra todo o /organizar). Fora do /organizar, ou sem o atributo: "atual". */
+export type BracoCko = "atual" | "v2";
+export function bracoCkoDoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): BracoCko {
+  return el.getAttribute("data-cko") === "v2" ? "v2" : "atual";
+}
+
 /** Os erros de domínio que mais aparecem (sugestão tocável embaixo do campo; nunca bloqueia). */
 const DOMINIO_ERRADO: Record<string, string> = {
   "gmial.com": "gmail.com", "gmal.com": "gmail.com", "gmai.com": "gmail.com", "gamil.com": "gmail.com", "gnail.com": "gmail.com",

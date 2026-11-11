@@ -1,0 +1,1418 @@
+{
+ "atual|compra": {
+  "invoke": [
+   {
+    "fn": "asaas-pix",
+    "body": {
+     "action": "create",
+     "landing_attribution": {
+      "landing_medicao_v": 2,
+      "landing_session_id": "<id>",
+      "landing_device_id": "<id>",
+      "braco_lp": "atual",
+      "braco_pix": "atual",
+      "forçado": false,
+      "atrib": {
+       "atrib_origem": "sem_sinal"
+      }
+     },
+     "offer": "LN_sempre279",
+     "fbp": "fb.1.1762560000000.123456789",
+     "fbc": null,
+     "sourceUrl": "https://www.coreaplicativo.com.br/organizar",
+     "email": "ana@email.com"
+    }
+   },
+   {
+    "fn": "asaas-pix",
+    "body": {
+     "action": "check",
+     "id": "asaasfalso0001",
+     "offer": "LN_sempre279",
+     "fbp": "fb.1.1762560000000.123456789",
+     "fbc": null,
+     "sourceUrl": "https://www.coreaplicativo.com.br/organizar"
+    }
+   }
+  ],
+  "pixel": [
+   [
+    "track",
+    "ViewContent",
+    {
+     "content_name": "landing_oferta",
+     "value": 27.9,
+     "currency": "BRL"
+    }
+   ],
+   [
+    "track",
+    "InitiateCheckout",
+    {
+     "value": 27.9,
+     "currency": "BRL",
+     "content_name": "LN_sempre279"
+    },
+    {
+     "eventID": "ic-asaasfalso0001"
+    }
+   ],
+   [
+    "track",
+    "Purchase",
+    {
+     "value": 27.9,
+     "currency": "BRL",
+     "content_name": "LN_sempre279"
+    },
+    {
+     "eventID": "asaasfalso0001"
+    }
+   ]
+  ],
+  "atribuicao": [
+   {
+    "v": 1,
+    "landing": true,
+    "attr": {
+     "atrib_origem": "sem_sinal"
+    },
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "oferta": "LN_sempre279",
+    "braco_pix": "atual",
+    "forçado": false,
+    "atrib": {
+     "atrib_origem": "sem_sinal"
+    }
+   }
+  ],
+  "eventos": [
+   {
+    "nome": "landing_oferta_vista",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "via": "bloco_15",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_email_antes_visto",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_cta",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "onde": "fixo",
+    "fase": "oferta",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_cta",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "onde": "pagar",
+    "oferta": "LN_sempre279",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_email_antes_ok",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "via": "nova",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_pix_gerado",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "oferta": "LN_sempre279",
+    "valor": 27.9,
+    "order_id": "asaasfalso0001",
+    "simulado": false,
+    "email_antes": true,
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_pix_copiado",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "ok": false,
+    "via": "texto",
+    "auto": true,
+    "order_id": "asaasfalso0001",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_cta",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "onde": "ja_paguei",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_pix_pago",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "oferta": "LN_sempre279",
+    "valor": 27.9,
+    "order_id": "asaasfalso0001",
+    "simulado": false,
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_pix_ja_paguei",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "order_id": "asaasfalso0001",
+    "resultado": "pago",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_email",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "via": "pix",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   }
+  ],
+  "otp": []
+ },
+ "atual|codigo": {
+  "invoke": [
+   {
+    "fn": "asaas-pix",
+    "body": {
+     "action": "create",
+     "landing_attribution": {
+      "landing_medicao_v": 2,
+      "landing_session_id": "<id>",
+      "landing_device_id": "<id>",
+      "braco_lp": "atual",
+      "braco_pix": "atual",
+      "forçado": false,
+      "atrib": {
+       "atrib_origem": "sem_sinal"
+      }
+     },
+     "offer": "LN_sempre279",
+     "fbp": "fb.1.1762560000000.123456789",
+     "fbc": null,
+     "sourceUrl": "https://www.coreaplicativo.com.br/organizar",
+     "email": "bia+existe@email.com"
+    }
+   },
+   {
+    "fn": "asaas-pix",
+    "body": {
+     "action": "check",
+     "id": "asaasfalso0001",
+     "offer": "LN_sempre279",
+     "fbp": "fb.1.1762560000000.123456789",
+     "fbc": null,
+     "sourceUrl": "https://www.coreaplicativo.com.br/organizar"
+    }
+   }
+  ],
+  "pixel": [
+   [
+    "track",
+    "ViewContent",
+    {
+     "content_name": "landing_oferta",
+     "value": 27.9,
+     "currency": "BRL"
+    }
+   ],
+   [
+    "track",
+    "InitiateCheckout",
+    {
+     "value": 27.9,
+     "currency": "BRL",
+     "content_name": "LN_sempre279"
+    },
+    {
+     "eventID": "ic-asaasfalso0001"
+    }
+   ],
+   [
+    "track",
+    "Purchase",
+    {
+     "value": 27.9,
+     "currency": "BRL",
+     "content_name": "LN_sempre279"
+    },
+    {
+     "eventID": "asaasfalso0001"
+    }
+   ]
+  ],
+  "atribuicao": [
+   {
+    "v": 1,
+    "landing": true,
+    "attr": {
+     "atrib_origem": "sem_sinal"
+    },
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "oferta": "LN_sempre279",
+    "braco_pix": "atual",
+    "forçado": false,
+    "atrib": {
+     "atrib_origem": "sem_sinal"
+    }
+   }
+  ],
+  "eventos": [
+   {
+    "nome": "landing_oferta_vista",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "via": "bloco_15",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_email_antes_visto",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_cta",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "onde": "pagar",
+    "oferta": "LN_sempre279",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_email_antes_erro",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "motivo": "tem_conta",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_cta",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "onde": "pagar_codigo",
+    "oferta": "LN_sempre279",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_email_antes_ok",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "via": "codigo",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_pix_gerado",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "oferta": "LN_sempre279",
+    "valor": 27.9,
+    "order_id": "asaasfalso0001",
+    "simulado": false,
+    "email_antes": true,
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_pix_copiado",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "ok": false,
+    "via": "texto",
+    "auto": true,
+    "order_id": "asaasfalso0001",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_cta",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "onde": "ja_paguei",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_pix_pago",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "oferta": "LN_sempre279",
+    "valor": 27.9,
+    "order_id": "asaasfalso0001",
+    "simulado": false,
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_pix_ja_paguei",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "order_id": "asaasfalso0001",
+    "resultado": "pago",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_email",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "via": "pix",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   }
+  ],
+  "otp": [
+   "bia+existe@email.com"
+  ]
+ },
+ "atual|ja_tem": {
+  "invoke": [
+   {
+    "fn": "asaas-pix",
+    "body": {
+     "action": "create",
+     "landing_attribution": {
+      "landing_medicao_v": 2,
+      "landing_session_id": "<id>",
+      "landing_device_id": "<id>",
+      "braco_lp": "atual",
+      "braco_pix": "atual",
+      "forçado": false,
+      "atrib": {
+       "atrib_origem": "sem_sinal"
+      }
+     },
+     "offer": "LN_sempre279",
+     "fbp": "fb.1.1762560000000.123456789",
+     "fbc": null,
+     "sourceUrl": "https://www.coreaplicativo.com.br/organizar",
+     "email": "cris+jatem@email.com"
+    }
+   }
+  ],
+  "pixel": [
+   [
+    "track",
+    "ViewContent",
+    {
+     "content_name": "landing_oferta",
+     "value": 27.9,
+     "currency": "BRL"
+    }
+   ]
+  ],
+  "atribuicao": [],
+  "eventos": [
+   {
+    "nome": "landing_oferta_vista",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "via": "bloco_15",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_email_antes_visto",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_cta",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "onde": "pagar",
+    "oferta": "LN_sempre279",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_email_antes_erro",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "motivo": "tem_conta",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_cta",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "onde": "pagar_codigo",
+    "oferta": "LN_sempre279",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_email_antes_ok",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "via": "codigo",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_ja_tem",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "via": "servidor",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "atual",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   }
+  ],
+  "otp": [
+   "cris+jatem@email.com"
+  ]
+ },
+ "v2|compra": {
+  "invoke": [
+   {
+    "fn": "asaas-pix",
+    "body": {
+     "action": "create",
+     "landing_attribution": {
+      "landing_medicao_v": 2,
+      "landing_session_id": "<id>",
+      "landing_device_id": "<id>",
+      "braco_lp": "v2",
+      "braco_pix": "atual",
+      "forçado": false,
+      "atrib": {
+       "atrib_origem": "sem_sinal"
+      }
+     },
+     "offer": "LN_sempre279",
+     "fbp": "fb.1.1762560000000.123456789",
+     "fbc": null,
+     "sourceUrl": "https://www.coreaplicativo.com.br/organizar",
+     "email": "ana@email.com"
+    }
+   },
+   {
+    "fn": "asaas-pix",
+    "body": {
+     "action": "check",
+     "id": "asaasfalso0001",
+     "offer": "LN_sempre279",
+     "fbp": "fb.1.1762560000000.123456789",
+     "fbc": null,
+     "sourceUrl": "https://www.coreaplicativo.com.br/organizar"
+    }
+   }
+  ],
+  "pixel": [
+   [
+    "track",
+    "ViewContent",
+    {
+     "content_name": "landing_oferta",
+     "value": 27.9,
+     "currency": "BRL"
+    }
+   ],
+   [
+    "track",
+    "InitiateCheckout",
+    {
+     "value": 27.9,
+     "currency": "BRL",
+     "content_name": "LN_sempre279"
+    },
+    {
+     "eventID": "ic-asaasfalso0001"
+    }
+   ],
+   [
+    "track",
+    "Purchase",
+    {
+     "value": 27.9,
+     "currency": "BRL",
+     "content_name": "LN_sempre279"
+    },
+    {
+     "eventID": "asaasfalso0001"
+    }
+   ]
+  ],
+  "atribuicao": [
+   {
+    "v": 1,
+    "landing": true,
+    "attr": {
+     "atrib_origem": "sem_sinal"
+    },
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "oferta": "LN_sempre279",
+    "braco_pix": "atual",
+    "forçado": false,
+    "atrib": {
+     "atrib_origem": "sem_sinal"
+    }
+   }
+  ],
+  "eventos": [
+   {
+    "nome": "landing_oferta_vista",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "via": "botao_50",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_email_antes_visto",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_cta",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "onde": "fixo",
+    "fase": "oferta",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_cta",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "onde": "pagar",
+    "oferta": "LN_sempre279",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_email_antes_ok",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "via": "nova",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_pix_gerado",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "oferta": "LN_sempre279",
+    "valor": 27.9,
+    "order_id": "asaasfalso0001",
+    "simulado": false,
+    "email_antes": true,
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_pix_copiado",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "ok": false,
+    "via": "texto",
+    "auto": true,
+    "order_id": "asaasfalso0001",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_cta",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "onde": "ja_paguei",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_pix_pago",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "oferta": "LN_sempre279",
+    "valor": 27.9,
+    "order_id": "asaasfalso0001",
+    "simulado": false,
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_pix_ja_paguei",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "order_id": "asaasfalso0001",
+    "resultado": "pago",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_email",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "via": "pix",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   }
+  ],
+  "otp": []
+ },
+ "v2|codigo": {
+  "invoke": [
+   {
+    "fn": "asaas-pix",
+    "body": {
+     "action": "create",
+     "landing_attribution": {
+      "landing_medicao_v": 2,
+      "landing_session_id": "<id>",
+      "landing_device_id": "<id>",
+      "braco_lp": "v2",
+      "braco_pix": "atual",
+      "forçado": false,
+      "atrib": {
+       "atrib_origem": "sem_sinal"
+      }
+     },
+     "offer": "LN_sempre279",
+     "fbp": "fb.1.1762560000000.123456789",
+     "fbc": null,
+     "sourceUrl": "https://www.coreaplicativo.com.br/organizar",
+     "email": "bia+existe@email.com"
+    }
+   },
+   {
+    "fn": "asaas-pix",
+    "body": {
+     "action": "check",
+     "id": "asaasfalso0001",
+     "offer": "LN_sempre279",
+     "fbp": "fb.1.1762560000000.123456789",
+     "fbc": null,
+     "sourceUrl": "https://www.coreaplicativo.com.br/organizar"
+    }
+   }
+  ],
+  "pixel": [
+   [
+    "track",
+    "ViewContent",
+    {
+     "content_name": "landing_oferta",
+     "value": 27.9,
+     "currency": "BRL"
+    }
+   ],
+   [
+    "track",
+    "InitiateCheckout",
+    {
+     "value": 27.9,
+     "currency": "BRL",
+     "content_name": "LN_sempre279"
+    },
+    {
+     "eventID": "ic-asaasfalso0001"
+    }
+   ],
+   [
+    "track",
+    "Purchase",
+    {
+     "value": 27.9,
+     "currency": "BRL",
+     "content_name": "LN_sempre279"
+    },
+    {
+     "eventID": "asaasfalso0001"
+    }
+   ]
+  ],
+  "atribuicao": [
+   {
+    "v": 1,
+    "landing": true,
+    "attr": {
+     "atrib_origem": "sem_sinal"
+    },
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "oferta": "LN_sempre279",
+    "braco_pix": "atual",
+    "forçado": false,
+    "atrib": {
+     "atrib_origem": "sem_sinal"
+    }
+   }
+  ],
+  "eventos": [
+   {
+    "nome": "landing_oferta_vista",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "via": "botao_50",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_email_antes_visto",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_cta",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "onde": "pagar",
+    "oferta": "LN_sempre279",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_email_antes_erro",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "motivo": "tem_conta",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_cta",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "onde": "pagar_codigo",
+    "oferta": "LN_sempre279",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_email_antes_ok",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "via": "codigo",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_pix_gerado",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "oferta": "LN_sempre279",
+    "valor": 27.9,
+    "order_id": "asaasfalso0001",
+    "simulado": false,
+    "email_antes": true,
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_pix_copiado",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "ok": false,
+    "via": "texto",
+    "auto": true,
+    "order_id": "asaasfalso0001",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_cta",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "onde": "ja_paguei",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_pix_pago",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "oferta": "LN_sempre279",
+    "valor": 27.9,
+    "order_id": "asaasfalso0001",
+    "simulado": false,
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_pix_ja_paguei",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "order_id": "asaasfalso0001",
+    "resultado": "pago",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_email",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "via": "pix",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   }
+  ],
+  "otp": [
+   "bia+existe@email.com"
+  ]
+ },
+ "v2|ja_tem": {
+  "invoke": [
+   {
+    "fn": "asaas-pix",
+    "body": {
+     "action": "create",
+     "landing_attribution": {
+      "landing_medicao_v": 2,
+      "landing_session_id": "<id>",
+      "landing_device_id": "<id>",
+      "braco_lp": "v2",
+      "braco_pix": "atual",
+      "forçado": false,
+      "atrib": {
+       "atrib_origem": "sem_sinal"
+      }
+     },
+     "offer": "LN_sempre279",
+     "fbp": "fb.1.1762560000000.123456789",
+     "fbc": null,
+     "sourceUrl": "https://www.coreaplicativo.com.br/organizar",
+     "email": "cris+jatem@email.com"
+    }
+   }
+  ],
+  "pixel": [
+   [
+    "track",
+    "ViewContent",
+    {
+     "content_name": "landing_oferta",
+     "value": 27.9,
+     "currency": "BRL"
+    }
+   ]
+  ],
+  "atribuicao": [],
+  "eventos": [
+   {
+    "nome": "landing_oferta_vista",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "via": "botao_50",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_email_antes_visto",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_cta",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "onde": "pagar",
+    "oferta": "LN_sempre279",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_email_antes_erro",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "motivo": "tem_conta",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_cta",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "onde": "pagar_codigo",
+    "oferta": "LN_sempre279",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_email_antes_ok",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "via": "codigo",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   },
+   {
+    "nome": "landing_ja_tem",
+    "landing_medicao_v": 2,
+    "medicao_forcada": false,
+    "via": "servidor",
+    "braco_titulo": "a",
+    "braco_oferta": "sempre",
+    "braco_checkout": "email",
+    "braco_lp": "v2",
+    "braco_pix": "atual",
+    "pix_forcado": false,
+    "plataforma": "web",
+    "in_app": false,
+    "atrib_origem": "sem_sinal"
+   }
+  ],
+  "otp": [
+   "cris+jatem@email.com"
+  ]
+ }
+}

@@ -102,7 +102,8 @@
         // preenchido). Só a /oferta na página de hoje lê (o /vitalicio e o braço "nova" não). Vira html[data-oem]; braco_email_oferta em todo
         // evento da /oferta. QA: ?oem=pagina|atual (fica: localStorage + cookie), ?oem=auto desfaz. Rollback: "off".
         // 11/11 14h (dono: "pode deixar ele como 100% substituindo o atual"): "todos" = todo aparelho no braço "pagina", sem sorteio.
-        var AB_OFERTA_EMAIL = "todos";
+        // 11/11 17h50 (dono: "volta o email"): DESLIGADO. "todos" ficou das 14h11 às ~17h55: 37 visitas, 14 viram o preço, ninguém tocou em pagar.
+        var AB_OFERTA_EMAIL = "off";
         // 11/11 (dono: "monta a tela"): A/B DO TOPO da /oferta — "off" = todos na 1ª tela de hoje · "on" = 50/50 estável por aparelho entre
         // "atual" e "anuncio" (a tela de Finanças que o anúncio mostra aparece sem rolar, logo abaixo do título; a pergunta "Por onde você
         // quer começar?" desce pra baixo dela). Só a /oferta na página de hoje lê (o /vitalicio e o braço "nova" não). Vira html[data-otp];

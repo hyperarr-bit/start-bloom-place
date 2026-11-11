@@ -33,6 +33,8 @@ import { isNativeShell } from "./native-shell";
 import { localDayKey } from "./utils";
 import { CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK, calcularSequencia, diasEfetivos, somarDias } from "./sequencia";
 import { computeDailyBudget, computeLooseBillsOutflow, computeMonthlyOutflow } from "./finance-totals";
+import { variaveisDoMesLidas } from "./finance-fatura";
+import { mesCorrenteId } from "./virada-contas";
 import { somaParcelasDoMes, type Parcela } from "./finance-parcelas";
 import { reais } from "./dinheiro";
 import { gastoDoDia, praHojeDoDia, type PraHoje } from "./montar-financas";
@@ -222,8 +224,11 @@ function entradasDoCard(get: Leitor) {
   const dueDays = lista(get<unknown>("finance-dueDays", [])) as Array<{ day?: number; bills?: Array<{ name?: string; paid?: boolean }> }>;
   const fixos = lista(get<unknown>("finance-fixed-expenses", []));
   // (17/10) + contas avulsas do MEU MÊS, como no card do Dashboard
-  const saida = computeMonthlyOutflow(soma(get<unknown>("finance-expenses", [])), soma(fixos), somaParcelasDoMes(lista(get<unknown>("finance-installments", [])) as Parcela[]), computeLooseBillsOutflow(dueDays, fixos));
-  return { receitas, saida, dueDays, fixos };
+  // (07/11, bug "dois-numeros") variáveis pela REGRA DA FATURA, como o card (lib/finance-fatura)
+  const variaveis = variaveisDoMesLidas(mesCorrenteId(), (k) => get<unknown>(k, undefined));
+  const saida = computeMonthlyOutflow(variaveis.total, soma(fixos), somaParcelasDoMes(lista(get<unknown>("finance-installments", [])) as Parcela[]), computeLooseBillsOutflow(dueDays, fixos));
+  // `noMes`: as variáveis que contam neste mês — o gasto de hoje sai daqui, como no Index (bug "missao-sobra-fatura")
+  return { receitas, saida, dueDays, fixos, noMes: variaveis.noMes };
 }
 /** O "quanto posso gastar por dia" SEM arredondar (o card do Dashboard mostra Math.round disto), ou null sem renda/folga. */
 export function porDiaExato(get: Leitor, dia: Date = new Date()): number | null {
@@ -240,7 +245,9 @@ export function praHojeDasFinancas(get: Leitor, dia: Date = new Date()): PraHoje
   try {
     const e = entradasDoCard(get);
     if (!e) return null;
-    return praHojeDoDia(e.receitas, e.saida, gastoDoDia(get<unknown>("finance-expenses", []), localDayKey(dia)), e.dueDays, e.fixos, dia);
+    // (07/11, bug "missao-sobra-fatura") o gasto de hoje da MESMA lista da saída (regra da fatura), como o Index
+    // passa ao card: crédito de hoje depois do fechamento é do mês seguinte e não sai de uma saída que não o tem
+    return praHojeDoDia(e.receitas, e.saida, gastoDoDia(e.noMes, localDayKey(dia)), e.dueDays, e.fixos, dia);
   } catch { return null; }
 }
 
@@ -284,7 +291,8 @@ export function conteudoDoModulo(get: Leitor, modulo: ModuloDaMissao, amanha: Da
         const receitas = soma(get<unknown>("finance-incomes", []));
         if (receitas > 0) {
           const fixosDoMes = lista(get<unknown>("finance-fixed-expenses", []));
-          const saida = computeMonthlyOutflow(soma(get<unknown>("finance-expenses", [])), soma(fixosDoMes), somaParcelasDoMes(lista(get<unknown>("finance-installments", [])) as Parcela[]), computeLooseBillsOutflow(dueDays, fixosDoMes));
+          // (07/11) variáveis pela regra da fatura, como o card (lib/finance-fatura)
+          const saida = computeMonthlyOutflow(variaveisDoMesLidas(mesCorrenteId(), (k) => get<unknown>(k, undefined)).total, soma(fixosDoMes), somaParcelasDoMes(lista(get<unknown>("finance-installments", [])) as Parcela[]), computeLooseBillsOutflow(dueDays, fixosDoMes));
           const orc = computeDailyBudget(receitas, saida, dueDays, fixosDoMes, amanha);
           if (!orc.cantSpend && orc.perDay > 0) return comModulo("financas", { title: `Hoje dá pra gastar até R$ ${reais(Math.floor(orc.perDay))}`, body: "Sem apertar o mês. Anota o 1º gasto do dia e o CORE recalcula na hora." }, true);
         }

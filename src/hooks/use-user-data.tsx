@@ -227,6 +227,21 @@ interface UserDataContextType {
    */
   tentarDeNovo?: () => void;
   /**
+   * A última leitura INTEIRA da conta que deu certo nesta sessão (07/11): quantas já deram certo
+   * e quando o PEDIDO saiu — o retrato do servidor que está no store é desse instante. Quem decide
+   * com o store na mão e grava a chave inteira por cima (virada do mês, dia anotado) confere se o
+   * retrato é deste mês/dia; não sendo, pede `relerConta` antes. Objeto novo a cada leitura, pra
+   * entrar em deps. Ausente no convidado e nos mocks de teste (vale como "não sei": segue como antes).
+   * Ver "SESSÃO VIVA" no provider.
+   */
+  ultimaLeitura?: { vez: number; pedidaEm: number };
+  /**
+   * Pede uma leitura inteira da conta AGORA, mesmo já sincronizado (07/11). Leitura no ar dentro
+   * do prazo: a que está chegando serve. Falhou: tenta de novo sozinha (escada de esperas, rede
+   * voltando, volta pro app) até dar certo — sem a faixa, a pessoa tem a conta e segue usando.
+   */
+  relerConta?: () => void;
+  /**
    * Marcar OUTRO dia (02/10): roda `fn` (uma ou várias escritas, SÍNCRONAS) dizendo
    * a que dia elas pertencem. `dia` = ontem/anteontem → a anotação entra na
    * sequência NAQUELE dia, não em hoje; `null` → não anota dia nenhum (ex.:
@@ -251,6 +266,9 @@ const HEAVY_KEY_BYTES = 50_000;
 const WRITE_WARN_BYTES = 100_000;
 /** Leitura da conta no ar há mais que isto: o aviso "conexão lenta" aparece (a leitura segue). */
 const MS_LEITURA_LENTA = 8_000;
+/** (07/11, bug "retrato-minutos") Conta lida há mais que isto (no mesmo dia): o 1º gesto é juntado com o servidor e a
+ *  volta pra aba/app relê — ver "O RETRATO VELHO NO MESMO DIA". */
+const MS_RETRATO_VELHO = 10 * 60_000;
 /** Espera entre as tentativas de ler a conta depois de uma falha (a última se repete). */
 const ESPERAS_NOVA_TENTATIVA = [2_000, 5_000, 10_000, 20_000, 30_000];
 /*
@@ -314,6 +332,19 @@ type EscritaSegurada = { base: unknown; valor: unknown; sistema: boolean; dia: s
  * volta. Daqui é indistinguível de "o envio não chegou" (mesmo servidor, mesma cópia) — sem
  * versão no servidor, a escolha é não perder registro.
  */
+/**
+ * (07/11, bug "recusa-laco") O envio caiu por falta de REDE (o pedido nem chegou ao servidor)? O postgrest-js
+ * devolve `status: 0` quando o fetch falha; quando o servidor responde e recusa, vem o HTTP (≥ 400) e, do Postgres,
+ * o `code` (22P05, 42501…). Sem status (dublês de teste, cliente antigo): `code` preenchido = recusa; sem nada,
+ * na dúvida é rede — o caminho que não perde o que ela anotou.
+ */
+const ehFalhaDeRede = (error: unknown, status: unknown): boolean => {
+  if (status === 0) return true;
+  if (typeof status === "number" && status >= 400) return false;
+  const code = (error as { code?: unknown } | null)?.code;
+  return !(typeof code === "string" && code.trim() !== "");
+};
+
 const PREFIXO_SEGURADAS = "core-seguradas-";
 const prefixoSeguradasDe = (uid: string) => `${PREFIXO_SEGURADAS}${uid}:`;
 const guardarSegurada = (uid: string, key: string, e: EscritaSegurada) =>
@@ -487,6 +518,13 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   const seguradas = useRef<Record<string, EscritaSegurada>>({});
   /** Hora da última escrita de cada chave: escrita feita DEPOIS do pedido de leitura ganha do retrato. */
   const ultimaEscrita = useRef<Map<string, number>>(new Map());
+  /** (07/11) Hora em que o último envio de cada chave SAIU pro servidor, e quantos envios dela estão no ar — ver
+   *  "O ENVIO QUE SAIU DEPOIS DO PEDIDO" na hidratação. */
+  const envioDaChave = useRef<Map<string, number>>(new Map());
+  const enviosNoAr = useRef<Map<string, number>>(new Map());
+  /** (07/11, bug "envio-velho") O número do último envio de cada chave (sobe a cada envio NOVO, não a cada nova
+   *  tentativa) — ver "A NOVA TENTATIVA DO VALOR VELHO" no persistKey. */
+  const ultimoEnvio = useRef<Map<string, number>>(new Map());
   /** (revisão 2, 17/10) a leitura da conta no ar — ver PRAZO DE CADA LEITURA DA CONTA */
   const leituraAtual = useRef<LeituraNoAr | null>(null);
   /** quantas vezes o prazo da leitura já dobrou enquanto a conta não chega */
@@ -517,6 +555,100 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
    * abertura junta de novo contra o servidor (que ainda não tem o juntado) e nada se perde.
    */
   const aConfirmar = useRef<Map<string, unknown>>(new Map());
+  /*
+   * SESSÃO VIVA (07/11): O STORE PODE SER UM RETRATO DE OUTRO DIA — OU DE OUTRO MÊS.
+   *
+   * A conta chega do servidor uma vez por sessão (e de novo na volta pro app, quando o auth
+   * reemite a sessão — mas essa leitura é ASSÍNCRONA, e numa aba sempre visível nem acontece).
+   * Aba do PC aberta dias seguidos, app do celular vivo em segundo plano: o que OUTRO aparelho
+   * gravou nesse meio-tempo não está aqui, e o `set` manda a chave INTEIRA. Quem decide em cima do
+   * store e grava a chave inteira por cima do servidor apagava o que o celular fez:
+   *  - a virada do mês (use-virada-do-mes): aba de 31/10 voltando em 06/11 deixava o servidor com
+   *    gastos [], receitas [] e a Luz "não paga" — arquivava outubro e zerava os ✓ em cima do
+   *    novembro que o celular já tinha lançado;
+   *  - o dia anotado (registrarDiaAnotado/registrarDiaRetro): a lista de dias velha + hoje ia por
+   *    cima dos dias que o celular anotou desde a leitura — a sequência perdia esses dias.
+   *
+   * Saída: `ultimaLeitura` diz de QUANDO é o retrato (o instante do pedido). Quem vai gravar em
+   * cima confere se o retrato é do mesmo mês (virada) ou do mesmo dia (dia anotado); não sendo,
+   * pede `relerConta` e só grava depois que a leitura dá certo — a virada reavalia quando
+   * `ultimaLeitura` muda; o dia fica em `diasPendentes` e entra na lista nova pela MESMA liberação
+   * da 1ª leitura (já sabe registrar hoje e ontem/anteontem). Leitura que falha com releitura
+   * pedida: tenta de novo sozinha (a escada de esperas, a rede voltando, a volta pro app), sem a
+   * faixa — a pessoa tem a conta e segue usando. Offline por muito tempo: a virada e o dia esperam
+   * a rede, a tela segue com o que tem (melhor do que apagar o que outro aparelho fez). Convidado
+   * não tem servidor: segue como antes. Limite conhecido: o dia pendente mora só na memória —
+   * fechar a aba antes de a rede voltar perde o registro daquele dia neste aparelho (a anotação em
+   * si, offline, também não sobe). Teste: src/test/sessao-viva-07-11.test.tsx.
+   *
+   * O GESTO EM CIMA DO RETRATO VELHO (07/11, bug "retrato-velho"). A virada e o dia anotado eram os
+   * únicos protegidos. O gesto comum — a aba do PC lida em 03/11 lançando a Farmácia em 06/11 — mandava
+   * a chave INTEIRA a partir do retrato de 03/11 e apagava a Padaria que o celular lançou em 05/11; a
+   * releitura chegava depois e o valor do aparelho ganhava. Agora, com o retrato de OUTRO DIA (a mesma
+   * régua do diaEsperaReleitura), a escrita entra pelo caminho das SEGURADAS — base = o que o servidor
+   * tinha na última confirmação (`doServidor`), guardada no aparelho — e pede `relerConta`. A
+   * releitura junta com mesclar3 (o que ela acrescentou entra, o que o celular lançou fica; o aviso de
+   * conflito já existe) e a liberação avisa as telas abertas. Isso vale também durante a espera da
+   * virada (rede lenta): a tela de Finanças ainda mostra outubro e aceita toques — o gasto novo junta
+   * com o novembro do celular em vez de ir por cima. E na 2ª rodada a liberação avisa as telas de
+   * TODA chave que mudou no servidor (não só as juntadas): a tela que não foi tocada também adota o
+   * que o celular lançou, senão o gesto seguinte, já com o retrato de hoje, gravava a lista velha dela.
+   * Custo aceito: no 1º gesto de um dia novo a gravação espera a releitura (centenas de ms; offline,
+   * até a rede voltar — a cópia no aparelho segura se o app fechar).
+   */
+  const ultimaLeituraRef = useRef<{ vez: number; pedidaEm: number } | null>(null);
+  const [ultimaLeitura, setUltimaLeitura] = useState<{ vez: number; pedidaEm: number } | undefined>(undefined);
+  /** alguém pediu a conta de novo e ela ainda não chegou — a falha tenta de novo mesmo sincronizado */
+  const releituraPedida = useRef(false);
+  /** dias anotados esperando a releitura pra entrar na lista (localDayKey) */
+  const diasPendentes = useRef<Set<string>>(new Set());
+  /*
+   * O RETRATO VELHO NO MESMO DIA (07/11, bug "retrato-minutos"). A régua do "retrato-velho" só olhava o DIA. No mesmo
+   * dia, a aba do PC lida às 8h00 e o celular lançando a Padaria: às 8h40 a aba voltava (a volta não relia — quem já
+   * está sincronizado sai cedo de `tentarDeNovo`) e o gesto mandava a chave inteira do retrato das 8h00; a Padaria
+   * sumia. A releitura só vinha com a renovação do token (~1 h) ou com o auth reemitindo a sessão. Agora o retrato
+   * lido há mais de MS_RETRATO_VELHO também é "velho" pro gesto (entra pelas SEGURADAS e pede `relerConta`, o mesmo
+   * caminho do outro dia), e a volta pra aba/app com ele pede `relerConta`. A régua do DIA ANOTADO segue só o dia
+   * (`retratoDeOutroDia`): a lista de dias só muda de um dia pro outro. Custo aceito: o 1º gesto depois de 10 min
+   * sem leitura espera uma leitura (centenas de ms).
+   */
+  const retratoPassouDoPrazo = (): boolean => {
+    const l = ultimaLeituraRef.current;
+    if (!userRef.current || !l) return false;
+    return localDayKey(new Date(l.pedidaEm)) !== localDayKey() || Date.now() - l.pedidaEm > MS_RETRATO_VELHO;
+  };
+  /*
+   * O QUE NÃO SUBIU (07/11, bug "offline-some"). O envio tenta 3 vezes (~1,5 s) e desistia. Sem rede (metrô), o
+   * que ela anotou ficava só na tela e no cache — e a próxima leitura da conta (a rede voltando, o dia novo, a
+   * virada) punha o valor do servidor no lugar, na tela e no cache. A gravação seguinte partia desse valor velho
+   * e a perda ficava de vez; fechar o app antes da rede voltar também perdia (a vassoura da abertura apaga o
+   * cache). Agora:
+   *  - `naoSubiram`: chaves cujo último envio desistiu com o valor ainda na tela. Na próxima leitura que dá
+   *    certo elas viram escrita SEGURADA (base = `doServidor`, o que o servidor tinha da última vez que
+   *    confirmou) e são JUNTADAS com o servidor por mesclar3, como a escrita feita antes de a conta chegar: o
+   *    que ela anotou fica, o que outro aparelho lançou nesse meio-tempo também — e o juntado sobe;
+   *  - o envio que desiste pede `relerConta`: a escada de tentativas, a rede voltando e a volta pro app
+   *    trazem a conta de novo sem ninguém tocar em nada;
+   *  - e guarda uma cópia no aparelho (`guardarSegurada`, sem dia nem aviso — escrita de sistema): o app
+   *    fechado antes de a rede voltar junta na próxima abertura. Sai quando um envio da chave dá certo.
+   * `doServidor` só guarda referências que já estão na memória (o retrato lido e o que subiu).
+   */
+  const naoSubiram = useRef<Set<string>>(new Set());
+  const doServidor = useRef<Map<string, unknown>>(new Map());
+  /*
+   * O ENVIO RECUSADO NÃO VIRA LAÇO (07/11, bug "recusa-laco"). O "não subiu" acima pedia `relerConta` pra QUALQUER
+   * erro. Com o servidor RECUSANDO a chave — texto colado com \u0000 (22P05), corpo grande demais (413), RLS (42501),
+   * 503/429 numa queda — a leitura dava certo, juntava, o envio era recusado de novo e pedia outra leitura: uma
+   * leitura da conta inteira a cada ~2 s, sem fim, enquanto o app estivesse aberto. Antes do 7884fd5d eram 3
+   * tentativas e parava. Agora:
+   *  - recusa do servidor (`ehFalhaDeRede` = não): a chave fica em `naoSubiram` e com a cópia no aparelho (a próxima
+   *    leitura, a rede voltando e a próxima abertura juntam e tentam de novo — 3 envios, sem laço), sai um
+   *    `dados_envio_recusado` e NÃO pede leitura;
+   *  - falha de rede: pede `relerConta` uma vez por chave (`releuPorFalha`) até um envio dela dar certo. Se a mesma
+   *    chave cai de novo depois de uma leitura que deu certo (a rede está viva), ela segue em `naoSubiram` e no
+   *    aparelho, mas não pede outra leitura. O evento `online` zera a trava e junta o que não subiu.
+   */
+  const releuPorFalha = useRef<Set<string>>(new Set());
 
   // Sync ref + react to user changes (login/logout/switch).
   useEffect(() => {
@@ -535,6 +667,9 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       // 16/10: o que estava segurado/sincronizado era da outra conta (ou de ninguém)
       sincronizadoRef.current = false;
       ultimaEscrita.current.clear();
+      envioDaChave.current.clear();
+      enviosNoAr.current.clear();
+      ultimoEnvio.current.clear();
       // revisão 2 (17/10): a leitura no ar e a tentativa marcada também — o efeito da hidratação
       // não corta mais leitura ao rodar de novo, então quem corta na troca de conta é aqui
       if (leituraAtual.current) { cancelarLeitura(leituraAtual.current); leituraAtual.current = null; }
@@ -544,6 +679,14 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       inicioDaEspera.current = null;
       aLiberar.current = null;
       aConfirmar.current.clear();
+      // 07/11: o retrato, a releitura pedida e os dias esperando eram da outra conta — ver "SESSÃO VIVA"
+      ultimaLeituraRef.current = null;
+      setUltimaLeitura(undefined);
+      releituraPedida.current = false;
+      diasPendentes.current.clear();
+      naoSubiram.current.clear(); // (07/11) e o que não subiu era da outra conta — ver "O QUE NÃO SUBIU"
+      releuPorFalha.current.clear();
+      doServidor.current.clear();
       setSemConexao(null);
       setContaCompleta(false);
       setLoaded(false);
@@ -690,6 +833,9 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       // Step 2: refresh from Supabase (server wins for non-heavy keys).
       if (!vale()) return;
       const pedidoEm = Date.now();
+      // (07/11) o que ainda vai pro servidor NA HORA DO PEDIDO — na fila (o envio espera 250 ms) ou no ar: o retrato
+      // não tem isto. Ver "O ENVIO QUE SAIU DEPOIS DO PEDIDO" abaixo.
+      const aCaminhoNoPedido = new Set<string>([...Object.keys(pendingWrites.current), ...enviosNoAr.current.keys()]);
       // revisão 2 (17/10): sem corrida com o prazo — a leitura vai até o fim (ou até ser trocada
       // depois do prazo, que a cancela; aí o `vale()` abaixo descarta a resposta dela)
       // revisão S1 (17/10): TODAS as páginas da conta, ou falha — ver LEITURA DA CONTA EM PÁGINAS
@@ -719,6 +865,17 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
            */
           map[row.key] = row.value;
         });
+
+        // (07/11) o envio que desistiu vira escrita segurada e é juntado abaixo, como o que foi escrito antes de a
+        // conta chegar — ver "O QUE NÃO SUBIU". A base é o último valor que o servidor confirmou.
+        for (const k of naoSubiram.current) {
+          if (k in seguradas.current) continue;
+          const local = k in pendingWrites.current ? pendingWrites.current[k] : storeRef.current[k];
+          if (local === undefined) continue;
+          seguradas.current[k] = { base: doServidor.current.get(k), valor: local, sistema: true, dia: null };
+        }
+        naoSubiram.current.clear();
+        for (const [k, v] of Object.entries(map)) doServidor.current.set(k, v);
 
         /*
          * 16/10 — O QUE FOI ESCRITO ANTES DE A CONTA CHEGAR É JUNTADO, NÃO SOBRESCRITO.
@@ -752,6 +909,20 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
          */
         const recentes = new Set<string>();
         for (const [k, t] of ultimaEscrita.current) {
+          if (t >= pedidoEm && !(k in mesclados)) recentes.add(k);
+        }
+        /*
+         * O ENVIO QUE SAIU DEPOIS DO PEDIDO (07/11, crítica do "sessão viva"). A releitura que a
+         * sessão viva pede (1º gesto depois da meia-noite, virada do mês na volta pra aba) sai
+         * poucos ms DEPOIS do gesto que a disparou — e o envio do gesto espera 250 ms. Com a
+         * resposta chegando depois do envio (rede de celular, conta em várias páginas), a chave
+         * não estava mais na fila nem era "escrita depois do pedido": o aparelho voltava pro
+         * valor velho (memória e cache) e a próxima gravação feita em cima dele apagava o que
+         * ela anotou. Escrita que ainda ia pro servidor no pedido, ou que saiu depois dele,
+         * também é mais nova que o retrato.
+         */
+        for (const k of aCaminhoNoPedido) if (!(k in mesclados)) recentes.add(k);
+        for (const [k, t] of envioDaChave.current) {
           if (t >= pedidoEm && !(k in mesclados)) recentes.add(k);
         }
         for (const [k, v] of Object.entries(mesclados)) {
@@ -788,6 +959,15 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
           if (flushTimer.current) clearTimeout(flushTimer.current);
           flushTimer.current = setTimeout(() => flushRef.current(), DEBOUNCE_MS);
         }
+        // (07/11) dias anotados que esperavam esta releitura — ver "SESSÃO VIVA"
+        for (const d of diasPendentes.current) dias.add(d);
+        // (07/11, bug "retrato-velho") 2ª rodada: o que mudou no servidor desde o retrato anterior (outro aparelho)
+        // também vai pras telas abertas — ver "O GESTO EM CIMA DO RETRATO VELHO". A escrita daqui que ainda vai
+        // pro servidor (recentes, fila) não: a tela já mostra a dela.
+        const mudaramNoServidor = eraSincronizado
+          ? Object.keys(map).filter((k) => !(k in mesclados) && !recentes.has(k) && !(k in pendingWrites.current)
+            && !iguais(storeRef.current[k], map[k]))
+          : [];
         if (!eraSincronizado) {
           // 17/10: a escrita só volta a subir direto na liberação (efeito do provider, depois que
           // as telas adotaram o valor juntado) — ver `aLiberar`.
@@ -807,7 +987,19 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
               : null,
           };
           setLiberacao((n) => n + 1);
+        } else if (dias.size > 0 || Object.keys(mesclados).length > 0 || mudaramNoServidor.length > 0) {
+          // (07/11) 2ª rodada com dia anotado esperando a releitura: a MESMA liberação da 1ª leitura
+          // registra o dia em cima da lista que o servidor tem AGORA — ver "SESSÃO VIVA".
+          // (07/11, bug "offline-some") e com escrita juntada (o envio que desistiu): a liberação avisa as telas
+          // abertas do valor juntado — sem isso a tela seguia com o dela e o próximo toque gravava por cima.
+          aLiberar.current = { uid, confirmado: { ...map, ...mesclados }, servidor: map, juntadasNaLeitura: [...Object.keys(mesclados), ...mudaramNoServidor], dias, perdidas, medida: null };
+          setLiberacao((n) => n + 1);
         }
+        diasPendentes.current.clear();
+        releituraPedida.current = false;
+        // (07/11) de quando é o retrato que está no store, no mesmo lote do store e do `loaded` — ver "SESSÃO VIVA"
+        ultimaLeituraRef.current = { vez: (ultimaLeituraRef.current?.vez ?? 0) + 1, pedidaEm: pedidoEm };
+        setUltimaLeitura(ultimaLeituraRef.current);
         falhasSeguidas.current = 0;
         degrauDoPrazo.current = 0;
         inicioDaEspera.current = null;
@@ -825,15 +1017,19 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       // Já sincronizado nesta sessão (2ª rodada, ex.: volta pro app): segue com o que tem.
       if (sincronizadoRef.current) {
         setLoaded(true);
-        return;
+        // (07/11) ...mas a releitura PEDIDA (virada do mês em sessão viva, dia anotado com a conta
+        // lida noutro dia) não desiste: tenta de novo sozinha, pela mesma escada abaixo — sem a
+        // faixa, a pessoa tem a conta e segue usando. Ver "SESSÃO VIVA".
+        if (!releituraPedida.current) return;
+      } else {
+        // 16/10: a conta NÃO chegou — `loaded` fica false (nada de tela "carregada" com o
+        // store vazio), o aviso aparece e tenta de novo sozinho.
+        setSemConexao("sem");
       }
-      // 16/10: a conta NÃO chegou — `loaded` fica false (nada de tela "carregada" com o
-      // store vazio), o aviso aparece e tenta de novo sozinho.
       falhasSeguidas.current += 1;
       // revisão 2: falhou DEPOIS do prazo (ex.: o sistema desistiu da conexão lenta) — a próxima
       // ganha o dobro; falha rápida (sem rede) não mexe no prazo
       if (Date.now() - leitura.desde >= leitura.prazo) degrauDoPrazo.current += 1;
-      setSemConexao("sem");
       const espera = ESPERAS_NOVA_TENTATIVA[Math.min(falhasSeguidas.current - 1, ESPERAS_NOVA_TENTATIVA.length - 1)];
       timerNovaTentativa.current = setTimeout(() => {
         timerNovaTentativa.current = null;
@@ -858,20 +1054,41 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   // que está chegando nem zera o prazo); sem leitura no ar (esperando a tentativa marcada) ou
   // com a do ar vencida, o efeito da hidratação começa outra.
   const tentarDeNovo = useCallback(() => {
-    if (!userRef.current || sincronizadoRef.current) return;
+    // (07/11) sincronizado COM releitura pedida também entra — ver "SESSÃO VIVA"
+    if (!userRef.current || (sincronizadoRef.current && !releituraPedida.current)) return;
     const l = leituraAtual.current;
     if (l && Date.now() - l.desde < l.prazo) return;
     setTentativa((t) => t + 1);
   }, []);
+  /** (07/11) Pede a conta de novo AGORA, mesmo sincronizado — ver "SESSÃO VIVA" e `relerConta` no tipo. */
+  const relerConta = useCallback(() => {
+    if (!userRef.current) return;
+    releituraPedida.current = true;
+    tentarDeNovo();
+  }, [tentarDeNovo]);
+  const relerContaRef = useRef(relerConta);
+  relerContaRef.current = relerConta;
   useEffect(() => {
-    const aoVoltarPraTela = () => { if (document.visibilityState !== "hidden") tentarDeNovo(); };
-    window.addEventListener("online", tentarDeNovo);
+    const aoVoltarPraTela = () => {
+      if (document.visibilityState === "hidden") return;
+      // (07/11, bug "retrato-minutos") sincronizado com o retrato velho: relê (o celular pode ter lançado nesse meio-tempo)
+      if (sincronizadoRef.current && retratoPassouDoPrazo()) relerConta();
+      else tentarDeNovo();
+    };
+    // (07/11, bug "recusa-laco") a rede voltou com envio que não subiu: zera a trava de uma leitura por chave e junta
+    const aoVoltarARede = () => {
+      if (sincronizadoRef.current && naoSubiram.current.size > 0) {
+        releuPorFalha.current.clear();
+        relerConta();
+      } else tentarDeNovo();
+    };
+    window.addEventListener("online", aoVoltarARede);
     document.addEventListener("visibilitychange", aoVoltarPraTela);
     return () => {
-      window.removeEventListener("online", tentarDeNovo);
+      window.removeEventListener("online", aoVoltarARede);
       document.removeEventListener("visibilitychange", aoVoltarPraTela);
     };
-  }, [tentarDeNovo]);
+  }, [tentarDeNovo, relerConta]);
 
   /*
    * LIBERAÇÃO (17/10): roda no commit em que o store juntado e o `loaded` chegam às telas,
@@ -985,6 +1202,7 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       // passa por cima dele (antes o store voltava pro valor velho e a tela ficava com o
       // novo; quem lesse pelo `get` via outra coisa e gravava em cima).
       const escreveuNoMeio = (ultimaEscrita.current.get(key) ?? 0) >= pedidoEm || key in seguradas.current;
+      if (value !== null && userRef.current?.id === userId) doServidor.current.set(key, value); // (07/11) base das junções
       if (value !== null && userRef.current?.id === userId && !escreveuNoMeio) {
         setStore(prev => ({ ...prev, [key]: value }));
         safeSetItem(userKey(userId, key), JSON.stringify(value));
@@ -998,24 +1216,75 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     return p;
   }, [store]);
 
-  const persistKey = useCallback(async (userId: string, key: string, value: any, attempt = 0) => {
+  /*
+   * A NOVA TENTATIVA DO VALOR VELHO (07/11, bug "envio-velho"). Rede piscando: o envio de [t0,t1] cai; 300 ms depois
+   * [t0,t1,t2] sobe na hora; aos 500 ms a nova tentativa de [t0,t1] subia POR CIMA — a tela com o t2, o servidor
+   * sem ele, e a próxima leitura (ou reabrir) apagava o t2. Agora cada envio NOVO de uma chave ganha um número
+   * (`ultimoEnvio`); a nova tentativa e o "não subiu" só seguem se o número dela ainda for o último. Havendo um
+   * envio mais novo, a tentativa velha desiste calada — o mais novo tem o próprio envio e as próprias tentativas. E
+   * o envio velho que dá certo depois de sair um mais novo não vira `doServidor` nem tira a chave de `naoSubiram` /
+   * da cópia do aparelho: quem confirma é o mais novo. (Dois envios no ar ao mesmo tempo chegando fora de ordem no
+   * servidor não se resolvem aqui; o caso real é a nova tentativa, que espera 0,5–1 s.)
+   */
+  const persistKey = useCallback(async (userId: string, key: string, value: any, attempt = 0, numero?: number) => {
     if (userRef.current?.id !== userId) return;
     // 21/10: conteúdo pago (kit, "Seu 2027") só o SERVIDOR grava — o banco recusa a escrita do cliente (lib/conteudo-pago)
     if (chaveSoDoServidor(key)) return;
-    const { error } = await (supabase as any)
-      .from("user_data")
-      .upsert({ user_id: userId, key, value }, { onConflict: "user_id,key" });
+    const meu = numero ?? (ultimoEnvio.current.get(key) ?? 0) + 1;
+    if (numero === undefined) ultimoEnvio.current.set(key, meu);
+    else if (ultimoEnvio.current.get(key) !== meu) return; // (07/11) já saiu um envio mais novo desta chave
+    // (07/11) a hidratação precisa saber o que ia pro servidor enquanto o retrato era tirado — ver "O ENVIO QUE SAIU DEPOIS DO PEDIDO"
+    envioDaChave.current.set(key, Date.now());
+    enviosNoAr.current.set(key, (enviosNoAr.current.get(key) ?? 0) + 1);
+    let error: unknown;
+    let status: unknown;
+    try {
+      ({ error, status } = await (supabase as any)
+        .from("user_data")
+        .upsert({ user_id: userId, key, value }, { onConflict: "user_id,key" }));
+    } finally {
+      const n = (enviosNoAr.current.get(key) ?? 1) - 1;
+      if (n > 0) enviosNoAr.current.set(key, n); else enviosNoAr.current.delete(key);
+    }
     if (error) {
       console.error(`[user-data] upsert failed for "${key}" (attempt ${attempt + 1}):`, error);
       if (attempt < 2) {
-        setTimeout(() => persistKey(userId, key, value, attempt + 1), 500 * Math.pow(2, attempt));
+        setTimeout(() => persistKey(userId, key, value, attempt + 1, meu), 500 * Math.pow(2, attempt));
+      } else if (userRef.current?.id === userId && ultimoEnvio.current.get(key) === meu) {
+        // (07/11, bug "recusa-laco") recusa do servidor não pede leitura — ver "O ENVIO RECUSADO NÃO VIRA LAÇO"
+        marcarQueNaoSubiu(userId, key, value, ehFalhaDeRede(error, status) ? null : { code: (error as { code?: unknown })?.code, status });
       }
-    } else if (aConfirmar.current.has(key) && userRef.current?.id === userId) {
+      return;
+    }
+    if (userRef.current?.id !== userId) return;
+    if (ultimoEnvio.current.get(key) !== meu) return; // (07/11) um envio mais novo confirma — ver acima
+    doServidor.current.set(key, value);
+    naoSubiram.current.delete(key);
+    releuPorFalha.current.delete(key);
+    if (aConfirmar.current.has(key)) {
       // 17/10: o servidor tem o juntado (ou algo feito em cima dele): a cópia guardada no aparelho sai
       aConfirmar.current.delete(key);
       esquecerSegurada(userId, key);
     }
   }, []);
+  /** (07/11) O 3º envio da chave desistiu — ver "O QUE NÃO SUBIU". Só se o valor ainda é o da tela: um mais novo
+   *  tem o próprio envio. `recusa` = o servidor respondeu e recusou: não pede leitura (ver "O ENVIO RECUSADO NÃO VIRA
+   *  LAÇO"); falha de rede pede uma vez por chave até um envio dela dar certo. */
+  const marcarQueNaoSubiu = (userId: string, key: string, value: unknown, recusa: { code: unknown; status: unknown } | null = null) => {
+    const naTela = key in pendingWrites.current ? pendingWrites.current[key] : storeRef.current[key];
+    if (naTela !== value && !iguais(naTela, value)) return;
+    naoSubiram.current.add(key);
+    const base = aConfirmar.current.has(key) ? aConfirmar.current.get(key) : doServidor.current.get(key);
+    aConfirmar.current.set(key, base);
+    guardarSegurada(userId, key, { base, valor: value, sistema: true, dia: null });
+    if (recusa) {
+      trackEvent("dados_envio_recusado", { key, code: typeof recusa.code === "string" ? recusa.code : "", status: typeof recusa.status === "number" ? recusa.status : null });
+      return;
+    }
+    if (releuPorFalha.current.has(key)) return;
+    releuPorFalha.current.add(key);
+    relerContaRef.current();
+  };
 
   const flush = useCallback(() => {
     const userId = userRef.current?.id;
@@ -1054,16 +1323,36 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
    */
   // Escopo do "marcar outro dia": enquanto a função roda, as escritas valem pro dia dito.
   const escopoDiaRef = useRef<{ dia: string | null; feito?: boolean } | null>(null);
+  /** (07/11) O retrato do servidor na memória é de OUTRO DIA (sessão viva que atravessou a meia-noite)? Convidado e
+   *  conta ainda não lida: não. A régua do dia anotado — ver "SESSÃO VIVA". (O gesto em cima do retrato velho usa
+   *  `retratoPassouDoPrazo`, que também conta os minutos — bug "retrato-minutos".) */
+  const retratoDeOutroDia = (): boolean => {
+    const l = ultimaLeituraRef.current;
+    return !!userRef.current && !!l && localDayKey(new Date(l.pedidaEm)) !== localDayKey();
+  };
+  /**
+   * (07/11) A lista de dias no store veio do servidor NOUTRO DIA? Sessão viva que atravessou a
+   * meia-noite: outro aparelho pode ter anotado dias desde então, e gravar a lista daqui por cima
+   * os apagaria. O dia fica esperando a releitura e entra na lista nova quando ela chegar (o aviso
+   * da sequência sai lá) — ver "SESSÃO VIVA". Convidado e conta lida hoje: não espera.
+   */
+  const diaEsperaReleitura = useCallback((dia: string): boolean => {
+    if (!retratoDeOutroDia()) return false;
+    diasPendentes.current.add(dia);
+    relerConta();
+    return true;
+  }, [relerConta]);
   const registrarDiaRetro = useCallback((key: string, value: any, dia: string | null) => {
     if (!dia || !loadedRef.current || escopoDiaRef.current?.feito) return;
     if (!contaComoAnotacao(key) || !temConteudo(value)) return;
     try { if (JSON.stringify(value) === JSON.stringify(storeRef.current[key])) return; } catch { return; }
+    if (diaEsperaReleitura(dia)) { if (escopoDiaRef.current) escopoDiaRef.current.feito = true; return; }
     const nova = registrarDiaRetroativo(storeRef.current[CHAVE_DIAS_ANOTADOS], dia, localDayKey(), storeRef.current[CHAVE_HUB_STREAK]);
     if (!nova) return; // o dia já estava na lista (ou fora da janela de 2 dias)
     // um gesto que grava várias chaves (Treino: histórico, registro, volume…) anota o dia UMA vez
     if (escopoDiaRef.current) escopoDiaRef.current.feito = true;
     setRef.current(CHAVE_DIAS_ANOTADOS, nova, { system: true });
-  }, []);
+  }, [diaEsperaReleitura]);
   const comDia = useCallback(<T,>(dia: string | null, fn: () => T): T => {
     const antes = escopoDiaRef.current;
     escopoDiaRef.current = { dia };
@@ -1076,12 +1365,13 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     if (!contaComoAnotacao(key) || !temConteudo(value)) return;
     try { if (JSON.stringify(value) === JSON.stringify(storeRef.current[key])) return; } catch { return; }
     diaAnotadoRef.current = hoje;
+    if (diaEsperaReleitura(hoje)) return; // (07/11) entra na lista nova quando a conta chegar
     const nova = registrarDia(storeRef.current[CHAVE_DIAS_ANOTADOS], hoje, storeRef.current[CHAVE_HUB_STREAK]);
     if (!nova) return; // hoje já estava na lista (outra sessão/aparelho)
     setRef.current(CHAVE_DIAS_ANOTADOS, nova, { system: true });
     const { dias } = calcularSequencia(nova, hoje);
     import("@/components/conquistas/aviso-sequencia").then((m) => m.avisarSequencia(dias)).catch(() => {});
-  }, []);
+  }, [diaEsperaReleitura]);
   // Lista apagada ("começar do zero"): o próximo registro de hoje entra de novo.
   useEffect(() => {
     if (!(CHAVE_DIAS_ANOTADOS in store)) diaAnotadoRef.current = null;
@@ -1108,7 +1398,10 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     if (userId) {
       safeSetItem(userKey(userId, key), JSON.stringify(value));
       ultimaEscrita.current.set(key, Date.now());
-      if (!sincronizadoRef.current) {
+      // (07/11) a conta na memória foi lida noutro dia — ver "O GESTO EM CIMA DO RETRATO VELHO" — ou há mais de
+      // 10 min (bug "retrato-minutos") — ver "O RETRATO VELHO NO MESMO DIA"
+      const retratoVelho = sincronizadoRef.current && retratoPassouDoPrazo();
+      if (!sincronizadoRef.current || retratoVelho) {
         // 16/10: a conta ainda não chegou do servidor — NÃO sobe (apagaria o que está
         // lá). Fica segurada e é juntada com o servidor quando a leitura der certo.
         // 17/10: e fica guardada no aparelho — fechar o app antes da conta chegar não perde.
@@ -1119,11 +1412,15 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
           h.sistema = h.sistema && !!opts?.system;
           if (!opts?.system) h.dia = diaDaEscrita;
         } else {
-          const base = opts && "base" in opts ? opts.base : key in antes ? antes[key] : undefined;
+          // retrato velho: a base é o que o SERVIDOR tinha da última vez (a tela e o store podem ter coisa que
+          // ainda está subindo — base com ela faria a junção achar que o servidor apagou)
+          const base = retratoVelho ? doServidor.current.get(key)
+            : opts && "base" in opts ? opts.base : key in antes ? antes[key] : undefined;
           seguradas.current[key] = { base, valor: value, sistema: !!opts?.system, dia: diaDaEscrita };
         }
         const e = seguradas.current[key];
         guardarSegurada(userId, key, aConfirmar.current.has(key) ? { ...e, base: aConfirmar.current.get(key) } : e);
+        if (retratoVelho) relerContaRef.current();
       } else {
         pendingWrites.current[key] = value;
         if (flushTimer.current) clearTimeout(flushTimer.current);
@@ -1199,6 +1496,11 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     if (flushTimer.current) { clearTimeout(flushTimer.current); flushTimer.current = null; }
     pendingWrites.current = {};
     seguradas.current = {}; // o que estava esperando a conta chegar também sai
+    diasPendentes.current.clear(); // 07/11: e o dia esperando a releitura
+    naoSubiram.current.clear(); // 07/11: e o envio que desistiu
+    releuPorFalha.current.clear();
+    doServidor.current.clear();
+    ultimoEnvio.current.clear();
     aConfirmar.current.clear();
     apagarSeguradasGuardadas({ daConta: userId });
     purgeUserLocalCache();
@@ -1207,7 +1509,7 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   return (
-    <UserDataContext.Provider value={{ get, set, comDia, loaded, fetchKey, isGuest: !user, apagarTudo, semConexao: user ? semConexao : null, contaCompleta: user ? contaCompleta : false, tentarDeNovo }}>
+    <UserDataContext.Provider value={{ get, set, comDia, loaded, fetchKey, isGuest: !user, apagarTudo, semConexao: user ? semConexao : null, contaCompleta: user ? contaCompleta : false, tentarDeNovo, ultimaLeitura: user ? ultimaLeitura : undefined, relerConta }}>
       {children}
     </UserDataContext.Provider>
   );

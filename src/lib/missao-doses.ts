@@ -49,6 +49,7 @@ import { missaoWebConvidada } from "@/lib/missao-web";
 import { montarFinancasLigado } from "@/lib/montar-financas";
 import { montarRotinaLigado } from "@/lib/montar-rotina";
 import { isNativeShell, plataformaApp } from "@/lib/native-shell";
+import { versaoVisivel } from "@/lib/versao-visivel";
 import { localDayKey } from "@/lib/utils";
 import { somarDias } from "@/lib/sequencia";
 import { missaoAtual } from "@/lib/teste-gratis";
@@ -473,10 +474,13 @@ const quizLigado = (s: SetupDaDose): boolean => {
  * série de 02/10 não muda); no app leva `prototipo: "app"`, a plataforma e a
  * versão do build — é o que separa a turma da 1.0.10 da da 1.0.9 nas consultas
  * (voltou no dia 2, dias de uso na 1ª semana).
+ * 07/11 (bug versao-missao): a versão é a `versaoVisivel()` (a do "Meu acesso"). Antes era `__APP_VERSION__`, a do
+ * build.gradle — no iPhone todo evento saía com a versão do ANDROID ("1.0.133 (134)"). Android segue igual; no
+ * iPhone, eventos até a build com este conserto levam a versão do Android (ver o relatório do bug).
  */
 export const eventoDaMissao = (dados: Record<string, unknown> = {}): Record<string, unknown> => {
   const base = isNativeShell()
-    ? { ...dados, prototipo: "app", plataforma: plataformaApp(), versao: typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev" }
+    ? { ...dados, prototipo: "app", plataforma: plataformaApp(), versao: versaoVisivel() }
     : { ...dados, prototipo: "web" };
   // 10/10 (DIA1_CHEIO): com a chave ligada TODO evento da missão leva o braço — é por `variante`
   // que o teste se lê. Desligada, o payload é o de hoje, campo a campo.

@@ -7,29 +7,16 @@
  * antigo ou uma versão futura puser num item continua lá depois que o app novo
  * mexe nele. E nada é gravado só por abrir a tela.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { useUserData } from "@/hooks/use-user-data";
+import { useHoje } from "@/hooks/use-hoje";
 import { localDayKey } from "@/lib/utils";
 import {
   CHAVE_CUIDADOS, CHAVE_DICAS, CHAVE_LEMBRETE, CHAVE_PESOS, CHAVE_PETS, CHAVE_REGISTROS, chaveRotinaDoDia, chaveTarefasDoPet, comPeso, marcarNaRotina,
-  novoId, pesoTexto, petsValidos, type Pet, type TarefaDaRotina,
+  novoId, pesoTexto, pesosDoPet, petsValidos, semPeso, type Pet, type TarefaDaRotina,
 } from "@/lib/pet";
 import { comCuidado, registrarAplicacao, type Cuidado, type LinhaDaCarteirinha, type Registro } from "@/lib/pet-cuidados";
 import { lerPrefsLembretePet, type PrefsLembretePet } from "@/lib/pet-avisos";
-
-/** "Hoje" que acompanha a virada do dia com a tela aberta (celular mantém a aba viva). */
-export function useHoje(): string {
-  const [hoje, setHoje] = useState(localDayKey());
-  useEffect(() => {
-    const sync = () => setHoje((h) => (h === localDayKey() ? h : localDayKey()));
-    const visivel = () => { if (document.visibilityState === "visible") sync(); };
-    document.addEventListener("visibilitychange", visivel);
-    window.addEventListener("focus", sync);
-    const id = window.setInterval(sync, 60_000);
-    return () => { document.removeEventListener("visibilitychange", visivel); window.removeEventListener("focus", sync); window.clearInterval(id); };
-  }, []);
-  return hoje;
-}
 
 const lista = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
@@ -38,6 +25,9 @@ export interface DicasPet { home?: "nao"; avisos?: "nao" }
 export function usePet() {
   const { get, set, loaded } = useUserData();
   const hoje = useHoje();
+  // `get` é retrato do desenho em que nasceu: o Desfazer roda depois, e precisa ler o de agora
+  const getVivo = useRef(get);
+  getVivo.current = get;
   const brutoPets = get<unknown>(CHAVE_PETS, []);
   const pets = useMemo(() => petsValidos(brutoPets), [brutoPets]);
   const cuidadosBrutos = get<unknown>(CHAVE_CUIDADOS, []);
@@ -119,6 +109,28 @@ export function usePet() {
     salvarPet({ ...pet, weight: pesoTexto(kg) });
   }, [get, set, salvarPet]);
 
+  /** Só o `weight`, em cima do item bruto (o resto do pet não passa pela limpeza de `petsValidos`). */
+  const gravarWeight = useCallback((petId: string, weight: string) => {
+    set(CHAVE_PETS, lista(getVivo.current<unknown>(CHAVE_PETS, [])).map((p) => ((p as Pet)?.id === petId ? { ...(p as object), weight } : p)));
+  }, [set]);
+
+  /** Tira a pesagem do dia e devolve como desfazer (lib/pet → semPeso). */
+  const apagarPeso = useCallback((pet: Pet, dia: string) => {
+    const { pesos, weight, kg, acompanhava } = semPeso(pet, get<unknown>(CHAVE_PESOS, {}), dia);
+    set(CHAVE_PESOS, pesos);
+    if (weight !== pet.weight) gravarWeight(pet.id, weight);
+    return () => {
+      const pesosAgora = getVivo.current<unknown>(CHAVE_PESOS, {});
+      const agora = petsValidos(getVivo.current<unknown>(CHAVE_PETS, [])).find((p) => p.id === pet.id);
+      if (kg === undefined || !agora) return;
+      const serie = pesosDoPet(agora, pesosAgora);
+      if (serie.some((p) => p.dia === dia)) return; // pesou de novo nesse dia: vale o que a pessoa acabou de digitar
+      set(CHAVE_PESOS, comPeso(pesosAgora, pet.id, dia, kg));
+      // pesagem mais nova depois do apagar: o peso atual é ela, a que voltou entra só no histórico
+      if (acompanhava && !serie.some((p) => p.dia > dia)) gravarWeight(pet.id, pet.weight);
+    };
+  }, [get, set, gravarWeight]);
+
   /* ── ajustes ── */
   const salvarPrefsLembrete = useCallback((p: PrefsLembretePet) => set(CHAVE_LEMBRETE, p), [set]);
   const salvarDicas = useCallback((d: DicasPet) => set(CHAVE_DICAS, { ...dicas, ...d }), [set, dicas]);
@@ -127,7 +139,7 @@ export function usePet() {
     loaded, hoje, pets, get, set,
     cuidadosBrutos, registrosBrutos, pesosBrutos, rotinaHoje, prefsLembrete, dicas,
     salvarPet, apagarPet, marcar, salvarTarefas, salvarCuidado, salvarCuidados, apagarCuidado, aplicar, apagarRegistro,
-    registrarPeso, salvarPrefsLembrete, salvarDicas,
+    registrarPeso, apagarPeso, salvarPrefsLembrete, salvarDicas,
   };
 }
 

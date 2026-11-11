@@ -57,6 +57,13 @@ interface ExpenseTableProps {
   /** "YYYY-MM" da chave que esta tabela edita. Ausente = mês corrente. Serve
    *  pro selo "fatura de out." (lib/finance-fatura). */
   mes?: string;
+  /** Só a tela do mês corrente passa (07/11, bug "gasto-futuro" — a receita tem
+   *  o mesmo desde 01/11): gasto com data de um mês que ainda não chegou vai pra
+   *  planilha DAQUELE mês em vez de somar agora (lib/finance-receita-futura).
+   *  Devolve o nome do mês onde guardou, ou null se a data não é futura. Vale
+   *  pro gasto à vista, no adicionar e na edição que troca a data; parcelado e
+   *  recorrente não passam por aqui (são dívida e custo fixo). */
+  guardarEmOutroMes?: (gasto: Expense) => string | null;
 }
 
 const paymentMethods = [
@@ -91,7 +98,19 @@ export const erroDoGasto = (descricao: string, valorDigitado: string): string | 
   return null;
 };
 
-export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: ExpenseTableProps) => {
+/**
+ * Data do gasto lançado SEM data (07/11, bug "credito-sem-data"): hoje, como
+ * sempre — menos quando a planilha é de OUTRO mês. Lá "hoje" cai fora do mês:
+ * a planilha de setembro, aberta em 07/11, gravava 2026-11-07 na chave de
+ * setembro, e no cartão com fechamento a fatura ia parar 2 meses à frente —
+ * onde nenhum mês lê (lib/finance-fatura). Sem data, o gasto ganha o dia 1
+ * daquele mês: conta no mês da planilha, que é onde a pessoa lançou. Quem
+ * quer outro dia (depois do fechamento, por exemplo) digita a data.
+ */
+export const dataDoGastoSemData = (mesDaChave: string, hoje: string = localDayKey()): string =>
+  !/^\d{4}-(0[1-9]|1[0-2])$/.test(mesDaChave) || hoje.startsWith(`${mesDaChave}-`) ? hoje : `${mesDaChave}-01`;
+
+export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes, guardarEmOutroMes }: ExpenseTableProps) => {
   const { labelOf: getCategoryLabel, styleOf: getCategoryStyle } = useFinanceCategories();
   const { labelOf: getCardLabel, styleOf: getCardStyle, configOf } = useFinanceCards();
   const mesDaChave = mes ?? mesCorrenteId();
@@ -234,17 +253,34 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
       description: newExpense.description.trim(),
       category: newExpense.category || "outros",
       value: numeroBR(newExpense.value),
-      date: newExpense.date || localDayKey(),
+      // (07/11, bug "virada-sem-data") a tabela do MÊS CORRENTE (quem passa a guarda: Index e a planilha do
+      // MÊS ATUAL) grava no balde: sem data é hoje, como sempre. O `mes` dela é do último desenho do pai e fica
+      // no mês velho se a tela atravessou a meia-noite do dia 1º — o dia 1 do mês velho arquivava o gasto lá.
+      date: newExpense.date || (guardarEmOutroMes ? localDayKey() : dataDoGastoSemData(mesDaChave)),
       paymentMethod: newExpense.paymentMethod || "pix",
       cardName: isCardPayment(newExpense.paymentMethod) ? (newExpense.cardName || "outro") : undefined,
       ...(!isCardPayment(newExpense.paymentMethod) && newExpense.conta ? { conta: newExpense.conta } : {}),
     };
+    // (07/11, bug "gasto-futuro") data num mês que ainda não chegou: o gasto vai pra planilha
+    // daquele mês e NÃO entra nesta lista — então também não é "o primeiro gasto" dela
+    const guardadoEm = guardarEmOutroMes?.(novo) ?? null;
+    if (guardadoEm) {
+      avisarGuardado(guardadoEm);
+      limparForm();
+      return;
+    }
     setExpenses([...expenses, novo]);
     limparForm();
     if (eraVazia) {
       onPrimeiroGasto?.({ id: novo.id, descricao: novo.description, valor: novo.value, categoria: getCategoryLabel(novo.category) });
     }
   };
+
+  /** Pra onde o gasto de mês futuro foi (a planilha dele, a que o ORÇAMENTO MENSAL abre). */
+  const avisarGuardado = (mesGuardado: string) =>
+    toast.success(`Gasto guardado em ${mesGuardado}: entra no painel no dia 1º`, {
+      description: `Até lá ele fica na planilha de ${mesGuardado}, em ORÇAMENTO MENSAL.`,
+    });
 
   /* Apagar com "Desfazer" (26/09, varredura): um toque na lixeira levava o
      gasto embora sem volta. O desfazer usa a lista MAIS RECENTE e devolve o
@@ -299,16 +335,26 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
     // valor inválido não salva — e agora diz por quê (26/09: negativo passava)
     const erro = erroDoGasto(rascunho.description, rascunho.value);
     if (erro) { toast.error(erro); return; }
-    setExpenses(expenses.map((e) => e.id !== editandoId ? e : {
-      ...e,
+    const original = expenses.find((e) => e.id === editandoId);
+    const editado = original && {
+      ...original,
       description: rascunho.description.trim(),
       category: rascunho.category || "outros",
       value: valor,
-      date: rascunho.date || e.date,
+      date: rascunho.date || original.date,
       paymentMethod: rascunho.paymentMethod || "pix",
       cardName: isCardPayment(rascunho.paymentMethod) ? (rascunho.cardName || "outro") : undefined,
       conta: !isCardPayment(rascunho.paymentMethod) && rascunho.conta ? rascunho.conta : undefined,
-    }));
+    };
+    // (07/11) data TROCADA pra um mês futuro = o gasto muda de planilha (mesma regra do adicionar
+    // e da receita). Gasto que já estava aqui com data futura e não mudou de data fica como sempre.
+    const guardadoEm = editado && editado.date !== original.date ? guardarEmOutroMes?.(editado) ?? null : null;
+    if (guardadoEm) {
+      setExpenses(expenses.filter((e) => e.id !== editandoId));
+      avisarGuardado(guardadoEm);
+    } else {
+      setExpenses(expenses.map((e) => e.id !== editandoId || !editado ? e : editado));
+    }
     setEditandoId(null);
   };
 

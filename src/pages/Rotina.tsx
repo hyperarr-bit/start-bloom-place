@@ -5,6 +5,7 @@ import { useMarcarOntem } from "@/hooks/use-marcar-ontem";
 import { useAuth } from "@/hooks/use-auth";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { semanaAtualId, localDayKey, dataSegura } from "@/lib/utils";
+import { useHoje } from "@/hooks/use-hoje";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useHumorDoDia } from "@/hooks/use-humor-do-dia";
@@ -321,8 +322,8 @@ export const MoodTracker = () => {
 };
 
 // ============= WATER & SLEEP TRACKER =============
-const HealthTracker = () => {
-  const today = getDateKey();
+export const HealthTracker = () => {
+  const today = useHoje();
   const [waterLog, setWaterLog] = usePersistedState<Record<string, number>>("water-log", {});
   const [sleepLog, setSleepLog] = usePersistedState<Record<string, number>>("sleep-log", {});
   // FIX 16/07: o módulo SAÚDE conta água/sono em core-saude-* — dois mundos
@@ -337,17 +338,27 @@ const HealthTracker = () => {
   const waterToday = Math.max(waterLog[today] || 0, waterLogSaude[today] || 0);
   const sleepToday = sleepLog[today] || sleepLogSaude[today] || 0;
 
-  const setAgua = (n: number) => {
-    setWaterLog(prev => ({ ...prev, [today]: n }));
-    setWaterLogSaude(prev => ({ ...prev, [today]: n }));
+  // virou o dia com a tela aberta: o campo do sono não fica com as horas de ontem
+  useEffect(() => {
+    setSleepInput(String(sleepLog[today] || sleepLogSaude[today] || ""));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [today]);
+
+  // O dia é o do TOQUE (07/11): com o app aberto de noite, o `today` do último desenho ainda é ontem às 8h
+  const setAgua = (proximo: (atual: number) => number) => {
+    const dia = getDateKey();
+    const n = Math.min(20, Math.max(0, proximo(Math.max(waterLog[dia] || 0, waterLogSaude[dia] || 0))));
+    setWaterLog(prev => ({ ...prev, [dia]: n }));
+    setWaterLogSaude(prev => ({ ...prev, [dia]: n }));
   };
-  const addWater = () => setAgua(Math.min(waterToday + 1, 20));
-  const removeWater = () => setAgua(Math.max(waterToday - 1, 0));
+  const addWater = () => setAgua(n => n + 1);
+  const removeWater = () => setAgua(n => n - 1);
   const saveSleep = (val: string) => {
     const n = parseFloat(val);
     if (!isNaN(n) && n >= 0 && n <= 24) {
-      setSleepLog(prev => ({ ...prev, [today]: n }));
-      setSleepLogSaude(prev => ({ ...prev, [today]: n }));
+      const dia = getDateKey();
+      setSleepLog(prev => ({ ...prev, [dia]: n }));
+      setSleepLogSaude(prev => ({ ...prev, [dia]: n }));
     }
   };
 

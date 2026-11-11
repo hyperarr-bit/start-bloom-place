@@ -5,6 +5,8 @@ import { TOM_DO_MODULO, TOM_DO_TIPO, type Tom } from "@/components/home-nova/e/p
 import { doPerfil, doPerfilDueDays, PERFIL_PESSOAL } from "@/lib/finance-perfil";
 import { somaParcelasDoMes, type Parcela } from "@/lib/finance-parcelas";
 import { computeDailyBudget, computeLooseBillsOutflow, computeMonthlyOutflow } from "@/lib/finance-totals";
+import { variaveisDoMesLidas } from "@/lib/finance-fatura";
+import { mesCorrenteId } from "@/lib/virada-contas";
 import { CHAVE_CUIDADOS, cuidadosValidos, faltaDoCuidado, ordenarCuidados } from "@/lib/beleza-cuidados";
 import { localDayKey } from "@/lib/utils";
 import { EMOJI_DO_HUMOR, humorDoDia } from "@/lib/humor-do-dia";
@@ -119,13 +121,14 @@ export function contasSemVencimento(get: Get): string[] {
 export function orcamentoRestante(get: Get): { pct: number; dias: number } | null {
   const perfil = get<string>("finance-perfil-ativo", PERFIL_PESSOAL) || PERFIL_PESSOAL;
   const incomes = doPerfil(lista(get<unknown>("finance-incomes", [])), perfil);
-  const variaveis = doPerfil(lista(get<unknown>("finance-expenses", [])), perfil);
+  // (07/11, bug "dois-numeros") variáveis pela REGRA DA FATURA, como o módulo (lib/finance-fatura)
+  const variaveis = variaveisDoMesLidas(mesCorrenteId(), (k) => get<unknown>(k, undefined), perfil).total;
   const fixas = doPerfil(lista(get<unknown>("finance-fixed-expenses", [])), perfil);
   const parcelas = doPerfil(lista(get<unknown>("finance-installments", [])), perfil) as Parcela[];
   const dueDays = doPerfilDueDays(lista(get<unknown>("finance-dueDays", [])), perfil);
   const renda = incomes.reduce((s: number, i: unknown) => s + valor(i), 0);
   if (renda <= 0) return null;
-  const saida = computeMonthlyOutflow(variaveis.reduce((s: number, e: unknown) => s + valor(e), 0), fixas.reduce((s: number, e: unknown) => s + valor(e), 0), somaParcelasDoMes(parcelas), computeLooseBillsOutflow(dueDays, fixas));
+  const saida = computeMonthlyOutflow(variaveis, fixas.reduce((s: number, e: unknown) => s + valor(e), 0), somaParcelasDoMes(parcelas), computeLooseBillsOutflow(dueDays, fixas));
   const { availableReal, remainingDays } = computeDailyBudget(renda, saida, dueDays, fixas);
   return { pct: Math.max(0, Math.min(100, Math.round((availableReal / renda) * 100))), dias: remainingDays };
 }

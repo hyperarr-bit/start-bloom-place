@@ -29,6 +29,8 @@ interface WishlistItemsProps {
   monthlyInstallments: number;
   fixedExpenses?: any[];
   dueDays?: any[];
+  /** (07/11) fatura do mês anterior que cai neste (Index variaveisMes.doMesAnterior) — fora do ritmo da previsão. */
+  faturaDoMesAnterior?: number;
 }
 
 const priorityConfig = {
@@ -65,16 +67,20 @@ export const previsaoDoMes = (
   fixedExpenses: { value?: unknown }[],
   dueDays: unknown[],
   agora: Date = new Date(),
+  /** (07/11, bug "previsao-fatura") a fatura do mês anterior que cai neste (Index variaveisMes.doMesAnterior):
+   *  já está em `gastosFixosEVariaveis`, entra uma vez e não segue o ritmo do dia — como no Dashboard. */
+  faturaDoMesAnterior = 0,
 ) => {
   const fixos = (fixedExpenses ?? []).reduce((s: number, e) => s + (Number(e?.value) || 0), 0);
   const variaveis = Math.max(0, gastosFixosEVariaveis - fixos);
+  const doDiaADia = Math.max(0, variaveis - (Number.isFinite(faturaDoMesAnterior) ? Math.max(0, faturaDoMesAnterior) : 0));
   // (17/10) + contas avulsas do MEU MÊS, como no Index
   const saidaDoMes = computeMonthlyOutflow(variaveis, fixos, parcelasDoMes || 0, computeLooseBillsOutflow(dueDays as any[] ?? [], fixedExpenses ?? []));
   const base = computeDailyBudget(receita, saidaDoMes, dueDays ?? [], fixedExpenses ?? []);
   const dia = agora.getDate();
   const diasNoMes = new Date(agora.getFullYear(), agora.getMonth() + 1, 0).getDate();
   const diasDepoisDeHoje = diasNoMes - dia;
-  const projecaoVariavel = dia > 0 ? (variaveis / dia) * diasDepoisDeHoje : 0;
+  const projecaoVariavel = dia > 0 ? (doDiaADia / dia) * diasDepoisDeHoje : 0;
   return {
     saidaDoMes,
     contasPendentes: base.unpaidBillsEstimate,
@@ -126,7 +132,7 @@ const ImportFromUrl = ({ onImport }: { onImport: (data: { title: string; image: 
   );
 };
 
-export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalExpenses, totalDebts, monthlyInstallments, fixedExpenses = [], dueDays = [] }: WishlistItemsProps) => {
+export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalExpenses, totalDebts, monthlyInstallments, fixedExpenses = [], dueDays = [], faturaDoMesAnterior = 0 }: WishlistItemsProps) => {
   // Defensive: normalize items so missing/invalid price/savedAmount don't crash the UI
   const items: WishlistItem[] = (Array.isArray(rawItems) ? rawItems : []).map((i: any) => ({
     ...i,
@@ -245,7 +251,7 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
   const overallProgress = totalWishlistValue > 0 ? (totalSaved / totalWishlistValue) * 100 : 0;
   
   // Previsão do fim do mês: a mesma do Dashboard (ver previsaoDoMes, 26/09)
-  const previsao = previsaoDoMes(monthlyBudget, totalExpenses, monthlyInstallments, fixedExpenses, dueDays);
+  const previsao = previsaoDoMes(monthlyBudget, totalExpenses, monthlyInstallments, fixedExpenses, dueDays, undefined, faturaDoMesAnterior);
   const forecast = {
     projectedBalance: previsao.saldoProjetado,
     remainingDays: previsao.diasDepoisDeHoje,

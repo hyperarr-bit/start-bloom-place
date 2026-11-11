@@ -3,6 +3,8 @@ import { useUserData } from "@/hooks/use-user-data";
 import { doPerfil, doPerfilDueDays, PERFIL_PESSOAL } from "@/lib/finance-perfil";
 import { somaParcelasDoMes, type Parcela } from "@/lib/finance-parcelas";
 import { computeDailyBudget, computeLooseBillsOutflow, computeMonthlyOutflow } from "@/lib/finance-totals";
+import { variaveisDoMesLidas } from "@/lib/finance-fatura";
+import { mesCorrenteId } from "@/lib/virada-contas";
 
 const lista = (v: unknown): any[] => (Array.isArray(v) ? v : []);
 const valor = (i: any) => Number(i?.value) || Number(i?.amount) || 0;
@@ -17,13 +19,14 @@ export const BudgetRemainingWidget = () => {
   // 03/09: só o perfil ativo (PF/PJ) — a empresa não entra no orçamento pessoal
   const perfil = get<string>("finance-perfil-ativo", PERFIL_PESSOAL) || PERFIL_PESSOAL;
   const incomes = doPerfil(lista(get<unknown>("finance-incomes", [])), perfil);
-  const variableExpenses = doPerfil(lista(get<unknown>("finance-expenses", [])), perfil);
+  // (07/11, bug "dois-numeros") variáveis pela REGRA DA FATURA, como o módulo (lib/finance-fatura) — o balde cru dava outro saldo
+  const variaveisDoMes = variaveisDoMesLidas(mesCorrenteId(), (k) => get<unknown>(k, undefined), perfil).total;
   const fixedExpenses = doPerfil(lista(get<unknown>("finance-fixed-expenses", [])), perfil);
   const parcelas = doPerfil(lista(get<unknown>("finance-installments", [])), perfil) as Parcela[];
   const dueDays = doPerfilDueDays(lista(get<unknown>("finance-dueDays", [])), perfil);
   const totalIncome = incomes.reduce((s: number, i: any) => s + valor(i), 0);
   const totalExpense = computeMonthlyOutflow(
-    variableExpenses.reduce((s: number, e: any) => s + valor(e), 0),
+    variaveisDoMes,
     fixedExpenses.reduce((s: number, e: any) => s + valor(e), 0),
     somaParcelasDoMes(parcelas),
     computeLooseBillsOutflow(dueDays, fixedExpenses),

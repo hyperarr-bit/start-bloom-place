@@ -599,7 +599,8 @@ describe("revisão 17/10: anotou e FECHOU o app antes de a conta chegar", () => 
     await voltaARede();
     await waitFor(() => expect(api.loaded).toBe(true));
     await esperar(2200);
-    expect(guardadasNoAparelho()).toEqual(["core-seguradas-u1:todo-list"]);
+    // (07/11, bug "offline-some") a lista de dias anotados, que também não subiu, agora guarda a cópia dela
+    expect(guardadasNoAparelho().sort()).toEqual(["core-seguradas-u1:core-dias-anotados", "core-seguradas-u1:todo-list"]);
     r.unmount();
     gravacaoFalha = false;
     montar();

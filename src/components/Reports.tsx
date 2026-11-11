@@ -1,5 +1,8 @@
 import { FileText, Download, FileSpreadsheet, Printer, Calendar, TrendingUp, TrendingDown, PieChart } from "lucide-react";
+import { toast } from "sonner";
 import { dataSegura, localDayKey, mesAtualExtenso } from "@/lib/utils";
+import { compartilharHtml, compartilharPlanilha } from "@/lib/compartilhar";
+import { isNativeShell } from "@/lib/native-shell";
 import { Button } from "@/components/ui/button";
 import { computeMonthlyBalance, computeSavingsRate } from "@/lib/finance-totals";
 import { ImportExtrato } from "@/components/finance/ImportExtrato";
@@ -35,7 +38,15 @@ interface FixedExpense {
 
 interface ReportsProps {
   incomes: Income[];
+  /** O balde CRU do mês — só pro ImportExtrato, que edita a lista (07/11). Os números do relatório vêm de
+   *  `despesasDoMes`. */
   expenses: Expense[];
+  /** Os gastos que CONTAM no mês pela regra da fatura (Index: `variaveisMes.noMes`, a mesma lista do
+   *  Dashboard e dos LIMITES). Ausente = o balde cru (quem não tem cartão com fechamento). */
+  despesasDoMes?: Expense[];
+  /** Contas avulsas do MEU MÊS com valor (lib/finance-totals listarContasAvulsasDoMes) — já estão no
+   *  `totalExpenses` desde 17/10. Ausente = nenhuma. */
+  contasAvulsas?: { day: number; bill: { id: string; name?: string; value: number; category?: string; paymentMethod?: string } }[];
   totalIncome: number;
   totalExpenses: number;
   totalDebts: number;
@@ -80,7 +91,7 @@ const reais = (v: number) => {
 /** Uma linha de despesa do relatório: gasto do dia a dia, custo fixo ou parcela. */
 export interface LinhaDeDespesa {
   id: string;
-  tipo: "Variável" | "Fixo" | "Parcela";
+  tipo: "Variável" | "Fixo" | "Parcela" | "Conta";
   descricao: string;
   /** "10 de 12" pra parcela, "vence dia 5" pro fixo */
   detalhe?: string;
@@ -97,7 +108,9 @@ export interface LinhaDeDespesa {
  * dia (R$ 464) — o relatório não fechava. Agora os três tipos entram, cada
  * um marcado.
  */
-export const linhasDeDespesa = (expenses: Expense[], fixos: FixedExpense[], parcelas: Parcela[]): LinhaDeDespesa[] => [
+export const linhasDeDespesa = (
+  expenses: Expense[], fixos: FixedExpense[], parcelas: Parcela[], avulsas: ReportsProps["contasAvulsas"] = [],
+): LinhaDeDespesa[] => [
   ...(expenses ?? []).map((e): LinhaDeDespesa => ({
     id: `v-${e.id}`, tipo: "Variável", descricao: e.description, categoria: e.category || "outros",
     valor: Number(e.value) || 0, data: e.date, pagamento: e.paymentMethod,
@@ -111,6 +124,11 @@ export const linhasDeDespesa = (expenses: Expense[], fixos: FixedExpense[], parc
     categoria: p.category === "roupa" ? "vestuario" : p.category || "outros",
     valor: valorDaParcelaNoMes(p), detalhe: `${parcelaDoMes(p)} de ${p.totalInstallments}`,
     data: p.date, pagamento: "credito",
+  })),
+  /* (07/11) Conta avulsa do MEU MÊS: entra no card desde 17/10 e aqui sumia dentro do "dia a dia". */
+  ...(avulsas ?? []).map(({ day, bill }): LinhaDeDespesa => ({
+    id: `c-${bill.id}`, tipo: "Conta", descricao: bill.name || "Conta", categoria: bill.category || "outros",
+    valor: Number(bill.value) || 0, detalhe: Number.isInteger(day) ? `vence dia ${day}` : undefined, pagamento: bill.paymentMethod,
   })),
 ];
 
@@ -151,9 +169,40 @@ export const montarCSV = (
   return "\uFEFF" + linhas.join("\r\n") + "\r\n";
 };
 
+/**
+ * A folha do relatório, a mesma na impressão do site e no arquivo do app. O charset vem antes do título (07/11): no app
+ * ela vira um arquivo .html, e quem abre o arquivo não sabe que é UTF-8 — sem isso "Relatório" vira "RelatÃ³rio".
+ */
+export const montarHtmlDoRelatorio = (mes: string, corpo: string) => `
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Relatório Financeiro - ${mes}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { color: #333; border-bottom: 2px solid #8b5cf6; padding-bottom: 10px; }
+            h2 { color: #666; margin-top: 20px; }
+            table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f5f5f5; }
+            .positive { color: green; }
+            .negative { color: red; }
+            .summary { display: flex; gap: 20px; margin: 20px 0; }
+            .summary-card { background: #f5f5f5; padding: 15px; border-radius: 8px; flex: 1; }
+          </style>
+        </head>
+        <body>
+          ${corpo}
+        </body>
+      </html>
+    `;
+
 export const Reports = ({
   incomes,
   expenses,
+  despesasDoMes,
+  contasAvulsas,
   totalIncome,
   totalExpenses,
   totalDebts,
@@ -182,13 +231,16 @@ export const Reports = ({
   const fixos = fixedExpenses ?? doPerfil(lista<FixedExpense>(get("finance-fixed-expenses", [])), perfil);
   const parcelas = installments ?? doPerfil(lista<Parcela>(get("finance-installments", [])), perfil);
 
-  const despesas = linhasDeDespesa(expenses, fixos, parcelas);
+  /* (07/11, bug "relatorio-fatura") Categorias, lista e CSV/Imprimir saem dos gastos que CONTAM no mês pela regra
+     da fatura — os mesmos do card "Despesas". Antes vinha o balde cru: com cartão que fecha dia 25, a TV de 28/10
+     (fatura de novembro) ficava fora das categorias e o cinema de 26/11 (fatura de dezembro) entrava, e o
+     "dia a dia" fechava com o card só na marra, por subtração. Agora cada parte é a soma da sua lista. */
+  const despesas = linhasDeDespesa(despesasDoMes ?? expenses, fixos, parcelas, contasAvulsas);
+  const somaDo = (tipo: LinhaDeDespesa["tipo"]) => despesas.filter((d) => d.tipo === tipo).reduce((s, d) => s + d.valor, 0);
   const totalFixos = fixos.reduce((s, f) => s + (Number(f.value) || 0), 0);
   const totalParcelas = somaParcelasDoMes(parcelas);
-  // O dia a dia é o que sobra do total oficial: assim os três somam EXATAMENTE
-  // o "Despesas" de cima, mesmo com compra no crédito que foi pra fatura do
-  // mês que vem (regra da fatura, lib/finance-fatura).
-  const totalDiaADia = Math.max(0, totalExpenses - totalFixos - totalParcelas);
+  const totalDiaADia = somaDo("Variável");
+  const totalAvulsas = somaDo("Conta");
 
   // Group expenses by category (dia a dia + fixos + parcelas)
   const expensesByCategory = despesas.reduce((acc, d) => {
@@ -197,47 +249,43 @@ export const Reports = ({
   }, {} as Record<string, number>);
 
   // Export to CSV
-  const exportToCSV = (type: "incomes" | "expenses" | "all") => {
+  const exportToCSV = async (type: "incomes" | "expenses" | "all") => {
     const csvContent = montarCSV(type, incomes, despesas, rotuloCategoria);
+    const nome = `financas_${type}_${localDayKey()}.csv`;
+    /* No app (07/11): o <a download> não faz nada no WebView, o botão ficava morto. O site segue baixando direto, sem
+       passar pelo Web Share: no PC com Windows a folha do sistema não tem "Salvar". */
+    if (isNativeShell()) {
+      const r = await compartilharPlanilha(csvContent, nome, "Relatório financeiro", "financas_relatorio_csv");
+      if (r === "failed") toast.error("Não deu pra exportar neste aparelho.");
+      return;
+    }
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `financas_${type}_${localDayKey()}.csv`;
+    link.download = nome;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   };
 
   // Print report
-  const printReport = () => {
+  const printReport = async () => {
     const printContent = document.getElementById("monthly-report");
     if (!printContent) return;
+    const html = montarHtmlDoRelatorio(currentMonth, printContent.innerHTML);
+
+    /* No app (07/11): no iPhone o window.open devolve null e a função saía calada. Vira arquivo na folha nativa. No site,
+       a janela tem que abrir no mesmo toque (sem await antes), senão o bloqueador de pop-up segura. */
+    if (isNativeShell()) {
+      const r = await compartilharHtml(html, `financas_relatorio_${localDayKey()}.html`, "Relatório financeiro", "financas_relatorio_html");
+      if (r === "failed") toast.error("Não deu pra exportar neste aparelho.");
+      return;
+    }
 
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Relatório Financeiro - ${currentMonth}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            h1 { color: #333; border-bottom: 2px solid #8b5cf6; padding-bottom: 10px; }
-            h2 { color: #666; margin-top: 20px; }
-            table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f5f5f5; }
-            .positive { color: green; }
-            .negative { color: red; }
-            .summary { display: flex; gap: 20px; margin: 20px 0; }
-            .summary-card { background: #f5f5f5; padding: 15px; border-radius: 8px; flex: 1; }
-          </style>
-        </head>
-        <body>
-          ${printContent.innerHTML}
-        </body>
-      </html>
-    `);
+    printWindow.document.write(html);
     printWindow.document.close();
     printWindow.print();
   };
@@ -311,6 +359,7 @@ export const Reports = ({
         {/* De onde vem o "Despesas": os três somam o número do card (26/09) */}
         <p className="text-[11px] text-muted-foreground mb-6" data-testid="despesas-composicao">
           Despesas = custos fixos {reais(totalFixos)} + dia a dia {reais(totalDiaADia)} + parcelas {reais(totalParcelas)}
+          {totalAvulsas > 0 ? ` + contas avulsas ${reais(totalAvulsas)}` : ""}
         </p>
 
         {/* Expenses by Category */}
@@ -384,7 +433,7 @@ export const Reports = ({
                         {d.descricao}
                         {d.tipo !== "Variável" && (
                           <span className="block text-[10px] text-muted-foreground">
-                            {d.tipo === "Fixo" ? "custo fixo" : "parcela"}{d.detalhe ? ` · ${d.detalhe}` : ""}
+                            {d.tipo === "Fixo" ? "custo fixo" : d.tipo === "Conta" ? "conta do mês" : "parcela"}{d.detalhe ? ` · ${d.detalhe}` : ""}
                           </span>
                         )}
                       </td>

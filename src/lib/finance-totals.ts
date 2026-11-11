@@ -78,6 +78,17 @@ const temValor = (b: any) => typeof b?.value === "number" && b.value > 0;
 export const computeLooseBillsOutflow = (dueDays: any[], fixedExpenses: any[]): number =>
   contasAvulsas(dueDays, fixedExpenses).reduce((s: number, b: any) => s + (temValor(b) ? b.value : 0), 0);
 
+/** As MESMAS contas que computeLooseBillsOutflow soma, uma a uma e com o dia em que vencem (07/11, bug
+ *  "relatorio-fatura"): o RELATÓRIOS lista cada uma como linha própria, em vez de escondê-las dentro do
+ *  "dia a dia". A soma dos `value` desta lista é sempre igual a computeLooseBillsOutflow. */
+export const listarContasAvulsasDoMes = (dueDays: any[], fixedExpenses: any[]): { day: number; bill: any }[] => {
+  const fixos = new Set((fixedExpenses ?? []).map((f: any) => f?.id).filter(Boolean));
+  return (dueDays ?? []).flatMap((d: any) =>
+    (Array.isArray(d?.bills) ? d.bills : [])
+      .filter((b: any) => b && !jaNaSaidaPorOutroTermo(b, fixos) && temValor(b))
+      .map((bill: any) => ({ day: d?.day, bill })));
+};
+
 /** Avulsas de um mês que NÃO é o corrente (arquivo do mês passado, planilha
  *  de mês futuro). Conta nascida de custo fixo (`fixedId`) nunca entra aqui:
  *  o retrato dos fixos daquele mês pode não existir (antes de 26/09 ninguém
@@ -141,4 +152,52 @@ export const statusDoPodeGastar = (
   const fixedCostsRecorded = (fixedExpenses ?? []).reduce((s: number, e: any) => s + (e?.value || 0), 0);
   const idealPerDay = totalIncome > 0 ? (totalIncome - fixedCostsRecorded) / daysInMonth : 0;
   return base.cantSpend ? "danger" : base.perDay > idealPerDay * 0.8 ? "good" : "warning";
+};
+
+/**
+ * PREVISÃO DO FIM DO MÊS (07/11, bug "pergunte-ritmo") — a conta saiu de dentro do Dashboard pra cá, pro
+ * Pergunte ao CORE ("Tô melhor que mês passado?") usar a MESMA. O Pergunte multiplicava a saída inteira
+ * (aluguel, parcelas e avulsas junto) pelos dias do mês: no dia 7, com aluguel de R$ 2.000, "fecha em
+ * ~R$ 9.000" enquanto o Dashboard dizia "sobra R$ 571".
+ *
+ * Só as VARIÁVEIS seguem o ritmo do dia. Fixos, parcelas (valor fixo do mês) e contas avulsas com valor
+ * (17/10) já estão inteiros em `monthlyOutflow` e entram uma vez. A avulsa SEM valor ainda não está na
+ * saída: entra pela estimativa de computeUnpaidOutsideOutflow (o mesmo número do "quanto posso gastar").
+ *
+ * (07/11, bug "previsao-fatura") A FATURA QUE VEIO DO MÊS PASSADO (lib/finance-fatura, variaveisMes.doMesAnterior:
+ * a compra no crédito depois do fechamento do mês anterior) também é valor fechado: entra uma vez, não é ritmo.
+ * Sem tirá-la, em 1º/11 a TV de R$ 1.000 de 28/10 virava "R$ 1.000 por dia" e o mês "fechava em R$ 30.000".
+ * Sem cartão com fechamento/vencimento ela é 0 e a conta é a de sempre.
+ */
+export const previsaoDoMes = ({
+  totalIncome, monthlyOutflow, fixedExpenses, monthlyInstallments, dueDays, faturaDoMesAnterior = 0, agora = new Date(),
+}: {
+  totalIncome: number;
+  /** A saída do mês (computeMonthlyOutflow) — fixos + variáveis + parcelas + avulsas. */
+  monthlyOutflow: number;
+  fixedExpenses: any[];
+  monthlyInstallments: number;
+  dueDays: any[];
+  /** A parte das variáveis que veio da fatura do mês anterior (soma de variaveisMes.doMesAnterior) — já dentro de
+   *  monthlyOutflow; fica fora do ritmo do dia. */
+  faturaDoMesAnterior?: number;
+  agora?: Date;
+}) => {
+  const day = agora.getDate();
+  const daysInMonth = new Date(agora.getFullYear(), agora.getMonth() + 1, 0).getDate();
+  const remainingDays = daysInMonth - day;
+  const fixedCostsRecorded = (fixedExpenses ?? []).reduce((s: number, e: any) => s + (e?.value || 0), 0);
+  const faturaAnterior = Number.isFinite(faturaDoMesAnterior) ? Math.max(0, faturaDoMesAnterior) : 0;
+  const variableSpent = Math.max(0, monthlyOutflow - fixedCostsRecorded - monthlyInstallments - computeLooseBillsOutflow(dueDays, fixedExpenses) - faturaAnterior);
+  const dailyVariableRate = day > 0 ? variableSpent / day : 0;
+  const projectedVariableRemaining = dailyVariableRate * remainingDays;
+  const unpaidBillsEstimate = computeUnpaidOutsideOutflow(dueDays, fixedExpenses);
+  /** Quanto o mês fecha de saída nesse ritmo. */
+  const saidaProjetada = monthlyOutflow + unpaidBillsEstimate + projectedVariableRemaining;
+  return {
+    day, daysInMonth, remainingDays, fixedCostsRecorded, variableSpent, dailyVariableRate,
+    projectedVariableRemaining, unpaidBillsEstimate, saidaProjetada,
+    projectedBalance: totalIncome - saidaProjetada,
+    totalAlreadySpent: monthlyOutflow,
+  };
 };

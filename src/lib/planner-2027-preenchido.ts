@@ -11,7 +11,9 @@
  * Finanças (perfil ativo, etiqueta `perfil` — doPerfil; "Tudo junto" = tudo, com os limites do Pessoal):
  *   finance-incomes / finance-expenses   o balde inteiro, como o app (Index soma sem olhar a data) — crítica r1: receita
  *                                        com data 30/09 no balde de outubro conta. Só com a virada PENDENTE (balde ainda
- *                                        do mês passado) filtra pela data do mês atual.
+ *                                        do mês passado) filtra pela data do mês atual. (07/11) Nas despesas e no
+ *                                        orçamento, os gastos pela regra da fatura (variaveisDoMesLidas: + a chave do
+ *                                        mês anterior); a lista de Gastos segue o balde, como a tabela do app.
  *   finance-fixed-expenses               entram todo mês
  *   finance-installments                 somaParcelasDoMes, só se finance-last-seen-month = mês atual
  *   finance-dueDays                      as contas do mês com ✓ (mês visto ≠ atual: vencimentos saem dos fixos, sem ✓)
@@ -28,7 +30,7 @@ import { doPerfil, doPerfilDueDays, registrarPerfis, PERFIL_PESSOAL, PERFIL_TODO
 import { computeLooseBillsOutflow, computeMonthlyOutflow } from "@/lib/finance-totals";
 import { parcelasComoGastos, somaParcelasDoMes, type Parcela } from "@/lib/finance-parcelas";
 import { CHAVE_FATURAS_PAGAS, cartaoDoId, faturasAVencer, parcelasDoMesPassado } from "@/lib/finance-faturas";
-import type { CardConfig } from "@/lib/finance-fatura";
+import { variaveisDoMesLidas, type CardConfig } from "@/lib/finance-fatura";
 import { CARD_CONFIG_KEY, CUSTOM_CARDS_KEY, DEFAULT_CARDS } from "@/lib/finance-cards-dados";
 import { chaveArquivada } from "@/lib/virada-do-mes";
 import { DIAS_DA_ROTINA } from "@/lib/rotina-habitos";
@@ -129,10 +131,19 @@ export function lerMesDoPlanner(get: Get, agora: Date = new Date()): MesDoPlanne
   const gastos = expenses.map((i) => linha(i, "Gasto")).filter((l) => l.valor > 0).sort((a, b) => (a.dia ?? 0) - (b.dia ?? 0));
 
   const somaVar = expenses.reduce((s, e) => s + Math.max(0, num(e.value)), 0);
+  /* (07/11, crítica do "dois-numeros") As variáveis que CONTAM no mês, pela regra da fatura — a mesma fonte da tela,
+     da Comparação e do balanço (lib/finance-fatura `variaveisDoMesLidas`): a TV de 28/10 depois do fechamento é
+     despesa de novembro; a compra de ontem depois do fechamento é de dezembro. Vale pro "Despesas" e pro Orçamento
+     (= aba LIMITES). A lista de Gastos e o "Total dos gastos" seguem o que ela lançou no mês (a tabela do app, com o
+     TOTAL dela). Com a virada PENDENTE o balde ainda é do mês passado e não há arquivo: segue o filtro pela data. */
+  const contam: Record<string, unknown>[] = mesVisto
+    ? variaveisDoMesLidas(mesId, (k) => get<unknown>(k, undefined), perfil === PERFIL_TODOS ? undefined : perfil, mesId).noMes as unknown as Record<string, unknown>[]
+    : expenses;
+  const somaQueConta = contam.reduce((s, e) => s + Math.max(0, num(e.value)), 0);
   const somaFixos = fixed.reduce((s, e) => s + Math.max(0, num(e.value ?? e.amount)), 0);
   const somaParcelas = somaParcelasDoMes(parcelas as unknown as Parcela[]);
   const avulsas = computeLooseBillsOutflow(dueDays, fixed);
-  const totalDespesas = centavos(computeMonthlyOutflow(somaVar, somaFixos, somaParcelas, avulsas));
+  const totalDespesas = centavos(computeMonthlyOutflow(somaQueConta, somaFixos, somaParcelas, avulsas));
   const totalReceitas = centavos(incomes.reduce((s, i) => s + Math.max(0, num(i.value)), 0));
 
   // vencimentos: as contas do mês (com ✓) — sem o mês visto, os fixos com dia, sem ✓
@@ -176,7 +187,7 @@ export function lerMesDoPlanner(get: Get, agora: Date = new Date()): MesDoPlanne
     : ((get<unknown>("finance-category-budgets-perfis", {}) as Record<string, Record<string, unknown>>) ?? {})[perfil] ?? {};
   const gasto = new Map<string, number>();
   // crítica r1 (técnico MEDIA 3): as parcelas do mês contam no gasto da categoria, como no Orçamento do app
-  for (const e of [...expenses, ...fixed, ...parcelasComoGastos(parcelas as unknown as Parcela[])] as Record<string, unknown>[]) {
+  for (const e of [...contam, ...fixed, ...parcelasComoGastos(parcelas as unknown as Parcela[])] as Record<string, unknown>[]) {
     const c = typeof e.category === "string" ? e.category : "outros";
     gasto.set(c, (gasto.get(c) ?? 0) + Math.max(0, num(e.value ?? e.amount)));
   }

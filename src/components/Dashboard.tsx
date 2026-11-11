@@ -15,7 +15,7 @@ import { AlertTriangle, Bell, CheckCircle, TrendingUp, TrendingDown, Calendar, D
 import { getCurrentYear } from "@/components/finance/storage-keys";
 import { totaisDoMes } from "@/components/finance/MonthComparison";
 import { perfilAtivoLocal } from "@/lib/finance-perfil";
-import { computeDailyBudget, computeLooseBillsOutflow, computeUnpaidOutsideOutflow, statusDoPodeGastar } from "@/lib/finance-totals";
+import { computeDailyBudget, previsaoDoMes, statusDoPodeGastar } from "@/lib/finance-totals";
 import { useAuth } from "@/hooks/use-auth";
 import { useMesCorrente, useVersaoDaVirada } from "@/hooks/use-virada-do-mes";
 import { useFinanceCategories } from "@/lib/finance-categories";
@@ -58,7 +58,14 @@ interface DashboardProps {
   totalExpenses: number;
   totalDebts: number;
   totalInvestments: number;
+  /** Gastos variáveis que CONTAM no mês (regra da fatura — Index `variaveisMes.noMes`): categorias, top 5,
+   *  forma de pagamento, fixos × variáveis. */
   expenses: Expense[];
+  /** (07/11, crítica do "dois-numeros") O que ela LANÇOU no mês, pela data da compra (Index `expenses` cru):
+   *  ÚLTIMAS TRANSAÇÕES e o "mês em uso" do elogio da poupança. A compra no crédito de ontem, depois do
+   *  fechamento, é da fatura seguinte mas é a transação mais recente; a TV de outubro que vence agora não é.
+   *  Mesma separação da retrospectiva (`lancados`). Sem ela, usa `expenses`. */
+  lancados?: Expense[];
   fixedExpenses: FixedExpense[];
   dueDays: DueDay[];
   savingsRate: number;
@@ -66,6 +73,9 @@ interface DashboardProps {
   /** Parcelas do mês — já dentro de totalExpenses; a previsão precisa do valor
    *  separado pra não projetar parcela fixa como gasto variável diário. */
   monthlyInstallments?: number;
+  /** (07/11, bug "previsao-fatura") A fatura do mês anterior que cai neste (Index variaveisMes.doMesAnterior) — já
+   *  dentro de totalExpenses; a previsão a deixa fora do ritmo do dia. Sem cartão com fechamento, 0. */
+  faturaDoMesAnterior?: number;
   onNavigate?: (tab: string) => void;
   /** Perfil ativo (PF/PJ): sem ele o gráfico anual não recalculava ao trocar o chip (13/09). */
   perfil?: string;
@@ -185,11 +195,13 @@ export const Dashboard = ({
   totalDebts,
   totalInvestments,
   expenses,
+  lancados: lancadosProp,
   fixedExpenses,
   dueDays,
   savingsRate,
   incomes,
   monthlyInstallments = 0,
+  faturaDoMesAnterior = 0,
   onNavigate,
   perfil,
   limpo = false,
@@ -200,6 +212,7 @@ export const Dashboard = ({
   gastoDeHoje,
 }: DashboardProps) => {
   const { cores: COLORS, positivo: COR_RECEITA, negativo: COR_DESPESA } = usePaletaGrafico();
+  const lancados = lancadosProp ?? expenses;
   const { user } = useAuth();
   // categorias personalizadas: resolve nome/cor no gráfico e no top de gastos
   const { labelOf, barOf } = useFinanceCategories();
@@ -246,7 +259,7 @@ export const Dashboard = ({
   const lastTransactions = useMemo(() => {
     const hoje = new Date();
     const allTransactions = [
-      ...expenses.map((e) => ({ ...e, type: "variable" as const })),
+      ...lancados.map((e) => ({ ...e, type: "variable" as const })),
       ...fixedExpenses
         .filter((e) => Number.isInteger(e.day) && (e.day as number) >= 1 && (e.day as number) <= hoje.getDate())
         .map((e) => ({ ...e, date: localDayKey(new Date(hoje.getFullYear(), hoje.getMonth(), e.day as number)), type: "fixed" as const })),
@@ -254,7 +267,7 @@ export const Dashboard = ({
     return allTransactions
       .sort((a, b) => b.date.localeCompare(a.date))
       .slice(0, 5);
-  }, [expenses, fixedExpenses]);
+  }, [lancados, fixedExpenses]);
 
   // Payment method breakdown
   const paymentBreakdown = useMemo(() => {
@@ -386,9 +399,11 @@ export const Dashboard = ({
     // Finanças (renda + contas fixas, zero ou um gasto variável) via "Excelente! Você está poupando 50% da sua
     // renda" no dia 1 — um elogio vazio, antes de qualquer gasto. O elogio/dica da poupança espera pelo menos
     // 5 gastos variáveis no mês ou 7 dias desde o primeiro; o aviso de "despesas maiores que a renda" não espera.
-    const datasDosGastos = expenses.map((e) => String(e?.date ?? "")).filter((d) => /^\d{4}-\d{2}-\d{2}/.test(d)).sort();
+    // (07/11) Pelo que ela LANÇOU no mês (`lancados`), não pelo que conta na fatura: a TV de outubro que vence
+    // agora não prova que o mês de agora está em uso.
+    const datasDosGastos = lancados.map((e) => String(e?.date ?? "")).filter((d) => /^\d{4}-\d{2}-\d{2}/.test(d)).sort();
     const diasDesdeOPrimeiroGasto = datasDosGastos.length ? (Date.now() - new Date(`${datasDosGastos[0].slice(0, 10)}T12:00:00`).getTime()) / 86_400_000 : 0;
-    const mesEmUso = expenses.length >= 5 || diasDesdeOPrimeiroGasto >= 7;
+    const mesEmUso = lancados.length >= 5 || diasDesdeOPrimeiroGasto >= 7;
     if (totalIncome === 0 && totalExpenses === 0) {
       // Sem dados — não mostra alerta
     } else if (savingsRate >= 20) {
@@ -404,7 +419,7 @@ export const Dashboard = ({
     }
 
     return list.slice(0, 4);
-  }, [dueDays, totalIncome, totalExpenses, savingsRate, totalDebts, expenses]);
+  }, [dueDays, totalIncome, totalExpenses, savingsRate, totalDebts, lancados]);
 
   const balance = totalIncome - totalExpenses;
 
@@ -412,35 +427,13 @@ export const Dashboard = ({
   // Logic: totalExpenses already includes fixedExpenses that are recorded.
   // We only need to project future variable spending + unpaid bills NOT yet in totalExpenses.
   const forecast = useMemo(() => {
-    const now = new Date();
-    const day = now.getDate();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const remainingDays = daysInMonth - day;
-
-    // Fixed costs already recorded (these are already inside totalExpenses)
-    const fixedCostsRecorded = fixedExpenses.reduce((s, e) => s + e.value, 0);
-
-    // Variable expenses = totalExpenses minus fixed costs and installments
-    // (parcelas são valor fixo do mês — não entram no ritmo diário projetado;
-    // 17/10: nem as contas avulsas do MEU MÊS, que agora estão em totalExpenses)
-    const variableSpent = Math.max(0, totalExpenses - fixedCostsRecorded - monthlyInstallments - computeLooseBillsOutflow(dueDays, fixedExpenses));
-    const dailyVariableRate = day > 0 ? variableSpent / day : 0;
-    const projectedVariableRemaining = dailyVariableRate * remainingDays;
-
-    // Unpaid bills: obrigações futuras ainda fora de totalExpenses — cálculo
-    // compartilhado em lib/finance-totals (mesmo número no Pergunte ao CORE).
-    // Só as avulsas: conta de fixo e fatura já estão em totalExpenses (26/09).
-    const unpaidBillsEstimate = computeUnpaidOutsideOutflow(dueDays, fixedExpenses);
-
-    // Projected balance = income - what's already spent - future bills - future variable
-    const projectedBalance = totalIncome - totalExpenses - unpaidBillsEstimate - projectedVariableRemaining;
-
-    return {
-      projectedBalance, dailyVariableRate, remainingDays, daysInMonth, day,
-      fixedCostsRecorded, unpaidBillsEstimate, variableSpent, projectedVariableRemaining,
-      totalAlreadySpent: totalExpenses,
-    };
-  }, [totalIncome, totalExpenses, fixedExpenses, dueDays, monthlyInstallments]);
+    // (07/11, bug "pergunte-ritmo") a conta mora em lib/finance-totals `previsaoDoMes` — a mesma do Pergunte ao
+    // CORE. Só as variáveis seguem o ritmo do dia (parcelas são valor fixo do mês; 17/10: nem as contas avulsas
+    // do MEU MÊS, que já estão em totalExpenses); as contas sem valor entram pela estimativa
+    // (computeUnpaidOutsideOutflow — conta de fixo e fatura já estão em totalExpenses, 26/09).
+    // (07/11, bug "previsao-fatura") a fatura que veio do mês passado entra uma vez, não vira ritmo.
+    return previsaoDoMes({ totalIncome, monthlyOutflow: totalExpenses, fixedExpenses, monthlyInstallments, dueDays, faturaDoMesAnterior });
+  }, [totalIncome, totalExpenses, fixedExpenses, dueDays, monthlyInstallments, faturaDoMesAnterior]);
 
   // Daily budget: how much you can spend per day
   // Logic: saldo atual = income - totalExpenses (already spent, includes fixed recorded)

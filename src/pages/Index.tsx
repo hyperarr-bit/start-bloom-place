@@ -56,7 +56,7 @@ import { CategoryBudgets } from "@/components/CategoryBudgets";
 import { MonthComparison } from "@/components/finance/MonthComparison";
 import { YearComparison } from "@/components/finance/YearComparison";
 import { TrackedCard } from "@/components/admin/TrackedCard";
-import { computeLooseBillsOutflow, computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
+import { computeLooseBillsOutflow, computeMonthlyOutflow, computeSavingsRate, listarContasAvulsasDoMes } from "@/lib/finance-totals";
 import { syncFixedExpensesToBills } from "@/lib/finance-sync";
 import { usarListaDoPerfil, usarDueDaysDoPerfil, mesclarPerfil, mesclarPerfilDueDays, doPerfil, devolverAoPessoal, registrarPerfis, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
 import { type Parcela, viradaDeParcelas, mesesAnteriores, chaveArquivadaDeParcelas, somaParcelasDoMes, somarMeses, marcarParcelaDoMes, parcelaPagaNoMes, valorDaParcelaNoMes } from "@/lib/finance-parcelas";
@@ -66,7 +66,7 @@ import { TotalPorCartao } from "@/components/finance/TotalPorCartao";
 import { usePainelLimpo } from "@/hooks/use-painel-limpo";
 import { useFinanceCards } from "@/lib/finance-cards";
 import { chaveArquivada } from "@/lib/virada-do-mes";
-import { guardarReceitaNoMes } from "@/lib/finance-receita-futura";
+import { guardarGastoNoMes, guardarReceitaNoMes } from "@/lib/finance-receita-futura";
 import { mesCorrenteId } from "@/lib/virada-contas";
 import { useVersaoDaVirada } from "@/hooks/use-virada-do-mes";
 import { SeletorDePerfil } from "@/components/finance/SeletorDePerfil";
@@ -243,6 +243,8 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   // receita com data de mês futuro vai pra planilha daquele mês (01/11, lib/finance-receita-futura)
   const guardarReceitaFutura = (receita: any) => guardarReceitaNoMes(receita, new Date(), getUserData, setUserData, perfilValido);
   const [expenses, setExpenses] = usarListaDoPerfil(expensesTodos, setExpensesTodos, perfilValido);
+  // gasto também (07/11, bug "gasto-futuro"): no balde ele somava no mês do cadastro e, no dia 1º, sumia dele
+  const guardarGastoFuturo = (gasto: any) => guardarGastoNoMes(gasto, new Date(), getUserData, setUserData, perfilValido);
   const [fixedExpenses, setFixedExpenses] = usarListaDoPerfil(fixedExpensesTodos, setFixedExpensesTodos, perfilValido);
   const [installments, setInstallments] = usarListaDoPerfil(installmentsAvancados as any[], setInstallmentsTodos, perfilValido);
   const expensesAnterior = doPerfil(expensesAnteriorTodos, perfilValido);
@@ -312,11 +314,16 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
     const { dueDays: reais, faturas: marcadas } = extrairFaturas(lista, dueDays as any[]);
     setDueDays(reais as any[]);
     if (!marcadas.length) return;
-    // a estimativa só segue a fatura que MUDOU (tocar outra conta devolve todas as faturas de novo)
+    /* SÓ A FATURA QUE MUDOU. Tocar em qualquer conta devolve TODAS as faturas da lista, com o estado
+       delas. A estimativa já seguia só as que mudaram; o "paguei" ia com a lista inteira — e
+       `marcarFaturas` remarca as parcelas do cartão a cada fatura "paga" que recebe: a parcela que a
+       pessoa tinha DESMARCADO voltava a paga no ✓ da Luz (07/11, bug "parcela-sozinha"). Nada mudou
+       nas faturas = nada a gravar em `finance-faturas-pagas`. */
     const mudaram = marcadas.filter((m) => (faturas.find((f) => f.card === m.card)?.paga ?? false) !== m.paga);
+    if (!mudaram.length) return;
     const fixosNovos = comEstimativasMarcadas(fixedExpenses as any[], mudaram);
     if (fixosNovos !== fixedExpenses) setFixedExpenses(fixosNovos as any[]);
-    marcarFaturas(marcadas);
+    marcarFaturas(mudaram);
   };
   /** "Paguei" das faturas: o `finance-faturas-pagas` + as parcelas daquele cartão no mês (22/09). */
   const marcarFaturas = (marcadas: { card: string; paga: boolean }[]) => {
@@ -421,7 +428,18 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   // cartão sai deste mês e entra no seguinte; sem fechamento cadastrado a
   // conta é a de sempre (lib/finance-fatura).
   const variaveisMes = variaveisDoMes(expenses, expensesAnterior, mesAgora, configOf);
+  // (07/11, bug "dois-numeros") `variaveisMes.noMes` é a lista que CONTA no mês: vai pro Dashboard (gráfico por
+  // categoria, top 5, por pagamento), pros LIMITES e pro RELATÓRIOS (`despesasDoMes`), pra fechar com o "Despesas".
+  // `expenses` cru segue só pras listas que EDITAM (tabela, importação) e pras que são por DATA (calendário, desafio da semana,
+  // e no Dashboard `lancados`: ÚLTIMAS TRANSAÇÕES e o "mês em uso" do elogio da poupança).
   const totalVariableExpenses = variaveisMes.total;
+  /* (07/11, bug "previsao-fatura") A parte das variáveis que veio da FATURA DO MÊS PASSADO (crédito depois do
+     fechamento de lá): valor fechado, entra uma vez. A PREVISÃO DO FIM DO MÊS (Dashboard, Pergunte ao CORE, lista
+     de desejos) a deixa fora do ritmo do dia. Sem cartão com fechamento é 0. */
+  const faturaDoMesAnterior = variaveisMes.doMesAnterior.reduce((s: number, g: any) => {
+    const v = Number(g?.value);
+    return s + (g?.value !== null && Number.isFinite(v) ? v : 0);
+  }, 0);
   /* 17/10 — o que ela gastou HOJE (variáveis que contam neste mês): a linha "Sobram R$ X pra hoje" do card
      QUANTO POSSO GASTAR HOJE (Dashboard `gastoDeHoje`; no de sempre só aparece com gasto hoje). */
   const gastoDeHoje = gastoDoDia(variaveisMes.noMes);
@@ -631,9 +649,11 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 totalIncome={totalIncome}
                 totalExpenses={monthlyOutflow}
                 monthlyInstallments={monthlyInstallments}
+                faturaDoMesAnterior={faturaDoMesAnterior}
                 totalDebts={totalDebts}
                 totalInvestments={totalInvestments}
-                expenses={expenses}
+                expenses={variaveisMes.noMes}
+                lancados={expenses}
                 fixedExpenses={fixedExpenses}
                 dueDays={dueDaysComFaturas as any[]}
                 savingsRate={savingsRate}
@@ -706,9 +726,11 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 totalIncome={totalIncome}
                 totalExpenses={monthlyOutflow}
                 monthlyInstallments={monthlyInstallments}
+                faturaDoMesAnterior={faturaDoMesAnterior}
                 totalDebts={totalDebts}
                 totalInvestments={totalInvestments}
-                expenses={expenses}
+                expenses={variaveisMes.noMes}
+                lancados={expenses}
                 fixedExpenses={fixedExpenses}
                 dueDays={dueDaysComFaturas as any[]}
                 savingsRate={savingsRate}
@@ -811,7 +833,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 <div className="grid lg:grid-cols-[1fr_280px] gap-4 min-w-0">
                   <div className="min-w-0">
                     <TrackedCard cardKey="expenses" tab="financeiro">
-                      <ExpenseTable expenses={expenses} setExpenses={setExpenses} onPrimeiroGasto={aoPrimeiroGasto} mes={mesAgora} />
+                      <ExpenseTable expenses={expenses} setExpenses={setExpenses} onPrimeiroGasto={aoPrimeiroGasto} guardarEmOutroMes={guardarGastoFuturo} mes={mesAgora} />
                     </TrackedCard>
                   </div>
                   <TrackedCard cardKey="notes" tab="financeiro">
@@ -908,6 +930,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
               monthlyInstallments={monthlyInstallments}
               fixedExpenses={fixedExpenses}
               dueDays={dueDays}
+              faturaDoMesAnterior={faturaDoMesAnterior}
             />
           </TrackedCard>
         )}
@@ -933,15 +956,22 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
           <TrackedCard cardKey="category-budgets" tab="limites">
             {/* 09/09: o perfil vai junto — os gastos já chegam filtrados, e o
                 teto tem que ser do MESMO perfil (ver CategoryBudgets). */}
-            <CategoryBudgets expenses={[...expenses, ...fixedExpenses]} perfil={perfilValido} perfis={perfis} />
+            {/* (07/11, bug "dois-numeros") os gastos que CONTAM no mês pela regra da fatura, como o total — com
+                `expenses` cru a compra de 26/11 (fatura de dezembro) entrava no limite de novembro e a de 28/10
+                (fatura de novembro) não. */}
+            <CategoryBudgets expenses={[...variaveisMes.noMes, ...fixedExpenses]} perfil={perfilValido} perfis={perfis} />
           </TrackedCard>
         )}
 
         {activeTab === "relatorios" && (
           <TrackedCard cardKey="reports" tab="relatorios">
+            {/* (07/11, bug "relatorio-fatura") `expenses` cru só pro ImportExtrato; os números saem de
+                `despesasDoMes` (regra da fatura) + as contas avulsas — o mesmo que o `monthlyOutflow` soma. */}
             <Reports
               incomes={incomes}
               expenses={expenses}
+              despesasDoMes={variaveisMes.noMes}
+              contasAvulsas={listarContasAvulsasDoMes(dueDays as any[], fixedExpenses)}
               totalIncome={totalIncome}
               totalExpenses={monthlyOutflow}
               totalDebts={totalDebts}
@@ -982,9 +1012,12 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
           monthlyOutflow,
           savingsRate,
           monthlyInstallments,
+          faturaDoMesAnterior,
           totalInvestments,
           totalDebts,
-          expenses,
+          // (07/11) a lista que CONTA no mês, a mesma dos LIMITES: "Como estão meus limites?" e "Onde tô
+          // vacilando?" somam as categorias por ela — sem isso o mesmo limite tinha dois números.
+          expenses: variaveisMes.noMes,
           fixedExpenses,
           dueDays,
           goals,

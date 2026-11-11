@@ -119,7 +119,7 @@ export const useMesCorrente = () => {
 
 export const useViradaDoMes = () => {
   const { user } = useAuth();
-  const { get, set, loaded } = useUserData();
+  const { get, set, loaded, ultimaLeitura, relerConta } = useUserData();
 
   /*
    * O MÊS VIRA COM O APP ABERTO (26/09, auditoria da virada 30/09 → 01/10).
@@ -147,6 +147,9 @@ export const useViradaDoMes = () => {
    * um novo alvo e o arquivamento roda com os dados certos na mão.
    */
   const feitoPara = useRef<string | null>(null);
+  /** (07/11) Alvo pra que a releitura da conta já foi pedida, e a `vez` da última leitura quando ela foi pedida —
+   *  ver "SESSÃO VIVA ATRAVESSA O MÊS". */
+  const releituraPedidaPara = useRef<{ alvo: string; vez: number } | null>(null);
 
   // (26/09) useLayoutEffect de propósito — ver "A TELA DE FINANÇAS RELÊ
   // DEPOIS DA VIRADA": as gravações e a versão precisam sair no mesmo passe.
@@ -157,6 +160,46 @@ export const useViradaDoMes = () => {
     // (26/09) trava por (quem, MÊS) — ver "O MÊS VIRA COM O APP ABERTO".
     const alvo = `${quem}|${agora}`;
     if (!loaded || feitoPara.current === alvo) return;
+
+    /*
+     * SESSÃO VIVA ATRAVESSA O MÊS: RELER A CONTA ANTES DE VIRAR (07/11).
+     *
+     * O store é um retrato do servidor de quando a conta foi lida. Aba do PC
+     * aberta em 31/10 e o celular lançando novembro (Padaria 42, Salário
+     * 5.000, Luz ✓): quando a aba voltava em 06/11, `mesVisto` mudava e a
+     * virada rodava NA HORA em cima de outubro — arquivava, zerava os ✓ e
+     * `gravar` mandava cada chave INTEIRA. O servidor ficava com gastos [],
+     * receitas [] e a Luz "não paga". A leitura da 2ª rodada (o auth reemite
+     * a sessão na volta) chegava tarde — e numa aba sempre visível nem vem.
+     *
+     * Abrir do zero é seguro (`loaded` só vem com a conta lida agora). Então a
+     * regra é: o retrato tem que ser DESTE mês. Não sendo, pede `relerConta`
+     * (uma vez por alvo; a leitura no ar serve) e volta sem virar — a leitura
+     * que dá certo muda `ultimaLeitura`, o efeito roda de novo e aí vira, em
+     * cima do que o servidor tem. Falhou: o provider tenta de novo sozinho
+     * (escada, rede voltando, volta pro app); até lá a tela segue com o mês
+     * velho — melhor do que apagar o mês novo de outro aparelho. Depois da
+     * releitura a tela de Finanças REMONTA mesmo sem a virada gravar nada (o
+     * celular pode já ter virado): o `usePersistedState` dela ainda segura o
+     * mês velho em memória e o 1º toque gravaria outubro por cima de novembro.
+     * Convidado (sem servidor) e provider sem `ultimaLeitura` (mocks): como antes.
+     */
+    /*
+     * (07/11, crítica) "A leitura no ar serve" — mas a do ar pode ter sido PEDIDA antes da meia-noite: ela chega com
+     * `pedidaEm` ainda no mês velho e, sem outro pedido, a virada voltava calada e o mês não virava até reabrir
+     * (numa aba sempre visível nada mais dispara leitura). Chegou leitura NOVA (`vez` maior que a do pedido) e ela
+     * ainda é de outro mês: pede outra. Falha não muda `ultimaLeitura` — quem tenta de novo é o provider.
+     */
+    if (user?.id && ultimaLeitura && mesCorrenteId(new Date(ultimaLeitura.pedidaEm)) !== agora) {
+      const pedida = releituraPedidaPara.current;
+      if (pedida?.alvo !== alvo || ultimaLeitura.vez > pedida.vez) {
+        releituraPedidaPara.current = { alvo, vez: ultimaLeitura.vez };
+        relerConta?.();
+      }
+      return;
+    }
+    const relida = releituraPedidaPara.current?.alvo === alvo;
+    releituraPedidaPara.current = null;
 
     let movidosTotal = 0;
     const mesesTocados = new Set<string>();
@@ -216,7 +259,11 @@ export const useViradaDoMes = () => {
       dueDays: readMonthData(uid, datadas.dueDays) ?? get<unknown>(datadas.dueDays, []),
       notes: lerBalde(datadas.notes),
     };
-    if (carregados.every((itens) => itens.length === 0) && !temContas(contas) && parcelas.length === 0 && !temMesPreenchido(preenchido)) return;
+    if (carregados.every((itens) => itens.length === 0) && !temContas(contas) && parcelas.length === 0 && !temMesPreenchido(preenchido)) {
+      // (07/11) releu e não há o que olhar: a tela ainda pode segurar o mês velho — remonta
+      if (relida) publicarVirada();
+      return;
+    }
     feitoPara.current = alvo;
     // (26/09) Toda escrita desta passada passa por `gravar`: se alguma tocou
     // DADO (não só carimbo), a tela de Finanças remonta no fim — ver "A TELA
@@ -372,6 +419,8 @@ export const useViradaDoMes = () => {
     }
     // (26/09) Gravou dado? Quem segura baldes em memória (Index) remonta
     // agora, no mesmo passe síncrono das gravações acima.
-    if (mexeuEmDados) publicarVirada();
-  }, [loaded, user?.id, get, set, mesVisto]);
+    // (07/11) Releu a conta antes de virar? Remonta mesmo sem gravar — ver "SESSÃO VIVA".
+    if (relida) trackEvent("virada_mes_releu_conta", { mes: agora, gravou: mexeuEmDados ? 1 : 0 });
+    if (mexeuEmDados || relida) publicarVirada();
+  }, [loaded, user?.id, get, set, mesVisto, ultimaLeitura, relerConta]);
 };

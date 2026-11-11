@@ -5,8 +5,9 @@ import { Sparkles } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
-import { getMonthTotals } from "@/components/finance/storage-keys";
-import { computeDailyBudget } from "@/lib/finance-totals";
+import { parPadrao, totaisDoMes } from "@/components/finance/MonthComparison";
+import { computeDailyBudget, previsaoDoMes } from "@/lib/finance-totals";
+import { perfilAtivoLocal } from "@/lib/finance-perfil";
 import { trackEvent } from "@/lib/analytics";
 
 /**
@@ -37,8 +38,12 @@ export interface AskCtx {
   monthlyOutflow: number;
   savingsRate: number;
   monthlyInstallments: number;
+  /** (07/11, bug "previsao-fatura") A fatura do mês anterior que cai neste (Index variaveisMes.doMesAnterior) — já
+   *  dentro de monthlyOutflow; fica fora do ritmo da previsão. Ausente = 0. */
+  faturaDoMesAnterior?: number;
   totalInvestments: number;
   totalDebts: number;
+  /** Variáveis que CONTAM no mês (regra da fatura — Index `variaveisMes.noMes`), as mesmas dos LIMITES. */
   expenses: any[];
   fixedExpenses: any[];
   dueDays: any[];
@@ -204,15 +209,23 @@ const QUESTIONS: Question[] = [
     emoji: "📊",
     label: "Tô melhor que mês passado?",
     answer: (ctx, { userId }) => {
-      const prevMonth = MONTHS[(new Date().getMonth() + 11) % 12];
-      const prev = getMonthTotals(prevMonth, userId);
-      const prevOutflow = prev.custosFixos + prev.custosVariaveis;
+      // (07/11, bug "pergunte-janeiro") o mês passado com o ANO dele (em janeiro, o dezembro do ano passado; sem ano
+      // lia o dezembro vazio do ano corrente) e a mesma soma do `monthlyOutflow` deste mês: fixos + variáveis +
+      // parcelas + avulsas. Só fixos + variáveis comparava dois números diferentes.
+      const [anterior] = parPadrao();
+      const prevMonth = MONTHS[anterior.idx];
+      const prev = totaisDoMes(anterior, userId, perfilAtivoLocal(userId));
+      const prevOutflow = prev.despesas;
       if (prevOutflow <= 0 && prev.receitas <= 0) {
         return `Ainda não tenho ${prevMonth} registrado pra comparar. A partir do mês que vem essa resposta fica boa.`;
       }
-      const today = new Date().getDate();
-      const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-      const paceOutflow = (ctx.monthlyOutflow / today) * daysInMonth;
+      // (07/11, bug "pergunte-ritmo") o ritmo é o da PREVISÃO DO FIM DO MÊS do Dashboard (lib/finance-totals
+      // `previsaoDoMes`): só as variáveis seguem o passo do dia. Multiplicar a saída inteira pelos dias do mês
+      // projetava o aluguel de novo a cada semana ("fecha em ~R$ 9.000" no dia 7 com R$ 100 de gasto).
+      const paceOutflow = previsaoDoMes({
+        totalIncome: ctx.totalIncome, monthlyOutflow: ctx.monthlyOutflow, fixedExpenses: ctx.fixedExpenses,
+        monthlyInstallments: ctx.monthlyInstallments, dueDays: ctx.dueDays, faturaDoMesAnterior: ctx.faturaDoMesAnterior,
+      }).saidaProjetada;
       const better = paceOutflow < prevOutflow;
       return `${prevMonth}: ${fmt(prevOutflow)} de gastos.\nEste mês até agora: ${fmt(ctx.monthlyOutflow)} — no ritmo atual, fecha em ~${fmt(paceOutflow)}.\n\n${better ? "✅ Sim! Nesse passo você gasta MENOS que mês passado." : `⚠️ No ritmo atual, passa ${fmt(paceOutflow - prevOutflow)} do mês anterior. Dá tempo de frear.`}`;
     },

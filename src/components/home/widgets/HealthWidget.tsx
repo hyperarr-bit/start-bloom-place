@@ -12,8 +12,6 @@ export const HealthWidget = ({ size = "small" }: { size?: WidgetSize }) => {
   const data = useLifeHubData();
   const { get, set } = useUserData();
 
-  const todayStr = localDayKey();
-
   /*
    * O "−" ERA UM BOTÃO MORTO (corrigido 16/08). Ele mexia só em
    * `core-saude-water`, mas o número na tela vem do useLifeHubData, que
@@ -23,9 +21,12 @@ export const HealthWidget = ({ size = "small" }: { size?: WidgetSize }) => {
    * número não mudava um dígito. "Não estou conseguindo redefinir a
    * quantidade de água tomada" (avaliação da Amanda, v50).
    * As duas chaves andam juntas agora — mesma regra do HydrationTracker.
+   * O dia é o do toque (07/11): o do último desenho ainda é ontem de manhã,
+   * com o app aberto desde a noite.
    */
   const adjustWater = (delta: number, e: React.MouseEvent) => {
     e.stopPropagation();
+    const todayStr = localDayKey();
     const log = get<any>("core-saude-water", {}) ?? {};
     const logRotina = get<any>("water-log", {}) ?? {};
     const current = Math.max(log[todayStr] || 0, logRotina[todayStr] || 0);

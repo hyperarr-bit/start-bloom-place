@@ -1,5 +1,7 @@
 /**
- * TELA DE ENTRAR SÓ COM CÓDIGO (06/11, mockup na tela real esperando o ok do dono).
+ * TELA DE ENTRAR SÓ COM CÓDIGO (06/11). LIGADA NO APP a partir da build 1.0.25/137 (dono 10/11: "pode fazer tudo";
+ * a tela nova é o motivo da build). No site segue desligada até o dono pedir (é só trocar ENTRAR_CODIGO_WEB e fazer
+ * o deploy).
  *
  * Quem comprou o vitalício no site não consegue entrar no app: a tela pedia senha, e o código por e-mail só aparecia
  * depois de digitar o e-mail, como link pequeno. Ligada, o /entrar abre em e-mail + "Receber código" e a senha vira
@@ -11,7 +13,7 @@
 import { isNativeShell } from "@/lib/native-shell";
 
 type ModoEntrarCodigo = "on" | "off";
-export const ENTRAR_CODIGO_APP = "off" as ModoEntrarCodigo;
+export const ENTRAR_CODIGO_APP = "on" as ModoEntrarCodigo;
 export const ENTRAR_CODIGO_WEB = "off" as ModoEntrarCodigo;
 
 /** O que o /auth manda pro /entrar pelo estado da rota. */

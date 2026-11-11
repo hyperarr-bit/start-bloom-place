@@ -155,9 +155,14 @@ export const getMonthTotals = (month: string, userId: string | null | undefined,
     custosFixos: fixed.reduce((s: number, e: any) => s + (e.value || 0), 0),
     custosVariaveis: expenses.reduce((s: number, e: any) => s + (e.value || 0), 0),
     dividas: installments.reduce(
+      /* A PARCELA DO MÊS, não a dívida inteira (05/11, PDF de cliente: o balanço anual caía -5.260 com a fatura em 830).
+         Mesma regra de `valorDaParcelaNoMes` e `mesDeInicio`, escrita aqui porque lib/finance-parcelas importa deste arquivo. */
       (s: number, i: any) => {
-        const remaining = (i.totalInstallments || 0) - (i.paidInstallments || 0);
-        return s + (remaining > 0 ? remaining * (i.installmentValue || 0) : 0);
+        const k = Number.isInteger(i.parcelaDoMes) && i.parcelaDoMes >= 1 ? i.parcelaDoMes : (i.paidInstallments || 0) + 1;
+        const mesDaData = typeof i.date === "string" ? i.date.slice(0, 7) : "";
+        const ehMes = (v: unknown) => typeof v === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(v);
+        const naoComecou = k === 1 && !i.levada && ehMes(mesDaData) && ehMes(i.startMonth) && mesDaData > i.startMonth;
+        return s + (k <= (i.totalInstallments || 0) && !naoComecou ? i.installmentValue || 0 : 0);
       }, 0
     ),
   };

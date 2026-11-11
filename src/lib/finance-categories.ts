@@ -84,6 +84,15 @@ export type CustomCategory = { value: string; label: string; palette: number; ar
 
 const norm = (s: string) => s.trim().toLowerCase();
 
+/**
+ * ORDEM ALFABÉTICA NA ESCOLHA (05/11, pedido de cliente). Só a exibição: as listas acima, o que está gravado e a
+ * paleta das personalizadas não mudam. "Outros" fica no fim (pelo value, não pela posição). Gráfico e relatório não
+ * passam por aqui: eles ordenam pelo valor e só leem labelOf/barOf.
+ */
+export const ordenarCategorias = <T extends { value: string; label: string }>(lista: T[]): T[] =>
+  [...lista].sort((a, b) =>
+    Number(a.value === "outros") - Number(b.value === "outros") || a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" }));
+
 export function customToCategory(c: CustomCategory): FinanceCategory {
   const p = CUSTOM_PALETTE[((c.palette % CUSTOM_PALETTE.length) + CUSTOM_PALETTE.length) % CUSTOM_PALETTE.length];
   return { value: c.value, label: c.label, color: p.color, bar: p.bar, custom: true };
@@ -91,7 +100,7 @@ export function customToCategory(c: CustomCategory): FinanceCategory {
 
 /**
  * Categorias + ações. `variableCats`/`fixedCats` já vêm com as personalizadas
- * intercaladas ANTES de "Outros". labelOf/styleOf/barOf resolvem qualquer
+ * juntas, em ordem alfabética, e "Outros" no fim. labelOf/styleOf/barOf resolvem qualquer
  * value (padrão, fixo ou personalizado) — usados nos gráficos/relatórios.
  */
 export function useFinanceCategories() {
@@ -109,11 +118,7 @@ export function useFinanceCategories() {
   const ativas = useMemo(() => list.filter((c) => !c.archived).map(customToCategory), [custom]);
   const todas = useMemo(() => list.map(customToCategory), [custom]);
 
-  const withCustom = (base: FinanceCategory[]) => {
-    const outros = base[base.length - 1]; // "Outros" fica sempre por último
-    const semOutros = base.slice(0, -1);
-    return [...semOutros, ...ativas, outros];
-  };
+  const withCustom = (base: FinanceCategory[]) => ordenarCategorias([...base, ...ativas]);
   const variableCats = useMemo(() => withCustom(VARIABLE_CATEGORIES), [ativas]);
   const fixedCats = useMemo(() => withCustom(FIXED_CATEGORIES), [ativas]);
 
@@ -127,7 +132,7 @@ export function useFinanceCategories() {
     FIXED_CATEGORIES.filter((c) => c.value !== "outros").forEach(push);
     ativas.forEach(push);
     push(VARIABLE_CATEGORIES[VARIABLE_CATEGORIES.length - 1]); // Outros
-    return out;
+    return ordenarCategorias(out);
   }, [ativas]);
 
   const byValue = useMemo(() => {

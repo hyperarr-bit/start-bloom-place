@@ -212,7 +212,9 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
       return;
     }
     toast.success(`Parcelado em ${nParcelas}x de R$ ${brl(total / nParcelas)}`, {
-      description: "Está no card CARTÃO DE CRÉDITO — PARCELAMENTOS, logo abaixo.",
+      description: detalhe.comecaEm
+        ? `A 1ª parcela entra em ${detalhe.comecaEm}. Até lá fica na lista e não soma no mês.`
+        : "Está no card CARTÃO DE CRÉDITO — PARCELAMENTOS, logo abaixo.",
     });
     limparForm();
     setParcelas("");

@@ -10,11 +10,12 @@ import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import { useAuth } from "@/hooks/use-auth";
 import { pedirAvaliacaoSePuder } from "@/lib/avaliacao";
+import { ordenarCategorias } from "@/lib/finance-categories";
 import {
   parseExtrato, suggestCategory, suggestPaymentMethod, ruleTokenOf, type ParsedTx,
 } from "@/lib/extrato-parser";
 
-const CATEGORY_OPTIONS = [
+const CATEGORY_OPTIONS = ordenarCategorias([
   { value: "alimentacao", label: "Alimentação" },
   { value: "restaurante", label: "Restaurante" },
   { value: "mercado", label: "Mercado" },
@@ -38,7 +39,7 @@ const CATEGORY_OPTIONS = [
   { value: "assinaturas", label: "Assinaturas" },
   { value: "academia", label: "Academia" },
   { value: "outros", label: "Outros" },
-];
+]);
 
 interface ReviewRow extends ParsedTx {
   key: string;

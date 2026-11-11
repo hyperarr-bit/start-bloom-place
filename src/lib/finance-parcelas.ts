@@ -121,8 +121,22 @@ export const mesesAnteriores = (mesId: string, quantos: number): string[] =>
 export const parcelaDoMes = (p: Parcela): number =>
   Number.isInteger(p.parcelaDoMes) && (p.parcelaDoMes as number) >= 1 ? (p.parcelaDoMes as number) : n(p.paidInstallments) + 1;
 
-/** Existe parcela vencendo neste mês? (não quitou antes dele) */
-export const parcelaAtiva = (p: Parcela): boolean => n(p.totalInstallments) >= 1 && parcelaDoMes(p) <= n(p.totalInstallments);
+/**
+ * PARCELA QUE AINDA NÃO COMEÇOU (07/11, chamados + PDF de cliente). A data era só registro: cadastrada em novembro com
+ * vencimento em junho, somava inteira em novembro e a virada de dezembro a dava como quitada sem ninguém pagar (em 07/11
+ * eram 30 pessoas e 50 parcelas). Devolve o mês da 1ª parcela enquanto ele for depois do mês do registro; é esse mês que a
+ * soma, a projeção e a virada respeitam. O registro continua no balde, então segue na lista e nas dívidas, e nada é
+ * reescrito em massa: o carimbo só anda quando o mês chega. Fica de fora quem já andou (`parcelaDoMes` > 1, inclusive quem
+ * cadastrou com "Já paguei") e o retrato `levada`, que é história de mês passado.
+ */
+export const mesDeInicio = (p: Parcela): string | null => {
+  const mes = typeof p?.date === "string" ? p.date.slice(0, 7) : "";
+  return ehMesId(mes) && ehMesId(p.startMonth) && !p.levada && parcelaDoMes(p) === 1 && mesesEntre(p.startMonth as string, mes) > 0 ? mes : null;
+};
+
+/** Existe parcela vencendo neste mês? (já começou e não quitou antes dele) */
+export const parcelaAtiva = (p: Parcela): boolean =>
+  n(p.totalInstallments) >= 1 && parcelaDoMes(p) <= n(p.totalInstallments) && !mesDeInicio(p);
 
 /** A parcela DESTE mês já foi paga? É o estado do checkbox. */
 export const parcelaPagaNoMes = (p: Parcela): boolean => n(p.paidInstallments) >= parcelaDoMes(p);
@@ -164,14 +178,50 @@ export const marcarParcelaDoMes = (p: Parcela, paga: boolean, mes: string): Parc
 };
 
 /**
+ * ANTECIPAR PARCELA (05/11, pedido de cliente: pagou 2 parcelas do carro de uma vez e não dava baixa na de novembro).
+ * O formato não muda: `paidInstallments` só fica à frente de `parcelaDoMes`, o que a virada e o app antigo já aceitam
+ * ("quem pagou adiantado continua adiantado"). Como é uma CONTAGEM, a baixa é sempre em sequência, sem buraco. O valor
+ * também não muda: cada parcela segue contando no mês em que vence, paga ou não.
+ */
+export const parcelasAdiantadas = (p: Parcela): number =>
+  Math.max(0, Math.min(n(p.paidInstallments), n(p.totalInstallments)) - parcelaDoMes(p));
+
+/** Dá pra adiantar quando a parcela do mês já está paga e ainda sobra alguma depois da última paga. */
+export const podeAdiantar = (p: Parcela): boolean =>
+  parcelaAtiva(p) && parcelaPagaNoMes(p) && n(p.paidInstallments) < n(p.totalInstallments);
+
+/** "YYYY-MM" em que vence a parcela nº `numero`, contando do mês da chave. */
+export const mesDaParcela = (p: Parcela, mes: string, numero: number): string =>
+  somarMeses(ehMesId(p.startMonth) ? (p.startMonth as string) : mes, numero - parcelaDoMes(p));
+
+/** Dá baixa em mais uma parcela à frente. Se a do mês estiver em aberto, ela entra junto. */
+export const adiantarParcela = (p: Parcela, mes: string): Parcela => {
+  if (!parcelaAtiva(p)) return p;
+  const k = parcelaDoMes(p);
+  return {
+    ...carimbar(p, mes),
+    parcelaDoMes: k,
+    paidInstallments: Math.min(n(p.totalInstallments), Math.max(n(p.paidInstallments), k) + 1),
+  };
+};
+
+/** Volta atrás UMA parcela adiantada. A do mês continua paga. */
+export const desfazerAdiantada = (p: Parcela, mes: string): Parcela =>
+  parcelasAdiantadas(p) > 0
+    ? { ...carimbar(p, mes), parcelaDoMes: parcelaDoMes(p), paidInstallments: parcelaDoMes(p) + parcelasAdiantadas(p) - 1 }
+    : p;
+
+/**
  * Cópia do registro como ele fica em `mesAlvo`, `diff` meses depois de onde
  * mora. `null` quando o alvo não é depois. Quitada antes do alvo devolve
  * `parcelaDoMes = total + 1` (a chamada decide se quer mostrar quitadas).
+ * Parcela que ainda não começou conta do mês dela: no próprio mês vem a 1ª.
  */
 export const avancarPara = (p: Parcela, mesDaChave: string, mesAlvo: string): Parcela | null => {
-  const origem = ehMesId(p.startMonth) ? (p.startMonth as string) : mesDaChave;
+  const inicio = mesDeInicio(p);
+  const origem = inicio ?? (ehMesId(p.startMonth) ? (p.startMonth as string) : mesDaChave);
   const diff = mesesEntre(origem, mesAlvo);
-  if (diff <= 0) return null;
+  if (diff < 0 || (diff === 0 && !inicio)) return null;
   const total = n(p.totalInstallments);
   const k = Math.min(parcelaDoMes(p) + diff, total + 1);
   const paid = Math.min(total, Math.max(n(p.paidInstallments), k - 1));
@@ -244,35 +294,51 @@ export const viradaDeParcelas = (
   let mudou = false;
 
   const lista = atuais.map((p) => {
-    if (!ehMesId(p.startMonth) || mesesEntre(p.startMonth as string, mesAgora) <= 0) return p;
-    const origem = p.startMonth as string;
-    (arquivos[origem] ??= []).push({ ...p, levada: true });
+    if (!ehMesId(p.startMonth)) return p;
+    const inicio = mesDeInicio(p);
+    const origem = inicio ?? (p.startMonth as string);
+    const diff = mesesEntre(origem, mesAgora);
+    if (diff < 0 || (diff === 0 && !inicio)) return p;
+    mudou = true;
+    // chegou o mês da 1ª parcela: o carimbo anda até ele e daí em diante é uma parcela como as outras
+    const base = inicio ? { ...p, startMonth: inicio } : p;
+    if (diff === 0) return base;
+    (arquivos[origem] ??= []).push({ ...base, levada: true });
     // meses pulados (ficou sem abrir o app): cada um ganha o retrato do que
     // seria a parcela dele, só enquanto ativa
     for (let m = somarMeses(origem, 1); mesesEntre(m, mesAgora) > 0; m = somarMeses(m, 1)) {
-      const cp = avancarPara(p, origem, m);
+      const cp = avancarPara(base, origem, m);
       if (cp && parcelaAtiva(cp)) (arquivos[m] ??= []).push({ ...cp, levada: true });
     }
-    mudou = true;
-    return avancarPara(p, origem, mesAgora) ?? p;
+    return avancarPara(base, origem, mesAgora) ?? p;
   });
 
   const ids = new Set(lista.map((p) => String(p?.id ?? "")));
   for (const fonte of fontes) {
     const itens = Array.isArray(fonte.itens) ? fonte.itens : [];
     let marcou = false;
-    const regravada = itens.map((p) => {
-      if (p?.levada) return p;
+    const regravada = itens.flatMap((p) => {
+      if (p?.levada) return [p];
       const id = String(p?.id ?? "");
-      const origem = ehMesId(p.startMonth) ? (p.startMonth as string) : fonte.mes;
+      const inicio = mesDeInicio(p);
+      const origem = inicio ?? (ehMesId(p.startMonth) ? (p.startMonth as string) : fonte.mes);
       const diff = mesesEntre(origem, mesAgora);
-      if (diff < 0) return p;
-      const cp = diff === 0 ? carimbar(p, mesAgora) : avancarPara(p, origem, mesAgora);
-      if (!cp || !parcelaAtiva(cp) || !id || ids.has(id)) return p;
+      // ainda não começou: vem pro balde como está, senão a dívida some da lista e do total até o mês dela. Sai da chave
+      // sem marca `levada`: retrato soma no mês dele, e esta parcela não vence ali.
+      if (inicio && diff < 0) {
+        if (!id || ids.has(id)) return [p];
+        ids.add(id);
+        lista.push(p);
+        marcou = true;
+        return [];
+      }
+      if (diff < 0) return [p];
+      const cp = diff > 0 ? avancarPara(p, origem, mesAgora) : inicio ? { ...p, startMonth: inicio } : carimbar(p, mesAgora);
+      if (!cp || !parcelaAtiva(cp) || !id || ids.has(id)) return [p];
       ids.add(id);
       lista.push(cp);
       marcou = true;
-      return { ...p, levada: true };
+      return [{ ...p, levada: true }];
     });
     if (marcou) { fontesAtualizadas[fonte.mes] = regravada; mudou = true; }
   }

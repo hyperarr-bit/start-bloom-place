@@ -107,7 +107,8 @@
         // "atual" e "anuncio" (a tela de Finanças que o anúncio mostra aparece sem rolar, logo abaixo do título; a pergunta "Por onde você
         // quer começar?" desce pra baixo dela). Só a /oferta na página de hoje lê (o /vitalicio e o braço "nova" não). Vira html[data-otp];
         // braco_topo_oferta em todo evento da /oferta. QA: ?otp=anuncio|atual (fica: localStorage + cookie), ?otp=auto desfaz. Rollback: "off".
-        var AB_OFERTA_TOPO = "off";
+        // 11/11 17h (dono: "liga"): ligado em 50/50. Rollback: "off".
+        var AB_OFERTA_TOPO = "on";
         var STRIPE_PK = "pk_live_51TJnAQQdjmrIbUhHDSWqG1trOT6mFfV87AC4Vv47kFJTAFOhYsNmvryGRnf3x824Ke3mXSsWiFCovKPIR6Kqx0IX00VcuAawhC"; // a chave PUBLICÁVEL (pk_live_…); com "PREENCHER" = comportamento off
         var STRIPE_PRECO_CENTAVOS = 6790; // só pra exibir — o valor cobrado vem SEMPRE do servidor (stripe-criar)
         var STRIPE_PARCELAS_MAX = 1; // 05/11 (dono): só aparece 1x no cartão; volta pra 12 quando a Stripe liberar parcelas

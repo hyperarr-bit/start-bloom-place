@@ -1061,8 +1061,8 @@ describe("11/11 · o <head>: o braço do e-mail da /oferta", () => {
 /* ───────── 11/11: a 1ª tela que continua o anúncio (AB_OFERTA_TOPO) — "atual" = a 1ª tela de hoje; "anuncio" = a tela de Finanças logo abaixo do título ───────── */
 const comTopo = (ab: "on" | "off") => comStripe("on").replace(/var AB_OFERTA_TOPO = "(on|off)"/, `var AB_OFERTA_TOPO = "${ab}"`);
 describe("11/11 · o <head>: o braço do topo da /oferta", () => {
-  it("a chave existe e está DESLIGADA no arquivo; off → todo mundo 'atual', sem sorteio, sem forçar e sem pedir a imagem", () => {
-    expect(HTML).toMatch(/var AB_OFERTA_TOPO = "off";/);
+  it("a chave existe e está em 50/50 no arquivo (dono, 11/11: 'liga'); off → todo mundo 'atual', sem sorteio, sem forçar e sem pedir a imagem", () => {
+    expect(HTML).toMatch(/var AB_OFERTA_TOPO = "on";/); // 11/11 17h (dono: "liga"): 50/50
     for (let i = 0; i < 40; i++) {
       const r = rodar(comTopo("off"), "/oferta", { "landing-device-id": randomUUID() });
       expect(r.attrs["data-otp"]).toBe("atual");

@@ -16,7 +16,8 @@ import { metadataDoPedido, validarPedidoStripe } from "../../supabase/functions/
 const raiz = resolve(__dirname, "../..");
 const HTML = readFileSync(resolve(raiz, "landing.html"), "utf8");
 const cabeca = HTML.match(/<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
-const comChave = (v: "on" | "off") => cabeca.replace(/var AB_OFERTA_LP = "(on|off)"/, `var AB_OFERTA_LP = "${v}"`);
+// 11/11: o sorteio do TOPO (AB_OFERTA_TOPO, ligado 11/11 17h) fica "off" aqui — este arquivo mede só o braço da PÁGINA; o do topo é testado no oferta-stripe.test.ts
+const comChave = (v: "on" | "off") => cabeca.replace(/var AB_OFERTA_LP = "(on|off)"/, `var AB_OFERTA_LP = "${v}"`).replace(/var AB_OFERTA_TOPO = "(on|off)"/, 'var AB_OFERTA_TOPO = "off"');
 /** o <head> como era antes do A/B: sem o bloco do braço */
 const semOBloco = cabeca.replace(/\n\s*\/\/ 06\/11: o braço da PÁGINA da \/oferta[\s\S]*?\n {8}\}\n(?= {8}\/\/ 04\/11: \/vida — a chave CHECKOUT_HOTMART)/, "\n");
 

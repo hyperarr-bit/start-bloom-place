@@ -42,7 +42,8 @@ import { TesteBanner, TrilhaDoTeste, RetomadaPosCompra } from "@/components/test
 // v61: tutorial pós-pago do trial (Missão dos 3 dias) — B1 boas-vindas do
 // pagante, B2 holofote fail-open, B3 celebração por dia vencido.
 import { MissaoDoTrial } from "@/components/missao/MissaoDoTrial";
-import { DonoDaMissaoNaSessao, MissaoDosesNaWeb } from "@/components/missao-doses/MissaoDosesNaWeb";
+// 11/11 (velocidade): a porta leve — a missão em doses em si é pedida sob demanda (ver MissaoDosesPortao)
+import { DonoDaMissaoNaSessao, MissaoDosesNaWeb } from "@/components/missao-doses/MissaoDosesPortao";
 import { OrigemDaContaNaSessao } from "@/components/home-nova/OrigemDaConta";
 import { SaveOfferDowngrade } from "@/components/missao/SaveOfferDowngrade";
 import { useLembretes } from "@/hooks/use-lembretes";

@@ -16,7 +16,7 @@ import { trackEvent } from "@/lib/analytics";
 import { avisarApagado } from "@/lib/desfazer";
 import { marcadaPelaCaixa } from "@/lib/remedio-caixa";
 import {
-  OPCOES_VEZES, agruparRemedios, doseADesmarcar, doseDaHora, doseQueChegou, dosesDoGrupoAgora, ehDia, gerarHorarios, inicioEscolhido, momentoDoInicio, montarLinhas, mudarHorarios, raizDoId, rotuloDosHorarios,
+  OPCOES_VEZES, agruparRemedios, doseADesmarcar, doseDaHora, doseQueChegou, dosesDoGrupoAgora, ehDia, gerarHorarios, inicioEscolhido, momentoDoInicio, montarLinhas, mudarHorarios, novosExistem, raizDoId, rotuloDosHorarios,
   trocaDoGrupo, tratamentoTerminou, ultimasDosesDoGrupo, type DoseMarcavel, type GrupoDeRemedio, type Remedio as Supplement, type VezesAoDia,
 } from "@/lib/remedios";
 
@@ -46,12 +46,18 @@ const lerEstoque = (v: string): number | null => {
 /** "2026-11-12" → "12/11" */
 const diaCurto = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
 /** "hoje 08:00" / "amanhã 09:00" / "10/11 08:00" — o começo do tratamento, na fileira de edição */
-const comecoEmTexto = (inicio: Date, agora: Date) => {
-  const dia = localDayKey(inicio);
+const comecoEmTexto = (inicio: Date, agora: Date) => `${diaEmTexto(inicio, agora)} ${horaEmTexto(inicio)}`;
+/** "hoje" / "amanhã" / "10/11" */
+const diaEmTexto = (quando: Date, agora: Date) => {
+  const dia = localDayKey(quando);
   const amanha = localDayKey(new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + 1));
-  const hora = `${String(inicio.getHours()).padStart(2, "0")}:${String(inicio.getMinutes()).padStart(2, "0")}`;
-  return `${dia === localDayKey(agora) ? "hoje" : dia === amanha ? "amanhã" : diaCurto(dia)} ${hora}`;
+  return dia === localDayKey(agora) ? "hoje" : dia === amanha ? "amanhã" : diaCurto(dia);
 };
+const horaEmTexto = (x: Date) => `${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`;
+/** "amanhã, às 07:00" — o dia e a hora, pros avisos curtos (10/11, I4) */
+const diaEHoraEmTexto = (quando: Date, agora: Date) => `${diaEmTexto(quando, agora)}, às ${horaEmTexto(quando)}`;
+/** 1× ao dia: a caixa não marca a 1ª dose de um horário mudado com mais de 3 h de antecedência (10/11, I2) */
+const ANTECEDENCIA_DOSE_NOVA_MS = 3 * 3600_000;
 
 const EstoqueEditavel = ({ nome, valor, baixo, onSalvar }: { nome: string; valor: number; baixo: boolean; onSalvar: (n: number) => void }) => {
   const [editando, setEditando] = useState(false);
@@ -332,15 +338,16 @@ export const PharmacyChecklist = () => {
     if (novos.every((h, j) => h === atuais[j])) return;
     const chave = linha.grupo ? `g:${linha.grupo}` : `i:${raizDoId(linha.id)}`;
     const inicioDeAntes = comecoAoAbrir.current?.chave === chave ? comecoAoAbrir.current.inicio : undefined;
-    const { itens, novoDesde } = mudarHorarios(doRemedio, novos, new Date(), inicioDeAntes);
+    const { itens, novoDesde, semDoseNova } = mudarHorarios(doRemedio, novos, new Date(), inicioDeAntes);
     const porId = new Map(doRemedio.map((s, j) => [s.id, itens[j]]));
     const lista = supplements.map(s => porId.get(s.id) ?? s);
     setSupplements(lista);
-    if (novoDesde) {
-      const comeco = momentoDoInicio(novoDesde);
-      const hojeMesmo = !!comeco && localDayKey(comeco) === todayStr();
-      toast(hojeMesmo ? `Os horários novos valem a partir de hoje, às ${novoDesde.slice(11, 16)}.` : "Os horários novos valem a partir de amanhã.",
-        { id: `remedio-horario-novo-${chave}`, duration: 4000 });
+    const comeco = momentoDoInicio(novoDesde);
+    // o dia E a hora (10/11, I4): "a partir de amanhã" com a dose nova daqui a 40 min, ou depois de amanhã, enganava
+    if (semDoseNova) {
+      toast("O tratamento termina antes de os horários novos começarem: até o fim valem os de antes.", { id: `remedio-horario-novo-${chave}`, duration: 5000 });
+    } else if (comeco) {
+      toast(`Os horários novos valem a partir de ${diaEHoraEmTexto(comeco, new Date())}.`, { id: `remedio-horario-novo-${chave}`, duration: 4000 });
     }
     void rearmarLembretes(lista, false);
   };
@@ -456,7 +463,14 @@ export const PharmacyChecklist = () => {
                   const comecoDoGrupo = abertoPraEditar && inicioDoGrupo && inicioDoGrupo.getTime() > agora.getTime() ? comecoEmTexto(inicioDoGrupo, agora) : "";
                   // horário mudado e os novos ainda não começaram (lib/remedios, mudarHorarios): a fileira diz quando começam
                   const troca = abertoPraEditar ? trocaDoGrupo(g) : undefined;
-                  const novosEm = troca && troca.novoDesde.getTime() > agora.getTime() ? comecoEmTexto(troca.novoDesde, agora) : "";
+                  const novosEm = troca && novosExistem(g, troca) && troca.novoDesde.getTime() > agora.getTime() ? comecoEmTexto(troca.novoDesde, agora) : "";
+                  /* 1× ao dia com horário mudado que ainda não começou (10/11, I4): o campo já mostra o horário
+                     novo, então embaixo dele vai a dose de hoje — "hoje 08:00 · 22:00 a partir de amanhã". */
+                  const trocaSimples = simples ? trocaDoGrupo(g) : undefined;
+                  const doseDeAntes = trocaSimples && doses[0] && doses[0].quando < trocaSimples.novoDesde.getTime() ? doses[0] : undefined;
+                  const horarioDeHoje = trocaSimples && novosExistem(g, trocaSimples) && trocaSimples.novoDesde.getTime() > agora.getTime()
+                    ? `${doseDeAntes ? `${diaEmTexto(new Date(doseDeAntes.quando), agora)} ${doseDeAntes.time} · ` : ""}${linha.time} a partir de ${diaEmTexto(trocaSimples.novoDesde, agora)}`
+                    : "";
                   const linhas = [
                     <motion.tr
                       key={g.chave}
@@ -475,7 +489,18 @@ export const PharmacyChecklist = () => {
                             // decide pela hora do TOQUE (08/11); se o dia virou com a tela parada, só refaz a tela
                             const c = contaNoToque(g, desenho);
                             if (!c || c.encerrado) return;
-                            if (g.itens.length === 1) toggleTaken(c.doses[0]?.id ?? linha.id, c.doses[0]?.dia ?? todayStr()); // a dose da vez: com o horário mudado, pode ser a de antes (id de antes)
+                            if (g.itens.length === 1) {
+                              const d = c.doses[0];
+                              /* 1ª dose de um horário mudado que ainda está longe (10/11, I2): a caixa não marca —
+                                 marcava a das 20:00 às 08:00 e o aviso dela sumia. Só diz quando é. */
+                              const trocaAqui = trocaDoGrupo(g);
+                              const agoraNoToque = new Date();
+                              if (d && trocaAqui && !foiTomada(d) && d.quando >= trocaAqui.novoDesde.getTime() && d.quando - agoraNoToque.getTime() > ANTECEDENCIA_DOSE_NOVA_MS) {
+                                toast(`A próxima de ${g.nome} é ${diaEHoraEmTexto(new Date(d.quando), agoraNoToque)}.`, { id: `remedio-ainda-nao-${g.chave}`, duration: 4000 });
+                              } else {
+                                toggleTaken(d?.id ?? linha.id, d?.dia ?? todayStr()); // a dose da vez: com o horário mudado, pode ser a de antes (id de antes)
+                              }
+                            }
                             else if (c.taken) {
                               marcadaPelaCaixa.delete(g.chave);
                               if (c.ultimaTomada) toggleTaken(c.ultimaTomada.id, c.ultimaTomada.dia);
@@ -540,7 +565,7 @@ export const PharmacyChecklist = () => {
                         )}
                       </td>
                       <td className="px-1 py-3 text-xs text-muted-foreground align-top">
-                        {simples ? (
+                        {simples ? (<>
                           <input
                             type="time"
                             value={linha.time}
@@ -548,7 +573,10 @@ export const PharmacyChecklist = () => {
                             onChange={e => changeTime(linha.id, e.target.value)}
                             className="bg-transparent text-xs text-muted-foreground min-w-[5.5rem] w-auto focus:outline-none focus:text-foreground"
                           />
-                        ) : (
+                          {horarioDeHoje && (
+                            <span className="block text-[10px] leading-tight text-muted-foreground" data-testid="remedio-horario-hoje">{horarioDeHoje}</span>
+                          )}
+                        </>) : (
                           /* uma pílula por dose: toque marca aquela dose. 32 px de altura (07/11,
                              crítica: com 24 px o dedo marcava a vizinha e o estoque descia junto).
                              GRADE FIXA de 2 colunas (1 em tela de menos de 380 px, pra tabela caber),

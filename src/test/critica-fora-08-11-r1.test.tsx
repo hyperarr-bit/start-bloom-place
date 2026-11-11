@@ -175,7 +175,7 @@ describe("crítica de fora, 08/11, rodada 1", () => {
     expect(r).toMatchObject({ horas: "07:00/15:00/23:00", ...HOJE, aviso: "07/16:00" });
     expect(pilulasDaUltima).toBe("00:00 08:00✓ 16:00");
     expect(r.fila.slice(0, 5)).toEqual(["07/16:00", "08/00:00", "08/07:00", "08/15:00", "08/23:00"]);
-    expect(falasDaUltima).toContain("Os horários novos valem a partir de amanhã.");
+    expect(falasDaUltima).toContain("Os horários novos valem a partir de amanhã, às 07:00."); // 10/11: o dia E a hora
   });
 
   it("F1 (agora) 08:00 → 23:00 às 15:00 (os mesmos 07/15/23): a mesma fila de 08:00 → 07:00", () => {
@@ -283,7 +283,7 @@ describe("crítica de fora, 08/11, rodada 1 — em volta do conserto", () => {
     expect(log(store)).toEqual(logIni);
     expect(pilulas()).toBe("00:00 08:00✓ 16:00");
     expect(avisos(store).slice(0, 3)).toEqual(["07/16:00", "08/00:00", "08/10:00"]);
-    expect(falas).toContain("Os horários novos valem a partir de amanhã.");
+    expect(falas).toContain("Os horários novos valem a partir de amanhã, às 10:00."); // 10/11: o dia E a hora
   });
 
   it("(agora) estoque zerado: a anotação 'sem baixa' fica como está e desmarcar a 08:00 de hoje não cria comprimido", () => {
@@ -323,7 +323,7 @@ describe("crítica de fora, 08/11, rodada 1 — em volta do conserto", () => {
     }
   });
 
-  it("(agora) conta pura, 1× ao dia: de 00:00, 00:30, 08:00, 20:00 e 23:00 pra qualquer hora, mudado de 2 h 30 em 2 h 30 — a dose da vez não muda na hora, cada 'id no dia' é de uma dose só e a 1ª dose nova fica a mais de 12 h da última de antes", () => {
+  it("(agora) conta pura, 1× ao dia: de 00:00, 00:30, 08:00, 20:00 e 23:00 pra qualquer hora, mudado de 2 h 30 em 2 h 30 — a dose da vez não muda na hora, cada 'id no dia' é de uma dose só e a 1ª dose nova fica a 6 h ou mais da última de antes (era 12 h; 10/11, I1)", () => {
     const problemas: string[] = [];
     for (const de of ["00:00", "00:30", "08:00", "20:00", "23:00"]) {
       const linha = [{ id: "r1", name: "Losartana", time: de, stock: 30, dosesPerDay: 1 }];
@@ -342,7 +342,7 @@ describe("crítica de fora, 08/11, rodada 1 — em volta do conserto", () => {
           const [h, mi] = de.split(":").map(Number);
           const L = new Date(a, me - 1, d, h, mi).getTime();
           const F = new Date(String(novoDesde)).getTime();
-          if (!(F - L > 12 * 3600_000)) problemas.push(`${onde}: 1ª nova ${novoDesde} a menos de 12 h da última de antes`);
+          if (!(F - L >= 6 * 3600_000)) problemas.push(`${onde}: 1ª nova ${novoDesde} a menos de 6 h da última de antes`);
           const dono = new Map<string, number>();
           for (let t = agora.getTime() - 12 * 3600_000; t < agora.getTime() + 60 * 3600_000; t += 60 * 60_000) {
             for (const x of dosesDoGrupoAgora(g, new Date(t))) {

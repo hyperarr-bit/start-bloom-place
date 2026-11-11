@@ -149,7 +149,7 @@ describe("crítica de fora, 08/11, rodada 2", () => {
     expect(log(store)).toEqual(logIni);
     expect(pilulas()).toBe("00:00 08:00✓ 16:00");
     expect(avisos(store).slice(0, 3)).toEqual(["07/16:00", "08/00:00", "08/09:30"]);
-    expect(falas).toContain("Os horários novos valem a partir de amanhã.");
+    expect(falas).toContain("Os horários novos valem a partir de amanhã, às 09:30."); // 10/11: o dia E a hora
   });
 
   it("G1 (agora) 12 em 12: 08:00 tomada às 08:00; às 08:10 a 1ª dose vira 09:30 — sem aviso 1 h 30 depois do comprimido: hoje 20:00, amanhã 09:30", () => {

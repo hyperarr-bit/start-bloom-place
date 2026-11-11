@@ -140,7 +140,7 @@ describe("crítica de fora, 08/11, rodada 3 — depois da simplificação", () =
     expect(log(store)).toEqual({ "2026-11-07": ["r1"], "2026-11-08": ["r1"] });
     agoraEm(7, 23, 55);
     fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "23:00" } });
-    expect(falas).toContain("Os horários novos valem a partir de amanhã.");
+    expect(falas).toContain("Os horários novos valem a partir de amanhã, às 23:00."); // 10/11: o dia E a hora
     expect(log(store)).toEqual({ "2026-11-07": ["r1"], "2026-11-08": ["r1"] });
     expect(estoque(store)).toEqual([29]);
     expect(avisos(store)).toContain("08/23:00");

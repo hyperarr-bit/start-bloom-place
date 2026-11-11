@@ -1,10 +1,9 @@
 /**
- * REMÉDIO, MUDAR O HORÁRIO COM A CHAVE REMEDIO_VEZES DESLIGADA (11/11, crítica da build 1.0.25).
+ * REMÉDIO, MUDAR O HORÁRIO COM A CHAVE REMEDIO_VEZES DESLIGADA (11/11, regra simples do dono).
  *
- * A regra "os horários novos valem a partir de amanhã" (lib/remedios, mudarHorarios) tem erro aberto
- * no 1× ao dia (critica-fora-10-11-r2: J1 e J3). Ela fica atrás da chave, junto com o cadastro de
- * várias doses. Com a chave off (a 1.0.25/137 e o site), mudar o horário vale NA HORA, como na 1.0.24:
- * a hora troca e o próximo aviso já é no horário novo.
+ * Com a chave off (como on), a próxima dose é o 1º horário novo a pelo menos meio intervalo do último
+ * comprimido marcado (1× ao dia: 12 h), nunca no passado (lib/remedios, mudarHorarios). A tela e o
+ * toast dizem o dia e a hora exatos: "Próxima dose: hoje às 20:00".
  */
 process.env.TZ = "America/Sao_Paulo";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -81,7 +80,7 @@ const linhas = (s: Store) => s.get<Remedio[]>(CHAVE, []);
 beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); falas.lista = []; plataforma.nativo = false; });
 afterEach(() => { cleanup(); vi.useRealTimers(); esquecerMarcasDaCaixa(); });
 
-describe("remédio: mudar o horário com a chave REMEDIO_VEZES desligada (1.0.25/137 e site)", () => {
+describe("remédio: mudar o horário com a chave REMEDIO_VEZES desligada (regra simples, 11/11)", () => {
   it("a chave está desligada no app e no site", () => {
     expect(REMEDIO_VEZES_APP).toBe("off");
     expect(REMEDIO_VEZES_WEB).toBe("off");
@@ -93,50 +92,55 @@ describe("remédio: mudar o horário com a chave REMEDIO_VEZES desligada (1.0.25
 
   for (const nativo of [false, true]) {
     const onde = nativo ? "app" : "site";
-    it(`${onde}: 1× 00:00 → 20:00 ao meio-dia: o próximo aviso é HOJE às 20:00, sem "a partir de amanhã"`, () => {
+    it(`${onde}: 1× 00:00 tomada à 00:00, ao meio-dia muda pra 20:00 → próxima dose hoje às 20:00`, () => {
       plataforma.nativo = nativo;
-      const store = criarStore({ [CHAVE]: simples("00:00") });
+      const store = criarStore({ [CHAVE]: simples("00:00"), [LOG]: { "2026-11-07": ["r1"] } });
       agoraEm(7, 12, 10);
       montar(store);
       fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "20:00" } });
-      expect(linhas(store)).toEqual(simples("20:00")); // só a hora mudou: sem horaAntes, antesAte, novoDesde nem id novo
+      expect(linhas(store)[0]).toMatchObject({ time: "20:00", horaAntes: "00:00", novoDesde: "2026-11-07T20:00" });
       expect(avisos(store)[0]).toBe("07/20:00");
-      expect(falas.lista.some((t) => t.includes("a partir de"))).toBe(false); // a tela não promete "a partir de amanhã"
+      expect(falas.lista).toContain("Próxima dose: hoje às 20:00.");
+      expect(screen.getByRole("button", { name: "Desmarcar Losartana" })).toBeTruthy(); // o ✓ de hoje continua
+      expect(screen.getByTestId("remedio-horario-hoje").textContent).toBe("Próxima dose: hoje às 20:00");
+      expect(store.get<Record<string, string[]>>(LOG, {})).toEqual({ "2026-11-07": ["r1"] }); // nenhuma marca muda
     });
   }
 
-  /* J1 com a dose de hoje já marcada (tomada à 00:00): igual à 1.0.24 — a caixa de hoje continua marcada
-     (o 1× do dia já foi), o próximo aviso é amanhã às 20:00 e a tela não promete nada sobre esta noite.
-     A diferença pra regra nova: nada some sem aparecer na tela, e quem quiser a de hoje desmarca. */
-  it("J1 1× 00:00 → 20:00 ao meio-dia, tomada à 00:00: como na 1.0.24 (hoje segue marcado, sem aviso enganoso)", () => {
-    const store = criarStore({ [CHAVE]: simples("00:00"), [LOG]: { "2026-11-07": ["r1"] } });
-    agoraEm(7, 12, 10);
+  it("1× 23:00 tomada às 23:00, às 23:10 muda pra 00:30 → 00:30 do dia 9 (25 h 30)", () => {
+    const store = criarStore({ [CHAVE]: simples("23:00"), [LOG]: { "2026-11-07": ["r1"] } });
+    agoraEm(7, 23, 10);
     montar(store);
-    fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "20:00" } });
-    expect(linhas(store)).toEqual(simples("20:00"));
-    expect(screen.getByRole("button", { name: "Desmarcar Losartana" })).toBeTruthy();
-    expect(avisos(store)[0]).toBe("08/20:00");
-    expect(falas.lista.some((t) => t.includes("a partir de"))).toBe(false);
+    fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "00:30" } });
+    expect(falas.lista).toContain("Próxima dose: 09/11 às 00:30.");
+    expect(avisos(store)[0]).toBe("09/00:30");
   });
 
-  it("J3 1× 20:00 tomado às 23:30 e mudado pra 02:00: muda na hora (como na 1.0.24), sem id novo, e a marca de hoje fica", () => {
+  it("1× 08:00 tomada, às 10:00 muda pra 23:00 → hoje às 23:00", () => {
+    const store = criarStore({ [CHAVE]: simples("08:00"), [LOG]: { "2026-11-07": ["r1"] } });
+    agoraEm(7, 10, 0);
+    montar(store);
+    fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "23:00" } });
+    expect(falas.lista).toContain("Próxima dose: hoje às 23:00.");
+    expect(avisos(store)[0]).toBe("07/23:00");
+  });
+
+  it("sem marca nas últimas 48 h: 08:00 → 11:00 às 10:00 é hoje às 11:00", () => {
+    const store = criarStore({ [CHAVE]: simples("08:00"), [LOG]: {} });
+    agoraEm(7, 10, 0);
+    montar(store);
+    fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "11:00" } });
+    expect(falas.lista).toContain("Próxima dose: hoje às 11:00.");
+    expect(avisos(store)[0]).toBe("07/11:00");
+  });
+
+  it("J3 1× 20:00 tomado às 23:30 e mudado pra 02:00: a próxima fica a 12 h da dose marcada e a marca de hoje fica", () => {
     const store = criarStore({ [CHAVE]: simples("20:00"), [LOG]: { "2026-11-07": ["r1"] } });
     agoraEm(7, 23, 35);
     montar(store);
     fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "02:00" } });
-    expect(linhas(store)).toEqual(simples("02:00"));
+    expect(linhas(store)[0].novoDesde).toBe("2026-11-09T02:00");
     expect(store.get<Record<string, string[]>>(LOG, {})["2026-11-07"]).toEqual(["r1"]);
-  });
-
-  it("uma troca gravada antes (campos horaAntes/antesAte/novoDesde/idAntes) sai da linha ao mudar com a chave off", () => {
-    const store = criarStore({
-      [CHAVE]: simples("20:00", { id: "r1~abc", idAntes: "r1", horaAntes: "00:00", antesAte: "2026-11-07", novoDesde: "2026-11-08T20:00" }),
-    });
-    agoraEm(7, 12, 10);
-    montar(store);
-    fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "21:00" } });
-    expect(linhas(store)).toEqual(simples("21:00", { id: "r1~abc" }));
-    expect(avisos(store)[0]).toBe("07/21:00");
   });
 
   it("mesmo horário de antes: não grava nada", () => {

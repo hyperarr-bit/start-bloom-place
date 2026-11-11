@@ -395,6 +395,9 @@ describe("Vitaminas e Remédios: o grupo na tabela", () => {
   });
 
   it("linha simples com 'até' continua com o horário editável na linha e mostra 'até dd/mm'", () => {
+    // 11/11: relógio fixo — pela regra simples a dose nova das 10:00 é a de hoje só se ainda não passou
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 7, 9, 30));
     const store = criarStore({ [CHAVE]: [{ id: "d", name: "Dipirona", time: "09:00", stock: 10, dosesPerDay: 1, ate: dia(3) }] });
     montar(store);
     expect(screen.getByTestId("remedio-detalhe").textContent).toBe(`até ${dia(3).slice(8, 10)}/${dia(3).slice(5, 7)}`);

@@ -304,7 +304,8 @@ export function useLifeHubData(): LifeHubData {
     const supplements = dosesEmVigor((Array.isArray(supplementsBrutos) ? supplementsBrutos : []).filter((s) => s && typeof s === "object"));
     const supplementLog = get<any>("core-saude-supplement-log", {});
     const todaySups = supplementLog[tStr] || [];
-    const supplementsTaken = Array.isArray(todaySups) ? todaySups.length : 0;
+    // nunca mais que as doses do dia (11/11: com o horário mudado, a de antes e a nova podem cair no mesmo dia)
+    const supplementsTaken = Array.isArray(todaySups) ? Math.min(todaySups.length, supplements.length) : 0;
 
     // Library
     const books = get<any[]>("lib-books", []);

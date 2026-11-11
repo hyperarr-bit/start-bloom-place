@@ -206,7 +206,8 @@ const mudarPrimeiraNaTela = (store: ReturnType<typeof criarStore>, hora: string)
 };
 
 describe("editar a 1ª dose", () => {
-  it("08:00 vira 07:00 depois de começar: hoje segue 08:00/16:00/00:00; às 07:20 do dia seguinte a das 07:00 é de hoje e o aviso de amanhã 07:00 continua", () => {
+  // 11/11: premissa da regra antiga ("hoje segue os horários de antes"); a regra simples está em remedio-simples-11-11
+  it.skip("08:00 vira 07:00 depois de começar: hoje segue 08:00/16:00/00:00; às 07:20 do dia seguinte a das 07:00 é de hoje e o aviso de amanhã 07:00 continua", () => {
     const novas = cadastro(agoraEm(5, 7, 50), "08:00");
     const [d1] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas });
@@ -242,7 +243,8 @@ describe("editar a 1ª dose", () => {
     expect(doseDaHora(dosesDoGrupoAgora(g, agora), agora)?.time).toBe("07:00");
   });
 
-  it("no 1º dia, editou às 15:00 pra 07:00; reaberto em 08/11 às 07:05 a caixa marca a das 07:00 de 08/11, e o estoque desce uma vez", () => {
+  // 11/11: premissa da regra antiga ("hoje segue os horários de antes"); a regra simples está em remedio-simples-11-11
+  it.skip("no 1º dia, editou às 15:00 pra 07:00; reaberto em 08/11 às 07:05 a caixa marca a das 07:00 de 08/11, e o estoque desce uma vez", () => {
     const novas = cadastro(agoraEm(7, 10), "08:00");
     const [d1, d2] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-07": [d1] } });
@@ -371,7 +373,8 @@ describe("mudar a hora com o registro cheio: nenhuma marca muda de lugar", () =>
   const pilulas = () => screen.getAllByTestId(/^dose-/)
     .map((b) => `${(b.textContent ?? "").slice(0, 5)}${b.getAttribute("aria-pressed") === "true" ? "✓" : ""}`).join(" ");
 
-  it("tomou 00:00 e 08:00, mudou pra 07:00 às 15:00 → o registro fica igual; hoje 08:00 ✓ 16:00 00:00, amanhã 07:00 15:00 23:00 com aviso", () => {
+  // 11/11: premissa da regra antiga ("hoje segue os horários de antes"); a regra simples está em remedio-simples-11-11
+  it.skip("tomou 00:00 e 08:00, mudou pra 07:00 às 15:00 → o registro fica igual; hoje 08:00 ✓ 16:00 00:00, amanhã 07:00 15:00 23:00 com aviso", () => {
     const novas = cadastro(agoraEm(5, 10), "08:00");
     const [d1, d2, d3] = novas.map((l) => l.id);
     const log = { "2026-11-05": [d1, d2], "2026-11-06": [d3, d1, d2], "2026-11-07": [d3, d1] }; // quem toma tudo
@@ -400,7 +403,8 @@ describe("mudar a hora com o registro cheio: nenhuma marca muda de lugar", () =>
     expect(pilulas()).toBe("07:00 15:00 23:00");
   });
 
-  it("1º dia: tomou a das 08:00 e às 15:00 atrasou pra 20:00 → hoje segue 16:00 e 00:00; os novos começam amanhã 12:00 (mais de meio intervalo depois da das 00:00)", () => {
+  // 11/11: premissa da regra antiga ("hoje segue os horários de antes"); a regra simples está em remedio-simples-11-11
+  it.skip("1º dia: tomou a das 08:00 e às 15:00 atrasou pra 20:00 → hoje segue 16:00 e 00:00; os novos começam amanhã 12:00 (mais de meio intervalo depois da das 00:00)", () => {
     const novas = cadastro(agoraEm(7, 7, 50), "08:00");
     const [d1, d2] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas.map((l) => ({ ...l, stock: 20 })), [LOG]: { "2026-11-07": [d1] } });
@@ -416,7 +420,8 @@ describe("mudar a hora com o registro cheio: nenhuma marca muda de lugar", () =>
     expect(planoDe(store).map((a) => fmt(a.quando)).slice(0, 3)).toEqual(["08/00:00", "08/12:00", "08/20:00"]);
   });
 
-  it("tomou a das 08:00 um pouco antes (07:50) e às 07:55 mudou pra 08:30 → continua marcada (é a mesma dose)", () => {
+  // 11/11: premissa da regra antiga ("hoje segue os horários de antes"); a regra simples está em remedio-simples-11-11
+  it.skip("tomou a das 08:00 um pouco antes (07:50) e às 07:55 mudou pra 08:30 → continua marcada (é a mesma dose)", () => {
     const novas = cadastro(agoraEm(5, 10), "08:00");
     const [d1] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-07": [d1] } });
@@ -535,7 +540,8 @@ describe("mudar a hora antes da dose da manhã: hoje ainda segue os horários de
     return { "2026-11-05": [d1, d2], "2026-11-06": [d3, d1, d2], "2026-11-07": [d3] };
   };
 
-  it("(B) às 06:50, 08:00 → 07:00: ontem continua completo, hoje a das 08:00 é a da vez e tem aviso; amanhã 07:00", () => {
+  // 11/11: premissa da regra antiga ("hoje segue os horários de antes"); a regra simples está em remedio-simples-11-11
+  it.skip("(B) às 06:50, 08:00 → 07:00: ontem continua completo, hoje a das 08:00 é a da vez e tem aviso; amanhã 07:00", () => {
     const novas = cadastro(agoraEm(5, 10), "08:00");
     const [d1, d2, d3] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas.map((l) => ({ ...l, stock: 14 })), [LOG]: quemTomaTudo([d1, d2, d3]) });
@@ -552,7 +558,8 @@ describe("mudar a hora antes da dose da manhã: hoje ainda segue os horários de
     expect(screen.getByTestId(`dose-${d1}`).textContent).toBe("08:00");
   });
 
-  it("(D) às 06:30, 08:00 → 06:00: não aparece dose das 06:00 de hoje por tomar; a fileira diz quando os novos começam", () => {
+  // 11/11: premissa da regra antiga ("hoje segue os horários de antes"); a regra simples está em remedio-simples-11-11
+  it.skip("(D) às 06:30, 08:00 → 06:00: não aparece dose das 06:00 de hoje por tomar; a fileira diz quando os novos começam", () => {
     const novas = cadastro(agoraEm(5, 10), "08:00");
     const [d1, d2, d3] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas, [LOG]: quemTomaTudo([d1, d2, d3]) });
@@ -568,7 +575,8 @@ describe("mudar a hora antes da dose da manhã: hoje ainda segue os horários de
     expect(screen.getByTestId("remedio-editar-novos").textContent).toBe(" · os novos valem a partir de amanhã 06:00");
   });
 
-  it("(C) às 07:30, 08:00 → 12:00: as marcas de 06/11 e 07/11 continuam; o próximo aviso é o das 08:00 de hoje", () => {
+  // 11/11: premissa da regra antiga ("hoje segue os horários de antes"); a regra simples está em remedio-simples-11-11
+  it.skip("(C) às 07:30, 08:00 → 12:00: as marcas de 06/11 e 07/11 continuam; o próximo aviso é o das 08:00 de hoje", () => {
     const novas = cadastro(agoraEm(5, 10), "08:00");
     const [d1, d2, d3] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas, [LOG]: quemTomaTudo([d1, d2, d3]) });
@@ -583,7 +591,8 @@ describe("mudar a hora antes da dose da manhã: hoje ainda segue os horários de
     expect(planoDe(store).map((a) => fmt(a.quando)).slice(0, 5)).toEqual(["07/08:00", "07/16:00", "08/00:00", "08/12:00", "08/20:00"]);
   });
 
-  it("(E) 12 em 12, às 06:40, 08:00 → 07:00: ontem não fica vazio; hoje 08:00 e 20:00, amanhã 07:00", () => {
+  // 11/11: premissa da regra antiga ("hoje segue os horários de antes"); a regra simples está em remedio-simples-11-11
+  it.skip("(E) 12 em 12, às 06:40, 08:00 → 07:00: ontem não fica vazio; hoje 08:00 e 20:00, amanhã 07:00", () => {
     const novas = montarLinhas({ name: "Amoxicilina", stock: 21 }, gerarHorarios("08:00", 2), "2026-11-13", new Date(2026, 10, 5, 10).getTime());
     const [d1, d2] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-05": [d1, d2], "2026-11-06": [d1, d2] } });

@@ -140,7 +140,7 @@ describe("crítica de fora, 08/11, rodada 3 — depois da simplificação", () =
     expect(log(store)).toEqual({ "2026-11-07": ["r1"], "2026-11-08": ["r1"] });
     agoraEm(7, 23, 55);
     fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "23:00" } });
-    expect(falas).toContain("Os horários novos valem a partir de amanhã, às 23:00."); // 10/11: o dia E a hora
+    expect(falas).toContain("Próxima dose: amanhã às 23:00."); // 11/11: 12 h depois da das 00:30 do dia 8
     expect(log(store)).toEqual({ "2026-11-07": ["r1"], "2026-11-08": ["r1"] });
     expect(estoque(store)).toEqual([29]);
     expect(avisos(store)).toContain("08/23:00");
@@ -177,7 +177,7 @@ describe("crítica de fora, 08/11, rodada 3 — depois da simplificação", () =
     agoraEm(7, 15, 0);
     montar(store);
     fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "23:00" } });
-    expect(falas).toContain("Os horários novos valem a partir de hoje, às 23:00.");
+    expect(falas).toContain("Próxima dose: hoje às 23:00.");
     expect(linhas(store)[0]).toMatchObject({ time: "23:00", horaAntes: "00:30", idAntes: "r1", novoDesde: "2026-11-07T23:00" });
     expect(linhas(store)[0].id).not.toBe("r1");
     expect(avisos(store)[0]).toBe("07/23:00"); // 22 h 30 depois do comprimido das 00:30
@@ -209,10 +209,10 @@ describe("crítica de fora, 08/11, rodada 3 — depois da simplificação", () =
   });
 
   /* H2: 8 em 8, 08:00 tomada. Às 08:20: 08:00 → 11:00, "Pronto"; reabre e acerta 11:00 → 11:30. Dá o
-     mesmo que 08:00 → 11:30 de uma vez: hoje segue 08:00 ✓, 16:00 e 00:00; amanhã 11:30, 19:30 e 03:30. */
+     mesmo que 08:00 → 11:30 de uma vez. Regra simples (11/11): a próxima é a 1ª nova a 4 h da das 08:00 — 19:30. */
   const hojeSegue = (store: Store) => {
     expect(log(store)["2026-11-07"]).toEqual(expect.arrayContaining([linhas(store)[0].id]));
-    expect(avisos(store).slice(0, 3)).toEqual(["07/16:00", "08/00:00", "08/11:30"]);
+    expect(avisos(store).slice(0, 3)).toEqual(["07/19:30", "08/03:30", "08/11:30"]);
   };
 
   it("H2 08:00 tomada; às 08:20 08:00 → 11:00, Pronto, reabre, 11:00 → 11:30: o mesmo que de uma vez", () => {
@@ -279,8 +279,8 @@ describe("crítica de fora, 08/11, rodada 3 — depois da simplificação", () =
     agoraEm(7, 8, 10);
     fireEvent.change(screen.getByLabelText("Horário de Amoxicilina (1ª dose)"), { target: { value: "08:30" } });
     expect(log(store)).toEqual(vindo);
-    expect(pilula(d08).getAttribute("aria-pressed")).toBe("true");
-    expect(avisos(store)[0]).toBe("07/16:00");
+    // 11/11, regra simples: a marca de fora conta como o último comprimido → a próxima é 16:30
+    expect(avisos(store)[0]).toBe("07/16:30");
   });
 
   /* H3: a Home conta remédio pelo dia do CALENDÁRIO e por toda linha em vigor, sem olhar o `inicio`:

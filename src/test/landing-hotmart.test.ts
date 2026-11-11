@@ -301,13 +301,16 @@ describe("hotmart.ts, rotas e obrigado", () => {
   it("vercel.json e vite.config.ts: /vida e /vida/ → landing.html, /vida/obrigado e /vida/obrigado/ → vida-obrigado.html (antes do catch-all); o /organizar igual", () => {
     const v = JSON.parse(readFileSync(resolve(raiz, "vercel.json"), "utf8")) as { rewrites: Array<{ source: string; destination: string }> };
     const i = (s: string) => v.rewrites.findIndex((r) => r.source === s);
+    // 11/11: o catch-all do vercel.json agora deixa /assets de fora: "/((?!assets(?:/|$)).*)" → /index.html
+    const CATCH_ALL = "/((?!assets(?:/|$)).*)";
+    expect(i(CATCH_ALL)).toBe(v.rewrites.length - 1);
     expect(v.rewrites[i("/vida")].destination).toBe("/landing.html");
     expect(v.rewrites[i("/vida/obrigado")].destination).toBe("/vida-obrigado.html");
     expect(v.rewrites[i("/vida/")].destination).toBe("/landing.html"); // K (revisão): com barra também
     expect(v.rewrites[i("/vida/obrigado/")].destination).toBe("/vida-obrigado.html");
-    expect(i("/vida/obrigado/")).toBeLessThan(i("/(.*)"));
+    expect(i("/vida/obrigado/")).toBeLessThan(i(CATCH_ALL));
     expect(v.rewrites[i("/organizar")].destination).toBe("/landing.html");
-    expect(i("/vida/obrigado")).toBeLessThan(i("/(.*)"));
+    expect(i("/vida/obrigado")).toBeLessThan(i(CATCH_ALL));
     const vite = readFileSync(resolve(raiz, "vite.config.ts"), "utf8");
     expect(vite).toContain('vidaObrigado: path.resolve(__dirname, "vida-obrigado.html")');
     expect(vite).toContain('replace(/^\\/vida\\/obrigado\\/?/, "/vida-obrigado.html")');

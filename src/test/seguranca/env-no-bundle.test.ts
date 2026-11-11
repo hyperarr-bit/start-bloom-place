@@ -76,7 +76,14 @@ describe("cabeçalhos de segurança do site (vercel.json)", () => {
     // 04/11: + /vida e /vida/ → /landing.html, /vida/obrigado e /vida/obrigado/ → /vida-obrigado.html (a LP v3 com checkout Hotmart)
     // 04/11: + /oferta e /oferta/ → /landing.html (a página atual a R$ 67,90 com o checkout Stripe)
     // 07/11: + /vitalicio e /vitalicio/ → /landing.html (a página nova da /oferta num link próprio)
-    expect(cfg.rewrites).toHaveLength(14);
+    // 07–10/11: /vitalicio e /vitalicio/ passaram a ir pra /conhecer.html; + /vitalicio/demo(/) → /conhecer-demo.html e
+    //   (10/11) /instalar, /instalar/, /instalar/demo, /instalar/demo/ (o funil de download das lojas)
+    // 09/11: o catch-all deixa /assets de fora ("/((?!assets(?:/|$)).*)" → /index.html): arquivo de build que sumiu dá 404, não o app
+    expect(cfg.rewrites).toHaveLength(20);
+    const rotas = (cfg.rewrites as Array<{ source: string; destination: string }>);
+    expect(rotas[rotas.length - 1]).toEqual({ source: "/((?!assets(?:/|$)).*)", destination: "/index.html" });
+    expect(rotas.find((r) => r.source === "/vitalicio")?.destination).toBe("/conhecer.html");
+    expect(rotas.find((r) => r.source === "/instalar")?.destination).toBe("/instalar.html");
     expect((cfg.rewrites as Array<{ source: string }>).map((r) => r.source)).toContain("/organizar");
     expect((cfg.rewrites as Array<{ source: string }>).map((r) => r.source)).toContain("/vendas");
   });

@@ -142,6 +142,9 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   // e que já abriram a retrospectiva NOVA neste aparelho; espelhos das chaves da conta retro-outubro-aviso-visto / retro-outubro-nova-aberta
   "core-retro-outubro-aviso-aparelho",
   "core-retro-outubro-nova-aparelho",
+  // 11/11 (trava da build 1.0.25): o Pix pendente do pagamento da /vitalicio (src/conhecer/checkout-state, 7 dias) — quem
+  // gerou o Pix e voltou tem que achar o mesmo pedido; nunca é prova de pagamento (o pedido é conferido de novo no servidor)
+  "core-conhecer-checkout-v1",
 ]);
 
 /** Famílias de chaves do aparelho (prefixo + id). */

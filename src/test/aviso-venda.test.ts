@@ -292,9 +292,11 @@ describe("a PWA do /vendas não encosta no app dos clientes", () => {
   it("vercel: /vendas → vendas.html; sw.js como JS, sem cache, com Service-Worker-Allowed só /vendas", () => {
     const cfg = JSON.parse(ler("vercel.json")) as { headers: Array<{ source: string; headers: Array<{ key: string; value: string }> }>; rewrites: Array<{ source: string; destination: string }> };
     const rw = cfg.rewrites.map((r) => `${r.source}→${r.destination}`);
+    // 11/11: o catch-all do vercel.json agora deixa /assets de fora: "/((?!assets(?:/|$)).*)" → /index.html
+    expect(rw).toContain("/((?!assets(?:/|$)).*)→/index.html");
     expect(rw).toContain("/vendas→/vendas.html");
     expect(rw).toContain("/vendas/→/vendas.html");
-    expect(rw.indexOf("/vendas→/vendas.html")).toBeLessThan(rw.indexOf("/(.*)→/index.html"));
+    expect(rw.indexOf("/vendas→/vendas.html")).toBeLessThan(rw.indexOf("/((?!assets(?:/|$)).*)→/index.html"));
     const sw = Object.fromEntries((cfg.headers.find((h) => h.source === "/vendas/sw.js")?.headers ?? []).map((h) => [h.key, h.value]));
     expect(sw["Content-Type"]).toMatch(/^application\/javascript/);
     expect(sw["Cache-Control"]).toMatch(/no-cache/);

@@ -10,6 +10,7 @@ import { chaveSoDoServidor } from "@/lib/conteudo-pago";
 import { iguais, mesclar3 } from "@/lib/mesclar-dados";
 import { CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK, calcularSequencia, contaComoAnotacao, registrarDia, registrarDiaRetroativo, temConteudo } from "@/lib/sequencia";
 import { registrarLeitorDosDados } from "@/lib/medicao-total";
+import { medicaoAbasLigada, usoModuloPrimeiraVezHoje } from "@/lib/abas-caderno";
 
 // Map user_data keys → activation action_key. Triggered first time a key is written
 // with non-empty value.
@@ -80,6 +81,11 @@ const checkActivation = (key: string, value: any) => {
   // 1.0.22: `abas-ocultas:financas` / `abas-ordem:treino` são preferência da fileira de abas — sem isto o /financ|treino/
   // das regras viraria "first_transaction"/"first_workout" (e avançaria missão/holofote) só por ocultar uma aba
   if (key.startsWith("abas-")) return;
+  // 07/11 (medição nova, lib/abas-caderno — SPEC trial-abas §8.1): *-last-seen-* é escrita de ABERTURA do módulo, não
+  // ação. Em 06/11, 56 de 56 `first_transaction` vieram de `finance-last-seen-month` (abrir Finanças com a conta vazia).
+  // Com a medição nova, ela não marca ativação nem solta `core:activation` (que também chamava o ConviteDeValor).
+  const medicaoNova = medicaoAbasLigada();
+  if (medicaoNova && /last-seen/.test(key)) return;
   for (const rule of ACTIVATION_RULES) {
     if (rule.match.test(key)) {
       if (rule.meaningful && !rule.meaningful(value)) return;
@@ -87,7 +93,10 @@ const checkActivation = (key: string, value: any) => {
       // *-last-seen-* é escrita de ABERTURA do módulo (marcador de navegação,
       // não ação da pessoa) — provado no emulador 17/08: abrir /financas já
       // emitia uso_modulo sem nenhum toque. Uso = ação, não visita.
-      if (!usoJaContado.has(key) && !/last-seen/.test(key)) {
+      if (medicaoNova) {
+        // medição nova: 1x por chave por DIA neste aparelho (antes era 1x por processo — reabrir o app repetia)
+        if (usoModuloPrimeiraVezHoje(key, localDayKey())) trackEvent("uso_modulo", { key, action: rule.action });
+      } else if (!usoJaContado.has(key) && !/last-seen/.test(key)) {
         usoJaContado.add(key);
         trackEvent("uso_modulo", { key, action: rule.action });
       }

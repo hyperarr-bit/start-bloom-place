@@ -331,6 +331,24 @@ export const PharmacyChecklist = () => {
     if (!time) return;
     const linha = supplements.find(s => s.id === id);
     if (!linha) return;
+    /* CHAVE DESLIGADA (11/11, crítica da build 1.0.25): a regra "a partir de amanhã" fica atrás da
+       REMEDIO_VEZES, junto com o cadastro de várias doses. Com ela off, mudar o horário vale NA HORA,
+       como na 1.0.24 e no site de hoje (troca a hora e rearma o aviso). Motivo: a regra nova ainda tem
+       erro aberto no 1× ao dia (J1: 00:00 → 20:00 ao meio-dia deixava 44 h sem dose e sem aviso;
+       J3: tomado atrasado e mudado logo depois, dose nova 2 h 30 depois do comprimido). Os campos de
+       uma troca antiga (horaAntes, antesAte, novoDesde, idAntes) saem da linha, senão a tela e os
+       avisos seguiam a troca velha. Nenhuma linha em produção tem esses campos. */
+    if (!vezesLigado) {
+      if (linha.time === time && !linha.horaAntes) return;
+      const lista = supplements.map(s => {
+        if (s.id !== id) return s;
+        const { horaAntes: _h, idAntes: _i, antesAte: _a, novoDesde: _n, ...resto } = s;
+        return { ...resto, time };
+      });
+      setSupplements(lista);
+      void rearmarLembretes(lista, false);
+      return;
+    }
     const doRemedio = supplements.filter(mesmoGrupo(linha));
     const i = doRemedio.findIndex(s => s.id === id);
     const atuais = doRemedio.map(s => s.time);

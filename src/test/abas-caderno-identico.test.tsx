@@ -3,7 +3,7 @@
  *
  * O caderno com sumário (lib/abas-caderno) mora atrás das chaves `abas_enxutas` (padrão "on" = braço hoje) e
  * `abas_visual` (padrão "hoje") — e a medição nova atrás de `abas_medicao` (padrão "off"). Com as três no padrão, a
- * fileira, a folha "Organizar abas" e os eventos têm de sair IGUAIS aos do main de antes do caderno (commit c66dd323).
+ * fileira, a folha "Organizar abas" e os eventos têm de sair IGUAIS aos do main de antes do caderno (commit 624dc97a, a base da 1.0.25 na loja).
  *
  * A foto do main está em src/test/fixtures/fileira-abas-main.json, gerada com ESTE arquivo rodando sobre o código de
  * antes do caderno (`GERAR_FOTO_FILEIRA=1 npx vitest run src/test/abas-caderno-identico.test.tsx`). Não regerar
@@ -127,7 +127,7 @@ describe("chave desligada: a fileira é a do main", () => {
       localStorage.clear(); _zerarTodasAsAbas(); _zerarHomeNova();
     }
     if (GERAR) {
-      writeFileSync(FOTO, JSON.stringify({ gerada_em: new Date().toISOString(), base: "c66dd323", cenarios: atual }, null, 1));
+      writeFileSync(FOTO, JSON.stringify({ gerada_em: new Date().toISOString(), base: "624dc97a", cenarios: atual }, null, 1));
       return;
     }
     expect(existsSync(FOTO), "a foto do main tem de existir").toBe(true);

@@ -25,9 +25,9 @@ import { isNativeShell } from "@/lib/native-shell";
 export type ModoChave = "on" | "off";
 /** App das lojas. DESLIGADA na build 1.0.25/137 (10/11): o remédio novo ainda tem problema aberto (crítica de fora
  *  10/11, rodada 2: J1, J2, J3). Ligar aqui só numa build depois do conserto; a 1.0.25 já entende `ate` e `inicio`. */
-export const REMEDIO_VEZES_APP: ModoChave = "off";
+export const REMEDIO_VEZES_APP = "off" as ModoChave;
 /** Site (Vercel). DESLIGADA até a build nova estar na loja (iPhone e Android). */
-export const REMEDIO_VEZES_WEB: ModoChave = "off";
+export const REMEDIO_VEZES_WEB = "off" as ModoChave;
 
 /** "Quantas vezes" e "Até quando" aparecem no cadastro deste aparelho? */
 export const remedioVezesLigado = (): boolean => (isNativeShell() ? REMEDIO_VEZES_APP : REMEDIO_VEZES_WEB) === "on";

@@ -13,6 +13,7 @@ import { isInAppBrowser } from "@/lib/funnel";
 import { trackEvent } from "@/lib/analytics";
 import { useUserData } from "@/hooks/use-user-data";
 import { isNativeShell } from "@/lib/native-shell";
+import { entrarCodigoLigado, type EstadoEntrarCodigo } from "@/lib/entrar-codigo";
 
 const GoogleIcon = () => (
   <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
@@ -98,7 +99,17 @@ const Auth = () => {
       }
     } else {
       const { error, session } = await signUp(email, password, name.trim());
-      if (error) {
+      if (error && entrarCodigoLigado() && /already registered|already been registered|user already/i.test(error.message || "")) {
+        // Já tem conta: a senha que ela acabou de digitar é o caminho mais curto; se não bater, segue pro código.
+        const alvo = email.trim().toLowerCase();
+        const { error: erroDaSenha } = await signIn(alvo, password);
+        if (erroDaSenha) {
+          navigate("/entrar", { state: { emailJaTemConta: alvo } satisfies EstadoEntrarCodigo });
+        } else {
+          trackEvent("login_completed", { method: "password" });
+          navigate("/");
+        }
+      } else if (error) {
         toast({ title: "Erro ao criar conta", description: error.message, variant: "destructive" });
       } else {
         trackEvent("signup_completed", { method: "password" });

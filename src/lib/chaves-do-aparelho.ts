@@ -215,7 +215,7 @@ export const CHAVES_REVISADAS_DA_CONTA_OU_TRANSITORIAS: Readonly<Record<string, 
   ],
   // UMA VIAGEM PELO LOGIN: gravadas antes de sair pro Google/Apple e lidas (e apagadas) na volta, no
   // primeiro render — antes do efeito da vassoura.
-  ida_e_volta_do_login: ["core-pos-compra-oauth", "core-auth-next"],
+  ida_e_volta_do_login: ["core-pos-compra-oauth", "core-auth-next", "core-auth-metodo"],
   // LEGADO DO TESTE DE CONVIDADO (Android v53, nada grava desde 18/08): depois do login quem manda é
   // a assinatura; limpar no login é o comportamento que já vale.
   legado_teste_convidado: ["core-teste-inicio", "core-guia-semente"],

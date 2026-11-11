@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { trackEvent } from "@/lib/analytics";
 import { persistLeadSource } from "@/lib/lead-source";
 import { destinoSeguro, pegarDestinoGuardado, urlEntrar } from "@/lib/destino-seguro";
+import { pegarMetodoLogin, registrarLoginOAuth } from "@/lib/login-oauth";
 
 const AuthCallback = () => {
   const navigate = useNavigate();
@@ -35,6 +36,7 @@ const AuthCallback = () => {
         const emailDoLink = query.get("e");
 
         if (errorDesc) {
+          pegarMetodoLogin(); // o OAuth voltou com erro: não houve login
           if (next) {
             trackEvent("auth_callback_link_vencido", { next });
             toast({ title: "Esse link já venceu", description: "Entra com seu e-mail e você volta direto pra oferta." });
@@ -90,6 +92,7 @@ const AuthCallback = () => {
         const createdAt = u?.user?.created_at ? new Date(u.user.created_at).getTime() : 0;
         const isNewUser = createdAt > 0 && Date.now() - createdAt < 10 * 60 * 1000;
         if (isNewUser && u?.user?.id) await persistLeadSource(supabase, u.user.id);
+        if (u?.user) registrarLoginOAuth(isNewUser ? { conta_nova: true } : {});
 
         if (next) {
           // sem sessão (link já usado, aba antiga): a porta é o /entrar, que volta pro destino

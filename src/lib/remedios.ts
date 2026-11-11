@@ -51,6 +51,14 @@ export interface Remedio {
   ate?: string;
   /** 07/11: momento da 1ª dose ("AAAA-MM-DDTHH:MM"), só em grupo de 2+ horários. Antes dele, nada. */
   inicio?: string;
+  /** 08/11: horário mudado — o de antes, que vale até o fim do dia `antesAte` (ver `mudarHorarios`) */
+  horaAntes?: string;
+  /** 08/11: o último dia (do tratamento) com os horários de antes ("AAAA-MM-DD") */
+  antesAte?: string;
+  /** 08/11: o momento da 1ª dose com os horários novos ("AAAA-MM-DDTHH:MM") */
+  novoDesde?: string;
+  /** 08/11: o id que a linha tinha, quando a dose de antes e a nova caem no mesmo dia do calendário */
+  idAntes?: string;
 }
 
 export const OPCOES_VEZES: ReadonlyArray<{ vezes: VezesAoDia; rotulo: string }> = [
@@ -309,12 +317,19 @@ export interface GrupoDeRemedio {
   estoque: number;
 }
 
+/**
+ * O id de sempre de uma linha: o id que `mudarHorarios` dá pras doses novas é "id~xxxx" (08/11).
+ * A chave do remédio na tela sai daqui, pra a linha não sumir e voltar (nem a fileira de edição
+ * fechar no meio da digitação) quando o id muda.
+ */
+export const raizDoId = (id: unknown): string => String(id ?? "").split("~")[0];
+
 /** As linhas da chave viram uma lista de grupos (remédio simples = grupo de 1), na ordem de cadastro. */
 export function agruparRemedios(lista: Remedio[]): GrupoDeRemedio[] {
   const grupos = new Map<string, Remedio[]>();
   for (const r of Array.isArray(lista) ? lista : []) {
     if (!r || typeof r !== "object") continue;
-    const chave = typeof r.grupo === "string" && r.grupo ? `g:${r.grupo}` : `i:${r.id}`;
+    const chave = typeof r.grupo === "string" && r.grupo ? `g:${r.grupo}` : `i:${raizDoId(r.id)}`;
     grupos.set(chave, [...(grupos.get(chave) ?? []), r]);
   }
   return [...grupos.entries()].map(([chave, itens]) => ({
@@ -343,8 +358,8 @@ export type DoseMarcavel = Remedio & { dia: string; quando: number };
  * (Crítica de fora, rodada 2, 07/11: com teto de 1 h, às 06:30 a tela ainda era a de
  * ONTEM, e quem tomava a das 08:00 adiantado e tocava a pílula ou a caixa desmarcava
  * a dose de ontem — estoque +1, histórico sem uma dose tomada, aviso das 08:00
- * tocando: 2 comprimidos em 1 h e meia.) `ANTECEDENCIA_MIN` segue só como o "tomar
- * um pouco antes" de `moverMarcasDoGrupo` e pra quando não há folga (horas iguais).
+ * tocando: 2 comprimidos em 1 h e meia.) `ANTECEDENCIA_MIN` segue só pra quando não
+ * há folga (horas iguais).
  */
 const ANTECEDENCIA_MIN = 60;
 function antecedenciaMin(horas: string[], primeira: string): number {
@@ -398,24 +413,59 @@ function diaDaDoseUnica(hora: string, agora: Date, ate?: string): string {
  * o último dia (a dose da noite dele vale até a hora da 1ª dose).
  */
 export function dosesDoGrupoAgora(g: GrupoDeRemedio, agora: Date = new Date()): DoseMarcavel[] {
-  if (tratamentoTerminou(g, agora)) return [];
-  const primeira = primeiraDe(g);
-  const hoje = localDayKey(agora);
+  // horário mudado (08/11, simplificação): até o dia do tratamento virar valem os horários de antes
+  const troca = trocaDoGrupo(g);
+  if (!troca) return dosesSemTroca(g, agora);
+  const antigo = grupoComHorasDeAntes(g);
+  if (diaDaConta(antigo, agora) <= troca.antesAte) return dosesSemTroca(antigo, agora);
+  return dosesSemTroca(g, agora, troca.novoDesde);
+}
+
+/**
+ * O dia da conta de agora: o dia do tratamento (grupo) ou o dia da dose (1 linha).
+ * Antes do `inicio` é o dia do início; depois do `ate`, o último dia.
+ */
+function diaDaConta(g: GrupoDeRemedio, agora: Date): string {
   if (g.itens.length <= 1) {
-    return g.itens
-      .filter((s) => doseVale({ time: s.time, ate: g.ate }, primeira, agora))
-      .map((s) => {
-        const dia = ehHora(s.time) ? diaDaDoseUnica(s.time, agora, g.ate) : hoje;
-        return { ...s, dia, quando: ehHora(s.time) ? momentoDe(dia, s.time).getTime() : 0 };
-      });
+    const s = g.itens[0];
+    return s && ehHora(s.time) ? diaDaDoseUnica(s.time, agora, g.ate) : localDayKey(agora);
   }
+  const primeira = primeiraDe(g);
   const p = ehHora(primeira) ? primeira : "00:00";
   const inicioGravado = g.itens.find((s) => ehInicio(s.inicio))?.inicio;
   const antes = antecedenciaMin(g.itens.map((s) => s.time), p);
   let dia = localDayKey(new Date(agora.getTime() - (minutosDe(p) - antes) * 60_000));
   if (ehInicio(inicioGravado) && dia < inicioGravado.slice(0, 10)) dia = inicioGravado.slice(0, 10);
   if (ehDia(g.ate) && dia > g.ate) dia = g.ate;
-  return dosesDoDiaDoTratamento(g, dia);
+  return dia;
+}
+
+/** A conta de sempre, com os horários das linhas. `desde`: antes dele não há dose (o começo dos horários novos). */
+function dosesSemTroca(g: GrupoDeRemedio, agora: Date, desde?: Date): DoseMarcavel[] {
+  if (tratamentoTerminou(g, agora)) return [];
+  const primeira = primeiraDe(g);
+  const hoje = localDayKey(agora);
+  const t0 = desde?.getTime() ?? -Infinity;
+  if (g.itens.length <= 1) {
+    return g.itens
+      .filter((s) => doseVale({ time: s.time, ate: g.ate }, primeira, agora))
+      .map((s) => {
+        if (!ehHora(s.time)) return { ...s, dia: hoje, quando: 0 };
+        let dia = diaDaDoseUnica(s.time, agora, g.ate);
+        // antes do começo dos horários novos não há dose: a da vez é a 1ª do horário novo
+        while (momentoDe(dia, s.time).getTime() < t0) dia = diaSeguinte(dia);
+        return { ...s, dia, quando: momentoDe(dia, s.time).getTime() };
+      });
+  }
+  let dia = diaDaConta(g, agora);
+  if (desde) {
+    // o dia do tratamento da 1ª dose nova (a dose da noite é do dia anterior)
+    const p = primeiraDe(g);
+    const hDesde = horaDoRelogio(desde);
+    const diaDoDesde = ehHora(p) && hDesde < p ? somarDias(localDayKey(desde), -1) : localDayKey(desde);
+    if (dia < diaDoDesde && !(ehDia(g.ate) && diaDoDesde > g.ate)) dia = diaDoDesde;
+  }
+  return dosesDoDiaDoTratamento(g, dia).filter((d) => d.quando >= t0);
 }
 
 /**
@@ -438,18 +488,48 @@ function dosesDoDiaDoTratamento(g: GrupoDeRemedio, dia: string): DoseMarcavel[] 
   return out;
 }
 
-/** Uma marca de "tomado" que saiu de um dia do registro: foi pra `para` (na linha `paraId`, se mudou de linha), ou sumiu (`null`). */
-export interface MarcaMovida { id: string; de: string; para: string | null; paraId?: string }
-
 /**
- * A marca de um comprimido tomado foi pra uma dose que ainda vem (G1, 08/11): as horas da dose
- * tomada, da dose nova e da próxima em aberto, pra tela dizer
- * "A das 08:00 que você marcou agora conta como a das 09:30. Próxima: 17:30."
- * (A marca pode ficar na mesma linha e no mesmo dia — 08:00 → 09:30 é a mesma linha —, por isso não vem em `movidas`.)
+ * MUDAR O HORÁRIO VALE A PARTIR DE AMANHÃ (decisão do dono, 08/11 — simplificação).
+ * Mudar a hora de um remédio (a 1ª dose de um grupo, outra dose dele, ou o horário de um
+ * remédio de 1 linha) não mexe em NENHUMA marca de "tomado": as doses do dia do tratamento
+ * de agora seguem os horários de antes até o dia virar, e os horários novos começam depois.
+ * Antes, a marca andava junto com a dose (`moverMarcasDoGrupo`, 07/11 e 08/11) — e cada
+ * rodada da crítica achava um jeito novo de a marca cair na dose errada.
+ *
+ * Como fica gravado (campos novos, todos opcionais; o app antigo ignora e vê os horários
+ * novos na hora, como sempre viu). Em cada linha:
+ *  - `time`: o horário NOVO (é o que a fileira de edição e o app antigo mostram);
+ *  - `horaAntes`: o horário de antes, que vale até o fim do dia `antesAte`;
+ *  - `antesAte`: o último dia do tratamento com os horários de antes ("AAAA-MM-DD");
+ *  - `novoDesde`: o momento da 1ª dose com os horários novos ("AAAA-MM-DDTHH:MM");
+ *  - `idAntes` (só às vezes): o id que a linha tinha (o novo é "id~xxxx", ver `raizDoId`). O registro de "tomado" é "id no dia do
+ *    calendário"; quando a dose de antes e a dose nova da mesma linha caem no MESMO dia do
+ *    calendário (8 em 8: 08:00 → 07:00 faz a das 00:00 virar 23:00 — no dia seguinte há a
+ *    00:00 de antes e a 23:00 nova), a linha ganha um id novo pras doses novas, e a marca da
+ *    dose de antes fica onde está, no id de antes. Nenhuma marca muda de lugar.
+ *
+ * Quando começam os horários novos (`novoDesde`): na 1ª dose nova depois da virada do dia do
+ * tratamento de antes e a mais de meio intervalo da última dose de antes (8 em 8 → 4 h; 1× ao
+ * dia → 12 h) — nunca 2 comprimidos colados na troca. 8 em 8 desde 08:00, às 15:00 mudado pra
+ * 07:00: hoje 08:00, 16:00 e 00:00; amanhã 07:00, 15:00 e 23:00.
  */
-export interface MarcaContaComo { de: string; para: string; proxima: string | null }
+export type TrocaDeHorario = { antesAte: string; novoDesde: Date };
+const temTroca = (s: Partial<Remedio> | undefined): boolean =>
+  !!s && ehHora(s.horaAntes) && ehDia(s.antesAte) && ehInicio(s.novoDesde);
 
-/** Metade do menor intervalo entre duas doses seguidas (a volta da meia-noite conta): 8 em 8 → 4 h. */
+/** A troca de horário gravada no grupo (todas as linhas com os campos), ou nada. */
+export function trocaDoGrupo(g: GrupoDeRemedio): TrocaDeHorario | undefined {
+  if (!g.itens.length || !g.itens.every(temTroca)) return undefined;
+  const novoDesde = momentoDoInicio(g.itens[0].novoDesde);
+  return novoDesde ? { antesAte: String(g.itens[0].antesAte), novoDesde } : undefined;
+}
+
+/** O grupo com as horas (e os ids) de antes da troca. */
+function grupoComHorasDeAntes(g: GrupoDeRemedio): GrupoDeRemedio {
+  return { ...g, itens: g.itens.map((s) => ({ ...s, id: s.idAntes ?? s.id, time: String(s.horaAntes) })) };
+}
+
+/** Metade do menor intervalo entre duas doses seguidas (a volta da meia-noite conta): 8 em 8 → 4 h; 1 horário → 12 h. */
 function meioIntervaloMin(horas: string[]): number {
   const m = [...new Set(horas.filter(ehHora).map(minutosDe))].sort((a, b) => a - b);
   if (m.length < 2) return 12 * 60;
@@ -457,105 +537,108 @@ function meioIntervaloMin(horas: string[]): number {
   return Math.floor(Math.min(...folgas) / 2);
 }
 
+const semCamposDaTroca = (s: Remedio): Remedio => {
+  const { horaAntes: _h, idAntes: _i, antesAte: _a, novoDesde: _n, ...resto } = s;
+  return resto;
+};
+const textoDoMomento = (x: Date) => `${localDayKey(x)}T${horaDoRelogio(x)}`;
+
 /**
- * MUDOU A HORA, A MARCA VAI JUNTO (07/11, 4ª rodada da crítica). O registro de
- * "tomado" é "id da linha no dia do calendário"; mudar a 1ª dose refaz as horas
- * do grupo, e a mesma linha passa a acontecer noutro dia — ou uma marca velha passa
- * a cair nela. Em 8 em 8 desde 08:00, com 00:00 (de ontem à noite, gravada hoje) e
- * 08:00 tomadas, mudar pra 07:00 às 15:00 fazia a das 23:00 de hoje aparecer
- * tomada e o aviso dela sumia: a pessoa pulava uma dose de antibiótico.
- *
- * A MARCA VAI PRA DOSE MAIS PERTO NO RELÓGIO (crítica de fora, 08/11, F1): cada
- * dose marcada do desenho velho (de anteontem a amanhã) leva a marca pra dose do
- * desenho novo — de QUALQUER linha — cujo momento fica mais perto do momento dela,
- * até a metade do menor intervalo entre as doses (4 h em 8 em 8, a mesma conta da
- * virada do dia). Antes ia pra MESMA LINHA no mesmo dia do tratamento: 08:00 → 23:00
- * às 15:00 (horários 23/07/15) levava a marca da 00:00 pra 15:00 de AGORA e apagava
- * a das 08:00 tomada — a pessoa pulava uma dose; os mesmos horários digitados como
- * 07:00 davam outra coisa. Agora o resultado só depende das horas: 08:00 → 23:00 e
- * 08:00 → 07:00 dão 07 ✓ e 15 em aberto; 08:00 → 02:00 dá 02 ✓ e 10 ✓ (não pede a
- * das 10:00 às 15:00, 3 h antes da das 18:00).
- *  - cada dose nova recebe no máximo uma marca (empate: a dose mais cedo);
- *  - a marca de uma dose que JÁ ACONTECEU (até agora + 1 h, o "tomar um pouco antes")
- *    pode ir pra dose mais perto mesmo que ela ainda venha, até meio intervalo (crítica
- *    de fora, 08/11, rodada 2, G1): o comprimido foi tomado, o aviso daquela dose tem
- *    que sumir. Antes a marca saía — 8 em 8, 08:00 tomada, às 08:20 a 1ª dose virava
- *    09:30: a pílula 09:30 ficava em aberto e o aviso tocava 1 h 30 depois do
- *    comprimido; a pessoa tomava de novo. Nunca passa de agora + meio intervalo;
- *  - a marca de uma dose que ainda vem (marcada adiantado, mais de 1 h antes) só vai
- *    pra uma dose nova até agora + 1 h. Sem dose perto o bastante, a marca sai;
- *  - uma marca solta que cairia numa dose nova que ainda vem também sai.
- * O estoque não muda (o comprimido foi tomado), e o formato da chave é o mesmo: id
- * da linha no dia do calendário em que a dose acontece.
+ * Mudar os horários de UM remédio (as linhas dele, na ordem; `novos` = o horário novo de cada
+ * linha). Devolve as linhas pra gravar e, se os horários novos ficaram pra depois, quando
+ * começam (`novoDesde`, pra tela avisar).
+ *  - Tratamento que ainda não começou (`inicio` no futuro): muda na hora, e o começo acompanha
+ *    a 1ª dose (`inicioAoMudarPrimeira`) — não há dose de hoje pra proteger. `inicioDeAntes`: o
+ *    começo de quando a fileira de edição abriu, pra conta não depender dos valores no meio da
+ *    digitação.
+ *  - Já começado: os horários de antes valem até o dia do tratamento de agora virar (ou o de
+ *    hoje, se for depois: às 02:00 a das 00:00 de ontem à noite ainda é do dia de ontem, e
+ *    "a partir de amanhã" é o dia de amanhã de verdade).
+ *  - Mudar de novo antes de os horários novos começarem (digitando, ou a roda do iPhone passando
+ *    por valores no meio, ou abrindo a fileira de novo): a conta parte sempre dos horários de
+ *    antes; voltar pra eles desfaz a troca.
  */
-export function moverMarcasDoGrupo(
-  antes: GrupoDeRemedio,
-  depois: GrupoDeRemedio,
-  log: Record<string, string[]>,
-  agora: Date = new Date(),
-): { log: Record<string, string[]>; movidas: MarcaMovida[]; contaComo?: MarcaContaComo } {
+export function mudarHorarios(itens: Remedio[], novos: string[], agora: Date = new Date(), inicioDeAntes?: string): { itens: Remedio[]; novoDesde?: string } {
+  const g0 = agruparRemedios(itens)[0];
+  if (!g0 || novos.length !== itens.length || !novos.every(ehHora)) return { itens };
+  // a troca que ainda não começou continua sendo a mesma: parte dos horários (e ids) de antes
+  const troca = trocaDoGrupo(g0);
+  const ativa = !!troca && agora.getTime() < troca.novoDesde.getTime();
+  const base = itens.map((s) => (ativa ? { ...semCamposDaTroca(s), id: s.idAntes ?? s.id, time: String(s.horaAntes) } : semCamposDaTroca(s)));
+  if (novos.every((h, i) => h === base[i].time)) return { itens: base };
+  const antigo: GrupoDeRemedio = { ...g0, itens: base };
+  const varias = base.length > 1;
+
+  // ainda não começou: muda já (sem dose de hoje pra proteger)
+  const inicio = varias ? momentoDoInicio(base.find((s) => ehInicio(s.inicio))?.inicio) : null;
+  if (inicio && inicio.getTime() > agora.getTime()) {
+    const daqui = ehInicio(inicioDeAntes) && momentoDoInicio(inicioDeAntes)!.getTime() > agora.getTime() ? inicioDeAntes : base[0].inicio;
+    const novoInicio = novos[0] !== base[0].time ? inicioAoMudarPrimeira(daqui, novos[0], agora, novos) : undefined;
+    return { itens: base.map((s, i) => ({ ...s, time: novos[i], ...(novoInicio ? { inicio: novoInicio } : {}) })) };
+  }
+
+  // o último dia com os horários de antes: o dia do tratamento de agora, ou hoje (o que vier depois)
   const hoje = localDayKey(agora);
-  const limite = agora.getTime() + ANTECEDENCIA_MIN * 60_000;
-  const marcadoNoLog = (dia: string, id: string) => Array.isArray(log[dia]) && log[dia].includes(id);
-  // as doses marcadas do desenho velho: o dia do tratamento de agora é ontem ou hoje (ou o 1º, amanhã)
-  const marcas: DoseMarcavel[] = [];
-  for (const n of [-2, -1, 0, 1]) {
-    for (const d of dosesDoDiaDoTratamento(antes, somarDias(hoje, n))) if (marcadoNoLog(d.dia, d.id)) marcas.push(d);
+  const diaAgora = troca && ativa ? troca.antesAte : diaDaConta(antigo, agora);
+  const antesAte = ativa && troca ? troca.antesAte : diaAgora > hoje ? diaAgora : hoje;
+  const pAntes = primeiraDe(antigo);
+  const dosesDeAntes = varias
+    ? dosesDoDiaDoTratamento(antigo, antesAte)
+    : base.filter((s) => ehHora(s.time)).map((s) => ({ ...s, dia: antesAte, quando: momentoDe(antesAte, s.time).getTime() }));
+  if (!dosesDeAntes.length) return { itens: base.map((s, i) => ({ ...s, time: novos[i] })) };
+  const ultima = Math.max(...dosesDeAntes.map((d) => d.quando));
+  // a virada do dia de antes: o 1º momento (de 5 em 5 min) depois da última dose em que o dia da conta já é o
+  // seguinte — de 5 em 5 min ela sai no máximo 5 min DEPOIS da virada de verdade, nunca antes
+  const semFim: GrupoDeRemedio = { ...antigo, ate: undefined };
+  let virada = ultima + 12 * 3600_000;
+  for (let t = ultima + 5 * 60_000; t <= ultima + 48 * 3600_000; t += 5 * 60_000) {
+    if (diaDaConta(semFim, new Date(t)) > antesAte) { virada = t; break; }
   }
-  // as doses do desenho novo em volta delas (um dia a mais de cada lado)
-  const novas: DoseMarcavel[] = [];
-  for (const n of [-3, -2, -1, 0, 1, 2]) novas.push(...dosesDoDiaDoTratamento(depois, somarDias(hoje, n)));
-  const raio = meioIntervaloMin(depois.itens.map((s) => s.time)) * 60_000;
-  const chave = (d: DoseMarcavel) => `${d.id}@${d.dia}`;
-  const pares: { m: DoseMarcavel; c: DoseMarcavel; dist: number }[] = [];
-  for (const m of marcas) {
-    for (const c of novas) {
-      const dist = Math.abs(c.quando - m.quando);
-      const cabe = c.quando <= limite || (m.quando <= limite && c.quando <= agora.getTime() + raio);
-      if (dist <= raio && cabe) pares.push({ m, c, dist });
-    }
-  }
-  pares.sort((x, y) => x.dist - y.dist || x.c.quando - y.c.quando || x.m.quando - y.m.quando);
-  const destino = new Map<DoseMarcavel, DoseMarcavel>();
-  const ocupada = new Set<string>();
-  for (const { m, c } of pares) {
-    if (destino.has(m) || ocupada.has(chave(c))) continue;
-    destino.set(m, c);
-    ocupada.add(chave(c));
-  }
-  const out: Record<string, string[]> = { ...log };
-  const tem = (dia: string, id: string) => Array.isArray(out[dia]) && out[dia].includes(id);
-  const tirar = (dia: string, id: string) => { out[dia] = (out[dia] ?? []).filter((x) => x !== id); };
-  const movidas: MarcaMovida[] = [];
-  // 1º tira toda marca que muda de lugar (ou não vai), 2º põe nos lugares novos — duas ocorrências
-  // podem trocar de lugar entre si, e tirar depois de pôr apagaria a que acabou de chegar
-  for (const m of marcas) {
-    const c = destino.get(m);
-    if (c && chave(c) === chave(m)) continue;
-    tirar(m.dia, m.id);
-    movidas.push({ id: m.id, de: m.dia, para: c ? c.dia : null, ...(c && c.id !== m.id ? { paraId: c.id } : {}) });
-  }
-  for (const c of destino.values()) {
-    if (!tem(c.dia, c.id)) out[c.dia] = [...(out[c.dia] ?? []), c.id];
-  }
-  // a marca solta que cairia numa dose nova que ainda vem
-  for (const c of novas) {
-    if (c.quando <= agora.getTime() || ocupada.has(chave(c)) || !tem(c.dia, c.id)) continue;
-    tirar(c.dia, c.id);
-    movidas.push({ id: c.id, de: c.dia, para: null });
-  }
-  // a marca que foi pra uma dose que ainda vem: as horas pra frase da tela (G1)
-  let contaComo: MarcaContaComo | undefined;
-  for (const [m, c] of [...destino.entries()].sort((x, y) => x[1].quando - y[1].quando)) {
-    if (contaComo || c.quando <= agora.getTime() || c.quando === m.quando) continue;
-    const p = primeiraDe(depois);
-    const diaDoTratamento = (x: DoseMarcavel) => (ehHora(p) && x.time < p ? somarDias(x.dia, -1) : x.dia);
-    const proxima = novas
-      .filter((x) => x.quando > c.quando && !tem(x.dia, x.id) && !(ehDia(depois.ate) && diaDoTratamento(x) > depois.ate))
-      .sort((a, b) => a.quando - b.quando)[0];
-    contaComo = { de: m.time, para: c.time, proxima: proxima ? proxima.time : null };
-  }
-  return { log: out, movidas, ...(contaComo ? { contaComo } : {}) };
+  const limite = Math.max(virada, ultima + meioIntervaloMin(novos) * 60_000 + 1);
+  // a 1ª dose nova depois do limite (de qualquer linha)
+  const candidatas = novos.flatMap((h) => [-1, 0, 1, 2, 3].map((n) => momentoDe(somarDias(antesAte, n), h).getTime()));
+  const novoDesde = Math.min(...candidatas.filter((q) => q >= limite));
+  // cada linha: o dia do calendário da última dose de antes e o da 1ª dose nova
+  const out = base.map((s, i) => {
+    const ultimoDiaAntes = varias && s.time < pAntes ? diaSeguinte(antesAte) : antesAte;
+    const primeiraNova = [-1, 0, 1, 2, 3].map((n) => somarDias(antesAte, n)).find((d) => momentoDe(d, novos[i]).getTime() >= novoDesde);
+    const colide = primeiraNova !== undefined && primeiraNova <= ultimoDiaAntes;
+    const atual = itens[i];
+    const id = !colide ? s.id : ativa && atual.idAntes && atual.id !== s.id ? atual.id : `${raizDoId(s.id)}~${agora.getTime().toString(36)}`;
+    return {
+      ...s,
+      id,
+      time: novos[i],
+      horaAntes: s.time,
+      antesAte,
+      novoDesde: textoDoMomento(new Date(novoDesde)),
+      ...(colide ? { idAntes: s.id } : {}),
+    };
+  });
+  return { itens: out, novoDesde: textoDoMomento(new Date(novoDesde)) };
+}
+
+/**
+ * As linhas pro plano dos avisos (lib/reagendar): as em vigor (`dosesEmVigor`) e, na linha com
+ * horário mudado, DUAS — a de antes (id de antes, até o dia da última dose de antes) e a nova
+ * (a partir de `novoDesde`, pelo `inicio`). O plano dos avisos não muda.
+ */
+export function linhasDosAvisos<T extends { id?: string; time?: string; ate?: string; grupo?: string; inicio?: string; horaAntes?: string; idAntes?: string; antesAte?: string; novoDesde?: string }>(lista: T[], agora: Date = new Date()): T[] {
+  const primeiraAntes = new Map<string, string>();
+  for (const r of lista) if (r?.grupo && !primeiraAntes.has(r.grupo) && ehHora(r.horaAntes)) primeiraAntes.set(r.grupo, r.horaAntes);
+  return dosesEmVigor(lista, agora).flatMap((r) => {
+    if (!temTroca(r as Partial<Remedio>)) return [r];
+    const horaAntes = String(r.horaAntes);
+    const antesAte = String(r.antesAte);
+    const pAntes = r.grupo ? primeiraAntes.get(r.grupo) : undefined;
+    const ultimoDiaAntes = pAntes && horaAntes < pAntes ? diaSeguinte(antesAte) : antesAte;
+    const ate = ehDia(r.ate) && r.ate < ultimoDiaAntes ? r.ate : ultimoDiaAntes;
+    const novoDesde = String(r.novoDesde);
+    return [
+      { ...r, id: r.idAntes ?? r.id, time: horaAntes, ate },
+      { ...r, inicio: ehInicio(r.inicio) && r.inicio > novoDesde ? r.inicio : novoDesde },
+    ];
+  });
 }
 
 /** Tratamento encerrado: a última ocorrência de cada linha (o dia em que ela foi registrada, se foi). */

@@ -2,7 +2,12 @@
  * CRÍTICA DE FORA, 08/11, RODADA 1 — repro. Cada caso diz o que DEVIA acontecer e está em `it.fails`
  * até o conserto (o comentário "hoje:" diz o que acontece agora).
  *
- *  F1 (ALTA) Mudar a 1ª dose de um 8 em 8 já começado pra um horário MAIS TARDE que a metade do
+ * SIMPLIFICAÇÃO 08/11 (decisão do dono): mudar o horário vale A PARTIR DE AMANHÃ — nenhuma marca muda de
+ * lugar e as doses de hoje seguem os horários de antes até o dia do tratamento virar (lib/remedios,
+ * mudarHorarios). O F1 (a marca andava pra dose errada) deixou de existir com a lógica de mover marcas;
+ * os casos dele viraram casos do comportamento novo. F2, F3, F4 e F5 seguem como estavam.
+ *
+ *  F1 (ALTA, antes da simplificação) Mudar a 1ª dose de um 8 em 8 já começado pra um horário MAIS TARDE que a metade do
  *     intervalo leva a marca de "tomado" pra frente no tempo: a mesma linha no mesmo dia do tratamento
  *     (lib/remedios, moverMarcasDoGrupo). 08:00 → 23:00 às 15:00 (horários 23/07/15) deixa a das 15:00
  *     de AGORA marcada (era a marca da 00:00) e apaga a da 08:00 tomada; o próximo aviso é 23:00 — 15 h
@@ -71,7 +76,7 @@ vi.mock("sonner", () => ({
 import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
 import { planejarRemedios } from "@/lib/notificacoes";
 import { lerDadosDosLembretes } from "@/lib/reagendar";
-import { agruparRemedios, dosesDoGrupoAgora, gerarHorarios, montarLinhas, moverMarcasDoGrupo, type Remedio } from "@/lib/remedios";
+import { agruparRemedios, dosesDoGrupoAgora, gerarHorarios, montarLinhas, mudarHorarios, type Remedio } from "@/lib/remedios";
 import { esquecerMarcasDaCaixa } from "@/lib/remedio-caixa";
 import { PharmacyChecklist } from "@/components/saude/PharmacyChecklist";
 
@@ -142,58 +147,55 @@ function mudouAs15(nova: string) {
   agoraEm(7, 15, 0);
   montar(store);
   mudarPrimeira(nova);
-  const r = { horas: linhas(store).map((l) => l.time).sort().join("/"), marcas: marcasNoRelogio(store), caixa: rotulo(), aviso: avisos(store)[0] };
+  const r = { horas: linhas(store).map((l) => l.time).sort().join("/"), marcas: marcasNoRelogio(store), caixa: rotulo(), aviso: avisos(store)[0], fila: avisos(store).slice(0, 8) }; // o fim (dia 13) depende de qual hora é a 1ª
   pilulasDaUltima = pilulas();
+  falasDaUltima = [...falas];
   cleanup();
   esquecerMarcasDaCaixa();
   return r;
 }
-/** as marcas de "tomado" pelo MOMENTO da dose ("06/23:00"), não pela linha: o mesmo horário digitado de outro
- *  jeito troca qual linha é a 1ª (e o dia do tratamento que a tela mostra), mas não o que foi tomado e quando */
+/** as marcas de "tomado" pelo MOMENTO da dose ("06/23:00"), com a hora de ANTES da troca (o registro não muda) */
 const marcasNoRelogio = (s: Store) => {
-  const hora = new Map(linhas(s).map((l) => [l.id, l.time]));
+  const hora = new Map(linhas(s).map((l) => [l.idAntes ?? l.id, l.horaAntes ?? l.time]));
   return Object.entries(log(s)).flatMap(([dia, ids]) => ids.filter((id) => hora.has(id)).map((id) => `${dia.slice(8, 10)}/${hora.get(id)}`)).sort();
 };
 let pilulasDaUltima = "";
+let falasDaUltima: string[] = [];
 
 describe("crítica de fora, 08/11, rodada 1", () => {
   afterEach(() => { nativo.on = false; rearmes.n = 0; });
 
-  /* Conserto (08/11): a marca vai pra dose do desenho novo mais perto NO RELÓGIO (lib/remedios,
-     moverMarcasDoGrupo). Os casos comparam o que foi tomado e quando (`marcas`), a caixa e o 1º aviso.
-     As pílulas da tela não entram na igualdade: com a 1ª dose às 23:00, a pílula 23:00 das 15:00 é a de
-     ONTEM à noite (o dia do tratamento começa na 1ª dose) — ✓, porque a 00:00 tomada virou ela; com a
-     1ª às 07:00 é a de hoje à noite, em aberto. Cada caso confere as pílulas à parte. */
-  it("F1 (controle) 08:00 → 07:00 às 15:00: 07 ✓, a das 15:00 é a da vez", () => {
-    expect(mudouAs15("07:00")).toEqual({
-      horas: "07:00/15:00/23:00", marcas: ["06/07:00", "06/15:00", "06/23:00", "07/07:00"],
-      caixa: "Marcar próxima dose de Amoxicilina (15:00)", aviso: "07/23:00",
-    });
-    expect(pilulasDaUltima).toBe("07:00✓ 15:00 23:00");
+  /* Simplificação (08/11): mudar a 1ª dose às 15:00 não mexe em nada de hoje — a 08:00 tomada segue ✓, a
+     das 16:00 é a próxima e tem aviso, a das 00:00 desta noite também. Os horários novos começam amanhã,
+     na 1ª dose nova a mais de meio intervalo (4 h) da das 00:00. Os mesmos horários digitados de outro
+     jeito (23:00 ou 07:00 = 07/15/23) dão a mesma fila. */
+  const HOJE = { marcas: ["06/08:00", "06/16:00", "07/00:00", "07/08:00"], caixa: "Próxima dose de Amoxicilina às 16:00" };
+  it("F1 (agora) 08:00 → 07:00 às 15:00: hoje segue 08:00 ✓ 16:00 00:00; amanhã 07:00, 15:00 e 23:00", () => {
+    const r = mudouAs15("07:00");
+    expect(r).toMatchObject({ horas: "07:00/15:00/23:00", ...HOJE, aviso: "07/16:00" });
+    expect(pilulasDaUltima).toBe("00:00 08:00✓ 16:00");
+    expect(r.fila.slice(0, 5)).toEqual(["07/16:00", "08/00:00", "08/07:00", "08/15:00", "08/23:00"]);
+    expect(falasDaUltima).toContain("Os horários novos valem a partir de amanhã.");
   });
 
-  it("F1 08:00 → 23:00 às 15:00 (os mesmos 07/15/23): a das 15:00 não fica marcada", () => {
-    // antes: pílulas "07:00✓ 15:00✓ 23:00✓", caixa "Desmarcar Amoxicilina" — a das 15:00 de agora aparecia tomada
+  it("F1 (agora) 08:00 → 23:00 às 15:00 (os mesmos 07/15/23): a mesma fila de 08:00 → 07:00", () => {
     const r = mudouAs15("23:00");
-    expect(pilulasDaUltima).toBe("07:00✓ 15:00 23:00✓"); // 23:00 = a de ontem à noite (a 00:00 tomada)
+    expect(pilulasDaUltima).toBe("00:00 08:00✓ 16:00");
     expect(r).toEqual(mudouAs15("07:00"));
   });
 
-  it("F1 08:00 → 22:00 às 15:00 (os mesmos 06/14/22 que 08:00 → 06:00): a das 14:00 não fica marcada", () => {
-    // antes: "06:00✓ 14:00✓ 22:00✓" com 22:00; com 06:00: "06:00✓ 14:00 22:00" e a caixa marca a das 14:00
+  it("F1 (agora) 08:00 → 22:00 às 15:00 (os mesmos 06/14/22 que 08:00 → 06:00): a mesma fila, e amanhã começa às 06:00", () => {
     const r = mudouAs15("22:00");
-    expect(pilulasDaUltima).toBe("06:00✓ 14:00 22:00✓"); // 22:00 = a de ontem à noite
+    expect(r).toMatchObject({ ...HOJE, aviso: "07/16:00" });
     expect(r).toEqual(mudouAs15("06:00"));
-    expect(r.caixa).toBe("Marcar próxima dose de Amoxicilina (14:00)");
+    expect(r.fila.slice(0, 3)).toEqual(["07/16:00", "08/00:00", "08/06:00"]);
   });
 
-  it("F1 08:00 → 02:00 às 15:00 (os mesmos 02/10/18 que 08:00 → 10:00): a caixa não pede a das 10:00 3 h antes da das 18:00", () => {
-    // antes: com 02:00 "02:00✓ 10:00 18:00" e a caixa "Marcar próxima dose (10:00)"; com 10:00 "02:00✓ 10:00✓ 18:00"
+  it("F1 (agora) 08:00 → 02:00 às 15:00 (02/10/18): a das 02:00 de amanhã ficaria a 2 h da das 00:00 — os novos começam às 10:00", () => {
     const r = mudouAs15("02:00");
-    expect(pilulasDaUltima).toBe("02:00✓ 10:00✓ 18:00");
+    expect(r).toMatchObject({ ...HOJE, aviso: "07/16:00" });
     expect(r).toEqual(mudouAs15("10:00"));
-    expect(pilulasDaUltima).toBe("02:00 10:00✓ 18:00"); // 02:00 = a de amanhã de madrugada, que ainda vem
-    expect(r).toMatchObject({ caixa: "Próxima dose de Amoxicilina às 18:00", aviso: "07/18:00" });
+    expect(r.fila.slice(0, 4)).toEqual(["07/16:00", "08/00:00", "08/10:00", "08/18:00"]);
   });
 
   it("F2 1× ao dia 23:00, esquecida no dia 7 e tomada às 00:30 do dia 8: o aviso das 23:00 do dia 8 fica e a caixa do dia 8 fica em aberto", () => {
@@ -270,55 +272,90 @@ describe("crítica de fora, 08/11, rodada 1", () => {
 
 /* Conserto 08/11: casos em volta dos 4 consertos. */
 describe("crítica de fora, 08/11, rodada 1 — em volta do conserto", () => {
-  it("F1+G1 a marca da dose tomada vai pra dose nova mais perto mesmo que ela ainda venha: às 08:30, 08:00 tomada e a 1ª dose mudada pra 10:00 → 10:00 ✓, próximo aviso 18:00", () => {
+  it("(agora) às 08:30, 08:00 tomada e a 1ª dose mudada pra 10:00: a marca fica na 08:00, o próximo aviso é 16:00 e os novos começam amanhã 10:00", () => {
     const novas = vezes(3, "08:00", agoraEm(3, 7, 50));
     const [d08, d16, d00] = novas.map((l) => l.id);
-    const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-06": [d08, d16], "2026-11-07": [d00, d08] } });
+    const logIni = { "2026-11-06": [d08, d16], "2026-11-07": [d00, d08] };
+    const store = criarStore({ [CHAVE]: novas, [LOG]: logIni });
     agoraEm(7, 8, 30);
     montar(store);
     mudarPrimeira("10:00");
-    // a 00:00 vira a 02:00 de hoje (já passou); a 08:00 tomada vira a 10:00 (ainda vem, mas a 2 h, dentro
-    // de meio intervalo): o comprimido foi tomado, o aviso das 10:00 some (rodada 2, G1). Antes a marca saía
-    // e o aviso tocava às 10:00, 2 h depois do comprimido.
-    expect(marcasNoRelogio(store)).toEqual(["06/10:00", "06/18:00", "07/02:00", "07/10:00"]);
-    expect(avisos(store)[0]).toBe("07/18:00");
-    expect(falas).toContain("A das 08:00 que você marcou agora conta como a das 10:00. Próxima: 18:00.");
+    expect(log(store)).toEqual(logIni);
+    expect(pilulas()).toBe("00:00 08:00✓ 16:00");
+    expect(avisos(store).slice(0, 3)).toEqual(["07/16:00", "08/00:00", "08/10:00"]);
+    expect(falas).toContain("Os horários novos valem a partir de amanhã.");
   });
 
-  it("F1 a marca muda de linha e a anotação 'sem baixa' vai junto (desmarcar não cria comprimido)", () => {
+  it("(agora) estoque zerado: a anotação 'sem baixa' fica como está e desmarcar a 08:00 de hoje não cria comprimido", () => {
     const novas = vezes(3, "08:00", agoraEm(3, 7, 50)).map((l) => ({ ...l, stock: 0 }));
-    const [d08, d16, d00] = novas.map((l) => l.id);
+    const [d08, , d00] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-07": [d00, d08] }, "core-saude-supplement-sem-baixa": { dia: "2026-11-07", ids: [d08] } });
     agoraEm(7, 15, 0);
     montar(store);
-    mudarPrimeira("23:00"); // 23/07/15: a 08:00 de hoje vira a 07:00, que agora é a linha d16
-    expect(log(store)["2026-11-07"]).toContain(d16);
-    expect(store.estado.dados["core-saude-supplement-sem-baixa"]).toEqual({ dia: "2026-11-07", ids: [d16] });
-    fireEvent.click(pilula(d16)); // desmarca a 07:00
+    mudarPrimeira("23:00");
+    expect(log(store)["2026-11-07"]).toEqual([d00, d08]);
+    expect(store.estado.dados["core-saude-supplement-sem-baixa"]).toEqual({ dia: "2026-11-07", ids: [d08] });
+    fireEvent.click(pilula(d08)); // desmarca a 08:00 de hoje
     expect(estoque(store)).toEqual([0, 0, 0]);
   });
 
-  it("F1 conta pura: de 08:00 pra qualquer hora às 15:00, nunca fica marcada uma dose que ainda vem, e as tomadas não somem", () => {
+  /* A conta pura (08/11, simplificação): de 08:00 pra qualquer hora às 15:00, hoje não muda e cada lugar do
+     registro ("id no dia") é de UMA dose só, antes e depois da troca — então nenhuma marca pode cair na dose
+     errada. E a 1ª dose nova fica a mais de meio intervalo da última de antes. */
+  it("(agora) conta pura: de 08:00 pra qualquer hora às 15:00, hoje não muda, cada 'id no dia' é de uma dose só e a 1ª dose nova fica a mais de 4 h da das 00:00", () => {
     const novas = vezes(3, "08:00", agoraEm(3, 7, 50));
-    const [d08, d16, d00] = novas.map((l) => l.id);
-    const log0 = { "2026-11-06": [d08, d16], "2026-11-07": [d00, d08] };
     const agora = agoraEm(7, 15, 0);
-    const antes = agruparRemedios(novas)[0];
-    for (let h = 0; h < 24; h++) {
-      const hora = `${String(h).padStart(2, "0")}:00`;
-      const horas = gerarHorarios(hora, 3);
-      const depois = agruparRemedios(novas.map((l, i) => ({ ...l, time: horas[i] })))[0];
-      const { log: novo } = moverMarcasDoGrupo(antes, depois, log0, agora);
-      const hora2 = new Map(depois.itens.map((l) => [l.id, l.time]));
-      const momentos = Object.entries(novo).flatMap(([dia, ids]) => ids.map((id) => {
-        const [a, m, d] = dia.split("-").map(Number);
-        const [hh, mm] = String(hora2.get(id)).split(":").map(Number);
-        return new Date(a, m - 1, d, hh, mm).getTime();
-      }));
-      expect([hora, momentos.length]).toEqual([hora, 4]); // as 4 tomadas continuam no histórico
-      expect([hora, momentos.every((t) => t <= agora.getTime() + 3600_000)]).toEqual([hora, true]);
+    for (let m = 0; m < 24 * 60; m += 30) {
+      const hora = `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+      const { itens, novoDesde } = mudarHorarios(novas, gerarHorarios(hora, 3), agora);
+      const g = agruparRemedios(itens)[0];
+      if (hora === "08:00") { expect(novoDesde).toBeUndefined(); continue; }
+      expect([hora, dosesDoGrupoAgora(g, agora).map((d) => `${d.time}@${d.dia}`)]).toEqual([hora, ["08:00@2026-11-07", "16:00@2026-11-07", "00:00@2026-11-08"]]);
+      expect([hora, String(novoDesde) > "2026-11-08T04:00"]).toEqual([hora, true]);
+      const dono = new Map<string, number>();
+      for (let t = new Date(2026, 10, 7, 0, 0).getTime(); t < new Date(2026, 10, 11).getTime(); t += 15 * 60_000) {
+        for (const d of dosesDoGrupoAgora(g, new Date(t))) {
+          const k = `${d.id}@${d.dia}`;
+          if (dono.has(k) && dono.get(k) !== d.quando) throw new Error(`${hora}: ${k} é de 2 doses`);
+          dono.set(k, d.quando);
+        }
+      }
     }
   });
+
+  it("(agora) conta pura, 1× ao dia: de 00:00, 00:30, 08:00, 20:00 e 23:00 pra qualquer hora, mudado de 2 h 30 em 2 h 30 — a dose da vez não muda na hora, cada 'id no dia' é de uma dose só e a 1ª dose nova fica a mais de 12 h da última de antes", () => {
+    const problemas: string[] = [];
+    for (const de of ["00:00", "00:30", "08:00", "20:00", "23:00"]) {
+      const linha = [{ id: "r1", name: "Losartana", time: de, stock: 30, dosesPerDay: 1 }];
+      for (let quando = 30; quando < 24 * 60; quando += 150) {
+        const agora = new Date(2026, 10, 7, 0, quando);
+        const antes = dosesDoGrupoAgora(agruparRemedios(linha)[0], agora).map((d) => `${d.id}@${d.dia} ${d.time}`);
+        for (let m = 0; m < 24 * 60; m += 30) {
+          const hora = `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+          if (hora === de) continue;
+          const onde = `${de} → ${hora} às ${fmt(agora)}`;
+          const { itens, novoDesde } = mudarHorarios(linha, [hora], agora);
+          const g = agruparRemedios(itens)[0];
+          const agoraDepois = dosesDoGrupoAgora(g, agora).map((d) => `${d.id}@${d.dia} ${d.time}`);
+          if (JSON.stringify(agoraDepois) !== JSON.stringify(antes)) problemas.push(`${onde}: a dose da vez mudou na hora (${antes} → ${agoraDepois})`);
+          const [a, me, d] = String(itens[0].antesAte).split("-").map(Number);
+          const [h, mi] = de.split(":").map(Number);
+          const L = new Date(a, me - 1, d, h, mi).getTime();
+          const F = new Date(String(novoDesde)).getTime();
+          if (!(F - L > 12 * 3600_000)) problemas.push(`${onde}: 1ª nova ${novoDesde} a menos de 12 h da última de antes`);
+          const dono = new Map<string, number>();
+          for (let t = agora.getTime() - 12 * 3600_000; t < agora.getTime() + 60 * 3600_000; t += 60 * 60_000) {
+            for (const x of dosesDoGrupoAgora(g, new Date(t))) {
+              const k = `${x.id}@${x.dia}`;
+              if (dono.has(k) && dono.get(k) !== x.quando) problemas.push(`${onde}: ${k} é de 2 doses`);
+              dono.set(k, x.quando);
+            }
+          }
+        }
+      }
+    }
+    expect([...new Set(problemas)].slice(0, 10)).toEqual([]);
+  }, 120_000);
 
   it("F2 1× ao dia: a dose da vez perto da meia-noite (23:00 às 00:30 = ontem; às 11:00 já é a de hoje; 00:30 às 21:30 = amanhã, às 21:29 ainda hoje)", () => {
     const g23 = agruparRemedios(montarLinhas({ name: "Losartana", stock: 30 }, ["23:00"], undefined, 1))[0];

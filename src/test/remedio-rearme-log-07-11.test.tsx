@@ -1,12 +1,10 @@
 /**
- * MUDAR A HORA E O REARME DOS AVISOS (07/11, crítica do conserto final).
+ * MUDAR A HORA E O REARME DOS AVISOS (07/11, crítica do conserto final; 08/11, simplificação).
  *
- * Mudar a hora de um remédio de 8 em 8 move as marcas de "tomado" (moverMarcasDoGrupo) e
- * rearma os avisos na hora, no toque. O rearme lia o registro de "tomado" do render
- * ANTERIOR (o `get` do app fecha sobre o estado daquele render): às 06:50, 08:00 → 07:00
- * com o registro cheio, a marca velha da das 00:00 (gravada hoje) contava como a das 23:00
- * de hoje, e o aviso das 23:00 ficava fora da fila do iPhone até o useLembretes rodar de
- * novo. Aqui o `get` é preso ao render, como no app (use-user-data).
+ * Mudar a hora rearma os avisos na hora, no toque, com a lista NOVA (o `get` do app fecha
+ * sobre o estado do render anterior; aqui ele é preso ao render, como no app — use-user-data).
+ * Desde 08/11 mudar o horário vale a partir de amanhã e não mexe no registro de "tomado":
+ * a fila do toque já tem os avisos de hoje com os horários de antes e os de amanhã com os novos.
  */
 process.env.TZ = "America/Sao_Paulo";
 
@@ -90,21 +88,19 @@ const fila = () => ln.agendados.filter(doRemedio).map((a) => new Date(a.schedule
 beforeEach(() => { ln.agendados = []; ln.rodadas = 0; vi.useFakeTimers({ toFake: ["Date"] }); });
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
-describe("mudar a hora rearma os avisos com o registro de 'tomado' NOVO", () => {
-  it("às 06:50, 08:00 → 07:00 com o registro cheio: a fila do iPhone tem o aviso das 23:00 de hoje", async () => {
+describe("mudar a hora rearma os avisos no toque", () => {
+  it("às 06:50, 08:00 → 07:00 com o registro cheio: a fila do iPhone tem os avisos de hoje com as horas de antes e os de amanhã com as novas", async () => {
     const novas = montarLinhas({ name: "Amoxicilina", stock: 14 }, gerarHorarios("08:00", 3), "2026-11-13", new Date(2026, 10, 5, 10).getTime());
     const [d1, d2, d3] = novas.map((l) => l.id);
-    const store = criarStore({
-      [CHAVE]: novas,
-      [LOG]: { "2026-11-05": [d1, d2], "2026-11-06": [d3, d1, d2], "2026-11-07": [d3] },
-    });
+    const log = { "2026-11-05": [d1, d2], "2026-11-06": [d3, d1, d2], "2026-11-07": [d3] };
+    const store = criarStore({ [CHAVE]: novas, [LOG]: log });
     agoraEm(7, 6, 50);
     render(<MemoryRouter><store.Provedor><PharmacyChecklist /></store.Provedor></MemoryRouter>);
     fireEvent.click(screen.getByRole("button", { name: "Editar horários de Amoxicilina" }));
     fireEvent.change(screen.getByLabelText("Horário de Amoxicilina (1ª dose)"), { target: { value: "07:00" } });
     expect((store.estado.dados[CHAVE] as Remedio[]).map((l) => l.time)).toEqual(["07:00", "15:00", "23:00"]);
-    expect((store.estado.dados[LOG] as Record<string, string[]>)["2026-11-07"] ?? []).toEqual([]);
+    expect(store.estado.dados[LOG]).toEqual(log); // nenhuma marca muda de lugar
     await waitFor(() => expect(ln.rodadas).toBeGreaterThan(0));
-    expect(fila().slice(0, 4)).toEqual(["07/07:00", "07/15:00", "07/23:00", "08/07:00"]);
+    expect(fila().slice(0, 5)).toEqual(["07/08:00", "07/16:00", "08/00:00", "08/07:00", "08/15:00"]);
   });
 });

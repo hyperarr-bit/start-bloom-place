@@ -16,8 +16,8 @@ import { trackEvent } from "@/lib/analytics";
 import { avisarApagado } from "@/lib/desfazer";
 import { marcadaPelaCaixa } from "@/lib/remedio-caixa";
 import {
-  OPCOES_VEZES, agruparRemedios, doseADesmarcar, doseDaHora, doseQueChegou, dosesDoGrupoAgora, ehDia, gerarHorarios, inicioAoMudarPrimeira, inicioEscolhido, momentoDoInicio, montarLinhas, moverMarcasDoGrupo, rotuloDosHorarios,
-  tratamentoTerminou, ultimasDosesDoGrupo, type DoseMarcavel, type GrupoDeRemedio, type Remedio as Supplement, type VezesAoDia,
+  OPCOES_VEZES, agruparRemedios, doseADesmarcar, doseDaHora, doseQueChegou, dosesDoGrupoAgora, ehDia, gerarHorarios, inicioEscolhido, momentoDoInicio, montarLinhas, mudarHorarios, raizDoId, rotuloDosHorarios,
+  trocaDoGrupo, tratamentoTerminou, ultimasDosesDoGrupo, type DoseMarcavel, type GrupoDeRemedio, type Remedio as Supplement, type VezesAoDia,
 } from "@/lib/remedios";
 
 /* O tipo da linha (`Remedio`, lib/remedios) é o de sempre — id, name, time,
@@ -29,8 +29,8 @@ const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanh�
 
 /* A CAIXA DESFAZ O QUE ELA MARCOU (07/11, crítica de fora): o 2º toque desfaz a dose que a caixa
    marcou por último (lib/remedio-caixa). A memória mora fora do componente (2ª rodada): num useRef
-   ela sumia ao trocar de tela entre os 2 toques. Esquece quando a pílula ou a mudança de hora mexe
-   no grupo, ou quando a caixa desmarca — aí vale o relógio (lib/remedios, doseADesmarcar).
+   ela sumia ao trocar de tela entre os 2 toques. Esquece quando a pílula mexe no grupo, ou quando
+   a caixa desmarca — aí vale o relógio (lib/remedios, doseADesmarcar).
    Ela serve SÓ pra escolher qual desmarcar; "ficou pra trás" sai do registro (rodada 3, 08/11). */
 
 /* ESTOQUE EDITÁVEL (25/09, cliente: "como alterar a quantidade de
@@ -141,14 +141,11 @@ export const PharmacyChecklist = () => {
   const [diaDoComeco, setDiaDoComeco] = useState<string | null>(null);
   /** o grupo com os horários/data abertos pra editar na tabela */
   const [editando, setEditando] = useState<string | null>(null);
-  /* A FOTO DE QUANDO A FILEIRA DE EDIÇÃO ABRIU (crítica do conserto final 07/11): o campo de
-     hora manda valores no meio da digitação (2,0,0,0 passa por 02:00 antes de 20:00; a roda do
-     iPhone também pode mandar), e cada um já mexia no começo e nas marcas. A conta partia do
-     valor do meio, e o resultado dependia do caminho: "amanhã 08:00" digitado 23:00 às 22:15
-     virava hoje 23:00; ir de 08:00 a 17:00 e voltar pra 08:00 apagava a marca da das 00:00.
-     Agora o começo e as marcas saem sempre desta foto. Marcar uma dose (ou mudar o "até")
-     vale como a foto nova, tirada na próxima mudança de hora. */
-  const fotoDaEdicao = useRef<{ chave: string; itens: Supplement[]; log: Record<string, string[]>; semBaixa: SemBaixa } | null>(null);
+  /* O COMEÇO DE QUANDO A FILEIRA ABRIU (só de tratamento que ainda não começou): o campo de hora
+     manda valores no meio da digitação (2,0,0,0 passa por 02:00 antes de 20:00), e "Começa amanhã
+     08:00" digitado 23:00 às 22:15 virava hoje 23:00 se a conta partisse do valor do meio. O começo
+     sai sempre deste. Não guarda marca nenhuma: mudar o horário não mexe no registro (08/11). */
+  const comecoAoAbrir = useRef<{ chave: string; inicio?: string } | null>(null);
   // 07/11: alarme exato do Android (ver `estadoAlarmeExato`) — "indisponivel" no iPhone e na web
   const [alarmeExato, setAlarmeExato] = useState<EstadoAlarmeExato>("indisponivel");
   const [dependentes, setDependentes] = usePersistedState<string[]>(CHAVE_DEPENDENTES, []);
@@ -165,9 +162,9 @@ export const PharmacyChecklist = () => {
 
   /** `dia`: o dia em que a dose acontece (lib/remedios, dosesDoGrupoAgora) — o registro vai pra ele */
   const toggleTaken = (id: string, dia: string = today) => {
-    const linha = supplements.find(s => s.id === id);
+    // `id` pode ser o de antes de uma troca de horário (lib/remedios, mudarHorarios: idAntes)
+    const linha = supplements.find(s => s.id === id || s.idAntes === id);
     if (!linha) return;
-    fotoDaEdicao.current = null;
     const juntas = mesmoGrupo(linha);
     const doDia = supplementLog[dia] || [];
     const semBaixaDoDia = semBaixa?.dia === dia && Array.isArray(semBaixa.ids) ? semBaixa.ids : [];
@@ -237,19 +234,15 @@ export const PharmacyChecklist = () => {
      O useLembretes reagenda sozinho a cada mudança de dado, mas ele roda no
      render seguinte — ANTES da permissão chegar no primeiro cadastro. Por isso
      o reagendamento explícito aqui, com um leitor que já enxerga a lista nova
-     (o `get` deste render ainda tem a lista antiga). `log`: o registro de "tomado"
-     novo, quando a mudança também mexeu nele (mudar a hora move as marcas) — senão o
-     rearme do toque lia o registro velho e, às 06:50 com 08:00 → 07:00, o aviso das
-     23:00 de hoje ficava fora da fila (crítica do conserto final 07/11). */
-  const rearmarLembretes = async (lista: Supplement[], pedir: boolean, log?: Record<string, string[]>) => {
+     (o `get` deste render ainda tem a lista antiga). */
+  const rearmarLembretes = async (lista: Supplement[], pedir: boolean) => {
     if (!isNativeShell()) return;
     if (pedir) {
       const ok = await pedirPermissao();
       trackEvent("lembrete_remedio_permissao", { concedida: ok, total: lista.length });
       if (!ok) return;
     } else if (!(await temPermissao())) return;
-    const leitor: Leitor = (k, fb) => (k === "core-saude-supplements" ? (lista as unknown as typeof fb)
-      : log && k === "core-saude-supplement-log" ? (log as unknown as typeof fb) : get(k, fb));
+    const leitor: Leitor = (k, fb) => (k === "core-saude-supplements" ? (lista as unknown as typeof fb) : get(k, fb));
     try { await reagendarTudo(leitor, lerPrefs(get<unknown>(CHAVE_PREFS, undefined))); } catch { /* sem plugin */ }
     await conferirAlarmeExato();
   };
@@ -323,99 +316,43 @@ export const PharmacyChecklist = () => {
   };
 
   /** Horário editável na própria linha — antes era só texto, e mudar de 8h
-   *  pra 20h exigia apagar e recadastrar (perdendo o estoque). */
+   *  pra 20h exigia apagar e recadastrar (perdendo o estoque).
+   *  A PARTIR DE AMANHÃ (decisão do dono, 08/11): o que já foi marcado fica como está e as doses
+   *  de hoje seguem os horários de antes até o dia do tratamento virar (lib/remedios,
+   *  mudarHorarios). Nenhuma marca de "tomado" muda de lugar. Num remédio de várias doses, a 1ª
+   *  dose ajusta as outras, como no cadastro; antes de o tratamento começar, muda na hora. */
   const changeTime = (id: string, time: string) => {
     if (!time) return;
     const linha = supplements.find(s => s.id === id);
-    const doGrupo = linha?.grupo ? supplements.filter(s => s.grupo === linha.grupo) : [];
-    const foto = linha && doGrupo.length > 1 ? fotoDoGrupo(linha.grupo!, doGrupo) : null;
-    let lista: Supplement[];
-    if (linha && doGrupo.length > 1 && doGrupo[0].id === id) {
-      /* 07/11 (retomada): a 1ª dose ajusta as outras, como no cadastro, e o `inicio`
-         acompanha (lib/remedios, inicioAoMudarPrimeira). Mudando só ela, adiantar
-         08:00 → 07:00 depois de começado fazia a das 07:00 virar "dose da noite":
-         gravava no dia seguinte e o aviso da manhã sumia todo dia. */
-      const novos = gerarHorarios(time, doGrupo.length);
-      const inicio = inicioAoMudarPrimeira((foto?.itens[0] ?? linha).inicio, time, new Date(), novos);
-      const posicao = new Map(doGrupo.map((s, i) => [s.id, i]));
-      lista = supplements.map(s => {
-        const i = posicao.get(s.id);
-        return i === undefined ? s : { ...s, time: novos[i] ?? s.time, ...(inicio ? { inicio } : {}) };
-      });
-    } else {
-      lista = supplements.map(s => (s.id === id ? { ...s, time } : s));
-    }
-    const log = foto ? moverMarcas(foto, lista) : undefined;
+    if (!linha) return;
+    const doRemedio = supplements.filter(mesmoGrupo(linha));
+    const i = doRemedio.findIndex(s => s.id === id);
+    const atuais = doRemedio.map(s => s.time);
+    const novos = doRemedio.length > 1 && i === 0 ? gerarHorarios(time, doRemedio.length) : atuais.map((h, j) => (j === i ? time : h));
+    if (novos.every((h, j) => h === atuais[j])) return;
+    const chave = linha.grupo ? `g:${linha.grupo}` : `i:${raizDoId(linha.id)}`;
+    const inicioDeAntes = comecoAoAbrir.current?.chave === chave ? comecoAoAbrir.current.inicio : undefined;
+    const { itens, novoDesde } = mudarHorarios(doRemedio, novos, new Date(), inicioDeAntes);
+    const porId = new Map(doRemedio.map((s, j) => [s.id, itens[j]]));
+    const lista = supplements.map(s => porId.get(s.id) ?? s);
     setSupplements(lista);
-    void rearmarLembretes(lista, false, log);
+    if (novoDesde) {
+      const comeco = momentoDoInicio(novoDesde);
+      const hojeMesmo = !!comeco && localDayKey(comeco) === todayStr();
+      toast(hojeMesmo ? `Os horários novos valem a partir de hoje, às ${novoDesde.slice(11, 16)}.` : "Os horários novos valem a partir de amanhã.",
+        { id: `remedio-horario-novo-${chave}`, duration: 4000 });
+    }
+    void rearmarLembretes(lista, false);
   };
 
-  /* 07/11 (4ª rodada da crítica): com as horas novas, a marca de "tomado" vai pro dia
-     em que a dose acontece agora (lib/remedios, moverMarcasDoGrupo) — senão a das 00:00
-     de ontem à noite, gravada hoje, aparecia como a das 23:00 de hoje e o aviso sumia.
-     A anotação de "marcado sem baixa" vai junto, pra desmarcar não criar comprimido.
-     A conta parte da foto de quando a fileira de edição abriu (`fotoDaEdicao`); só as marcas
-     DESTE remédio saem dela — as dos outros ficam como estão agora.
-     Devolve o registro novo (pro rearme dos avisos), ou nada se ele não mudou. */
-  const moverMarcas = (foto: NonNullable<typeof fotoDaEdicao.current>, lista: Supplement[]): Record<string, string[]> | undefined => {
-    const grupo = foto.itens[0]?.grupo;
-    const antes = agruparRemedios(foto.itens)[0];
-    const depois = agruparRemedios(lista).find(g => g.chave === `g:${grupo}`);
-    if (!antes || !depois) return undefined;
-    const { log: calculado, movidas, contaComo: conta } = moverMarcasDoGrupo(antes, depois, foto.log, new Date());
-    const ids = new Set(depois.itens.map(s => s.id));
-    const log: Record<string, string[]> = { ...supplementLog };
-    let mudou = false;
-    for (const d of new Set([...Object.keys(supplementLog), ...Object.keys(calculado)])) {
-      const atual = Array.isArray(supplementLog[d]) ? supplementLog[d] : [];
-      const novo = [...atual.filter(x => !ids.has(x)), ...(Array.isArray(calculado[d]) ? calculado[d] : []).filter(x => ids.has(x))];
-      if (novo.length === atual.length && novo.every((x, i) => x === atual[i])) continue;
-      log[d] = novo;
-      mudou = true;
-    }
-    if (mudou) setSupplementLog(log);
-    /* 08/11 (crítica de fora, rodada 2, G1): a marca de um comprimido tomado foi pra uma dose
-       que ainda vem — a tela diz, pra pessoa não estranhar o ✓ adiantado nem tomar de novo. */
-    if (conta) {
-      toast(`A das ${conta.de} que você marcou agora conta como a das ${conta.para}.${conta.proxima ? ` Próxima: ${conta.proxima}.` : ""}`, { id: `remedio-conta-como-${depois.chave}`, duration: 6000 });
-    }
-    marcadaPelaCaixa.delete(depois.chave); // as marcas mudaram de dia: o que a caixa marcou não vale mais
-    // a anotação "marcado sem baixa" vai com a marca — pro dia novo e, se a marca mudou de linha
-    // (08/11, F1: ela vai pra dose mais perto no relógio, de qualquer linha), pro id novo
-    let sb: SemBaixa = foto.semBaixa?.dia && Array.isArray(foto.semBaixa.ids) ? foto.semBaixa : { dia: "", ids: [] };
-    const afetadas = movidas.filter(m => sb.dia === m.de && sb.ids.includes(m.id));
-    if (afetadas.length) {
-      let dia = sb.dia;
-      let idsSb = sb.ids.filter(x => !afetadas.some(m => m.id === x));
-      for (const m of afetadas) {
-        if (!m.para) continue;
-        const novoId = m.paraId ?? m.id;
-        if (m.para === dia) idsSb = [...idsSb.filter(x => x !== novoId), novoId];
-        else if (!idsSb.length) { dia = m.para; idsSb = [novoId]; }
-      }
-      sb = { dia, ids: idsSb };
-    }
-    if (JSON.stringify(sb) !== JSON.stringify(semBaixa ?? { dia: "", ids: [] })) setSemBaixa(sb);
-    return mudou ? log : undefined;
-  };
-
-  /** A foto do grupo pra conta da mudança de hora: a de quando a fileira abriu, ou (sem ela) a de agora. */
-  const fotoDoGrupo = (grupo: string, doGrupo: Supplement[]) => {
-    const chave = `g:${grupo}`;
-    if (fotoDaEdicao.current?.chave !== chave) {
-      fotoDaEdicao.current = { chave, itens: doGrupo, log: supplementLog, semBaixa };
-    }
-    return fotoDaEdicao.current;
-  };
   const abrirOuFecharEdicao = (g: GrupoDeRemedio) => {
     const abrir = editando !== g.chave;
     setEditando(abrir ? g.chave : null);
-    fotoDaEdicao.current = abrir ? { chave: g.chave, itens: g.itens, log: supplementLog, semBaixa } : null;
+    comecoAoAbrir.current = abrir ? { chave: g.chave, inicio: g.itens.find(s => s.inicio)?.inicio } : null;
   };
 
   /** "Até quando" do grupo inteiro; vazio = sem fim. */
   const changeAte = (g: GrupoDeRemedio, ate: string) => {
-    fotoDaEdicao.current = null;
     const ids = new Set(g.itens.map(s => s.id));
     const lista = supplements.map(s => {
       if (!ids.has(s.id)) return s;
@@ -517,6 +454,9 @@ export const PharmacyChecklist = () => {
                   const abertoPraEditar = editando === g.chave;
                   const inicioDoGrupo = g.itens.length > 1 ? momentoDoInicio(linha.inicio) : null;
                   const comecoDoGrupo = abertoPraEditar && inicioDoGrupo && inicioDoGrupo.getTime() > agora.getTime() ? comecoEmTexto(inicioDoGrupo, agora) : "";
+                  // horário mudado e os novos ainda não começaram (lib/remedios, mudarHorarios): a fileira diz quando começam
+                  const troca = abertoPraEditar ? trocaDoGrupo(g) : undefined;
+                  const novosEm = troca && troca.novoDesde.getTime() > agora.getTime() ? comecoEmTexto(troca.novoDesde, agora) : "";
                   const linhas = [
                     <motion.tr
                       key={g.chave}
@@ -535,7 +475,7 @@ export const PharmacyChecklist = () => {
                             // decide pela hora do TOQUE (08/11); se o dia virou com a tela parada, só refaz a tela
                             const c = contaNoToque(g, desenho);
                             if (!c || c.encerrado) return;
-                            if (g.itens.length === 1) toggleTaken(linha.id, c.doses[0]?.dia ?? todayStr());
+                            if (g.itens.length === 1) toggleTaken(c.doses[0]?.id ?? linha.id, c.doses[0]?.dia ?? todayStr()); // a dose da vez: com o horário mudado, pode ser a de antes (id de antes)
                             else if (c.taken) {
                               marcadaPelaCaixa.delete(g.chave);
                               if (c.ultimaTomada) toggleTaken(c.ultimaTomada.id, c.ultimaTomada.dia);
@@ -620,7 +560,9 @@ export const PharmacyChecklist = () => {
                              branco sobre verde dava contraste 2,0 no escuro e 2,9 no claro). */
                           <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-x-1 gap-y-2 w-max" data-testid={`remedio-doses-${g.chave}`}>
                             {g.itens.map(s => {
-                              const dose = doses.find(d => d.id === s.id);
+                              // com o horário mudado, a dose de hoje pode ser a de antes (hora e id de antes — lib/remedios, mudarHorarios)
+                              const dose = doses.find(d => d.id === s.id || (!!s.idAntes && d.id === s.idAntes));
+                              const hora = dose?.time ?? s.time;
                               const t = !!dose && foiTomada(dose);
                               const daVez = !encerrado && !t && daVezDose?.id === s.id;
                               return (
@@ -632,18 +574,18 @@ export const PharmacyChecklist = () => {
                                     // a dose desta pílula pela hora do TOQUE (08/11): com o dia virado desde o desenho,
                                     // a 08:00 desenhada era a de ontem — só refaz a tela e não grava
                                     const c = contaNoToque(g, desenho);
-                                    const doseAgora = c && !c.encerrado ? c.doses.find(d => d.id === s.id) : undefined;
+                                    const doseAgora = c && !c.encerrado ? c.doses.find(d => d.id === s.id || (!!s.idAntes && d.id === s.idAntes)) : undefined;
                                     if (!doseAgora) return;
                                     marcadaPelaCaixa.delete(g.chave); // a pílula mexeu: a caixa volta a escolher pelo relógio
-                                    toggleTaken(s.id, doseAgora.dia);
+                                    toggleTaken(doseAgora.id, doseAgora.dia);
                                   }}
                                   aria-pressed={t}
-                                  aria-label={t ? `Desmarcar dose das ${s.time} de ${g.nome}` : `Marcar dose das ${s.time} de ${g.nome}`}
+                                  aria-label={t ? `Desmarcar dose das ${hora} de ${g.nome}` : `Marcar dose das ${hora} de ${g.nome}`}
                                   data-testid={`dose-${s.id}`}
                                   data-da-vez={daVez || undefined}
                                   className={`relative h-8 w-12 min-[380px]:w-[3.25rem] rounded-md border text-[11px] font-semibold tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${t ? "bg-[hsl(var(--saude-green)/0.15)] border-[hsl(var(--saude-green))] text-emerald-800 dark:text-emerald-300" : daVez ? "border-[hsl(var(--saude-green))] text-foreground" : "border-border text-muted-foreground hover:border-[hsl(var(--saude-green)/0.5)]"}`}
                                 >
-                                  {s.time}
+                                  {hora}
                                   {t && (
                                     <span aria-hidden className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-card border border-[hsl(var(--saude-green))] grid place-items-center">
                                       <Check className="w-2 h-2 text-[hsl(var(--saude-green))]" strokeWidth={3.5} />
@@ -681,6 +623,7 @@ export const PharmacyChecklist = () => {
                             {/* enquanto não começou, o começo à vista, só texto (conserto final 07/11: mudar a 1ª
                                 dose depois de "Começa amanhã" desfazia a escolha, e esta fileira nem mostrava) */}
                             {comecoDoGrupo && <span data-testid="remedio-editar-comeca"> · começa {comecoDoGrupo}</span>}
+                            {novosEm && <span data-testid="remedio-editar-novos"> · os novos valem a partir de {novosEm}</span>}
                           </span>
                           {g.itens.map((s, i) => (
                             <input
@@ -703,7 +646,7 @@ export const PharmacyChecklist = () => {
                               className={`${campoPequeno} w-[8.5rem]`}
                             />
                           </>)}
-                          <button type="button" onClick={() => { setEditando(null); fotoDaEdicao.current = null; }} className="h-8 px-3 rounded-lg bg-primary/10 text-primary text-[11px] font-semibold">Pronto</button>
+                          <button type="button" onClick={() => { setEditando(null); comecoAoAbrir.current = null; }} className="h-8 px-3 rounded-lg bg-primary/10 text-primary text-[11px] font-semibold">Pronto</button>
                         </div>
                       </td>
                     </motion.tr>,

@@ -6,9 +6,11 @@
  *  - a dose das 00:00 marcada às 23:50 grava no dia em que acontece (amanhã): à 0h
  *    não há aviso dela, às 00:10 ela continua marcada e o estoque não desce de novo;
  *  - 1º dia, cadastro 07:50 e tomou às 07:55: a caixa marca a das 08:00, não a das 00:00;
- *  - mudar a 1ª dose ajusta as outras e o `inicio` (retomada): adiantar 08:00 → 07:00
- *    depois de começado não faz a das 07:00 virar "dose da noite" (o aviso da manhã
- *    seguia sumindo todo dia); o dia do tratamento vira na hora ATUAL da 1ª linha;
+ *  - mudar a 1ª dose ajusta as outras (retomada); o dia do tratamento vira na hora ATUAL
+ *    da 1ª linha. Desde 08/11 (decisão do dono, simplificação) mudar o horário de um
+ *    remédio já começado vale A PARTIR DE AMANHÃ: nenhuma marca muda de lugar e as doses
+ *    de hoje seguem os horários de antes até o dia do tratamento virar (lib/remedios,
+ *    mudarHorarios). Os casos de "mudar a hora" daqui seguem a regra nova;
  *  - cadastro às 20:30 de um 8 em 8 desde as 08:00 começa hoje (a das 00:00 tem aviso);
  *  - a tabela: grade fixa das doses (marcar não mexe em nada), lápis fora da grade,
  *    caixa de 36 px.
@@ -204,14 +206,19 @@ const mudarPrimeiraNaTela = (store: ReturnType<typeof criarStore>, hora: string)
 };
 
 describe("editar a 1ª dose", () => {
-  it("08:00 vira 07:00 depois de começar: às 07:20 do dia seguinte a das 07:00 é de hoje e o aviso de amanhã 07:00 continua", () => {
+  it("08:00 vira 07:00 depois de começar: hoje segue 08:00/16:00/00:00; às 07:20 do dia seguinte a das 07:00 é de hoje e o aviso de amanhã 07:00 continua", () => {
     const novas = cadastro(agoraEm(5, 7, 50), "08:00");
     const [d1] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas });
     agoraEm(7, 10);
     mudarPrimeiraNaTela(store, "07:00");
-    // a 1ª ajusta as outras (como no cadastro) e o início só troca a hora
-    expect(linhas(store).map((l) => [l.time, l.inicio])).toEqual([["07:00", "2026-11-05T07:00"], ["15:00", "2026-11-05T07:00"], ["23:00", "2026-11-05T07:00"]]);
+    // a 1ª ajusta as outras (como no cadastro); o começo do tratamento não muda; os de antes valem até o dia 7 virar
+    expect(linhas(store).map((l) => [l.time, l.horaAntes, l.inicio])).toEqual([
+      ["07:00", "08:00", "2026-11-05T08:00"], ["15:00", "16:00", "2026-11-05T08:00"], ["23:00", "00:00", "2026-11-05T08:00"],
+    ]);
+    expect(linhas(store).every((l) => l.antesAte === "2026-11-07" && l.novoDesde === "2026-11-08T07:00")).toBe(true);
+    expect(dosesDoGrupoAgora(agruparRemedios(linhas(store))[0], agoraEm(7, 10, 1)).map((d) => `${d.time}@${d.dia}`))
+      .toEqual(["08:00@2026-11-07", "16:00@2026-11-07", "00:00@2026-11-08"]);
 
     agoraEm(8, 7, 20); // fechou e reabriu
     const g = agruparRemedios(linhas(store))[0];
@@ -241,7 +248,10 @@ describe("editar a 1ª dose", () => {
     const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-07": [d1] } });
     agoraEm(7, 15);
     mudarPrimeiraNaTela(store, "07:00");
-    expect(linhas(store).map((l) => [l.time, l.inicio])).toEqual([["07:00", "2026-11-07T07:00"], ["15:00", "2026-11-07T07:00"], ["23:00", "2026-11-07T07:00"]]);
+    expect(linhas(store).map((l) => [l.time, l.horaAntes, l.inicio])).toEqual([
+      ["07:00", "08:00", "2026-11-07T08:00"], ["15:00", "16:00", "2026-11-07T08:00"], ["23:00", "00:00", "2026-11-07T08:00"],
+    ]);
+    expect(store.estado.dados[LOG]).toEqual({ "2026-11-07": [d1] }); // nenhuma marca muda de lugar
     agoraEm(8, 7, 5);
     montar(store);
     expect(screen.getByTestId(`dose-${d1}`)).toHaveAttribute("data-da-vez", "true");
@@ -353,8 +363,15 @@ describe("a tabela: nada se mexe ao marcar", () => {
 /* 4ª rodada da crítica (07/11): mudar a hora refaz as doses, e a marca de "tomado" tem que ir
    junto — senão o que foi tomado ontem à noite (gravado hoje) passa a valer pra outra dose de hoje,
    e o aviso dela some. */
-describe("mudar a hora com o registro cheio: a marca vai junto com a dose", () => {
-  it("tomou 00:00 e 08:00, mudou pra 07:00 às 15:00 → a das 23:00 de hoje NÃO está marcada e o aviso das 23:00 existe", () => {
+/* 08/11 (decisão do dono, simplificação): mudar o horário vale A PARTIR DE AMANHÃ. Com o registro
+   cheio, nenhuma marca muda de lugar: hoje segue com os horários de antes, amanhã começa com os novos.
+   Quando a dose de antes e a nova da mesma linha caem no mesmo dia do calendário (a das 00:00 vira
+   23:00), a linha ganha um id novo pras doses novas e a marca de antes fica no id de antes. */
+describe("mudar a hora com o registro cheio: nenhuma marca muda de lugar", () => {
+  const pilulas = () => screen.getAllByTestId(/^dose-/)
+    .map((b) => `${(b.textContent ?? "").slice(0, 5)}${b.getAttribute("aria-pressed") === "true" ? "✓" : ""}`).join(" ");
+
+  it("tomou 00:00 e 08:00, mudou pra 07:00 às 15:00 → o registro fica igual; hoje 08:00 ✓ 16:00 00:00, amanhã 07:00 15:00 23:00 com aviso", () => {
     const novas = cadastro(agoraEm(5, 10), "08:00");
     const [d1, d2, d3] = novas.map((l) => l.id);
     const log = { "2026-11-05": [d1, d2], "2026-11-06": [d3, d1, d2], "2026-11-07": [d3, d1] }; // quem toma tudo
@@ -362,34 +379,41 @@ describe("mudar a hora com o registro cheio: a marca vai junto com a dose", () =
     agoraEm(7, 15);
     mudarPrimeiraNaTela(store, "07:00");
     expect(linhas(store).map((l) => l.time)).toEqual(["07:00", "15:00", "23:00"]);
-    // a das 07:00 (a de 08:00 de hoje, tomada) segue marcada; a das 00:00 de ontem à noite não vira a das 23:00
-    expect((store.estado.dados[LOG] as Record<string, string[]>)["2026-11-07"]).toEqual([d1]);
-    expect(linhas(store).map((l) => l.stock)).toEqual([14, 14, 14]); // só a marca muda de lugar
-    for (const [h, m] of [[15, 10], [22, 30]]) {
+    expect(store.estado.dados[LOG]).toEqual(log);
+    expect(linhas(store).map((l) => l.stock)).toEqual([14, 14, 14]);
+    // a das 00:00 vira 23:00: no dia 8 há a 00:00 de antes e a 23:00 nova — a linha ganha um id novo pras novas
+    expect(linhas(store).map((l) => [l.id === novas.find((n) => n.id === (l.idAntes ?? l.id))?.id, l.idAntes ?? null]))
+      .toEqual([[true, null], [true, null], [false, d3]]);
+    for (const [h, m, fila] of [
+      [15, 10, ["07/16:00", "08/00:00", "08/07:00", "08/15:00"]],
+      [22, 30, ["08/00:00", "08/07:00", "08/15:00", "08/23:00"]],
+    ] as const) {
       cleanup();
       agoraEm(7, h, m);
       montar(store);
-      expect(screen.getByTestId(`dose-${d3}`)).toHaveAttribute("aria-pressed", "false");
-      expect(screen.getByTestId(`dose-${d1}`)).toHaveAttribute("aria-pressed", "true");
-      expect(lerDadosDosLembretes(store.get).remedios.filter((r) => r.tomadoHoje).map((r) => r.hora)).toEqual(["07:00"]);
-      expect(planoDe(store).map((a) => fmt(a.quando))).toContain("07/23:00");
+      expect(pilulas()).toBe("08:00✓ 16:00 00:00");
+      expect(planoDe(store).map((a) => fmt(a.quando)).slice(0, 4)).toEqual(fila);
     }
+    cleanup();
+    agoraEm(8, 6, 0);
+    montar(store);
+    expect(pilulas()).toBe("07:00 15:00 23:00");
   });
 
-  it("1º dia: tomou a das 08:00 e às 15:00 atrasou pra 20:00 → às 19:55 a das 20:00 não está marcada e tem aviso", () => {
+  it("1º dia: tomou a das 08:00 e às 15:00 atrasou pra 20:00 → hoje segue 16:00 e 00:00; os novos começam amanhã 12:00 (mais de meio intervalo depois da das 00:00)", () => {
     const novas = cadastro(agoraEm(7, 7, 50), "08:00");
-    const [d1] = novas.map((l) => l.id);
+    const [d1, d2] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas.map((l) => ({ ...l, stock: 20 })), [LOG]: { "2026-11-07": [d1] } });
     agoraEm(7, 15);
     mudarPrimeiraNaTela(store, "20:00");
     expect(linhas(store).map((l) => l.time)).toEqual(["20:00", "04:00", "12:00"]);
-    expect((store.estado.dados[LOG] as Record<string, string[]>)["2026-11-07"] ?? []).toEqual([]);
+    expect(store.estado.dados[LOG]).toEqual({ "2026-11-07": [d1] });
     expect(linhas(store).map((l) => l.stock)).toEqual([20, 20, 20]);
     agoraEm(7, 19, 55);
     montar(store);
-    expect(screen.getByTestId(`dose-${d1}`)).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByTestId(`dose-${d1}`)).toHaveAttribute("data-da-vez", "true");
-    expect(fmt(planoDe(store)[0].quando)).toBe("07/20:00");
+    expect(screen.getByTestId(`dose-${d1}`)).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId(`dose-${d2}`)).toHaveAttribute("data-da-vez", "true"); // a das 16:00, esquecida
+    expect(planoDe(store).map((a) => fmt(a.quando)).slice(0, 3)).toEqual(["08/00:00", "08/12:00", "08/20:00"]);
   });
 
   it("tomou a das 08:00 um pouco antes (07:50) e às 07:55 mudou pra 08:30 → continua marcada (é a mesma dose)", () => {
@@ -398,21 +422,28 @@ describe("mudar a hora com o registro cheio: a marca vai junto com a dose", () =
     const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-07": [d1] } });
     agoraEm(7, 7, 55);
     mudarPrimeiraNaTela(store, "08:30");
-    expect((store.estado.dados[LOG] as Record<string, string[]>)["2026-11-07"]).toEqual([d1]);
+    expect(store.estado.dados[LOG]).toEqual({ "2026-11-07": [d1] });
+    montar(store);
+    expect(screen.getByTestId(`dose-${d1}`)).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId(`dose-${d1}`).textContent).toContain("08:00");
   });
 
-  it("a das 00:00 marcada às 23:50 e a 1ª mudada pra 07:00 às 23:55 → a marca vai pra das 23:00 de hoje (sai de amanhã)", () => {
+  it("a das 00:00 marcada às 23:50 e a 1ª mudada pra 07:00 às 23:55 → a marca fica na das 00:00 (dia 8) e a das 23:00 do dia 8 tem aviso", () => {
     const novas = cadastro(agoraEm(5, 10), "08:00");
     const [d1, d2, d3] = novas.map((l) => l.id);
-    const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-07": [d1, d2], "2026-11-08": [d3] } });
+    const log = { "2026-11-07": [d1, d2], "2026-11-08": [d3] };
+    const store = criarStore({ [CHAVE]: novas, [LOG]: log });
     agoraEm(7, 23, 55);
     mudarPrimeiraNaTela(store, "07:00");
-    const log = store.estado.dados[LOG] as Record<string, string[]>;
-    expect(log["2026-11-07"]).toEqual([d1, d2, d3]);
-    expect(log["2026-11-08"] ?? []).toEqual([]);
+    expect(store.estado.dados[LOG]).toEqual(log);
+    montar(store);
+    expect(pilulas()).toBe("08:00✓ 16:00✓ 00:00✓");
+    const fila = planoDe(store).map((a) => fmt(a.quando));
+    expect(fila).not.toContain("08/00:00");
+    expect(fila.slice(0, 3)).toEqual(["08/07:00", "08/15:00", "08/23:00"]);
   });
 
-  it("estoque zerado: a marca sem baixa vai junto, e desmarcar depois não cria comprimido", () => {
+  it("estoque zerado: a anotação 'sem baixa' fica como está, e desmarcar a das 00:00 depois não cria comprimido", () => {
     const novas = cadastro(agoraEm(5, 10), "08:00");
     const [, , d3] = novas.map((l) => l.id);
     const store = criarStore({
@@ -422,9 +453,12 @@ describe("mudar a hora com o registro cheio: a marca vai junto com a dose", () =
     });
     agoraEm(7, 23, 55);
     mudarPrimeiraNaTela(store, "07:00");
-    expect(store.estado.dados["core-saude-supplement-sem-baixa"]).toEqual({ dia: "2026-11-07", ids: [d3] });
+    expect(store.estado.dados["core-saude-supplement-sem-baixa"]).toEqual({ dia: "2026-11-08", ids: [d3] });
     montar(store);
-    fireEvent.click(screen.getByTestId(`dose-${d3}`));
+    const linha3 = linhas(store)[2];
+    expect(linha3.idAntes).toBe(d3);
+    fireEvent.click(screen.getByTestId(`dose-${linha3.id}`)); // a pílula da das 00:00 (a de antes)
+    expect((store.estado.dados[LOG] as Record<string, string[]>)["2026-11-08"]).toEqual([]);
     expect(linhas(store).map((l) => l.stock)).toEqual([0, 0, 0]);
   });
 });
@@ -491,7 +525,9 @@ describe("cadastro: 'Começa hoje/amanhã'", () => {
    tratamento vira por causa da troca — levava a marca de ontem pra dose de hoje (a pessoa pulava uma
    dose de antibiótico) ou apagava marcas verdadeiras de ontem. A marca agora vai da MESMA ocorrência
    (o mesmo dia do tratamento) com as horas velhas pra ela com as horas novas. */
-describe("mudar a hora antes da dose da manhã (o dia do tratamento vira com a troca)", () => {
+/* Mudar a hora de madrugada, antes da dose da manhã (08/11, simplificação): "a partir de amanhã" é o dia
+   de amanhã de verdade — hoje continua com os horários de antes, inclusive a dose da manhã. */
+describe("mudar a hora antes da dose da manhã: hoje ainda segue os horários de antes", () => {
   const ordenado = (v: unknown) => [...((v as string[] | undefined) ?? [])].sort();
   const logDe = (store: ReturnType<typeof criarStore>) => store.estado.dados[LOG] as Record<string, string[]>;
   const quemTomaTudo = (ids: string[]) => {
@@ -499,66 +535,65 @@ describe("mudar a hora antes da dose da manhã (o dia do tratamento vira com a t
     return { "2026-11-05": [d1, d2], "2026-11-06": [d3, d1, d2], "2026-11-07": [d3] };
   };
 
-  it("(B) às 06:50, 08:00 → 07:00: a das 07:00 de hoje NÃO está marcada, tem aviso, e ontem continua completo", () => {
+  it("(B) às 06:50, 08:00 → 07:00: ontem continua completo, hoje a das 08:00 é a da vez e tem aviso; amanhã 07:00", () => {
     const novas = cadastro(agoraEm(5, 10), "08:00");
     const [d1, d2, d3] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas.map((l) => ({ ...l, stock: 14 })), [LOG]: quemTomaTudo([d1, d2, d3]) });
     agoraEm(7, 6, 50);
     mudarPrimeiraNaTela(store, "07:00");
     expect(linhas(store).map((l) => l.time)).toEqual(["07:00", "15:00", "23:00"]);
-    expect(ordenado(logDe(store)["2026-11-06"])).toEqual([d1, d2, d3].sort());
-    expect(logDe(store)["2026-11-07"] ?? []).toEqual([]);
+    expect(logDe(store)).toEqual(quemTomaTudo([d1, d2, d3]));
     expect(linhas(store).map((l) => l.stock)).toEqual([14, 14, 14]);
-    expect(planoDe(store).map((a) => fmt(a.quando)).slice(0, 2)).toEqual(["07/07:00", "07/15:00"]);
+    expect(planoDe(store).map((a) => fmt(a.quando)).slice(0, 4)).toEqual(["07/08:00", "07/16:00", "08/00:00", "08/07:00"]);
     agoraEm(7, 6, 59);
     montar(store);
     expect(screen.getByTestId(`dose-${d1}`)).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByTestId(`dose-${d1}`)).toHaveAttribute("data-da-vez", "true");
+    expect(screen.getByTestId(`dose-${d1}`).textContent).toBe("08:00");
   });
 
-  it("(D) às 06:30, 08:00 → 06:00: a das 06:00 de hoje (que já passou) aparece por tomar, não tomada", () => {
+  it("(D) às 06:30, 08:00 → 06:00: não aparece dose das 06:00 de hoje por tomar; a fileira diz quando os novos começam", () => {
     const novas = cadastro(agoraEm(5, 10), "08:00");
     const [d1, d2, d3] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas, [LOG]: quemTomaTudo([d1, d2, d3]) });
     agoraEm(7, 6, 30);
     mudarPrimeiraNaTela(store, "06:00");
     expect(ordenado(logDe(store)["2026-11-06"])).toEqual([d1, d2, d3].sort());
-    expect(logDe(store)["2026-11-07"] ?? []).toEqual([]);
+    expect(logDe(store)["2026-11-07"]).toEqual([d3]);
     montar(store);
     expect(screen.getByTestId(`dose-${d1}`)).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByRole("button", { name: "Marcar próxima dose de Amoxicilina (06:00)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Próxima dose de Amoxicilina às 08:00" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Editar horários de Amoxicilina" }));
     expect(screen.queryByTestId("remedio-editar-comeca")).toBeNull(); // já começou: sem "começa"
+    expect(screen.getByTestId("remedio-editar-novos").textContent).toBe(" · os novos valem a partir de amanhã 06:00");
   });
 
-  it("(C) às 07:30, 08:00 → 12:00: as marcas de 06/11 e 07/11 continuam; nenhuma dose que já passou fica 'por tomar'", () => {
+  it("(C) às 07:30, 08:00 → 12:00: as marcas de 06/11 e 07/11 continuam; o próximo aviso é o das 08:00 de hoje", () => {
     const novas = cadastro(agoraEm(5, 10), "08:00");
     const [d1, d2, d3] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas, [LOG]: quemTomaTudo([d1, d2, d3]) });
     agoraEm(7, 7, 30);
     mudarPrimeiraNaTela(store, "12:00");
     expect(linhas(store).map((l) => l.time)).toEqual(["12:00", "20:00", "04:00"]);
-    expect(ordenado(logDe(store)["2026-11-06"])).toEqual([d1, d2, d3].sort());
-    expect(logDe(store)["2026-11-07"]).toEqual([d3]);
+    expect(logDe(store)).toEqual(quemTomaTudo([d1, d2, d3]));
     agoraEm(7, 7, 35);
     montar(store);
-    for (const id of [d1, d2, d3]) expect(screen.getByTestId(`dose-${id}`)).toHaveAttribute("aria-pressed", "true");
-    expect(screen.queryByRole("button", { name: /Marcar próxima dose/ })).toBeNull();
-    // o próximo aviso é o da dose de hoje com a hora nova
-    expect(fmt(planoDe(store)[0].quando)).toBe("07/12:00");
+    expect(screen.getByRole("button", { name: "Próxima dose de Amoxicilina às 08:00" })).toBeInTheDocument();
+    // hoje 08:00, 16:00 e 00:00; os novos começam amanhã 12:00 (a das 04:00 ficaria colada na das 00:00)
+    expect(planoDe(store).map((a) => fmt(a.quando)).slice(0, 5)).toEqual(["07/08:00", "07/16:00", "08/00:00", "08/12:00", "08/20:00"]);
   });
 
-  it("(E) 12 em 12, às 06:40, 08:00 → 07:00: ontem não fica vazio, e a das 07:00 de hoje tem aviso e não está marcada", () => {
+  it("(E) 12 em 12, às 06:40, 08:00 → 07:00: ontem não fica vazio; hoje 08:00 e 20:00, amanhã 07:00", () => {
     const novas = montarLinhas({ name: "Amoxicilina", stock: 21 }, gerarHorarios("08:00", 2), "2026-11-13", new Date(2026, 10, 5, 10).getTime());
     const [d1, d2] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-05": [d1, d2], "2026-11-06": [d1, d2] } });
     agoraEm(7, 6, 40);
     mudarPrimeiraNaTela(store, "07:00");
-    expect(logDe(store)["2026-11-06"]).toEqual([d1, d2]);
-    expect(logDe(store)["2026-11-07"] ?? []).toEqual([]);
-    expect(fmt(planoDe(store)[0].quando)).toBe("07/07:00");
+    expect(logDe(store)).toEqual({ "2026-11-05": [d1, d2], "2026-11-06": [d1, d2] });
+    expect(planoDe(store).map((a) => fmt(a.quando)).slice(0, 3)).toEqual(["07/08:00", "07/20:00", "08/07:00"]);
     montar(store);
     expect(screen.getByTestId(`dose-${d1}`)).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId(`dose-${d1}`).textContent).toBe("08:00");
   });
 });
 
@@ -744,7 +779,7 @@ describe("digitar a 1ª dose (valores no meio do caminho)", () => {
     const store = criarStore({ [CHAVE]: novas, [LOG]: log });
     agoraEm(7, 7, 30);
     digitarPrimeira(store, "17:00", "08:00");
-    expect(linhas(store).map((l) => [l.time, l.inicio])).toEqual(novas.map((l) => [l.time, l.inicio]));
+    expect(linhas(store)).toEqual(novas); // voltou ao que era: sem troca de horário gravada
     const doDia = (d: string) => [...(((store.estado.dados[LOG] as Record<string, string[]>)[d]) ?? [])].sort();
     expect(doDia("2026-11-06")).toEqual([d1, d2, d3].sort());
     expect(doDia("2026-11-07")).toEqual([d3]); // a das 00:00 de hoje cedo, tomada, continua tomada

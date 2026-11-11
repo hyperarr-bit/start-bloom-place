@@ -1,22 +1,20 @@
 /**
- * CRÍTICA DE FORA, 08/11, RODADA 3 — repro. Cada caso diz o que DEVIA acontecer e está em `it.fails`
- * até o conserto (o comentário "hoje:" diz o que acontece agora). Os "(controle)" e "(medida)" passam hoje.
+ * CRÍTICA DE FORA, 08/11, RODADA 3 — repro, e depois da SIMPLIFICAÇÃO 08/11 (decisão do dono): mudar o
+ * horário de um remédio vale A PARTIR DE AMANHÃ — nenhuma marca de "tomado" muda de lugar e as doses de
+ * hoje seguem os horários de antes até o dia do tratamento virar (lib/remedios, mudarHorarios). Saiu a
+ * lógica de mover marcas (moverMarcasDoGrupo e a "foto" da fileira de edição). H1, H2 e H4 eram buracos
+ * dela e viraram casos do comportamento novo (passam). H3 (Home) não tem a ver com mudar o horário e
+ * segue em `it.fails` até o conserto dele.
  *
- *  H1 (ALTA) 1× ao dia de madrugada (00:30) marcado antes da meia-noite grava no dia SEGUINTE (A3, certo).
- *     Se logo depois a pessoa muda o horário pra antes da meia-noite (23:00), a marca fica no dia seguinte:
- *     a tela pede a das 23:00 de hoje (o comprimido que ela acabou de tomar), o toque baixa o estoque de
- *     novo (1 comprimido = 2 marcas, 30 → 28), e o dia seguinte aparece tomado o dia inteiro, SEM o aviso
- *     das 23:00: a pessoa pula a dose do dia seguinte. Mudar o horário de remédio de 1 linha não leva a
- *     marca junto (PharmacyChecklist changeTime só move marcas de grupo). Só no ramo (o main grava sempre hoje).
- *  H2 (MÉDIA) O G1 só vale numa abertura da fileira de edição: 08:00 tomada, às 08:20 08:00 → 11:00
- *     (a marca vai pra 11:00), "Pronto" (ou trocar de tela), reabre e 11:00 → 11:30: a marca das 11:00 é
- *     tratada como "adiantada" e sai — a das 11:30 fica devida e o aviso toca 3 h 30 depois do comprimido.
- *     De uma vez (08:00 → 11:30) a marca vai pra 11:30. Fura a guarda do G1 (nunca menos de meio intervalo).
- *  H3 (BAIXA) A Home conta remédio por toda linha em vigor, sem o `inicio`: com "Começa amanhã", hoje a Home
- *     diz "3 suplementos pendentes" de um tratamento que não começou (dosesEmVigor não olha o começo).
- *  H4 (BAIXA) A foto da fileira de edição não vê marca que chega de fora depois de aberta (outro aparelho,
- *     conta relida ao voltar pro app): mudar a 1ª dose grava o registro do grupo a partir da foto e apaga a
- *     marca que a tela já mostrava.
+ *  H1 1× ao dia de madrugada (00:30) marcado antes da meia-noite grava no dia SEGUINTE (A3, certo). Se
+ *     logo depois a pessoa muda o horário pra 23:00, a marca fica onde está (a das 00:30 do dia 8, já
+ *     tomada) e o horário novo começa às 23:00 do dia 8 — com aviso. Antes, a tela pedia de novo o
+ *     comprimido que ela acabou de tomar e o dia 8 ficava sem aviso.
+ *  H2 Mudar a 1ª dose em 2 aberturas da fileira (ou trocando de tela no meio) dá o mesmo que de uma vez.
+ *  H3 (BAIXA, segue aberto) A Home conta remédio por toda linha em vigor, sem o `inicio`: com "Começa
+ *     amanhã", hoje a Home diz "3 suplementos pendentes" de um tratamento que não começou.
+ *  H4 Marca que chega de fora (outro aparelho) com a fileira de edição aberta não some ao mudar a 1ª
+ *     dose: mudar o horário não grava o registro de "tomado".
  */
 process.env.TZ = "America/Sao_Paulo";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -131,10 +129,10 @@ const marcasNoRelogio = (s: Store) => {
 const simples = (time: string) => ({ id: "r1", name: "Losartana", time, stock: 30, dosesPerDay: 1 });
 const caixaSimples = () => screen.getByRole("button", { name: /^(Desmarcar Losartana|Marcar Losartana como tomado)$/ });
 
-describe("crítica de fora, 08/11, rodada 3 — repro", () => {
-  /* H1: 1× ao dia de madrugada (00:30), tomado às 23:50 (grava amanhã, A3). Às 23:55 a pessoa muda o
-     horário pra 23:00. A marca fica no dia 8: o dia 8 aparece tomado e o aviso das 23:00 do dia 8 some. */
-  it.fails("H1 1× ao dia 00:30 tomado às 23:50, horário mudado pra 23:00 às 23:55: o dia 8 NÃO fica tomado e o aviso das 23:00 do dia 8 existe", () => {
+describe("crítica de fora, 08/11, rodada 3 — depois da simplificação", () => {
+  /* H1: 1× ao dia de madrugada (00:30), tomado às 23:50 (grava no dia 8, A3). Às 23:55 a pessoa muda o
+     horário pra 23:00. A marca fica no dia 8 (é a das 00:30, tomada); o 23:00 começa no dia 8 com aviso. */
+  it("H1 1× ao dia 00:30 tomado às 23:50, horário mudado pra 23:00 às 23:55: a marca fica, o dia 8 segue ✓ até a virada e o aviso das 23:00 do dia 8 existe", () => {
     const store = criarStore({ [CHAVE]: [simples("00:30")], [LOG]: { "2026-11-07": ["r1"] } });
     agoraEm(7, 23, 50);
     montar(store);
@@ -142,29 +140,24 @@ describe("crítica de fora, 08/11, rodada 3 — repro", () => {
     expect(log(store)).toEqual({ "2026-11-07": ["r1"], "2026-11-08": ["r1"] });
     agoraEm(7, 23, 55);
     fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "23:00" } });
-    // hoje: log fica {07: [r1], 08: [r1]} — às 23:00 o comprimido das 23:50 é a dose do dia 7
+    expect(falas).toContain("Os horários novos valem a partir de amanhã.");
+    expect(log(store)).toEqual({ "2026-11-07": ["r1"], "2026-11-08": ["r1"] });
+    expect(estoque(store)).toEqual([29]);
+    expect(avisos(store)).toContain("08/23:00");
+    // no dia 8 de dia a caixa mostra o ✓ do comprimido das 23:50 (a das 00:30 do dia 8); perto das 23:00, a nova
     agoraEm(8, 9, 0);
     voltarProApp();
-    expect(caixaSimples().getAttribute("aria-label")).toBe("Marcar Losartana como tomado");
-    expect(avisos(store)).toContain("08/23:00");
-  });
-
-  it.fails("H1b sem registro antes: logo depois de mudar pra 23:00 a caixa diz 'Marcar' (o comprimido das 23:50 sumiu da tela) e a fila de 23:56 não tem o aviso das 23:00 do dia 8", () => {
-    const store = criarStore({ [CHAVE]: [simples("00:30")], [LOG]: {} });
-    agoraEm(7, 23, 50);
-    montar(store);
-    fireEvent.click(caixaSimples());
-    agoraEm(7, 23, 55);
-    fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "23:00" } });
-    agoraEm(7, 23, 56);
-    voltarProApp();
-    // hoje: 'Marcar Losartana como tomado' (a das 23:00 do dia 7, que é o comprimido das 23:50) — um toque
-    // baixa o estoque de novo (30 → 28 com 1 comprimido) e o dia 8 continua marcado
     expect(caixaSimples().getAttribute("aria-label")).toBe("Desmarcar Losartana");
-    expect(avisos(store)).toContain("08/23:00");
+    agoraEm(8, 22, 0);
+    voltarProApp();
+    expect(caixaSimples().getAttribute("aria-label")).toBe("Marcar Losartana como tomado");
+    fireEvent.click(caixaSimples());
+    expect(estoque(store)).toEqual([28]); // 2 comprimidos, 2 baixas
+    expect(avisos(store).filter((a) => a.startsWith("08/"))).toEqual([]);
+    expect(avisos(store)[0]).toBe("09/23:00");
   });
 
-  it("H1b (medida) o que acontece hoje: 1 comprimido, 2 marcas, estoque 28, sem aviso no dia 8", () => {
+  it("H1b sem registro antes: logo depois de mudar pra 23:00 a caixa segue ✓ (o comprimido das 23:50), um toque não baixa de novo e a fila tem o aviso das 23:00 do dia 8", () => {
     const store = criarStore({ [CHAVE]: [simples("00:30")], [LOG]: {} });
     agoraEm(7, 23, 50);
     montar(store);
@@ -173,10 +166,36 @@ describe("crítica de fora, 08/11, rodada 3 — repro", () => {
     fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "23:00" } });
     agoraEm(7, 23, 56);
     voltarProApp();
-    fireEvent.click(caixaSimples()); // a tela pediu a das 23:00 do dia 7
-    expect(log(store)).toEqual({ "2026-11-07": ["r1"], "2026-11-08": ["r1"] });
-    expect(estoque(store)).toEqual([28]);
-    expect(avisos(store).filter((a) => a.startsWith("08/"))).toEqual([]);
+    expect(caixaSimples().getAttribute("aria-label")).toBe("Desmarcar Losartana");
+    expect(log(store)).toEqual({ "2026-11-08": ["r1"] });
+    expect(estoque(store)).toEqual([29]);
+    expect(avisos(store)).toContain("08/23:00");
+  });
+
+  it("H1c 1× ao dia 00:30 (tomado hoje cedo) mudado pra 23:00 às 15:00: começa hoje às 23:00 (a linha ganha id novo); até a virada a caixa desmarca e marca a das 00:30 de hoje, no id de antes", () => {
+    const store = criarStore({ [CHAVE]: [simples("00:30")], [LOG]: { "2026-11-07": ["r1"] } });
+    agoraEm(7, 15, 0);
+    montar(store);
+    fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "23:00" } });
+    expect(falas).toContain("Os horários novos valem a partir de hoje, às 23:00.");
+    expect(linhas(store)[0]).toMatchObject({ time: "23:00", horaAntes: "00:30", idAntes: "r1", novoDesde: "2026-11-07T23:00" });
+    expect(linhas(store)[0].id).not.toBe("r1");
+    expect(avisos(store)[0]).toBe("07/23:00"); // 22 h 30 depois do comprimido das 00:30
+    agoraEm(7, 16, 0);
+    voltarProApp();
+    expect(caixaSimples().getAttribute("aria-label")).toBe("Desmarcar Losartana");
+    fireEvent.click(caixaSimples()); // desmarca a das 00:30 de hoje (id de antes)
+    expect(log(store)).toEqual({});
+    expect(estoque(store)).toEqual([31]);
+    fireEvent.click(caixaSimples());
+    expect(log(store)).toEqual({ "2026-11-07": ["r1"] });
+    expect(estoque(store)).toEqual([30]);
+    agoraEm(7, 22, 0);
+    voltarProApp();
+    expect(caixaSimples().getAttribute("aria-label")).toBe("Marcar Losartana como tomado");
+    fireEvent.click(caixaSimples());
+    expect(log(store)).toEqual({ "2026-11-07": ["r1", linhas(store)[0].id] });
+    expect(estoque(store)).toEqual([29]);
   });
 
   it("H1 (controle) o mesmo sem mudar o horário: o dia 8 fica tomado (é a das 00:30 do dia 8)", () => {
@@ -189,26 +208,33 @@ describe("crítica de fora, 08/11, rodada 3 — repro", () => {
     expect(caixaSimples().getAttribute("aria-label")).toBe("Desmarcar Losartana");
   });
 
-  /* H2: G1 depende de a mudança ser numa abertura só. 8 em 8, 08:00 tomada. Às 08:20: 08:00 → 11:00
-     (a marca vai pra 11:00, G1), "Pronto"; reabre e acerta 11:00 → 11:30. Na 2ª conta a marca das 11:00
-     é "adiantada" (ainda vem, mais de 1 h) e sai: a das 11:30 fica devida, 3 h 30 depois do comprimido.
-     Numa abertura só (08:00 → 11:30) a marca vai pra 11:30. */
-  it.fails("H2 08:00 tomada; às 08:20 08:00 → 11:00, Pronto, reabre, 11:00 → 11:30: a das 11:30 fica tomada (igual a fazer de uma vez)", () => {
+  /* H2: 8 em 8, 08:00 tomada. Às 08:20: 08:00 → 11:00, "Pronto"; reabre e acerta 11:00 → 11:30. Dá o
+     mesmo que 08:00 → 11:30 de uma vez: hoje segue 08:00 ✓, 16:00 e 00:00; amanhã 11:30, 19:30 e 03:30. */
+  const hojeSegue = (store: Store) => {
+    expect(log(store)["2026-11-07"]).toEqual(expect.arrayContaining([linhas(store)[0].id]));
+    expect(avisos(store).slice(0, 3)).toEqual(["07/16:00", "08/00:00", "08/11:30"]);
+  };
+
+  it("H2 08:00 tomada; às 08:20 08:00 → 11:00, Pronto, reabre, 11:00 → 11:30: o mesmo que de uma vez", () => {
     const novas = vezes(3, "08:00", agoraEm(3, 7, 50));
     const [d08, d16, d00] = novas.map((l) => l.id);
-    const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-06": [d08, d16], "2026-11-07": [d00, d08] } });
+    const logIni = { "2026-11-06": [d08, d16], "2026-11-07": [d00, d08] };
+    const store = criarStore({ [CHAVE]: novas, [LOG]: logIni });
     agoraEm(7, 8, 20);
     montar(store);
     mudarPrimeira("11:00");
-    expect(marcasNoRelogio(store)).toContain("07/11:00");
     agoraEm(7, 8, 21);
     mudarPrimeira("11:30");
-    // hoje: "07/11:30" não está marcada, o 1º aviso é 07/11:30 (3 h 30 depois do comprimido das 08:00)
-    expect(marcasNoRelogio(store)).toContain("07/11:30");
-    expect(avisos(store)[0]).toBe("07/19:30");
+    expect(log(store)).toEqual(logIni);
+    hojeSegue(store);
+    const deUmaVez = criarStore({ [CHAVE]: novas, [LOG]: logIni });
+    cleanup();
+    montar(deUmaVez);
+    mudarPrimeira("11:30");
+    expect(linhas(store).map((l) => [l.time, l.horaAntes, l.novoDesde])).toEqual(linhas(deUmaVez).map((l) => [l.time, l.horaAntes, l.novoDesde]));
   });
 
-  it.fails("H2b o mesmo trocando de tela entre as duas mudanças (desmonta e monta de novo)", () => {
+  it("H2b o mesmo trocando de tela entre as duas mudanças (desmonta e monta de novo)", () => {
     const novas = vezes(3, "08:00", agoraEm(3, 7, 50));
     const [d08, d16, d00] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-06": [d08, d16], "2026-11-07": [d00, d08] } });
@@ -220,21 +246,10 @@ describe("crítica de fora, 08/11, rodada 3 — repro", () => {
     agoraEm(7, 8, 22);
     montar(store);
     mudarPrimeira("11:30");
-    expect(avisos(store)[0]).toBe("07/19:30");
+    hojeSegue(store);
   });
 
-  it("H2 (controle) numa abertura só, 08:00 → 11:30: 11:30 ✓, 1º aviso 19:30", () => {
-    const novas = vezes(3, "08:00", agoraEm(3, 7, 50));
-    const [d08, d16, d00] = novas.map((l) => l.id);
-    const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-06": [d08, d16], "2026-11-07": [d00, d08] } });
-    agoraEm(7, 8, 20);
-    montar(store);
-    mudarPrimeira("11:30");
-    expect(marcasNoRelogio(store)).toContain("07/11:30");
-    expect(avisos(store)[0]).toBe("07/19:30");
-  });
-
-  it("H2 (controle) desfazer em 2 aberturas: 08:00 → 11:00, Pronto, 11:00 → 08:00 volta a marca pra 08:00", () => {
+  it("H2 (controle) desfazer em 2 aberturas: 08:00 → 11:00, Pronto, 11:00 → 08:00 volta ao que era (sem troca gravada)", () => {
     const novas = vezes(3, "08:00", agoraEm(3, 7, 50));
     const [d08, d16, d00] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-06": [d08, d16], "2026-11-07": [d00, d08] } });
@@ -242,15 +257,14 @@ describe("crítica de fora, 08/11, rodada 3 — repro", () => {
     montar(store);
     mudarPrimeira("11:00");
     mudarPrimeira("08:00");
+    expect(linhas(store)).toEqual(novas);
     expect(marcasNoRelogio(store)).toEqual(["06/08:00", "06/16:00", "07/00:00", "07/08:00"]);
     expect(avisos(store)[0]).toBe("07/16:00");
   });
 
-  /* H4: a foto da fileira de edição não vê marca que chega de FORA depois de aberta (outro aparelho, a
-     conta relida ao voltar pro app). Fileira aberta às 07:50; às 08:05 chega do celular a marca da 08:00;
-     às 08:10 a 1ª dose muda pra 08:30 (na mesma fileira): a conta parte da foto sem a 08:00 e grava o
-     registro do grupo inteiro por cima — a marca do celular some e a das 08:30 fica devida. */
-  it.fails("H4 marca que chega de outro aparelho com a fileira de edição aberta não some ao mudar a 1ª dose", async () => {
+  /* H4: a marca que chega de FORA (outro aparelho) com a fileira de edição aberta não some: mudar a 1ª
+     dose não grava o registro de "tomado". */
+  it("H4 marca que chega de outro aparelho com a fileira de edição aberta não some ao mudar a 1ª dose", async () => {
     const novas = vezes(3, "08:00", agoraEm(3, 7, 50));
     const [d08, d16, d00] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-06": [d08, d16], "2026-11-07": [d00] } });
@@ -264,8 +278,9 @@ describe("crítica de fora, 08/11, rodada 3 — repro", () => {
     expect(pilula(d08).getAttribute("aria-pressed")).toBe("true"); // a tela já mostra a marca do celular
     agoraEm(7, 8, 10);
     fireEvent.change(screen.getByLabelText("Horário de Amoxicilina (1ª dose)"), { target: { value: "08:30" } });
-    // hoje: a marca some (a 08:30 fica devida, o aviso das 08:30 toca 25 min depois do comprimido)
-    expect(marcasNoRelogio(store)).toContain("07/08:30");
+    expect(log(store)).toEqual(vindo);
+    expect(pilula(d08).getAttribute("aria-pressed")).toBe("true");
+    expect(avisos(store)[0]).toBe("07/16:00");
   });
 
   /* H3: a Home conta remédio pelo dia do CALENDÁRIO e por toda linha em vigor, sem olhar o `inicio`:

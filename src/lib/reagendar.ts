@@ -29,7 +29,7 @@ import { mesCorrenteId } from "@/lib/virada-contas";
 import { chaveArquivada } from "@/lib/virada-do-mes";
 import type { PrefsNotificacoes } from "@/lib/prefs-notificacoes";
 import { nomeComQuem } from "@/lib/saude-dependentes";
-import { dosesEmVigor, ehDia as ehDiaDeRemedio, ehInicio } from "@/lib/remedios";
+import { ehDia as ehDiaDeRemedio, ehInicio, linhasDosAvisos } from "@/lib/remedios";
 import { localDayKey } from "@/lib/utils";
 import { algumLigado, lerDadosDoSkincare, type DadosDoSkincare } from "@/lib/beleza-lembrete";
 // 17/10 (1.0.16, "Rotina pronta em 3 toques"): o lembrete de manhã da Rotina — prefs na chave própria
@@ -158,7 +158,7 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
   const diarioDieta = get<Record<string, { meals?: Record<string, unknown> }>>("dieta-diary-v2", {}) ?? {};
 
   // Remédios (07/09): a lista do PharmacyChecklist + o log de "tomado hoje"
-  type Suplemento = { id?: string; name?: string; time?: string; quem?: string; ate?: string; grupo?: string; inicio?: string };
+  type Suplemento = { id?: string; name?: string; time?: string; quem?: string; ate?: string; grupo?: string; inicio?: string; horaAntes?: string; idAntes?: string; antesAte?: string; novoDesde?: string };
   const suplementos = get<Suplemento[]>("core-saude-supplements", []) ?? [];
   const logRemedio = get<Record<string, string[]>>("core-saude-supplement-log", {}) ?? {};
   const tomadosHoje = logRemedio[hoje] ?? [];
@@ -167,7 +167,8 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
   amanhaDate.setDate(amanhaDate.getDate() + 1);
   const tomadosAmanha = logRemedio[localDayKey(amanhaDate)] ?? [];
   // (07/11) tratamento com data de fim já passada não entra no plano; a dose da noite do último dia, sim (lib/remedios)
-  const remedios: RemedioAgendavel[] = dosesEmVigor((Array.isArray(suplementos) ? suplementos : []).filter((s) => s?.name && s?.time))
+  // (08/11) horário mudado: a linha vira a de antes (até o dia virar) e a nova (desde a 1ª dose nova) — lib/remedios
+  const remedios: RemedioAgendavel[] = linhasDosAvisos((Array.isArray(suplementos) ? suplementos : []).filter((s) => s?.name && s?.time))
     .map((s) => ({
       id: String(s.id ?? ""),
       // remédio do dependente leva o nome dele no aviso (22/09): "Hora do Ômega 3 (Mãe)"

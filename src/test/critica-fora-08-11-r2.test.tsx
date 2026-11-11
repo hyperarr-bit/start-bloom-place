@@ -3,6 +3,12 @@
  * até o conserto (o comentário "hoje:" diz o que acontece agora). As varreduras do fim passam hoje
  * e ficam de guarda. G1 consertado 08/11 (lib/remedios, moverMarcasDoGrupo): os 2 casos viraram `it`.
  *
+ * SIMPLIFICAÇÃO 08/11 (decisão do dono): mudar o horário vale A PARTIR DE AMANHÃ — nenhuma marca muda de
+ * lugar e as doses de hoje seguem os horários de antes até o dia do tratamento virar (lib/remedios,
+ * mudarHorarios); saiu a lógica de mover marcas. O G1 deixou de existir: a marca da 08:00 tomada fica na
+ * 08:00, e a 1ª dose nova vem amanhã, a mais de meio intervalo da última dose de hoje. Os 2 casos do G1 e a
+ * varredura "mudar a 1ª dose e a fila" seguem a regra nova. G2 e G3 seguem abertos.
+ *
  *  G1 (MÉDIA) Mudar a 1ª dose pra mais tarde logo depois de tomar: a marca da dose tomada SOME (a dose
  *     nova mais perto dela ainda vem, a mais de 1 h) e o aviso dela fica — 8 em 8, 08:00 tomada, às
  *     08:20 a 1ª dose vira 09:30: a pílula 09:30 fica em aberto e o aviso toca às 09:30, 1 h 30 depois
@@ -65,7 +71,7 @@ vi.mock("sonner", () => ({
 import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
 import { planejarRemedios } from "@/lib/notificacoes";
 import { lerDadosDosLembretes } from "@/lib/reagendar";
-import { agruparRemedios, gerarHorarios, montarLinhas, moverMarcasDoGrupo, type Remedio } from "@/lib/remedios";
+import { gerarHorarios, momentoDoInicio, montarLinhas, mudarHorarios, type Remedio } from "@/lib/remedios";
 import { esquecerMarcasDaCaixa } from "@/lib/remedio-caixa";
 import { PharmacyChecklist } from "@/components/saude/PharmacyChecklist";
 
@@ -132,31 +138,31 @@ const tomadas = (s: Store) => marcasNoRelogio(s);
 describe("crítica de fora, 08/11, rodada 2", () => {
   afterEach(() => { nativo.on = false; rearmes.n = 0; });
 
-  it("G1 8 em 8: 08:00 tomada; às 08:20 a 1ª dose vira 09:30 — a marca vai pra 09:30 e o próximo aviso é 17:30", () => {
+  it("G1 (agora) 8 em 8: 08:00 tomada; às 08:20 a 1ª dose vira 09:30 — a marca fica na 08:00, hoje segue (16:00 e 00:00) e os novos começam amanhã 09:30", () => {
     const novas = vezes(3, "08:00", agoraEm(3, 7, 50));
     const [d08, d16, d00] = novas.map((l) => l.id);
-    const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-06": [d08, d16], "2026-11-07": [d00, d08] } });
+    const logIni = { "2026-11-06": [d08, d16], "2026-11-07": [d00, d08] };
+    const store = criarStore({ [CHAVE]: novas, [LOG]: logIni });
     agoraEm(7, 8, 20);
     montar(store);
     mudarPrimeira("09:30");
-    // antes do conserto: ["06/09:30", "06/17:30", "07/01:30"] — a 08:00 tomada sumia; pílula 09:30 em aberto; 1º aviso 07/09:30
-    expect(tomadas(store)).toEqual(["06/09:30", "06/17:30", "07/01:30", "07/09:30"]);
-    expect(pilulas()).toContain("09:30✓");
-    expect(avisos(store)[0]).toBe("07/17:30");
-    expect(falas).toContain("A das 08:00 que você marcou agora conta como a das 09:30. Próxima: 17:30.");
+    expect(log(store)).toEqual(logIni);
+    expect(pilulas()).toBe("00:00 08:00✓ 16:00");
+    expect(avisos(store).slice(0, 3)).toEqual(["07/16:00", "08/00:00", "08/09:30"]);
+    expect(falas).toContain("Os horários novos valem a partir de amanhã.");
   });
 
-  it("G1 12 em 12: 08:00 tomada às 08:00; às 08:10 a 1ª dose vira 09:30 — sem aviso 1 h 30 depois do comprimido", () => {
+  it("G1 (agora) 12 em 12: 08:00 tomada às 08:00; às 08:10 a 1ª dose vira 09:30 — sem aviso 1 h 30 depois do comprimido: hoje 20:00, amanhã 09:30", () => {
     const novas = vezes(2, "08:00", agoraEm(3, 7, 50));
     const [d08, d20] = novas.map((l) => l.id);
-    const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-06": [d08, d20], "2026-11-07": [d08] } });
+    const logIni = { "2026-11-06": [d08, d20], "2026-11-07": [d08] };
+    const store = criarStore({ [CHAVE]: novas, [LOG]: logIni });
     agoraEm(7, 8, 10);
     montar(store);
     mudarPrimeira("09:30");
-    // antes do conserto: 1º aviso 07/09:30 e a caixa dizia "Próxima dose de Amoxicilina às 09:30"
-    expect(avisos(store)[0]).toBe("07/21:30");
-    expect(tomadas(store)).toHaveLength(3);
-    expect(falas).toContain("A das 08:00 que você marcou agora conta como a das 09:30. Próxima: 21:30.");
+    expect(avisos(store).slice(0, 3)).toEqual(["07/20:00", "08/09:30", "08/21:30"]);
+    expect(log(store)).toEqual(logIni);
+    expect(rotulo()).toBe("Próxima dose de Amoxicilina às 20:00");
   });
 
   it.fails("G2 'Começa hoje 08:00' desenhado às 23:59 e tocado às 00:00:30: vira o dia 8 (o amanhã da tela), não o 9", () => {
@@ -236,14 +242,14 @@ describe("crítica de fora, 08/11, rodada 2 — varredura de guarda (passa hoje)
   }, 120_000);
 });
 
-/* ---------- guarda: mudar a 1ª dose de um remédio de várias doses nunca tira da fila a próxima dose em aberto ---------- */
-describe("crítica de fora, 08/11, rodada 2 — mudar a 1ª dose e a fila (passa hoje)", () => {
-  it("12/12, 8/8 e 6/6, em dia: de 30 em 30 min por um dia, toda 1ª dose nova de 30 em 30 min — o 1º aviso é a próxima dose sem marca, nenhuma dose a mais de meio intervalo à frente fica marcada e o 1º aviso não cai a menos de meio intervalo do último comprimido (G1)", () => {
+/* ---------- guarda: mudar a 1ª dose de um remédio de várias doses (simplificação 08/11: a partir de amanhã) ---------- */
+describe("crítica de fora, 08/11, rodada 2 — mudar a 1ª dose e a fila (a partir de amanhã)", () => {
+  it("12/12, 8/8 e 6/6, em dia: de hora em hora por um dia, toda 1ª dose nova de 30 em 30 min — a fila de hoje segue a de antes até a última dose do dia, nada entre ela e a 1ª dose nova, que fica depois de hoje e a mais de meio intervalo dela", () => {
     const problemas: string[] = [];
     for (const [n, p] of [[2, "08:00"], [3, "08:00"], [4, "06:00"], [2, "20:00"]] as const) {
       const novas = montarLinhas({ name: "A", stock: 50 }, gerarHorarios(p, n), undefined, new Date(2026, 10, 3, 7, 0).getTime(), `2026-11-03T${p}`);
-      const antes = agruparRemedios(novas)[0];
-      for (let nowMin = 0; nowMin < 24 * 60; nowMin += 30) {
+      const meio = (12 * 60 / n) * 60_000;
+      for (let nowMin = 0; nowMin < 24 * 60; nowMin += 60) {
         const agora = new Date(2026, 10, 7, 0, nowMin);
         vi.setSystemTime(agora);
         const log0: Record<string, string[]> = {};
@@ -252,31 +258,29 @@ describe("crítica de fora, 08/11, rodada 2 — mudar a 1ª dose e a fila (passa
           const q = new Date(2026, 10, d, h, m);
           if (q.getTime() <= agora.getTime() && q.getTime() > new Date(2026, 10, 5).getTime()) (log0[dk(q)] ??= []).push(l.id);
         }
+        const planoCom = (lista: Remedio[]) => planejarRemedios(lerDadosDosLembretes(<T,>(k: string, f: T): T => (k === CHAVE ? lista as T : k === LOG ? log0 as T : f)).remedios, agora);
+        const semTroca = planoCom(novas);
         for (let novaMin = 0; novaMin < 24 * 60; novaMin += 30) {
           const hora = `${String(Math.floor(novaMin / 60)).padStart(2, "0")}:${String(novaMin % 60).padStart(2, "0")}`;
-          const horas = gerarHorarios(hora, n);
-          const lista: Remedio[] = novas.map((l, i) => ({ ...l, time: horas[i], inicio: `2026-11-03T${hora}` }));
-          const { log: novo } = moverMarcasDoGrupo(antes, agruparRemedios(lista)[0], log0, agora);
-          const get = <T,>(k: string, f: T): T => (k === CHAVE ? lista as T : k === LOG ? novo as T : f);
-          const plano = planejarRemedios(lerDadosDosLembretes(get).remedios, agora);
-          const occ = [7, 8].flatMap((d) => lista.map((l) => {
-            const [h, m] = l.time.split(":").map(Number);
-            const q = new Date(2026, 10, d, h, m);
-            return { k: `${dk(q)}|${l.id}`, quando: q.getTime() };
-          })).sort((a, b) => a.quando - b.quando);
-          const marcadas = marcasDe(novo);
+          if (hora === p) continue;
+          const { itens, novoDesde } = mudarHorarios(novas, gerarHorarios(hora, n), agora);
           const onde = `${n}x ${p} ${fmt(agora)} → ${hora}`;
-          const prox = occ.find((o) => o.quando > agora.getTime() && !marcadas.has(o.k));
-          if (prox && (!plano[0] || fmt(plano[0].quando) !== fmt(new Date(prox.quando)))) problemas.push(`${onde}: 1º aviso ${plano[0] ? fmt(plano[0].quando) : "nenhum"}, devia ${fmt(new Date(prox.quando))}`);
-          // (vale também depois do conserto do G1: a marca de um comprimido tomado anda no máximo meio intervalo)
-          for (const o of occ) if (o.quando > agora.getTime() + (12 * 60 / n) * 60_000 && marcadas.has(o.k)) problemas.push(`${onde}: marcada ${o.k}, que ainda vem`);
-          // G1 (conserto 08/11): o 1º aviso nunca cai a menos de meio intervalo do último comprimido (antes: 591 trocas)
-          const ultimo = Math.max(-Infinity, ...novas.flatMap((l) => Object.entries(log0).filter(([, ids]) => ids.includes(l.id)).map(([dia]) => {
-            const [a, me, d] = dia.split("-").map(Number);
-            const [h, m] = l.time.split(":").map(Number);
-            return new Date(a, me - 1, d, h, m).getTime();
-          })));
-          if (plano[0] && plano[0].quando.getTime() - ultimo < (12 * 60 / n) * 60_000) problemas.push(`${onde}: 1º aviso ${fmt(plano[0].quando)}, a menos de meio intervalo do comprimido das ${fmt(new Date(ultimo))}`);
+          const F = momentoDoInicio(novoDesde);
+          if (!F) { problemas.push(`${onde}: sem novoDesde`); continue; }
+          // a última dose de antes: a do fim do dia do tratamento gravado (a da noite cai no dia seguinte)
+          const antesAte = String(itens[0].antesAte);
+          const [a, me, d] = antesAte.split("-").map(Number);
+          const L = Math.max(...itens.map((l) => {
+            const [h, m] = String(l.horaAntes).split(":").map(Number);
+            return new Date(a, me - 1, d + (String(l.horaAntes) < p ? 1 : 0), h, m).getTime();
+          }));
+          const com = planoCom(itens).map((x) => x.quando.getTime());
+          const antes = semTroca.map((x) => x.quando.getTime()).filter((t) => t <= L);
+          const ateF = com.filter((t) => t < F.getTime());
+          if (JSON.stringify(ateF) !== JSON.stringify(antes)) problemas.push(`${onde}: antes da 1ª dose nova ${ateF.map((t) => fmt(new Date(t)))}, devia ${antes.map((t) => fmt(new Date(t)))}`);
+          if (com.find((t) => t >= F.getTime()) !== F.getTime()) problemas.push(`${onde}: o 1º aviso dos horários novos não é ${fmt(F)}`);
+          if (F.getTime() - L <= meio) problemas.push(`${onde}: 1ª dose nova ${fmt(F)} a menos de meio intervalo da última de antes ${fmt(new Date(L))}`);
+          if (dk(F) <= dk(agora)) problemas.push(`${onde}: os horários novos começam hoje (${fmt(F)})`);
         }
       }
     }

@@ -19,6 +19,7 @@
  * window.__eventosLanding). Todos levam landing_session_id, braco_titulo, braco_oferta, utm_*, ad ids, plataforma.
  *   landing_html {tela1_ms, ttfb_ms, forcados, divisao}   · landing_bloco {bloco}  (1x por bloco visto)
  *   landing_area {area, modulo}                           · landing_demo_aberta {modulo, via}
+ *   (11/11) landing_topo_foto {} — tocou na tela de Finanças da 1ª tela (braço "anuncio" do AB_OFERTA_TOPO); todo evento da /oferta leva braco_topo_oferta
  *   landing_demo_pronta {modulo, ms_desde_html}           · landing_demo_modulo {modulo, via: pilula|grade|dentro|area}
  *   landing_demo_mexeu {modulo}                           · landing_demo_saida {destino}
  *   landing_oferta_vista {}                               · landing_caixinha {marcada}
@@ -79,7 +80,7 @@
 import {
 
   EMAIL_OK, MODULO_DA_AREA, NOME_DO_MODULO, ROTULO_OFERTA, VALOR_OFERTA, URL_APP_STORE,
-  bracoCheckoutDoHtml, bracoLpDoHtml, bracoLpOfertaDoHtml, bracoEmailOfertaDoHtml, bracoPixDoHtml, motivoPixDoHtml, NOME_NO_BANCO, CNPJ_NO_BANCO, checarEmailAntes, sugestaoDeEmail, voltaDoLembrete, upsell2027DoHtml, voltaDoEmailU2027, upsellPosDoHtml, ehPraSempreOferta,
+  bracoCheckoutDoHtml, bracoLpDoHtml, bracoLpOfertaDoHtml, bracoEmailOfertaDoHtml, bracoTopoOfertaDoHtml, bracoPixDoHtml, motivoPixDoHtml, NOME_NO_BANCO, CNPJ_NO_BANCO, checarEmailAntes, sugestaoDeEmail, voltaDoLembrete, upsell2027DoHtml, voltaDoEmailU2027, upsellPosDoHtml, ehPraSempreOferta,
   ESTADO_VAZIO, bracoOfertaDoHtml, bracoTituloDoHtml, ehArea, ehModuloLanding, estadoQueVolta, mmss, ofertaEscolhida, reais, urlPlay, venceEm,
   type Area, type EstadoLanding, type MensagemDaDemo, type ModuloLanding, type OfertaLanding, type PixLanding, type PixU2027,
 } from "./regras";
@@ -108,7 +109,7 @@ const agora = () => Math.round(performance.now());
 type Janela = Window & {
   __landingCliqueLoja?: (e: MouseEvent) => void;
   __landingSimularJaTem?: boolean;
-  __landing?: { oem_forcado?: boolean; lpo_forcado?: boolean; lpo_link?: boolean; ab_lp_oferta?: string; lpo_stripe_cedo?: string; pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null };
+  __landing?: { otp_forcado?: boolean; oem_forcado?: boolean; lpo_forcado?: boolean; lpo_link?: boolean; ab_lp_oferta?: string; lpo_stripe_cedo?: string; pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null };
   __eventosLanding?: Record<string, unknown>[];
   /** 02/11 (dev/testes): voltou() = "voltei do banco" (≥ 5 s fora) sem trocar de aba; vencer() = o QR vence em 1,5 s */
   __landingSimular?: { pagar: () => void; pagarU2027?: () => void; voltou?: () => void; vencer?: () => void };
@@ -184,6 +185,10 @@ const LPO_ATIVO = STRIPE && (w.__landing?.ab_lp_oferta === "on" || LPO_FORCADO |
 const BRACO_EMAIL_OFERTA = STRIPE && !LPO_NOVA && document.documentElement.hasAttribute("data-oem") ? bracoEmailOfertaDoHtml() : null;
 const OEM_PAGINA = BRACO_EMAIL_OFERTA === "pagina";
 const OEM_FORCADO = !!w.__landing?.oem_forcado;
+/** 11/11: o braço do TOPO da /oferta (AB_OFERTA_TOPO no <head> → html[data-otp]): "anuncio" = a tela de Finanças do anúncio na 1ª tela, logo
+ *  abaixo do título (a pergunta desce); "atual" = a 1ª tela de hoje. Só na página de hoje. Sem o atributo (o <head> antigo em cache): nada. */
+const BRACO_TOPO_OFERTA = STRIPE && !LPO_NOVA && document.documentElement.hasAttribute("data-otp") ? bracoTopoOfertaDoHtml() : null;
+const OTP_FORCADO = !!w.__landing?.otp_forcado;
 const PIX_MOTIVO = motivoPixDoHtml(); // 02/11: chips "O que te travou?" no estado "voltou" do b (PIX_MOTIVO, padrão off)
 const U2027 = upsell2027DoHtml(); // 31/10: o "Seu 2027" no pós-pago (chave UPSELL_2027 / ?u2027=on)
 const VOLTA_U2027 = voltaDoEmailU2027(BUSCA); // 31/10: chegou pelo bloco do 2027 no e-mail de compra confirmada
@@ -225,7 +230,7 @@ const ua = navigator.userAgent || "";
 const plataforma = /iPhone|iPad|iPod/i.test(ua) ? "ios" : /Android/i.test(ua) ? "android" : "web";
 const inApp = /FBAN|FBAV|FB_IAB|FBIOS|Instagram/i.test(ua);
 const pixForcado = !!w.__landing?.pix_forcado; // 02/11 r1: ?pix=b do dono/QA fica no aparelho — todo evento diz, não só o landing_html (a análise exclui)
-const medicaoForçada = SIMULADO || ["lp_forcado", "pix_forcado", "oferta_forcada", "checkout_forcado", "t_forcado", "lpo_forcado", "oem_forcado"].some(k => (w.__landing as Record<string, unknown> | undefined)?.[k] === true);
+const medicaoForçada = SIMULADO || ["lp_forcado", "pix_forcado", "oferta_forcada", "checkout_forcado", "t_forcado", "lpo_forcado", "oem_forcado", "otp_forcado"].some(k => (w.__landing as Record<string, unknown> | undefined)?.[k] === true);
 const storageAtrib = (() => { try { return localStorage; } catch { return null; } })();
 const atrib = capturarAtribuicao(location.search, storageAtrib, Date.now(), medicaoForçada);
 const contextoAtribuicao = () => ({ landing_session_id: sessao, landing_device_id: aparelho, braco_lp: brLp, braco_pix: brPix, forçado: medicaoForçada, atrib });
@@ -233,7 +238,7 @@ const contextoAtribuicao = () => ({ landing_session_id: sessao, landing_device_i
 export function evento(nome: string, dados: Record<string, unknown> = {}): void {
   // O listener delegado registra uma vez também os links criados pelo checkout/upsells.
   if (nome === "landing_loja" && !dados.link_click_id) return;
-  const corpo = { landing_medicao_v: 2, medicao_forcada: medicaoForçada, ...dados, ...(PAGINA ? { pagina: PAGINA, braco_checkout_ext: EXT, braco_vida: BRACO_VIDA } : {}), ...(BRACO_LP_OFERTA ? { braco_lp_oferta: BRACO_LP_OFERTA, lpo_forcado: LPO_FORCADO } : {}), ...(BRACO_EMAIL_OFERTA ? { braco_email_oferta: BRACO_EMAIL_OFERTA, oem_forcado: OEM_FORCADO } : {}), landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, braco_pix: brPix, pix_forcado: pixForcado, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
+  const corpo = { landing_medicao_v: 2, medicao_forcada: medicaoForçada, ...dados, ...(PAGINA ? { pagina: PAGINA, braco_checkout_ext: EXT, braco_vida: BRACO_VIDA } : {}), ...(BRACO_LP_OFERTA ? { braco_lp_oferta: BRACO_LP_OFERTA, lpo_forcado: LPO_FORCADO } : {}), ...(BRACO_EMAIL_OFERTA ? { braco_email_oferta: BRACO_EMAIL_OFERTA, oem_forcado: OEM_FORCADO } : {}), ...(BRACO_TOPO_OFERTA ? { braco_topo_oferta: BRACO_TOPO_OFERTA, otp_forcado: OTP_FORCADO } : {}), landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, braco_pix: brPix, pix_forcado: pixForcado, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
   listaDeEventos.push({ nome, ...corpo });
   if (!PRODUCAO) return;
   try {
@@ -611,6 +616,8 @@ cheiaComprar?.addEventListener("click", () => {
 document.getElementById("lp2-demo-cartao")?.addEventListener("click", () => { evento("landing_cta", { onde: "testar_app_cartao" }); abrirCheia("financas", "cartao"); });
 
 /* ───────────────────────── 1. topo: a área ───────────────────────── */
+// 11/11 (AB_OFERTA_TOPO, braço "anuncio"): o toque na tela de Finanças da 1ª tela leva à demo (que já abre em Finanças)
+document.getElementById("lp-topo-foto")?.addEventListener("click", () => { evento("landing_topo_foto", {}); rolarAte($("demo")); });
 document.querySelectorAll<HTMLButtonElement>(".lp-area").forEach((b) => {
   b.addEventListener("click", () => {
     const area = b.dataset.a as Area;

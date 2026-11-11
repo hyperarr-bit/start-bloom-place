@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { pkStripeValida, reaisDeCentavos } from "@/landing/hotmart";
-import { bracoEmailOfertaDoAparelho } from "@/landing/regras";
+import { bracoEmailOfertaDoAparelho, bracoTopoOfertaDoAparelho } from "@/landing/regras";
 
 const raiz = resolve(__dirname, "../..");
 const HTML = readFileSync(resolve(raiz, "landing.html"), "utf8");
@@ -26,10 +26,11 @@ function rodar(fonte: string, url: string, store: Record<string, string> = {}) {
   const location = { search: u.search, hash: u.hash, pathname: u.pathname, hostname: "www.coreaplicativo.com.br", protocol: "https:", replace };
   const localStorage = { getItem: (k: string) => (k in store ? store[k] : null), setItem: (k: string, v: string) => { store[k] = String(v); }, removeItem: (k: string) => { delete store[k]; } };
   const ck = { v: "" };
-  const document = { documentElement: { setAttribute: (k: string, v: string) => { attrs[k] = v; } }, createElement: () => ({ setAttribute: () => {} }), head: { appendChild: () => {} }, get cookie() { return ck.v; }, set cookie(c: string) { ck.v = c.split(";")[0]; } };
+  const links: Array<{ href?: string }> = [];
+  const document = { documentElement: { setAttribute: (k: string, v: string) => { attrs[k] = v; } }, createElement: () => ({ setAttribute: () => {} }), head: { appendChild: (l: { href?: string }) => { links.push(l); } }, get cookie() { return ck.v; }, set cookie(c: string) { ck.v = c.split(";")[0]; } };
   const window: Record<string, unknown> = { localStorage, crypto: { randomUUID: () => randomUUID() } };
   new Function("location", "document", "window", "localStorage", "URLSearchParams", "Math", "fetch", "sessionStorage", fonte)(location, document, window, localStorage, URLSearchParams, Math, undefined, { getItem: () => null });
-  return { attrs, store, replace, mem: (window.__landing ?? {}) as Record<string, unknown> };
+  return { attrs, store, replace, links, mem: (window.__landing ?? {}) as Record<string, unknown> };
 }
 const semSorteio = (a: Record<string, string>) => { const { "data-pix": _p, "data-vida": _v, "data-lp": _l, ...r } = a; return r; };
 
@@ -129,7 +130,7 @@ async function abrirPagina(o: { pagina?: "oferta" | null; oem?: "atual" | "pagin
     confirmPixPayment: async (...args: unknown[]) => { confirmados.push({ tipo: "pix", args }); return pixRetorno ?? { paymentIntent: { id: "pi_123", status: "requires_action", next_action: { type: "pix_display_qr_code", pix_display_qr_code: { data: "00020126PIXSTRIPE", image_url_png: "https://qr.stripe.com/x.png", expires_at: 1893456000 } } } }; },
   };
   const d = document.documentElement;
-  for (const a of ["data-pagina", "data-checkout-ext", "data-hm-sem-parcelas", "data-pix", "data-vida", "data-checkout-aberto", "data-oem"]) d.removeAttribute(a);
+  for (const a of ["data-pagina", "data-checkout-ext", "data-hm-sem-parcelas", "data-pix", "data-vida", "data-checkout-aberto", "data-oem", "data-otp"]) d.removeAttribute(a);
   d.setAttribute("data-t", "a"); d.setAttribute("data-oferta", "sempre"); d.setAttribute("data-checkout", "email"); d.setAttribute("data-lp", "atual");
   const pagina = o.pagina === undefined ? "oferta" : o.pagina;
   if (pagina) { d.setAttribute("data-pagina", pagina); d.setAttribute("data-checkout-ext", "stripe"); }
@@ -1054,6 +1055,66 @@ describe("11/11 · o <head>: o braço do e-mail da /oferta", () => {
       expect(r.attrs["data-oem"]).toBeUndefined();
       expect(r.mem.oem).toBeUndefined();
     }
+  });
+});
+
+/* ───────── 11/11: a 1ª tela que continua o anúncio (AB_OFERTA_TOPO) — "atual" = a 1ª tela de hoje; "anuncio" = a tela de Finanças logo abaixo do título ───────── */
+const comTopo = (ab: "on" | "off") => comStripe("on").replace(/var AB_OFERTA_TOPO = "(on|off)"/, `var AB_OFERTA_TOPO = "${ab}"`);
+describe("11/11 · o <head>: o braço do topo da /oferta", () => {
+  it("a chave existe e está DESLIGADA no arquivo; off → todo mundo 'atual', sem sorteio, sem forçar e sem pedir a imagem", () => {
+    expect(HTML).toMatch(/var AB_OFERTA_TOPO = "off";/);
+    for (let i = 0; i < 40; i++) {
+      const r = rodar(comTopo("off"), "/oferta", { "landing-device-id": randomUUID() });
+      expect(r.attrs["data-otp"]).toBe("atual");
+      expect(r.mem).toMatchObject({ otp: "atual", ab_oferta_topo: "off", otp_forcado: false });
+      expect(r.links).toHaveLength(0);
+    }
+  });
+  it("on → metade em cada braço pelo bit 4 do aparelho (igual ao regras.ts), fixo por aparelho; só o 'anuncio' pede a imagem", () => {
+    const c = { atual: 0, anuncio: 0 };
+    for (let i = 0; i < 400; i++) {
+      const id = randomUUID();
+      const store: Record<string, string> = { "landing-device-id": id };
+      const r = rodar(comTopo("on"), "/oferta", store);
+      expect(r.attrs["data-otp"]).toBe(bracoTopoOfertaDoAparelho(id));
+      expect(r.mem).toMatchObject({ ab_oferta_topo: "on", otp_forcado: false });
+      expect(rodar(comTopo("on"), "/oferta?utm_content=x", store).attrs["data-otp"]).toBe(r.attrs["data-otp"]);
+      expect(r.links.map((l) => l.href)).toEqual(r.attrs["data-otp"] === "anuncio" ? ["/landing/demo-financas.webp"] : []);
+      c[r.attrs["data-otp"] as "atual" | "anuncio"] += 1;
+    }
+    expect(c.atual).toBeGreaterThan(150);
+    expect(c.anuncio).toBeGreaterThan(150);
+  });
+  it("?otp=anuncio força (mesmo com a chave off), fica no aparelho e marca a medição; ?otp=auto desfaz", () => {
+    const store: Record<string, string> = {};
+    const a = rodar(comTopo("off"), "/oferta?otp=anuncio", store);
+    expect(a.attrs["data-otp"]).toBe("anuncio");
+    expect(a.mem).toMatchObject({ otp: "anuncio", otp_forcado: true });
+    expect(store["landing-otp-force"]).toBe("anuncio");
+    const b = rodar(comTopo("off"), "/oferta", store);
+    expect(b.attrs["data-otp"]).toBe("anuncio");
+    expect(b.mem.otp_forcado).toBe(true);
+    const c = rodar(comTopo("off"), "/oferta?otp=auto", store);
+    expect(c.attrs["data-otp"]).toBe("atual");
+    expect(c.mem.otp_forcado).toBe(false);
+    expect(store["landing-otp-force"]).toBeUndefined();
+  });
+  it("só a /oferta na página de hoje: /vitalicio, /organizar, /vida e o braço 'nova' não ganham data-otp, nem com ?otp=anuncio", () => {
+    for (const url of ["/vitalicio?otp=anuncio", "/organizar?otp=anuncio", "/vida?otp=anuncio", "/oferta?lpo=nova&otp=anuncio"]) {
+      const r = rodar(comTopo("on"), url, {});
+      expect(r.attrs["data-otp"]).toBeUndefined();
+      expect(r.mem.otp).toBeUndefined();
+    }
+  });
+  it("o braço do topo não mexe no do e-mail (bits diferentes) e a página guarda a imagem sem src, escondida fora do braço", () => {
+    for (let i = 0; i < 60; i++) {
+      const id = randomUUID();
+      const sem = rodar(comTopo("off"), "/oferta", { "landing-device-id": id }), com = rodar(comTopo("on"), "/oferta", { "landing-device-id": id });
+      expect(com.attrs["data-oem"]).toBe(sem.attrs["data-oem"]);
+    }
+    expect(HTML).toMatch(/<img id="lp-topo-foto-img" data-src="\/landing\/demo-financas\.webp"/);
+    expect(HTML).not.toMatch(/<img id="lp-topo-foto-img"[^>]* src=/);
+    expect(HTML).toContain('html:not([data-otp="anuncio"]) .lp-topo-foto { display: none !important; }');
   });
 });
 

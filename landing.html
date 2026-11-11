@@ -103,6 +103,11 @@
         // evento da /oferta. QA: ?oem=pagina|atual (fica: localStorage + cookie), ?oem=auto desfaz. Rollback: "off".
         // 11/11 14h (dono: "pode deixar ele como 100% substituindo o atual"): "todos" = todo aparelho no braço "pagina", sem sorteio.
         var AB_OFERTA_EMAIL = "todos";
+        // 11/11 (dono: "monta a tela"): A/B DO TOPO da /oferta — "off" = todos na 1ª tela de hoje · "on" = 50/50 estável por aparelho entre
+        // "atual" e "anuncio" (a tela de Finanças que o anúncio mostra aparece sem rolar, logo abaixo do título; a pergunta "Por onde você
+        // quer começar?" desce pra baixo dela). Só a /oferta na página de hoje lê (o /vitalicio e o braço "nova" não). Vira html[data-otp];
+        // braco_topo_oferta em todo evento da /oferta. QA: ?otp=anuncio|atual (fica: localStorage + cookie), ?otp=auto desfaz. Rollback: "off".
+        var AB_OFERTA_TOPO = "off";
         var STRIPE_PK = "pk_live_51TJnAQQdjmrIbUhHDSWqG1trOT6mFfV87AC4Vv47kFJTAFOhYsNmvryGRnf3x824Ke3mXSsWiFCovKPIR6Kqx0IX00VcuAawhC"; // a chave PUBLICÁVEL (pk_live_…); com "PREENCHER" = comportamento off
         var STRIPE_PRECO_CENTAVOS = 6790; // só pra exibir — o valor cobrado vem SEMPRE do servidor (stripe-criar)
         var STRIPE_PARCELAS_MAX = 1; // 05/11 (dono): só aparece 1x no cartão; volta pra 12 quando a Stripe liberar parcelas
@@ -283,6 +288,24 @@
             }
             d.setAttribute("data-oem", boe);
             mem.oem = boe; mem.ab_oferta_email = AB_OFERTA_EMAIL;
+            // 11/11: o braço do TOPO da /oferta (AB_OFERTA_TOPO): "atual" | "anuncio". Bit 4 de "otp:"+id — independente dos bits 0, 8, 12, 16,
+            // 20 e 24 dos outros sorteios. Conta igual à bracoTopoOfertaDoAparelho (regras.ts). No braço "anuncio" a imagem da 1ª tela é pedida
+            // já aqui (preload + fetchpriority; o <img> ganha o src no parse — a mesma receita do celular do v2: 1 pedido só nos 2 motores).
+            var pot = pega("otp"), ckt = null;
+            try { var cst = String(document.cookie || "").split(";"); for (var it = 0; it < cst.length; it++) { var jt = cst[it].indexOf("="); if (jt > 0 && cst[it].slice(0, jt).trim() === "landing_otp_force") ckt = cst[it].slice(jt + 1).trim(); } } catch (et0) {}
+            if (pot === "anuncio" || pot === "atual" || pot === "auto") {
+              grava("landing-otp-force", pot === "auto" ? null : pot);
+              try { document.cookie = "landing_otp_force=" + (pot === "auto" ? "; Max-Age=0" : pot + "; Max-Age=2592000") + "; Path=/; SameSite=Lax"; } catch (et1) {}
+            }
+            var bot = (pot === "anuncio" || pot === "atual") ? pot : pot === "auto" ? null : (le("landing-otp-force") || ckt);
+            mem.otp_forcado = (bot === "anuncio" || bot === "atual");
+            if (!mem.otp_forcado) {
+              bot = "atual";
+              if (AB_OFERTA_TOPO === "on") bot = ((hash("otp:" + pegaId()) >>> 4) & 1) === 0 ? "atual" : "anuncio";
+            }
+            d.setAttribute("data-otp", bot);
+            mem.otp = bot; mem.ab_oferta_topo = AB_OFERTA_TOPO;
+            if (bot === "anuncio") { try { var prelt = document.createElement("link"); prelt.rel = "preload"; prelt.as = "image"; prelt.href = "/landing/demo-financas.webp"; prelt.setAttribute("fetchpriority", "high"); document.head.appendChild(prelt); } catch (et2) {} }
           }
           if (blo === "nova") { try { var prelo = document.createElement("link"); prelo.rel = "preload"; prelo.as = "image"; prelo.href = "/landing/v3-home.webp"; prelo.setAttribute("fetchpriority", "high"); document.head.appendChild(prelo); } catch (eo2) {} }
         }
@@ -852,6 +875,15 @@
       html:not([data-checkout-ext="stripe"]) [data-so-gw="stripe"], html[data-checkout-ext="stripe"] [data-so-gw="hotmart"] { display: none !important; } /* o selo do gateway */ /* nos 2 braços da /vida (v2 e atual) */
       html[data-checkout-ext="hotmart"] .lp-email-antes, html[data-checkout-ext="hotmart"] #lp-pagar, html[data-checkout-ext="hotmart"] #lp-pagar-erro, html[data-checkout-ext="hotmart"] #lp-pix, html[data-checkout-ext="hotmart"] .lp-ancora, html[data-checkout-ext="stripe"] .lp-email-antes, html[data-checkout-ext="stripe"] #lp-pagar, html[data-checkout-ext="stripe"] #lp-pagar-erro, html[data-checkout-ext="stripe"] #lp-pix, html[data-checkout-ext="stripe"] .lp-ancora { display: none !important; }
       html[data-hm-sem-parcelas] .lp2-hm-parcelas { display: none !important; }
+      /* 11/11 (AB_OFERTA_TOPO): a 1ª tela que continua o anúncio — a tela de Finanças (a mesma imagem leve da demo, lá embaixo) num celular
+         cortado reto embaixo, logo abaixo do título; só no braço "anuncio" da /oferta. Nos outros (e fora da /oferta) nada disto aparece e a
+         imagem nem é pedida (o <img> nasce sem src). A altura do celular cabe na 1ª tela (svh) e para antes do "Gastos por categoria". */
+      html:not([data-otp="anuncio"]) .lp-topo-foto { display: none !important; }
+      button.lp-topo-foto { display: flex; flex-direction: column; align-items: center; width: 100%; margin: 16px 0 0; padding: 13px 16px 0; border: 0; border-radius: 24px; background: linear-gradient(180deg, #fdf0f6 0%, #f8dcea 100%); color: var(--tx); overflow: hidden; cursor: pointer; -webkit-tap-highlight-color: transparent; font: inherit; }
+      .lp-topo-foto-tit { display: block; font-size: 19px; line-height: 24px; font-weight: 800; letter-spacing: -.02em; }
+      .lp-topo-fone { --w: min(300px, 100%); display: block; width: var(--w); height: 340px; height: clamp(210px, calc(100vh - 348px), 366px); height: clamp(210px, calc(100svh - 348px), 366px); margin: 10px 0 0; border: 6px solid #16121c; border-bottom: 0; border-radius: 30px 30px 0 0; background: #fff; overflow: hidden; box-shadow: 0 18px 40px -16px rgba(28,26,31,.45); }
+      .lp-topo-fone img { display: block; width: 100%; height: auto; }
+      html[data-otp="anuncio"] .lp-topo .lp-pergunta { margin-top: 24px; }
       /* 11/11 (AB_OFERTA_EMAIL): o campo de e-mail no cartão da /oferta, só no braço "pagina" — nos outros (e fora da /oferta) nada disto aparece */
       html:not([data-oem="pagina"]) .lp-email-oferta { display: none !important; }
       .lp-email-oferta { display: flex; flex-direction: column; gap: 7px; margin: 0 0 12px; text-align: left; }
@@ -1120,6 +1152,9 @@
         <p class="lp-sub" data-so-t="a">Dinheiro, rotina, treino, saúde e mais 12 áreas, organizados num lugar só.</p>
         <p class="lp-sub" data-so-t="b">Dinheiro, rotina e corpo no mesmo painel, em 5 minutos por dia.</p>
         <p class="lp-sub" data-so-t="c">Dinheiro, rotina, treino e mais 13 áreas, num app só.</p>
+        <!-- 11/11 (AB_OFERTA_TOPO, braço "anuncio"): a tela de Finanças do anúncio, sem rolar. O toque leva à demo (o app de verdade). -->
+        <button type="button" class="lp-topo-foto" id="lp-topo-foto" data-so-ext="hotmart" aria-label="Finanças no CORE. Toque pra mexer no app de verdade."><span class="lp-topo-foto-tit">Finanças ✅</span><span class="lp-topo-fone"><img id="lp-topo-foto-img" data-src="/landing/demo-financas.webp" alt="O módulo Finanças do CORE: receitas, despesas, saldo do mês e alertas de contas" width="720" height="1274" decoding="async" /></span></button>
+        <script data-so-ext="hotmart">if (document.documentElement.getAttribute("data-otp") === "anuncio") { try { var imt = document.getElementById("lp-topo-foto-img"); imt.fetchPriority = "high"; imt.src = imt.getAttribute("data-src"); } catch (e) {} }</script>
         <p class="lp-pergunta">Por onde você quer começar?</p>
         <div class="lp-areas" role="list">
           <button type="button" class="lp-area" data-a="tudo" role="listitem" aria-pressed="false"><span class="lp-selo-mais">O MAIS ESCOLHIDO</span><span class="lp-area-ico" style="background:#fce7f3">🎯</span><span class="lp-area-txt"><b>Tudo, sinceramente</b><span>Dinheiro, rotina e o resto, juntos</span></span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>

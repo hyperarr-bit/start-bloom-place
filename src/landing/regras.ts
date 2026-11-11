@@ -258,6 +258,20 @@ export function bracoEmailOfertaDoAparelho(id: string): BracoEmailOferta {
   return ((h >>> 20) & 1) === 0 ? "atual" : "pagina";
 }
 
+/** 11/11: o braço do TOPO da /oferta (AB_OFERTA_TOPO no <head> → html[data-otp]). "anuncio" = a tela de Finanças do anúncio na 1ª tela,
+ *  logo abaixo do título (a pergunta "Por onde você quer começar?" desce); "atual" = a 1ª tela de hoje. Sem o atributo: "atual". */
+export type BracoTopoOferta = "atual" | "anuncio";
+export function bracoTopoOfertaDoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): BracoTopoOferta {
+  return el.getAttribute("data-otp") === "anuncio" ? "anuncio" : "atual";
+}
+/** A conta do <head> (bit 4 do djb2-xor de "otp:" + id — independente dos bits 0, 8, 12, 16, 20 e 24 dos outros sorteios), pros testes. */
+export function bracoTopoOfertaDoAparelho(id: string): BracoTopoOferta {
+  const s = `otp:${id}`;
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return ((h >>> 4) & 1) === 0 ? "atual" : "anuncio";
+}
+
 /** Os erros de domínio que mais aparecem (sugestão tocável embaixo do campo; nunca bloqueia). */
 const DOMINIO_ERRADO: Record<string, string> = {
   "gmial.com": "gmail.com", "gmal.com": "gmail.com", "gmai.com": "gmail.com", "gamil.com": "gmail.com", "gnail.com": "gmail.com",

@@ -46,7 +46,8 @@ describe("o <head>", () => {
   it("o regex do 'antes' tirou o bloco (senão a comparação abaixo não prova nada)", () => {
     expect(cabeca).toContain("data-lpo");
     expect(semOBloco).not.toContain("data-lpo");
-    expect(semOBloco.length).toBeGreaterThan(cabeca.length - 4000);
+    // 11/11: o braço do topo (otp) mora dentro do mesmo bloco → o bloco passou de ~3,5 mil pra ~5,3 mil caracteres
+    expect(semOBloco.length).toBeGreaterThan(cabeca.length - 6000);
   });
   it("chave off: 200 aparelhos, todos no atual, sem preload da página nova", () => {
     for (let i = 0; i < 200; i++) {
@@ -60,8 +61,8 @@ describe("o <head>", () => {
     for (const url of ["/oferta", "/oferta/", "/oferta?lp=v2&oferta=ano", "/organizar", "/organizar?lp=v2", "/vida", "/vida?vida=atual", "/ofertas", "/comece"]) {
       const id = randomUUID();
       const novo = rodar(comChave("off"), url, { "landing-device-id": id }), antes = rodar(semOBloco, url, { "landing-device-id": id });
-      const { "data-lpo": _a, "data-oem": _g, ...attrs } = novo.attrs; // data-oem: o braço do e-mail (11/11) mora dentro deste bloco
-      const { lpo: _b, ab_lp_oferta: _c, lpo_forcado: _d, lpo_stripe_cedo: _e, lpo_link: _f, oem: _h, ab_oferta_email: _i, oem_forcado: _j, ...mem } = novo.mem;
+      const { "data-lpo": _a, "data-oem": _g, "data-otp": _k, ...attrs } = novo.attrs; // data-oem e data-otp: os braços do e-mail e do topo (11/11) moram dentro deste bloco
+      const { lpo: _b, ab_lp_oferta: _c, lpo_forcado: _d, lpo_stripe_cedo: _e, lpo_link: _f, oem: _h, ab_oferta_email: _i, oem_forcado: _j, otp: _l, ab_oferta_topo: _m, otp_forcado: _n, ...mem } = novo.mem;
       expect(attrs).toEqual(antes.attrs);
       expect(mem).toEqual(antes.mem);
       expect(novo.store).toEqual(antes.store);

@@ -67,15 +67,21 @@ describe('rota de download por aparelho', () => {
     expect(storeForDevice(String(agent), Number(touches))).toBe(expected);
   });
 
+  it('a primeira tela não tem botão de baixar: igual à /organizar, a pessoa escolhe por onde começar antes', () => {
+    const topo = new DOMParser().parseFromString(html, 'text/html').querySelector('#topo')!;
+    expect(topo.querySelectorAll('a, [data-download-auto], [data-loja]')).toHaveLength(0);
+    expect(topo.querySelectorAll('button.lp-area')).toHaveLength(4);
+  });
+
   it('no computador, o CTA mostra as duas lojas sem registrar saída para loja', async () => {
     await boot();
-    const cta = query<HTMLAnchorElement>('[data-download-auto][data-onde="topo"]');
+    const cta = query<HTMLAnchorElement>('[data-download-auto][data-onde="demo"]');
     expect(cta.getAttribute('href')).toBe('#download');
     expect(cta.hasAttribute('data-loja')).toBe(false);
     expect(document.querySelectorAll('#download a[data-loja]')).toHaveLength(2);
     click(cta);
     expect(scroll).toHaveBeenCalledWith('download', { behavior: 'smooth', block: 'start' });
-    expect(mocks.event).toHaveBeenCalledWith('landing_cta', { onde: 'topo', destino: 'escolher_loja' });
+    expect(mocks.event).toHaveBeenCalledWith('landing_cta', { onde: 'demo', destino: 'escolher_loja' });
     expect(mocks.prepare).not.toHaveBeenCalled();
   });
 
@@ -83,7 +89,7 @@ describe('rota de download por aparelho', () => {
     vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(agent);
     await boot();
     const anchors = [...document.querySelectorAll<HTMLAnchorElement>('[data-download-auto]')];
-    expect(anchors).toHaveLength(4);
+    expect(anchors).toHaveLength(3);
     for (const anchor of anchors) { expect(anchor.dataset.loja).toBe(store); expect(new URL(anchor.href).host).toBe(host); }
     expect(mocks.prepare).not.toHaveBeenCalled(); // Rendering is not a store visit.
     const cta = anchors[0];
@@ -91,7 +97,7 @@ describe('rota de download por aparelho', () => {
     expect(mocks.prepare).not.toHaveBeenCalled();
     click(cta.querySelector('svg')!);
     expect(mocks.prepare).toHaveBeenCalledTimes(1);
-    expect(mocks.prepare).toHaveBeenLastCalledWith(cta, 'topo');
+    expect(mocks.prepare).toHaveBeenLastCalledWith(cta, 'demo');
     expect(scroll).not.toHaveBeenCalled();
     click(cta, 1, 'auxclick');
     expect(mocks.prepare).toHaveBeenCalledTimes(2);

@@ -12,6 +12,7 @@ import type { AreaKey } from "@/lib/funnel";
  *   ?area=dinheiro|rotina|corpo|saude|metas
  *   ?ofertas-saida=curto,…   → chaves das ofertas de saída (lib/ofertas-saida)
  *   ?paywall-minimalista=on|off|auto → o paywall minimalista (17/10, lib/paywall-minimalista)
+ *   ?titulo-paywall=on|off|ab|auto → o teste de título (06/11, lib/titulo-paywall); com ?area= conta como porta escolhida
  *   ?moldura=gate     → a moldura do gate do TrialBanner (conta logada sem assinatura, modo="gate")
  * 16/10: a moldura é a MESMA do passo "offer" do funil (px-5 pt-4, coluna cheia) — o herói do
  * curto sangra com -mx-5/-mt-4. 17/10: com o tema claro FORÇADO do funil (LIGHT_VARS + tema-claro),
@@ -47,7 +48,7 @@ export default function DevPaywallIos() {
     <div style={{ ...LIGHT_VARS, background: "#ffffff" }} className="tema-claro min-h-[calc(100dvh-var(--app-safe-top,0px))] text-foreground flex flex-col">
       <div className="flex flex-col px-5 pt-4 pb-7 min-h-[calc(100dvh-var(--app-safe-top,0px))]">
         <div className="w-full flex-1 flex flex-col">
-          <PaywallIOS area={area} answers={{ gasto: "R$ 100 a R$ 300" }} onPagoSemConta={() => { /* nada: é só pra olhar */ }} />
+          <PaywallIOS area={area} answers={{ gasto: "R$ 100 a R$ 300", ...(q.get("area") ? { area } : {}) }} onPagoSemConta={() => { /* nada: é só pra olhar */ }} />
         </div>
       </div>
     </div>

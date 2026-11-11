@@ -790,6 +790,11 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
    */
   // 1.0.21 (FLUXO ENXUTO / modo 1.0.12): a calma dos 3 primeiros dias (lib/festas-calma, regra do dono 27/10): dia 1 até 3,
   // dias 2 e 3 até 2, 1 por abertura; a rara sempre comemora (não conta); o resto entra quieto no álbum
+  // 10/11 (crítica r2): a "primeira" figurinha fica PRESA ao id escolhido. Na calma, o mesmo render que escolhe a
+  // primeira silencia os outros (ex.: Primeiro gole) e grava `conquistas-vistas`; no render seguinte a regra
+  // "vistas vazia" já falhava e o envelope "Seu álbum começou" virava um aviso pequeno. Enquanto o id estiver na
+  // fila (ainda não visto), ele segue como primeira.
+  const primeiraRef = useRef<{ conta: string; id: string } | null>(null);
   const { fila, semFesta } = useMemo<{ fila: Item[]; semFesta: string[] }>(() => {
     const bruto = filaBruta();
     if (!calma || !bruto.fila.length) return bruto;
@@ -817,8 +822,10 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
       // O tutorial em cena adia a chegada; não consome a primeira figurinha em silêncio.
       // A assinatura/trial não define a comemoração. Nenhuma festa cobre uma dose ativa.
       if (esperaMissao) return { fila: [], semFesta: silenciosos };
-      const primeira = vistas.adesivos.length === 0 && vistas.marcos.length === 0 && !mostradasAntes.length && !itens.length ? novos[0] : undefined;
+      const presa = primeiraRef.current?.conta === conta ? novos.find((b) => b.id === primeiraRef.current?.id) : undefined;
+      const primeira = presa ?? (vistas.adesivos.length === 0 && vistas.marcos.length === 0 && !mostradasAntes.length && !itens.length ? novos[0] : undefined);
       if (primeira) {
+        primeiraRef.current = { conta, id: primeira.id };
         itens.push({ tipo: "adesivo", badge: primeira, primeira: true });
         novos = novos.filter(b => b.id !== primeira.id);
       }
@@ -847,7 +854,7 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
     const semFesta = [...raros.slice(maxRaros), ...comuns.slice(maxComuns)].map((b) => b.id);
     return { fila: itens, semFesta };
     }
-  }, [calma, tiqueAbertura, loaded, vistas, seq.recorde, seq.dias, seq.hojeFeito, conq.folha, conq.diaUmSilencioso, contaNova, capasVistas, emConquistas, esperaMissao, c2, mostradasAntes]);
+  }, [calma, tiqueAbertura, loaded, vistas, seq.recorde, seq.dias, seq.hojeFeito, conq.folha, conq.diaUmSilencioso, contaNova, capasVistas, emConquistas, esperaMissao, c2, mostradasAntes, conta]);
 
   // os que ficaram sem festa entram como vistos (uma escrita só)
   const semFestaTxt = semFesta.join(",");

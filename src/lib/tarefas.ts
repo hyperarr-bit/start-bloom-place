@@ -145,6 +145,12 @@ export const diaDoAviso = (t: Parcial): string => prazoDaTarefa(t) ?? (ehDia(t?.
 
 const DIA_DA_SEMANA_MIUDO = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 const dataLocal = (dia: string) => { const [a, m, d] = dia.split("-").map(Number); return new Date(a, m - 1, d); };
+/** O domingo da semana de `dia` (ele mesmo, se já for domingo): o atalho "até domingo" do prazo. */
+export const domingoDaSemana = (dia: string): string => {
+  const d = dataLocal(dia);
+  d.setDate(d.getDate() + ((7 - d.getDay()) % 7));
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 /** "07/10" */
 const ddmm = (dia: string) => `${dia.slice(8, 10)}/${dia.slice(5, 7)}`;
 /** Dias de diferença entre duas chaves "YYYY-MM-DD" (b − a), em dias de calendário. */

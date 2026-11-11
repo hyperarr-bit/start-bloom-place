@@ -49,6 +49,7 @@ import { TelaParabens } from "@/components/onboarding/TelaParabens";
 import { fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
 import { modo1012 } from "@/lib/modo-1012";
 import { EntrarComCodigo } from "@/components/auth/EntrarComCodigo";
+import { entrarCodigoLigado } from "@/lib/entrar-codigo";
 import { ultimaCompraAnualFoiTrial } from "@/lib/revenuecat";
 import { EVENTO_MISSAO_DOSES, lerMissao } from "@/lib/missao-doses";
 import { lerAcessoAnteriorDaConta, type TipoDeAcessoAnterior } from "@/lib/conta-ja-tinha-acesso";
@@ -92,6 +93,10 @@ export function SignupIOS({
   const [appleLoading, setAppleLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [existingAccount, setExistingAccount] = useState(false);
+  /* Chave ENTRAR_CODIGO: depois da compra, e-mail que já tem conta vai direto pro código. Só no pós-compra: o cadastro
+   * antes do paywall não muda. */
+  const [querSenha, setQuerSenha] = useState(false);
+  const codigoDireto = existingAccount && !!posCompra && !querSenha && entrarCodigoLigado();
   /** 1.0.17: a conta em que ela entrou já tinha acesso (vitalício da web…) e acabou de começar o teste da Apple. */
   const [jaTinha, setJaTinha] = useState<{ tipo: TipoDeAcessoAnterior; seguir: () => void } | null>(null);
 
@@ -266,7 +271,7 @@ export function SignupIOS({
           return;
         }
         setExistingAccount(true);
-        setErr("Esse e-mail já tem conta. Entre com sua senha — ou recupere abaixo.");
+        setErr(posCompra && entrarCodigoLigado() ? null : "Esse e-mail já tem conta. Entre com sua senha — ou recupere abaixo.");
         setLoading(false);
         return;
       }
@@ -341,7 +346,15 @@ export function SignupIOS({
         <div className="flex-1 h-px bg-border" />
       </div>
 
-      <form onSubmit={submit} className="space-y-3">
+      {codigoDireto && (
+        <div className="space-y-3">
+          <EntrarComCodigo email={email} funil="ios" guiado enviarAoAbrir aviso="Esse e-mail já tem conta." rotulo="Receber código" onSession={() => { trackEvent("funnel_click", { cta: "signup_success", via: "codigo_email_existente", funil: "ios", pos_compra: !!posCompra }); void entrouEmContaExistente("codigo", onSession); }} />
+          <button type="button" onClick={() => setQuerSenha(true)} data-testid="cadastro-usar-senha" className="block mx-auto text-[12.5px] text-muted-foreground underline underline-offset-2">
+            Prefiro entrar com senha
+          </button>
+        </div>
+      )}
+      <form onSubmit={submit} className="space-y-3" hidden={codigoDireto}>
         <Input placeholder="Seu nome" value={name} onFocus={focoCampo("nome")} onChange={(e) => setName(e.target.value)} autoComplete="name" className="h-12" />
         <Input type="email" placeholder="Seu melhor e-mail" value={email} onFocus={focoCampo("email")} onChange={(e) => { setEmail(e.target.value); if (existingAccount) { setExistingAccount(false); setErr(null); } }} autoComplete="email" className="h-12" />
         <Input type="password" placeholder={existingAccount ? "Sua senha" : "Crie uma senha (mín. 6)"} value={password} onFocus={focoCampo("senha")} onChange={(e) => setPassword(e.target.value)} autoComplete={existingAccount ? "current-password" : "new-password"} className="h-12" />
@@ -369,7 +382,7 @@ export function SignupIOS({
                 ? <>Salvar meu acesso <ArrowRight className="w-4 h-4" /></>
                 : <>Criar minha conta <ArrowRight className="w-4 h-4" /></>}
         </Button>
-        {existingAccount && (
+        {existingAccount && !codigoDireto && (
           <>
             {/* 15/09: sem senha e sem provedor — código por e-mail, dentro do
                 app. Foi o que faltou pra quem pagou às 11:51 e ficou fora. */}

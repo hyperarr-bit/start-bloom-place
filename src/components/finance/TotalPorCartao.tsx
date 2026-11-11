@@ -13,10 +13,15 @@ import { mesCorrenteId } from "@/lib/virada-contas";
  *
  * 1.0.16 — A FATURA DO MONTAR: o custo fixo "Fatura do cartão" que o "Vamos montar suas Finanças"
  * cria (`ehEstimativaDaFatura`, lib/finance-faturas) é a fatura do mês, mais ou menos — entra na
- * coluna de gastos do cartão dele (são as compras do cartão, chutadas). Só ele: os outros custos
- * fixos no cartão seguem fora, como sempre (cliente antigo vê exatamente o mesmo número). Quando o
- * mesmo cartão também tem compras ou parcelas anotadas no mês, aparece o aviso pra apagar a
- * estimativa — senão a fatura conta duas vezes.
+ * coluna de gastos do cartão dele (são as compras do cartão, chutadas). Quando o mesmo cartão também
+ * tem compras ou parcelas anotadas no mês, aparece o aviso pra apagar a estimativa — senão a fatura
+ * conta duas vezes.
+ *
+ * 05/11 — OS FIXOS NO CRÉDITO (3 clientes): Netflix, academia e afins no cartão ficavam fora do total,
+ * e o número não batia com a fatura. Entram nos gastos pela regra de `faturasDoMes`
+ * (`paymentMethod === "credito"` + cartão). Duas exceções, pra não contar em dobro: cartão com a
+ * estimativa do Montar (o chute já é a fatura inteira) e fixo da categoria "Fatura Cartão" (é o
+ * pagamento da própria fatura, não uma compra).
  */
 const brl = (v: number) => (Number.isFinite(v) ? v : 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -27,7 +32,7 @@ interface Props {
   variableExpenses?: any[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   variableExpensesAnterior?: any[];
-  /** Custos fixos do mês — só a estimativa da fatura do Montar é lida daqui. */
+  /** Custos fixos do mês: a estimativa da fatura do Montar e os pagos no crédito. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fixos?: any[];
   /** "YYYY-MM" do mês da tela. Ausente = mês corrente. */
@@ -62,6 +67,10 @@ export const TotalPorCartao = ({ parcelas, variableExpenses = [], variableExpens
   }
   const variableCardSpending: Record<string, number> = { ...comprasNoCartao };
   for (const [card, v] of Object.entries(estimativa)) variableCardSpending[card] = (variableCardSpending[card] || 0) + v;
+  for (const f of Array.isArray(fixos) ? fixos : []) {
+    if (f?.paymentMethod !== "credito" || !f.cardName || f.category === "fatura_cartao" || f.cardName in estimativa) continue;
+    if (Number(f.value) > 0) variableCardSpending[f.cardName] = (variableCardSpending[f.cardName] || 0) + Number(f.value);
+  }
 
   // Merge into unified card totals
   const allCardTotals = { ...cardTotals };
@@ -72,7 +81,7 @@ export const TotalPorCartao = ({ parcelas, variableExpenses = [], variableExpens
   /* Estimativa + compras anotadas que caem NESTA fatura = a mesma fatura duas vezes. Só compras (não
      parcela): no mês do Montar o cartão nasce com "conta no mês do vencimento" e a compra anotada vai
      pra fatura seguinte — o aviso só aparece quando elas chegam; a parcela conta no mês em que é
-     lançada (simplificação do app inteiro) e avisaria cedo demais, quando a estimativa ainda vale. */
+     lançada (ou no mês da 1ª parcela, se for futuro) e avisaria cedo demais, quando a estimativa ainda vale. */
   const contandoDuasVezes = Object.keys(estimativa).filter((card) => (comprasNoCartao[card] || 0) > 0);
   const doCartao = (card: string) => {
     const nome = getCardLabel(card);
@@ -82,6 +91,8 @@ export const TotalPorCartao = ({ parcelas, variableExpenses = [], variableExpens
   /* Card spending summary - parcelamentos + gastos variáveis. Com
      fechamento cadastrado a linha vira a FATURA do mês (07/09). */
   if (Object.keys(allCardTotals).length === 0) return null;
+  // 05/11 (4 clientes com a dúvida): uma frase só, mesmo com vários cartões sem fechamento
+  const semFechamento = Object.keys(allCardTotals).some((card) => { const cfg = configOf(card); return !cfg?.closingDay && !contaNoMesDoVencimento(cfg); });
   return (
     <div className="bg-card rounded-lg overflow-hidden border border-border animate-fade-in" data-testid="total-por-cartao">
       <div className="bg-muted/50 py-2 px-4">
@@ -147,6 +158,11 @@ export const TotalPorCartao = ({ parcelas, variableExpenses = [], variableExpens
           </tfoot>
         </table>
       </div>
+      {semFechamento && (
+        <p className="px-4 py-2 text-[11px] leading-snug border-t border-border text-muted-foreground" data-testid="dica-fechamento">
+          Sem data de fechamento, a compra conta no mês em que foi feita. Toque em “fechamento” no cartão pra ela cair na fatura certa.
+        </p>
+      )}
       {contandoDuasVezes.map((card) => (
         <p key={card} className="px-4 py-2 text-[11px] leading-snug border-t border-border bg-amber-500/10 text-amber-700 dark:text-amber-300" data-testid="aviso-estimativa">
           Se você anota todas as compras {doCartao(card)} aqui, apaga a “Fatura do cartão” dos custos fixos — senão a fatura conta duas vezes.

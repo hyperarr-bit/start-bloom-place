@@ -33,7 +33,7 @@ import {
 } from "@/lib/ficou-de-ontem";
 import {
   AVISO_PADRAO_TAREFA, AVISOS_TAREFA, apareceHoje, avisoDaTarefa, avisoJaPassou, dataDeCriacao, detalhesDaTarefa, diaDoAviso, ehPrioridade, estadoDoPrazo,
-  diaSeguinte, horaDaTarefa, horaDoAviso, montarSubtarefas, moverTarefaNoDia, normalizarHora, ordenarPorHora, posicaoNoDia, prazoDaTarefa, progressoDasSubtarefas,
+  diaSeguinte, domingoDaSemana, horaDaTarefa, horaDoAviso, montarSubtarefas, moverTarefaNoDia, normalizarHora, ordenarPorHora, posicaoNoDia, prazoDaTarefa, progressoDasSubtarefas,
   resumoDosDetalhes, rotuloCurtoDoDia, rotuloDoDia, subtarefasDaTarefa, tarefasFuturas, textoDoAviso, type EstadoDoPrazo, type Subtarefa, type TarefaDoDia,
   CHAVE_TAREFAS_CARREIRA, CHAVE_TAREFAS_ROTINA,
 } from "@/lib/tarefas";
@@ -503,6 +503,10 @@ export function FormTarefa({
             )}
           </span>
         </label>
+        {/* 05/11 (2 chamados): tarefa da semana sem dia certo. O mesmo prazo de sempre, sem abrir o calendário. */}
+        {prazo !== domingoDaSemana(dia > hoje ? dia : hoje) && (
+          <button type="button" className={cn(chip(false), "mt-1.5")} onClick={() => setPrazo(domingoDaSemana(dia > hoje ? dia : hoje))}>Até domingo</button>
+        )}
         <p className="mt-1.5 text-[11.5px] text-muted-foreground" data-testid="dica-do-prazo">
           {prazo ? "Ela aparece todo dia na lista até ser feita; passado o prazo, fica em vermelho." : "Com prazo, a tarefa continua na lista todo dia até ser feita."}
         </p>

@@ -187,6 +187,7 @@ import { ExplicaFolha } from "@/components/paywall/ExplicaFolha";
 import { LinhaDoTempoDoTeste, diaDoAviso, lerAvisoDoTeste, passosDoTeste, passosSemTeste, type AvisoDoTeste } from "@/components/paywall/LinhaDoTempoDoTeste";
 import { guardarForcaDoMinimalista, paywallMinimalistaLigado } from "@/lib/paywall-minimalista";
 import { camposDoSino } from "@/lib/sino-paywall";
+import { anotarBracoDaFolha, bracoTitulo, estiloDoTituloDaArea, guardarForcaTitulo, tituloDaArea, type BracoTitulo } from "@/lib/titulo-paywall";
 import {
   TransformChart, ValueStack, ModulesIncludedCard, AnchorCard, AreaAnchorCard,
   MuralDepoimentos, CompareTable, CHART_LABEL,
@@ -400,7 +401,7 @@ export function PaywallIOS({
   /* 1.0.18 (dono 22/10, chave `motivos_folha`, lib/mensal-degraus): o braço da folha "O que te fez parar?" ("com"|"sem")
    * vai junto, nos mesmos eventos — {} com a chave desligada e no gate. */
   const [sinoCampos] = useState<{ sino?: "com" | "sem"; motivos?: "com" | "sem" }>(() => (gate ? {} : { ...camposDoSino(), ...camposDosMotivos() }));
-  const registrarSucesso = (ev: string, d: Record<string, unknown>) => (gate ? trackEventBeacon : trackEvent)(ev, { ...d, ...sinoCampos });
+  const registrarSucesso = (ev: string, d: Record<string, unknown>) => (gate ? trackEventBeacon : trackEvent)(ev, { ...d, ...sinoCampos, ...camposDoTitulo });
   const { user: usuarioLogado } = useAuth();
   const [excluirAberto, setExcluirAberto] = useState(false);
   const [comprando, setComprando] = useState(false);
@@ -439,6 +440,9 @@ export function PaywallIOS({
   /* 17/10 — PAYWALL MINIMALISTA (lib/paywall-minimalista): só muda o layout curto. Responde na hora
    * (força de QA `?paywall-minimalista=` / constante) e de novo quando a loja traz a metadata. */
   const [minimalista, setMinimalista] = useState(() => { guardarForcaDoMinimalista(); return paywallMinimalistaLigado(); });
+  /* 06/11 — TESTE DE TÍTULO (chave `titulo_paywall`, lib/titulo-paywall): o braço de quem escolheu a área na porta
+   * (null = chave desligada ou fora do teste; o gate nunca entra). Lido ao abrir e de novo quando a loja traz a metadata. */
+  const [tituloBraco, setTituloBraco] = useState<BracoTitulo | null>(() => { guardarForcaTitulo(); return gate ? null : bracoTitulo(area, answers); });
   /* o passo do lembrete na linha do tempo: só se o 920001 vai mesmo sair (null = lendo a permissão) */
   const [aviso, setAviso] = useState<AvisoDoTeste | null>(null);
   /* 16/10 — a explicação antes da folha, na 2ª vez (ExplicaFolha) */
@@ -526,7 +530,7 @@ export function PaywallIOS({
     // `loja: "ios"` em todo evento: sem isso o iPhone entraria somando nos
     // números do funil do Android e as duas leituras virariam uma média de
     // dois públicos, duas lojas e duas mecânicas de pagamento.
-    trackEvent("funnel_view", { step: "offer", funil: FUNIL, area, loja: "ios", ...sinoCampos });
+    trackEvent("funnel_view", { step: "offer", funil: FUNIL, area, loja: "ios", ...sinoCampos, ...(curto && minimalista && tituloBraco ? { titulo_area: tituloBraco } : {}) });
     // gate: a mesma régua do gate antigo ("seu plano ficou salvo", 2 h / 24 h), cancelada na compra
     if (gate) { try { void agendarResgateDoPlano(null)?.catch?.(() => { /* noop */ }); } catch { /* noop */ } }
     /* Aquecimento do RevenueCat no mount (lição da v91 do Android): sem
@@ -563,8 +567,10 @@ export function PaywallIOS({
           setPrecoMensalLoja(seguro(() => rc.precoMensalIos() ?? null, null));
           // 16/10: sempre (a explicação da 2ª folha também mostra o "R$ 0,00" da loja)
           setPrecoTeste(seguro(() => rc.precoDoTesteIos() ?? null, null));
+          const tituloLido = gate ? null : bracoTitulo(area, answers);
+          setTituloBraco(tituloLido);
           // o braço que a pessoa VIU (o funnel_view do mount sai antes da loja responder)
-          trackEvent("paywall_oferta_vista", { funil: FUNIL, loja: "ios", area, ...d, dias: rc.diasTrialIos() || DIAS_DE_TESTE_PADRAO, trial: rc.anualIosTemTrial(), ...(ligou ? { textos: true, economia: economiaLida } : {}), ...(curtoLigou || gate ? { paywall_curto: true, economia: economiaLida } : {}), ...((curtoLigou || gate) && miniLigou ? { minimalista: true } : {}), ...sinoCampos });
+          trackEvent("paywall_oferta_vista", { funil: FUNIL, loja: "ios", area, ...d, dias: rc.diasTrialIos() || DIAS_DE_TESTE_PADRAO, trial: rc.anualIosTemTrial(), ...(ligou ? { textos: true, economia: economiaLida } : {}), ...(curtoLigou || gate ? { paywall_curto: true, economia: economiaLida } : {}), ...((curtoLigou || gate) && miniLigou ? { minimalista: true } : {}), ...((curtoLigou || gate) && miniLigou && rc.anualIosTemTrial() && tituloLido ? { titulo_area: tituloLido } : {}), ...sinoCampos });
         }
       };
       lido();
@@ -815,6 +821,10 @@ export function PaywallIOS({
   const mostraSegundaChance = segundaChance === "visivel" && !mostraMensal && !comprando;
   /* 17/10 — o paywall minimalista: o layout curto com a chave `paywall_minimalista` */
   const mini = curto && minimalista;
+  /* 06/11: o braço só vale nos eventos com o título em teste na tela (minimalista com teste grátis) */
+  const tituloExposto = mini && comTrial ? tituloBraco : null;
+  const camposDoTitulo = tituloExposto ? { titulo_area: tituloExposto } : {};
+  useEffect(() => { anotarBracoDaFolha(tituloExposto); return () => anotarBracoDaFolha(null); }, [tituloExposto]);
   // o lembrete da linha do tempo só aparece se o 920001 vai mesmo sair (permissão), lida 1x
   useEffect(() => {
     if (!mini || aviso !== null) return;
@@ -951,6 +961,7 @@ export function PaywallIOS({
       offering: oferta.offering, preco: mostraMensal ? precoMensalTxt : precoAnual,
       ...(curto ? { paywall_curto: true } : {}),
       ...(mini ? { minimalista: true } : {}),
+      ...camposDoTitulo,
     });
     // 16/10: na 2ª vez (folha já fechada) a explicação substitui a pílula
     if (!mostraMensal && !comprando && !preparando && explicarAntesDaFolha()) return;
@@ -1114,6 +1125,7 @@ export function PaywallIOS({
   /* 17/10 — o PAYWALL MINIMALISTA (ver o cabeçalho): título + linha do tempo + um cartão do plano + botão */
   if (mini) {
     const precoMensalMini = precoMensalLoja ?? SEM_PRECO;
+    const tituloDoBraco = tituloBraco === "com" && comTrial && !mostraMensal ? tituloDaArea(area) : null;
     const passos = mostraMensal
       ? passosSemTeste({ preco: precoMensalMini, periodo: "mes" })
       : comTrial
@@ -1133,11 +1145,11 @@ export function PaywallIOS({
         {/* o título e a linha do tempo no meio do espaço que sobra: tudo cresce com a altura da tela
             (sem buraco no 390×844) e aperta no 375×667 — ver ESCALA_DA_TELA */}
         <div className="flex-1 flex flex-col justify-center max-w-sm w-full mx-auto py-[var(--mini-respiro)]" style={ESCALA_DA_TELA}>
-          <h1 className="text-[length:var(--mini-titulo)] font-black tracking-[-0.03em] leading-[1.06] text-[#16121c]" data-testid="ios-mini-titulo">
+          <h1 className="text-[length:var(--mini-titulo)] font-black tracking-[-0.03em] leading-[1.06] text-[#16121c]" style={tituloDoBraco ? estiloDoTituloDaArea(tituloDoBraco) : undefined} data-testid="ios-mini-titulo">
             {mostraMensal
               ? <>Assine o{" "}<br />plano mensal</>
               : comTrial
-                ? <>Experimente{" "}<br />{dias} dias grátis</>
+                ? <>{tituloDoBraco ?? "Experimente"}{" "}<br />{dias} dias grátis</>
                 : <>Assine o{" "}<br />plano anual</>}
           </h1>
           <p className="mt-2 text-[length:var(--mini-sub)] leading-snug text-muted-foreground">Veja exatamente como funciona sua assinatura.</p>

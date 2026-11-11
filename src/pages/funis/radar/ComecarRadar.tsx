@@ -32,6 +32,7 @@ import {
 import { pedirAvaliacaoSePuder } from "@/lib/avaliacao";
 import { agendarResgateDoPlano, cancelarResgateDoPlano } from "@/lib/notificacoes";
 import { EntrarComCodigo } from "@/components/auth/EntrarComCodigo";
+import { entrarCodigoLigado } from "@/lib/entrar-codigo";
 
 // Marca que o OAuth partiu do funil: o /auth/callback lê isso pra devolver o
 // usuário NOVO pro paywall do funil (em vez de pular direto pro app).
@@ -954,6 +955,11 @@ export function SignupScreen({ onSession, onConfirm, posCompra }: { onSession: (
   // "User already registered": a pessoa voltou pelo anúncio e já tem conta.
   // Em vez de beco sem saída, oferece login com o e-mail que ela já digitou.
   const [existingAccount, setExistingAccount] = useState(false);
+  /* Chave ENTRAR_CODIGO: no app, depois da compra, e-mail que já tem conta vai direto pro código. Esta tela também é o
+   * cadastro da web antes do paywall, e esse não muda. */
+  const [querSenha, setQuerSenha] = useState(false);
+  const codigoPosCompra = !!posCompra && isNativeShell() && entrarCodigoLigado();
+  const codigoDireto = existingAccount && codigoPosCompra && !querSenha;
   // Telemetria de campo (20/07): 41% de quem VÊ o form não conclui e a gente
   // não sabia ONDE parava. 1º foco de cada campo vira evento — o último campo
   // focado antes do abandono aponta o degrau exato. 1 evento por campo/tela.
@@ -1174,7 +1180,7 @@ export function SignupScreen({ onSession, onConfirm, posCompra }: { onSession: (
         }
         // Senha não bateu: mostra o caminho de recuperação, sem beco sem saída.
         setExistingAccount(true);
-        setErr("Esse e-mail já tem conta. Entre com sua senha — ou recupere abaixo.");
+        setErr(codigoPosCompra ? null : "Esse e-mail já tem conta. Entre com sua senha — ou recupere abaixo.");
         setLoading(false);
         return;
       }
@@ -1303,7 +1309,15 @@ export function SignupScreen({ onSession, onConfirm, posCompra }: { onSession: (
         </p>
       )}
 
-      <form onSubmit={submit} className="space-y-3">
+      {codigoDireto && (
+        <div className="space-y-3">
+          <EntrarComCodigo email={email} funil="w" guiado enviarAoAbrir aviso="Esse e-mail já tem conta." rotulo="Receber código" onSession={onSession} />
+          <button type="button" onClick={() => setQuerSenha(true)} data-testid="cadastro-usar-senha" className="w-full text-center text-[13px] text-muted-foreground underline underline-offset-2">
+            Prefiro entrar com senha
+          </button>
+        </div>
+      )}
+      <form onSubmit={submit} className="space-y-3" hidden={codigoDireto}>
         <Input placeholder="Seu nome" value={name} onFocus={focoCampo("nome")} onChange={(e) => setName(e.target.value)} autoComplete="name" className="h-12" />
         <Input type="email" placeholder="Seu melhor e-mail" value={email} onFocus={focoCampo("email")} onChange={(e) => { setEmail(e.target.value); if (existingAccount) { setExistingAccount(false); setErr(null); } }} autoComplete="email" className="h-12" />
         <Input type="password" placeholder={existingAccount ? "Sua senha" : "Crie uma senha (mín. 6)"} value={password} onFocus={focoCampo("senha")} onChange={(e) => setPassword(e.target.value)} autoComplete={existingAccount ? "current-password" : "new-password"} className="h-12" />
@@ -1325,7 +1339,7 @@ export function SignupScreen({ onSession, onConfirm, posCompra }: { onSession: (
                 ? <>Salvar meu acesso <ArrowRight className="w-4 h-4" /></>
                 : <>Criar conta e continuar <ArrowRight className="w-4 h-4" /></>}
         </Button>
-        {existingAccount && (
+        {existingAccount && !codigoDireto && (
           <>
             {/* 15/09: código por e-mail, sem senha e sem sair do app — ver
                 EntrarComCodigo (caso real do iPhone que pagou e ficou fora). */}

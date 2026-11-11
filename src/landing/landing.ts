@@ -79,7 +79,7 @@
 import {
 
   EMAIL_OK, MODULO_DA_AREA, NOME_DO_MODULO, ROTULO_OFERTA, VALOR_OFERTA, URL_APP_STORE,
-  bracoCheckoutDoHtml, bracoLpDoHtml, bracoLpOfertaDoHtml, bracoPixDoHtml, motivoPixDoHtml, NOME_NO_BANCO, CNPJ_NO_BANCO, checarEmailAntes, sugestaoDeEmail, voltaDoLembrete, upsell2027DoHtml, voltaDoEmailU2027, upsellPosDoHtml, ehPraSempreOferta,
+  bracoCheckoutDoHtml, bracoLpDoHtml, bracoLpOfertaDoHtml, bracoEmailOfertaDoHtml, bracoPixDoHtml, motivoPixDoHtml, NOME_NO_BANCO, CNPJ_NO_BANCO, checarEmailAntes, sugestaoDeEmail, voltaDoLembrete, upsell2027DoHtml, voltaDoEmailU2027, upsellPosDoHtml, ehPraSempreOferta,
   ESTADO_VAZIO, bracoOfertaDoHtml, bracoTituloDoHtml, ehArea, ehModuloLanding, estadoQueVolta, mmss, ofertaEscolhida, reais, urlPlay, venceEm,
   type Area, type EstadoLanding, type MensagemDaDemo, type ModuloLanding, type OfertaLanding, type PixLanding, type PixU2027,
 } from "./regras";
@@ -108,7 +108,7 @@ const agora = () => Math.round(performance.now());
 type Janela = Window & {
   __landingCliqueLoja?: (e: MouseEvent) => void;
   __landingSimularJaTem?: boolean;
-  __landing?: { lpo_forcado?: boolean; lpo_link?: boolean; ab_lp_oferta?: string; lpo_stripe_cedo?: string; pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null };
+  __landing?: { oem_forcado?: boolean; lpo_forcado?: boolean; lpo_link?: boolean; ab_lp_oferta?: string; lpo_stripe_cedo?: string; pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null };
   __eventosLanding?: Record<string, unknown>[];
   /** 02/11 (dev/testes): voltou() = "voltei do banco" (≥ 5 s fora) sem trocar de aba; vencer() = o QR vence em 1,5 s */
   __landingSimular?: { pagar: () => void; pagarU2027?: () => void; voltou?: () => void; vencer?: () => void };
@@ -179,6 +179,11 @@ const LPO_FORCADO = !!w.__landing?.lpo_forcado;
 /** 07/11: o /vitalicio é a página nova num link próprio (sempre "nova"): conta como teste ativo pra o braço ir pro PI e pro Purchase. */
 const LPO_LINK = !!w.__landing?.lpo_link;
 const LPO_ATIVO = STRIPE && (w.__landing?.ab_lp_oferta === "on" || LPO_FORCADO || LPO_LINK);
+/** 11/11: o braço do E-MAIL da /oferta (AB_OFERTA_EMAIL no <head> → html[data-oem]): "pagina" = o campo de e-mail no cartão da oferta, acima
+ *  do botão (o checkout abre já com ele); "atual" = o e-mail pedido dentro do checkout. Só na página de hoje (a "nova" não tem o cartão). */
+const BRACO_EMAIL_OFERTA = STRIPE && !LPO_NOVA && document.documentElement.hasAttribute("data-oem") ? bracoEmailOfertaDoHtml() : null;
+const OEM_PAGINA = BRACO_EMAIL_OFERTA === "pagina";
+const OEM_FORCADO = !!w.__landing?.oem_forcado;
 const PIX_MOTIVO = motivoPixDoHtml(); // 02/11: chips "O que te travou?" no estado "voltou" do b (PIX_MOTIVO, padrão off)
 const U2027 = upsell2027DoHtml(); // 31/10: o "Seu 2027" no pós-pago (chave UPSELL_2027 / ?u2027=on)
 const VOLTA_U2027 = voltaDoEmailU2027(BUSCA); // 31/10: chegou pelo bloco do 2027 no e-mail de compra confirmada
@@ -220,7 +225,7 @@ const ua = navigator.userAgent || "";
 const plataforma = /iPhone|iPad|iPod/i.test(ua) ? "ios" : /Android/i.test(ua) ? "android" : "web";
 const inApp = /FBAN|FBAV|FB_IAB|FBIOS|Instagram/i.test(ua);
 const pixForcado = !!w.__landing?.pix_forcado; // 02/11 r1: ?pix=b do dono/QA fica no aparelho — todo evento diz, não só o landing_html (a análise exclui)
-const medicaoForçada = SIMULADO || ["lp_forcado", "pix_forcado", "oferta_forcada", "checkout_forcado", "t_forcado", "lpo_forcado"].some(k => (w.__landing as Record<string, unknown> | undefined)?.[k] === true);
+const medicaoForçada = SIMULADO || ["lp_forcado", "pix_forcado", "oferta_forcada", "checkout_forcado", "t_forcado", "lpo_forcado", "oem_forcado"].some(k => (w.__landing as Record<string, unknown> | undefined)?.[k] === true);
 const storageAtrib = (() => { try { return localStorage; } catch { return null; } })();
 const atrib = capturarAtribuicao(location.search, storageAtrib, Date.now(), medicaoForçada);
 const contextoAtribuicao = () => ({ landing_session_id: sessao, landing_device_id: aparelho, braco_lp: brLp, braco_pix: brPix, forçado: medicaoForçada, atrib });
@@ -228,7 +233,7 @@ const contextoAtribuicao = () => ({ landing_session_id: sessao, landing_device_i
 export function evento(nome: string, dados: Record<string, unknown> = {}): void {
   // O listener delegado registra uma vez também os links criados pelo checkout/upsells.
   if (nome === "landing_loja" && !dados.link_click_id) return;
-  const corpo = { landing_medicao_v: 2, medicao_forcada: medicaoForçada, ...dados, ...(PAGINA ? { pagina: PAGINA, braco_checkout_ext: EXT, braco_vida: BRACO_VIDA } : {}), ...(BRACO_LP_OFERTA ? { braco_lp_oferta: BRACO_LP_OFERTA, lpo_forcado: LPO_FORCADO } : {}), landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, braco_pix: brPix, pix_forcado: pixForcado, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
+  const corpo = { landing_medicao_v: 2, medicao_forcada: medicaoForçada, ...dados, ...(PAGINA ? { pagina: PAGINA, braco_checkout_ext: EXT, braco_vida: BRACO_VIDA } : {}), ...(BRACO_LP_OFERTA ? { braco_lp_oferta: BRACO_LP_OFERTA, lpo_forcado: LPO_FORCADO } : {}), ...(BRACO_EMAIL_OFERTA ? { braco_email_oferta: BRACO_EMAIL_OFERTA, oem_forcado: OEM_FORCADO } : {}), landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, braco_pix: brPix, pix_forcado: pixForcado, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
   listaDeEventos.push({ nome, ...corpo });
   if (!PRODUCAO) return;
   try {
@@ -1855,11 +1860,65 @@ const opcoesStripe = () => ({
   pk: ST_PK, precoCentavos: ST_PRECO, parcelasMax: Number(w.__landing?.stripe_parcelas_max) || 12, producao: PRODUCAO, pedeCpf: w.__landing?.stripe_pede_cpf === true,
   evento: eventoStripe, pixel: pixelStripe, atrib: LPO_ATIVO ? { ...atrib, braco_lp_oferta: String(BRACO_LP_OFERTA) } : atrib, sessao, aparelho, urlChegada: URL_DE_CHEGADA, fbclid: BUSCA.get("fbclid"),
 });
+/* ── 11/11: braço "pagina" (AB_OFERTA_EMAIL): o e-mail no cartão da oferta, acima do botão. Sem e-mail válido o checkout não abre (o erro fica
+ *    embaixo do campo); com ele, o checkout abre já preenchido. O e-mail nunca vai em evento. A aba guarda o que foi digitado (recarga / volta do banco). ── */
+const CHAVE_EMAIL_OFERTA = "oferta-email-pagina";
+const campoOferta = OEM_PAGINA ? (document.getElementById("lp-email-of") as HTMLInputElement | null) : null;
+const erroOfertaEl = document.getElementById("lp-email-of-erro");
+const sugOfertaEl = document.getElementById("lp-email-of-sugestao") as HTMLButtonElement | null;
+const emailOfertaMedido = { comecou: false, valido: false };
+function erroEmailOferta(msg: string | null) {
+  if (!campoOferta || !erroOfertaEl) return;
+  erroOfertaEl.textContent = msg ?? "";
+  erroOfertaEl.hidden = !msg;
+  if (msg) campoOferta.setAttribute("aria-invalid", "true"); else campoOferta.removeAttribute("aria-invalid");
+}
+function sugerirEmailOferta() {
+  if (!campoOferta || !sugOfertaEl) return;
+  const sg = sugestaoDeEmail(campoOferta.value);
+  sugOfertaEl.hidden = !sg;
+  sugOfertaEl.dataset.v = sg ?? "";
+  sugOfertaEl.innerHTML = sg ? `Você quis dizer <b>${esc(sg)}</b>?` : "";
+}
+/** começou a digitar / ficou válido: 1× por carga da página */
+function medirEmailOferta() {
+  if (!campoOferta) return;
+  const v = campoOferta.value.trim().toLowerCase();
+  if (v && !emailOfertaMedido.comecou) { emailOfertaMedido.comecou = true; evento("landing_oferta_email_comecou", {}); }
+  if (EMAIL_OK.test(v)) {
+    if (!emailOfertaMedido.valido) { emailOfertaMedido.valido = true; evento("landing_oferta_email_valido", {}); }
+    try { sessionStorage.setItem(CHAVE_EMAIL_OFERTA, v); } catch { /* fica só no campo */ }
+  }
+}
+/** o e-mail do cartão, conferido. null = o checkout não abre: o erro aparece embaixo do campo, que ganha o foco */
+function emailDaOferta(): string | null {
+  if (!campoOferta) return null;
+  const email = campoOferta.value.trim().toLowerCase();
+  const motivo = !email ? "vazio" : !EMAIL_OK.test(email) ? "invalido" : null;
+  if (!motivo) { erroEmailOferta(null); return email; }
+  erroEmailOferta(motivo === "vazio" ? "Digite seu e-mail pra continuar: é por ele que você entra no CORE." : "Confira o e-mail: parece que falta alguma coisa.");
+  evento("landing_email_antes_erro", { motivo, onde: "oferta_pagina" });
+  try { campoOferta.focus({ preventScroll: true }); campoOferta.scrollIntoView({ block: "center", behavior: "smooth" }); } catch { /* jsdom */ }
+  return null;
+}
 if (STRIPE) {
   const abrirStripe = (de?: string) => {
     evento("landing_cta", { onde: "stripe", fase: estado.fase, ...(de ? { de } : {}) });
-    void carregarStripeCheckout().then((m) => m.abrirCheckout(opcoesStripe()));
+    let emailInicial: string | null = null;
+    if (OEM_PAGINA && campoOferta) { emailInicial = emailDaOferta(); if (!emailInicial) return; }
+    void carregarStripeCheckout().then((m) => m.abrirCheckout(emailInicial ? { ...opcoesStripe(), emailInicial } : opcoesStripe()));
   };
+  if (campoOferta) {
+    try { const guardado = sessionStorage.getItem(CHAVE_EMAIL_OFERTA); if (guardado && EMAIL_OK.test(guardado)) campoOferta.value = guardado; } catch { /* noop */ }
+    campoOferta.addEventListener("input", () => { erroEmailOferta(null); sugerirEmailOferta(); medirEmailOferta(); });
+    campoOferta.addEventListener("blur", sugerirEmailOferta);
+    campoOferta.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); campoOferta.blur(); abrirStripe("email"); } });
+    sugOfertaEl?.addEventListener("click", () => {
+      const v = sugOfertaEl.dataset.v; if (!v) return;
+      campoOferta.value = v; sugOfertaEl.hidden = true; erroEmailOferta(null);
+      evento("landing_email_antes_sugestao", { onde: "oferta_pagina" }); medirEmailOferta();
+    });
+  }
   document.getElementById(ID_BOTAO_HM)?.addEventListener("click", () => abrirStripe());
   if (LPO_NOVA) {
     ligarOfertaNova({ abrir: abrirStripe });

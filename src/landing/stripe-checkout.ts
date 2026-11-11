@@ -53,6 +53,8 @@ export type OpcoesCheckout = {
   trocaCartao?: boolean;
   evento: Evento; pixel: Pixel; atrib: Record<string, string>; sessao: string; aparelho: string; urlChegada: string; fbclid: string | null;
   voltaDoBanco?: { pi: string; status: string };
+  /** 11/11 (AB_OFERTA_EMAIL, braço "pagina"): o e-mail já digitado no cartão da oferta. O formulário abre com ele numa linha ("Trocar" devolve o campo). */
+  emailInicial?: string;
 };
 
 export type RespostaCriar = { ok: boolean; clientSecret?: string; pi?: string; erro?: string; status?: string; pix?: PixQr | null };
@@ -223,6 +225,11 @@ const CSS = `
 .oc-campo:focus{outline:none;border-color:var(--magenta,#d6338a);box-shadow:0 0 0 3px rgba(214,51,138,.15)}
 .oc-sug{margin:6px 0 0;padding:0;border:0;background:none;font-size:13.5px;color:var(--magenta,#d6338a);font-weight:700;text-align:left}
 .oc-erro{margin:8px 0 0;font-size:13.5px;color:#b42318;font-weight:600}
+.oc-email-ok{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:18px 0 0;padding:11px 14px;border-radius:12px;border:1.5px solid #ebe8ee;font-size:13px;line-height:1.3;color:var(--suave,#6b6670)}
+.oc-email-ok span{min-width:0;overflow-wrap:anywhere}
+.oc-email-ok b{display:block;font-size:15px;font-weight:700;color:var(--tx,#1c1a1f)}
+.oc-email-ok button{flex:none;min-height:44px;margin:-8px 0;padding:0 0 0 10px;border:0;background:none;font-family:inherit;font-size:14px;font-weight:700;color:var(--magenta,#d6338a)}
+.oc-email-caixa[hidden]{display:none}
 .oc-metodos{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}
 .oc-metodo{display:flex;align-items:center;justify-content:center;gap:9px;min-height:60px;padding:0 10px;border-radius:14px;border:1.5px solid #d9d4dd;background:#fff;color:inherit;font-family:inherit;font-size:16.5px;font-weight:800}
 .oc-metodo svg{flex:none;width:21px;height:21px}
@@ -301,6 +308,8 @@ let stripe: StripeLike | null = null;
 let elementos: Elementos | null = null;
 let elementoCartao: ElementoPagamento | null = null;
 let est: Estado | null = null;
+/** braço "pagina": o último e-mail que veio do cartão da oferta */
+let ultimoEmailInicial: string | null = null;
 /** cada abertura do formulário é uma montagem: o que chegar atrasado de uma montagem velha não mexe na tela nova */
 let montagem = 0;
 /** Stripe.js + PI prontos = o Pix pode ser gerado */
@@ -376,13 +385,18 @@ const preco = () => reaisDeCentavos(opc!.precoCentavos);
 function telaForm() {
   const o = opc!;
   const alvo = raiz!.querySelector<HTMLElement>("#oc-in")!;
+  // 11/11 (braço "pagina"): o e-mail veio do cartão da oferta — aqui vira uma linha, e o campo fica guardado atrás do "Trocar"
+  const emailPronto = !!o.emailInicial && EMAIL_OK.test(est!.email.trim().toLowerCase());
   alvo.innerHTML = `
     <div class="oc-resumo" data-testid="oferta-resumo"><div><h2 id="oc-tit">CORE · Acesso vitalício</h2><p>Pagamento único · nada é cobrado depois</p></div><div class="oc-preco">${esc(preco())}</div></div>
     <ul class="oc-provas"><li>As 16 áreas da vida num app só</li><li>iPhone, Android e computador, com a mesma conta</li><li>7 dias de garantia: não gostou, devolvemos 100%</li></ul>
+    ${emailPronto ? `<div class="oc-email-ok" id="oc-email-ok" data-testid="oferta-email-ok"><span>Seu acesso chega em<b>${esc(est!.email.trim().toLowerCase())}</b></span><button type="button" id="oc-email-trocar">Trocar</button></div>` : ""}
+    <div class="oc-email-caixa" id="oc-email-caixa"${emailPronto ? " hidden" : ""}>
     <label class="oc-rot" for="oc-email">Seu e-mail <span>· é por onde você entra no CORE</span></label>
     <input class="oc-campo" id="oc-email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="254" placeholder="voce@email.com" value="${esc(est!.email)}" />
     <button type="button" class="oc-sug" id="oc-sug" hidden></button>
     <p class="oc-erro" id="oc-email-erro" role="alert" hidden></p>
+    </div>
     ${o.pedeCpf ? `<label class="oc-rot" for="oc-cpf">CPF <span>· pra nota fiscal</span></label>
     <input class="oc-campo" id="oc-cpf" type="text" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00" value="${esc(mascararCpf(est!.cpf))}" />
     <p class="oc-erro" id="oc-cpf-erro" role="alert" hidden></p>` : ""}
@@ -407,6 +421,8 @@ function telaForm() {
   campo.addEventListener("input", () => { est!.email = campo.value; erroEmail(null); atualizarSug(); medirEmail(); });
   campo.addEventListener("blur", atualizarSug);
   sug.addEventListener("click", () => { campo.value = sug.dataset.s ?? campo.value; est!.email = campo.value; sug.hidden = true; o.evento("landing_email_antes_sugestao", { onde: "stripe" }); medirEmail(); });
+  alvo.querySelector("#oc-email-trocar")?.addEventListener("click", () => { o.evento("landing_stripe_email_trocar", {}); mostrarCampoEmail(); campo.focus(); });
+  if (emailPronto) medirEmail();
   const cpf = alvo.querySelector<HTMLInputElement>("#oc-cpf");
   cpf?.addEventListener("input", () => { const m = mascararCpf(cpf.value); if (cpf.value !== m) cpf.value = m; est!.cpf = soDigitosCpf(m); erroCpf(null); });
   alvo.querySelector("#oc-pagar")!.addEventListener("click", () => { void tocouPagar(); });
@@ -487,7 +503,13 @@ function erroAoPagar(etapa: string, e?: ErroStripe) {
   opc?.evento("landing_stripe_pagar_erro", { metodo: metodoAtual(), etapa, tipo: String(e?.type ?? "").slice(0, 40), code: String(e?.code ?? "").slice(0, 40) });
 }
 
-function erroEmail(m: string | null) { const e = raiz?.querySelector<HTMLElement>("#oc-email-erro"); if (e) { e.hidden = !m; e.textContent = m ?? ""; } }
+/** braço "pagina": tira a linha do e-mail pronto e devolve o campo (no "Trocar", e sempre que houver um erro pra mostrar nele) */
+function mostrarCampoEmail() {
+  raiz?.querySelector("#oc-email-ok")?.remove();
+  const c = raiz?.querySelector<HTMLElement>("#oc-email-caixa");
+  if (c) c.hidden = false;
+}
+function erroEmail(m: string | null) { if (m) mostrarCampoEmail(); const e = raiz?.querySelector<HTMLElement>("#oc-email-erro"); if (e) { e.hidden = !m; e.textContent = m ?? ""; } }
 function erroCpf(m: string | null) { const e = raiz?.querySelector<HTMLElement>("#oc-cpf-erro"); if (e) { e.hidden = !m; e.textContent = m ?? ""; } }
 function erroGeral(m: string | null) { const e = raiz?.querySelector<HTMLElement>("#oc-erro"); if (e) { e.hidden = !m; e.textContent = m ?? ""; } }
 
@@ -849,6 +871,8 @@ export async function abrirCheckout(o: OpcoesCheckout): Promise<void> {
   abertoEm = Date.now(); saiuEm = null; saidas = 0;
   vigiarSaida(true);
   if (!est) { const ref = refDaAba(); est = { fase: "form", ref, pi: piDaAba(ref), clientSecret: null, metodo: "pix", pix: null, email: "", cpf: "" }; }
+  // só quando o e-mail do cartão da oferta mudou: quem trocou o e-mail aqui dentro, fechou e reabriu continua com o que escolheu
+  if (o.emailInicial && est.fase === "form" && o.emailInicial !== ultimoEmailInicial) { est.email = o.emailInicial; ultimoEmailInicial = o.emailInicial; }
   if (o.voltaDoBanco) {
     est.pi = o.voltaDoBanco.pi;
     est.fase = "aguardando"; telaAguardando();
@@ -890,4 +914,4 @@ function fecharJa(_via: string) {
 }
 
 /** testes: zera o módulo entre páginas */
-export function _zerar() { pararVigia(); raiz?.remove(); raiz = null; est = null; ultimaCriacao = null; icNoHeap.clear(); aberta = false; opc = null; api = null; stripe = null; elementos = null; elementoCartao = null; montagem += 1; pixPronto = false; cartaoPronto = false; cargaFalhou = false; cartaoFalhou = false; carteiraMedida = false; emailMedido.comecou = ""; emailMedido.valido = ""; fechandoPelaTela = false; saiuEm = null; carregandoStripe = null; soltarTeto(); trocandoPix = false; window.removeEventListener("popstate", aoVoltarNavegador); vigiarSaida(false); soltar(); }
+export function _zerar() { pararVigia(); raiz?.remove(); raiz = null; est = null; ultimoEmailInicial = null; ultimaCriacao = null; icNoHeap.clear(); aberta = false; opc = null; api = null; stripe = null; elementos = null; elementoCartao = null; montagem += 1; pixPronto = false; cartaoPronto = false; cargaFalhou = false; cartaoFalhou = false; carteiraMedida = false; emailMedido.comecou = ""; emailMedido.valido = ""; fechandoPelaTela = false; saiuEm = null; carregandoStripe = null; soltarTeto(); trocandoPix = false; window.removeEventListener("popstate", aoVoltarNavegador); vigiarSaida(false); soltar(); }

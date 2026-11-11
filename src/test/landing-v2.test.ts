@@ -133,7 +133,7 @@ describe("o sorteio da página (AB_LP, head do landing.html)", () => {
 const corpoDe = (html: string) => html.match(/<body>([\s\S]*)<\/body>/)![1];
 const estiloDe = (html: string) => html.match(/<style>([\s\S]*?)<\/style>/)![1];
 // 04/11: + as regras da /vida (data-checkout-ext / data-so-ext / data-hm-*) — só casam com atributos que o /organizar nunca tem
-const soV2 = /data-lp="v2"|data-so-lp|\.lp2-|BRAÇO v2|data-checkout-ext|data-so-ext|data-hm-/;
+const soV2 = /data-lp="v2"|data-so-lp|\.lp2-|BRAÇO v2|data-checkout-ext|data-so-ext|data-hm-|data-oem|\.lp-email-oferta/;
 
 describe("braço atual = a página de hoje (origin/main 30/10), sem tirar nem pôr", () => {
   it("o HTML do corpo, tirando o que é só do v2 (e o atributo data-so-lp), é IGUAL ao de hoje", () => {

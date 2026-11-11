@@ -144,7 +144,7 @@ describe("o HTML do braço Hotmart", () => {
   it("cada texto do braço Pix da /vida que fala de Pix tem o par do Hotmart (preço, sub, passo, FAQ, fim, selo), nos 2 braços", () => {
     const n = (sel: string, lp: string) => [...div.querySelectorAll(sel)].filter((e) => e.closest(`[data-so-lp="${lp}"]`)).length;
     expect(n('[data-so-ext="pix"]', "v2")).toBe(n('[data-so-ext="hotmart"]', "v2") - 3); // + parcelas, botão e erro do botão
-    expect(n('[data-so-ext="pix"]', "atual")).toBe(n('[data-so-ext="hotmart"]', "atual") - 3); // + parcelas, botão e o selo da Stripe (/oferta)
+    expect(n('[data-so-ext="pix"]', "atual")).toBe(n('[data-so-ext="hotmart"]', "atual") - 4); // + parcelas, botão e o selo da Stripe (/oferta) + o e-mail no cartão (11/11)
   });
   it("o CSS some com o Pix (e-mail antes, #lp-pagar, #lp-pix) e com a âncora 'De R$ 97,90' quando a /vida é Hotmart — só com html[data-checkout-ext]", () => {
     expect(HTML).toContain('html[data-checkout-ext="hotmart"] .lp-email-antes, html[data-checkout-ext="hotmart"] #lp-pagar, html[data-checkout-ext="hotmart"] #lp-pagar-erro, html[data-checkout-ext="hotmart"] #lp-pix, html[data-checkout-ext="hotmart"] .lp-ancora, html[data-checkout-ext="stripe"]');

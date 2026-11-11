@@ -244,6 +244,20 @@ export function bracoLpOfertaDoAparelho(id: string): BracoLpOferta {
   return ((h >>> 12) & 1) === 0 ? "atual" : "nova";
 }
 
+/** 11/11: o braço do E-MAIL da /oferta (AB_OFERTA_EMAIL no <head> → html[data-oem]). "pagina" = o campo de e-mail no cartão da oferta,
+ *  acima do botão (o checkout já abre com ele); "atual" = o e-mail pedido dentro do checkout. Sem o atributo: "atual". */
+export type BracoEmailOferta = "atual" | "pagina";
+export function bracoEmailOfertaDoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): BracoEmailOferta {
+  return el.getAttribute("data-oem") === "pagina" ? "pagina" : "atual";
+}
+/** A conta do <head> (bit 20 do djb2-xor de "oem:" + id — independente dos bits 0, 8, 12, 16 e 24 dos outros sorteios), pros testes. */
+export function bracoEmailOfertaDoAparelho(id: string): BracoEmailOferta {
+  const s = `oem:${id}`;
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return ((h >>> 20) & 1) === 0 ? "atual" : "pagina";
+}
+
 /** Os erros de domínio que mais aparecem (sugestão tocável embaixo do campo; nunca bloqueia). */
 const DOMINIO_ERRADO: Record<string, string> = {
   "gmial.com": "gmail.com", "gmal.com": "gmail.com", "gmai.com": "gmail.com", "gamil.com": "gmail.com", "gnail.com": "gmail.com",

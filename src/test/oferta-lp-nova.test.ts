@@ -60,8 +60,8 @@ describe("o <head>", () => {
     for (const url of ["/oferta", "/oferta/", "/oferta?lp=v2&oferta=ano", "/organizar", "/organizar?lp=v2", "/vida", "/vida?vida=atual", "/ofertas", "/comece"]) {
       const id = randomUUID();
       const novo = rodar(comChave("off"), url, { "landing-device-id": id }), antes = rodar(semOBloco, url, { "landing-device-id": id });
-      const { "data-lpo": _a, ...attrs } = novo.attrs;
-      const { lpo: _b, ab_lp_oferta: _c, lpo_forcado: _d, lpo_stripe_cedo: _e, lpo_link: _f, ...mem } = novo.mem;
+      const { "data-lpo": _a, "data-oem": _g, ...attrs } = novo.attrs; // data-oem: o braço do e-mail (11/11) mora dentro deste bloco
+      const { lpo: _b, ab_lp_oferta: _c, lpo_forcado: _d, lpo_stripe_cedo: _e, lpo_link: _f, oem: _h, ab_oferta_email: _i, oem_forcado: _j, ...mem } = novo.mem;
       expect(attrs).toEqual(antes.attrs);
       expect(mem).toEqual(antes.mem);
       expect(novo.store).toEqual(antes.store);

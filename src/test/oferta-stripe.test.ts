@@ -11,6 +11,7 @@ import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { pkStripeValida, reaisDeCentavos } from "@/landing/hotmart";
+import { bracoEmailOfertaDoAparelho } from "@/landing/regras";
 
 const raiz = resolve(__dirname, "../..");
 const HTML = readFileSync(resolve(raiz, "landing.html"), "utf8");
@@ -99,7 +100,7 @@ let opcoesCartao: Record<string, unknown> | null = null;
 let metodosCriados: Array<Record<string, unknown>> = [];
 let enviosDoCartao = 0;
 let cbsElemento: Record<string, (e: Record<string, unknown>) => void> = {};
-async function abrirPagina(o: { pagina?: "oferta" | null; url?: string; pedeCpf?: boolean; segurarReady?: boolean; antes?: () => void; criar?: (c: Chamada) => Promise<Record<string, unknown>>; status?: () => Promise<Record<string, unknown>> } = {}) {
+async function abrirPagina(o: { pagina?: "oferta" | null; oem?: "atual" | "pagina"; url?: string; pedeCpf?: boolean; segurarReady?: boolean; antes?: () => void; criar?: (c: Chamada) => Promise<Record<string, unknown>>; status?: () => Promise<Record<string, unknown>> } = {}) {
   await dormir(20);
   (await import("@/landing/stripe-checkout"))._zerar(); // a espera do Pix da página anterior não vaza pra esta
   vi.resetModules();
@@ -128,11 +129,12 @@ async function abrirPagina(o: { pagina?: "oferta" | null; url?: string; pedeCpf?
     confirmPixPayment: async (...args: unknown[]) => { confirmados.push({ tipo: "pix", args }); return pixRetorno ?? { paymentIntent: { id: "pi_123", status: "requires_action", next_action: { type: "pix_display_qr_code", pix_display_qr_code: { data: "00020126PIXSTRIPE", image_url_png: "https://qr.stripe.com/x.png", expires_at: 1893456000 } } } }; },
   };
   const d = document.documentElement;
-  for (const a of ["data-pagina", "data-checkout-ext", "data-hm-sem-parcelas", "data-pix", "data-vida", "data-checkout-aberto"]) d.removeAttribute(a);
+  for (const a of ["data-pagina", "data-checkout-ext", "data-hm-sem-parcelas", "data-pix", "data-vida", "data-checkout-aberto", "data-oem"]) d.removeAttribute(a);
   d.setAttribute("data-t", "a"); d.setAttribute("data-oferta", "sempre"); d.setAttribute("data-checkout", "email"); d.setAttribute("data-lp", "atual");
   const pagina = o.pagina === undefined ? "oferta" : o.pagina;
   if (pagina) { d.setAttribute("data-pagina", pagina); d.setAttribute("data-checkout-ext", "stripe"); }
-  (window as unknown as { __landing?: unknown }).__landing = pagina ? { pagina, checkout_ext: "stripe", stripe_pk: PK, stripe_preco_centavos: 6790, stripe_parcelas: "Pix ou cartão, em até 12x", stripe_parcelas_max: 12, stripe_pede_cpf: o.pedeCpf === true } : undefined;
+  if (pagina && o.oem) d.setAttribute("data-oem", o.oem);
+  (window as unknown as { __landing?: unknown }).__landing = pagina ? { pagina, checkout_ext: "stripe", stripe_pk: PK, stripe_preco_centavos: 6790, stripe_parcelas: "Pix ou cartão, em até 12x", stripe_parcelas_max: 12, stripe_pede_cpf: o.pedeCpf === true, ...(o.oem ? { oem: o.oem, ab_oferta_email: "on", oem_forcado: false } : {}) } : undefined;
   document.head.querySelectorAll("style[data-teste-st]").forEach((s) => s.remove());
   const st = document.createElement("style"); st.setAttribute("data-teste-st", ""); st.textContent = estilo; document.head.appendChild(st);
   document.body.removeAttribute("style");
@@ -993,5 +995,181 @@ describe("stripe-criar pendurado", () => {
     expect(dos("landing_stripe_pagar_erro")[0]).toMatchObject({ metodo: "pix", etapa: "criar" });
     expect(dos("landing_erro").find((e) => e.onde === "stripe_criar")).toMatchObject({ msg: "teto" });
     expect(confirmados).toHaveLength(0);
+  });
+});
+
+/* ───────── 11/11: o e-mail no cartão da oferta (AB_OFERTA_EMAIL) — "atual" pede o e-mail dentro do checkout; "pagina" pede em cima do botão ───────── */
+const comEmailNaPagina = (ab: "on" | "off" | "todos") => comStripe("on").replace(/var AB_OFERTA_EMAIL = "(on|off|todos)"/, `var AB_OFERTA_EMAIL = "${ab}"`);
+describe("11/11 · o <head>: o braço do e-mail da /oferta", () => {
+  it("a chave existe; off → todo mundo 'atual', sem sorteio e sem forçar", () => {
+    expect(HTML).toMatch(/var AB_OFERTA_EMAIL = "(on|off|todos)";/);
+    for (let i = 0; i < 40; i++) {
+      const r = rodar(comEmailNaPagina("off"), "/oferta");
+      expect(r.attrs["data-oem"]).toBe("atual");
+      expect(r.mem).toMatchObject({ oem: "atual", ab_oferta_email: "off", oem_forcado: false });
+    }
+  });
+  it("on → metade em cada braço pelo bit 20 do aparelho (igual ao regras.ts), fixo por aparelho", () => {
+    const c = { atual: 0, pagina: 0 };
+    for (let i = 0; i < 400; i++) {
+      const id = randomUUID();
+      const store: Record<string, string> = { "landing-device-id": id };
+      const r = rodar(comEmailNaPagina("on"), "/oferta", store);
+      expect(r.attrs["data-oem"]).toBe(bracoEmailOfertaDoAparelho(id));
+      expect(r.mem).toMatchObject({ ab_oferta_email: "on", oem_forcado: false });
+      expect(rodar(comEmailNaPagina("on"), "/oferta?utm_content=x", store).attrs["data-oem"]).toBe(r.attrs["data-oem"]);
+      c[r.attrs["data-oem"] as "atual" | "pagina"] += 1;
+    }
+    expect(c.atual).toBeGreaterThan(150);
+    expect(c.pagina).toBeGreaterThan(150);
+  });
+  it("todos → todo aparelho no braço 'pagina', sem sorteio e sem marcar forçado; ?oem=atual ainda força a tela de hoje (QA)", () => {
+    for (let i = 0; i < 200; i++) {
+      const r = rodar(comEmailNaPagina("todos"), "/oferta?utm_content=c7", { "landing-device-id": randomUUID() });
+      expect(r.attrs["data-oem"]).toBe("pagina");
+      expect(r.mem).toMatchObject({ oem: "pagina", ab_oferta_email: "todos", oem_forcado: false });
+    }
+    const f = rodar(comEmailNaPagina("todos"), "/oferta?oem=atual", {});
+    expect(f.attrs["data-oem"]).toBe("atual");
+    expect(f.mem.oem_forcado).toBe(true);
+    for (const url of ["/vitalicio", "/organizar", "/vida", "/oferta?lpo=nova"]) expect(rodar(comEmailNaPagina("todos"), url, {}).attrs["data-oem"]).toBeUndefined();
+  });
+  it("?oem=pagina força (mesmo com a chave off), fica no aparelho e marca a medição; ?oem=auto desfaz", () => {
+    const store: Record<string, string> = {};
+    const a = rodar(comEmailNaPagina("off"), "/oferta?oem=pagina", store);
+    expect(a.attrs["data-oem"]).toBe("pagina");
+    expect(a.mem).toMatchObject({ oem: "pagina", oem_forcado: true });
+    expect(store["landing-oem-force"]).toBe("pagina");
+    const b = rodar(comEmailNaPagina("off"), "/oferta", store);
+    expect(b.attrs["data-oem"]).toBe("pagina");
+    expect(b.mem.oem_forcado).toBe(true);
+    const c = rodar(comEmailNaPagina("off"), "/oferta?oem=auto", store);
+    expect(c.attrs["data-oem"]).toBe("atual");
+    expect(c.mem.oem_forcado).toBe(false);
+    expect(store["landing-oem-force"]).toBeUndefined();
+  });
+  it("só a /oferta na página de hoje: /vitalicio, /organizar, /vida e o braço 'nova' não ganham data-oem, nem com ?oem=pagina", () => {
+    for (const url of ["/vitalicio?oem=pagina", "/organizar?oem=pagina", "/vida?oem=pagina", "/oferta?lpo=nova&oem=pagina"]) {
+      const r = rodar(comEmailNaPagina("on"), url, {});
+      expect(r.attrs["data-oem"]).toBeUndefined();
+      expect(r.mem.oem).toBeUndefined();
+    }
+  });
+});
+
+const campoPagina = () => document.getElementById("lp-email-of") as HTMLInputElement;
+const digitarNaPagina = (v: string) => { const c = campoPagina(); c.value = v; c.dispatchEvent(new Event("input")); };
+const tocarNoBotao = () => (document.getElementById("lp-hotmart-atual") as HTMLButtonElement).click();
+const esperarPix = () => vi.waitFor(() => { if (!document.querySelector('[data-testid="oferta-pix"]')) throw new Error("sem pix"); }, { timeout: 3000, interval: 20 });
+describe("11/11 · o e-mail no cartão da oferta, no jsdom", () => {
+  it("braço atual: o campo não aparece, o checkout pede o e-mail lá dentro (como hoje) e todo evento leva braco_email_oferta", async () => {
+    await abrirPagina({ oem: "atual" });
+    expect(escondido(document.getElementById("lp-email-oferta")!)).toBe(true);
+    await abrirCheckout();
+    expect(aberta()).toBe(true);
+    expect(document.getElementById("oc-email-ok")).toBeNull();
+    expect(document.getElementById("oc-email-caixa")!.hidden).toBe(false);
+    expect((document.getElementById("oc-email") as HTMLInputElement).value).toBe("");
+    expect(dos("landing_stripe_email_valido")).toHaveLength(0);
+    for (const e of eventos().filter((x) => x.nome.startsWith("landing_"))) expect(e).toMatchObject({ braco_email_oferta: "atual", oem_forcado: false });
+  });
+  it("sem data-oem (o <head> antigo em cache): igual a hoje, e os eventos não levam o braço", async () => {
+    await abrirPagina();
+    expect(escondido(document.getElementById("lp-email-oferta")!)).toBe(true);
+    await abrirCheckout();
+    expect(document.getElementById("oc-email-ok")).toBeNull();
+    for (const e of eventos()) expect(e).not.toHaveProperty("braco_email_oferta");
+  });
+  it("braço pagina: o campo aparece em cima do botão; tocar sem e-mail (ou com e-mail quebrado) NÃO abre o checkout e mostra o erro", async () => {
+    await abrirPagina({ oem: "pagina" });
+    const caixa = document.getElementById("lp-email-oferta")!;
+    expect(escondido(caixa)).toBe(false);
+    expect(caixa.compareDocumentPosition(document.getElementById("lp-hotmart-atual")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    tocarNoBotao();
+    await dormir(80);
+    expect(aberta()).toBe(false);
+    expect(document.getElementById("lp-email-of-erro")!.hidden).toBe(false);
+    expect(document.getElementById("lp-email-of-erro")!.textContent).toContain("Digite seu e-mail");
+    expect(dos("landing_email_antes_erro")[0]).toMatchObject({ motivo: "vazio", onde: "oferta_pagina", braco_email_oferta: "pagina" });
+    digitarNaPagina("maria@");
+    expect(document.getElementById("lp-email-of-erro")!.hidden).toBe(true); // digitar tira o erro
+    tocarNoBotao();
+    await dormir(80);
+    expect(aberta()).toBe(false);
+    expect(dos("landing_email_antes_erro")[1]).toMatchObject({ motivo: "invalido", onde: "oferta_pagina" });
+    expect(dos("landing_stripe_aberto")).toHaveLength(0);
+    expect(fbq.mock.calls.filter((c) => c[1] === "InitiateCheckout")).toHaveLength(0);
+    expect(dos("landing_cta").filter((e) => e.onde === "stripe")).toHaveLength(2); // o toque continua medido
+  });
+  it("braço pagina com e-mail: o checkout abre com o e-mail pronto (linha + Trocar), sem campo, e o Pix sai com esse e-mail até o pago", async () => {
+    await abrirPagina({ oem: "pagina" });
+    digitarNaPagina("  Ana@Exemplo.com ");
+    await abrirCheckout();
+    expect(aberta()).toBe(true);
+    expect(document.getElementById("oc-email-ok")!.textContent).toContain("ana@exemplo.com");
+    expect(document.getElementById("oc-email-caixa")!.hidden).toBe(true);
+    expect(dos("landing_oferta_email_comecou")).toHaveLength(1);
+    expect(dos("landing_oferta_email_valido")).toHaveLength(1);
+    expect(dos("landing_stripe_email_valido")).toHaveLength(1); // o funil do checkout continua comparável com o braço atual
+    expect(dos("landing_stripe_aberto")[0]).toMatchObject({ braco_email_oferta: "pagina" });
+    expect(fbq.mock.calls.filter((c) => c[1] === "InitiateCheckout")).toHaveLength(1);
+    pagar().click();
+    await esperarPix();
+    expect(confirmados[0].tipo).toBe("pix");
+    expect(confirmados[0].args[1]).toEqual({ payment_method: { billing_details: { email: "ana@exemplo.com" } } });
+    expect(criadas[1]).toMatchObject({ pi: "pi_123", email: "ana@exemplo.com" });
+    statusPago = true;
+    await vi.waitFor(() => { if (!document.querySelector('[data-testid="oferta-pago"]')) throw new Error("sem pago"); }, { timeout: 5000, interval: 50 });
+    expect(dos("landing_stripe_pago")[0]).toMatchObject({ metodo: "pix", braco_email_oferta: "pagina" });
+    expect(fbq.mock.calls.filter((c) => c[1] === "Purchase")).toEqual([["track", "Purchase", expect.objectContaining({ value: 67.9, currency: "BRL" }), { eventID: "pi_123" }]]);
+  });
+  it("braço pagina no cartão: o PaymentMethod leva o e-mail da página", async () => {
+    await abrirPagina({ oem: "pagina" });
+    digitarNaPagina("maria@gmail.com");
+    await abrirCheckout();
+    botaoMetodo("card").click();
+    pagar().click();
+    await vi.waitFor(() => { if (!document.querySelector('[data-testid="oferta-pago"]')) throw new Error("sem pago"); }, { timeout: 3000, interval: 20 });
+    expect(metodosCriados[0]).toMatchObject({ params: { billing_details: { email: "maria@gmail.com" } } });
+  });
+  it("Trocar: abre o campo com o e-mail e mede; fechar e reabrir não desfaz a troca; e-mail novo na página vence; o Pix sai com o último", async () => {
+    await abrirPagina({ oem: "pagina" });
+    digitarNaPagina("ana@exemplo.com");
+    await abrirCheckout();
+    (document.getElementById("oc-email-trocar") as HTMLButtonElement).click();
+    expect(document.getElementById("oc-email-ok")).toBeNull();
+    expect(document.getElementById("oc-email-caixa")!.hidden).toBe(false);
+    expect((document.getElementById("oc-email") as HTMLInputElement).value).toBe("ana@exemplo.com");
+    expect(dos("landing_stripe_email_trocar")).toHaveLength(1);
+    digitarEmail("bia@exemplo.com");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    expect(aberta()).toBe(false);
+    await abrirCheckout(); // a página ainda diz ana@: a troca feita lá dentro fica
+    expect(document.getElementById("oc-email-ok")!.textContent).toContain("bia@exemplo.com");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    digitarNaPagina("carla@exemplo.com");
+    await abrirCheckout();
+    expect(document.getElementById("oc-email-ok")!.textContent).toContain("carla@exemplo.com");
+    pagar().click();
+    await esperarPix();
+    expect(confirmados[0].args[1]).toEqual({ payment_method: { billing_details: { email: "carla@exemplo.com" } } });
+  });
+  it("erro de digitação na página: sugere a correção, um toque conserta; recarregar a aba devolve o e-mail; Enter abre o checkout", async () => {
+    await abrirPagina({ oem: "pagina" });
+    digitarNaPagina("maria@gmial.com");
+    const sug = document.getElementById("lp-email-of-sugestao") as HTMLButtonElement;
+    expect(sug.hidden).toBe(false);
+    expect(sug.textContent).toContain("maria@gmail.com");
+    sug.click();
+    expect(campoPagina().value).toBe("maria@gmail.com");
+    expect(sug.hidden).toBe(true);
+    expect(dos("landing_email_antes_sugestao")[0]).toMatchObject({ onde: "oferta_pagina" });
+    expect(sessionStorage.getItem("oferta-email-pagina")).toBe("maria@gmail.com");
+    await abrirPagina({ oem: "pagina", antes: () => sessionStorage.setItem("oferta-email-pagina", "maria@gmail.com") });
+    expect(campoPagina().value).toBe("maria@gmail.com");
+    campoPagina().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    await vi.waitFor(() => { if (!aberta()) throw new Error("fechada"); }, { timeout: 3000, interval: 20 });
+    expect(document.getElementById("oc-email-ok")!.textContent).toContain("maria@gmail.com");
+    expect(dos("landing_cta").find((e) => e.onde === "stripe")).toMatchObject({ de: "email" });
   });
 });

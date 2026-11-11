@@ -62,6 +62,7 @@ import { registrarConstruiuRemoto } from "@/lib/construiu-ab";
 import { registrarRetroOutubroRemoto } from "@/lib/retro-outubro";
 import { registrarHomeNovaRemoto } from "@/lib/home-nova";
 import { registrarFluxoEnxutoRemoto } from "@/lib/fluxo-enxuto";
+import { registrarAbasRemoto } from "@/lib/abas-caderno";
 import { registrarInicioDoTesteNoSdk } from "@/lib/meta-inicio-teste-ios";
 
 /** As chaves que viajam no metadata das offerings (um lugar só, chamado em toda leitura de offerings):
@@ -95,6 +96,7 @@ const registrarChavesDasOfferings = (offerings: unknown): void => {
     registrarHomeNovaRemoto, // 1.0.19: `home_nova` (off|admin|on|ab|novas|novas+admin; sem a chave = padrão: app "novas+admin", site "off") — a Home do carrossel do dia (lib/home-nova)
     registrarSkanTrialSdkRemoto, // 1.0.19 (varredura 26/10): `skan_trial_sdk` (on|off, padrão off) — o StartTrial pelo SDK da Meta no iPhone (lib/skan-trial-sdk)
     registrarFluxoEnxutoRemoto, // 1.0.21: `fluxo_enxuto` (on|off|ab; sem a chave = padrão: iPhone "on", site/Android "off"; só vale no iPhone) — lib/fluxo-enxuto
+    registrarAbasRemoto, // 07/11: `abas_enxutas` (on|off|sumario|ab|ac|abc, padrão on) + `abas_visual` (hoje|fixa|caderno, padrão hoje) + `abas_medicao` (on|off, padrão off); só iPhone — lib/abas-caderno
     registrarConstruiuRemoto, // 29/10: `construiu_ab` (ab|a|b, padrão ab) — o A/B do resumo dos 3 dias (lib/construiu-ab)
     registrarMotivosRemoto, // 1.0.18: `motivos_folha` (off|on|ab, padrão off) — a folha "O que te fez parar?" depois da folha do anual fechada (lib/mensal-degraus)
   ];

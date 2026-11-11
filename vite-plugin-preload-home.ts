@@ -17,11 +17,12 @@
  * escreve os nomes certos. Se a Home não estiver no bundle, o HTML sai como sempre. O helper de pré-carga do Vite
  * (__vitePreload) encontra o <link> já no documento e não cria outro.
  *
- * Crítica r1 (07/11): NO SITE os pedidos saem com prioridade BAIXA (fetchpriority="low"). Quem tem sessão mas não tem
- * acesso também abre "/" e cai no "Assine no app" (tela de venda) — com prioridade normal, ~45 pedaços da Home
- * disputavam a rede com a entrada e atrasavam essa tela (+0,5 s, 5 de 5 pares). No APP DA LOJA (window.Capacitor,
- * injetado pelo shell antes de qualquer script; ou o esquema capacitor: do iPhone) os arquivos estão no aparelho, não
- * há rede pra disputar, e a prioridade fica a normal.
+ * Crítica r2 (10/11): SÓ NO APP DA LOJA (window.Capacitor, injetado pelo shell antes de qualquer script; ou o esquema
+ * capacitor: do iPhone). No SITE o script não faz nada. Motivo: quem tem sessão mas não tem acesso também abre "/" e
+ * cai no "Assine no app" (tela de venda); os ~45 pedaços da Home disputavam a rede com a entrada e atrasavam essa tela
+ * em ~0,8 s — mesmo com fetchpriority="low" (6 de 6 pares, crítica r2). No app os arquivos estão no aparelho e não há
+ * rede pra disputar. O site perde só ~0,33 s na 1ª visita do assinante; o resto da lente (Home pedida junto com a
+ * entrada, no App.tsx) continua valendo.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -84,11 +85,10 @@ export function preloadDaHome(raiz: string): Plugin {
         if (!home.length) return html;
         const script =
           `<script>` +
-          `// 07/11 (desempenho): já tem sessão e vai cair na Home → os pedaços dela baixam junto com a entrada (vite-plugin-preload-home.ts)\n` +
-          `(function(){try{var p=location.pathname;if(p!=="/"&&p!=="/home")return;var ls=window.localStorage;if(!ls||!ls.getItem("sb-${ref}-auth-token"))return;` +
+          `// 07/11 (desempenho): só no app da loja, já tem sessão e vai cair na Home → os pedaços dela compilam junto com a entrada (vite-plugin-preload-home.ts)\n` +
+          `(function(){try{var C=window.Capacitor,nat=!!(C&&C.isNativePlatform&&C.isNativePlatform())||location.protocol==="capacitor:";if(!nat)return;var p=location.pathname;if(p!=="/"&&p!=="/home")return;var ls=window.localStorage;if(!ls||!ls.getItem("sb-${ref}-auth-token"))return;` +
           `var l=${JSON.stringify(home)};var e=ls.getItem("core-home-nova-origem-aparelho")||"";if(/:nova$/.test(e)||ls.getItem("forcar-home-nova")==="on")l=l.concat(${JSON.stringify(homeE)});` +
-          `var C=window.Capacitor,nat=!!(C&&C.isNativePlatform&&C.isNativePlatform())||location.protocol==="capacitor:";` +
-          `for(var i=0;i<l.length;i++){var k=document.createElement("link");if(l[i].c){k.rel="preload";k.as="style";}else{k.rel="modulepreload";}if(!nat)k.setAttribute("fetchpriority","low");k.crossOrigin="";k.href="/"+l[i].f;document.head.appendChild(k);}}catch(x){}})();` +
+          `for(var i=0;i<l.length;i++){var k=document.createElement("link");if(l[i].c){k.rel="preload";k.as="style";}else{k.rel="modulepreload";}k.crossOrigin="";k.href="/"+l[i].f;document.head.appendChild(k);}}catch(x){}})();` +
           `</script>\n`;
         return html.replace("</head>", `${script}</head>`);
       },

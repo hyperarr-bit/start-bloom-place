@@ -27,6 +27,11 @@ vi.mock("@capacitor/local-notifications", () => ({
   },
 }));
 const plataforma = vi.hoisted(() => ({ nativo: false }));
+const chave = vi.hoisted(() => ({ ligada: false }));
+vi.mock("@/lib/remedio-vezes", async (orig) => {
+  const real = await orig<typeof import("@/lib/remedio-vezes")>();
+  return { ...real, remedioVezesLigado: () => chave.ligada || real.remedioVezesLigado() };
+});
 vi.mock("@/lib/native-shell", async (orig) => ({
   ...(await orig<typeof import("@/lib/native-shell")>()),
   isNativeShell: () => plataforma.nativo,
@@ -66,16 +71,23 @@ const CHAVE = "core-saude-supplements";
 const montar = (store: ReturnType<typeof criarStore>) =>
   render(<MemoryRouter><store.Provedor><PharmacyChecklist /></store.Provedor></MemoryRouter>);
 
-beforeEach(() => { plataforma.nativo = false; });
+beforeEach(() => { plataforma.nativo = false; chave.ligada = false; });
 afterEach(() => { cleanup(); });
 
 describe("a chave REMEDIO_VEZES", () => {
-  it("ligada no app das lojas, desligada no site", () => {
-    expect(REMEDIO_VEZES_APP).toBe("on");
+  it("build 1.0.25/137 (10/11): desligada no app e no site — o remédio novo tem problema aberto (J1–J3)", () => {
+    expect(REMEDIO_VEZES_APP).toBe("off");
     expect(REMEDIO_VEZES_WEB).toBe("off");
     expect(remedioVezesLigado()).toBe(false);
     plataforma.nativo = true;
-    expect(remedioVezesLigado()).toBe(true);
+    expect(remedioVezesLigado()).toBe(false);
+  });
+
+  it("no app desta build, com a chave desligada: o cadastro de sempre (1 horário)", () => {
+    plataforma.nativo = true;
+    montar(criarStore({}));
+    expect(screen.queryByRole("button", { name: "8 em 8" })).toBeNull();
+    expect(screen.queryByTestId("remedio-ate")).toBeNull();
   });
 
   it("no site, sem a chave: só o cadastro de sempre — sem 'Quantas vezes', sem 'Até quando', sem o aviso", () => {
@@ -107,8 +119,9 @@ describe("a chave REMEDIO_VEZES", () => {
     expect(screen.queryByLabelText("Até quando de Amoxicilina")).toBeNull();
   });
 
-  it("no app das lojas: 'Quantas vezes' e 'Até quando' aparecem, sem o aviso de atualizar", () => {
+  it("no app das lojas, com a chave ligada: 'Quantas vezes' e 'Até quando' aparecem, sem o aviso de atualizar", () => {
     plataforma.nativo = true;
+    chave.ligada = true;
     montar(criarStore({}));
     expect(screen.getByRole("button", { name: "8 em 8" })).toBeInTheDocument();
     expect(screen.getByTestId("remedio-ate")).toBeInTheDocument();

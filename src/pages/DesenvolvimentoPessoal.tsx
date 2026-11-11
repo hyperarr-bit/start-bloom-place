@@ -9,6 +9,7 @@ import { PhotoPicker } from "@/components/ui/PhotoPicker";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { juntarGratidao } from "@/lib/gratidao";
 import { useHumorDoDia } from "@/hooks/use-humor-do-dia";
 import { useLocation } from "react-router-dom";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
@@ -367,6 +368,8 @@ const DesenvolvimentoPessoal = () => {
 
   // GRATIDÃO
   const [gratitudeEntries, setGratitudeEntries] = usePersistedState<Record<string, string[]>>("dp-gratitude", {});
+  const [gratidaoDaHome] = usePersistedState<Record<string, string[]>>("core-gratitude-log", {}); // só leitura: quem grava é o "+" da Home
+  const historicoGratidao = useMemo(() => juntarGratidao(gratitudeEntries, gratidaoDaHome), [gratitudeEntries, gratidaoDaHome]);
   const today = localDayKey();
   const [todayGratitude, setTodayGratitude] = useState<string[]>(() => gratitudeEntries[today] || ["", "", ""]);
 
@@ -753,10 +756,10 @@ const DesenvolvimentoPessoal = () => {
             </div>
             <div className="bg-card rounded-xl border border-border p-4">
               <h3 className="text-xs font-bold mb-3">📅 HISTÓRICO</h3>
-              {Object.entries(gratitudeEntries).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 14).map(([date, items]) => (
+              {Object.entries(historicoGratidao).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 14).map(([date, items]) => (
                 <div key={date} className="bg-muted/30 rounded-lg p-3 border border-border mb-2">
                   <p className="text-xs font-bold mb-1">{new Date(date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "long" })}</p>
-                  {(Array.isArray(items) ? items : []).filter(Boolean).map((item, i) => <p key={i} className="text-xs text-muted-foreground">• {item}</p>)}
+                  {items.map((item, i) => <p key={i} className="text-xs text-muted-foreground">• {item}</p>)}
                 </div>
               ))}
             </div>

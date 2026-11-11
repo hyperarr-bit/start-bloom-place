@@ -452,9 +452,9 @@ const HomePage = () => {
                 reembolso. Agora aponta pras lojas de verdade. */}
             <LojasCard variant="home" />
 
+            {/* 07/11: o título e a porta "Organizar" (ocultar/ordenar ações) moram no componente */}
             <div data-tour="acoes-rapidas">
-              <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-3">Ações rápidas</h3>
-              <QuickActions />
+              <QuickActions titulo="Ações rápidas" />
             </div>
 
             {/* Widgets */}

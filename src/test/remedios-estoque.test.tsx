@@ -33,7 +33,7 @@ describe("Vitaminas e Remédios — quantidade em estoque", () => {
   it("cadastra com a quantidade digitada no Qtd", () => {
     const store = criarStore();
     renderizar(store);
-    fireEvent.change(screen.getByPlaceholderText("Novo suplemento..."), { target: { value: "Losartana" } });
+    fireEvent.change(screen.getByPlaceholderText("Novo remédio ou suplemento..."), { target: { value: "Losartana" } });
     fireEvent.change(screen.getByTestId("remedio-qtd"), { target: { value: "60" } });
     fireEvent.keyDown(screen.getByTestId("remedio-qtd"), { key: "Enter" });
     expect(remedios(store)[0]).toMatchObject({ name: "Losartana", stock: 60 });
@@ -47,8 +47,8 @@ describe("Vitaminas e Remédios — quantidade em estoque", () => {
     fireEvent.change(screen.getByTestId("remedio-qtd"), { target: { value: "2a0" } });
     expect(screen.getByTestId("remedio-qtd")).toHaveValue("20");
     fireEvent.change(screen.getByTestId("remedio-qtd"), { target: { value: "" } });
-    fireEvent.change(screen.getByPlaceholderText("Novo suplemento..."), { target: { value: "Ômega 3" } });
-    fireEvent.keyDown(screen.getByPlaceholderText("Novo suplemento..."), { key: "Enter" });
+    fireEvent.change(screen.getByPlaceholderText("Novo remédio ou suplemento..."), { target: { value: "Ômega 3" } });
+    fireEvent.keyDown(screen.getByPlaceholderText("Novo remédio ou suplemento..."), { key: "Enter" });
     expect(remedios(store)[0].stock).toBe(30);
   });
 

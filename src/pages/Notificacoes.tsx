@@ -100,12 +100,6 @@ const Notificacoes = () => {
     return () => document.removeEventListener("visibilitychange", aoVoltar);
   }, []);
 
-  /** Atalho pra tela "Alarmes e lembretes" do Android; ao voltar, relê tudo (quem liberou ganha o horário exato). */
-  const liberarAlarmeExato = async () => {
-    setAlarmeExato(await abrirAjusteDeAlarmeExato());
-    await atualizarEstado();
-  };
-
   /**
    * A preferência ao vivo, fora do ciclo de render.
    *
@@ -119,6 +113,22 @@ const Notificacoes = () => {
 
   /** Fila: um reagendamento por vez, na ordem em que os toques chegaram. */
   const filaRef = useRef<Promise<unknown>>(Promise.resolve());
+
+  /** Atalho pra tela "Alarmes e lembretes" do Android; ao voltar, relê tudo (quem liberou ganha o horário exato).
+   *  07/11: liberou → REFAZ os avisos. O que já estava armado continua inexato até ser
+   *  agendado de novo — antes só o texto da tela mudava e o lembrete seguia atrasando. */
+  const liberarAlarmeExato = async () => {
+    const estado = await abrirAjusteDeAlarmeExato();
+    setAlarmeExato(estado);
+    if (estado === "granted") {
+      filaRef.current = filaRef.current.then(async () => {
+        const { reagendarTudo } = await import("@/lib/reagendar");
+        await reagendarTudo(get, prefsRef.current);
+      });
+      await filaRef.current;
+    }
+    await atualizarEstado();
+  };
 
   /**
    * Aplica as prefs no agendador de verdade e relê o que ficou de pé.

@@ -2,6 +2,9 @@ import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { trackEvent } from "@/lib/analytics";
 import { PaywallAssinatura } from "@/components/paywall/PaywallAssinatura";
+import { PaywallSemTeste } from "@/components/paywall/PaywallSemTeste";
+import { usePaywallComTeste } from "@/hooks/use-paywall-teste";
+import { getFunnelArea } from "@/lib/funnel";
 
 /**
  * A "ABA DE COMPRAR" DO /planos ("Meu acesso").
@@ -47,6 +50,12 @@ export function AppPurchaseSheet({ onClose }: { onClose: () => void }) {
   }, []);
 
   useEffect(() => { trackEvent("app_sheet_view", { produto: "assinatura" }); }, []);
+  /* 12/11 (1.0.26 / Android 138): chave `paywall_teste` off (padrão) = o paywall SEM teste em tela cheia; o Voltar
+     redondo (e o do Android, pelo histórico fantasma acima) fecha. "on" = o sheet de hoje. */
+  const comTeste = usePaywallComTeste();
+  if (!comTeste) {
+    return <PaywallSemTeste modo="planos" area={getFunnelArea() ?? "dinheiro"} onVoltar={onClose} onPagoSemConta={() => { window.location.href = "/"; }} />;
+  }
 
   return (
     <div className="fixed inset-0 z-[90]">

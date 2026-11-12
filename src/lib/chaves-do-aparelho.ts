@@ -103,6 +103,7 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-att-braco", // 1.0.18: o braço sorteado no modo "ab" do att_momento (auto3s|comecar), estável entre aberturas
   "core-sino-paywall", // 1.0.18: a última resposta do RevenueCat pra tela do sino antes do paywall (metadata sino_paywall: off|on|ab)
   "core-sino-braco", // 1.0.18: o braço sorteado no modo "ab" do sino_paywall (com|sem), estável entre aberturas
+  "core-paywall-teste", // 12/11 (1.0.26): a última resposta do RevenueCat pro paywall com/sem teste (metadata paywall_teste: on|off)
   "core-titulo-paywall", // 06/11: a última resposta do RevenueCat pro teste de título do paywall (metadata titulo_paywall: off|on|ab)
   "core-titulo-braco", // 06/11: o braço sorteado no modo "ab" do titulo_paywall (com|sem), estável entre aberturas
   "core-sino-visto", // 1.0.18: a tela do sino já apareceu neste aparelho (nunca repete: voltar, reabrir, deep link)

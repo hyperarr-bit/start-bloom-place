@@ -44,6 +44,9 @@ export const BRUTO_POR_PRODUTO_CENTS: Record<string, number> = {
   core_anual_69: 6990,
   core_anual_119: 11990, // 17/10: preços novos do iPhone (líquido oficial ainda não lido da ASC)
   core_mensal_19: 1990,
+  core_anual_99: 9990, // 12/11: paywall sem teste (líquido oficial ainda não lido da ASC)
+  core_anual_69_direto: 6990,
+  core_mensal_34: 3490,
 };
 const RAZAO_LIQUIDA_PADRAO = 8030 / 9790;
 

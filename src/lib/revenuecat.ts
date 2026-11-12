@@ -63,6 +63,7 @@ import { registrarRetroOutubroRemoto } from "@/lib/retro-outubro";
 import { registrarHomeNovaRemoto } from "@/lib/home-nova";
 import { registrarFluxoEnxutoRemoto } from "@/lib/fluxo-enxuto";
 import { registrarInicioDoTesteNoSdk } from "@/lib/meta-inicio-teste-ios";
+import { OFFERING_SEM_TESTE, PRODUTOS_SEM_TESTE, registrarPaywallTesteRemoto, type PlanoSemTeste } from "@/lib/paywall-teste";
 
 /** As chaves que viajam no metadata das offerings (um lugar só, chamado em toda leitura de offerings):
  *  ofertas de saída (10/10), Conquistas 2 (16/10, `conquistas2`), a intro do módulo (16/10, `intro_modulo`), o
@@ -96,6 +97,7 @@ const registrarChavesDasOfferings = (offerings: unknown): void => {
     registrarSkanTrialSdkRemoto, // 1.0.19 (varredura 26/10): `skan_trial_sdk` (on|off, padrão off) — o StartTrial pelo SDK da Meta no iPhone (lib/skan-trial-sdk)
     registrarFluxoEnxutoRemoto, // 1.0.21: `fluxo_enxuto` (on|off|ab; sem a chave = padrão: iPhone "on", site/Android "off"; só vale no iPhone) — lib/fluxo-enxuto
     registrarConstruiuRemoto, // 29/10: `construiu_ab` (ab|a|b, padrão ab) — o A/B do resumo dos 3 dias (lib/construiu-ab)
+    registrarPaywallTesteRemoto, // 12/11 (1.0.26): `paywall_teste` (on|off, padrão off = paywall SEM teste) — lib/paywall-teste
     registrarMotivosRemoto, // 1.0.18: `motivos_folha` (off|on|ab, padrão off) — a folha "O que te fez parar?" depois da folha do anual fechada (lib/mensal-degraus)
   ];
   for (const f of cada) {
@@ -1280,7 +1282,11 @@ let produtoMensalIos: ProdutoRC | undefined;
 let prefetchAnualDesfecho = "nao_rodou";
 
 /** Oferta da App Store = o anual da família core_anual_* (97, 69…), nunca o pré-pago do Play. */
-const ehAnualDaAppStore = (id: string | undefined): boolean => !!id && /^core_anual(_\d+)?$/.test(id);
+/* 12/11: os produtos do paywall SEM teste (core_anual_99, core_anual_69_direto) NUNCA entram aqui — o fluxo com teste
+ * (chave `paywall_teste` on) segue comprando o anual de hoje mesmo que alguém ponha um deles na offering atual. Eles
+ * são lidos só pelo prefetchSemTeste (offering `sem_teste`). O _direto já não casava a regex; o _99 casava. */
+const ehAnualDaAppStore = (id: string | undefined): boolean =>
+  !!id && /^core_anual(_\d+)?$/.test(id) && !(Object.values(PRODUTOS_SEM_TESTE) as string[]).includes(id);
 
 export async function prefetchAnualIos(): Promise<void> {
   if (produtoAnualIos) return;
@@ -1637,3 +1643,126 @@ export async function restaurar(): Promise<boolean> {
     return false;
   }
 }
+
+/* ─────────────────────────── PAYWALL SEM TESTE (12/11, 1.0.26 iPhone / Android 138) ───────────────────────────
+ *
+ * Chave `paywall_teste` off (padrão, lib/paywall-teste): o app vende SEM teste grátis — anual core_anual_99,
+ * mensal core_mensal_34 e, na saída, o presente core_anual_69_direto (69,90/ano, cobra na hora). Os ids moram em
+ * PRODUTOS_SEM_TESTE (um lugar só). Onde procurar cada um, nesta ordem:
+ *   1) a offering `sem_teste` do RevenueCat; 2) a `current`; 3) qualquer outra offering; 4) a loja direto
+ *   (getProducts), pra nunca ficar botão morto se o painel ainda não tiver o pacote.
+ * O casamento de id é EXATO (ou `id:plano_base` no Android): core_anual_69_direto nunca casa com core_anual_69,
+ * e o fluxo de hoje (core_anual_97/core_mensal/core_anual_69) não lê nada daqui — com a chave on, nada muda.
+ * Preço, por mês e valor vêm SEMPRE da loja (priceString); o texto fixo é só reserva da tela. */
+type ItemSemTeste = { pacote: PacoteRC | null; produto: ProdutoRC; offering: string | null };
+const itensSemTeste: Partial<Record<PlanoSemTeste, ItemSemTeste>> = {};
+const casaIdDaLoja = (alvo: string, id: string | null | undefined): boolean => !!id && (id === alvo || id.startsWith(alvo + ":"));
+
+/** Decisão pura: o pacote de cada plano sem teste nas offerings (sem_teste > current > as outras). */
+export function lerPacotesSemTeste(offerings: unknown): Partial<Record<PlanoSemTeste, { pacote: PacoteRC; offering: string | null }>> {
+  type Off = { identifier?: string; availablePackages?: PacoteRC[] } | null | undefined;
+  const o = offerings as { current?: Off; all?: Record<string, Off> } | null | undefined;
+  const ordem: Array<[string | null, Off]> = [];
+  const todas = o?.all ?? {};
+  if (todas[OFFERING_SEM_TESTE]) ordem.push([OFFERING_SEM_TESTE, todas[OFFERING_SEM_TESTE]]);
+  if (o?.current) ordem.push([o.current.identifier ?? null, o.current]);
+  for (const [k, v] of Object.entries(todas)) if (k !== OFFERING_SEM_TESTE && v !== o?.current) ordem.push([k, v]);
+  const achados: Partial<Record<PlanoSemTeste, { pacote: PacoteRC; offering: string | null }>> = {};
+  for (const plano of Object.keys(PRODUTOS_SEM_TESTE) as PlanoSemTeste[]) {
+    for (const [nome, off] of ordem) {
+      const p = (off?.availablePackages ?? []).find((x) => casaIdDaLoja(PRODUTOS_SEM_TESTE[plano], x?.product?.identifier));
+      if (p) { achados[plano] = { pacote: p, offering: nome }; break; }
+    }
+  }
+  return achados;
+}
+
+/** Carrega (e guarda) os três produtos sem teste. Solto: nunca lança. */
+export async function prefetchSemTeste(): Promise<void> {
+  if (!configurado || !Purchases) return;
+  try {
+    const offerings = await Purchases.getOfferings();
+    registrarChavesDasOfferings(offerings);
+    const achados = lerPacotesSemTeste(offerings);
+    for (const [plano, a] of Object.entries(achados) as Array<[PlanoSemTeste, { pacote: PacoteRC; offering: string | null }]>) {
+      if (a?.pacote?.product) itensSemTeste[plano] = { pacote: a.pacote, produto: a.pacote.product, offering: a.offering };
+    }
+  } catch { /* segue pra loja direto */ }
+  const faltam = (Object.keys(PRODUTOS_SEM_TESTE) as PlanoSemTeste[]).filter((p) => !itensSemTeste[p]);
+  if (!faltam.length) return;
+  try {
+    const mod = await import("@revenuecat/purchases-capacitor");
+    const { products } = await Purchases.getProducts({ productIdentifiers: faltam.map((p) => PRODUTOS_SEM_TESTE[p]), type: mod.PRODUCT_CATEGORY.SUBSCRIPTION });
+    for (const plano of faltam) {
+      const produto = (products ?? []).find((p) => casaIdDaLoja(PRODUTOS_SEM_TESTE[plano], p?.identifier));
+      if (produto) itensSemTeste[plano] = { pacote: null, produto, offering: null };
+    }
+  } catch { /* a tela usa a reserva de texto e o toque tenta de novo */ }
+}
+
+export type DadosSemTeste = { produto: string; preco: string; valor: number | null; precoMes: string | null; offering: string | null; pacote: boolean };
+/** O que a loja serviu pra um plano sem teste; null = ainda não carregou (ou não existe na loja). */
+export function dadosSemTeste(plano: PlanoSemTeste): DadosSemTeste | null {
+  const it = itensSemTeste[plano];
+  const p = it?.produto as { priceString?: string; price?: number; currencyCode?: string } | undefined;
+  if (!it || !p?.priceString) return null;
+  const valor = p.price && p.price > 0 ? p.price : null;
+  return {
+    produto: PRODUTOS_SEM_TESTE[plano],
+    preco: p.priceString,
+    valor,
+    precoMes: valor && plano !== "mensal" ? formatarMoeda(valor / 12, p.currencyCode || "BRL") : null,
+    offering: it.offering,
+    pacote: !!it.pacote,
+  };
+}
+
+/** Compra um plano sem teste. true = a folha fechou com sucesso e o acesso sincronizou; false = motivoUltimaCompra diz por quê. */
+export async function comprarSemTeste(plano: PlanoSemTeste, lugar: string): Promise<boolean> {
+  ultimoMotivo = null;
+  const alvo = PRODUTOS_SEM_TESTE[plano];
+  if (!(await garantirPronto())) {
+    ultimoMotivo = "catalogo";
+    trackEvent("app_compra_falhou", { motivo: "rc_" + estado, produto: alvo, oferta: `sem_teste_${plano}`, lugar, retentou: true });
+    return false;
+  }
+  try {
+    if (!itensSemTeste[plano]) await prefetchSemTeste();
+    const it = itensSemTeste[plano];
+    if (!it) {
+      ultimoMotivo = "produto_ausente";
+      trackEvent("app_compra_falhou", { motivo: "produto_ausente", produto: alvo, oferta: `sem_teste_${plano}`, lugar });
+      return false;
+    }
+    /* Android: o plano BASE explícito (sem fase grátis nenhuma). Na Apple a lista vem vazia e a compra é o pacote. */
+    const opcoes: OpcaoAssinatura[] = ((it.produto as { subscriptionOptions?: OpcaoAssinatura[] })?.subscriptionOptions ?? []);
+    const base = plataformaApp() === "ios" ? undefined : opcoes.find((o) => !!o?.isBasePlan);
+    trackEventBeacon("app_compra_opcao", {
+      desde_toque_ms: consumirToque(),
+      produto: alvo,
+      escolhida: base?.id ?? it.produto.identifier ?? alvo,
+      preco: (it.produto as { priceString?: string }).priceString ?? null,
+      trial: false,
+      oferta: `sem_teste_${plano}`,
+      offering: it.offering,
+      lugar,
+      pacote: !!it.pacote,
+    });
+    const P = Purchases as NonNullable<typeof Purchases>;
+    const resultado = await folhaComRetentativa(alvo, () => (base
+      ? P.purchaseSubscriptionOption({ subscriptionOption: base as Parameters<NonNullable<typeof Purchases>["purchaseSubscriptionOption"]>[0]["subscriptionOption"] })
+      : it.pacote
+        ? P.purchasePackage({ aPackage: it.pacote })
+        : P.purchaseStoreProduct({ product: it.produto })));
+    registrarResultadoDaFolha("sucesso", alvo);
+    // a verdade da loja: compra direta não é teste (o lembrete "acaba amanhã" não arma)
+    anotarTrialDaCompra(resultado, false);
+    await sincronizarAssinatura();
+    return true;
+  } catch (e) {
+    return desfechoDaFalha(e, alvo);
+  }
+}
+
+/** Só testes: esquece os produtos sem teste carregados. */
+export const _zerarCacheSemTeste = (): void => { for (const k of Object.keys(itensSemTeste)) delete itensSemTeste[k as PlanoSemTeste]; };

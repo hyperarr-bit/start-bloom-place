@@ -53,7 +53,8 @@ const entitlementDaCompra = () => {
   if (!id || ehVitalicio(id)) return {};
   let compraEm = Date.now();
   try { compraEm = Number(localStorage.getItem("__rc_mock_compra_em")) || compraEm; } catch { /* noop */ }
-  const trial = /^core_anual(_\d+)?$/.test(id);
+  // 12/11: os produtos SEM teste (core_anual_99, core_anual_69_direto) cobram na hora — NORMAL, nunca TRIAL
+  const trial = /^core_anual(_\d+)?$/.test(id) && !SEM_TESTE_MOCK.includes(id);
   const fim = compraEm + (trial ? 3 : /^core_anual/.test(id) ? 365 : 30) * 86_400_000;
   return {
     pro: {
@@ -121,6 +122,24 @@ const PRECOS_BASE: Record<string, string> = {
   "core_anual:coreanual": "R$ 159,90",
   "core_mensal:coremensal": "R$ 24,90",
   "core_mensal:coremensalpix": "R$ 19,90",
+  // 12/11: o paywall SEM teste (lib/paywall-teste) — offering `sem_teste`, sem oferta introdutória
+  core_anual_99: "R$ 99,90",
+  core_mensal_34: "R$ 34,90",
+  core_anual_69_direto: "R$ 69,90",
+  // no Android o RevenueCat devolve produto:plano_base (frente das lojas, 12/11)
+  "core_anual_99:coreanual99": "R$ 99,90",
+  "core_mensal_34:coremensal34": "R$ 34,90",
+  "core_anual_69_direto:coreanual69direto": "R$ 69,90",
+};
+const SEM_TESTE_MOCK = ["core_anual_99", "core_mensal_34", "core_anual_69_direto"];
+// `localStorage.__rc_mock_sem_teste_off` = "1" ensaia o painel SEM a offering nova (a tela usa a reserva de texto)
+const offeringSemTeste = () => {
+  try { if (localStorage.getItem("__rc_mock_sem_teste_off") === "1") return {}; } catch { /* noop */ }
+  return { sem_teste: { identifier: "sem_teste", metadata: {}, availablePackages: [
+    { identifier: "$rc_annual", packageType: "ANNUAL", product: produtoMock(ehIos() ? "core_anual_99" : "core_anual_99:coreanual99") },
+    { identifier: "$rc_monthly", packageType: "MONTHLY", product: produtoMock(ehIos() ? "core_mensal_34" : "core_mensal_34:coremensal34") },
+    { identifier: "presente_69", packageType: "CUSTOM", product: produtoMock(ehIos() ? "core_anual_69_direto" : "core_anual_69_direto:coreanual69direto") },
+  ] } };
 };
 const PRECOS: Record<string, string> = new Proxy(PRECOS_BASE, {
   get(alvo, id: string) {
@@ -205,17 +224,20 @@ export const Purchases: any = {
           { identifier: "$rc_monthly", packageType: "MONTHLY", product: produtoMock("core_mensal_19") },
         ],
       };
-      return { current: atual, all: { [atual.identifier]: atual, anual_69: anual69, ...(semMensal19 ? {} : { mensal_19: mensal19 }) } };
+      return { current: atual, all: { [atual.identifier]: atual, anual_69: anual69, ...(semMensal19 ? {} : { mensal_19: mensal19 }), ...offeringSemTeste() } };
     }
     // v53: offering de assinatura ($rc_annual/$rc_monthly), como na loja real.
-    return {
-      current: {
-        availablePackages: [
-          { identifier: "$rc_annual", product: { identifier: "core_anual:coreanual", priceString: PRECOS["core_anual:coreanual"] } },
-          { identifier: "$rc_monthly", product: { identifier: "core_mensal:coremensal", priceString: PRECOS["core_mensal:coremensal"] } },
-        ],
-      },
+    // 12/11: + `all` com a offering `sem_teste` e o metadata do painel (`__rc_mock_metadata`) na atual.
+    let metadataAndroid: Record<string, unknown> = {};
+    try { metadataAndroid = JSON.parse(localStorage.getItem("__rc_mock_metadata") || "{}"); } catch { /* noop */ }
+    const atualAndroid = {
+      identifier: "default", metadata: metadataAndroid,
+      availablePackages: [
+        { identifier: "$rc_annual", product: { identifier: "core_anual:coreanual", priceString: PRECOS["core_anual:coreanual"] } },
+        { identifier: "$rc_monthly", product: { identifier: "core_mensal:coremensal", priceString: PRECOS["core_mensal:coremensal"] } },
+      ],
     };
+    return { current: atualAndroid, all: { default: atualAndroid, ...offeringSemTeste() } };
   },
   async getProducts({ productIdentifiers }: { productIdentifiers: string[] }) {
     // 13/08: catálogo vazio é um estado REAL (build velha, Play fora do ar) e

@@ -29,6 +29,7 @@
  *
  * Coberto por `cadastro-pos-compra-ios.test.tsx`.
  */
+import { paywallComTeste } from "@/lib/paywall-teste"; // 12/11: sem teste, quem comprou leu "a assinatura"
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Check, Loader2, MailCheck, Lock, ShieldCheck } from "lucide-react";
@@ -395,7 +396,7 @@ export function SignupIOS({
       </form>
 
       <div className="mt-4"><SelosIOS /></div>
-      {jaTinha && <AvisoJaTinhaAcesso tipo={jaTinha.tipo} oQue="teste" via="cadastro" onEntendi={() => { const seguir = jaTinha.seguir; setJaTinha(null); seguir(); }} />}
+      {jaTinha && <AvisoJaTinhaAcesso tipo={jaTinha.tipo} oQue={paywallComTeste() ? "teste" : "assinatura"} via="cadastro" onEntendi={() => { const seguir = jaTinha.seguir; setJaTinha(null); seguir(); }} />}
     </div>
   );
 }

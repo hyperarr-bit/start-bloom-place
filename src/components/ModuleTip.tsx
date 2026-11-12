@@ -4,7 +4,8 @@ import { X, ChevronRight, Lightbulb } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { useDemoDoFunil } from "@/lib/demo-do-funil";
 import { fileiraDeDemo } from "@/components/ui/abas-ocultaveis";
-import { EVENTO_DICAS_DE_NOVO, dicasDoModulo, irParaDica, modoDasDicas, type Dica, type DetalheDicasDeNovo } from "@/lib/dicas-do-modulo";
+import { usePortaDoSumario } from "@/hooks/use-abas-ocultas";
+import { DICA_SUMARIO, EVENTO_DICAS_DE_NOVO, dicasDoModulo, irParaDica, modoDasDicas, type Dica, type DetalheDicasDeNovo } from "@/lib/dicas-do-modulo";
 
 interface ModuleTipProps {
   moduleId: string;
@@ -69,8 +70,12 @@ export const ModuleTip = ({ moduleId, tips, tema = "app" }: ModuleTipProps) => {
     return () => window.removeEventListener(EVENTO_DICAS_DE_NOVO, deNovo);
   }, [moduleId]);
 
+  // 07/11 (lib/abas-caderno): no braço sumário, em módulo com aba guardada, a 3ª dica fala do Sumário (o toque abre o
+  // sumário, pelo mesmo evento)
+  const portaDoSumario = usePortaDoSumario(moduleId);
   const daLista = dicasDoModulo(moduleId);
-  const dicas: readonly Dica[] = daLista.length ? daLista : (tips ?? []).map((texto) => ({ texto }));
+  const dicasBase: readonly Dica[] = daLista.length ? daLista : (tips ?? []).map((texto) => ({ texto }));
+  const dicas: readonly Dica[] = portaDoSumario ? dicasBase.map((d) => (d.organizarAbas ? { ...d, ...DICA_SUMARIO } : d)) : dicasBase;
   const modo = modoDasDicas();
   const t = TEMAS[tema];
 

@@ -4,6 +4,7 @@ import { iniciarFichaDoAparelho, propriedadesComuns } from "@/lib/aparelho";
 import { anotarPeloEvento } from "@/lib/momento-ruim";
 import { camposHomeNova } from "@/lib/home-nova";
 import { camposFluxoEnxuto } from "@/lib/fluxo-enxuto";
+import { camposAbasCaderno } from "@/lib/abas-caderno";
 import { camposModo1012 } from "@/lib/modo-1012";
 
 // Persistent session id for the tab
@@ -375,7 +376,8 @@ export const trackEvent = (
     // 10/10: a ficha do aparelho (device_id, versão, plataforma, turma, att) vai em
     // TODO evento — ver lib/aparelho. Só soma: o `data` do evento vence.
     // 1.0.19: com a chave `home_nova` em qualquer modo que não "off", todo evento diz qual Home a pessoa vê (nova|atual)
-    const payload = { ...meta, ...propriedadesComuns(), ...camposHomeNova(), ...camposFluxoEnxuto(), ...camposModo1012(), ...data };
+    // 07/11: com as chaves de abas fora do padrão, todo evento diz o braço e o visual da fileira (lib/abas-caderno)
+    const payload = { ...meta, ...propriedadesComuns(), ...camposHomeNova(), ...camposFluxoEnxuto(), ...camposModo1012(), ...camposAbasCaderno(), ...data };
     anotarPeloEvento(eventName);
 
     // 17/10 (desempenho): getSession (a sessão do aparelho) e não getUser — o getUser vai ao servidor
@@ -418,7 +420,7 @@ export const trackEventBeacon = (eventName: string, data: Record<string, unknown
     const corpo = (userId: string | null) => JSON.stringify({
       user_id: userId,
       event_name: eventName,
-      event_data: { ...meta, ...propriedadesComuns(), ...camposFluxoEnxuto(), ...camposModo1012(), ...data },
+      event_data: { ...meta, ...propriedadesComuns(), ...camposFluxoEnxuto(), ...camposModo1012(), ...camposAbasCaderno(), ...data },
       trial_day: null,
       session_id: getSessionId(),
     });

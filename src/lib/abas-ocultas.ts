@@ -15,6 +15,7 @@
  * aberto todas aparecem, porque ele aponta pras abas pelo `data-spotlight`.
  */
 import { ABAS_ENXUTAS, ABAS_POUCO_USO, ABAS_QUE_NUNCA_SAEM } from "@/lib/abas-enxutas";
+import { bracoAbas } from "@/lib/abas-caderno";
 
 export const chaveAbasOcultas = (moduloId: string) => `abas-ocultas:${moduloId}`;
 export const chaveOrdemDasAbas = (moduloId: string) => `abas-ordem:${moduloId}`;
@@ -100,6 +101,8 @@ export function abasEnxutasLigada(): boolean {
     if (f === "on") return true;
     if (f === "off") return false;
   } catch { /* segue */ }
+  // 07/11 (lib/abas-caderno): o braço TODAS do sorteio de abas = sem o padrão enxuto (a força acima vence o braço)
+  try { if (bracoAbas() === "todas") return false; } catch { /* segue */ }
   return ABAS_ENXUTAS;
 }
 

@@ -135,6 +135,13 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-home-nova-dica-mais", // 1.0.19 (26/10): a dica do "+" já tocada/aparições (lib/dica-mais) — nunca volta; a mesma chave vai pra conta
   "core-fluxo-enxuto", // 1.0.21 (27/10): a última resposta do RevenueCat pro fluxo enxuto (metadata fluxo_enxuto: on|off|ab, lib/fluxo-enxuto)
   "core-fluxo-enxuto-braco", // 1.0.21: o braço sorteado no "ab" do fluxo enxuto (enxuto|atual), estável entre aberturas
+  // 07/11 (lib/abas-caderno): as últimas respostas do RevenueCat pras abas (abas_enxutas / abas_visual / abas_medicao), o braço
+  // sorteado ("<modo>:<braço>", estável entre aberturas) e o `uso_modulo` 1x por chave por dia ({ dia, chaves })
+  "core-abas-enxutas",
+  "core-abas-visual",
+  "core-abas-medicao",
+  "core-abas-braco",
+  "core-uso-modulo-dia",
   "core-construiu-ab", // 29/10: a última resposta do RevenueCat pro A/B do resumo dos 3 dias (metadata construiu_ab: ab|a|b, lib/construiu-ab)
   "core-construiu-braco", // 29/10: o braço do resumo dos 3 dias por conta ({hash da conta: a|b}), estável — não troca de braço
   "core-presente-aviso-v1", // 31/10: o aviso do presente na página Você ({ vistoEm, fechado }, lib/presente-aviso) — espelho da mesma chave da conta, não pisca de volta

@@ -460,6 +460,14 @@ export function LiberandoIOS() {
   }, [missaoPronta, vaiTerMissao, isSubscribed]);
 
   const spa = sincronizado === true && isSubscribed && (missaoPronta || !vaiTerMissao);
+  /* 12/11 (1.0.26, QA no Simulador): com a velocidade, a Home (e a Home nova) só eram pedidas ao chegar em "/", e o
+   * "Começar" das boas-vindas mostrava ~0,3 s de branco antes do convite da missão. Quem já pagou e está a 1 toque da
+   * Home: pede os pedaços agora (só baixa/compila; quem decide o que mostrar segue sendo a Home). */
+  useEffect(() => {
+    if (!spa) return;
+    import("@/pages/Home").catch(() => {});
+    import("@/components/home-nova/e/HomeE").catch(() => {});
+  }, [spa]);
   const pronto = sincronizado === false || spa || esperouDemais;
   const irPraHome = () => {
     if (spa) { trackEvent("app_pos_compra_home", { via: "rota", funil: "ios" }); navigate("/", { replace: true }); return; }

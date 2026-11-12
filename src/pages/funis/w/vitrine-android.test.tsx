@@ -41,6 +41,9 @@ import { PaywallW } from "./PaywallW";
 vi.mock("@/lib/revenuecat", () => ({
   initRevenueCat: vi.fn().mockResolvedValue(undefined),
   prefetchVitalicio: vi.fn().mockResolvedValue(undefined),
+  prefetchSemTeste: vi.fn().mockResolvedValue(undefined), // 12/11: o mensal do Android é o core_mensal_34
+  dadosMensalAndroid: () => null, // a loja ainda não respondeu: vale a reserva "R$ 34,90"
+  comprarMensalAndroid: vi.fn(),
   estadoRevenueCat: () => "pronto",
   temVitalicio97: () => true,
   comprar: vi.fn(),
@@ -75,23 +78,23 @@ describe("paywall do Android: dois preços, vitalício em foco", () => {
     expect(screen.getByText(/cancele quando quiser/i)).toBeTruthy();   // coluna mensal
     expect(screen.getByText(/MELHOR ESCOLHA/i)).toBeTruthy();          // coluna vitalício
     expect(screen.getAllByText(/97,90/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/24,90/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/34,90/).length).toBeGreaterThan(0); // 12/11: mensal do Android = 34,90
   });
 
   it("o VITALÍCIO nasce selecionado: CTA de pagamento único, sem renovação", () => {
     montar();
     expect(screen.getByText(/Quero pra sempre/i)).toBeTruthy();
     /* A letra legal do vitalício fala de pagamento ÚNICO. Se aparecesse
-     * "Assinatura de R$ 24,90/mês" aqui, o padrão teria voltado pro mensal. */
+     * "Assinatura de R$ 34,90/mês" aqui, o padrão teria voltado pro mensal. */
     expect(screen.getByText(/Pagamento/i)).toBeTruthy();
-    expect(screen.queryByText(/Começar por R\$ ?24,90\/mês/i)).toBeNull();
+    expect(screen.queryByText(/Começar por R\$ ?34,90\/mês/i)).toBeNull();
   });
 
   it("escolher o mensal vira a tela inteira, com o aviso de renovação", () => {
     montar();
     fireEvent.click(screen.getByText(/cancele quando quiser/i));
-    expect(screen.getByText(/Começar por R\$ ?24,90\/mês/i)).toBeTruthy();
-    expect(screen.getByText(/Assinatura de R\$ ?24,90\/mês/i)).toBeTruthy();
+    expect(screen.getByText(/Começar por R\$ ?34,90\/mês/i)).toBeTruthy();
+    expect(screen.getByText(/Assinatura de R\$ ?34,90\/mês/i)).toBeTruthy();
     expect(screen.getByText(/cancela quando quiser/i)).toBeTruthy();
   });
 

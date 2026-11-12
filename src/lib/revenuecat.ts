@@ -1766,5 +1766,14 @@ export async function comprarSemTeste(plano: PlanoSemTeste, lugar: string): Prom
   }
 }
 
+/* 12/11 (dono, Android 138+): o MENSAL com renovação do Android passa a ser core_mensal_34 (R$ 34,90/mês, plano-base
+ * coremensal34, sem teste) — funil (PaywallW), gate e /planos. Mesmo motor do mensal sem teste do iPhone: offering
+ * `sem_teste` > as outras > a loja direto, plano BASE explícito na folha. A offering default (e o metadata dela) não
+ * muda: as versões no ar seguem lendo o core_mensal de 24,90 dela. O vitalício 97,90 e o 24,90 à vista
+ * (coremensalvista, o resgate) seguem nos caminhos de sempre. */
+export const comprarMensalAndroid = (lugar: string): Promise<boolean> => comprarSemTeste("mensal", lugar);
+/** O que a loja serviu pro mensal de 34,90 (null até responder — a tela usa a reserva "R$ 34,90"). */
+export const dadosMensalAndroid = (): DadosSemTeste | null => dadosSemTeste("mensal");
+
 /** Só testes: esquece os produtos sem teste carregados. */
 export const _zerarCacheSemTeste = (): void => { for (const k of Object.keys(itensSemTeste)) delete itensSemTeste[k as PlanoSemTeste]; };

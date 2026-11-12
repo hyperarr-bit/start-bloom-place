@@ -14,6 +14,7 @@ vi.mock("@/integrations/supabase/client", () => ({ supabase: { functions: { invo
 vi.mock("@/lib/revenuecat", () => ({
   initRevenueCat: vi.fn().mockResolvedValue(undefined),
   prefetchVitalicio: vi.fn().mockResolvedValue(undefined),
+  prefetchSemTeste: vi.fn().mockResolvedValue(undefined), dadosMensalAndroid: () => null, // 12/11: mensal 34,90 do Android
   estadoRevenueCat: () => "pronto",
   temVitalicio97: () => true,
   comprar: vi.fn(), comprarVitalicio: vi.fn(), comprarAnual97: vi.fn(),

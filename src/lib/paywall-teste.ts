@@ -27,6 +27,8 @@ export const PRODUTOS_SEM_TESTE = {
   presente: "core_anual_69_direto",
 } as const;
 export type PlanoSemTeste = keyof typeof PRODUTOS_SEM_TESTE;
+/** 12/11 (dono): o mensal com renovação do ANDROID (funil, gate, /planos) = o mesmo core_mensal_34, pelo plano-base da Play. */
+export const ID_MENSAL_ANDROID = `${PRODUTOS_SEM_TESTE.mensal}:coremensal34` as const;
 
 /** A offering do RevenueCat onde os três moram (procurada primeiro; depois qualquer offering; depois a loja direto). */
 export const OFFERING_SEM_TESTE = "sem_teste";

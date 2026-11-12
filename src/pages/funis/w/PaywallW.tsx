@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { APP_PRECOS } from "@/lib/native-shell";
 import { ehApple, pelaLoja, temEscadaPix, formasDePagamento, erroFolhaNaoConcluiu, avisoRenovacao, erroJaAtivo, erroNaoPermitido } from "@/lib/loja";
 import { PresenteDireto, economiaDoAnual, ECONOMIA_RESERVA, ANUAL_MES_RESERVA } from "@/components/paywall/PaywallSemTeste";
-import { PRECOS_RESERVA_SEM_TESTE, PRODUTOS_SEM_TESTE } from "@/lib/paywall-teste";
+import { ID_MENSAL_ANDROID, PRECOS_RESERVA_SEM_TESTE, PRODUTOS_SEM_TESTE } from "@/lib/paywall-teste";
 import type { DadosSemTeste } from "@/lib/revenuecat";
 import { AppLegalFooter } from "@/components/paywall/PaywallFlow";
 import { PixCheckout } from "@/components/paywall/PixCheckout";
@@ -206,7 +206,7 @@ function LifetimeCardW({ naWeb = false }: { naWeb?: boolean }) {
             : "pagamento único · Pix ou cartão na tela do Google"}
         </div>
         <div className="relative text-[11px] font-semibold text-black/40 mt-1">
-          {naWeb ? "= R$ 8,16/mês no 1º ano, R$ 0 depois" : "4 meses de mensal = CORE pra sempre"}
+          {naWeb ? "= R$ 8,16/mês no 1º ano, R$ 0 depois" : `${ehApple() ? 4 : MESES_MENSAL_34} meses de mensal = CORE pra sempre`}
         </div>
         <div className="relative grid grid-cols-3 gap-1.5 mt-3.5">
           {["16 módulos", "Sem mensalidade", "Acesso na hora"].map((c) => (
@@ -228,7 +228,9 @@ function LifetimeCardW({ naWeb = false }: { naWeb?: boolean }) {
  *  "24,90" × "97,90" sem a matemática, o barato levava 92% do mix. */
 /** 12/11 noite (iPhone, paywall sem teste): as MESMAS colunas com o anual no lugar do vitalício. */
 type SemTesteColunas = { anual: string; anualMes: string; mensal: string; economia: number };
-function PrecosLadoALadoW({ plano, onSelect, naWeb = false, semTeste = null }: { plano: "vitalicio" | "mensal"; onSelect: (p: "vitalicio" | "mensal") => void; naWeb?: boolean; semTeste?: SemTesteColunas | null }) {
+/** 12/11 (dono): o mensal com renovação do Android é o core_mensal_34 (R$ 34,90). 97,90 ÷ 34,90 = 2,8 → "3 meses de mensal". */
+const MESES_MENSAL_34 = Math.ceil(97.9 / PRECOS_RESERVA_SEM_TESTE.mensal.valor);
+function PrecosLadoALadoW({ plano, onSelect, naWeb = false, semTeste = null, mensalApp = null }: { plano: "vitalicio" | "mensal"; onSelect: (p: "vitalicio" | "mensal") => void; naWeb?: boolean; semTeste?: SemTesteColunas | null; /** Android: o preço do mensal de 34,90 (da loja) */ mensalApp?: string | null }) {
   const moldura = (ativo: boolean) =>
     `rounded-3xl p-[2px] transition-all ${ativo
       ? "bg-gradient-to-br from-accent via-accent/45 to-accent/15 shadow-[0_14px_40px_-16px_hsl(var(--accent)/0.5)]"
@@ -240,7 +242,7 @@ function PrecosLadoALadoW({ plano, onSelect, naWeb = false, semTeste = null }: {
           <span className="h-[19px]" aria-hidden />
           <span className="text-[30px] font-black leading-none mt-1.5">1</span>
           <span className="text-[12.5px] font-bold text-black/45">mês</span>
-          <span className="text-[17px] font-extrabold mt-2">{semTeste ? semTeste.mensal : APP_PRECOS.mensal.preco}</span>
+          <span className="text-[17px] font-extrabold mt-2">{semTeste ? semTeste.mensal : mensalApp ?? APP_PRECOS.mensal.preco}</span>
           <span className="text-[10px] font-semibold text-black/40">{naWeb ? "30 dias" : "por mês"}</span>
           <span className="mx-3 my-2 border-t border-black/10" aria-hidden />
           <span className="text-[10.5px] font-semibold text-black/45 pb-1 px-1 leading-tight mt-auto">
@@ -270,7 +272,7 @@ function PrecosLadoALadoW({ plano, onSelect, naWeb = false, semTeste = null }: {
           <span className="text-[10.5px] font-semibold text-black/45 pb-1 px-1 leading-tight mt-auto">
             {semTeste
               ? <>Economize {semTeste.economia}%<br /><b className="text-black/60">contra o mensal</b></>
-              : <>4 meses de mensal =<br /><b className="text-black/60">CORE pra sempre</b></>}
+              : <>{mensalApp ? MESES_MENSAL_34 : 4} meses de mensal =<br /><b className="text-black/60">CORE pra sempre</b></>}
           </span>
         </div>
       </div>
@@ -360,6 +362,10 @@ export function PaywallW({
   } : null;
   /** os campos de todo evento do semTeste (o braço do A/B vai em todos) */
   const camposSemTeste = { funil: "ios", loja: "ios", area, paywall_teste: "off", paywall_visual: "android" };
+  /* 12/11 (dono): no app do Android o mensal com renovação é o core_mensal_34 — preço da loja, reserva "R$ 34,90".
+   * O iPhone (fluxo com teste) e o site seguem no de sempre. */
+  const mensal34 = !naWeb && !ehApple();
+  const mensalAppTxt = mensal34 ? mensalTxt : APP_PRECOS.mensal.preco;
   // A/B do preço: A = só vitalício · B = vitalício + mensal visível.
   // No iPhone não há sorteio: é sempre o layout de duas colunas (ver
   // IOS_PLANO_INICIAL). `sortearBraco()` nem chega a ser chamado lá, senão
@@ -429,6 +435,7 @@ export function PaywallW({
       await rc.prefetchVitalicio();
       if (!vivoRef.current) return;
       if (rc.estadoRevenueCat() === "pronto") setVitalicioNaLoja(rc.temVitalicio97());
+      if (mensal34) void rc.prefetchSemTeste().then(() => { if (vivoRef.current) setLojaSemTeste((l) => ({ ...l, mensal: rc.dadosMensalAndroid() })); });
       if (!rc.temVitalicio97()) {
         retry = window.setTimeout(async () => {
           // init de novo: se o primeiro falhou por rede, o prefetch sozinho
@@ -577,9 +584,9 @@ export function PaywallW({
     try {
       const rc = await import("@/lib/revenuecat");
       rc.marcarToqueDeCompra?.(abriuEm);
-      const idProduto = produto === "mensal" ? "core_mensal" : vitalicioNaLoja !== false ? "core_vitalicio_97" : "core_anual:coreanual97";
+      const idProduto = produto === "mensal" ? (mensal34 ? ID_MENSAL_ANDROID : "core_mensal") : vitalicioNaLoja !== false ? "core_vitalicio_97" : "core_anual:coreanual97";
       const ok = produto === "mensal"
-        ? await rc.comprar("core_mensal", { semTrial: true })
+        ? (mensal34 ? await rc.comprarMensalAndroid("funil_w") : await rc.comprar("core_mensal", { semTrial: true }))
         : vitalicioNaLoja !== false
           ? await rc.comprarVitalicio("core_vitalicio_97")
           : await rc.comprarAnual97();
@@ -728,7 +735,7 @@ export function PaywallW({
             }
             // na web o preço é outro (27,90 no Pix) — a âncora tem que bater
             // com o card e com o CTA, senão a tela promete três números
-            const preco = mostraMensal ? "24,90" : naWeb ? PRECO_WEB : "97,90";
+            const preco = mostraMensal ? (mensal34 ? mensalTxt.replace(/^R\$\s*/, "") : "24,90") : naWeb ? PRECO_WEB : "97,90";
             const precoSub = mostraMensal ? (naWeb ? "30 dias" : "por mês") : "1x, pra sempre";
             const precoTitulo = mostraMensal
               ? <>{naWeb ? <>CORE por 30 dias,<br />pra começar hoje</> : <>CORE mensal,<br />pra começar hoje</>}</>
@@ -749,6 +756,7 @@ export function PaywallW({
               naWeb={naWeb}
               plano={plano}
               semTeste={colunasSemTeste}
+              mensalApp={mensal34 ? mensalTxt : null}
               onSelect={(p) => { setPlano(p); tocouPlano.current = true; if (!naWeb) guardarChave(CHAVES_FUNIL_W.plano, p); trackEvent("funnel_click", semTeste ? { cta: "paywall_plano", plano: p === "mensal" ? "mensal" : "anual", ...camposSemTeste } : { cta: "w_plano", plano: p, braco: bracoEvento, funil: "w" }); }}
             />
           ) : (
@@ -855,7 +863,7 @@ export function PaywallW({
               )}
               {reabrindoEm === null && (
                 <button className="block w-full text-center text-[11.5px] font-semibold mt-1 opacity-80 underline underline-offset-2 disabled:opacity-50" disabled={comprando} onClick={() => void comprar("mensal")}>
-                  ou assina o mensal — {APP_PRECOS.mensal.preco}/mês · cancela quando quiser
+                  ou assina o mensal — {mensalAppTxt}/mês · cancela quando quiser
                 </button>
               )}
             </div>
@@ -874,7 +882,7 @@ export function PaywallW({
                   const p = escolha === "mensal" ? "mensal" : "anual";
                   trackEvent("funnel_click", { cta: "app_paywall_cta", ...camposSemTeste, plano: p, produto: PRODUTOS_SEM_TESTE[p], preco: p === "anual" ? anualTxt : mensalTxt });
                 } else
-                trackEvent("funnel_click", { cta: "app_paywall_cta", produto: naWeb ? (escolha === "mensal" ? OFERTA_WEB_MES : OFERTA_WEB) : escolha === "mensal" ? "core_mensal" : "core_vitalicio_97", funil: "w", braco: bracoEvento });
+                trackEvent("funnel_click", { cta: "app_paywall_cta", produto: naWeb ? (escolha === "mensal" ? OFERTA_WEB_MES : OFERTA_WEB) : escolha === "mensal" ? (mensal34 ? ID_MENSAL_ANDROID : "core_mensal") : "core_vitalicio_97", funil: "w", braco: bracoEvento });
                 void comprar(escolha);
               }}
             >
@@ -885,7 +893,7 @@ export function PaywallW({
                     ? <>Começar por {mensalTxt}/mês <ArrowRight className="w-4 h-4" /></>
                     : <>Quero o anual — {anualTxt}/ano <ArrowRight className="w-4 h-4" /></>)
                 : duasColunas && plano === "mensal"
-                  ? <>Começar por {APP_PRECOS.mensal.preco}{naWeb ? "" : "/mês"} <ArrowRight className="w-4 h-4" /></>
+                  ? <>Começar por {mensalAppTxt}{naWeb ? "" : "/mês"} <ArrowRight className="w-4 h-4" /></>
                   : <>Quero pra sempre — {naWeb ? PRECO_WEB : APP_PRECOS.vitalicio97.preco} <ArrowRight className="w-4 h-4" /></>}
             </Button>
           </motion.div>
@@ -904,7 +912,7 @@ export function PaywallW({
                 : naWeb
                 ? <>Pagamento <strong className="text-foreground font-semibold">único</strong> no Pix · acesso na hora · garantia de 7 dias, devolve em 1 mensagem</>
                 : duasColunas && plano === "mensal"
-                ? <>Assinatura de {APP_PRECOS.mensal.preco}/mês {pelaLoja()}{formasDePagamento() && ` · ${formasDePagamento()}`} · {avisoRenovacao()}</>
+                ? <>Assinatura de {mensalAppTxt}/mês {pelaLoja()}{formasDePagamento() && ` · ${formasDePagamento()}`} · {avisoRenovacao()}</>
                 : <>Pagamento <strong className="text-foreground font-semibold">único</strong> {pelaLoja()}{formasDePagamento() && ` · ${formasDePagamento()}`} · sem mensalidade</>}
             </span>
           </p>

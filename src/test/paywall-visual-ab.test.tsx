@@ -7,7 +7,8 @@
  *    34,90, nenhum texto de teste/vitalício/"pra sempre"; compra core_anual_97_direto / core_mensal_34; Voltar ou folha
  *    cancelada → presente 69,90 sem teste; todo evento leva `paywall_visual: "android"`;
  *  · o braço "enxovaly" leva `paywall_visual: "enxovaly"` e mostra os mesmos preços;
- *  · o Android, com qualquer chave, segue no paywall de hoje (vitalício 97,90 + mensal 24,90, produtos de hoje).
+ *  · o Android, com qualquer chave, segue no paywall de hoje (vitalício 97,90), só com o mensal trocado pra 34,90
+ *    (core_mensal_34:coremensal34, 12/11 — ver android-mensal-34.test.tsx).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, act, waitFor } from "@testing-library/react";
@@ -27,6 +28,7 @@ vi.mock("@/lib/revenuecat", async (original) => ({
   estadoRevenueCat: () => "pronto",
   temVitalicio97: () => true,
   dadosSemTeste: (p: "anual" | "mensal" | "presente") => loja[p],
+  dadosMensalAndroid: () => loja.mensal,
   comprarSemTeste: vi.fn(async () => loja.ok),
   comprar: vi.fn(async () => true),
   comprarVitalicio: vi.fn(async () => true),
@@ -267,17 +269,17 @@ describe("braço enxovaly: os mesmos preços, o braço nos eventos", () => {
 });
 
 /* ─────────────────────── Android: o paywall de hoje ─────────────────────── */
-describe("Android: o PaywallW de hoje, intacto", () => {
-  it("vitalício 97,90 + mensal 24,90; compra o core_vitalicio_97; nada de anual/34,90/69,90", async () => {
+describe("Android: o PaywallW de hoje, só com o mensal em 34,90", () => {
+  it("vitalício 97,90 + mensal 34,90; compra o core_vitalicio_97; nada de anual/24,90/69,90", async () => {
     plataforma("android");
     const onPago = vi.fn();
     render(<MemoryRouter><PaywallW area="dinheiro" answers={{ gasto: "R$ 100 a R$ 300" }} onPagoSemConta={onPago} /></MemoryRouter>);
     await espera();
     const corpo = document.body.textContent ?? "";
     expect(corpo).toContain("Pra sempre");
-    expect(corpo).toMatch(/24,90/);
+    expect(corpo).toMatch(/34,90/);
     expect(corpo).toMatch(/97,90/);
-    expect(corpo).not.toMatch(/34,90|69,90|99,90/);
+    expect(corpo).not.toMatch(/24,90|69,90|99,90/);
     expect(screen.queryByTestId("paywall-w-sem-teste")).toBeNull();
     expect(screen.queryByTestId("paywall-w-voltar")).toBeNull();
     fireEvent.click(screen.getByText(/Quero pra sempre/));

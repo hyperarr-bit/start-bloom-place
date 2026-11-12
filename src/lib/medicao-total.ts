@@ -40,6 +40,7 @@
  */
 import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
+import { quandoHomeProntaEOciosa } from "@/lib/home-pronta";
 import { letrasDe, MIN_LETRAS_ROTULO, normalizarChave } from "@/lib/medicao-normalizar";
 
 /* ─────────────────────────── chave remota ─────────────────────────── */
@@ -135,6 +136,19 @@ export function carregarDicionario(): Promise<void> {
       .then(() => { processarPendentes(); aquecerPeneira(); });
   }
   return carregandoDicionario;
+}
+
+/*
+ * 07/11 (desempenho, lente "abertura"): na abertura o dicionário (114 KB) era pedido assim que a entrada rodava, antes
+ * mesmo do pedaço da Home — 37 KB a mais na fila da rede de celular e o compilar + montar o Set no meio da montagem da
+ * Home. Aqui ele espera a Home pintar e o tempo ocioso (lib/home-pronta); sem Home em 6 s, vai mesmo assim. Um toque ou
+ * uma vista de card antes disso continua chamando carregarDicionario() na hora (e a fila `pendentes` guarda o toque).
+ */
+let dicionarioAgendado = false;
+function agendarDicionario(): void {
+  if (dicionario || carregandoDicionario || dicionarioAgendado) return;
+  dicionarioAgendado = true;
+  quandoHomeProntaEOciosa(() => { dicionarioAgendado = false; void carregarDicionario(); }, { maxMs: 6000, ociosoMs: 3000 });
 }
 
 /** Só testes: troca o dicionário (null = volta a carregar o do build). */
@@ -612,7 +626,7 @@ export function anotarTela(pathname: string): void {
       if (ligada()) somar("t", `${tela}|`, 1);
       abrirTrecho();
       conectarObservadores();
-      void carregarDicionario();
+      agendarDicionario(); // 07/11 (desempenho, lente "abertura"): o dicionário só depois que a Home pintou — ver agendarDicionario
       agendarVarredura();
     } else {
       desconectarObservadores();

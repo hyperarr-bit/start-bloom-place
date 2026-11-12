@@ -34,12 +34,20 @@ function QuandoPerto({ largura, altura, children }: { largura: string; altura: n
 }
 const mil = (v: number) => `${(v / 1000).toFixed(0)}k`;
 
+/**
+ * ANIMAÇÃO CURTA (11/11, velocidade 1.0.26 — item 5 aprovado pelo dono). O padrão da recharts é 1,5 s na pizza e na área
+ * (≈ 90 quadros, cada um renderizando o gráfico inteiro): na conta cheia eram ~7.300 renders e ~250 ms de CPU a cada
+ * vez que o Dashboard aparecia. Os gráficos continuam crescendo na tela, só que em 280 ms, saindo rápido e assentando
+ * devagar (ease-out). Exportado pro teste (src/test/dashboard-graficos-animacao.test.tsx).
+ */
+export const ANIMACAO_CURTA = { isAnimationActive: true, animationDuration: 280, animationEasing: "ease-out" as const, animationBegin: 0 };
+
 export function GraficoCategorias({ dados, cores }: { dados: { name: string; value: number }[]; cores: string[] }) {
   return (
     <QuandoPerto largura="50%" altura={180}>
     <ResponsiveContainer width="50%" height={180}>
       <PieChart>
-        <Pie data={dados} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={2}>
+        <Pie data={dados} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={2} {...ANIMACAO_CURTA}>
           {dados.map((_, index) => (
             <Cell key={`cell-${index}`} fill={cores[index % cores.length]} />
           ))}
@@ -60,8 +68,8 @@ export function GraficoReceitasDespesas({ dados, corReceita, corDespesa }: { dad
         <YAxis tick={{ fontSize: 10 }} tickFormatter={mil} />
         <Tooltip formatter={(value: number) => brl(value)} />
         <Legend wrapperStyle={{ fontSize: 10 }} />
-        <Bar dataKey="Receitas" fill={corReceita} radius={[4, 4, 0, 0]} />
-        <Bar dataKey="Despesas" fill={corDespesa} radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Receitas" fill={corReceita} radius={[4, 4, 0, 0]} {...ANIMACAO_CURTA} />
+        <Bar dataKey="Despesas" fill={corDespesa} radius={[4, 4, 0, 0]} {...ANIMACAO_CURTA} />
       </BarChart>
     </ResponsiveContainer>
     </QuandoPerto>
@@ -82,7 +90,7 @@ export function GraficoPatrimonio({ dados, cor }: { dados: { month: string; Patr
         <XAxis dataKey="month" tick={{ fontSize: 10 }} />
         <YAxis tick={{ fontSize: 10 }} tickFormatter={mil} />
         <Tooltip formatter={(value: number) => brl(value)} />
-        <Area type="monotone" dataKey="Patrimônio" stroke={cor} fill="url(#colorPatrimony)" strokeWidth={2} />
+        <Area type="monotone" dataKey="Patrimônio" stroke={cor} fill="url(#colorPatrimony)" strokeWidth={2} {...ANIMACAO_CURTA} />
       </AreaChart>
     </ResponsiveContainer>
     </QuandoPerto>

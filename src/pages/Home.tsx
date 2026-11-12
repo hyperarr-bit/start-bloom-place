@@ -42,6 +42,7 @@ import { contaCarregadaDeVerdade, decidirOrigemDaConta, lerEscolhaDaConta } from
 import { ConviteHomeNova } from "@/components/home-nova/EscolhaDaHome";
 import { AvisoRetroNova } from "@/components/wrapped/AvisoRetroNova";
 import { contarUso } from "@/lib/medicao-total";
+import { avisarHomePronta } from "@/lib/home-pronta";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ATRIBUTO_RAIZ } from "@/lib/nav-abas";
 
@@ -189,6 +190,16 @@ const HomePage = () => {
   const [onboardingResolved, setOnboardingResolved] = useState(false);
   const [showWidgetPicker, setShowWidgetPicker] = useState(false);
   const [editingWidgets, setEditingWidgets] = useState(false);
+  // 07/11 (desempenho, lente "abertura"): a tela de carregamento vai embora neste commit — a Home de verdade (ou o
+  // tutorial, ou a Home nova, quando o pedaço dela já chegou) pinta. Avisa quem espera por ela no quadro seguinte à
+  // pintura (lib/home-pronta: a pré-carga dos módulos, os Momentos das Conquistas e o dicionário da medição só disparam
+  // depois disto — antes, na conta nova, eles disputavam a rede com o próprio pedaço da Home nova).
+  const vaiPintar = loaded && onboardingResolved && !homeNova.esperandoOrigem && (!homeNova.ligada || homeECarregada);
+  useEffect(() => {
+    if (!vaiPintar) return;
+    const quadro = requestAnimationFrame(() => { setTimeout(avisarHomePronta, 0); });
+    return () => cancelAnimationFrame(quadro);
+  }, [vaiPintar]);
 
   // Re-evaluate welcome/onboarding once data is loaded from Supabase
   useEffect(() => {

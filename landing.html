@@ -156,7 +156,7 @@
         }
 
         // 05/11: na /vida a oferta é sempre "sempre" (vitalício) — ignora ?oferta=ano e a força guardada (nenhum 27,90 do "ano" lá)
-        var naVida = /^\/(vida|oferta|vitalicio|simples)\/?$/.test(location.pathname || ""); /* 11/11: e o /simples (a LP de uma tela é sempre vitalício) */ // 04/11: a /oferta também (vitalício, nada de 27,90); 07/11: e o /vitalicio
+        var naVida = /^\/(vida|oferta|vitalicio|simples|tiktok)\/?$/.test(location.pathname || ""); /* 11/11: e o /simples (a LP de uma tela é sempre vitalício) */ // 04/11: a /oferta também (vitalício, nada de 27,90); 07/11: e o /vitalicio
         var po = naVida ? null : pega("oferta");
         if (po === "ano" || po === "sempre") grava("landing-oferta-force", po);
         var o = naVida ? "sempre" : (po === "ano" || po === "sempre") ? po : le("landing-oferta-force");
@@ -229,7 +229,7 @@
         // checkout em tela cheia do /organizar (./checkout-organizar.ts — o MESMO Pix de R$ 27,90 do Asaas), SEMPRE, sem ler CHECKOUT_ORG_V2
         // nem a força do ?cko. Por baixo é o /organizar no braço "atual" (sem sorteio do AB_LP nem força do ?lp): do QR em diante é o
         // cartão de hoje. Vira html[data-uma]; os eventos se separam pelo path "/simples" (+ braco_cko "v2"). O /organizar não muda.
-        var UMA = /^\/simples\/?$/.test(location.pathname || "");
+        var UMA = /^\/(simples|tiktok)\/?$/.test(location.pathname || ""); /* 12/11: /tiktok = o MESMO /simples num link próprio (dono vai divulgar no TikTok; as vendas se separam pelo path "/tiktok") */
         if (UMA) { d.setAttribute("data-uma", ""); mem.uma = true; }
         var plp = VIDA || OFERTA || UMA ? null : pega("lp");
         if (plp === "v2" || plp === "atual") grava("landing-lp-force", plp);

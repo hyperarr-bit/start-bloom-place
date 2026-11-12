@@ -51,6 +51,8 @@
     },
     { "source": "/simples", "destination": "/landing.html" },
     { "source": "/simples/", "destination": "/landing.html" },
+    { "source": "/tiktok", "destination": "/landing.html" },
+    { "source": "/tiktok/", "destination": "/landing.html" },
     {
       "source": "/oferta",
       "destination": "/landing.html"

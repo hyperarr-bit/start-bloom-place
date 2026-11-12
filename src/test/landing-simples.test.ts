@@ -53,8 +53,20 @@ describe("/simples no <head>", () => {
     expect(store).toMatchObject({ "landing-lp-force": "v2", "landing-cko-force": "atual", "landing-oferta-force": "ano" }); // as forças do /organizar ficam como estavam
     expect(ck.v).toContain("landing_cko_force=atual");
   });
+  it("12/11: /tiktok é o MESMO /simples num link próprio (dono divulga no TikTok; a venda se separa pelo path)", () => {
+    for (const url of ["/tiktok", "/tiktok/", "/tiktok?lp=v2&cko=atual&oferta=ano"]) {
+      const r = rodar(url, { "landing-device-id": randomUUID() });
+      expect(r.attrs).toMatchObject({ "data-uma": "", "data-lp": "atual", "data-oferta": "sempre", "data-cko": "v2" });
+      expect(r.mem).toMatchObject({ uma: true, lp: "atual", oferta: "sempre", cko: "v2" });
+      expect(r.attrs["data-pagina"]).toBeUndefined();
+    }
+    const rw = (JSON.parse(readFileSync(resolve(raiz, "vercel.json"), "utf8")) as { rewrites: Array<{ source: string; destination: string }> }).rewrites;
+    const geral = rw.findIndex((x) => x.source.startsWith("/(("));
+    for (const s of ["/tiktok", "/tiktok/"]) { const i = rw.findIndex((x) => x.source === s); expect(rw[i]?.destination).toBe("/landing.html"); expect(geral).toBeGreaterThan(i); }
+    expect(readFileSync(resolve(raiz, "vite.config.ts"), "utf8")).toMatch(/\\\/tiktok\\\/\?\(\\\?\|\$\)/);
+  });
   it("as outras rotas não ganham nada do /simples", () => {
-    for (const url of ["/organizar", "/organizar?lp=v2", "/oferta", "/vida", "/vitalicio", "/simples/outra", "/simplesmente"]) {
+    for (const url of ["/organizar", "/organizar?lp=v2", "/oferta", "/vida", "/vitalicio", "/simples/outra", "/simplesmente", "/tiktok/outra", "/tiktoks"]) {
       const r = rodar(url);
       expect(r.attrs["data-uma"]).toBeUndefined();
       expect(r.mem.uma).toBeUndefined();

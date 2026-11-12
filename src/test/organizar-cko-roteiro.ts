@@ -34,7 +34,7 @@ export const apagarCookies = () => {
   for (const c of document.cookie.split(";")) { const n = c.split("=")[0].trim(); if (n) { document.cookie = `${n}=; Max-Age=0; Path=/`; document.cookie = `${n}=; Max-Age=0; Path=/; Domain=.coreaplicativo.com.br`; } }
 };
 
-export type Abrir = { lp: Lp; pix: Pix; u2027?: boolean; limpar?: boolean; url?: string; cko?: "v2" | "atual" | null; ckoForcado?: boolean; oferta?: "ano" | "sempre"; manterHist?: boolean };
+export type Abrir = { lp: Lp; pix: Pix; u2027?: boolean; limpar?: boolean; url?: string; cko?: "v2" | "atual" | null; ckoForcado?: boolean; oferta?: "ano" | "sempre"; manterHist?: boolean; /** 11/11: /simples (a LP de uma tela): html[data-uma] + a 1ª tela saindo do <template>, como o <head> e o script inline fazem */ uma?: boolean };
 export let fbq = vi.fn();
 
 /** o observador de interseção como no navegador: avisa DEPOIS (o do setup.ts avisa dentro do observe(), antes de o landing.ts terminar
@@ -109,11 +109,13 @@ export async function abrirPagina(o: Abrir): Promise<void> {
   d.setAttribute("data-pix", o.pix);
   if (o.u2027) { d.setAttribute("data-u2027", "on"); d.setAttribute("data-upsell-pos", "presente"); }
   if (o.cko) d.setAttribute("data-cko", o.cko);
-  w().__landing = o.ckoForcado ? { cko_forcado: true } : {};
+  if (o.uma) d.setAttribute("data-uma", "");
+  w().__landing = { ...(o.ckoForcado ? { cko_forcado: true } : {}), ...(o.uma ? { uma: true } : {}) };
   fbq = vi.fn();
   w().fbq = fbq;
   document.body.removeAttribute("style");
   document.body.innerHTML = CORPO;
+  if (o.uma) { const tpl = document.getElementById("lp-uma") as HTMLTemplateElement; tpl.parentNode!.replaceChild(tpl.content.cloneNode(true), tpl); }
   await import("@/landing/landing");
   await vi.waitFor(() => { if (!nomes().includes("landing_html")) throw new Error("sem landing_html"); }, { timeout: 2000, interval: 10 });
 }

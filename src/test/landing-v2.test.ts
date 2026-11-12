@@ -141,6 +141,8 @@ describe("braço atual = a página de hoje (origin/main 30/10), sem tirar nem p�
     novo.innerHTML = corpoDe(HTML);
     // 06/11 (A/B da /oferta): o template da página nova e o script dele só agem com html[data-lpo="nova"]; o resto do corpo não muda
     const tplNova = novo.querySelector("#lpo-nova")!; tplNova.nextElementSibling!.remove(); tplNova.remove();
+    // 11/11 (/simples): idem — o template da LP de uma tela e o script dele só agem com html[data-uma]
+    const tplUma = novo.querySelector("#lp-uma")!; tplUma.nextElementSibling!.remove(); tplUma.remove();
     novo.querySelectorAll('[data-so-lp="v2"]').forEach((el) => el.remove());
     novo.querySelectorAll("[data-so-lp]").forEach((el) => el.removeAttribute("data-so-lp"));
     // 04/11 (A/B da /vida): o que é só da Hotmart nunca aparece no /organizar (sem html[data-checkout-ext]); o atributo data-so-ext sai

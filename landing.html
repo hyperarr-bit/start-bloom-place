@@ -156,7 +156,7 @@
         }
 
         // 05/11: na /vida a oferta é sempre "sempre" (vitalício) — ignora ?oferta=ano e a força guardada (nenhum 27,90 do "ano" lá)
-        var naVida = /^\/(vida|oferta|vitalicio)\/?$/.test(location.pathname || ""); // 04/11: a /oferta também (vitalício, nada de 27,90); 07/11: e o /vitalicio
+        var naVida = /^\/(vida|oferta|vitalicio|simples)\/?$/.test(location.pathname || ""); /* 11/11: e o /simples (a LP de uma tela é sempre vitalício) */ // 04/11: a /oferta também (vitalício, nada de 27,90); 07/11: e o /vitalicio
         var po = naVida ? null : pega("oferta");
         if (po === "ano" || po === "sempre") grava("landing-oferta-force", po);
         var o = naVida ? "sempre" : (po === "ano" || po === "sempre") ? po : le("landing-oferta-force");
@@ -224,7 +224,14 @@
           mem.pagina = "oferta"; mem.checkout_ext = "stripe"; mem.ab_stripe = CHECKOUT_STRIPE;
           mem.stripe_pk = STRIPE_PK; mem.stripe_preco_centavos = STRIPE_PRECO_CENTAVOS; mem.stripe_parcelas_max = STRIPE_PARCELAS_MAX; mem.stripe_parcelas = STRIPE_PARCELAS_TEXTO; mem.stripe_pede_cpf = STRIPE_PEDE_CPF === true;
         }
-        var plp = VIDA || OFERTA ? null : pega("lp");
+        // 11/11 (dono: "faz uma nova LP, vai ser só isso aí do print… quando clica no botão vai para o checkout"; "cria em uma nova, não substitui"):
+        // /simples = a LP de UMA TELA num link próprio. Título + 3 celulares + "R$ 27,90 · Vitalício" + botão, e mais nada; o botão abre o
+        // checkout em tela cheia do /organizar (./checkout-organizar.ts — o MESMO Pix de R$ 27,90 do Asaas), SEMPRE, sem ler CHECKOUT_ORG_V2
+        // nem a força do ?cko. Por baixo é o /organizar no braço "atual" (sem sorteio do AB_LP nem força do ?lp): do QR em diante é o
+        // cartão de hoje. Vira html[data-uma]; os eventos se separam pelo path "/simples" (+ braco_cko "v2"). O /organizar não muda.
+        var UMA = /^\/simples\/?$/.test(location.pathname || "");
+        if (UMA) { d.setAttribute("data-uma", ""); mem.uma = true; }
+        var plp = VIDA || OFERTA || UMA ? null : pega("lp");
         if (plp === "v2" || plp === "atual") grava("landing-lp-force", plp);
         if (plp === "auto") grava("landing-lp-force", null);
         // 04/11: o braço da /vida (AB_VIDA): "v3" = página v2 · "atual" = a página de hoje do /organizar (com a Hotmart)
@@ -243,8 +250,8 @@
           d.setAttribute("data-vida", bvida);
           mem.vida = bvida; mem.ab_vida = AB_VIDA;
         }
-        var lp = OFERTA ? "atual" : VIDA ? (bvida === "atual" ? "atual" : "v2") : (plp === "v2" || plp === "atual") ? plp : le("landing-lp-force");
-        mem.lp_forcado = !VIDA && !OFERTA && (lp === "v2" || lp === "atual");
+        var lp = OFERTA || UMA ? "atual" : VIDA ? (bvida === "atual" ? "atual" : "v2") : (plp === "v2" || plp === "atual") ? plp : le("landing-lp-force");
+        mem.lp_forcado = !VIDA && !OFERTA && !UMA && (lp === "v2" || lp === "atual");
         if (lp !== "v2" && lp !== "atual") {
           lp = "atual";
           // outro bit da conta (o bit 0 do djb2 é só a paridade dos caracteres — seria o MESMO braço do checkout) → independente
@@ -388,7 +395,9 @@
         // com o MESMO Pix. Sem sorteio: "on" = todo o /organizar, nos 2 braços do AB_LP. ?cko=v2|atual força (localStorage + cookie: o Instagram
         // zera o storage), ?cko=auto desfaz. Na /vida, na /oferta e no /vitalicio nada disto existe; na oferta "ano", sempre o atual.
         // Se um dia precisar de sorteio: bit 4 de "cko:"+id (os bits 0, 8, 12, 16, 20 e 24 já são de outros sorteios).
-        if (!VIDA && !OFERTA) {
+        // 11/11: no /simples a camada vale SEMPRE (sem chave, sem ?cko, sem ler nem gravar a força do /organizar).
+        if (UMA) { d.setAttribute("data-cko", "v2"); mem.cko = "v2"; mem.cko_forcado = false; mem.ab_cko = "uma"; }
+        else if (!VIDA && !OFERTA) {
           var pko = pega("cko"), cookieCko = null;
           try { var csc = String(document.cookie || "").split(";"); for (var ikc = 0; ikc < csc.length; ikc++) { var jkc = csc[ikc].indexOf("="); if (jkc > 0 && csc[ikc].slice(0, jkc).trim() === "landing_cko_force") cookieCko = csc[ikc].slice(jkc + 1).trim(); } } catch (ec0) {}
           if (pko === "v2" || pko === "atual" || pko === "auto") {
@@ -926,6 +935,11 @@
          data-cko-falhou = o módulo da camada não carregou: o cartão volta a ser o de hoje, com o campo.
          aria-busy = tocou num botão que abre a camada antes de o módulo dela chegar: o botão esmaece na hora (como o da Hotmart). -->
     <style>html[data-cko="v2"]:not([data-cko-falhou]) .lp-email-antes { display: none !important; } html[data-cko="v2"] [data-ir="oferta"][aria-busy="true"], html[data-cko="v2"] #lp-pagar[aria-busy="true"] { opacity: .75; pointer-events: none; }</style>
+    <!-- 11/11: /simples (html[data-uma]) = a LP de uma tela. Da página de hoje ficam só a marca, a 1ª tela nova (#uma, que nasce de um
+         <template> logo depois da marca) e o cartão do Pix — e o cartão só aparece do QR em diante (data-uma-cartao, posto pelo landing.ts),
+         com o "Seu 2027" na tela ou se a camada do checkout não carregou (data-cko-falhou: o cartão de hoje, com o campo do e-mail).
+         Fora do /simples nenhuma regra daqui casa. -->
+    <style>html[data-uma] main.lp > :not(.lp-barra):not(#uma):not(#oferta), html[data-uma] #fim, html[data-uma] #lp-fixo { display: none !important; } html[data-uma]:not([data-uma-cartao]):not([data-u27-pag]):not([data-cko-falhou]) #oferta { display: none !important; } html[data-uma][data-uma-cartao] #uma, html[data-uma][data-u27-pag] #uma, html[data-uma][data-cko-falhou] #uma { display: none !important; } html[data-uma] .lp-oferta { padding-top: 10px; } html[data-uma] .lp-rodape { background: #fff; color: var(--fraco); border-top: 0; padding: 22px 20px calc(22px + env(safe-area-inset-bottom)); } html[data-uma] .lp-rodape a { color: var(--suave); }</style>
     <!-- Meta Pixel (só a fila aqui; o fbevents.js entra no carregador adiado do landing.ts, depois da 1ª pintura) -->
     <script>
       !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];}(window,document,'script');
@@ -1177,6 +1191,45 @@
       <header class="lp-barra">
         <span class="lp-marca">CORE</span>
       </header>
+      <!-- ═════════ /simples · A LP DE UMA TELA (11/11) ═════════
+           Num <template>: o /organizar, a /oferta e a /vida não pintam, não estilizam e não baixam nada daqui. Só com html[data-uma] o
+           script logo abaixo põe isto no lugar. Telas = print real do app (a Home é a de hoje). O botão é um [data-ir="oferta"] como os
+           outros: com a camada do checkout valendo (sempre, no /simples), o landing.ts abre a camada. -->
+      <template id="lp-uma">
+        <style>
+          #uma { padding: 8px 20px 0; }
+          #uma h1, #uma p, #uma figure { margin: 0; }
+          .uma-h1 { font-size: clamp(28px, 8.7vw, 34px); line-height: 1.08; font-weight: 850; letter-spacing: -.035em; }
+          .uma-sub { margin-top: 10px !important; font-size: clamp(15px, 4.3vw, 17px); line-height: 1.38; color: var(--suave); }
+          .uma-fones { display: flex; gap: 10px; margin: 18px -8px 0; }
+          .uma-fone { flex: 1 1 0; min-width: 0; text-align: center; }
+          .uma-tela { position: relative; height: 0; padding-top: calc(727 / 360 * 100% - 8px); border: 4px solid #1c1a1f; border-radius: 17px; overflow: hidden; background: #fff; box-shadow: 0 6px 16px rgba(38,38,38,.14); box-sizing: content-box; }
+          .uma-tela img { position: absolute; left: 0; top: 0; display: block; width: 100%; height: 100%; max-width: none; object-fit: cover; object-position: top center; }
+          .uma-fone figcaption { margin-top: 8px; font-size: 13px; font-weight: 700; letter-spacing: -.01em; color: var(--suave); }
+          .uma-preco { display: flex; align-items: center; gap: 12px; margin-top: 24px; }
+          .uma-preco > b { font-size: 31px; line-height: 1; font-weight: 900; letter-spacing: -.045em; white-space: nowrap; }
+          .uma-preco > span { display: flex; flex-direction: column; font-size: 15px; line-height: 1.2; font-weight: 800; letter-spacing: -.01em; }
+          .uma-preco i { font-style: normal; font-size: 13px; font-weight: 600; color: var(--suave); } /* dono 11/11: sem comparação de preço ("De R$ 97,90/ano" saiu) */
+          #uma button.uma-cta { margin-top: 12px; font-size: 17.5px; font-weight: 800; }
+          .uma-nota { margin-top: 10px !important; font-size: clamp(11px, 3.2vw, 12.5px); line-height: 1.35; color: var(--suave); text-align: center; }
+          @media (max-height: 640px) { .uma-fones { margin-left: 8px; margin-right: 8px; } .uma-preco { margin-top: 16px; } }
+        </style>
+        <section id="uma" data-bloco="topo">
+          <h1 class="uma-h1">Sua vida organizada<br />num app só.</h1>
+          <p class="uma-sub">Dinheiro, rotina, treino e mais 13 áreas. No iPhone, no Android e no computador.</p>
+          <div class="uma-fones">
+            <figure class="uma-fone"><div class="uma-tela"><img src="/landing/uma-home.webp" width="360" height="727" alt="Tela inicial do app CORE: pontos do dia, hábitos, água, refeições e os módulos" fetchpriority="high" decoding="async" /></div><figcaption>Seu dia</figcaption></figure>
+            <figure class="uma-fone"><div class="uma-tela"><img src="/landing/uma-financas.webp" width="360" height="727" alt="Finanças no CORE: receitas, despesas, alertas de contas e gastos por categoria" fetchpriority="high" decoding="async" /></div><figcaption>Finanças</figcaption></figure>
+            <figure class="uma-fone"><div class="uma-tela"><img src="/landing/uma-rotina.webp" width="360" height="727" alt="Rotina no CORE: hábitos diários e 41 dias seguidos" fetchpriority="high" decoding="async" /></div><figcaption>Rotina</figcaption></figure>
+          </div>
+          <div class="uma-preco"><b>R$&nbsp;27,90</b><span>Vitalício<i>para sempre</i></span></div>
+          <button type="button" class="lp-cta uma-cta" data-ir="oferta">Quero organizar minha vida</button>
+          <p class="uma-nota">Pix único · sem renovação automática · 7 dias de garantia</p>
+        </section>
+      </template>
+      <script>
+        if (document.documentElement.hasAttribute("data-uma")) { try { var tplUma = document.getElementById("lp-uma"); tplUma.parentNode.replaceChild(tplUma.content.cloneNode(true), tplUma); } catch (e) {} }
+      </script>
       <section class="lp-topo" id="topo" data-bloco="topo" data-so-lp="atual">
         <h1 class="lp-h1" data-so-t="a">Sua vida inteira, num app só.</h1>
         <h1 class="lp-h1" data-so-t="b">Organize tudo num app só.</h1>

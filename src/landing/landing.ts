@@ -109,7 +109,7 @@ const agora = () => Math.round(performance.now());
 type Janela = Window & {
   __landingCliqueLoja?: (e: MouseEvent) => void;
   __landingSimularJaTem?: boolean;
-  __landing?: { cko_forcado?: boolean; otp_forcado?: boolean; oem_forcado?: boolean; lpo_forcado?: boolean; lpo_link?: boolean; ab_lp_oferta?: string; lpo_stripe_cedo?: string; pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null };
+  __landing?: { uma?: boolean; cko_forcado?: boolean; otp_forcado?: boolean; oem_forcado?: boolean; lpo_forcado?: boolean; lpo_link?: boolean; ab_lp_oferta?: string; lpo_stripe_cedo?: string; pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null };
   __eventosLanding?: Record<string, unknown>[];
   /** 02/11 (dev/testes): voltou() = "voltei do banco" (≥ 5 s fora) sem trocar de aba; vencer() = o QR vence em 1,5 s */
   __landingSimular?: { pagar: () => void; pagarU2027?: () => void; voltou?: () => void; vencer?: () => void };
@@ -176,6 +176,9 @@ const ROTULO_BOTAO_HM = V2 ? "Quero organizar minha vida" : "Quero organizar tud
  *  pra metadata do PI e pro Purchase do navegador. Com a chave off, a /oferta só ganha os 2 campos nos eventos landing_*. */
 const BRACO_LP_OFERTA = PAGINA === "oferta" ? bracoLpOfertaDoHtml() : null;
 const LPO_NOVA = STRIPE && BRACO_LP_OFERTA === "nova";
+/** 11/11: /simples = a LP de uma tela (html[data-uma], posto no <head>). Por baixo é o /organizar no braço "atual" com a camada do
+ *  checkout sempre valendo; aqui só muda: nada de demo de fundo, e o cartão do Pix só aparece do QR em diante (ver espelharUma). */
+const UMA = w.__landing?.uma === true;
 const LPO_FORCADO = !!w.__landing?.lpo_forcado;
 /** 07/11: o /vitalicio é a página nova num link próprio (sempre "nova"): conta como teste ativo pra o braço ir pro PI e pro Purchase. */
 const LPO_LINK = !!w.__landing?.lpo_link;
@@ -409,7 +412,7 @@ const depoisDoLoad = (f: () => void) => { if (document.readyState === "complete"
 /* crítica r2 do upsell 2027 (técnico MEDIA 1, só com o 2027 ligado): quem já está no Pix/pago não precisa da demo de 4–5 MB — e,
  * no WebKit, o iframe navegando depois do pushState da página do 2027 comia o 1º Voltar. Com a chave off, igual a antes. */
 const demoDeFundoServe = () => !(U2027 && estado.fase !== "oferta");
-if (!V2 && !LPO_NOVA) { // 06/11: a página nova da /oferta não tem demo
+if (!V2 && !LPO_NOVA && !UMA) { // 06/11: a página nova da /oferta não tem demo; 11/11: nem o /simples
   depoisDoPixel(() => depoisDoLoad(() => ocioso(() => { if (demoDeFundoServe()) iniciarDemo("fundo"); }, 1500)));
   if ("IntersectionObserver" in window) {
     const perto = new IntersectionObserver((ens) => { if (ens.some((e) => e.isIntersecting) && demoDeFundoServe()) { iniciarDemo("perto"); perto.disconnect(); } }, { threshold: 0.25 });
@@ -680,7 +683,7 @@ document.querySelectorAll<HTMLButtonElement>(".lp-mod[data-m]").forEach((b) => b
 }));
 document.querySelectorAll<HTMLElement>("[data-ir]").forEach((b) => b.addEventListener("click", () => {
   const alvo = b.dataset.ir!;
-  const onde = b.closest("#lp-fixo") ? "fixo" : b.closest("#fim") ? "fim" : b.closest("#topo-v2") ? "topo" : "outro";
+  const onde = b.closest("#lp-fixo") ? "fixo" : b.closest("#fim") ? "fim" : b.closest("#topo-v2") || b.closest("#uma") ? "topo" : "outro";
   if (alvo === "oferta") evento("landing_cta", { onde, fase: estado.fase });
   if (alvo === "dentro-v2") evento("landing_lojas_topo", {}); // r1: "App Store · Google Play · Computador" da 1ª tela → rola até "Sim, é um app de verdade"
   // 08/11: com o checkout novo valendo (e a pessoa ainda na oferta), o botão que rolava até o cartão abre a camada
@@ -933,6 +936,10 @@ window.addEventListener("pagehide", reSemear);
 
 const card = $("lp-card");
 const caixa = $("lp-pix");
+/** 11/11 (/simples): a página é só a 1ª tela; o cartão toma o lugar dela quando sai da oferta (código, "Gerando…", QR, pago, conta,
+ *  "Você já tem"). O CSS do <head> lê html[data-uma-cartao] (sem :has — WebView antiga). Fora do /simples isto nunca roda. */
+const espelharUma = () => { if (UMA) document.documentElement.toggleAttribute("data-uma-cartao", card.dataset.fase !== "oferta"); };
+if (UMA && "MutationObserver" in window) new MutationObserver(espelharUma).observe(card, { attributes: true, attributeFilter: ["data-fase"] });
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 const ICO_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
 const ICO_COPIAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>';
@@ -1616,6 +1623,7 @@ function htmlPixB(p: PixLanding): string {
 let telaRenderizada: string | null = null;
 function render() {
   renderDoCartao();
+  espelharUma();
   const camada = sincronizarCko(); // 08/11: a camada do checkout novo mostra a fase (ou fecha); null = sem camada (sempre, com a chave off)
   if (!V2) return;
   reSemear();

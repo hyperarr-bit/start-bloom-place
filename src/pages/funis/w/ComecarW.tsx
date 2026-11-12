@@ -59,9 +59,10 @@ import {
 import { PromessasScreen, ContratoScreen } from "@/pages/funis/teste/ComecarTeste";
 import { SignupScreen, ConfirmScreen, LiberandoScreen, POS_COMPRA_OAUTH_KEY } from "@/pages/funis/radar/ComecarRadar";
 import { PaywallW } from "./PaywallW";
-/* 12/11 (1.0.26 / Android 138): chave `paywall_teste` off (padrão) = o paywall SEM teste nas duas lojas (lib/paywall-teste) */
+/* 12/11 (1.0.26): chave `paywall_teste` off (padrão) = o paywall SEM teste — SÓ no iPhone (12/11 noite: o Android fica
+   como hoje); o visual sai do A/B `paywall_visual` (lib/paywall-teste) */
 import { PaywallSemTeste } from "@/components/paywall/PaywallSemTeste";
-import { usePaywallComTeste } from "@/hooks/use-paywall-teste";
+import { usePaywallComTeste, usePaywallVisual } from "@/hooks/use-paywall-teste";
 /* Lazy de propósito: esta folha só existe dentro do app da loja, e o
    ComecarW é carregado ansiosamente na /inicio da WEB (velocidade da 1ª tela,
    02/09) — o vaul do Drawer não pode entrar no bundle de quem nunca vai vê-la. */
@@ -664,6 +665,7 @@ export default function ComecarW() {
    * com pagamento pendente de cadastro (posCompra). */
   const { user: usuarioLogado, isSubscribed: jaAssina } = useAuth();
   const paywallComTeste = usePaywallComTeste();
+  const paywallVisual = usePaywallVisual(!naWeb && !paywallComTeste);
   useEffect(() => {
     if (naWeb || step !== "offer" || posCompra || (usuarioLogado && jaAssina)) return;
     void import("@/lib/notificacoes").then((m) => m.agendarResgateDoPlano(AREAS[areaOuPadrao].nome, { area: areaOuPadrao })).catch(() => { /* noop */ });
@@ -914,8 +916,10 @@ export default function ComecarW() {
                   depende de ninguém lembrar de uma condicional. */}
               {/* 12/11: chave `paywall_teste` off (padrão) — o paywall SEM teste nas duas lojas, sem o sino antes
                   ("A gente te avisa antes do teste acabar" não tem mais por quê). "on" = a bifurcação de hoje, intacta. */}
-              {step === "offer" && !naWeb && !paywallComTeste && (
-                <PaywallSemTeste area={areaOuPadrao} answers={answers} onPagoSemConta={() => pagoSemConta()} onVoltar={recuarDoPaywall} />
+              {/* 12/11 noite: A/B do visual, só iPhone — "android" = o PaywallW abaixo vendendo sem teste; "enxovaly" = PaywallSemTeste */}
+              {step === "offer" && !naWeb && !paywallComTeste && (paywallVisual === "android"
+                ? <PaywallW area={areaOuPadrao} answers={answers} semTeste onVoltar={recuarDoPaywall} onPagoSemConta={() => pagoSemConta()} />
+                : <PaywallSemTeste area={areaOuPadrao} answers={answers} onPagoSemConta={() => pagoSemConta()} onVoltar={recuarDoPaywall} />
               )}
               {step === "offer" && (naWeb || paywallComTeste) && (
                 ehApple() ? (

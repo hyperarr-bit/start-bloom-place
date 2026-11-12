@@ -124,6 +124,7 @@ const PRECOS_BASE: Record<string, string> = {
   "core_mensal:coremensalpix": "R$ 19,90",
   // 12/11: o paywall SEM teste (lib/paywall-teste) — offering `sem_teste`, sem oferta introdutória
   core_anual_99: "R$ 99,90",
+  core_anual_97_direto: "R$ 97,90", // 12/11 noite: o anual sem teste do iPhone
   core_mensal_34: "R$ 34,90",
   core_anual_69_direto: "R$ 69,90",
   // no Android o RevenueCat devolve produto:plano_base (frente das lojas, 12/11)
@@ -131,12 +132,12 @@ const PRECOS_BASE: Record<string, string> = {
   "core_mensal_34:coremensal34": "R$ 34,90",
   "core_anual_69_direto:coreanual69direto": "R$ 69,90",
 };
-const SEM_TESTE_MOCK = ["core_anual_99", "core_mensal_34", "core_anual_69_direto"];
+const SEM_TESTE_MOCK = ["core_anual_99", "core_anual_97_direto", "core_mensal_34", "core_anual_69_direto"];
 // `localStorage.__rc_mock_sem_teste_off` = "1" ensaia o painel SEM a offering nova (a tela usa a reserva de texto)
 const offeringSemTeste = () => {
   try { if (localStorage.getItem("__rc_mock_sem_teste_off") === "1") return {}; } catch { /* noop */ }
   return { sem_teste: { identifier: "sem_teste", metadata: {}, availablePackages: [
-    { identifier: "$rc_annual", packageType: "ANNUAL", product: produtoMock(ehIos() ? "core_anual_99" : "core_anual_99:coreanual99") },
+    { identifier: "$rc_annual", packageType: "ANNUAL", product: produtoMock(ehIos() ? "core_anual_97_direto" : "core_anual_99:coreanual99") },
     { identifier: "$rc_monthly", packageType: "MONTHLY", product: produtoMock(ehIos() ? "core_mensal_34" : "core_mensal_34:coremensal34") },
     { identifier: "presente_69", packageType: "CUSTOM", product: produtoMock(ehIos() ? "core_anual_69_direto" : "core_anual_69_direto:coreanual69direto") },
   ] } };

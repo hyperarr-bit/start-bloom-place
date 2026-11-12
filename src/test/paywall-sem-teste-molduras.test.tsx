@@ -1,6 +1,8 @@
 /**
  * PAYWALL SEM TESTE NAS MOLDURAS (12/11) — chave `paywall_teste`:
- *  · funil (ComecarW, passo offer): off = PaywallSemTeste nas duas lojas, SEM a tela do sino antes; on = a bifurcação de
+ *  · 12/11 noite: SÓ iPhone — o Android fica como hoje com qualquer valor da chave; no iPhone o visual sai do A/B
+ *    `paywall_visual` (android = PaywallW semTeste · enxovaly = PaywallSemTeste);
+ *  · funil (ComecarW, passo offer): off = paywall sem teste, SEM a tela do sino antes; on = a bifurcação de
  *    hoje (iPhone: PaywallIOS dentro do sino; Android: PaywallW);
  *  · gate do app (TrialBanner, conta logada sem acesso): off = PaywallSemTeste modo gate (sem "Você ganhou 3 dias
  *    grátis" e sem o presente do bloqueio por cima); on = o gate de hoje;
@@ -36,7 +38,7 @@ vi.mock("@capacitor/app", () => ({ App: { addListener: async () => ({ remove: as
 vi.mock("@/components/paywall/PaywallSemTeste", () => ({
   PaywallSemTeste: ({ modo = "funil" }: { modo?: string }) => <div data-testid="sem-teste" data-modo={modo}>sem teste</div>,
 }));
-vi.mock("@/pages/funis/w/PaywallW", () => ({ PaywallW: () => <div data-testid="paywall-w">paywall</div> }));
+vi.mock("@/pages/funis/w/PaywallW", () => ({ PaywallW: ({ semTeste }: { semTeste?: boolean }) => <div data-testid={semTeste ? "paywall-w-sem-teste" : "paywall-w"}>paywall</div> }));
 vi.mock("@/pages/funis/ios/PaywallIOS", () => ({ PaywallIOS: ({ modo = "funil" }: { modo?: string }) => <div data-testid="paywall-ios" data-modo={modo}>paywall ios</div> }));
 vi.mock("@/pages/funis/ios/SinoIOS", () => ({ AntesDoPaywallIOS: ({ children }: { children?: ReactNode }) => <div data-testid="antes-do-paywall">{children}</div> }));
 vi.mock("@/pages/funis/ios/CadastroIOS", () => ({ SignupIOS: () => <div />, ConfirmIOS: () => <div />, LiberandoIOS: () => <div /> }));
@@ -53,7 +55,7 @@ vi.mock("framer-motion", async (orig) => {
 
 import ComecarW from "@/pages/funis/w/ComecarW";
 import { TrialBanner } from "@/components/TrialBanner";
-import { CHAVE_PAYWALL_TESTE_APARELHO, _zerarChavePaywallTeste, registrarPaywallTesteRemoto } from "@/lib/paywall-teste";
+import { CHAVE_FORCA_PAYWALL_VISUAL, CHAVE_PAYWALL_TESTE_APARELHO, _zerarChavePaywallTeste, _zerarPaywallVisual, registrarPaywallTesteRemoto } from "@/lib/paywall-teste";
 
 const plataforma = (p: "ios" | "android") => { (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => p }; };
 const espera = (ms = 30) => act(async () => { await new Promise((r) => setTimeout(r, ms)); });
@@ -70,6 +72,7 @@ beforeEach(() => {
   localStorage.clear(); // conta VAZIA, aparelho novo
   sessionStorage.clear();
   _zerarChavePaywallTeste();
+  _zerarPaywallVisual();
   window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
   Object.assign(estado.auth, { user: null, noTrial: true, isSubscribed: false, subLoaded: true, trialExpired: false });
   plataforma("ios");
@@ -77,14 +80,39 @@ beforeEach(() => {
 afterEach(() => { cleanup(); delete (window as { Capacitor?: unknown }).Capacitor; (globalThis as { __PAYWALL_TESTE__?: string }).__PAYWALL_TESTE__ = "on"; });
 
 describe("funil (ComecarW, passo offer)", () => {
-  it.each(["ios", "android"] as const)("%s, chave off (padrão): PaywallSemTeste, sem o sino e sem o paywall de hoje", async (p) => {
-    plataforma(p);
+  it("iPhone, chave off (padrão), braço enxovaly: PaywallSemTeste, sem o sino e sem o paywall de hoje", async () => {
+    localStorage.setItem(CHAVE_FORCA_PAYWALL_VISUAL, "enxovaly");
     funil();
     await espera();
     expect(screen.getByTestId("sem-teste").dataset.modo).toBe("funil");
     expect(screen.queryByTestId("antes-do-paywall")).toBeNull();
     expect(screen.queryByTestId("paywall-ios")).toBeNull();
     expect(screen.queryByTestId("paywall-w")).toBeNull();
+    expect(screen.queryByTestId("paywall-w-sem-teste")).toBeNull();
+  });
+  it("iPhone, chave off (padrão), braço android: o PaywallW vendendo sem teste, sem o sino", async () => {
+    funil("/app?step=offer&paywall-visual=android");
+    await espera();
+    expect(screen.getByTestId("paywall-w-sem-teste")).toBeInTheDocument();
+    expect(screen.queryByTestId("sem-teste")).toBeNull();
+    expect(screen.queryByTestId("antes-do-paywall")).toBeNull();
+    expect(screen.queryByTestId("paywall-ios")).toBeNull();
+  });
+  it("iPhone, sem força: o sorteio escolhe UM dos dois braços (e só um)", async () => {
+    funil();
+    await espera();
+    const n = ["sem-teste", "paywall-w-sem-teste"].filter((id) => screen.queryByTestId(id)).length;
+    expect(n).toBe(1);
+  });
+  it("ANDROID fica como hoje: chave off (ou ausente) = o PaywallW de hoje (vitalício 97,90 + mensal 24,90), nada sem teste", async () => {
+    plataforma("android");
+    chave("off");
+    localStorage.setItem(CHAVE_FORCA_PAYWALL_VISUAL, "enxovaly");
+    funil("/app?step=offer&paywall-teste=off");
+    await espera();
+    expect(screen.getByTestId("paywall-w")).toBeInTheDocument();
+    expect(screen.queryByTestId("paywall-w-sem-teste")).toBeNull();
+    expect(screen.queryByTestId("sem-teste")).toBeNull();
   });
   it("iPhone, chave on: o paywall de hoje (sino + PaywallIOS)", async () => {
     chave("on");
@@ -103,6 +131,7 @@ describe("funil (ComecarW, passo offer)", () => {
     expect(screen.queryByTestId("sem-teste")).toBeNull();
   });
   it("a resposta do RevenueCat chega com a tela aberta e troca o paywall (on → hoje; off → sem teste)", async () => {
+    localStorage.setItem(CHAVE_FORCA_PAYWALL_VISUAL, "enxovaly");
     funil();
     await espera();
     expect(screen.getByTestId("sem-teste")).toBeInTheDocument();
@@ -115,12 +144,20 @@ describe("funil (ComecarW, passo offer)", () => {
 
 describe("gate do app (TrialBanner)", () => {
   beforeEach(() => { estado.auth.user = conta(); });
-  it.each(["ios", "android"] as const)("%s, chave off: PaywallSemTeste modo gate, sem o presente do bloqueio por cima", async (p) => {
-    plataforma(p);
+  it("iPhone, chave off: PaywallSemTeste modo gate, sem o presente do bloqueio por cima", async () => {
     gate();
     expect((await screen.findByTestId("sem-teste")).dataset.modo).toBe("gate");
     expect(screen.queryByTestId("presente-bloqueio")).toBeNull();
     expect(screen.queryByTestId("paywall-assinatura")).toBeNull();
+  });
+  it("ANDROID, chave off: o gate de hoje (PaywallAssinatura + presente do bloqueio), nada sem teste", async () => {
+    plataforma("android");
+    chave("off");
+    gate();
+    await espera();
+    expect(screen.getByTestId("paywall-assinatura").textContent).toBe("gate");
+    expect(screen.getByTestId("presente-bloqueio")).toBeInTheDocument();
+    expect(screen.queryByTestId("sem-teste")).toBeNull();
   });
   it("conta da Porta, chave off: sem o 'Você ganhou 3 dias grátis'", async () => {
     estado.auth.user = { ...conta(), user_metadata: { porta: { area: "dinheiro" } } };

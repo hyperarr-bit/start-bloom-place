@@ -14,7 +14,7 @@ import { MemoryRouter } from "react-router-dom";
 
 const loja = vi.hoisted(() => ({
   ok: true, motivo: null as string | null, restauraOk: false,
-  anual: { produto: "core_anual_99", preco: "R$ 99,90", valor: 99.9, precoMes: "R$ 8,33", offering: "sem_teste", pacote: true } as null | Record<string, unknown>,
+  anual: { produto: "core_anual_97_direto", preco: "R$ 97,90", valor: 97.9, precoMes: "R$ 8,16", offering: "sem_teste", pacote: true } as null | Record<string, unknown>,
   mensal: { produto: "core_mensal_34", preco: "R$ 34,90", valor: 34.9, precoMes: null, offering: "sem_teste", pacote: true } as null | Record<string, unknown>,
   presente: { produto: "core_anual_69_direto", preco: "R$ 69,90", valor: 69.9, precoMes: "R$ 5,83", offering: "sem_teste", pacote: true } as null | Record<string, unknown>,
 }));
@@ -54,7 +54,7 @@ const montar = (o: { onPago?: () => void; onVoltar?: () => void; modo?: "funil" 
   render(<MemoryRouter><PaywallSemTeste area="dinheiro" answers={{}} onPagoSemConta={onPago} onVoltar={o.onVoltar} modo={o.modo} /></MemoryRouter>);
   return onPago;
 };
-const esperarLoja = () => waitFor(() => expect(screen.getByTestId("sem-teste-anual").textContent).toContain("R$ 99,90"));
+const esperarLoja = () => waitFor(() => expect(screen.getByTestId("sem-teste-anual").textContent).toContain("R$ 97,90"));
 
 beforeEach(() => {
   delete (globalThis as { __PAYWALL_TESTE__?: string }).__PAYWALL_TESTE__; // o padrão de verdade (o setup fixa "on")
@@ -63,7 +63,7 @@ beforeEach(() => {
   vi.mocked(trackEvent).mockClear();
   vi.mocked(comprarSemTeste).mockClear();
   loja.ok = true; loja.motivo = null; loja.restauraOk = false;
-  loja.anual = { produto: "core_anual_99", preco: "R$ 99,90", valor: 99.9, precoMes: "R$ 8,33", offering: "sem_teste", pacote: true };
+  loja.anual = { produto: "core_anual_97_direto", preco: "R$ 97,90", valor: 97.9, precoMes: "R$ 8,16", offering: "sem_teste", pacote: true };
   loja.mensal = { produto: "core_mensal_34", preco: "R$ 34,90", valor: 34.9, precoMes: null, offering: "sem_teste", pacote: true };
   loja.presente = { produto: "core_anual_69_direto", preco: "R$ 69,90", valor: 69.9, precoMes: "R$ 5,83", offering: "sem_teste", pacote: true };
   ios();
@@ -112,7 +112,7 @@ describe("a chave `paywall_teste` (lib/paywall-teste)", () => {
 describe("os produtos novos nas offerings (lerPacotesSemTeste)", () => {
   const pac = (id: string) => ({ identifier: id, product: { identifier: id, priceString: "x" } });
   it("um lugar só pros ids", () => {
-    expect(PRODUTOS_SEM_TESTE).toEqual({ anual: "core_anual_99", mensal: "core_mensal_34", presente: "core_anual_69_direto" });
+    expect(PRODUTOS_SEM_TESTE).toEqual({ anual: "core_anual_97_direto", mensal: "core_mensal_34", presente: "core_anual_69_direto" });
   });
   it("lê a offering `sem_teste` (que NÃO é a atual) — iPhone", () => {
     const r = lerPacotesSemTeste({
@@ -120,19 +120,19 @@ describe("os produtos novos nas offerings (lerPacotesSemTeste)", () => {
       all: {
         default: { identifier: "default", availablePackages: [pac("core_anual_97"), pac("core_mensal")] },
         anual_69: { identifier: "anual_69", availablePackages: [pac("core_anual_69")] },
-        sem_teste: { identifier: "sem_teste", availablePackages: [pac("core_anual_99"), pac("core_mensal_34"), pac("core_anual_69_direto")] },
+        sem_teste: { identifier: "sem_teste", availablePackages: [pac("core_anual_97_direto"), pac("core_mensal_34"), pac("core_anual_69_direto")] },
       },
     });
-    expect(r.anual?.pacote.product.identifier).toBe("core_anual_99");
+    expect(r.anual?.pacote.product.identifier).toBe("core_anual_97_direto");
     expect(r.mensal?.pacote.product.identifier).toBe("core_mensal_34");
     expect(r.presente?.pacote.product.identifier).toBe("core_anual_69_direto");
     expect(r.presente?.offering).toBe("sem_teste");
   });
   it("Android: produto:plano_base", () => {
     const r = lerPacotesSemTeste({ current: null, all: { sem_teste: { identifier: "sem_teste", availablePackages: [
-      pac("core_anual_99:coreanual99"), pac("core_mensal_34:coremensal34"), pac("core_anual_69_direto:coreanual69direto"),
+      pac("core_anual_97_direto:coreanual97direto"), pac("core_mensal_34:coremensal34"), pac("core_anual_69_direto:coreanual69direto"),
     ] } } });
-    expect(r.anual?.pacote.product.identifier).toBe("core_anual_99:coreanual99");
+    expect(r.anual?.pacote.product.identifier).toBe("core_anual_97_direto:coreanual97direto");
     expect(r.mensal?.pacote.product.identifier).toBe("core_mensal_34:coremensal34");
     expect(r.presente?.pacote.product.identifier).toBe("core_anual_69_direto:coreanual69direto");
   });
@@ -144,10 +144,10 @@ describe("os produtos novos nas offerings (lerPacotesSemTeste)", () => {
 
 /* ─────────────────────────────── a tela ─────────────────────────────── */
 describe("a tela (PaywallSemTeste) — conta vazia, chave off", () => {
-  it("contas puras: economia 76%, 4 itens, a linha do que se paga", () => {
-    expect(economiaDoAnual(99.9, 34.9)).toBe(76);
+  it("contas puras: economia 77%, 4 itens, a linha do que se paga", () => {
+    expect(economiaDoAnual(97.9, 34.9)).toBe(77);
     expect(itensIncluidos("dinheiro")).toHaveLength(4);
-    expect(linhaDoQueVocePaga("anual", "R$ 99,90")).toBe("Você paga R$ 99,90 hoje. Renovação anual automática. Cancele quando quiser.");
+    expect(linhaDoQueVocePaga("anual", "R$ 97,90")).toBe("Você paga R$ 97,90 hoje. Renovação anual automática. Cancele quando quiser.");
     expect(linhaDoQueVocePaga("mensal", "R$ 34,90")).toBe("Você paga R$ 34,90 hoje. Renovação mensal automática. Cancele quando quiser.");
   });
 
@@ -158,21 +158,21 @@ describe("a tela (PaywallSemTeste) — conta vazia, chave off", () => {
     expect(tela.dataset.plano).toBe("anual");
     expect(screen.getByTestId("sem-teste-titulo").textContent).toBe("Libere o CORE completo");
     expect(screen.getByTestId("sem-teste-itens").querySelectorAll("li")).toHaveLength(4);
-    expect(screen.getByTestId("sem-teste-selo").textContent).toBe("ECONOMIZE 76%. MELHOR VALOR");
-    expect(screen.getByTestId("sem-teste-anual").textContent).toContain("R$ 8,33/mês");
+    expect(screen.getByTestId("sem-teste-selo").textContent).toBe("ECONOMIZE 77%. MELHOR VALOR");
+    expect(screen.getByTestId("sem-teste-anual").textContent).toContain("R$ 8,16/mês");
     expect(screen.getByTestId("sem-teste-mensal").textContent).toContain("R$ 34,90/mês");
     expect(screen.getByTestId("sem-teste-cta").textContent).toBe("Assinar plano anual");
-    expect(screen.getByTestId("sem-teste-legal").textContent).toBe("Você paga R$ 99,90 hoje. Renovação anual automática. Cancele quando quiser.");
+    expect(screen.getByTestId("sem-teste-legal").textContent).toBe("Você paga R$ 97,90 hoje. Renovação anual automática. Cancele quando quiser.");
     expect(screen.getByTestId("sem-teste-rodape").textContent).toMatch(/Restaurar compras.*Termos.*Privacidade/);
     expect(tela.textContent).not.toMatch(TEXTO_DE_TESTE);
-    expect(eventos("paywall_oferta_vista")[0]).toMatchObject({ produto: "core_anual_99", trial: false, paywall_teste: "off" });
+    expect(eventos("paywall_oferta_vista")[0]).toMatchObject({ produto: "core_anual_97_direto", trial: false, paywall_teste: "off" });
   });
 
-  it("loja calada: a reserva de texto (99,90 / 34,90), sem texto de teste", async () => {
+  it("loja calada: a reserva de texto (97,90 / 34,90), sem texto de teste", async () => {
     loja.anual = null; loja.mensal = null;
     montar();
     await espera();
-    expect(screen.getByTestId("sem-teste-anual").textContent).toContain("R$ 99,90");
+    expect(screen.getByTestId("sem-teste-anual").textContent).toContain("R$ 97,90");
     expect(screen.getByTestId("sem-teste-mensal").textContent).toContain("R$ 34,90");
     expect(screen.getByTestId("paywall-sem-teste").textContent).not.toMatch(TEXTO_DE_TESTE);
   });
@@ -189,7 +189,7 @@ describe("a tela (PaywallSemTeste) — conta vazia, chave off", () => {
     expect(eventos("app_sheet_success")[0]).toMatchObject({ produto: "core_mensal_34", trial: false });
   });
 
-  it("anual: compra o core_anual_99 e segue (cadastro)", async () => {
+  it("anual: compra o core_anual_97_direto e segue (cadastro)", async () => {
     const onPago = montar();
     await esperarLoja();
     await act(async () => { fireEvent.click(screen.getByTestId("sem-teste-cta")); });
@@ -235,13 +235,12 @@ describe("a tela (PaywallSemTeste) — conta vazia, chave off", () => {
     } finally { vi.useRealTimers(); }
   });
 
-  it("o Voltar do Android (`core:voltar` do ComecarW) também abre o presente", async () => {
-    android();
+  it("o evento `core:voltar` do ComecarW também abre o presente", async () => {
     montar();
     await esperarLoja();
     await act(async () => { window.dispatchEvent(new CustomEvent("core:voltar")); });
     await waitFor(() => expect(screen.getByTestId("presente-direto")).toBeTruthy());
-    expect(screen.getByTestId("presente-direto").textContent).toContain("Google Play");
+    expect(screen.getByTestId("presente-direto").textContent).toContain("App Store");
     expect(screen.getByTestId("presente-direto").textContent).not.toMatch(TEXTO_DE_TESTE);
   });
 

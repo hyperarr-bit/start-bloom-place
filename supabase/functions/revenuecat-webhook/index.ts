@@ -309,6 +309,9 @@ const PRODUTOS: Record<string, { billing: string; cents: number }> = {
   // 12/11 (paywall SEM teste, 1.0.26 / Android 138 — chave `paywall_teste` off): anual 99,90, mensal 34,90 e o
   // presente de saída 69,90 SEM teste. Sem estas linhas a chave mais longa seria "core_anual" (159,90) /
   // "core_mensal" (24,90). O _direto casaria core_anual_69 (6990) por sorte — fica explícito.
+  // 12/11 noite (dono): o anual sem teste do iPhone é R$ 97,90 = core_anual_97_direto (o core_anual_97 tem teste preso no
+  // produto). Linha própria: sem ela a chave mais longa seria "core_anual_97" — mesmo valor, mas é o produto de teste.
+  core_anual_97_direto: { billing: "annual", cents: 9790 },
   core_anual_99: { billing: "annual", cents: 9990 },
   core_anual_69_direto: { billing: "annual", cents: 6990 },
   core_mensal_34: { billing: "monthly", cents: 3490 },

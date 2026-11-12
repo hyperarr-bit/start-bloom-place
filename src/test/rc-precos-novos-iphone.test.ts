@@ -111,6 +111,12 @@ describe.each(COM_MAPA)("%s: produtos do paywall sem teste", (f) => {
   it("o 69,90 de hoje (com teste) segue igual", () => {
     expect(info("core_anual_69")).toEqual({ billing: "annual", cents: 6990 });
   });
+  it("12/11 noite: o anual SEM teste do iPhone é core_anual_97_direto = 97,90 (linha própria, não o core_anual_97 com teste)", () => {
+    expect(info("core_anual_97_direto")).toEqual({ billing: "annual", cents: 9790 });
+    expect(info("core_anual_97")).toEqual({ billing: "annual", cents: 9790 });
+    const s = fonte(f);
+    expect(s).toMatch(/\n\s*core_anual_97_direto: \{ billing: "annual", cents: 9790 \}/);
+  });
 });
 
 describe("afiliados: bruto dos produtos sem teste", () => {
@@ -118,5 +124,6 @@ describe("afiliados: bruto dos produtos sem teste", () => {
     expect(brutoCents({ product_id: "core_anual_99" })).toBe(9990);
     expect(brutoCents({ product_id: "core_mensal_34:coremensal34" })).toBe(3490);
     expect(brutoCents({ product_id: "core_anual_69_direto" })).toBe(6990);
+    expect(brutoCents({ product_id: "core_anual_97_direto" })).toBe(9790);
   });
 });

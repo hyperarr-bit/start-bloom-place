@@ -3,17 +3,19 @@
  * Com a chave "on" esta tela não aparece: volta o fluxo de hoje com o teste de 3 dias, intacto.
  *
  * A ESTRUTURA é a do paywall da Enxovaly (prints do dono, 12/11), com a identidade do CORE (grafite + magenta + Inter):
- *   1. foto grande no topo (o Finanças REAL num iPhone, na mão — public/paywall-hero.jpg) com degradê pro fundo;
+ *   1. foto grande no topo (print REAL do app num iPhone — public/paywall-sem-teste-foto.jpg; 12/11 noite: a foto antiga mostrava
+ *      "Outubro de 2026" e saiu) com degradê pro fundo;
  *      botão Voltar redondo por cima (só no funil e no /planos);
  *   2. título grande ("Libere o CORE completo"; o braço "com" do teste de título troca pelo da área, lib/titulo-paywall);
  *   3. subtítulo de 1 linha;
  *   4. "Incluso na assinatura" + 4 itens com ✓ em círculo (os 4 do ValueStack da área, os mesmos do paywall de hoje);
- *   5. card do anual MARCADO, com a faixa "ECONOMIZE N%. MELHOR VALOR" (N dos preços da loja; reserva 76);
+ *   5. card do anual MARCADO, com a faixa "ECONOMIZE N%. MELHOR VALOR" (N dos preços da loja; reserva 77);
  *   6. card do mensal;
  *   7. botão "Assinar plano anual" / "Assinar plano mensal";
- *   8. "Você paga R$ 99,90 hoje. Renovação anual automática. Cancele quando quiser.";
+ *   8. "Você paga R$ 97,90 hoje. Renovação anual automática. Cancele quando quiser.";
  *   9. Restaurar compras · Termos · Privacidade.
- * Preços SEMPRE da loja (priceString de core_anual_99 / core_mensal_34); o texto fixo é só reserva.
+ * Preços SEMPRE da loja (priceString de core_anual_97_direto / core_mensal_34); o texto fixo é só reserva.
+ * 12/11 noite (dono): SÓ no iPhone, e é o braço "enxovaly" do A/B `paywall_visual` (o outro é o PaywallW semTeste).
  *
  * SAÍDA: fechou o paywall (Voltar redondo, Voltar do Android = `core:voltar`, fechar no /planos) ou cancelou a folha
  * da loja → o PRESENTE de 69,90/ano SEM teste (core_anual_69_direto, paga na hora), 1x por paywall aberto. Sem o
@@ -34,15 +36,17 @@ import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
 import { CaixaDePresente } from "@/components/paywall/CaixaDePresente";
 import { STACKS } from "@/pages/funis/dia14/stacks";
 import { bracoTitulo, guardarForcaTitulo, tituloDaArea } from "@/lib/titulo-paywall";
-import { PRECOS_RESERVA_SEM_TESTE, PRODUTOS_SEM_TESTE } from "@/lib/paywall-teste";
+import { PRECOS_RESERVA_SEM_TESTE, PRODUTOS_SEM_TESTE, visualDoPaywall } from "@/lib/paywall-teste";
 import type { DadosSemTeste } from "@/lib/revenuecat";
 
 export const TITULO_SEM_TESTE = "Libere o CORE completo";
 export const SUBTITULO_SEM_TESTE = "Dinheiro, rotina, corpo e metas num app só.";
-/** Reserva do selo enquanto a loja não respondeu: 99,90 contra 12 × 34,90. */
-export const ECONOMIA_RESERVA = 76;
+/** Reserva do selo enquanto a loja não respondeu: 97,90 contra 12 × 34,90 = 418,80 → 76,6% → 77. */
+export const ECONOMIA_RESERVA = 77;
+/** Reserva do "por mês" do anual: 97,90 ÷ 12 = 8,158 → R$ 8,16. */
+export const ANUAL_MES_RESERVA = "R$ 8,16";
 
-/** A economia do anual contra 12 meses de mensal (pura): 99,90 × 34,90 → 76. */
+/** A economia do anual contra 12 meses de mensal (pura): 97,90 × 34,90 → 77. */
 export const economiaDoAnual = (anual: number | null | undefined, mensal: number | null | undefined): number | null => {
   if (!anual || !mensal || anual <= 0 || mensal <= 0) return null;
   const pct = Math.round((1 - anual / (12 * mensal)) * 100);
@@ -53,7 +57,7 @@ export const economiaDoAnual = (anual: number | null | undefined, mensal: number
 export const itensIncluidos = (area: AreaKey): string[] =>
   (STACKS[area] ?? STACKS.dinheiro).slice(0, 4).map((s) => `${s.title}: ${s.sub}`);
 
-/** "Você paga R$ 99,90 hoje. Renovação anual automática. Cancele quando quiser." */
+/** "Você paga R$ 97,90 hoje. Renovação anual automática. Cancele quando quiser." */
 export const linhaDoQueVocePaga = (plano: "anual" | "mensal", preco: string): string =>
   `Você paga ${preco} hoje. Renovação ${plano === "anual" ? "anual" : "mensal"} automática. Cancele quando quiser.`;
 
@@ -106,10 +110,13 @@ export function PaywallSemTeste({
 
   const anualTxt = precos.anual?.preco ?? PRECOS_RESERVA_SEM_TESTE.anual.preco;
   const mensalTxt = precos.mensal?.preco ?? PRECOS_RESERVA_SEM_TESTE.mensal.preco;
-  const anualMesTxt = precos.anual?.precoMes ?? "R$ 8,33";
+  const anualMesTxt = precos.anual?.precoMes ?? ANUAL_MES_RESERVA;
   const economia = economiaDoAnual(precos.anual?.valor ?? PRECOS_RESERVA_SEM_TESTE.anual.valor, precos.mensal?.valor ?? PRECOS_RESERVA_SEM_TESTE.mensal.valor) ?? ECONOMIA_RESERVA;
   const titulo = tituloBraco === "com" ? (tituloDaArea(area) ?? TITULO_SEM_TESTE) : TITULO_SEM_TESTE;
-  const campos = { funil: FUNIL, loja, area, paywall_teste: "off", ...(tituloBraco ? { titulo_area: tituloBraco } : {}) };
+  // 12/11 noite: o braço do A/B do visual (só iPhone) em TODO evento; gate e /planos mostram este desenho pros dois
+  // braços, então levam também o braço do aparelho (`paywall_visual_braco`) pra separar na conta
+  const [bracoAparelho] = useState(() => visualDoPaywall());
+  const campos = { funil: FUNIL, loja, area, paywall_teste: "off", paywall_visual: "enxovaly", ...(modo !== "funil" ? { paywall_visual_braco: bracoAparelho } : {}), ...(tituloBraco ? { titulo_area: tituloBraco } : {}) };
 
   /* a loja: preços reais + o presente já carregado (o toque em sair não espera rede) */
   useEffect(() => {
@@ -269,7 +276,7 @@ export function PaywallSemTeste({
       <div className="relative max-w-[480px] mx-auto">
         {/* 1. a foto: o CORE real num iPhone, na mão, sangrando até as bordas, com degradê pro fundo */}
         <div className="relative w-full h-[min(46vh,420px)] overflow-hidden" aria-hidden>
-          <img src="/paywall-hero.jpg" alt="" className="absolute inset-0 w-full h-full object-cover object-[50%_18%]" draggable={false} />
+          <img src="/paywall-sem-teste-foto.jpg" alt="" className="absolute inset-0 w-full h-full object-cover object-[50%_18%]" draggable={false} />
           <div className="absolute inset-x-0 bottom-0 h-[42%]" style={{ background: `linear-gradient(180deg, rgba(251,248,250,0) 0%, ${FUNDO} 92%)` }} />
         </div>
         {modo !== "gate" && (

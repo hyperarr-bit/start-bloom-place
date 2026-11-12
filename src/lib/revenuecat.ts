@@ -1288,7 +1288,7 @@ let prefetchAnualDesfecho = "nao_rodou";
  * (chave `paywall_teste` on) segue comprando o anual de hoje mesmo que alguém ponha um deles na offering atual. Eles
  * são lidos só pelo prefetchSemTeste (offering `sem_teste`). O _direto já não casava a regex; o _99 casava. */
 const ehAnualDaAppStore = (id: string | undefined): boolean =>
-  !!id && /^core_anual(_\d+)?$/.test(id) && !(Object.values(PRODUTOS_SEM_TESTE) as string[]).includes(id);
+  !!id && /^core_anual(_\d+)?$/.test(id) && !(Object.values(PRODUTOS_SEM_TESTE) as string[]).includes(id) && id !== "core_anual_99"; // 12/11 noite: o 99 saiu do app
 
 export async function prefetchAnualIos(): Promise<void> {
   if (produtoAnualIos) return;
@@ -1648,7 +1648,7 @@ export async function restaurar(): Promise<boolean> {
 
 /* ─────────────────────────── PAYWALL SEM TESTE (12/11, 1.0.26 iPhone / Android 138) ───────────────────────────
  *
- * Chave `paywall_teste` off (padrão, lib/paywall-teste): o app vende SEM teste grátis — anual core_anual_99,
+ * Chave `paywall_teste` off (padrão, lib/paywall-teste): o app (só iPhone) vende SEM teste grátis — anual core_anual_97_direto (97,90),
  * mensal core_mensal_34 e, na saída, o presente core_anual_69_direto (69,90/ano, cobra na hora). Os ids moram em
  * PRODUTOS_SEM_TESTE (um lugar só). Onde procurar cada um, nesta ordem:
  *   1) a offering `sem_teste` do RevenueCat; 2) a `current`; 3) qualquer outra offering; 4) a loja direto

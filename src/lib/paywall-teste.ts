@@ -1,3 +1,6 @@
+import { idDoAparelho } from "@/lib/dia1-cheio";
+import { isIOS, isNativeShell } from "@/lib/native-shell";
+
 /**
  * PAYWALL COM OU SEM TESTE GRÁTIS (12/11, 1.0.26 iPhone / Android 138) — a chave e os produtos. A tela sem teste
  * mora em components/paywall/PaywallSemTeste (estrutura do paywall da Enxovaly, identidade do CORE).
@@ -9,13 +12,16 @@
  * `paywall_minimalista`/`titulo_paywall`:
  *   · "off" (ou ausente, ou RevenueCat sem resposta) → o paywall SEM teste (o novo, PaywallSemTeste) — padrão;
  *   · "on"                                            → o fluxo de hoje com o teste de 3 dias, exatamente igual.
- * Vale pro iPhone e pro Android. A última resposta fica no aparelho (`core-paywall-teste`): reabrir o app antes de o
+ * 12/11 noite (dono): SÓ o iPhone. No Android (e no site) é sempre "on" = o paywall de hoje (vitalício 97,90 + mensal
+ * 24,90 e o resgate de hoje), qualquer que seja a chave. A última resposta fica no aparelho (`core-paywall-teste`): reabrir o app antes de o
  * RevenueCat responder mostra o mesmo paywall da última vez. QA: `?paywall-teste=on|off|auto`.
  */
 
 /** Os produtos NOVOS (outra frente cria na Apple/Play/RevenueCat). Um lugar só: trocar aqui troca o app inteiro. */
 export const PRODUTOS_SEM_TESTE = {
-  anual: "core_anual_99",
+  /** 12/11 noite (dono): o anual sem teste é R$ 97,90 (não 99,90). NUNCA o core_anual_97 — ele tem 3 dias grátis presos
+   *  no produto. O core_anual_99 sai do app (o produto continua na loja). */
+  anual: "core_anual_97_direto",
   mensal: "core_mensal_34",
   /** o presente de saída: 69,90/ano SEM oferta introdutória (cobra na hora) */
   presente: "core_anual_69_direto",
@@ -27,7 +33,7 @@ export const OFFERING_SEM_TESTE = "sem_teste";
 
 /** RESERVA de texto enquanto a loja não respondeu — o preço de verdade é sempre o priceString da loja. */
 export const PRECOS_RESERVA_SEM_TESTE: Record<PlanoSemTeste, { preco: string; valor: number }> = {
-  anual: { preco: "R$ 99,90", valor: 99.9 },
+  anual: { preco: "R$ 97,90", valor: 97.9 },
   mensal: { preco: "R$ 34,90", valor: 34.9 },
   presente: { preco: "R$ 69,90", valor: 69.9 },
 };
@@ -72,6 +78,7 @@ export function lerChaveRemotaPaywallTeste(offerings: unknown): ModoPaywallTeste
 export function registrarPaywallTesteRemoto(offerings: unknown): void {
   try {
     if (!offerings || typeof offerings !== "object") return;
+    registrarPaywallVisualRemoto(offerings);
     remota = lerChaveRemotaPaywallTeste(offerings) ?? PAYWALL_TESTE_PADRAO;
     ls.set(CHAVE_PAYWALL_TESTE_APARELHO, remota);
     try { window.dispatchEvent(new CustomEvent(EVENTO_PAYWALL_TESTE, { detail: remota })); } catch { /* sem janela */ }
@@ -91,11 +98,16 @@ export function guardarForcaPaywallTeste(busca?: string): void {
   else if (t === "auto") ls.del(CHAVE_FORCA_PAYWALL_TESTE);
 }
 
-/** O modo que vale AQUI: força de QA > RevenueCat desta abertura > última resposta do aparelho > padrão ("off"). */
+/** O app do iPhone? (12/11 noite, dono: o Android — e o site — ficam EXATAMENTE como hoje: o paywall sem teste é só do iPhone.) */
+const noIphone = (): boolean => { try { return isNativeShell() && isIOS(); } catch { return false; } };
+
+/** O modo que vale AQUI: fora do iPhone "on" (o de hoje, sempre) > força de QA > RevenueCat desta abertura > última
+ *  resposta do aparelho > padrão ("off"). */
 export function modoPaywallTeste(): ModoPaywallTeste {
   // só testes: o setup da suíte fixa "on" (o paywall de hoje); os testes da chave apagam o global
   const g = modoDe((globalThis as { __PAYWALL_TESTE__?: unknown }).__PAYWALL_TESTE__);
   if (g) return g;
+  if (!noIphone()) return "on";
   const f = modoDe(ls.get(CHAVE_FORCA_PAYWALL_TESTE));
   if (f) return f;
   if (remota) return remota;
@@ -104,3 +116,91 @@ export function modoPaywallTeste(): ModoPaywallTeste {
 
 /** O app nativo mostra o paywall COM teste (o de hoje)? false = o paywall novo, sem teste. */
 export const paywallComTeste = (): boolean => modoPaywallTeste() === "on";
+
+/* ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ * A/B DO VISUAL DO PAYWALL SEM TESTE (12/11 noite, dono) — SÓ no iPhone. Os dois braços vendem o mesmo: anual 97,90
+ * (core_anual_97_direto), mensal 34,90 e o presente 69,90 na saída, tudo sem teste.
+ *   · "android"  = o desenho do paywall do Android (PaywallW, modo semTeste);
+ *   · "enxovaly" = o PaywallSemTeste (foto no topo, estrutura da Enxovaly).
+ * CHAVE REMOTA `paywall_visual` na metadata de qualquer offering (a `current` vence): "android" | "enxovaly" | "ab".
+ * Padrão (sem a chave) = "ab": sorteio 50/50 estável por aparelho (FNV-1a do id do aparelho, sal "paywall-visual:"),
+ * gravado em `core-paywall-visual-braco`. No Android é sempre "android" (lá o paywall sem teste nem aparece).
+ * QA: `?paywall-visual=android|enxovaly|auto` (grava em `paywall-visual-force`, fora dos prefixos varridos).
+ * Todo evento dos dois paywalls leva `paywall_visual`.
+ * ──────────────────────────────────────────────────────────────────────────────────────────────────────────────── */
+export type VisualPaywall = "android" | "enxovaly";
+export type ModoPaywallVisual = VisualPaywall | "ab";
+export const CHAVE_REMOTA_PAYWALL_VISUAL = "paywall_visual";
+/** A última resposta do RevenueCat pro modo (chave do aparelho). */
+export const CHAVE_PAYWALL_VISUAL_APARELHO = "core-paywall-visual";
+/** O braço sorteado neste aparelho (chave do aparelho; estável entre aberturas). */
+export const CHAVE_PAYWALL_VISUAL_BRACO = "core-paywall-visual-braco";
+export const CHAVE_FORCA_PAYWALL_VISUAL = "paywall-visual-force";
+export const PARAM_PAYWALL_VISUAL = "paywall-visual";
+export const PAYWALL_VISUAL_PADRAO: ModoPaywallVisual = "ab";
+
+const visualDe = (v: unknown): VisualPaywall | null => {
+  const s = String(v ?? "").trim().toLowerCase();
+  return s === "android" || s === "enxovaly" ? s : null;
+};
+const modoVisualDe = (v: unknown): ModoPaywallVisual | null => {
+  const s = String(v ?? "").trim().toLowerCase();
+  return s === "ab" ? "ab" : visualDe(s);
+};
+
+let remotaVisual: ModoPaywallVisual | null = null;
+
+/** Decisão pura: o `paywall_visual` das offerings (a `current` vence); null = ninguém disse. */
+export function lerChaveRemotaPaywallVisual(offerings: unknown): ModoPaywallVisual | null {
+  type Off = { metadata?: Record<string, unknown> } | null | undefined;
+  const o = offerings as { current?: Off; all?: Record<string, Off> } | null | undefined;
+  let lido: ModoPaywallVisual | null = null;
+  for (const off of Object.values(o?.all ?? {})) {
+    if (off === o?.current) continue;
+    lido = modoVisualDe(off?.metadata?.[CHAVE_REMOTA_PAYWALL_VISUAL]) ?? lido;
+  }
+  return modoVisualDe(o?.current?.metadata?.[CHAVE_REMOTA_PAYWALL_VISUAL]) ?? lido;
+}
+
+/** Chamado junto do registrarPaywallTesteRemoto (cada getOfferings que respondeu). Só iPhone. Sem a chave = "ab". */
+export function registrarPaywallVisualRemoto(offerings: unknown): void {
+  try {
+    if (!noIphone() || !offerings || typeof offerings !== "object") return;
+    remotaVisual = lerChaveRemotaPaywallVisual(offerings) ?? PAYWALL_VISUAL_PADRAO;
+    ls.set(CHAVE_PAYWALL_VISUAL_APARELHO, remotaVisual);
+  } catch { /* metadata estranha: fica como estava */ }
+}
+/** Só testes. */
+export const _zerarPaywallVisual = (): void => { remotaVisual = null; };
+
+/** Guarda `?paywall-visual=android|enxovaly|auto` (QA) neste aparelho. */
+export function guardarForcaPaywallVisual(busca?: string): void {
+  let v: string | null;
+  try { v = new URLSearchParams(busca ?? window.location.search).get(PARAM_PAYWALL_VISUAL); } catch { return; }
+  const t = (v ?? "").trim().toLowerCase();
+  if (visualDe(t)) ls.set(CHAVE_FORCA_PAYWALL_VISUAL, t);
+  else if (t === "auto") ls.del(CHAVE_FORCA_PAYWALL_VISUAL);
+}
+
+/** Sorteio determinístico pelo id do aparelho (FNV-1a 32 bits, sal próprio "paywall-visual:"): 50/50. */
+export function sortearVisualPaywall(id: string): VisualPaywall {
+  let h = 0x811c9dc5;
+  const s = `paywall-visual:${id}`;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return ((h >>> 8) % 2) === 0 ? "android" : "enxovaly";
+}
+
+/** O braço deste aparelho: Android/site = "android" · força de QA > RevenueCat (fixo) > aparelho (fixo) > sorteio gravado. */
+export function visualDoPaywall(): VisualPaywall {
+  if (!noIphone()) return "android";
+  guardarForcaPaywallVisual();
+  const f = visualDe(ls.get(CHAVE_FORCA_PAYWALL_VISUAL));
+  if (f) return f;
+  const m = remotaVisual ?? modoVisualDe(ls.get(CHAVE_PAYWALL_VISUAL_APARELHO)) ?? PAYWALL_VISUAL_PADRAO;
+  if (m !== "ab") return m;
+  const gravado = visualDe(ls.get(CHAVE_PAYWALL_VISUAL_BRACO));
+  if (gravado) return gravado;
+  const sorteado = sortearVisualPaywall(idDoAparelho());
+  ls.set(CHAVE_PAYWALL_VISUAL_BRACO, sorteado);
+  return sorteado;
+}

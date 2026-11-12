@@ -17,15 +17,18 @@
  *    a âncora honesta do app é "4 meses de mensal = seu pra sempre".
  */
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Check, Loader2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { APP_PRECOS } from "@/lib/native-shell";
-import { ehApple, pelaLoja, temEscadaPix, formasDePagamento, erroFolhaNaoConcluiu, avisoRenovacao } from "@/lib/loja";
+import { ehApple, pelaLoja, temEscadaPix, formasDePagamento, erroFolhaNaoConcluiu, avisoRenovacao, erroJaAtivo, erroNaoPermitido } from "@/lib/loja";
+import { PresenteDireto, economiaDoAnual, ECONOMIA_RESERVA, ANUAL_MES_RESERVA } from "@/components/paywall/PaywallSemTeste";
+import { PRECOS_RESERVA_SEM_TESTE, PRODUTOS_SEM_TESTE } from "@/lib/paywall-teste";
+import type { DadosSemTeste } from "@/lib/revenuecat";
 import { AppLegalFooter } from "@/components/paywall/PaywallFlow";
 import { PixCheckout } from "@/components/paywall/PixCheckout";
 import { EntradaDeCodigo } from "@/components/paywall/EntradaDeCodigo";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { AREAS, type AreaKey } from "@/lib/funnel";
 import { CHAVES_FUNIL_W, guardarChave, lerChave, ehPerfilSimples } from "@/pages/funis/w/retomada";
 import {
@@ -223,7 +226,9 @@ function LifetimeCardW({ naWeb = false }: { naWeb?: boolean }) {
  *  mensal custam R$ 298,80 contra R$ 97,90 uma vez (= R$ 8,16/mês no 1º ano,
  *  zero depois). É a lição do sábado — quando as colunas antigas só diziam
  *  "24,90" × "97,90" sem a matemática, o barato levava 92% do mix. */
-function PrecosLadoALadoW({ plano, onSelect, naWeb = false }: { plano: "vitalicio" | "mensal"; onSelect: (p: "vitalicio" | "mensal") => void; naWeb?: boolean }) {
+/** 12/11 noite (iPhone, paywall sem teste): as MESMAS colunas com o anual no lugar do vitalício. */
+type SemTesteColunas = { anual: string; anualMes: string; mensal: string; economia: number };
+function PrecosLadoALadoW({ plano, onSelect, naWeb = false, semTeste = null }: { plano: "vitalicio" | "mensal"; onSelect: (p: "vitalicio" | "mensal") => void; naWeb?: boolean; semTeste?: SemTesteColunas | null }) {
   const moldura = (ativo: boolean) =>
     `rounded-3xl p-[2px] transition-all ${ativo
       ? "bg-gradient-to-br from-accent via-accent/45 to-accent/15 shadow-[0_14px_40px_-16px_hsl(var(--accent)/0.5)]"
@@ -235,7 +240,7 @@ function PrecosLadoALadoW({ plano, onSelect, naWeb = false }: { plano: "vitalici
           <span className="h-[19px]" aria-hidden />
           <span className="text-[30px] font-black leading-none mt-1.5">1</span>
           <span className="text-[12.5px] font-bold text-black/45">mês</span>
-          <span className="text-[17px] font-extrabold mt-2">{APP_PRECOS.mensal.preco}</span>
+          <span className="text-[17px] font-extrabold mt-2">{semTeste ? semTeste.mensal : APP_PRECOS.mensal.preco}</span>
           <span className="text-[10px] font-semibold text-black/40">{naWeb ? "30 dias" : "por mês"}</span>
           <span className="mx-3 my-2 border-t border-black/10" aria-hidden />
           <span className="text-[10.5px] font-semibold text-black/45 pb-1 px-1 leading-tight mt-auto">
@@ -256,14 +261,16 @@ function PrecosLadoALadoW({ plano, onSelect, naWeb = false }: { plano: "vitalici
           <span className={`-mx-3 text-[10px] font-extrabold tracking-[0.08em] py-[5px] ${plano === "vitalicio" ? "bg-accent text-accent-foreground" : "bg-accent/10 text-accent"}`}>
             MELHOR ESCOLHA
           </span>
-          <span className="text-[21px] font-black leading-[1.05] mt-1.5 px-1 tracking-tight">Pra sempre</span>
+          <span className="text-[21px] font-black leading-[1.05] mt-1.5 px-1 tracking-tight">{semTeste ? "1 ano" : "Pra sempre"}</span>
           {/* 06/09: a web vende o vitalício a PRECO_WEB (47,90); o app segue no
               preço da loja. A âncora "N meses de mensal" acompanha: 47,90 ÷ 24,90 ≈ 2. */}
-          <span className="text-[17px] font-extrabold mt-1.5">{naWeb ? `R$ ${PRECO_WEB}` : APP_PRECOS.vitalicio97.preco}</span>
-          <span className="text-[10px] font-semibold text-black/40">vitalício · uma única vez</span>
+          <span className="text-[17px] font-extrabold mt-1.5">{semTeste ? semTeste.anual : naWeb ? `R$ ${PRECO_WEB}` : APP_PRECOS.vitalicio97.preco}</span>
+          <span className="text-[10px] font-semibold text-black/40">{semTeste ? `por ano · ${semTeste.anualMes}/mês` : "vitalício · uma única vez"}</span>
           <span className="mx-3 my-2 border-t border-black/10" aria-hidden />
           <span className="text-[10.5px] font-semibold text-black/45 pb-1 px-1 leading-tight mt-auto">
-            4 meses de mensal =<br /><b className="text-black/60">CORE pra sempre</b>
+            {semTeste
+              ? <>Economize {semTeste.economia}%<br /><b className="text-black/60">contra o mensal</b></>
+              : <>4 meses de mensal =<br /><b className="text-black/60">CORE pra sempre</b></>}
           </span>
         </div>
       </div>
@@ -272,8 +279,14 @@ function PrecosLadoALadoW({ plano, onSelect, naWeb = false }: { plano: "vitalici
 }
 
 export function PaywallW({
-  area, answers, onPagoSemConta, naWeb = false,
+  area, answers, onPagoSemConta, naWeb = false, semTeste = false, onVoltar,
 }: { area: AreaKey; answers: Record<string, string>; onPagoSemConta: () => void;
+  /* 12/11 noite (dono, SÓ iPhone, braço "android" do A/B `paywall_visual`): o MESMO desenho vendendo o paywall sem
+   * teste — anual 97,90 (core_anual_97_direto) no lugar do vitalício, mensal 34,90, nada de "pra sempre"/"único", e
+   * na saída (Voltar redondo ou folha cancelada) o presente 69,90/ano sem teste no lugar da escada de resgate. */
+  semTeste?: boolean;
+  /** semTeste: o recuo do funil quando o Voltar redondo não abriu o presente */
+  onVoltar?: () => void;
   /* 31/08 — o MESMO paywall com outro cano de pagamento. Na web o dinheiro
    * sai por Pix (oferta w97 da Cakto): a folha do Google paga 13-27% (medido
    * 27-31/08), cobra 15% e segura o caixa 60 dias; o Pix histórico paga ~45%,
@@ -329,6 +342,24 @@ export function PaywallW({
   const vivoRef = useRef(true);
   // Disponibilidade real: otimista até resposta NEGATIVA da loja (regra v81).
   const [vitalicioNaLoja, setVitalicioNaLoja] = useState<boolean | null>(null);
+  /* semTeste: os preços da loja (o texto fixo é só reserva) e o presente de saída (1x por paywall aberto) */
+  const [lojaSemTeste, setLojaSemTeste] = useState<{ anual: DadosSemTeste | null; mensal: DadosSemTeste | null }>({ anual: null, mensal: null });
+  const [presente, setPresente] = useState<DadosSemTeste | null>(null);
+  const presenteTentadoRef = useRef(false);
+  const presenteAbertoRef = useRef(false);
+  presenteAbertoRef.current = !!presente;
+  const comprandoRef = useRef(false);
+  const compraFeitaRef = useRef(false);
+  const anualTxt = lojaSemTeste.anual?.preco ?? PRECOS_RESERVA_SEM_TESTE.anual.preco;
+  const mensalTxt = lojaSemTeste.mensal?.preco ?? PRECOS_RESERVA_SEM_TESTE.mensal.preco;
+  const colunasSemTeste: SemTesteColunas | null = semTeste ? {
+    anual: anualTxt,
+    anualMes: lojaSemTeste.anual?.precoMes ?? ANUAL_MES_RESERVA,
+    mensal: mensalTxt,
+    economia: economiaDoAnual(lojaSemTeste.anual?.valor ?? PRECOS_RESERVA_SEM_TESTE.anual.valor, lojaSemTeste.mensal?.valor ?? PRECOS_RESERVA_SEM_TESTE.mensal.valor) ?? ECONOMIA_RESERVA,
+  } : null;
+  /** os campos de todo evento do semTeste (o braço do A/B vai em todos) */
+  const camposSemTeste = { funil: "ios", loja: "ios", area, paywall_teste: "off", paywall_visual: "android" };
   // A/B do preço: A = só vitalício · B = vitalício + mensal visível.
   // No iPhone não há sorteio: é sempre o layout de duas colunas (ver
   // IOS_PLANO_INICIAL). `sortearBraco()` nem chega a ser chamado lá, senão
@@ -362,6 +393,26 @@ export function PaywallW({
 
   useEffect(() => {
     vivoRef.current = true;
+    if (semTeste) {
+      trackEvent("funnel_view", { step: "offer", ...camposSemTeste, perfil: simples ? "simples" : "topo" });
+      let retrySem: number | null = null;
+      void (async () => {
+        try {
+          const rc = await import("@/lib/revenuecat");
+          await rc.initRevenueCat();
+          await rc.prefetchSemTeste();
+          const ler = () => {
+            if (!vivoRef.current) return;
+            const a = rc.dadosSemTeste("anual"), m = rc.dadosSemTeste("mensal");
+            setLojaSemTeste({ anual: a, mensal: m });
+            trackEvent("paywall_oferta_vista", { ...camposSemTeste, produto: PRODUTOS_SEM_TESTE.anual, preco: a?.preco ?? null, preco_mensal: m?.preco ?? null, offering: a?.offering ?? null, trial: false });
+          };
+          if (!rc.dadosSemTeste("anual")) retrySem = window.setTimeout(async () => { await rc.prefetchSemTeste(); ler(); }, 2500);
+          else ler();
+        } catch { /* a reserva de texto segura a tela */ }
+      })();
+      return () => { vivoRef.current = false; if (retrySem) window.clearTimeout(retrySem); };
+    }
     trackEvent("funnel_view", { step: "offer", funil: "w", area, braco: bracoEvento, perfil: simples ? "simples" : "topo" });
     /* Varredura 31/08 (5 sessões de emulador insistindo no produto_ausente
      * expuseram a diferença): o W montava SEM initRevenueCat() — no funil de
@@ -411,7 +462,7 @@ export function PaywallW({
    * cima de quem apertou Voltar ou minimizou o app. Voltar físico (evento
    * core:voltar, do ComecarW) e app escondido desarmam a reabertura. */
   useEffect(() => {
-    const aoVoltar = () => desarmar();
+    const aoVoltar = () => { desarmar(); if (semTeste) void abrirPresente("x_paywall"); };
     const aoEsconder = () => { if (document.hidden) desarmar(); };
     window.addEventListener("core:voltar", aoVoltar);
     document.addEventListener("visibilitychange", aoEsconder);
@@ -432,7 +483,84 @@ export function PaywallW({
     setConferindo(false);
   };
 
+  /* semTeste: saída sem compra, 1 evento por paywall aberto (o mesmo `paywall_saiu` do braço enxovaly) */
+  const abertoEmRef = useRef(Date.now());
+  const saiuSemTesteRef = useRef(false);
+  useEffect(() => {
+    if (!semTeste) return;
+    const sair = (beacon: boolean) => {
+      if (saiuSemTesteRef.current || compraFeitaRef.current) return;
+      saiuSemTesteRef.current = true;
+      (beacon ? trackEventBeacon : trackEvent)("paywall_saiu", { ...camposSemTeste, segundos_na_tela: Math.round((Date.now() - abertoEmRef.current) / 1000), viu_oferta: presenteTentadoRef.current });
+    };
+    const aoEsconder = () => { if (document.visibilityState === "hidden" && !comprandoRef.current) sair(true); };
+    document.addEventListener("visibilitychange", aoEsconder);
+    return () => { document.removeEventListener("visibilitychange", aoEsconder); sair(false); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** semTeste: o presente de 69,90 sem teste — 1x por paywall aberto, só se a loja tem o produto. true = abriu. */
+  const abrirPresente = async (lugar: "x_paywall" | "folha_cancelada"): Promise<boolean> => {
+    if (!semTeste || presenteTentadoRef.current || comprandoRef.current || compraFeitaRef.current) return false;
+    presenteTentadoRef.current = true;
+    try {
+      const rc = await import("@/lib/revenuecat");
+      if (!rc.dadosSemTeste("presente")) await rc.prefetchSemTeste();
+      const d = rc.dadosSemTeste("presente");
+      if (!d || !vivoRef.current) return false;
+      // downsell é MAIS BARATO que a vitrine (regra do dono, 16/10)
+      const vitrine = rc.dadosSemTeste("anual")?.valor ?? PRECOS_RESERVA_SEM_TESTE.anual.valor;
+      if (d.valor && d.valor >= vitrine) return false;
+      trackEvent("presente69_view", { ...camposSemTeste, lugar, preco: d.preco, de: anualTxt, trial: false, direto: true });
+      setPresente(d);
+      return true;
+    } catch { return false; }
+  };
+
+  const concluirSemTeste = (produto: string, oferta: string, preco: string | null) => {
+    compraFeitaRef.current = true;
+    trackEvent("app_sheet_success", { ...camposSemTeste, produto, oferta, preco, trial: false });
+    void import("@/lib/notificacoes").then((n) => { void n.cancelarResgateDoPlano(); }).catch(() => { /* noop */ });
+    onPagoSemConta();
+  };
+
+  /** semTeste: a compra pela loja, sem escada de resgate — cancelou a folha = o presente. */
+  const comprarSemTeste = async (escolha: "vitalicio" | "mensal") => {
+    if (comprandoRef.current) return;
+    comprandoRef.current = true;
+    setComprando(true);
+    setErro(null);
+    const p = escolha === "mensal" ? "mensal" : "anual";
+    try {
+      const rc = await import("@/lib/revenuecat");
+      rc.marcarToqueDeCompra?.();
+      const ok = await rc.comprarSemTeste(p, "ios");
+      comprandoRef.current = false;
+      if (!vivoRef.current) return;
+      setComprando(false);
+      if (ok) { concluirSemTeste(PRODUTOS_SEM_TESTE[p], `sem_teste_${p}`, p === "anual" ? anualTxt : mensalTxt); return; }
+      const motivo = rc.motivoUltimaCompra();
+      if (motivo === "pendente") setPendente(true);
+      else if (motivo === "ja_ativo") setErro(erroJaAtivo());
+      else if (motivo === "nao_permitido") setErro(erroNaoPermitido());
+      else if (motivo === "produto_ausente" || motivo === "catalogo") setErro("A loja ainda tá carregando este plano. Espera uns segundos e toca de novo.");
+      else if (motivo === "cancelou" || motivo === null) void abrirPresente("folha_cancelada");
+      else setErro(erroFolhaNaoConcluiu());
+    } catch {
+      comprandoRef.current = false;
+      if (vivoRef.current) { setComprando(false); setErro(erroFolhaNaoConcluiu()); }
+    }
+  };
+
+  /** semTeste: o Voltar redondo — o presente abre por cima? então fica; senão recua um passo. */
+  const voltarSemTeste = () => {
+    trackEvent("funnel_click", { cta: "paywall_voltar", ...camposSemTeste });
+    window.dispatchEvent(new CustomEvent("core:voltar"));
+    if (onVoltar) window.setTimeout(() => { if (vivoRef.current && !presenteAbertoRef.current && !comprandoRef.current) onVoltar(); }, 450);
+  };
+
   const comprar = async (produto: "vitalicio" | "mensal") => {
+    if (semTeste) { await comprarSemTeste(produto); return; }
     if (comprando) return;
     setErro(null);
     desarmar();
@@ -545,7 +673,17 @@ export function PaywallW({
   }
 
   return (
-    <div className="relative w-full max-w-sm mx-auto text-center pb-40 pt-8">
+    <div className="relative w-full max-w-sm mx-auto text-center pb-40 pt-8" {...(semTeste ? { "data-testid": "paywall-w-sem-teste", "data-plano": plano === "mensal" ? "mensal" : "anual" } : {})}>
+      {/* semTeste (iPhone): o iPhone não tem Voltar físico — o mesmo botão redondo do paywall sem teste (rola junto, não cobre o texto) */}
+      {semTeste && onVoltar && (
+        <button
+          type="button" aria-label="Voltar" data-testid="paywall-w-voltar" onClick={voltarSemTeste}
+          className="absolute left-0 z-[76] w-11 h-11 rounded-full bg-white/90 backdrop-blur text-[#16121c] grid place-items-center shadow-[0_6px_18px_-8px_rgba(0,0,0,.35)] active:scale-95 transition-transform"
+          style={{ top: 4 }}
+        >
+          <ArrowLeft className="w-5 h-5" strokeWidth={2.5} />
+        </button>
+      )}
       {/* Reveal (web) */}
       <motion.div
         initial={{ scale: 0.4, opacity: 0 }}
@@ -579,6 +717,15 @@ export function PaywallW({
             // abre no mensal (24,90/mês) e troca pro vitalício se a pessoa
             // mudar de coluna. No braço A é sempre o vitalício.
             const mostraMensal = duasColunas && plano === "mensal";
+            if (semTeste) {
+              // 12/11 noite: a âncora do anual sem teste — preço da loja (já com a moeda), "por ano", nada de "pra sempre"
+              const preco = mostraMensal ? mensalTxt : anualTxt;
+              const precoSub = mostraMensal ? "por mês" : "por ano";
+              const precoTitulo = mostraMensal ? <>CORE mensal,<br />pra começar hoje</> : <>CORE anual,<br />pra enxergar tudo</>;
+              return area === "dinheiro"
+                ? <AnchorCard gasto={answers?.gasto ?? ""} preco={preco} precoSub={precoSub} precoTitulo={precoTitulo} prefixo="" />
+                : <AreaAnchorCard area={area as Exclude<AreaKey, "dinheiro">} preco={preco} precoSub={precoSub} precoTitulo={mostraMensal ? precoTitulo : undefined} prefixo="" />;
+            }
             // na web o preço é outro (27,90 no Pix) — a âncora tem que bater
             // com o card e com o CTA, senão a tela promete três números
             const preco = mostraMensal ? "24,90" : naWeb ? PRECO_WEB : "97,90";
@@ -601,7 +748,8 @@ export function PaywallW({
             <PrecosLadoALadoW
               naWeb={naWeb}
               plano={plano}
-              onSelect={(p) => { setPlano(p); tocouPlano.current = true; if (!naWeb) guardarChave(CHAVES_FUNIL_W.plano, p); trackEvent("funnel_click", { cta: "w_plano", plano: p, braco: bracoEvento, funil: "w" }); }}
+              semTeste={colunasSemTeste}
+              onSelect={(p) => { setPlano(p); tocouPlano.current = true; if (!naWeb) guardarChave(CHAVES_FUNIL_W.plano, p); trackEvent("funnel_click", semTeste ? { cta: "paywall_plano", plano: p === "mensal" ? "mensal" : "anual", ...camposSemTeste } : { cta: "w_plano", plano: p, braco: bracoEvento, funil: "w" }); }}
             />
           ) : (
             <LifetimeCardW naWeb={naWeb} />
@@ -613,7 +761,7 @@ export function PaywallW({
         {!simples && <ValueStack area={area} />}
         <motion.div {...stagger(3)}>{area === "dinheiro" ? <CompareTable /> : <ModulesIncludedCard />}</motion.div>
 
-        <MuralDepoimentos area={area} />
+        <MuralDepoimentos area={area} soAssinatura={semTeste} />
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl border border-border bg-card py-3.5 text-center">
             <div className="text-[13px] text-[#f0a500] tracking-wide" aria-label="5 estrelas">★★★★★</div>
@@ -722,12 +870,20 @@ export function PaywallW({
               onClick={() => {
                 const escolha = duasColunas ? plano : "vitalicio";
                 if (!naWeb) guardarChave(CHAVES_FUNIL_W.plano, escolha);
+                if (semTeste) {
+                  const p = escolha === "mensal" ? "mensal" : "anual";
+                  trackEvent("funnel_click", { cta: "app_paywall_cta", ...camposSemTeste, plano: p, produto: PRODUTOS_SEM_TESTE[p], preco: p === "anual" ? anualTxt : mensalTxt });
+                } else
                 trackEvent("funnel_click", { cta: "app_paywall_cta", produto: naWeb ? (escolha === "mensal" ? OFERTA_WEB_MES : OFERTA_WEB) : escolha === "mensal" ? "core_mensal" : "core_vitalicio_97", funil: "w", braco: bracoEvento });
                 void comprar(escolha);
               }}
             >
               {comprando
                 ? <Loader2 className="w-4 h-4 animate-spin" />
+                : semTeste
+                  ? (plano === "mensal"
+                    ? <>Começar por {mensalTxt}/mês <ArrowRight className="w-4 h-4" /></>
+                    : <>Quero o anual — {anualTxt}/ano <ArrowRight className="w-4 h-4" /></>)
                 : duasColunas && plano === "mensal"
                   ? <>Começar por {APP_PRECOS.mensal.preco}{naWeb ? "" : "/mês"} <ArrowRight className="w-4 h-4" /></>
                   : <>Quero pra sempre — {naWeb ? PRECO_WEB : APP_PRECOS.vitalicio97.preco} <ArrowRight className="w-4 h-4" /></>}
@@ -741,7 +897,9 @@ export function PaywallW({
               {/* Na WEB não existe loja: quem cobra é o Pix. Dizer "pelo Google
                 * Play" aqui seria mentira na tela que pede o dinheiro — e o
                 * comprador que lê "Google Play" e vê um QR de Pix desiste. */}
-              {naWeb && duasColunas && plano === "mensal"
+              {semTeste
+                ? <>Assinatura de {plano === "mensal" ? `${mensalTxt}/mês` : `${anualTxt}/ano`} {pelaLoja()} · {avisoRenovacao()}</>
+                : naWeb && duasColunas && plano === "mensal"
                 ? <>Pagamento <strong className="text-foreground font-semibold">único</strong> no Pix · <strong className="text-foreground font-semibold">30 dias</strong> de acesso · garantia de 7 dias, devolve em 1 mensagem</>
                 : naWeb
                 ? <>Pagamento <strong className="text-foreground font-semibold">único</strong> no Pix · acesso na hora · garantia de 7 dias, devolve em 1 mensagem</>
@@ -760,6 +918,31 @@ export function PaywallW({
           )}
         </div>
       </div>
+
+      {semTeste && presente && (
+        <PresenteDireto
+          oferta={presente}
+          precoDe={anualTxt}
+          onFechar={() => { trackEvent("presente69_fechou", { ...camposSemTeste, direto: true }); setPresente(null); }}
+          onComprar={async () => {
+            const rc = await import("@/lib/revenuecat");
+            trackEvent("presente69_toque", { ...camposSemTeste, direto: true });
+            rc.marcarToqueDeCompra?.();
+            const ok = await rc.comprarSemTeste("presente", "ios");
+            if (ok) {
+              trackEvent("presente69_sucesso", { ...camposSemTeste, preco: presente.preco, direto: true });
+              concluirSemTeste(PRODUTOS_SEM_TESTE.presente, "presente69_direto", presente.preco);
+              return null;
+            }
+            const motivo = rc.motivoUltimaCompra();
+            trackEvent("presente69_falhou", { ...camposSemTeste, motivo, direto: true });
+            if (motivo === "cancelou" || motivo === null) return null;
+            if (motivo === "ja_ativo") return erroJaAtivo();
+            if (motivo === "nao_permitido") return erroNaoPermitido();
+            return erroFolhaNaoConcluiu();
+          }}
+        />
+      )}
 
       {/* Overlay anti-abandono na abertura da folha (motor do app) */}
       {comprando && (

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { EVENTO_PAYWALL_TESTE, guardarForcaPaywallTeste, paywallComTeste } from "@/lib/paywall-teste";
+import { EVENTO_PAYWALL_TESTE, guardarForcaPaywallTeste, paywallComTeste, visualDoPaywall, type VisualPaywall } from "@/lib/paywall-teste";
 
 /**
  * "O paywall do app é o COM teste (o de hoje)?" — lido na hora (força de QA > RevenueCat > última resposta do aparelho >
@@ -14,4 +14,20 @@ export function usePaywallComTeste(): boolean {
     return () => window.removeEventListener(EVENTO_PAYWALL_TESTE, aoMudar);
   }, []);
   return comTeste;
+}
+
+/**
+ * 12/11 noite: o braço do A/B do visual do paywall sem teste (só iPhone; Android = "android"). `ativo` false = nem
+ * sorteia (quem não vai ver o paywall sem teste não ganha braço gravado). Relido quando a metadata do RevenueCat chega.
+ */
+export function usePaywallVisual(ativo = true): VisualPaywall {
+  const [visual, setVisual] = useState<VisualPaywall>(() => (ativo ? visualDoPaywall() : "android"));
+  useEffect(() => {
+    if (!ativo) return;
+    const aoMudar = () => setVisual(visualDoPaywall());
+    window.addEventListener(EVENTO_PAYWALL_TESTE, aoMudar);
+    aoMudar();
+    return () => window.removeEventListener(EVENTO_PAYWALL_TESTE, aoMudar);
+  }, [ativo]);
+  return visual;
 }

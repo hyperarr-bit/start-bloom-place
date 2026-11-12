@@ -22,6 +22,9 @@ import { ParabensPorta, contaDaPorta, parabensJaVisto, type PortaNaConta } from 
 import { entrouPeloLinkDaPorta } from "@/lib/porta-sessao";
 // lazy: o paywall do iPhone (e o que ele puxa do PaywallDia14) não entra no bundle principal do site
 const PaywallIOS = lazy(() => import("@/pages/funis/ios/PaywallIOS").then((m) => ({ default: m.PaywallIOS })));
+// 12/11 (1.0.26 / Android 138): chave `paywall_teste` off (padrão) = o gate do app é o paywall SEM teste, nas duas lojas
+const PaywallSemTeste = lazy(() => import("@/components/paywall/PaywallSemTeste").then((m) => ({ default: m.PaywallSemTeste })));
+import { usePaywallComTeste } from "@/hooks/use-paywall-teste";
 
 /** Tela do intervalo entre pagar e o crédito cair. Não é paywall e não é o
  *  app: é a resposta honesta pra quem acabou de pagar e voltou. Ela some
@@ -121,6 +124,7 @@ export const TrialBanner = () => {
   /* 10/10 (brief da Porta, seção 3): conta criada no site (user_metadata.porta), no iPhone, sem
    * assinatura → "Você ganhou 3 dias grátis" antes do paywall, 1x por sessão do app. */
   const [parabensFeito, setParabensFeito] = useState(() => parabensJaVisto());
+  const paywallComTeste = usePaywallComTeste();
 
   // Rescue do Purchase: quem paga o Pix sai do app pra abrir o banco e volta
   // já liberado (webhook gravou a assinatura) — a tela de confirmação não
@@ -214,7 +218,15 @@ export const TrialBanner = () => {
                     não passou" é desenhado nesta vaga (antes ficava atrás do
                     bloqueio e a pessoa só via "compre de novo"). */}
                 <VagaDoAvisoCobranca />
-                {ehApple() && !parabensFeito && (contaDaPorta(user.user_metadata) || entrouPeloLinkDaPorta())
+                {/* 12/11: sem teste (chave `paywall_teste` off) — sem o "Você ganhou 3 dias grátis" da Porta e sem o
+                    presente do bloqueio por cima (o presente sem teste mora dentro do PaywallSemTeste) */}
+                {!paywallComTeste
+                  ? (
+                    <Suspense fallback={<div className="min-h-[100dvh] bg-white" />}>
+                      <PaywallSemTeste modo="gate" area={getFunnelArea() ?? "dinheiro"} onPagoSemConta={() => { window.location.href = "/"; }} />
+                    </Suspense>
+                  )
+                  : ehApple() && !parabensFeito && (contaDaPorta(user.user_metadata) || entrouPeloLinkDaPorta())
                   ? <ParabensPorta porta={(user.user_metadata as { porta?: PortaNaConta }).porta} onContinuar={() => setParabensFeito(true)} />
                   : gateCurto
                   ? (
@@ -240,7 +252,7 @@ export const TrialBanner = () => {
                 {/* 07/10 (iPhone): quem perdeu o acesso depois de já ter testado vê o
                     presente de 69,90 por cima deste paywall; "Agora não" devolve o
                     paywall de sempre. Nunca junto com o aviso de cartão recusado. */}
-                <PresenteNoBloqueio />
+                {paywallComTeste && <PresenteNoBloqueio />}
               </>
             /* 01/10: venda na web desligada (src/lib/rotas-web.ts) — a conta
                logada sem acesso vê "Assine no app e use aqui também" no lugar

@@ -16,6 +16,10 @@ import { afterAll } from "vitest";
 // 31/10: o planner novo e a oferta com as folhas foram LIGADOS no site; a suíte de antes descreve as chaves desligadas
 (globalThis as { __PLANNER_2027__?: string; __U27_PLANNER__?: string }).__PLANNER_2027__ = "off";
 (globalThis as { __PLANNER_2027__?: string; __U27_PLANNER__?: string }).__U27_PLANNER__ = "off";
+/* 12/11 — PAYWALL SEM TESTE (lib/paywall-teste): o padrão do app é "off" (sem teste), mas a suíte de antes descreve o
+ * paywall COM o teste de 3 dias — que é exatamente o "on". Aqui a suíte inteira roda com "on" (é a trava de que o "on"
+ * ficou igual ao de hoje); os testes da chave (paywall-sem-teste*.test.tsx) apagam o global e veem o padrão de verdade. */
+(globalThis as { __PAYWALL_TESTE__?: string }).__PAYWALL_TESTE__ = "on";
 
 /**
  * REDE EXTERNA BLOQUEADA NOS TESTES (28/09). O cliente do Supabase aponta pra

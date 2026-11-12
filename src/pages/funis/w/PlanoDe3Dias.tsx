@@ -6,6 +6,7 @@ import { AREAS, type AreaKey } from "@/lib/funnel";
 import { isNativeShell } from "@/lib/native-shell";
 import { ofertaLigada } from "@/lib/ofertas-saida";
 import { textoDoContrato } from "@/lib/onboarding-1tela";
+import { paywallComTeste } from "@/lib/paywall-teste";
 import { COMPROMISSOS_POR_AREA, DEPOIS_DO_TESTE_POR_AREA, DIAS_POR_AREA, compromissoComoChip } from "./compromissos";
 
 const FUNIL = "w";
@@ -135,7 +136,7 @@ export function PlanoDe3Dias({ area, nome, onDone }: { area: AreaKey; nome?: str
 
         {/* o cadeado: o que vem depois do teste, borrado */}
         <div className="mt-3 relative rounded-2xl border border-border bg-card p-3.5 overflow-hidden" data-testid="plano-3-dias-cadeado">
-          <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">Depois do teste</div>
+          <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">{paywallComTeste() ? "Depois do teste" : "Depois dos 3 dias"}</div>
           <p className="text-[12px] text-muted-foreground mt-0.5">O que o CORE monta pra você nos próximos 30 dias</p>
           <ul className="mt-2 space-y-1.5 select-none" aria-hidden style={{ filter: "blur(4px)" }}>
             {depois.map((t) => (
@@ -144,7 +145,7 @@ export function PlanoDe3Dias({ area, nome, onDone }: { area: AreaKey; nome?: str
           </ul>
           <div className="absolute inset-x-0 bottom-0 pt-8 pb-3 bg-gradient-to-t from-card via-card/95 to-transparent grid place-items-center">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white border border-border px-3 py-1.5 text-[11.5px] font-bold text-foreground shadow-sm">
-              <Lock className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden /> Desbloqueia quando começar o teste grátis
+              <Lock className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden /> {paywallComTeste() ? "Desbloqueia quando começar o teste grátis" : "Desbloqueia quando você assinar"}
             </span>
           </div>
         </div>

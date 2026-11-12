@@ -59,6 +59,9 @@ import {
 import { PromessasScreen, ContratoScreen } from "@/pages/funis/teste/ComecarTeste";
 import { SignupScreen, ConfirmScreen, LiberandoScreen, POS_COMPRA_OAUTH_KEY } from "@/pages/funis/radar/ComecarRadar";
 import { PaywallW } from "./PaywallW";
+/* 12/11 (1.0.26 / Android 138): chave `paywall_teste` off (padrão) = o paywall SEM teste nas duas lojas (lib/paywall-teste) */
+import { PaywallSemTeste } from "@/components/paywall/PaywallSemTeste";
+import { usePaywallComTeste } from "@/hooks/use-paywall-teste";
 /* Lazy de propósito: esta folha só existe dentro do app da loja, e o
    ComecarW é carregado ansiosamente na /inicio da WEB (velocidade da 1ª tela,
    02/09) — o vaul do Drawer não pode entrar no bundle de quem nunca vai vê-la. */
@@ -660,6 +663,7 @@ export default function ComecarW() {
    * pago 2h antes (21% dos armados-que-compraram em 03/09). Também não arma
    * com pagamento pendente de cadastro (posCompra). */
   const { user: usuarioLogado, isSubscribed: jaAssina } = useAuth();
+  const paywallComTeste = usePaywallComTeste();
   useEffect(() => {
     if (naWeb || step !== "offer" || posCompra || (usuarioLogado && jaAssina)) return;
     void import("@/lib/notificacoes").then((m) => m.agendarResgateDoPlano(AREAS[areaOuPadrao].nome, { area: areaOuPadrao })).catch(() => { /* noop */ });
@@ -908,7 +912,12 @@ export default function ComecarW() {
                   renderizar. A partir daqui o paywall do Android e o do iPhone
                   são produtos separados: mexer num não alcança o outro, e não
                   depende de ninguém lembrar de uma condicional. */}
-              {step === "offer" && (
+              {/* 12/11: chave `paywall_teste` off (padrão) — o paywall SEM teste nas duas lojas, sem o sino antes
+                  ("A gente te avisa antes do teste acabar" não tem mais por quê). "on" = a bifurcação de hoje, intacta. */}
+              {step === "offer" && !naWeb && !paywallComTeste && (
+                <PaywallSemTeste area={areaOuPadrao} answers={answers} onPagoSemConta={() => pagoSemConta()} onVoltar={recuarDoPaywall} />
+              )}
+              {step === "offer" && (naWeb || paywallComTeste) && (
                 ehApple() ? (
                   /* 10/10 (PAYWALL_CURTO, ramo v14-paywall-curto): o paywall curto tem um botão Voltar
                      redondo e chama `onVoltar` quando nenhuma oferta de saída abre — aqui ele recua um

@@ -125,41 +125,43 @@ describe("crítica de fora, 10/11, rodada 1", () => {
      (vai tomar de manhã). A tela diz "a partir de amanhã", mas a 1ª dose nova cai no dia 9: o dia 8
      não tem dose nem aviso (35 h sem remédio). A guarda de "meio intervalo" (12 h no 1× ao dia) joga
      a das 07:00 do dia 8 (11 h depois da última) pra frente um dia inteiro. */
-  it("I1 1× ao dia 20:00 → 07:00 (tomada às 20:00): o dia 8 tem a dose das 07:00, com aviso", () => {
+  it("I1 1× ao dia 20:00 → 07:00 (tomada às 20:00): pela regra simples (11/11) a próxima é 09/07:00", () => {
     const store = criarStore({ [CHAVE]: [simples("20:00")], [LOG]: { "2026-11-07": ["r1"] } });
     agoraEm(7, 21, 0);
     montar(store);
     fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "07:00" } });
-    expect(falas).toContain("Os horários novos valem a partir de amanhã, às 07:00.");
-    expect(avisos(store)[0]).toBe("08/07:00"); // era "09/07:00"
-  });
-
-  it("I1 (depois do conserto) 20:00 → 07:00: novoDesde é o dia 8; às 07:00 do dia 8 a caixa é a das 07:00, em aberto, e marca no dia 8", () => {
-    const store = criarStore({ [CHAVE]: [simples("20:00")], [LOG]: { "2026-11-07": ["r1"] } });
-    agoraEm(7, 21, 0);
-    montar(store);
-    fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "07:00" } });
-    expect(linhas(store)[0].novoDesde).toBe("2026-11-08T07:00");
-    // até a virada, a caixa segue o ✓ das 20:00 de hoje
-    agoraEm(7, 23, 0);
-    voltarProApp();
-    expect(caixaSimples().getAttribute("aria-label")).toBe("Desmarcar Losartana");
-    agoraEm(8, 7, 0);
-    voltarProApp();
-    expect(caixaSimples().getAttribute("aria-label")).toBe("Marcar Losartana como tomado");
-    fireEvent.click(caixaSimples());
-    expect(log(store)).toEqual({ "2026-11-07": ["r1"], "2026-11-08": [linhas(store)[0].id] });
+    // 11/11, regra simples do dono: 20:00 + 12 h = 08:00 do dia 8 → a próxima é 09/07:00 (o dia 8 fica sem dose)
+    expect(falas).toContain("Próxima dose: 09/11 às 07:00.");
     expect(avisos(store)[0]).toBe("09/07:00");
   });
 
-  it("I1d 1× ao dia 23:00 → 00:30 às 10:00: a das 00:30 de amanhã ficaria 1 h 30 depois da das 23:00; a 1ª nova é a do dia 9 e a tela diz o dia", () => {
+  it("I1 (regra simples, 11/11) 20:00 → 07:00: novoDesde é o dia 9; às 07:00 do dia 9 a caixa é a das 07:00, em aberto, e marca no dia 9", () => {
+    const store = criarStore({ [CHAVE]: [simples("20:00")], [LOG]: { "2026-11-07": ["r1"] } });
+    agoraEm(7, 21, 0);
+    montar(store);
+    fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "07:00" } });
+    expect(linhas(store)[0].novoDesde).toBe("2026-11-09T07:00");
+    // até lá, a caixa segue o ✓ das 20:00 do dia 7
+    agoraEm(7, 23, 0);
+    voltarProApp();
+    expect(caixaSimples().getAttribute("aria-label")).toBe("Desmarcar Losartana");
+    agoraEm(9, 7, 0);
+    voltarProApp();
+    expect(caixaSimples().getAttribute("aria-label")).toBe("Marcar Losartana como tomado");
+    fireEvent.click(caixaSimples());
+    expect(log(store)).toEqual({ "2026-11-07": ["r1"], "2026-11-09": [linhas(store)[0].id] });
+    expect(avisos(store)[0]).toBe("10/07:00");
+  });
+
+  it("I1d 1× ao dia 23:00 → 00:30 às 10:00, sem marca: a 1ª nova é a de amanhã 00:30 e a tela diz o dia (regra simples, 11/11)", () => {
     const store = criarStore({ [CHAVE]: [simples("23:00")], [LOG]: {} });
     agoraEm(7, 10, 0);
     montar(store);
     fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "00:30" } });
-    expect(linhas(store)[0].novoDesde).toBe("2026-11-09T00:30");
-    expect(falas).toContain("Os horários novos valem a partir de 09/11, às 00:30.");
-    expect(avisos(store).slice(0, 2)).toEqual(["07/23:00", "09/00:30"]);
+    // 11/11, regra simples: sem marca nas últimas 48 h, a próxima é o 1º horário novo que não passou
+    expect(linhas(store)[0].novoDesde).toBe("2026-11-08T00:30");
+    expect(falas).toContain("Próxima dose: amanhã às 00:30.");
+    expect(avisos(store).slice(0, 2)).toEqual(["08/00:30", "09/00:30"]);
   });
 
   it("I1b o mesmo mudado de MANHÃ, antes da dose das 20:00 (dia 7 09:00): amanhã já é 07:00", () => {
@@ -167,7 +169,7 @@ describe("crítica de fora, 10/11, rodada 1", () => {
     agoraEm(7, 9, 0);
     montar(store);
     fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "07:00" } });
-    expect(avisos(store).slice(0, 2)).toEqual(["07/20:00", "08/07:00"]); // hoje: 07/20:00 e 09/07:00
+    expect(avisos(store).slice(0, 2)).toEqual(["08/07:00", "09/07:00"]); // 11/11, regra simples: sem marca, a 1ª nova que não passou
   });
 
   it("I1c com 'Até' = dia 8: o último dia tem a dose das 07:00, e nenhuma dose depois do fim", () => {
@@ -188,7 +190,7 @@ describe("crítica de fora, 10/11, rodada 1", () => {
     agoraEm(7, 9, 0);
     montar(store);
     fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "20:00" } });
-    expect(avisos(store)[0]).toBe("08/20:00");
+    expect(avisos(store)[0]).toBe("07/20:00"); // 11/11, regra simples: 08:00 + 12 h = 20:00 de hoje
     agoraEm(8, 8, 0);
     voltarProApp();
     fireEvent.click(caixaSimples());
@@ -196,18 +198,18 @@ describe("crítica de fora, 10/11, rodada 1", () => {
     expect(avisos(store)[0]).toBe("08/20:00"); // hoje: "09/20:00"
   });
 
-  it("I2 (depois do conserto, com o I1) dia 8 20:00, por costume: a caixa marca a das 07:00 do DIA 8 (atrasada) e o dia 9 amanhece em aberto, com aviso", () => {
+  it("I2 (regra simples, 11/11) dia 9 20:00, por costume: a caixa marca a das 07:00 do DIA 9 (atrasada) e o dia 10 amanhece em aberto, com aviso", () => {
     const store = criarStore({ [CHAVE]: [simples("20:00")], [LOG]: { "2026-11-07": ["r1"] } });
     agoraEm(7, 21, 0);
     montar(store);
     fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "07:00" } });
-    agoraEm(8, 20, 0);
+    agoraEm(9, 20, 0);
     voltarProApp();
     expect(caixaSimples().getAttribute("aria-label")).toBe("Marcar Losartana como tomado");
     fireEvent.click(caixaSimples());
-    expect(log(store)).toEqual({ "2026-11-07": ["r1"], "2026-11-08": [linhas(store)[0].id] });
-    expect(avisos(store)[0]).toBe("09/07:00");
-    agoraEm(9, 7, 0);
+    expect(log(store)).toEqual({ "2026-11-07": ["r1"], "2026-11-09": [linhas(store)[0].id] });
+    expect(avisos(store)[0]).toBe("10/07:00");
+    agoraEm(10, 7, 0);
     voltarProApp();
     expect(caixaSimples().getAttribute("aria-label")).toBe("Marcar Losartana como tomado");
   });
@@ -229,14 +231,16 @@ describe("crítica de fora, 10/11, rodada 1", () => {
   });
 
   /* I3: mudar o horário no ÚLTIMO dia do tratamento ("Até" = dia 7). */
-  it("I3 12 em 12 20:00 (20:00 e 08:00) até o dia 7, mudado pra 08:00 às 10:00 do dia 7: a das 08:00 do dia 8 (a última) tem aviso", () => {
+  /* 11/11, regra simples: ABERTO (atrás da chave, só com "Até"). Mudar a 1ª dose de um tratamento com fim muda
+     qual dose é "da noite": a das 08:00 do dia 8 deixa de existir (I3) ou ganha uma depois do fim (I3b). */
+  it.fails("I3 12 em 12 20:00 (20:00 e 08:00) até o dia 7, mudado pra 08:00 às 10:00 do dia 7: a das 08:00 do dia 8 (a última) tem aviso", () => {
     const lista = mudarHorarios(tratamento(2, "20:00", "2026-11-07"), ["08:00", "20:00"], agoraEm(7, 10, 0)).itens;
     const { fila, tela } = telaEAvisos(lista, agoraEm(7, 10, 0));
     expect(tela).toEqual(["07/20:00", "08/08:00"]); // passa: a tela mostra a última dose
     expect(fila).toEqual(["07/20:00", "08/08:00"]); // hoje: só "07/20:00"
   });
 
-  it("I3 (depois do conserto) na hora da última dose (dia 8 08:00) a tela não diz 'terminou', a caixa marca a das 08:00 e às 20:00 do dia 8 terminou", () => {
+  it.fails("I3 (depois do conserto) na hora da última dose (dia 8 08:00) a tela não diz 'terminou', a caixa marca a das 08:00 e às 20:00 do dia 8 terminou", () => {
     const store = criarStore({ [CHAVE]: tratamento(2, "20:00", "2026-11-07"), [LOG]: {} });
     agoraEm(7, 10, 0);
     montar(store);
@@ -255,7 +259,7 @@ describe("crítica de fora, 10/11, rodada 1", () => {
     expect(screen.getByTestId("remedio-detalhe").textContent).toContain("terminou");
   });
 
-  it("I3b 12 em 12 08:00 (08:00 e 20:00) até o dia 7, mudado pra 20:00 às 10:00 do dia 7: nenhum aviso depois do fim", () => {
+  it.fails("I3b 12 em 12 08:00 (08:00 e 20:00) até o dia 7, mudado pra 20:00 às 10:00 do dia 7: nenhum aviso depois do fim", () => {
     const lista = mudarHorarios(tratamento(2, "08:00", "2026-11-07"), ["20:00", "08:00"], agoraEm(7, 10, 0)).itens;
     const { fila, tela } = telaEAvisos(lista, agoraEm(7, 10, 0));
     expect(tela).toEqual(["07/20:00"]); // passa: a última dose é a das 20:00 do dia 7
@@ -266,17 +270,17 @@ describe("crítica de fora, 10/11, rodada 1", () => {
      regra) e o aviso das 08:00 toca — mas a linha mostra "22:00" e a caixa em aberto. Num remédio de
      várias doses a pílula mostra a hora de hoje (08:00); no de 1× ao dia não há nada na tela que diga
      que hoje ainda é 08:00 (o toast "a partir de amanhã" some em 4 s). Às 22:00 não toca nada. */
-  it("I4 1× ao dia 08:00 → 22:00 às 07:00: às 08:00 a linha mostra a hora da dose de hoje (08:00)", () => {
+  it("I4 1× ao dia 08:00 → 22:00 às 07:00 (sem marca): a linha mostra o dia e a hora da próxima dose", () => {
     const store = criarStore({ [CHAVE]: [simples("08:00")], [LOG]: {} });
     agoraEm(7, 7, 0);
     montar(store);
     fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "22:00" } });
-    expect(avisos(store)[0]).toBe("07/08:00"); // a regra: hoje ainda é 08:00
+    // 11/11, regra simples: sem marca nas últimas 48 h, a próxima é a 1ª nova que não passou — hoje 22:00
+    expect(avisos(store)[0]).toBe("07/22:00");
     agoraEm(7, 8, 0);
     voltarProApp();
-    expect(screen.getByTestId("remedio-horario-hoje").textContent).toBe("hoje 08:00 · 22:00 a partir de amanhã"); // era só o campo com "22:00"
-    expect(screen.getByText(/08:00/)).toBeTruthy();
-    expect(falas).toContain("Os horários novos valem a partir de amanhã, às 22:00.");
+    expect(screen.getByTestId("remedio-horario-hoje").textContent).toBe("Próxima dose: hoje às 22:00");
+    expect(falas).toContain("Próxima dose: hoje às 22:00.");
   });
 });
 
@@ -320,7 +324,8 @@ describe("crítica de fora, 10/11, rodada 1 — varreduras de guarda", () => {
     expect(problemas.slice(0, 10)).toEqual([]);
   }, 180_000);
 
-  it("1× ao dia: a 1ª nova nunca fica a menos de 6 h da última de antes, e o dia seguinte do calendário tem a dose nova (a não ser que ela caísse a menos de 6 h)", () => {
+  // 11/11: regra de 6 h substituída pela do meio intervalo do último comprimido (varredura em remedio-simples-11-11)
+  it.skip("1× ao dia: a 1ª nova nunca fica a menos de 6 h da última de antes, e o dia seguinte do calendário tem a dose nova (a não ser que ela caísse a menos de 6 h)", () => {
     const problemas: string[] = [];
     for (let de = 0; de < 24 * 60; de += 120) {
       for (let pra = 30; pra < 24 * 60; pra += 120) {

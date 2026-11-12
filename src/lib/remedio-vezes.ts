@@ -5,9 +5,8 @@
  *   · "Quantas vezes" além de 1× ao dia (12 em 12, 8 em 8, 6 em 6) e a fileira "Horários"
  *     com o "Começa hoje/amanhã";
  *   · "Até quando" (data de fim) — no cadastro e na edição de um remédio que ainda não tem fim;
- *   · (11/11) a regra "mudar o horário vale a partir de amanhã" (lib/remedios, mudarHorarios). Com a chave
- *     off, mudar o horário vale NA HORA, como na 1.0.24 (PharmacyChecklist, changeTime) — a regra nova ainda
- *     tem J1/J3 abertos (src/test/critica-fora-10-11-r2) e não pode ir pra todo mundo.
+ *   · (11/11, depois) mudar o horário NÃO fica mais atrás da chave: on ou off, a próxima dose é o 1º horário
+ *     novo a meio intervalo do último comprimido marcado (lib/remedios, mudarHorarios).
  *
  * POR QUE: o lembrete do celular é agendado pelo app do celular, e a versão que está hoje na
  * loja não conhece `ate` nem `inicio` (lib/remedios). Um 8 em 8 com fim cadastrado no site

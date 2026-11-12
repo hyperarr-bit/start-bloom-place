@@ -165,37 +165,36 @@ let falasDaUltima: string[] = [];
 describe("crítica de fora, 08/11, rodada 1", () => {
   afterEach(() => { nativo.on = false; rearmes.n = 0; });
 
-  /* Simplificação (08/11): mudar a 1ª dose às 15:00 não mexe em nada de hoje — a 08:00 tomada segue ✓, a
-     das 16:00 é a próxima e tem aviso, a das 00:00 desta noite também. Os horários novos começam amanhã,
-     na 1ª dose nova a mais de meio intervalo (4 h) da das 00:00. Os mesmos horários digitados de outro
-     jeito (23:00 ou 07:00 = 07/15/23) dão a mesma fila. */
-  const HOJE = { marcas: ["06/08:00", "06/16:00", "07/00:00", "07/08:00"], caixa: "Próxima dose de Amoxicilina às 16:00" };
-  it("F1 (agora) 08:00 → 07:00 às 15:00: hoje segue 08:00 ✓ 16:00 00:00; amanhã 07:00, 15:00 e 23:00", () => {
+  /* Regra simples (11/11): a última tomada é a das 08:00 do dia 7 → a próxima é a 1ª nova a 4 h ou mais dela
+     e que não passou (15:00 em diante). Nenhuma marca muda. Os mesmos horários digitados de outro jeito
+     (23:00 ou 07:00 = 07/15/23) dão a mesma fila. */
+  const MARCAS = ["06/08:00", "06/16:00", "07/00:00", "07/08:00"];
+  it("F1 (agora) 08:00 → 07:00 às 15:00: a próxima é hoje 15:00; o registro fica igual", () => {
     const r = mudouAs15("07:00");
-    expect(r).toMatchObject({ horas: "07:00/15:00/23:00", ...HOJE, aviso: "07/16:00" });
-    expect(pilulasDaUltima).toBe("00:00 08:00✓ 16:00");
-    expect(r.fila.slice(0, 5)).toEqual(["07/16:00", "08/00:00", "08/07:00", "08/15:00", "08/23:00"]);
-    expect(falasDaUltima).toContain("Os horários novos valem a partir de amanhã, às 07:00."); // 10/11: o dia E a hora
+    expect(r).toMatchObject({ horas: "07:00/15:00/23:00", marcas: MARCAS });
+    expect(pilulasDaUltima).toBe("07:00 15:00 23:00"); // a das 07:00 de hoje fica apagada (já passou)
+    expect(r.fila.slice(0, 3)).toEqual(["07/23:00", "08/07:00", "08/15:00"]); // a das 15:00 é agora: já está na tela
+    expect(falasDaUltima).toContain("Próxima dose: hoje às 15:00.");
   });
 
   it("F1 (agora) 08:00 → 23:00 às 15:00 (os mesmos 07/15/23): a mesma fila de 08:00 → 07:00", () => {
     const r = mudouAs15("23:00");
-    expect(pilulasDaUltima).toBe("00:00 08:00✓ 16:00");
+    expect(pilulasDaUltima).toBe("07:00 15:00 23:00"); // a das 07:00 de hoje fica apagada (já passou)
     expect(r).toEqual(mudouAs15("07:00"));
   });
 
-  it("F1 (agora) 08:00 → 22:00 às 15:00 (os mesmos 06/14/22 que 08:00 → 06:00): a mesma fila, e amanhã começa às 06:00", () => {
+  it("F1 (agora) 08:00 → 22:00 às 15:00 (os mesmos 06/14/22 que 08:00 → 06:00): a mesma fila; a das 14:00 já passou, a próxima é 22:00", () => {
     const r = mudouAs15("22:00");
-    expect(r).toMatchObject({ ...HOJE, aviso: "07/16:00" });
+    expect(r).toMatchObject({ marcas: MARCAS, aviso: "07/22:00" });
     expect(r).toEqual(mudouAs15("06:00"));
-    expect(r.fila.slice(0, 3)).toEqual(["07/16:00", "08/00:00", "08/06:00"]);
+    expect(r.fila.slice(0, 3)).toEqual(["07/22:00", "08/06:00", "08/14:00"]);
   });
 
-  it("F1 (agora) 08:00 → 02:00 às 15:00 (02/10/18): a das 02:00 de amanhã ficaria a 2 h da das 00:00 — os novos começam às 10:00", () => {
+  it("F1 (agora) 08:00 → 02:00 às 15:00 (02/10/18): a próxima é hoje 18:00", () => {
     const r = mudouAs15("02:00");
-    expect(r).toMatchObject({ ...HOJE, aviso: "07/16:00" });
+    expect(r).toMatchObject({ marcas: MARCAS, aviso: "07/18:00" });
     expect(r).toEqual(mudouAs15("10:00"));
-    expect(r.fila.slice(0, 4)).toEqual(["07/16:00", "08/00:00", "08/10:00", "08/18:00"]);
+    expect(r.fila.slice(0, 3)).toEqual(["07/18:00", "08/02:00", "08/10:00"]);
   });
 
   it("F2 1× ao dia 23:00, esquecida no dia 7 e tomada às 00:30 do dia 8: o aviso das 23:00 do dia 8 fica e a caixa do dia 8 fica em aberto", () => {
@@ -272,7 +271,7 @@ describe("crítica de fora, 08/11, rodada 1", () => {
 
 /* Conserto 08/11: casos em volta dos 4 consertos. */
 describe("crítica de fora, 08/11, rodada 1 — em volta do conserto", () => {
-  it("(agora) às 08:30, 08:00 tomada e a 1ª dose mudada pra 10:00: a marca fica na 08:00, o próximo aviso é 16:00 e os novos começam amanhã 10:00", () => {
+  it("(agora, regra simples 11/11) às 08:30, 08:00 tomada e a 1ª dose mudada pra 10:00: a marca fica; a próxima é 18:00 (4 h depois das 08:00, 10:00 não serve)", () => {
     const novas = vezes(3, "08:00", agoraEm(3, 7, 50));
     const [d08, d16, d00] = novas.map((l) => l.id);
     const logIni = { "2026-11-06": [d08, d16], "2026-11-07": [d00, d08] };
@@ -281,12 +280,12 @@ describe("crítica de fora, 08/11, rodada 1 — em volta do conserto", () => {
     montar(store);
     mudarPrimeira("10:00");
     expect(log(store)).toEqual(logIni);
-    expect(pilulas()).toBe("00:00 08:00✓ 16:00");
-    expect(avisos(store).slice(0, 3)).toEqual(["07/16:00", "08/00:00", "08/10:00"]);
-    expect(falas).toContain("Os horários novos valem a partir de amanhã, às 10:00."); // 10/11: o dia E a hora
+    expect(pilulas()).toBe("02:00 10:00 18:00"); // a das 10:00 fica apagada (a 2 h da das 08:00)
+    expect(avisos(store).slice(0, 3)).toEqual(["07/18:00", "08/02:00", "08/10:00"]);
+    expect(falas).toContain("Próxima dose: hoje às 18:00.");
   });
 
-  it("(agora) estoque zerado: a anotação 'sem baixa' fica como está e desmarcar a 08:00 de hoje não cria comprimido", () => {
+  it("(agora) estoque zerado: a anotação 'sem baixa' fica como está e o estoque não muda", () => {
     const novas = vezes(3, "08:00", agoraEm(3, 7, 50)).map((l) => ({ ...l, stock: 0 }));
     const [d08, , d00] = novas.map((l) => l.id);
     const store = criarStore({ [CHAVE]: novas, [LOG]: { "2026-11-07": [d00, d08] }, "core-saude-supplement-sem-baixa": { dia: "2026-11-07", ids: [d08] } });
@@ -295,14 +294,14 @@ describe("crítica de fora, 08/11, rodada 1 — em volta do conserto", () => {
     mudarPrimeira("23:00");
     expect(log(store)["2026-11-07"]).toEqual([d00, d08]);
     expect(store.estado.dados["core-saude-supplement-sem-baixa"]).toEqual({ dia: "2026-11-07", ids: [d08] });
-    fireEvent.click(pilula(d08)); // desmarca a 08:00 de hoje
-    expect(estoque(store)).toEqual([0, 0, 0]);
+    expect(estoque(store)).toEqual([0, 0, 0]); // 11/11: a 08:00 de hoje sai da tela (a tela passa pros horários novos)
   });
 
   /* A conta pura (08/11, simplificação): de 08:00 pra qualquer hora às 15:00, hoje não muda e cada lugar do
      registro ("id no dia") é de UMA dose só, antes e depois da troca — então nenhuma marca pode cair na dose
      errada. E a 1ª dose nova fica a mais de meio intervalo da última de antes. */
-  it("(agora) conta pura: de 08:00 pra qualquer hora às 15:00, hoje não muda, cada 'id no dia' é de uma dose só e a 1ª dose nova fica a mais de 4 h da das 00:00", () => {
+  // 11/11: regra "hoje não muda" substituída pela regra simples ("id no dia" de uma dose só: varredura em remedio-simples-11-11)
+  it.skip("(agora) conta pura: de 08:00 pra qualquer hora às 15:00, hoje não muda, cada 'id no dia' é de uma dose só e a 1ª dose nova fica a mais de 4 h da das 00:00", () => {
     const novas = vezes(3, "08:00", agoraEm(3, 7, 50));
     const agora = agoraEm(7, 15, 0);
     for (let m = 0; m < 24 * 60; m += 30) {
@@ -323,7 +322,8 @@ describe("crítica de fora, 08/11, rodada 1 — em volta do conserto", () => {
     }
   });
 
-  it("(agora) conta pura, 1× ao dia: de 00:00, 00:30, 08:00, 20:00 e 23:00 pra qualquer hora, mudado de 2 h 30 em 2 h 30 — a dose da vez não muda na hora, cada 'id no dia' é de uma dose só e a 1ª dose nova fica a 6 h ou mais da última de antes (era 12 h; 10/11, I1)", () => {
+  // 11/11: idem (a dose da vez muda na hora e a folga é a do meio intervalo do último comprimido)
+  it.skip("(agora) conta pura, 1× ao dia: de 00:00, 00:30, 08:00, 20:00 e 23:00 pra qualquer hora, mudado de 2 h 30 em 2 h 30 — a dose da vez não muda na hora, cada 'id no dia' é de uma dose só e a 1ª dose nova fica a 6 h ou mais da última de antes (era 12 h; 10/11, I1)", () => {
     const problemas: string[] = [];
     for (const de of ["00:00", "00:30", "08:00", "20:00", "23:00"]) {
       const linha = [{ id: "r1", name: "Losartana", time: de, stock: 30, dosesPerDay: 1 }];

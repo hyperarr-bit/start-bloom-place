@@ -138,7 +138,7 @@ const tomadas = (s: Store) => marcasNoRelogio(s);
 describe("crítica de fora, 08/11, rodada 2", () => {
   afterEach(() => { nativo.on = false; rearmes.n = 0; });
 
-  it("G1 (agora) 8 em 8: 08:00 tomada; às 08:20 a 1ª dose vira 09:30 — a marca fica na 08:00, hoje segue (16:00 e 00:00) e os novos começam amanhã 09:30", () => {
+  it("G1 (regra simples, 11/11) 8 em 8: 08:00 tomada; às 08:20 a 1ª dose vira 09:30 — a marca fica; a próxima é hoje 17:30 (4 h depois das 08:00)", () => {
     const novas = vezes(3, "08:00", agoraEm(3, 7, 50));
     const [d08, d16, d00] = novas.map((l) => l.id);
     const logIni = { "2026-11-06": [d08, d16], "2026-11-07": [d00, d08] };
@@ -147,12 +147,12 @@ describe("crítica de fora, 08/11, rodada 2", () => {
     montar(store);
     mudarPrimeira("09:30");
     expect(log(store)).toEqual(logIni);
-    expect(pilulas()).toBe("00:00 08:00✓ 16:00");
-    expect(avisos(store).slice(0, 3)).toEqual(["07/16:00", "08/00:00", "08/09:30"]);
-    expect(falas).toContain("Os horários novos valem a partir de amanhã, às 09:30."); // 10/11: o dia E a hora
+    expect(pilulas()).toBe("01:30 09:30 17:30");
+    expect(avisos(store).slice(0, 3)).toEqual(["07/17:30", "08/01:30", "08/09:30"]);
+    expect(falas).toContain("Próxima dose: hoje às 17:30.");
   });
 
-  it("G1 (agora) 12 em 12: 08:00 tomada às 08:00; às 08:10 a 1ª dose vira 09:30 — sem aviso 1 h 30 depois do comprimido: hoje 20:00, amanhã 09:30", () => {
+  it("G1 (regra simples, 11/11) 12 em 12: 08:00 tomada às 08:00; às 08:10 a 1ª dose vira 09:30 — sem aviso 1 h 30 depois do comprimido: hoje 21:30", () => {
     const novas = vezes(2, "08:00", agoraEm(3, 7, 50));
     const [d08, d20] = novas.map((l) => l.id);
     const logIni = { "2026-11-06": [d08, d20], "2026-11-07": [d08] };
@@ -160,9 +160,9 @@ describe("crítica de fora, 08/11, rodada 2", () => {
     agoraEm(7, 8, 10);
     montar(store);
     mudarPrimeira("09:30");
-    expect(avisos(store).slice(0, 3)).toEqual(["07/20:00", "08/09:30", "08/21:30"]);
+    expect(avisos(store).slice(0, 3)).toEqual(["07/21:30", "08/09:30", "08/21:30"]);
     expect(log(store)).toEqual(logIni);
-    expect(rotulo()).toBe("Próxima dose de Amoxicilina às 20:00");
+    expect(rotulo()).toBe("Próxima dose de Amoxicilina às 21:30");
   });
 
   it.fails("G2 'Começa hoje 08:00' desenhado às 23:59 e tocado às 00:00:30: vira o dia 8 (o amanhã da tela), não o 9", () => {
@@ -244,7 +244,8 @@ describe("crítica de fora, 08/11, rodada 2 — varredura de guarda (passa hoje)
 
 /* ---------- guarda: mudar a 1ª dose de um remédio de várias doses (simplificação 08/11: a partir de amanhã) ---------- */
 describe("crítica de fora, 08/11, rodada 2 — mudar a 1ª dose e a fila (a partir de amanhã)", () => {
-  it("12/12, 8/8 e 6/6, em dia: de hora em hora por um dia, toda 1ª dose nova de 30 em 30 min — a fila de hoje segue a de antes até a última dose do dia, nada entre ela e a 1ª dose nova, que fica depois de hoje e a mais de meio intervalo dela", () => {
+  // 11/11: regra "a partir de amanhã" substituída pela regra simples (varredura em remedio-simples-11-11)
+  it.skip("12/12, 8/8 e 6/6, em dia: de hora em hora por um dia, toda 1ª dose nova de 30 em 30 min — a fila de hoje segue a de antes até a última dose do dia, nada entre ela e a 1ª dose nova, que fica depois de hoje e a mais de meio intervalo dela", () => {
     const problemas: string[] = [];
     for (const [n, p] of [[2, "08:00"], [3, "08:00"], [4, "06:00"], [2, "20:00"]] as const) {
       const novas = montarLinhas({ name: "A", stock: 50 }, gerarHorarios(p, n), undefined, new Date(2026, 10, 3, 7, 0).getTime(), `2026-11-03T${p}`);

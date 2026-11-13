@@ -47,6 +47,10 @@ export type OpcoesCheckout = {
   pk: string; precoCentavos: number; parcelasMax: number; producao: boolean;
   /** STRIPE_PEDE_CPF no <head> (nota fiscal): o campo de CPF abaixo do e-mail */
   pedeCpf?: boolean;
+  /** Opt-in web journey; defaults preserve the existing /oferta checkout. */
+  somentePix?: boolean;
+  layout?: "novo";
+  storagePrefix?: string;
   /** só testes: liga a medição da carteira sem mexer em MEDIR_CARTEIRA */
   medirCarteira?: boolean;
   /** só testes: mostra o "Prefiro pagar com cartão" sem mexer em PIX_TROCA_CARTAO */
@@ -83,8 +87,8 @@ const w = window as Janela;
 const FUNCOES = "https://itoylenzvahbscgjgtqf.supabase.co/functions/v1";
 const ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0b3lsZW56dmFoYnNjZ2pndHFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMTc4NzUsImV4cCI6MjA4OTg5Mzg3NX0.G3bJEdD5B5lmc1cic6UYGeu2xv4XrbmZ9MA_afoYnLg";
 const GUIA = "https://www.coreaplicativo.com.br/guia/core-comece-aqui.pdf";
-const CHAVE_REF = "oferta-stripe-ref";
-const CHAVE_PI = "oferta-stripe-pi";
+const chaveRef = () => `${opc?.storagePrefix ?? "oferta"}-stripe-ref`;
+const chavePi = () => `${opc?.storagePrefix ?? "oferta"}-stripe-pi`;
 /**
  * 06/11: APPLE PAY e GOOGLE PAY, SÓ MEDIÇÃO. "on" = landing_stripe_carteira diz quantos aparelhos teriam a carteira, sem mostrar nada
  * (o Element segue com wallets "never"). Antes de ligar: registrar o domínio na Stripe e abrir o Permissions-Policy `payment=()` do
@@ -105,14 +109,14 @@ const novoId = () => { try { return crypto.randomUUID(); } catch { return `o${Da
 
 /** o PaymentIntent desta ref (sessionStorage, junto da ref): a recarga reaproveita o mesmo (e o mesmo QR do Pix) */
 function piDaAba(ref: string): string | null {
-  try { const j = JSON.parse(sessionStorage.getItem(CHAVE_PI) || "null") as { ref?: string; pi?: string } | null; return j && j.ref === ref && typeof j.pi === "string" && /^pi_/.test(j.pi) ? j.pi : null; } catch { return null; }
+  try { const j = JSON.parse(sessionStorage.getItem(chavePi()) || "null") as { ref?: string; pi?: string } | null; return j && j.ref === ref && typeof j.pi === "string" && /^pi_/.test(j.pi) ? j.pi : null; } catch { return null; }
 }
-function guardarPi(ref: string, pi: string) { try { sessionStorage.setItem(CHAVE_PI, JSON.stringify({ ref, pi })); } catch { /* heap */ } }
+function guardarPi(ref: string, pi: string) { try { sessionStorage.setItem(chavePi(), JSON.stringify({ ref, pi })); } catch { /* heap */ } }
 /** a ref do pedido nesta aba (a mesma se a pessoa fecha e reabre — o servidor não cria 2 PaymentIntents) */
 function refDaAba(): string {
-  try { const r = sessionStorage.getItem(CHAVE_REF); if (r && /^[A-Za-z0-9-]{8,64}$/.test(r)) return r; } catch { /* noop */ }
+  try { const r = sessionStorage.getItem(chaveRef()); if (r && /^[A-Za-z0-9-]{8,64}$/.test(r)) return r; } catch { /* noop */ }
   const r = novoId();
-  try { sessionStorage.setItem(CHAVE_REF, r); } catch { /* fica no heap */ }
+  try { sessionStorage.setItem(chaveRef(), r); } catch { /* fica no heap */ }
   return r;
 }
 
@@ -360,7 +364,7 @@ function soltar() {
 function montarCamada(o: OpcoesCheckout): HTMLElement {
   if (!document.getElementById("oc-estilo")) { const st = document.createElement("style"); st.id = "oc-estilo"; st.textContent = CSS; document.head.appendChild(st); }
   const el = document.createElement("div");
-  el.className = "oc"; el.id = "oc";
+  el.className = o.layout === "novo" ? "oc oc-novo" : "oc"; el.id = "oc";
   el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-labelledby", "oc-tit");
   el.innerHTML = `
     <div class="oc-barra"><b>CORE</b><span>${ICO_CADEADO}Pagamento seguro</span><button type="button" class="oc-x" id="oc-x" aria-label="Fechar o pagamento">×</button></div>
@@ -412,6 +416,12 @@ function telaForm() {
     <p class="oc-erro" id="oc-erro" role="alert" hidden></p>
     <button type="button" class="oc-cta" id="oc-pagar"></button>
     <p class="oc-miuda">Pix ou cartão${o.parcelasMax > 1 ? ` em até ${o.parcelasMax}x` : ""} · processado pela Stripe · CORE · CNPJ 55.041.112/0001-82</p>`;
+  if (o.somentePix) {
+    est!.metodo = "pix";
+    alvo.querySelector(".oc-metodos")?.remove();
+    alvo.querySelector(".oc-miuda")!.textContent = "Pagamento único por Pix · processado pela Stripe · CORE · CNPJ 55.041.112/0001-82";
+  }
+  if (o.layout === "novo") montarLayoutNovo(alvo);
   const campo = alvo.querySelector<HTMLInputElement>("#oc-email")!;
   const sug = alvo.querySelector<HTMLButtonElement>("#oc-sug")!;
   const atualizarSug = () => {
@@ -439,6 +449,21 @@ function telaForm() {
   });
   mostrarMetodo();
   void montarElemento();
+}
+
+
+/** The reviewed checkout design, using the same payment state machine and server confirmation. */
+function montarLayoutNovo(alvo: HTMLElement) {
+  alvo.querySelector(".oc-resumo")?.remove();
+  alvo.querySelector(".oc-provas")?.remove();
+  const form = document.createElement("section"); form.className = "oc-form-card";
+  while (alvo.firstChild) form.appendChild(alvo.firstChild);
+  form.insertAdjacentHTML("afterbegin", '<h2 id="oc-tit">Seu acesso ao CORE.</h2><p class="oc-form-intro">Informe seu e-mail para continuar com o Pix.</p><h3 class="oc-step"><span>1</span> Seu acesso</h3>');
+  form.querySelector(".oc-pagamento")!.insertAdjacentHTML("beforebegin", '<h3 class="oc-step"><span>2</span> Pagamento por Pix</h3>');
+  form.querySelector("#oc-pagar")!.insertAdjacentHTML("beforebegin", `<div class="oc-total"><span>Total a pagar</span><strong>${esc(preco())}</strong></div>`);
+  const aside = document.createElement("aside");aside.className = "oc-order-card";
+  aside.innerHTML = `<div class="oc-product-row"><img src="/completo/icone-app-512.webp" width="56" height="56" alt=""/><div><span class="oc-eyebrow">SEU APP. SUA VIDA.</span><h2>CORE completo</h2><p>Acesso vitalício · 16 módulos</p></div></div><div class="oc-total"><span>Total da compra</span><strong>${esc(preco())}</strong></div><p class="oc-once">Pagamento único. Sem renovação.</p><h3>Você recebe acesso a:</h3><ul><li>Todos os 16 módulos: finanças, rotina e mais 14 áreas</li><li>CORE no iPhone, Android e computador</li><li>Acesso vitalício, com uma única conta</li></ul><div class="oc-guarantee">${ICO_CADEADO}<div><strong>7 dias de garantia</strong><p>Se não for para você, devolvemos 100% do valor.</p></div></div>`;
+  const grid = document.createElement("div");grid.className = "oc-new-grid";grid.append(aside,form);alvo.append(grid);
 }
 
 const metodoAtual = (): Metodo => (est?.metodo === "card" ? "card" : "pix");
@@ -590,7 +615,7 @@ async function montarElemento() {
       stripe = s;
     } catch { return false; }
     // erro síncrono no cartão não derruba o Pix: o Stripe.js está aqui, e o Pix só precisa dele
-    try { montarCartao(stripe, minha, t0); }
+    try { if (!o.somentePix) montarCartao(stripe, minha, t0); }
     catch (e) {
       cartaoFalhou = true;
       o.evento("landing_erro", { onde: "stripe_cartao", msg: String((e as Error)?.name ?? "").slice(0, 40) });
@@ -702,7 +727,7 @@ function telaPix() {
       <div class="oc-copia"><input id="oc-codigo" readonly value="${esc(p.data ?? "")}" aria-label="Pix copia e cola" /><button type="button" id="oc-copiar">Copiar</button></div>
       <ol class="oc-passos"><li>Abra o app do seu banco e escolha <b>Pix copia e cola</b> (ou leia o QR).</li><li>Cole o código e confirme ${esc(preco())}.</li><li>Volte aqui: esta tela confirma sozinha.</li></ol>
       ${hora ? `<p>Vale até ${esc(hora)}. O acesso também chega no seu e-mail.</p>` : "<p>O acesso também chega no seu e-mail.</p>"}
-      ${o.trocaCartao ?? PIX_TROCA_CARTAO === "on" ? `<p class="oc-erro" id="oc-erro" role="alert" hidden></p><button type="button" class="oc-trocar" id="oc-trocar">Prefiro pagar com cartão</button>` : ""}
+      ${!o.somentePix && (o.trocaCartao ?? PIX_TROCA_CARTAO === "on") ? `<p class="oc-erro" id="oc-erro" role="alert" hidden></p><button type="button" class="oc-trocar" id="oc-trocar">Prefiro pagar com cartão</button>` : ""}
     </div>`;
   alvo.querySelector("#oc-trocar")?.addEventListener("click", () => { void trocarPixPorCartao(); });
   if (!p.image_url_png && p.data) void desenharQr(alvo.querySelector<HTMLElement>("#oc-qr")!, p.data);
@@ -757,8 +782,8 @@ function telaRecebido() {
   opc?.evento("landing_stripe_recebido_sem_confirmar", { pi: est.pi });
   raiz.querySelector<HTMLElement>("#oc-in")!.innerHTML = `
     <div class="oc-pago" data-testid="oferta-recebido">
-      <h2 id="oc-tit">Pagamento recebido?</h2>
-      <p>O acesso chega no seu e-mail em até 1 minuto. Enquanto isso, baixe o app:</p>
+      <h2 id="oc-tit">${opc?.layout === "novo" ? "Ainda não conseguimos confirmar" : "Pagamento recebido?"}</h2>
+      <p>${opc?.layout === "novo" ? "Confira o status no seu banco antes de tentar pagar novamente. Quando o pagamento for confirmado, as instruções de acesso chegam por e-mail." : "O acesso chega no seu e-mail em até 1 minuto. Enquanto isso, baixe o app:"}</p>
       <div class="oc-selos"><a href="${URL_APP_STORE}" data-loja="ios"><img src="/selos/app-store.svg" alt="Baixar na App Store" width="144" height="48" /></a><a href="${esc(urlPlay("oferta"))}" data-loja="android"><img src="/selos/google-play.png" alt="Disponível no Google Play" width="124" height="48" /></a></div>
       <p class="oc-contato">No app, toque em <b>“Já tenho conta? Entrar”</b> com o e-mail da compra. Não chegou? <a href="mailto:contato@coreaplicativo.com.br">contato@coreaplicativo.com.br</a></p>
     </div>`;
@@ -799,7 +824,7 @@ function mostrarPago(metodo: string) {
     window.addEventListener("popstate", aoVoltarNavegador);
     vigiarSaida(true);
   }
-  try { sessionStorage.removeItem(CHAVE_REF); sessionStorage.removeItem(CHAVE_PI); } catch { /* noop */ }
+  try { sessionStorage.removeItem(chaveRef()); sessionStorage.removeItem(chavePi()); } catch { /* noop */ }
   o.evento("landing_stripe_pago", { metodo, pi: est.pi });
   if (est.pi) o.pixel("Purchase", { value: o.precoCentavos / 100, currency: "BRL", content_name: "oferta_stripe" }, est.pi);
   telaPago();

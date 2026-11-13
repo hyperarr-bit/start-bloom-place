@@ -2,3 +2,5 @@
 @media(max-width:700px){.oc-new-grid{display:flex;flex-direction:column;gap:18px}.oc-order-card,.oc-form-card{width:100%;padding:22px}.oc-novo .oc-in{padding:20px 16px 40px}.oc-novo .oc-barra{padding:15px 20px}.oc-order-card .oc-total{margin-top:18px}.oc-order-card h3{margin-top:19px}.oc-once{padding-bottom:17px}.oc-guarantee{margin-top:18px}.oc-form-card h2{font-size:25px}.oc-novo .oc-barra>span{font-size:11px}}
 
 .oc-novo .oc-corpo{padding:0}.oc-novo .oc-in:has(.oc-pix){max-width:600px}
+
+.oc-novo .oc-metodo{font-size:14px;min-height:50px;border-radius:10px}.oc-novo .oc-metodo[aria-checked="true"]{border-color:#c72878;color:#b02569}.oc-novo .oc-metodos{margin:0 0 18px}

@@ -2,8 +2,12 @@ import {captureLandingMeta,trackEventBeacon} from '@/lib/analytics';
 import {captureLeadSource} from '@/lib/lead-source';
 import {idDoAparelho} from '@/landing/marcador';
 import {fireMetaEvent} from '@/lib/meta-pixel';
+import {readStripeReturn} from './stripe-return';
 import {compactCheckoutSource} from '@/conhecer/attribution';
 export const QA=new URLSearchParams(location.search).get('qa')==='1'||!['coreaplicativo.com.br','www.coreaplicativo.com.br'].includes(location.hostname);
+export const bankReturn=readStripeReturn(location.href);
+// Remove Stripe return secrets before initializing any page analytics.
+if(new URLSearchParams(location.search).has('payment_intent_client_secret')){const clean=new URL(location.href);clean.searchParams.delete('payment_intent_client_secret');history.replaceState(history.state,'',clean.href)}
 const source=compactCheckoutSource(location.href);
 const params=new URLSearchParams(location.search);
 const atrib:Record<string,string>={};
@@ -27,7 +31,7 @@ export function initPixel(){
   }
  fireMetaEvent('ViewContent',{content_name:'CORE completo vitalício',value:67.9,currency:'BRL'},`completo-vc-${session}`);
 }
-export async function openPayment(){
+export async function openPayment(voltaDoBanco?: {pi:string;status:string}){
  const {abrirCheckout}=await import('@/landing/stripe-checkout');
- await abrirCheckout({pk:'pk_live_51TJnAQQdjmrIbUhHDSWqG1trOT6mFfV87AC4Vv47kFJTAFOhYsNmvryGRnf3x824Ke3mXSsWiFCovKPIR6Kqx0IX00VcuAawhC',precoCentavos:6790,parcelasMax:1,producao:!QA,pedeCpf:false,somentePix:true,layout:'novo',storagePrefix:QA?'completo-qa':'completo',trocaCartao:false,medirCarteira:false,evento:event,pixel:(name,data,id)=>{if(!QA && (name==='Purchase'||name==='InitiateCheckout'||name==='ViewContent'||name==='CompleteRegistration'))fireMetaEvent(name,data,id)},atrib,sessao:session,aparelho:device,urlChegada:source.url,fbclid:params.get('fbclid')});
+ await abrirCheckout({pk:'pk_live_51TJnAQQdjmrIbUhHDSWqG1trOT6mFfV87AC4Vv47kFJTAFOhYsNmvryGRnf3x824Ke3mXSsWiFCovKPIR6Kqx0IX00VcuAawhC',precoCentavos:6790,parcelasMax:1,producao:!QA,pedeCpf:false,somentePix:false,layout:'novo',storagePrefix:QA?'completo-qa':'completo',trocaCartao:false,medirCarteira:false,voltaDoBanco,evento:event,pixel:(name,data,id)=>{if(!QA && (name==='Purchase'||name==='InitiateCheckout'||name==='ViewContent'||name==='CompleteRegistration'))fireMetaEvent(name,data,id)},atrib,sessao:session,aparelho:device,urlChegada:source.url,fbclid:params.get('fbclid')});
 }

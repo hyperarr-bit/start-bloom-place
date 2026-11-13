@@ -458,8 +458,8 @@ function montarLayoutNovo(alvo: HTMLElement) {
   alvo.querySelector(".oc-provas")?.remove();
   const form = document.createElement("section"); form.className = "oc-form-card";
   while (alvo.firstChild) form.appendChild(alvo.firstChild);
-  form.insertAdjacentHTML("afterbegin", '<h2 id="oc-tit">Seu acesso ao CORE.</h2><p class="oc-form-intro">Informe seu e-mail para continuar com o Pix.</p><h3 class="oc-step"><span>1</span> Seu acesso</h3>');
-  form.querySelector(".oc-pagamento")!.insertAdjacentHTML("beforebegin", '<h3 class="oc-step"><span>2</span> Pagamento por Pix</h3>');
+  form.insertAdjacentHTML("afterbegin", `<h2 id="oc-tit">Seu acesso ao CORE.</h2><p class="oc-form-intro">${opc?.somentePix ? "Informe seu e-mail para continuar com o Pix." : "Informe seu e-mail e escolha como pagar."}</p><h3 class="oc-step"><span>1</span> Seu acesso</h3>`);
+  (form.querySelector(".oc-metodos") ?? form.querySelector(".oc-pagamento"))!.insertAdjacentHTML("beforebegin", `<h3 class="oc-step"><span>2</span> ${opc?.somentePix ? "Pagamento por Pix" : "Forma de pagamento"}</h3>`);
   form.querySelector("#oc-pagar")!.insertAdjacentHTML("beforebegin", `<div class="oc-total"><span>Total a pagar</span><strong>${esc(preco())}</strong></div>`);
   const aside = document.createElement("aside");aside.className = "oc-order-card";
   aside.innerHTML = `<div class="oc-product-row"><img src="/completo/icone-app-512.webp" width="56" height="56" alt=""/><div><span class="oc-eyebrow">SEU APP. SUA VIDA.</span><h2>CORE completo</h2><p>Acesso vitalício · 16 módulos</p></div></div><div class="oc-total"><span>Total da compra</span><strong>${esc(preco())}</strong></div><p class="oc-once">Pagamento único. Sem renovação.</p><h3>Você recebe acesso a:</h3><ul><li>Todos os 16 módulos: finanças, rotina e mais 14 áreas</li><li>CORE no iPhone, Android e computador</li><li>Acesso vitalício, com uma única conta</li></ul><div class="oc-guarantee">${ICO_CADEADO}<div><strong>7 dias de garantia</strong><p>Se não for para você, devolvemos 100% do valor.</p></div></div>`;

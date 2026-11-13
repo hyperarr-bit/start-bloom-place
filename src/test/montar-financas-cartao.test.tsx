@@ -634,15 +634,16 @@ describe("TOTAL POR CARTÃO NO MÊS com a estimativa", () => {
   const total = (props: Partial<React.ComponentProps<typeof TotalPorCartao>>, inicial: Record<string, unknown> = { "finance-card-config": { nubank: { dueDay: 20, mesDoVencimento: true } } }) => {
     render(<Provedor inicial={inicial} controle={novoControle()}><TotalPorCartao parcelas={[]} mes="2026-10" {...props} /></Provedor>);
   };
-  it("a estimativa entra nos gastos do cartão; custo fixo comum no cartão continua fora (como sempre)", () => {
+  it("a estimativa entra nos gastos do cartão; o fixo do MESMO cartão não soma em cima (o chute já é a fatura inteira)", () => {
     total({ fixos: [ESTIMATIVA, { id: "n", description: "Netflix", value: 40, paymentMethod: "credito", cardName: "nubank" }] });
     const linha = screen.getByText("Nubank").closest("tr")!;
     expect(within(linha).getAllByText("R$ 800,00")).toHaveLength(2); // gastos e total — sem os R$ 40 da Netflix
     expect(screen.queryByTestId("aviso-estimativa")).toBeNull();
   });
-  it("cliente sem estimativa: nada muda (fixo no cartão não entra, sem compra o card nem aparece)", () => {
+  it("cliente sem estimativa (05/11): o fixo no crédito entra nos gastos do cartão", () => {
     total({ fixos: [{ id: "n", description: "Netflix", value: 40, paymentMethod: "credito", cardName: "nubank" }] });
-    expect(screen.queryByTestId("total-por-cartao")).toBeNull();
+    const linha = screen.getByText("Nubank").closest("tr")!;
+    expect(within(linha).getAllByText("R$ 40,00")).toHaveLength(2); // gastos e total
   });
   it("compra do mês passado que cai NESTA fatura + estimativa = aviso pra apagar a estimativa (senão conta duas vezes)", () => {
     total({ fixos: [ESTIMATIVA], variableExpensesAnterior: [{ id: "c", description: "Mercado", value: 120, date: "2026-09-20", paymentMethod: "credito", cardName: "nubank" }] });

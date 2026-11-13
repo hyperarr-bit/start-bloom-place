@@ -237,7 +237,8 @@ describe("braço atual, chave off: a página de hoje", () => {
     await peNaTela();
     expect(Object.keys(dos("landing_cta")[0])).not.toContain("de");
     expect(dos("landing_cta")[0]).toMatchObject({ onde: "stripe", fase: "oferta", braco_lp_oferta: "atual", lpo_forcado: false });
-    expect(criadas[0].atrib).toEqual({ utm_content: "c7", tem_fbclid: "1" });
+    // 09/11 (caad0cbd, atribuição guardada 30 dias — src/landing/atribuicao): o pedido ganhou atrib_origem e atrib_em
+    expect(criadas[0].atrib).toEqual({ utm_content: "c7", tem_fbclid: "1", atrib_origem: "url", atrib_em: expect.any(String) });
     await pagarNoCartao();
     expect(purchase()).toEqual(["track", "Purchase", { value: 67.9, currency: "BRL", content_name: "oferta_stripe" }, { eventID: "pi_123" }]);
     for (const e of eventos()) expect(e.braco_lp_oferta).toBe("atual");
@@ -292,7 +293,7 @@ describe("braço nova", () => {
     await abrirPagina({ braco: "nova", ativo: true });
     document.querySelector<HTMLButtonElement>('[data-lpo-abre="topo"]')!.click();
     await peNaTela();
-    expect(criadas[0].atrib).toEqual({ utm_content: "c7", tem_fbclid: "1", braco_lp_oferta: "nova" });
+    expect(criadas[0].atrib).toEqual({ utm_content: "c7", tem_fbclid: "1", braco_lp_oferta: "nova", atrib_origem: "url", atrib_em: expect.any(String) });
     await pagarNoCartao();
     expect(purchase()).toEqual(["track", "Purchase", { value: 67.9, currency: "BRL", content_name: "oferta_stripe", braco_lp_oferta: "nova" }, { eventID: "pi_123" }]);
     expect(fbq.mock.calls.find((c) => c[1] === "InitiateCheckout")![2]).not.toHaveProperty("braco_lp_oferta");

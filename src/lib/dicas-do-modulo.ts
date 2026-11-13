@@ -111,7 +111,7 @@ export const DICAS_DO_MODULO: Readonly<Record<string, readonly Dica[]>> = {
     // HIDRATAÇÃO 55,9% usaram (142 em 2+ dias); water-log: 475 pagantes (41%), 28% em 4+ dias
     { texto: "Toque no copo para registrar a água do dia", aba: "hoje", alvos: ['[data-spotlight="add-water"]'], acao: "mostrar" },
     // VITAMINAS E REMÉDIOS 47,6% usaram, 143 em 2+ dias (o card que mais repete); gravar de novo nos dias 2–3: 43,8% × 15,9%
-    { texto: "Cadastre vitaminas e remédios e marque ao tomar", aba: "hoje", alvos: ['input[placeholder="Novo suplemento..."]'], acao: "focar" },
+    { texto: "Cadastre vitaminas e remédios e marque ao tomar", aba: "hoje", alvos: ['input[placeholder="Novo remédio ou suplemento..."]'], acao: "focar" },
     ORGANIZAR,
   ],
   beleza: [

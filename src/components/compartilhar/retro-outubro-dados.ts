@@ -96,7 +96,8 @@ const nomes = (v: unknown): string[] => Array.isArray(v) ? v.filter((x): x is st
 /** O resultado de Finanças do mês: passa no critério do azul? E os dias com lançamento. */
 export function avaliarFinancas(fin: FinancasDoMes, prefixo: string, hoje: string) {
   const datado = (i: Item) => typeof i?.date === "string" && i.date.trim().startsWith(prefixo) && i.date.trim().slice(0, 10) <= hoje;
-  const gastos = (fin.expenses as Item[]).filter(datado);
+  // (07/11) os dias com gasto vêm do que ela LANÇOU no mês (data da compra); o "saiu" abaixo segue a fatura
+  const gastos = ((fin.lancados ?? fin.expenses) as Item[]).filter(datado);
   const entradas = (fin.incomes as Item[]).filter(datado);
   const receitas = soma(fin.incomes as Item[]);
   const saiu = computeMonthlyOutflow(soma(fin.expenses as Item[]), soma(fin.fixed as Item[]), somaParcelasDoMes(fin.parcelas), fin.avulsas ?? 0);

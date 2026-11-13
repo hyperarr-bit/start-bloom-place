@@ -13,7 +13,13 @@ import { AREAS, FUNNEL_AREA_KEY, type AreaKey } from "@/lib/funnel";
  * urgência, sem mascote. NÃO chama compra nem restaurar: o teste só começa quando a folha da Apple
  * confirma. 1x por sessão do app (fechou e abriu de novo: pode ver de novo; nunca em loop na mesma).
  */
-export type PortaNaConta = { respostas?: { area?: string | null; rota?: string | null } | null } | null | undefined;
+export type PortaNaConta = {
+  respostas?: { area?: string | null; rota?: string | null } | null;
+  /** 05/11: a conta nasceu na entrada do iPhone, sem as perguntas do plano */
+  pagina?: string | null;
+  /** 05/11: o e-mail já tinha conta: não há teste grátis pra prometer */
+  conta_antiga?: boolean | null;
+} | null | undefined;
 
 /** A conta veio da Porta? (`user_metadata.porta` gravado pelo site) */
 export const contaDaPorta = (metadata: unknown): boolean => {
@@ -23,6 +29,7 @@ export const contaDaPorta = (metadata: unknown): boolean => {
 
 /** "Seu plano de Dinheiro já está salvo." — a área do site; "Tudo"/desconhecida = sem nome. */
 export function linhaDoPlano(porta: PortaNaConta): string {
+  if (porta?.pagina === "iphone") return "Sua conta está pronta.";
   const area = porta?.respostas?.area ?? null;
   const nome = area && area in AREAS ? AREAS[area as AreaKey].nome : null;
   return nome ? `Seu plano de ${nome} já está salvo.` : "Seu plano de 3 dias já está salvo.";
@@ -63,7 +70,7 @@ export function ParabensPorta({ porta, onContinuar }: { porta: PortaNaConta; onC
         <div className="w-20 h-20 rounded-full bg-[#16121c] text-white grid place-items-center mb-6 shadow-[0_16px_32px_-12px_rgba(22,18,28,.55)]" aria-hidden>
           <Check className="w-10 h-10" strokeWidth={3.5} />
         </div>
-        <h1 className="text-[32px] font-black tracking-[-0.03em] leading-[1.05]" data-testid="porta-parabens-titulo">Você ganhou<br />3 dias grátis</h1>
+        <h1 className="text-[32px] font-black tracking-[-0.03em] leading-[1.05]" data-testid="porta-parabens-titulo">{porta?.conta_antiga ? "Tudo pronto" : <>Você ganhou<br />3 dias grátis</>}</h1>
         <p className="mt-3 text-[16px] text-[#4f5a64] leading-snug" data-testid="porta-parabens-plano">{linhaDoPlano(porta)}</p>
       </div>
       <BotaoDoFunil

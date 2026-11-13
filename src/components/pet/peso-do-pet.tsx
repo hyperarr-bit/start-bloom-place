@@ -2,8 +2,14 @@
  * PESO (29/09) — o número que o vet pergunta em toda consulta e que manda na
  * dose do remédio e do antipulgas. Histórico em `pet-pesos` (chave nova, por
  * pet); o campo `weight` de sempre acompanha o mais novo, pro app antigo.
+ *
+ * "Ver as pesagens" (07/11, chamado 18cc19fe): a lista com a lixeira, fechada por
+ * padrão pra não crescer o card. Só as datadas: o `weight` sem data não é pesagem
+ * e se troca pesando de novo.
  */
 import { useMemo, useState } from "react";
+import { Trash2 } from "lucide-react";
+import { avisarApagado } from "@/lib/desfazer";
 import { dataSegura } from "@/lib/utils";
 import { lerPeso, pesoComUnidade, pesosDoPet, type Pet } from "@/lib/pet";
 import { BotaoPet, CartaoPet, campoClasse } from "./kit";
@@ -24,9 +30,10 @@ const Linha = ({ pontos }: { pontos: { dia: string; kg: number }[] }) => {
 };
 
 export const PesoDoPet = ({ pet, dados }: { pet: Pet; dados: UsePet }) => {
-  const { pesosBrutos, registrarPeso, hoje } = dados;
+  const { pesosBrutos, registrarPeso, apagarPeso, hoje } = dados;
   const serie = useMemo(() => pesosDoPet(pet, pesosBrutos), [pet, pesosBrutos]);
   const [valor, setValor] = useState("");
+  const [verPesagens, setVerPesagens] = useState(false);
   const ultimo = serie[serie.length - 1];
   const datados = serie.filter((p) => p.dia);
   // o atual pode ser o `weight` sem data (mudado no app antigo depois da última pesagem): compara com a última pesada
@@ -69,6 +76,37 @@ export const PesoDoPet = ({ pet, dados }: { pet: Pet; dados: UsePet }) => {
           />
           <BotaoPet onClick={salvar} disabled={kg === null || kg > 150} data-testid="peso-salvar">Pesar hoje</BotaoPet>
         </div>
+        {datados.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setVerPesagens((v) => !v)}
+            aria-expanded={verPesagens}
+            className="mt-1 -mb-2 min-h-[44px] text-[12.5px] font-semibold text-muted-foreground hover:text-foreground"
+            data-testid="peso-ver-pesagens"
+          >
+            {verPesagens ? "Esconder as pesagens" : `Ver as pesagens (${datados.length})`}
+          </button>
+        )}
+        {verPesagens && datados.length > 0 && (
+          <ul className="mt-2 max-h-[264px] overflow-y-auto rounded-xl border border-border bg-card">
+            {[...datados].reverse().map((p, idx) => (
+              <li key={p.dia} className={`flex items-center gap-3 pl-3 pr-1 ${idx ? "border-t border-border" : ""}`}>
+                <span className="flex-1 min-w-0 text-[13px] tabular-nums text-muted-foreground">{dataSegura(p.dia, "dd/MM/yyyy")}</span>
+                <span className="text-[13.5px] font-semibold tabular-nums text-foreground">{pesoComUnidade(p.kg)}</span>
+                {/* `p-0`: sem ele a regra dos botões só-ícone (index.css) estica a lixeira pra 60 px, e o toque
+                    na divisa das linhas de 44 px caía na lixeira da pesagem de baixo */}
+                <button
+                  type="button"
+                  aria-label={`Apagar a pesagem de ${dataSegura(p.dia, "dd/MM/yyyy")}`}
+                  onClick={() => avisarApagado(`Pesagem de ${dataSegura(p.dia, "dd/MM")} apagada`, apagarPeso(pet, p.dia))}
+                  className="w-11 h-11 p-0 shrink-0 grid place-items-center rounded-lg text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="w-4 h-4" aria-hidden="true" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </CartaoPet>
   );

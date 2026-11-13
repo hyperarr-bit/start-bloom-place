@@ -154,6 +154,13 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      // 07/11 (sensação de velocidade, vídeo do Emil Kowalski): as curvas do app (lib/movimento.ts) também como classes —
+      // `ease-sai` pra quem ENTRA (chega rápido e assenta), `ease-entra` pra quem SAI (acelera e some). O tailwindcss-animate
+      // lê transitionTimingFunction, então valem tanto pra `transition` quanto pra `animate-in/out`.
+      transitionTimingFunction: {
+        sai: "cubic-bezier(0.22, 1, 0.36, 1)",
+        entra: "cubic-bezier(0.4, 0, 1, 1)",
+      },
       keyframes: {
         "accordion-down": {
           from: { height: "0" },

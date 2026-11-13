@@ -126,8 +126,8 @@ export function gravarPeso(ctx: ContextoAcao, { pesoTexto }: { pesoTexto: string
   const weight = parseFloat(pesoTexto.replace(",", "."));
   if (!weight || weight <= 0) { toast.error("Informe um peso válido"); return false; }
   const measures = get<Array<Record<string, unknown>>>("core-saude-measures", []);
-  measures.push({ date: hojeStr(), weight, id: crypto.randomUUID() });
-  set("core-saude-measures", measures);
+  // 07/11: lista NOVA, nunca push no que o `get` devolveu — o memo das conquistas compara por referência (use-memo-por-chaves)
+  set("core-saude-measures", [...measures, { date: hojeStr(), weight, id: crypto.randomUUID() }]);
   vibrar();
   aoGravar?.();
   toast.success(`⚖️ ${weight}kg registrado!`);

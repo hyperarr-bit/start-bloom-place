@@ -1,3 +1,4 @@
+import { useEntradaDaHome } from "@/components/home/entrada-da-home";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Target, Plus, X } from "lucide-react";
@@ -14,6 +15,7 @@ interface CountdownItem {
 const KEY = "core-home-countdowns";
 
 export const CountdownWidget = () => {
+  const entrada = useEntradaDaHome(); // 07/11: as linhas nascem prontas na volta pra Home
   const { get, set: setData } = useUserData();
   const [items, setItems] = useState<CountdownItem[]>(() => get(KEY, []));
   const [adding, setAdding] = useState(false);
@@ -64,7 +66,7 @@ export const CountdownWidget = () => {
           {items.slice(0, 3).map(item => {
             const days = getDaysLeft(item.date);
             return (
-              <motion.div key={item.id} className="flex items-center gap-2" initial={{ opacity: 0, x: -5 }} animate={{ opacity: 1, x: 0 }}>
+              <motion.div key={item.id} className="flex items-center gap-2" initial={entrada ? { opacity: 0, x: -5 } : false} animate={{ opacity: 1, x: 0 }}>
                 <Target className="w-3 h-3 text-primary/50 flex-shrink-0" />
                 <span className="text-xs flex-1 truncate">{item.label}</span>
                 <span className="text-xs font-bold text-primary tabular-nums">{days}d</span>

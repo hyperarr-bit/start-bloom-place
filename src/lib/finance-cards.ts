@@ -24,6 +24,7 @@ import { useUserData } from "@/hooks/use-user-data";
 
 // 31/10 (planner 2027): a lista e as chaves moram em ./finance-cards-dados (sem React) — o planner lê sem puxar o store.
 import { DEFAULT_CARDS, CUSTOM_CARDS_KEY, CARD_CONFIG_KEY, type FinanceCard } from "@/lib/finance-cards-dados";
+import { configOfDe } from "@/lib/finance-fatura";
 export { DEFAULT_CARDS, CUSTOM_CARDS_KEY, CARD_CONFIG_KEY, type FinanceCard };
 
 // Paleta dos PERSONALIZADOS — classes literais (o Tailwind precisa enxergá-las
@@ -94,11 +95,9 @@ export function useFinanceCards() {
     () => (configBruta && typeof configBruta === "object" && !Array.isArray(configBruta) ? configBruta : SEM_CONFIG),
     [configBruta],
   );
-  /** Fechamento/vencimento do cartão, ou undefined (sem fatura). */
-  const configOf = (value: string): CardConfig | undefined => {
-    const c = config[value];
-    return c && (Number.isInteger(c.closingDay) || Number.isInteger(c.dueDay)) ? c : undefined;
-  };
+  /** Fechamento/vencimento do cartão, ou undefined (sem fatura). A regra mora em lib/finance-fatura `configOfDe`
+   *  (07/11): os leitores sem React — comparação, retrospectiva, Home — usam a MESMA, senão o mês dá dois números. */
+  const configOf = useMemo(() => configOfDe(config), [config]);
   /** Grava fechamento/vencimento; dia fora de 1–31 vira "sem". Os dois
    *  vazios apagam a entrada — cartão volta a não ter fatura. */
   const setConfig = (value: string, cfg: CardConfig) => {

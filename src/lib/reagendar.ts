@@ -1,6 +1,6 @@
 import {
   agendarAniversarios, agendarCabelo, agendarCompromissos, agendarCuidados, agendarValidade, agendarContas, agendarDieta, agendarLeitura, agendarLembreteSequencia, agendarLimiteDoDia, agendarManutencao, agendarRemedios,
-  agendarRetrospectiva, agendarRotina, agendarSkincare, agendarTarefas, agendarTreino, type ManutencaoAgendavel, type PessoaAgendavel,
+  agendarRetrospectiva, agendarRotina, agendarSkincare, agendarTarefas, agendarTreino, comRodadaDoTeto, type ManutencaoAgendavel, type PessoaAgendavel,
   type RemedioAgendavel,
 } from "@/lib/notificacoes";
 import { agendarPet } from "@/lib/notificacoes";
@@ -29,6 +29,7 @@ import { mesCorrenteId } from "@/lib/virada-contas";
 import { chaveArquivada } from "@/lib/virada-do-mes";
 import type { PrefsNotificacoes } from "@/lib/prefs-notificacoes";
 import { nomeComQuem } from "@/lib/saude-dependentes";
+import { ehDia as ehDiaDeRemedio, ehInicio, linhasDosAvisos } from "@/lib/remedios";
 import { localDayKey } from "@/lib/utils";
 import { algumLigado, lerDadosDoSkincare, type DadosDoSkincare } from "@/lib/beleza-lembrete";
 // 17/10 (1.0.16, "Rotina pronta em 3 toques"): o lembrete de manhã da Rotina — prefs na chave própria
@@ -157,17 +158,26 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
   const diarioDieta = get<Record<string, { meals?: Record<string, unknown> }>>("dieta-diary-v2", {}) ?? {};
 
   // Remédios (07/09): a lista do PharmacyChecklist + o log de "tomado hoje"
-  type Suplemento = { id?: string; name?: string; time?: string; quem?: string };
+  type Suplemento = { id?: string; name?: string; time?: string; quem?: string; ate?: string; grupo?: string; inicio?: string; horaAntes?: string; idAntes?: string; antesAte?: string; novoDesde?: string };
   const suplementos = get<Suplemento[]>("core-saude-supplements", []) ?? [];
-  const tomadosHoje = (get<Record<string, string[]>>("core-saude-supplement-log", {}) ?? {})[hoje] ?? [];
-  const remedios: RemedioAgendavel[] = (Array.isArray(suplementos) ? suplementos : [])
-    .filter((s) => s?.name && s?.time)
+  const logRemedio = get<Record<string, string[]>>("core-saude-supplement-log", {}) ?? {};
+  const tomadosHoje = logRemedio[hoje] ?? [];
+  // (07/11) a dose das 00:00 marcada às 23:50 grava no dia em que acontece (amanhã): o aviso dela sai da fila
+  const amanhaDate = new Date();
+  amanhaDate.setDate(amanhaDate.getDate() + 1);
+  const tomadosAmanha = logRemedio[localDayKey(amanhaDate)] ?? [];
+  // (07/11) tratamento com data de fim já passada não entra no plano; a dose da noite do último dia, sim (lib/remedios)
+  // (08/11) horário mudado: a linha vira a de antes (até o dia virar) e a nova (desde a 1ª dose nova) — lib/remedios
+  const remedios: RemedioAgendavel[] = linhasDosAvisos((Array.isArray(suplementos) ? suplementos : []).filter((s) => s?.name && s?.time))
     .map((s) => ({
       id: String(s.id ?? ""),
       // remédio do dependente leva o nome dele no aviso (22/09): "Hora do Ômega 3 (Mãe)"
       nome: nomeComQuem(String(s.name), s.quem),
       hora: String(s.time),
       tomadoHoje: Array.isArray(tomadosHoje) && tomadosHoje.includes(String(s.id)),
+      ...(Array.isArray(tomadosAmanha) && tomadosAmanha.includes(String(s.id)) ? { tomadoAmanha: true } : {}),
+      ...(ehDiaDeRemedio(s.ate) ? { ate: s.ate } : {}),
+      ...(ehInicio(s.inicio) ? { desde: s.inicio } : {}),
     }));
 
   /* FATURA DO CARTÃO no aviso de conta a vencer (22/09): a mesma conta da
@@ -332,15 +342,39 @@ export function assinaturaDos(dados: DadosDosLembretes, prefs: PrefsNotificacoes
   ]);
 }
 
-/** Aplica as preferências no agendador do sistema. Devolve quantos de cada tipo. */
-export async function reagendarTudo(
-  get: Leitor,
-  prefs: PrefsNotificacoes,
-): Promise<Record<string, number>> {
+/**
+ * Aplica as preferências no agendador do sistema. Devolve quantos de cada tipo.
+ *
+ * No iPhone só cabem 64 avisos pendentes (TETO_IPHONE, lib/notificacoes): as
+ * séries daqui só dizem o que querem e a rodada reparte as vagas no fim, sem
+ * contar os avisos velhos de ninguém. Na frente vêm o remédio e o que tem data
+ * marcada (ver repartirVagas).
+ *
+ * UMA RODADA POR VEZ (07/11): o cadastro rearma na hora e o useLembretes rearma
+ * logo depois. Duas ao mesmo tempo se atropelavam na conta das vagas.
+ */
+let rodadaEmCurso: Promise<unknown> = Promise.resolve();
+export function reagendarTudo(get: Leitor, prefs: PrefsNotificacoes): Promise<Record<string, number>> {
+  const vez = rodadaEmCurso.then(() => comRodadaDoTeto(() => agendarCadaSerie(get, prefs)));
+  rodadaEmCurso = vez.catch(() => { /* quem chamou trata; a fila segue */ });
+  return vez;
+}
+
+async function agendarCadaSerie(get: Leitor, prefs: PrefsNotificacoes): Promise<Record<string, number>> {
   const d = lerDadosDosLembretes(get);
   return {
     contas: await agendarContas(d.dueDays, { hora: prefs.horaContas, ligado: prefs.contas }, d.dueDaysProximoMes),
     retrospectiva: await agendarRetrospectiva(prefs.retrospectiva),
+    consulta: await agendarConsultas(d.consultas ?? [], { ligado: d.consultasLigado !== false }),
+    compromisso: await agendarCompromissos(d.compromissos, { ligado: prefs.compromissos }),
+    tarefa: await agendarTarefas(d.tarefas, { ligado: prefs.tarefas }),
+    aniversario: await agendarAniversarios(d.pessoas, { hora: prefs.horaAniversario, ligado: prefs.aniversario }),
+    casa: await agendarManutencao(d.manutencao, { hora: prefs.horaCasa, ligado: prefs.casa }),
+    saude: await agendarRemedios(d.remedios, { ligado: d.remediosLigado }),
+    limite: await agendarLimiteDoDia(
+      { temFinancas: d.temFinancas, abriuFinancasHoje: d.abriuFinancasHoje },
+      { hora: prefs.horaLimite, ligado: prefs.limite },
+    ),
     rotina: await agendarRotina(
       { marcados: d.marcados, sequencia: d.sequencia },
       { hora: prefs.horaRotina, ligado: prefs.rotina },
@@ -351,16 +385,6 @@ export async function reagendarTudo(
     ),
     leitura: await agendarLeitura(d.leitura, { hora: prefs.horaLeitura, ligado: prefs.leitura }),
     dieta: await agendarDieta({ jaPreencheuHoje: d.jaPreencheuHoje }, { hora: prefs.horaDieta, ligado: prefs.dieta }),
-    saude: await agendarRemedios(d.remedios, { ligado: d.remediosLigado }),
-    consulta: await agendarConsultas(d.consultas ?? [], { ligado: d.consultasLigado !== false }),
-    aniversario: await agendarAniversarios(d.pessoas, { hora: prefs.horaAniversario, ligado: prefs.aniversario }),
-    casa: await agendarManutencao(d.manutencao, { hora: prefs.horaCasa, ligado: prefs.casa }),
-    compromisso: await agendarCompromissos(d.compromissos, { ligado: prefs.compromissos }),
-    tarefa: await agendarTarefas(d.tarefas, { ligado: prefs.tarefas }),
-    limite: await agendarLimiteDoDia(
-      { temFinancas: d.temFinancas, abriuFinancasHoje: d.abriuFinancasHoje },
-      { hora: prefs.horaLimite, ligado: prefs.limite },
-    ),
     sequencia: await agendarLembreteSequencia(d.seqAnotada, { hora: prefs.horaSequencia, ligado: prefs.sequencia }),
     pet: d.pet ? await agendarPet(d.pet) : 0,
     relacoes: d.relacoes ? await agendarRelacoes(d.relacoes) : 0,

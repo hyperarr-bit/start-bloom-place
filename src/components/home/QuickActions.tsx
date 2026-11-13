@@ -1,9 +1,12 @@
+import { useEntradaDaHome } from "@/components/home/entrada-da-home";
 import { CHAVE_ACOES_CONQUISTAS, registrarAcao } from "@/lib/conquistas-acoes";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { localDayKey } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { Droplets, DollarSign, Banknote, Scale, Lightbulb, ListTodo, Heart, SmilePlus, X, Check, Dumbbell, Moon, Utensils, Shield } from "lucide-react";
+import { Droplets, DollarSign, Banknote, Scale, Lightbulb, ListTodo, Heart, SmilePlus, X, Check, Dumbbell, Moon, Utensils, Shield, SlidersHorizontal } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
+import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
+import { FolhaOrganizarAbas, fileiraDeDemo } from "@/components/ui/abas-ocultaveis";
 import { humorDoDia } from "@/lib/humor-do-dia";
 import { CHAVE_COPO_ML, COPO_ML_PADRAO, normalizarCopoMl, rotuloAcaoAgua } from "@/lib/saude-copo";
 import { CHAVE_MACROS, type MacrosPlano, formatarMacros, temMacros } from "@/lib/dieta-macros";
@@ -36,6 +39,15 @@ export const EVENTO_ACAO_RAPIDA = "core:acao-rapida";
 export const abrirAcaoRapida = (id: ActionId) => {
   window.dispatchEvent(new CustomEvent(EVENTO_ACAO_RAPIDA, { detail: { id } }));
 };
+
+/* OCULTAR / ORDENAR AÇÕES RÁPIDAS (07/11, dono: "enxutar"). A MESMA regra e a MESMA folha "Organizar" das abas dos
+   módulos (hooks/use-abas-ocultas + components/ui/abas-ocultaveis): os ids ocultos vão pra conta em
+   `abas-ocultas:acoes-rapidas` (string[]) e a ordem em `abas-ordem:acoes-rapidas` — prefixo "abas-", fora da ativação
+   e da sequência, chave nova (nenhuma chave antiga muda). Não há padrão enxuto pra este id (ABAS_POUCO_USO não o tem):
+   quem não mexer vê as 12 de sempre. Só a FILEIRA obedece — o link de fora (Pendências de hoje, tour) abre o formulário
+   de uma ação oculta do mesmo jeito (como o link profundo pra aba oculta), e a folha do "+" da Home nova
+   (`apenasFormularios`) não tem fileira, logo não muda. Na demo de venda não há porta (fileiraDeDemo). */
+export const MODULO_ACOES_RAPIDAS = "acoes-rapidas";
 
 interface QuickAction {
   id: ActionId;
@@ -90,12 +102,15 @@ const vibrate = () => {
    `onAtivaChange` (qual formulário está aberto), `onFeito` (uma ação gravou) e `onFolhaPropriaChange` (a ação
    abriu/fechou uma FOLHA PRÓPRIA — hoje só a Tarefa, que é um Sheet do Radix e não um formulário inline; quem
    nos monta dentro de outra folha precisa sair da frente). Sem as props, nada muda. */
-export const QuickActions = ({ apenasFormularios = false, onAtivaChange, onFeito, onFolhaPropriaChange }: {
+export const QuickActions = ({ apenasFormularios = false, titulo, onAtivaChange, onFeito, onFolhaPropriaChange }: {
   apenasFormularios?: boolean;
+  /** O título da seção na Home de hoje (07/11): com ele, o componente desenha o cabeçalho — título + a porta "Organizar". */
+  titulo?: string;
   onAtivaChange?: (id: ActionId | null) => void;
   onFeito?: (id: ActionId) => void;
   onFolhaPropriaChange?: (id: ActionId | null) => void;
 } = {}) => {
+  const entrada = useEntradaDaHome(); // 07/11: os botões entram um a um só na 1ª montagem da sessão
   const { get, set } = useUserData();
   // Água: o botão diz o tamanho do copo/garrafa que a pessoa escolheu em Saúde.
   const copoMlAgua = normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO));
@@ -103,6 +118,21 @@ export const QuickActions = ({ apenasFormularios = false, onAtivaChange, onFeito
   const lifeData = useLifeHubData();
   const navigate = useNavigate();
   const [activeAction, setActiveAction] = useState<ActionId | null>(null);
+  // Ocultar/ordenar (07/11, ver MODULO_ACOES_RAPIDAS): a lista que a folha mostra, com o rótulo vivo da água.
+  const listaOcultavel = useMemo(
+    () => actions.map((a) => ({ id: a.id, label: a.id === "water" ? rotuloAcaoAgua(copoMlAgua) : a.label })),
+    [copoMlAgua],
+  );
+  const ocultaveis = useAbasOcultas(MODULO_ACOES_RAPIDAS, listaOcultavel);
+  const [organizar, setOrganizar] = useState(false);
+  const demo = fileiraDeDemo();
+  const abrirOrganizar = (origem: "cabecalho" | "fileira") => {
+    setOrganizar(true);
+    trackEvent("abas_organizar_aberto", { modulo: MODULO_ACOES_RAPIDAS, ocultas: ocultaveis.ocultas.length, origem });
+  };
+  const acaoPorId = (id: ActionId) => actions.find((a) => a.id === id)!;
+  // a fileira: só as visíveis, na ordem da pessoa
+  const naFileira = ocultaveis.visiveis.map((v) => acaoPorId(v.id));
   // avisa só MUDANÇAS (não o valor inicial da montagem): o aviso "null" na montagem chegava à folha do "+" antes de ela
   // zerar o que lembrava da abertura anterior e a fechava em 150 ms ao reabrir (achado no Simulador, 26/10)
   const montouAvisos = useRef(false);
@@ -283,11 +313,30 @@ export const QuickActions = ({ apenasFormularios = false, onAtivaChange, onFeito
 
   return (
     <div ref={raizRef} className="space-y-2">
+      {/* Cabeçalho da seção (07/11): o título que a Home desenhava + a porta da folha "Organizar", o mesmo botão do
+          Personalizar das Pendências (10/10). mb-1 + o space-y-2 do pai = os 12 px (mb-3) de antes. */}
+      {titulo && !apenasFormularios && (
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{titulo}</h3>
+          {!demo && (
+            <button
+              type="button"
+              onClick={() => abrirOrganizar("cabecalho")}
+              aria-label="Organizar ações rápidas"
+              data-track="acoes-organizar"
+              data-testid="acoes-organizar-abrir"
+              className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
       {/* Faixa das ações. No celular rola pro lado com o dedo. No computador
           (md+) quebra em duas linhas: as 12 cabem no espaço e ninguém precisa
           descobrir que existe algo escondido à direita (cliente na web, 11/09). */}
       {!apenasFormularios && <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide md:flex-wrap md:overflow-visible">
-        {actions.map((a, i) => (
+        {naFileira.map((a, i) => (
           <motion.button
             key={a.id}
             data-acao-rapida={a.id}
@@ -298,7 +347,7 @@ export const QuickActions = ({ apenasFormularios = false, onAtivaChange, onFeito
                 ? "border-green-400 bg-green-50 dark:bg-green-500/10" 
                 : "border-border/50 bg-card hover:bg-muted/50"
             }`}
-            initial={{ opacity: 0, x: 10 }}
+            initial={entrada ? { opacity: 0, x: 10 } : false}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.05 * i }}
             whileTap={{ scale: 0.95 }}
@@ -319,6 +368,21 @@ export const QuickActions = ({ apenasFormularios = false, onAtivaChange, onFeito
             )}
           </motion.button>
         ))}
+        {/* "+N ocultas" (07/11): só quando a pessoa ocultou algo — o chip fantasma do fim das fileiras de abas, e abre a
+            mesma folha. Com nada oculto, a fileira é a de sempre (a porta fica no cabeçalho). */}
+        {!demo && ocultaveis.ocultas.length > 0 && (
+          <button
+            type="button"
+            onClick={() => abrirOrganizar("fileira")}
+            aria-label={`${ocultaveis.ocultas.length} ${ocultaveis.ocultas.length === 1 ? "ação oculta" : "ações ocultas"}`}
+            data-track="acoes-ocultas"
+            data-testid="acoes-ocultas"
+            className="flex items-center gap-1 px-2.5 py-2 rounded-xl text-[11px] text-muted-foreground whitespace-nowrap flex-shrink-0 hover:bg-muted/50 transition-colors"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" strokeWidth={2} aria-hidden />
+            <span>+{ocultaveis.ocultas.length} {ocultaveis.ocultas.length === 1 ? "oculta" : "ocultas"}</span>
+          </button>
+        )}
       </div>}
 
       {/* B5 (1.0.18, QA 21/10): "Registrar Gasto" com o teclado do iPhone — o WKWebView rola a Home pra mostrar o campo e
@@ -634,6 +698,27 @@ export const QuickActions = ({ apenasFormularios = false, onAtivaChange, onFeito
         )}
       </AnimatePresence>
       <FolhaNovaTarefa aberta={folhaTarefa} onFechar={() => setFolhaTarefa(false)} onde="Rotina" onSalvar={criarTarefa} />
+      {/* A folha "Organizar ações rápidas" (07/11): a MESMA das abas dos módulos. Ocultar a ação cujo formulário está
+          aberto fecha o formulário (como ocultar a aba aberta cai na primeira visível). */}
+      {!apenasFormularios && (
+        <FolhaOrganizarAbas
+          abas={ocultaveis}
+          aberta={organizar}
+          onFechar={() => setOrganizar(false)}
+          ocultarAba={(id) => { const ok = ocultaveis.ocultar(id); if (ok && activeAction === id) close(); return ok; }}
+          textos={{
+            titulo: "Organizar ações rápidas",
+            descricao: "Deixe à vista só o que você usa. Ocultar não apaga nada — a ação volta quando você liga.",
+            dica: null,
+            minimo: "Pelo menos uma ação fica sempre à vista.",
+            mostrarTodas: "Mostrar todas as ações",
+          }}
+          icone={(item) => {
+            const a = acaoPorId(item.id);
+            return <span className={`w-10 h-10 rounded-xl flex items-center justify-center ${a.color}`}><a.icon className={`w-[18px] h-[18px] ${a.iconColor}`} /></span>;
+          }}
+        />
+      )}
     </div>
   );
 };

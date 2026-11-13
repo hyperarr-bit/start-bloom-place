@@ -103,6 +103,8 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-att-braco", // 1.0.18: o braço sorteado no modo "ab" do att_momento (auto3s|comecar), estável entre aberturas
   "core-sino-paywall", // 1.0.18: a última resposta do RevenueCat pra tela do sino antes do paywall (metadata sino_paywall: off|on|ab)
   "core-sino-braco", // 1.0.18: o braço sorteado no modo "ab" do sino_paywall (com|sem), estável entre aberturas
+  "core-titulo-paywall", // 06/11: a última resposta do RevenueCat pro teste de título do paywall (metadata titulo_paywall: off|on|ab)
+  "core-titulo-braco", // 06/11: o braço sorteado no modo "ab" do titulo_paywall (com|sem), estável entre aberturas
   "core-sino-visto", // 1.0.18: a tela do sino já apareceu neste aparelho (nunca repete: voltar, reabrir, deep link)
   "core-lembrete-teste", // pedido do aviso de 36 h do teste (texto de uso desde 16/10), armado quando a permissão vier
   "core-semana-pagante", // 16/10: semana do pagante (começo + último agendamento dos 7 avisos depois do pagamento)
@@ -140,6 +142,9 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   // e que já abriram a retrospectiva NOVA neste aparelho; espelhos das chaves da conta retro-outubro-aviso-visto / retro-outubro-nova-aberta
   "core-retro-outubro-aviso-aparelho",
   "core-retro-outubro-nova-aparelho",
+  // 11/11 (trava da build 1.0.25): o Pix pendente do pagamento da /vitalicio (src/conhecer/checkout-state, 7 dias) — quem
+  // gerou o Pix e voltou tem que achar o mesmo pedido; nunca é prova de pagamento (o pedido é conferido de novo no servidor)
+  "core-conhecer-checkout-v1",
 ]);
 
 /** Famílias de chaves do aparelho (prefixo + id). */
@@ -215,7 +220,7 @@ export const CHAVES_REVISADAS_DA_CONTA_OU_TRANSITORIAS: Readonly<Record<string, 
   ],
   // UMA VIAGEM PELO LOGIN: gravadas antes de sair pro Google/Apple e lidas (e apagadas) na volta, no
   // primeiro render — antes do efeito da vassoura.
-  ida_e_volta_do_login: ["core-pos-compra-oauth", "core-auth-next"],
+  ida_e_volta_do_login: ["core-pos-compra-oauth", "core-auth-next", "core-auth-metodo"],
   // LEGADO DO TESTE DE CONVIDADO (Android v53, nada grava desde 18/08): depois do login quem manda é
   // a assinatura; limpar no login é o comportamento que já vale.
   legado_teste_convidado: ["core-teste-inicio", "core-guia-semente"],

@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { isNativeShell } from "./native-shell";
 import { getAuthRedirectUrl } from "./utils";
+import { pegarMetodoLogin, registrarLoginOAuth } from "./login-oauth";
 
 /**
  * LOGIN COM GOOGLE DENTRO DO APP (28/07).
@@ -198,12 +199,13 @@ export async function entrarComApple(): Promise<{ error: { message: string } | n
       token: idToken,
     });
     if (error) return { error: { message: error.message } };
+    registrarLoginOAuth(); // no iPhone não há volta de OAuth: a sessão nasce aqui
     return { error: null };
   } catch (e) {
     const m = (e as { message?: string })?.message ?? "";
     // Cancelar é decisão, não falha: não vira mensagem de erro na tela.
     // 1001 = ASAuthorizationError.canceled; a mensagem vem localizada, sem "cancel"
-    if (/cancel|1001/i.test(m)) return { error: null };
+    if (/cancel|1001/i.test(m)) { pegarMetodoLogin(); return { error: null }; }
     return { error: { message: "Não deu pra entrar com a Apple agora. Usa o e-mail — sem senha, com o código." } };
   }
 }

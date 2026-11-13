@@ -118,6 +118,9 @@ describe("/entrar vindo da welcome: a volta pro funil", () => {
   it("o login de quem TEM conta segue intacto (mesmo vindo da welcome): e-mail + senha → signIn → /home + login_completed", async () => {
     montarEntrar("/entrar?de=welcome");
     expect(screen.getByText("Entrar no seu CORE")).toBeInTheDocument();
+    // 1.0.25: no app a tela abre no código (ENTRAR_CODIGO_APP on); a senha fica a 1 toque, em "Prefiro entrar com senha"
+    const preferiuSenha = screen.queryByTestId("entrar-com-senha");
+    if (preferiuSenha) fireEvent.click(preferiuSenha);
     fireEvent.change(screen.getByLabelText(/Seu e-mail/i), { target: { value: "ana@gmail.com" } });
     fireEvent.change(screen.getByLabelText(/Sua senha/i), { target: { value: "segredo123" } });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Entrar no meu CORE/ })); });

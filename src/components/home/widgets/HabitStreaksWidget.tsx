@@ -1,8 +1,10 @@
+import { useEntradaDaHome } from "@/components/home/entrada-da-home";
 import { motion } from "framer-motion";
 import { localDayKey } from "@/lib/utils";
 import { useUserData } from "@/hooks/use-user-data";
 
 export const HabitStreaksWidget = () => {
+  const entrada = useEntradaDaHome(); // 07/11: os quadradinhos nascem prontos na volta pra Home
   const { get } = useUserData();
   const habits = get<any[]>("core-rotina-habits", []);
   const habitLog = get<any>("core-rotina-habit-log", {});
@@ -46,7 +48,7 @@ export const HabitStreaksWidget = () => {
                     <motion.div
                       key={di}
                       className={`flex-1 aspect-square rounded-sm ${done ? "bg-emerald-500" : "bg-muted"}`}
-                      initial={{ scale: 0 }}
+                      initial={entrada ? { scale: 0 } : false}
                       animate={{ scale: 1 }}
                       transition={{ delay: (hi * 7 + di) * 0.01 }}
                     />

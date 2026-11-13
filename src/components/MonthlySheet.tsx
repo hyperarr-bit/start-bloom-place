@@ -19,6 +19,7 @@ import { variaveisDoMes } from "@/lib/finance-fatura";
 import { useFinanceCards } from "@/lib/finance-cards";
 import { chaveArquivada } from "@/lib/virada-do-mes";
 import { mesCorrenteId } from "@/lib/virada-contas";
+import { guardarGastoNoMes, guardarReceitaNoMes } from "@/lib/finance-receita-futura";
 
 interface MonthlySheetProps {
   month: string;
@@ -38,12 +39,18 @@ export const MonthlySheet = ({ month, year, onClose }: MonthlySheetProps) => {
   const isCurrent = isCurrentMonth(month) && ano === getCurrentYear();
   const mesId = mesIdDe(month, ano);
   const agora = mesCorrenteId();
-  const { get } = useUserData();
+  const { get, set } = useUserData();
   const { configOf } = useFinanceCards();
 
   /* 03/09: a planilha do mês segue o perfil ativo (PF/PJ), com a volta
      mesclada — nunca grava a lista filtrada por cima da completa. */
   const [perfilAtivo] = usePersistedState<string>("finance-perfil-ativo", PERFIL_PESSOAL);
+  /* MÊS ATUAL (07/11, bug "gasto-futuro"): receita/gasto com data de um mês que ainda não chegou
+     vai pra planilha DAQUELE mês, como no financeiro geral (Index) — esta tela grava nas mesmas
+     chaves e era a única porta que não passava pela guarda (lib/finance-receita-futura). Planilha
+     de outro mês não passa: a chave dela já é datada, o lançamento mora no mês em que a pessoa está. */
+  const guardarReceitaFutura = isCurrent ? (r: any) => guardarReceitaNoMes(r, new Date(), get, set, perfilAtivo || PERFIL_PESSOAL) : undefined;
+  const guardarGastoFuturo = isCurrent ? (g: any) => guardarGastoNoMes(g, new Date(), get, set, perfilAtivo || PERFIL_PESSOAL) : undefined;
   const [incomesTodos, setIncomesTodos] = usePersistedState(keys.incomes, [] as any[]);
   const [expensesTodos, setExpensesTodos] = usePersistedState(keys.expenses, [] as any[]);
   const [fixedTodos, setFixedTodos] = usePersistedState(keys.fixed, [] as any[]);
@@ -180,7 +187,7 @@ export const MonthlySheet = ({ month, year, onClose }: MonthlySheetProps) => {
       </div>
 
       <div className="min-w-0">
-        <IncomeTable incomes={incomes} setIncomes={setIncomes} />
+        <IncomeTable incomes={incomes} setIncomes={setIncomes} guardarEmOutroMes={guardarReceitaFutura} />
       </div>
       <div className="min-w-0">
         {/* (21/10, chamado "os custos fixos pagos não deviam sumir quando vira o mês"):
@@ -195,7 +202,7 @@ export const MonthlySheet = ({ month, year, onClose }: MonthlySheetProps) => {
         <FixedExpensesTable expenses={fixedExpenses} setExpenses={setFixedExpenses} dueDays={dueDays as any[]} setDueDays={setDueDays as (d: any[]) => void} mes={mesId} projetados={fixosProjetados} />
       </div>
       <div className="min-w-0">
-        <ExpenseTable expenses={expenses} setExpenses={setExpenses} mes={mesId} />
+        <ExpenseTable expenses={expenses} setExpenses={setExpenses} mes={mesId} guardarEmOutroMes={guardarGastoFuturo} />
       </div>
       <BillsDueCards dueDays={dueDays} setDueDays={setDueDays} />
       <div className="min-w-0">

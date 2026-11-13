@@ -1,5 +1,6 @@
 import { isNativeShell } from "./native-shell";
 import { ehRetornoDeLogin, fecharNavegador, sessaoDoLink } from "./auth-nativo";
+import { pegarMetodoLogin, registrarLoginOAuth } from "./login-oauth";
 import { codigoDoLinkDaPorta, ehLinkDeEntrar, resgatarCodigo } from "./porta-handoff";
 
 /**
@@ -77,6 +78,7 @@ export async function ligarDeepLinks(navegar: (rota: string) => void): Promise<(
       if (ehRetornoDeLogin(url)) {
         const ok = await sessaoDoLink(url!);
         await fecharNavegador();
+        if (ok) registrarLoginOAuth(); else pegarMetodoLogin();
         /*
          * PRA ONDE volta quem logou com Google (04/08).
          *

@@ -126,9 +126,17 @@ describe("o cliente nunca grava a chave paga", () => {
     const s = ler("src/hooks/use-user-data.tsx");
     const persist = s.indexOf("const persistKey = useCallback(");
     expect(persist).toBeGreaterThan(0);
-    const corpo = s.slice(persist, persist + 600);
-    expect(corpo.indexOf("if (chaveSoDoServidor(key)) return;")).toBeGreaterThan(0);
-    expect(corpo.indexOf("if (chaveSoDoServidor(key)) return;")).toBeLessThan(corpo.indexOf(".upsert("));
+    // O corpo vai até a próxima função do provider (o flush), e não uma janela
+    // fixa de caracteres: o persistKey cresce (contadores de envio, comentários)
+    // e a checagem tem que continuar valendo. As duas ordens seguem iguais:
+    // a trava existe e vem ANTES do primeiro .upsert(.
+    const fim = s.indexOf("const flush = useCallback(", persist);
+    expect(fim).toBeGreaterThan(persist);
+    const corpo = s.slice(persist, fim);
+    const trava = corpo.indexOf("if (chaveSoDoServidor(key)) return;");
+    expect(trava).toBeGreaterThan(0);
+    expect(corpo.indexOf(".upsert(")).toBeGreaterThan(-1);
+    expect(trava).toBeLessThan(corpo.indexOf(".upsert("));
     expect(s).toMatch(/\.filter\(k => !chaveSoDoServidor\(k\)\)/);
   });
 });

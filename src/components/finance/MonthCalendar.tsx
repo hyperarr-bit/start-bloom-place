@@ -45,6 +45,13 @@ interface DueDay {
   bills: Bill[];
 }
 
+/** Conta como o grid mostra: com o dia DELA em `finance-dueDays`. "Dia 31" em
+ *  novembro aparece no dia 30 (último do mês, decisão de 16/10), e o ✓, a
+ *  lixeira e o lápis precisam mexer no card do dia 31 — mandando o dia da tela,
+ *  o setBillsForDay procurava um dia 30 que não tem a conta: nada marcava, nada
+ *  apagava, e o Salvar da edição movia a conta pro 30 de vez (bug dia-31, 07/11). */
+type ContaNoGrid = Bill & { diaReal: number };
+
 interface Props {
   incomes: any[];
   expenses: any[];
@@ -113,7 +120,7 @@ export const MonthCalendar = ({
 
   // mapa dia → itens (recalcula só quando os dados mudam)
   const byDay = useMemo(() => {
-    const map: Record<number, { expenses: any[]; incomes: any[]; bills: Bill[]; installments: any[] }> = {};
+    const map: Record<number, { expenses: any[]; incomes: any[]; bills: ContaNoGrid[]; installments: any[] }> = {};
     const get = (d: number) => (map[d] ??= { expenses: [], incomes: [], bills: [], installments: [] });
     for (const e of expenses) {
       const d = dayInCurrentMonth(e?.date, now);
@@ -129,7 +136,7 @@ export const MonthCalendar = ({
     // transformou em conta do dia — com checkbox de pago e alertas.
     for (const dd of dueDays ?? []) {
       if (dd?.day >= 1 && dd.day <= 31 && Array.isArray(dd.bills) && dd.bills.length)
-        get(Math.min(dd.day, daysInMonth)).bills.push(...dd.bills);
+        get(Math.min(dd.day, daysInMonth)).bills.push(...dd.bills.map((b) => ({ ...b, diaReal: dd.day })));
     }
     for (const p of installments ?? []) {
       // Parcela ativa: o dia vem do `date` da compra (melhor sinal disponível).
@@ -234,15 +241,20 @@ export const MonthCalendar = ({
     const name = rascunho.name.trim();
     if (!name || !editandoId) return;
     const value = parseValor(rascunho.value);
-    const diaEscolhido = Math.min(Math.max(parseInt(rascunho.day, 10) || selectedDay, 1), daysInMonth);
 
     let conta: Bill | undefined;
+    let diaDeOrigem = selectedDay;
     const semAConta = (dueDays ?? []).map((d) => {
       const achou = (d.bills ?? []).find((b) => b.id === editandoId);
-      if (achou) conta = achou;
+      if (achou) { conta = achou; diaDeOrigem = d.day; }
       return { ...d, bills: (d.bills ?? []).filter((b) => b.id !== editandoId) };
     });
     if (!conta) { setEditandoId(null); return; }
+    // O "Dia" aceita 1–31 como o dado (`day` 1-31), não só os dias DESTE mês: a
+    // conta do dia 31 editada em novembro continua no 31 (o grid encosta ela no
+    // 30 enquanto o mês for curto). Encostar aqui em daysInMonth movia a conta
+    // pro 30 de vez — e o campo vazio volta pro dia dela, não pro dia da tela.
+    const diaEscolhido = Math.min(Math.max(parseInt(rascunho.day, 10) || diaDeOrigem, 1), 31);
 
     const atualizada: Bill = { ...conta, name };
     if (value === undefined) delete atualizada.value;
@@ -254,7 +266,7 @@ export const MonthCalendar = ({
       : [...semAConta, { day: diaEscolhido, color: "slate", bills: [atualizada] }];
 
     setDueDays(proximo.sort((a, b) => a.day - b.day));
-    setSelectedDay(diaEscolhido);
+    setSelectedDay(Math.min(diaEscolhido, daysInMonth)); // o grid não tem dia 31 em mês curto
     setEditandoId(null);
   };
 
@@ -441,7 +453,7 @@ export const MonthCalendar = ({
                       type="number"
                       inputMode="numeric"
                       min={1}
-                      max={daysInMonth}
+                      max={31} /* o dado aceita 1–31, não só os dias deste mês — ver salvarEdicao */
                       value={rascunho.day}
                       onChange={(e) => setRascunho({ ...rascunho, day: e.target.value })}
                       className="w-9 bg-transparent outline-none text-[13px] font-semibold text-center"
@@ -468,7 +480,7 @@ export const MonthCalendar = ({
                     conseguir marcar. Editar mora no lápis ao lado, pra não
                     roubar o toque de quem só quer dar o ✓. */}
                 <label className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer py-1.5 min-h-9">
-                  <Checkbox checked={b.paid} onCheckedChange={() => toggleBill(selectedDay, b.id)} className="w-[18px] h-[18px]" />
+                  <Checkbox checked={b.paid} onCheckedChange={() => toggleBill(b.diaReal, b.id)} className="w-[18px] h-[18px]" />
                   <span className={`truncate ${b.paid ? "line-through text-muted-foreground" : ""}`}>
                     {b.name}{!b.paid && selectedDay < today ? " · venceu" : !b.paid && selectedDay === today ? " · vence hoje" : ""}
                   </span>
@@ -481,10 +493,10 @@ export const MonthCalendar = ({
                   {/* conta vinda de fixo se gerencia lá — só a manual edita/apaga */}
                   {!b.fixedId && (
                     <>
-                      <button onClick={() => comecarEdicao(b, selectedDay)} className="w-9 h-9 grid place-items-center text-muted-foreground hover:text-sky-600" aria-label={`Editar ${b.name}`}>
+                      <button onClick={() => comecarEdicao(b, b.diaReal)} className="w-9 h-9 grid place-items-center text-muted-foreground hover:text-sky-600" aria-label={`Editar ${b.name}`}>
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
-                      <button onClick={() => removeBill(selectedDay, b.id)} className="w-9 h-9 grid place-items-center text-muted-foreground hover:text-destructive" aria-label={`Remover ${b.name}`}>
+                      <button onClick={() => removeBill(b.diaReal, b.id)} className="w-9 h-9 grid place-items-center text-muted-foreground hover:text-destructive" aria-label={`Remover ${b.name}`}>
                         <X className="w-3.5 h-3.5" />
                       </button>
                     </>

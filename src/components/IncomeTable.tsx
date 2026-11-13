@@ -46,6 +46,16 @@ export const IncomeTable = ({ incomes, setIncomes, prefillExample = false, guard
       : { description: "", value: "", date: "" }
   );
 
+  /* (07/11, bug "receita-exemplo") Ao reabrir, o 1º desenho chega com a lista ainda vazia (o cache não veio) e o
+     useState acima guarda o exemplo; quando o Salário salvo chega, o "Salário / 3000" ficava no campo e um toque no +
+     duplicava a renda. Lista com receita + formulário ainda igual ao exemplo = ela não mexeu: o formulário esvazia.
+     O que ela digitou (qualquer campo diferente do exemplo) fica. */
+  useEffect(() => {
+    if (incomes.length > 0 && newIncome.description === "Salário" && newIncome.value === "3000" && !newIncome.date) {
+      setNewIncome({ description: "", value: "", date: "" });
+    }
+  }, [incomes.length]); // eslint-disable-line react-hooks/exhaustive-deps -- só quando a lista muda de tamanho
+
   const exampleActive =
     prefillExample &&
     incomes.length === 0 &&

@@ -1,4 +1,6 @@
 import { doPerfil, perfilAtivoLocal } from "@/lib/finance-perfil";
+import { variaveisDoMesLidas } from "@/lib/finance-fatura";
+import { mesIdDe } from "@/lib/finance-parcelas";
 // Shared finance storage key utilities.
 //
 // IMPORTANT: All app data is stored in localStorage under a per-user prefix
@@ -142,22 +144,31 @@ const writeJsonForUser = (userId: string | null | undefined, logicalKey: string,
  * Leitores de cópia/arquivo (virada de mês) usam readMonthData, que segue cru.
  */
 export const getMonthTotals = (month: string, userId: string | null | undefined, year?: number, perfil?: string) => {
-  const keys = getFinanceStorageKeys(month, year);
+  const targetYear = year ?? getCurrentYear();
+  const keys = getFinanceStorageKeys(month, targetYear);
   const p = perfil ?? perfilAtivoLocal(userId);
 
   const incomes = doPerfil(readJsonForUser(userId, keys.incomes) || [], p);
-  const expenses = doPerfil(readJsonForUser(userId, keys.expenses) || [], p);
   const fixed = doPerfil(readJsonForUser(userId, keys.fixed) || [], p);
   const installments = doPerfil(readJsonForUser(userId, keys.installments) || [], p);
+  // (07/11, bug "dois-numeros") variáveis pela REGRA DA FATURA, como a tela: a chave do mês + a do anterior
+  // (lib/finance-fatura `variaveisDoMesLidas`). Somar a chave crua dava outro número pro mesmo mês na Comparação
+  // e no Balanço. Sem cartão com fechamento cadastrado, é a soma crua de sempre.
+  const variaveis = variaveisDoMesLidas(mesIdDe(month, targetYear), (chave) => readJsonForUser(userId, chave), p);
 
   return {
     receitas: incomes.reduce((s: number, i: any) => s + (i.value || 0), 0),
     custosFixos: fixed.reduce((s: number, e: any) => s + (e.value || 0), 0),
-    custosVariaveis: expenses.reduce((s: number, e: any) => s + (e.value || 0), 0),
+    custosVariaveis: variaveis.total,
     dividas: installments.reduce(
+      /* A PARCELA DO MÊS, não a dívida inteira (05/11, PDF de cliente: o balanço anual caía -5.260 com a fatura em 830).
+         Mesma regra de `valorDaParcelaNoMes` e `mesDeInicio`, escrita aqui porque lib/finance-parcelas importa deste arquivo. */
       (s: number, i: any) => {
-        const remaining = (i.totalInstallments || 0) - (i.paidInstallments || 0);
-        return s + (remaining > 0 ? remaining * (i.installmentValue || 0) : 0);
+        const k = Number.isInteger(i.parcelaDoMes) && i.parcelaDoMes >= 1 ? i.parcelaDoMes : (i.paidInstallments || 0) + 1;
+        const mesDaData = typeof i.date === "string" ? i.date.slice(0, 7) : "";
+        const ehMes = (v: unknown) => typeof v === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(v);
+        const naoComecou = k === 1 && !i.levada && ehMes(mesDaData) && ehMes(i.startMonth) && mesDaData > i.startMonth;
+        return s + (k <= (i.totalInstallments || 0) && !naoComecou ? i.installmentValue || 0 : 0);
       }, 0
     ),
   };

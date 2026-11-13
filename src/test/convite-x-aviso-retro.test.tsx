@@ -63,6 +63,10 @@ import { localDayKey } from "@/lib/utils";
 import { SEMENTE_COMPLETA } from "@/pages/dev/retro-outubro-exemplo";
 import { criarNuvem, prepararJsdom, type Dados, type Nuvem } from "./compat-comum";
 
+/* 11/11 (trava da build 1.0.25): o aviso da retro só existe até 10/11 (lib/retro-aviso, ULTIMO_DIA_AVISO_RETRO).
+   O relógio fica em 05/11, dentro da janela; o Date anda sozinho (shouldAdvanceTime) pros ~5 s de espera. */
+vi.useFakeTimers({ toFake: ["Date"], shouldAdvanceTime: true });
+vi.setSystemTime(new Date(2026, 10, 5, 12, 0));
 const hoje = localDayKey();
 const BASE: Dados = { ...SEMENTE_COMPLETA, "core-user-name": "Ana", "core-onboarding-done": "true", "core-all-modules-celebrated": "true", "gamification-lastCheckIn": hoje };
 const Arvore = ({ n }: { n: Nuvem }) => (

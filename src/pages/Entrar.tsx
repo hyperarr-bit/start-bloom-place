@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { destinoSeguro, guardarDestino } from "@/lib/destino-seguro";
+import { guardarMetodoLogin, pegarMetodoLogin } from "@/lib/login-oauth";
 import { entrarComGoogle, entrarComApple } from "@/lib/auth-nativo";
 import { EntrarComCodigo } from "@/components/auth/EntrarComCodigo";
 import { ehApple } from "@/lib/loja";
@@ -27,6 +28,7 @@ import { trackEvent, instalouVindoDoSite } from "@/lib/analytics";
 import { ENTRADA_APP } from "@/lib/rotas-web";
 import { RestaurarCompras } from "@/components/app/RestaurarCompras";
 import { ehLinkDoPlannerB } from "@/lib/planner-2027-chave";
+import { entrarCodigoLigado, type EstadoEntrarCodigo } from "@/lib/entrar-codigo";
 
 /** /entrar — duas plateias, a mesma tela.
  *
@@ -64,6 +66,7 @@ const Entrar = () => {
   const { user, loading: authLoading, signIn } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const { state: estadoDaRota } = useLocation();
   const app = isNativeShell();
   /* LINK DE E-MAIL (01/10): `?next=` (só caminho interno permitido — ver
    * destino-seguro.ts) e `?e=` (e-mail preenchido). É a porta de quem clicou
@@ -85,7 +88,10 @@ const Entrar = () => {
   };
   // Quem veio pelo link não "comprou no tutorial": copy neutra, igual à do app.
   const neutro = app || !!next;
-  const [email, setEmail] = useState(next && /\S+@\S+\.\S+/.test(emailDoLink) ? emailDoLink : "");
+  /* Veio do "Criar conta" com e-mail que já existe (chave ENTRAR_CODIGO): chega com o e-mail e o código sai sozinho.
+   * Pelo estado da rota, nunca pela URL: e-mail em URL vai parar em log e em analytics. */
+  const emailJaTemConta = (estadoDaRota as EstadoEntrarCodigo | null)?.emailJaTemConta ?? "";
+  const [email, setEmail] = useState(next && /\S+@\S+\.\S+/.test(emailDoLink) ? emailDoLink : emailJaTemConta);
   /* crítica r2 do upsell 2027 (compradora MEDIA 1): quem chega pelo "Planejar meu 2027" acabou de pagar por Pix e nunca
    * criou senha. Com o link do 2027 B + o e-mail dela, a tela abre no CÓDIGO POR E-MAIL; a senha vira link secundário.
    * Fora desse link (o único que existe com as chaves do 2027 ligadas), a tela fica igual. */
@@ -94,7 +100,10 @@ const Entrar = () => {
     try { const u = new URL(next, "https://x.invalid"); return ehLinkDoPlannerB(u.pathname, u.search); } catch { return false; }
   })();
   const [querSenha, setQuerSenha] = useState(false);
-  const soCodigo = codigoPrimeiro && !querSenha;
+  /* Chave ENTRAR_CODIGO: o código vira o caminho principal de todo mundo (quem comprou no site nunca teve senha na
+   * cabeça). Diferente do codigoPrimeiro, a pessoa digita o e-mail aqui. */
+  const telaCodigo = entrarCodigoLigado() && !codigoPrimeiro;
+  const soCodigo = (codigoPrimeiro || telaCodigo) && !querSenha;
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -133,9 +142,11 @@ const Entrar = () => {
   const handleApple = async () => {
     setAppleLoading(true);
     guardarDestino(next); // o OAuth sai do site; o /auth/callback lê isto na volta
+    guardarMetodoLogin("apple", next);
     const { error } = await entrarComApple();
     if (error) {
-      setErrorMsg("Não foi possível entrar com a Apple. Tente com e-mail e senha.");
+      pegarMetodoLogin();
+      setErrorMsg(`Não foi possível entrar com a Apple. ${telaCodigo ? "Tente com o código por e-mail." : "Tente com e-mail e senha."}`);
       setAppleLoading(false);
     }
   };
@@ -143,11 +154,13 @@ const Entrar = () => {
   const handleGoogle = async () => {
     setGoogleLoading(true);
     guardarDestino(next);
+    guardarMetodoLogin("google", next);
     // entrarComGoogle bifurca: web segue igual, app usa Custom Tab + core://auth
     // (no app o redirect antigo devolvia a pessoa no SITE — ver auth-nativo.ts)
     const { error } = await entrarComGoogle();
     if (error) {
-      setErrorMsg("Não foi possível entrar com Google. Tente com e-mail e senha.");
+      pegarMetodoLogin();
+      setErrorMsg(`Não foi possível entrar com Google. ${telaCodigo ? "Tente com o código por e-mail." : "Tente com e-mail e senha."}`);
       setGoogleLoading(false);
     }
   };
@@ -204,10 +217,35 @@ const Entrar = () => {
     );
   }
 
+  const campoEmail = (
+    <div className="space-y-1.5">
+      <label htmlFor="entrar-email" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+        Seu e-mail
+      </label>
+      <div className="relative">
+        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          id="entrar-email"
+          type="email"
+          placeholder="seu@gmail.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="pl-10 h-12"
+          required
+          autoComplete="email"
+          inputMode="email"
+        />
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4 py-10 relative overflow-hidden">
-      {/* brilho suave no topo — recepção, não tela genérica de login */}
-      <div className="pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-[28rem] h-[28rem] rounded-full bg-emerald-500/10 blur-3xl" />
+      {/* brilho suave no topo — recepção, não tela genérica de login. Em camada própria: mais largo que o celular, ele
+          deixava esta div rolar 29 px de lado, e rolar um botão pra dentro da tela empurrava o conteúdo pra esquerda. */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[28rem] h-[28rem] rounded-full bg-emerald-500/10 blur-3xl" />
+      </div>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -234,7 +272,12 @@ const Entrar = () => {
               {neutro ? "Entrar no seu CORE" : "Seu acesso está liberado 🎉"}
             </h1>
             <p className="text-sm text-muted-foreground leading-relaxed" data-testid={soCodigo ? "entrar-codigo-primeiro" : undefined}>
-              {soCodigo ? (
+              {telaCodigo && soCodigo ? (
+                <>
+                  Digite o e-mail {neutro ? "da sua conta" : "da compra"}. A gente manda um{" "}
+                  <strong className="text-foreground">código de 8 números</strong>.
+                </>
+              ) : soCodigo ? (
                 <>
                   A gente manda um <strong className="text-foreground">código de 8 números</strong> pro{" "}
                   <strong className="text-foreground break-words">{email}</strong>. Você digita aqui e pronto.
@@ -257,8 +300,15 @@ const Entrar = () => {
 
         {soCodigo && (
           <div className="space-y-3">
-            <EntrarComCodigo email={email} funil="entrar_2027" cheio rotulo="Mandar o código pro meu e-mail" onSession={() => { trackEvent("login_completed", { method: "codigo_email", source: "email_access", ...(next ? { next } : {}) }); navigate(destinoPos); }} />
-            <button type="button" onClick={() => setQuerSenha(true)} data-testid="entrar-com-senha" className="block w-full text-center text-[13px] text-muted-foreground underline underline-offset-2">
+            {telaCodigo ? (
+              <EntrarComCodigo email={email} funil="entrar_codigo" guiado rotulo="Receber código" enviarAoAbrir={!!emailJaTemConta} aviso={emailJaTemConta ? "Esse e-mail já tem conta." : undefined} onSession={() => { trackEvent("login_completed", { method: "codigo_email", source: "email_access", ...(next ? { next } : {}) }); navigate(destinoPos); }}>
+                {campoEmail}
+              </EntrarComCodigo>
+            ) : (
+              <EntrarComCodigo email={email} funil="entrar_2027" cheio rotulo="Mandar o código pro meu e-mail" onSession={() => { trackEvent("login_completed", { method: "codigo_email", source: "email_access", ...(next ? { next } : {}) }); navigate(destinoPos); }} />
+            )}
+            {errorMsg && <p className="text-sm text-destructive leading-snug" role="alert">{errorMsg}</p>}
+            <button type="button" onClick={() => { if (telaCodigo) trackEvent("funnel_click", { cta: "entrar_preferiu_senha", funil: "entrar_codigo" }); setQuerSenha(true); }} data-testid="entrar-com-senha" className="block w-full text-center text-[13px] text-muted-foreground underline underline-offset-2">
               Prefiro entrar com senha
             </button>
           </div>
@@ -268,25 +318,7 @@ const Entrar = () => {
         {!soCodigo && (<>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-3">
-            <div className="space-y-1.5">
-              <label htmlFor="entrar-email" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Seu e-mail
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="entrar-email"
-                  type="email"
-                  placeholder="seu@gmail.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 h-12"
-                  required
-                  autoComplete="email"
-                  inputMode="email"
-                />
-              </div>
-            </div>
+            {campoEmail}
             <div className="space-y-1.5">
               <label htmlFor="entrar-senha" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 Sua senha

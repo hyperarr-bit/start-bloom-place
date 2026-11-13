@@ -344,20 +344,34 @@ const soma = (itens: unknown[]) => itens.reduce<number>((s, i) => s + num((i as 
 const doMesFin = <T extends { date?: unknown }>(itens: T[], mesId: string): T[] =>
   itens.filter((i) => typeof i?.date !== "string" || !/^\d{4}-\d{2}/.test(i.date) || i.date.startsWith(`${mesId}-`));
 
-interface TotaisDoMes { receitas: number; saida: number; medido: boolean; expenses: { date?: string; category?: string }[]; fixos: number; parcelas: number }
+interface TotaisDoMes {
+  receitas: number; saida: number; medido: boolean;
+  /** O que ela LANÇOU no mês (data dentro dele): base dos dias com gasto, delivery e 1º dia. */
+  lancados: { date?: string; category?: string }[];
+  fixos: number; parcelas: number;
+}
 
+/* (07/11, bug "insignias-fatura") O DINHEIRO segue a fatura, a ATIVIDADE segue a data da compra — a mesma
+   separação que o 0f5b6021 fez na retrospectiva. `f.expenses` já é a lista que conta no mês pela regra da
+   fatura; filtrá-la pela data (como antes) tirava a TV de 28/10 que a tela conta em novembro, e o Cinema no
+   crédito de 26/11 (adiado pra fatura de dezembro) sumia dos dias com gasto — o dia 26 virava "sem gastar".
+   O filtro de data só vale pros itens da chave do PRÓPRIO mês (`f.lancados`): antes da virada o balde ainda
+   tem gastos do mês passado, que nunca contaram aqui. Os que vieram da chave do mês anterior (fatura que cai
+   neste) passam direto. Sem `lancados` (bloco montado na mão) é o filtro de sempre. */
 const totaisDe = (f: FinancasDoMes, mesId: string): TotaisDoMes => {
   const incomes = doMesFin(f.incomes, mesId);
-  const expenses = doMesFin(f.expenses, mesId);
+  const doProprioMes = new Set<unknown>(f.lancados ?? f.expenses);
+  const contam = f.expenses.filter((e) => !doProprioMes.has(e) || doMesFin([e], mesId).length > 0);
+  const lancados = doMesFin(f.lancados ?? f.expenses, mesId);
   const receitas = soma(incomes);
-  const variaveis = soma(expenses);
+  const variaveis = soma(contam);
   const fixos = soma(f.fixed);
   const parcelas = somaParcelasDoMes(f.parcelas as Parcela[]);
   const saida = computeMonthlyOutflow(variaveis, fixos, parcelas, f.avulsas ?? 0);
   return {
     receitas, saida, fixos, parcelas,
-    expenses: expenses as { date?: string; category?: string }[],
-    medido: receitas > 0 && expenses.length + f.fixed.length >= MIN_GASTOS_POUPANCA && saida > 0,
+    lancados: lancados as { date?: string; category?: string }[],
+    medido: receitas > 0 && lancados.length + f.fixed.length >= MIN_GASTOS_POUPANCA && saida > 0,
   };
 };
 
@@ -398,15 +412,15 @@ export function medirInsignias(get: Get, hoje: string = localDayKey(), mesAlvo?:
   marcar("fin-guardei", fin.medido ? Math.max(0, computeSavingsRate(fin.receitas, fin.saida)) : 0);
   marcar("fin-sobrou", fin.medido ? Math.max(0, computeMonthlyBalance(fin.receitas, fin.saida)) : 0);
   // dias da base do mês (do 1º registro datado até hoje) sem gasto anotado — só com o mês anotado
-  const gastosDatados = fin.expenses.filter((e) => noMes(e.date)).length;
+  const gastosDatados = fin.lancados.filter((e) => noMes(e.date)).length;
   if (gastosDatados >= MIN_GASTOS_POUPANCA) {
-    const primeiro = atividadeDoMes(ano, mesIdx, dados, { incomes: [], expenses: fin.expenses, fixed: [], parcelas: [] }).primeiroDia ?? 1;
-    const comGasto = new Set(fin.expenses.map((e) => e.date).filter(noMes));
+    const primeiro = atividadeDoMes(ano, mesIdx, dados, { incomes: [], expenses: fin.lancados, fixed: [], parcelas: [] }).primeiroDia ?? 1;
+    const comGasto = new Set(fin.lancados.map((e) => e.date).filter(noMes));
     let semGasto = 0;
     for (let d = primeiro; d <= ultimoDia; d++) if (!comGasto.has(`${mesId}-${pad2(d)}`)) semGasto++;
     marcar("fin-sem-gastar", semGasto);
     // semanas cheias do mês (janelas de 7 dias a partir do dia 1) sem gasto em "delivery"
-    const delivery = new Set(fin.expenses.filter((e) => e.category === "delivery" && noMes(e.date)).map((e) => e.date as string));
+    const delivery = new Set(fin.lancados.filter((e) => e.category === "delivery" && noMes(e.date)).map((e) => e.date as string));
     let semDelivery = 0;
     for (let inicio = 1; inicio + 6 <= ultimoDia; inicio += 7) {
       let limpa = true;

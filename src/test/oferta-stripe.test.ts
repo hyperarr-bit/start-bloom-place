@@ -280,9 +280,12 @@ describe("a /oferta no jsdom", () => {
   it("rotas: /oferta e /oferta/ → landing.html (vercel e vite); a função do webhook sem JWT", () => {
     const v = JSON.parse(readFileSync(resolve(raiz, "vercel.json"), "utf8")) as { rewrites: Array<{ source: string; destination: string }> };
     const i = (s: string) => v.rewrites.findIndex((r) => r.source === s);
+    // 11/11: o catch-all do vercel.json agora deixa /assets de fora: "/((?!assets(?:/|$)).*)" → /index.html
+    const CATCH_ALL = "/((?!assets(?:/|$)).*)";
+    expect(i(CATCH_ALL)).toBe(v.rewrites.length - 1);
     expect(v.rewrites[i("/oferta")].destination).toBe("/landing.html");
     expect(v.rewrites[i("/oferta/")].destination).toBe("/landing.html");
-    expect(i("/oferta/")).toBeLessThan(i("/(.*)"));
+    expect(i("/oferta/")).toBeLessThan(i(CATCH_ALL));
     expect(readFileSync(resolve(raiz, "vite.config.ts"), "utf8")).toContain('replace(/^\\/oferta\\/?/, "/landing.html")');
     expect(readFileSync(resolve(raiz, "supabase/config.toml"), "utf8")).toMatch(/\[functions\.stripe-webhook\]\nverify_jwt = false/);
   });

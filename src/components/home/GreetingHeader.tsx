@@ -1,3 +1,4 @@
+import { useEntradaDaHome } from "@/components/home/entrada-da-home";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Sun, Moon, CloudSun, Sunset, Pencil, ChevronDown } from "lucide-react";
@@ -38,6 +39,7 @@ const algoPorCimaDoAviso = (): boolean => {
 };
 
 export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: GreetingHeaderProps) => {
+  const entrada = useEntradaDaHome(); // 07/11: só a 1ª montagem da sessão anima a saudação
   const { user } = useAuth();
   const { get, set: setUserData } = useUserData();
   const { text: greeting, Icon: GreetingIcon } = getGreeting();
@@ -121,7 +123,7 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
           mais baixo que o texto). */}
       <motion.div
         className="flex items-center justify-between"
-        initial={{ opacity: 0, y: -10 }}
+        initial={entrada ? { opacity: 0, y: -10 } : false}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >

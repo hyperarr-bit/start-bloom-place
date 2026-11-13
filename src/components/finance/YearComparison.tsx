@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ArrowLeftRight } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SelectEnxuto } from "@/components/ui/select-enxuto";
 import { getCurrentYear } from "@/components/finance/storage-keys";
 import { perfilAtivoLocal } from "@/lib/finance-perfil";
 import { useAuth } from "@/hooks/use-auth";
@@ -136,7 +136,8 @@ export const YearComparison = ({ perfil }: Props) => {
   const [anoB, setAnoB] = useState(anoAtual);
   const [mesmoPeriodo, setMesmoPeriodo] = useState(true);
   const [verTodas, setVerTodas] = useState(false);
-  const anos = useMemo(() => anosDaLista(anoAtual), [anoAtual]);
+  // 07/11 (desempenho): as opções só montam com a lista aberta (SelectEnxuto)
+  const anos = useMemo(() => anosDaLista(anoAtual).map((a) => ({ value: String(a), label: String(a) })), [anoAtual]);
 
   // O toggle só existe quando tem efeito: um dos anos é o corrente E o ano
   // ainda não acabou (em dezembro "mesmo período" = ano inteiro).
@@ -160,16 +161,7 @@ export const YearComparison = ({ perfil }: Props) => {
   const nenhumComDado = !totaisA.temLancamento && !totaisB.temLancamento;
 
   const seletor = (valor: number, setar: (a: number) => void, rotulo: string) => (
-    <Select value={String(valor)} onValueChange={(v) => setar(Number(v))}>
-      <SelectTrigger className="h-7 text-xs flex-1" aria-label={rotulo}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {anos.map((a) => (
-          <SelectItem key={a} value={String(a)} className="text-xs">{a}</SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <SelectEnxuto value={String(valor)} onValueChange={(v) => setar(Number(v))} opcoes={anos} rotulo={String(valor)} ariaLabel={rotulo} className="h-7 text-xs flex-1" classeItem="text-xs" />
   );
 
   /* Uma linha do resumo por ano: os três números, ou — quando o ano não tem

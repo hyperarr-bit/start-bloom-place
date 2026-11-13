@@ -2,14 +2,26 @@ import { useState } from "react";
 import { normalizarCopoMl } from "@/lib/saude-copo";
 import { motion } from "framer-motion";
 import { localDayKey } from "@/lib/utils";
-import { Droplets, Minus, Pencil, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Droplets, Minus, Pencil, Plus } from "lucide-react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useHoje } from "@/hooks/use-hoje";
 import { SerieHistorico } from "@/components/historico/SerieHistorico";
+import { somarDias } from "@/lib/sequencia";
 
 const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
 
+/** Até onde dá pra voltar: a mesma janela da maior lente de dias do histórico. */
+const DIAS_PRA_TRAS = 30;
+const SEMANA = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+const MES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+const rotuloDoDia = (dia: string, hoje: string) => {
+  if (dia === somarDias(hoje, -1)) return "ontem";
+  const [a, m, d] = dia.split("-").map(Number);
+  return `${SEMANA[new Date(a, m - 1, d).getDay()]}, ${d} ${MES[m - 1]}`;
+};
+
 export const HydrationTracker = () => {
-  const today = todayStr();
+  const today = useHoje();
   const [waterLog, setWaterLog] = usePersistedState<Record<string, number>>("core-saude-water", {});
   const [waterGoalRaw, setWaterGoal] = usePersistedState<number>("core-saude-water-goal", 8);
   const waterGoal = Math.min(20, Math.max(1, Math.round(Number(waterGoalRaw) || 8)));
@@ -33,7 +45,21 @@ export const HydrationTracker = () => {
   // (lê o maior do dia, escreve nos dois) pra nenhuma tela mostrar zero
   const [waterLogRotina, setWaterLogRotina] = usePersistedState<Record<string, number>>("water-log", {});
 
-  const current = Math.max(waterLog[today] || 0, waterLogRotina[today] || 0);
+  /*
+   * DIA ANTERIOR (05/11, pedido de cliente): esqueceu de marcar ontem ou errou o número. O card inteiro passa a mostrar
+   * o dia escolhido e o + e o − escrevem nele, nas DUAS chaves, como no hoje. Fica só em memória: reabrir sempre volta
+   * pro hoje, e `null` = hoje, então passar da meia-noite com o card aberto não prende ninguém no dia que acabou.
+   */
+  const [diaEscolhido, setDiaEscolhido] = useState<string | null>(null);
+  const passado = !!diaEscolhido && diaEscolhido < today; // nunca dia futuro, nem com o relógio do aparelho mexido
+  const dia = passado ? (diaEscolhido as string) : today;
+  const rotuloDia = rotuloDoDia(dia, today);
+  const limite = somarDias(today, -DIAS_PRA_TRAS);
+  const irPara = (novo: string) => setDiaEscolhido(novo < today ? novo : null);
+  // Mesmo critério do Histórico: conta sem registro não vê nada novo (a miniatura dos cartões de quem chega fica igual)
+  const temRegistro = [...Object.values(waterLog), ...Object.values(waterLogRotina)].some((v) => Number(v) > 0);
+
+  const current = Math.max(waterLog[dia] || 0, waterLogRotina[dia] || 0);
   const pct = Math.min(100, (current / waterGoal) * 100);
   const mlCurrent = current * copoMl;
   const mlGoal = waterGoal * copoMl;
@@ -50,15 +76,21 @@ export const HydrationTracker = () => {
    * As duas chaves andam juntas (a Rotina conta pela `water-log`) — mexer só
    * numa fazia o `Math.max` do `current` ressuscitar o valor antigo, que é
    * exatamente por que o "−" do widget da Home não funcionava.
+   *
+   * O DIA É O DO TOQUE (07/11): com o app aberto de noite, o `today` do último
+   * desenho ainda é ontem às 8h. O "+" somava em ontem, o "−" e o "Zerar"
+   * tiravam de ontem, e a tela redesenhada no dia novo dizia 0ml.
    */
-  const setPorcoes = (n: number) => {
-    const v = Math.min(20, Math.max(0, n));
-    setWaterLog(prev => ({ ...prev, [today]: v }));
-    setWaterLogRotina(prev => ({ ...prev, [today]: v }));
+  // Junção 1.0.25: dia anterior escolhido grava nele; senão o dia de HOJE lido na hora do toque (não o do desenho).
+  const setPorcoes = (proximo: (atual: number) => number) => {
+    const dia = passado ? (diaEscolhido as string) : todayStr();
+    const v = Math.min(20, Math.max(0, proximo(Math.max(waterLog[dia] || 0, waterLogRotina[dia] || 0))));
+    setWaterLog(prev => ({ ...prev, [dia]: v }));
+    setWaterLogRotina(prev => ({ ...prev, [dia]: v }));
   };
-  const addWater = () => setPorcoes(current + 1);
-  const removeWater = () => setPorcoes(current - 1);
-  const zerarDia = () => setPorcoes(0);
+  const addWater = () => setPorcoes(n => n + 1);
+  const removeWater = () => setPorcoes(n => n - 1);
+  const zerarDia = () => setPorcoes(() => 0);
   const ajustaMeta = (delta: number) => setWaterGoal(Math.min(20, Math.max(1, waterGoal + delta)));
 
   return (
@@ -204,7 +236,7 @@ export const HydrationTracker = () => {
               data-spotlight="add-water"
               className="flex items-center gap-2 px-4 py-2 min-h-10 rounded-lg bg-[hsl(var(--saude-blue)/0.12)] hover:bg-[hsl(var(--saude-blue)/0.2)] text-[hsl(var(--saude-blue))] text-xs font-bold transition-colors flex-1 justify-center border border-[hsl(var(--saude-blue)/0.2)]"
             >
-              <Plus className="w-3.5 h-3.5" /> +{copoMl}ml
+              <Plus className="w-3.5 h-3.5" /> +{copoMl}ml{passado ? ` em ${rotuloDia}` : ""}
             </button>
           </div>
           {current > 0 && (
@@ -212,12 +244,39 @@ export const HydrationTracker = () => {
               onClick={zerarDia}
               className="w-full text-center text-[11px] text-muted-foreground underline underline-offset-2 py-1"
             >
-              Zerar o dia e começar de novo
+              {passado ? "Zerar este dia" : "Zerar o dia e começar de novo"}
             </button>
           )}
 
         </div>
       </div>
+
+      {(temRegistro || passado) && (
+        <div className="mt-2 flex items-center justify-between gap-2" data-testid="agua-dia">
+          <button
+            onClick={() => irPara(somarDias(dia, -1))}
+            disabled={dia <= limite}
+            className="min-h-10 flex items-center gap-0.5 text-[11px] font-semibold text-muted-foreground disabled:opacity-30"
+          >
+            <ChevronLeft className="w-4 h-4" /> Dia anterior
+          </button>
+          {passado ? (
+            <button onClick={() => setDiaEscolhido(null)} className="min-h-10 text-center text-xs font-bold leading-tight">
+              {rotuloDia[0].toUpperCase() + rotuloDia.slice(1)}
+              <span className="block text-[10px] font-medium text-muted-foreground underline underline-offset-2">voltar pra hoje</span>
+            </button>
+          ) : (
+            <span className="text-xs font-bold">Hoje</span>
+          )}
+          <button
+            onClick={() => irPara(somarDias(dia, 1))}
+            disabled={!passado}
+            className="min-h-10 flex items-center gap-0.5 text-[11px] font-semibold text-muted-foreground disabled:opacity-30"
+          >
+            Próximo dia <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Histórico (23/08, review da Elaine): as duas chaves andam juntas
           (a Rotina conta pela `water-log`) — a série une as duas pelo MAIOR

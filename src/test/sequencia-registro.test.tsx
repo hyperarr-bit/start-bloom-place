@@ -143,15 +143,24 @@ describe("registro do dia anotado", () => {
     await waitFor(() => expect(lista()).toEqual(["2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25", "2026-09-26"]));
   });
 
-  it("virada de dia com o app aberto: a anotação de amanhã entra como novo dia", async () => {
+  it("virada de dia com o app aberto: a anotação de amanhã entra como novo dia — depois de reler a conta (07/11)", async () => {
     await montar();
     act(() => api.set("finance-expenses", [{ id: 1 }]));
     await waitFor(() => expect(lista()).toEqual(["2026-09-26"]));
+    await passaDebounce();
+    expect(gravacoesDaLista()).toHaveLength(1);
+    // o que o servidor tem agora (este mock não guarda o upsert sozinho)
+    linhasDoServidor = [{ key: CHAVE_DIAS_ANOTADOS, value: ["2026-09-26"] }, { key: "finance-expenses", value: [{ id: 1 }] }];
     vi.setSystemTime(new Date(2026, 8, 27, 0, 10)); // 00:10 do dia seguinte
     act(() => api.set("finance-expenses", [{ id: 1 }, { id: 2 }]));
+    // 07/11 (sessão viva, use-user-data "SESSÃO VIVA"): a conta foi lida ONTEM — outro aparelho pode ter
+    // anotado dias desde então, e a lista daqui + hoje iria por cima deles. O dia espera a releitura e
+    // entra na lista que o servidor tem agora; o gesto em si sobe na hora. Antes: entrava direto, numa
+    // gravação só com a de ontem (debounce).
     await waitFor(() => expect(lista()).toEqual(["2026-09-26", "2026-09-27"]));
     await passaDebounce();
-    expect(gravacoesDaLista()).toHaveLength(1); // debounce junta as duas numa gravação no servidor
-    expect(gravacoesDaLista()[0].value).toEqual(["2026-09-26", "2026-09-27"]);
+    expect(gravacoesDaLista()).toHaveLength(2);
+    expect(gravacoesDaLista()[1].value).toEqual(["2026-09-26", "2026-09-27"]);
+    expect(api.get("finance-expenses", [])).toEqual([{ id: 1 }, { id: 2 }]); // a releitura não desfez o gesto
   });
 });

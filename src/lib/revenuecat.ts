@@ -52,6 +52,7 @@ import { registrarMedicaoTotalRemota } from "@/lib/medicao-total";
 import { registrarChavePaywallMinimalista } from "@/lib/paywall-minimalista";
 import { registrarMenuNovoRemoto } from "@/lib/menu-novo";
 import { registrarSinoRemoto } from "@/lib/sino-paywall";
+import { camposDoTituloNaFolha, registrarTituloRemoto } from "@/lib/titulo-paywall";
 import { registrarSkanTrialSdkRemoto } from "@/lib/skan-trial-sdk";
 import { registrarCardRecusaRemoto } from "@/lib/card-recusa";
 import { registrarDias23Remoto } from "@/lib/dias23";
@@ -87,6 +88,7 @@ const registrarChavesDasOfferings = (offerings: unknown): void => {
     registrarDias23Remoto, // 1.0.18: `dias23` (on|off) — os dias 2 e 3 do teste: número pronto + escolhe o seu + o resumo ao abrir no dia 3 (lib/dias23)
     registrarMenuNovoRemoto, // 1.0.18: `menu_novo` (todos|off) — o menu da conta em 3 grupos + topo sem sol/paleta (lib/menu-novo)
     registrarSinoRemoto, // 1.0.18: `sino_paywall` (off|on|ab) — a tela do sino antes do paywall do iPhone (lib/sino-paywall)
+    registrarTituloRemoto, // 06/11: `titulo_paywall` (off|on|ab) — o teste de título do paywall minimalista (lib/titulo-paywall)
     registrarAvaliacaoTesteDia2Remoto, // 1.0.18: `avaliacao_teste_dia2` (on|off, padrão off) — pedir nota também pro teste que voltou no dia 2 (lib/avaliacao-teste-dia2)
     registrarDegrau2Remoto, // 1.0.18: `recusa_degrau2` (on|off, padrão off) — o 2º degrau da recusa, mensal 19,90 (lib/mensal-degraus)
     registrarRetroOutubroRemoto, // 23/10: `retro_outubro` (on|off, padrão off) — a retrospectiva de outubro em cards animados, a partir de 01/11 (lib/retro-outubro)
@@ -929,6 +931,7 @@ function registrarResultadoDaFolha(resultado: ResultadoDaFolha, produto: string)
     produto,
     ms_desde_toque: base ? agora - base : null,
     segunda_chance: ultimaFolhaFalhouEm != null && agora - ultimaFolhaFalhouEm < SEGUNDA_CHANCE_JANELA_MS,
+    ...camposDoTituloNaFolha(),
   });
   ultimaFolhaFalhouEm = resultado === "sucesso" ? null : agora;
   toqueDaFolhaEm = null;

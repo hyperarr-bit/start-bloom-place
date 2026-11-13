@@ -14,7 +14,8 @@ import { TotalPorCartao } from "@/components/finance/TotalPorCartao";
 import { useFinanceCards } from "@/lib/finance-cards";
 import { useFinanceCategories } from "@/lib/finance-categories";
 import {
-  type Parcela, carimbar, carimbarLista, marcarParcelaDoMes, nomeDoMes, parcelaDoMes, parcelaPagaNoMes, parcelaQuitada,
+  type Parcela, adiantarParcela, carimbar, carimbarLista, desfazerAdiantada, marcarParcelaDoMes, mesDaParcela, mesDeInicio, mesesEntre,
+  nomeDoMes, parcelaAtiva, parcelaDoMes, parcelaPagaNoMes, parcelaQuitada, parcelasAdiantadas, podeAdiantar,
   somaParcelasDoMes, somarMeses,
 } from "@/lib/finance-parcelas";
 import { mesCorrenteId } from "@/lib/virada-contas";
@@ -54,7 +55,12 @@ interface InstallmentTrackerProps {
  * `handled` avisa a origem que alguém recebeu (dispatchEvent é síncrono).
  */
 export const NOVO_PARCELAMENTO_EVENT = "core:novo-parcelamento";
-export type NovoParcelamentoDetalhe = { installment: Installment; handled: boolean };
+export type NovoParcelamentoDetalhe = {
+  installment: Installment;
+  handled: boolean;
+  /** Nome do mês, quando a 1ª parcela é de um mês futuro (ver mesDeInicio). */
+  comecaEm?: string;
+};
 
 /**
  * Este card tinha lista PRÓPRIA de categorias (roupa/beleza/eletrônicos…), que
@@ -92,6 +98,10 @@ export const InstallmentTracker = ({
      startMonth = o mês da chave em que está", sem escrita de boot. */
   const gravar = (lista: Installment[]) => setInstallments(carimbarLista(lista, mesDaChave));
 
+  /* 1ª parcela num mês futuro (mesDeInicio): fica na lista, mas só conta a partir daquele mês. */
+  const avisarInicio = (mesInicio: string) =>
+    toast.success(`A 1ª parcela entra em ${nomeDoMes(mesInicio)}`, { description: "Fica na lista e só conta a partir desse mês." });
+
   // Recebe o parcelamento criado lá no "+ Novo gasto" (ver NOVO_PARCELAMENTO_EVENT).
   // A lista entra pelo setInstallments do pai, então total mensal, dívidas,
   // calendário e conquistas recalculam na hora, sem recarregar.
@@ -100,7 +110,10 @@ export const InstallmentTracker = ({
       const detalhe = (e as CustomEvent<NovoParcelamentoDetalhe>).detail;
       if (!detalhe?.installment) return;
       detalhe.handled = true;
-      gravar([...installments, carimbar(detalhe.installment, mesDaChave)]);
+      const nova = carimbar(detalhe.installment, mesDaChave);
+      const inicio = mesDeInicio(nova);
+      if (inicio) detalhe.comecaEm = nomeDoMes(inicio);
+      gravar([...installments, nova]);
     };
     window.addEventListener(NOVO_PARCELAMENTO_EVENT, onNovo);
     return () => window.removeEventListener(NOVO_PARCELAMENTO_EVENT, onNovo);
@@ -120,20 +133,20 @@ export const InstallmentTracker = ({
       return;
     }
     const pagas = parseInt(newItem.paidInstallments, 10);
-    gravar([
-      ...installments,
-      {
-        id: Date.now().toString(),
-        description: descricao,
-        totalValue,
-        installmentValue: totalValue / totalInstallments,
-        paidInstallments: Math.max(0, Math.min(Number.isInteger(pagas) ? pagas : 0, totalInstallments)),
-        totalInstallments,
-        cardName: newItem.cardName || "outro",
-        category: newItem.category || "outros",
-        date: newItem.date || localDayKey(),
-      },
-    ]);
+    const nova: Installment = {
+      id: Date.now().toString(),
+      description: descricao,
+      totalValue,
+      installmentValue: totalValue / totalInstallments,
+      paidInstallments: Math.max(0, Math.min(Number.isInteger(pagas) ? pagas : 0, totalInstallments)),
+      totalInstallments,
+      cardName: newItem.cardName || "outro",
+      category: newItem.category || "outros",
+      date: newItem.date || localDayKey(),
+    };
+    gravar([...installments, nova]);
+    const inicio = mesDeInicio(carimbar(nova, mesDaChave));
+    if (inicio) avisarInicio(inicio);
     setNewItem({ description: "", totalValue: "", totalInstallments: "", paidInstallments: "", cardName: "", category: "", date: "" });
     setShowForm(false);
   };
@@ -149,8 +162,9 @@ export const InstallmentTracker = ({
     const faltam = total - pagas;
     const valor = numeroBR(newItem.totalValue);
     const daParcela = Number.isFinite(valor) && valor > 0 ? ` (R$ ${brl(valor / total)})` : "";
-    const ultima = nomeDoMes(somarMeses(mesDaChave, faltam - 1), true);
-    const quando = mes && mes !== mesCorrenteId() ? `Em ${nomeDoMes(mes)}` : "Este mês";
+    const inicio = mesDeInicio({ date: newItem.date, startMonth: mesDaChave, parcelaDoMes: pagas + 1 } as Parcela);
+    const ultima = nomeDoMes(somarMeses(inicio ?? mesDaChave, faltam - 1), true);
+    const quando = inicio ? `Em ${nomeDoMes(inicio)}` : mes && mes !== mesCorrenteId() ? `Em ${nomeDoMes(mes)}` : "Este mês";
     return `${quando}: parcela ${pagas + 1} de ${total}${daParcela} · ${faltam === 1 ? "é a última" : `faltam ${faltam}, a última em ${ultima}`}`;
   })();
 
@@ -205,12 +219,16 @@ export const InstallmentTracker = ({
     // pagas nunca passa do total nem fica negativo: é isso que decide se a
     // dívida conta como quitada nos totais e nas conquistas
     const pagasOk = Math.max(0, Math.min(Number.isInteger(pagas) ? pagas : 0, total));
-    gravar(installments.map((i) => {
+    const original = installments.find((i) => i.id === editandoId);
+    const editadas = installments.map((i) => {
       if (i.id !== editandoId) return i;
       // "Já paguei" mudou → a parcela do mês acompanha, preservando se ela
       // estava marcada como paga ou não (senão o checkbox mentiria)
       const estavaPaga = parcelaPagaNoMes(i);
-      const parcela = Math.min(estavaPaga ? pagasOk : pagasOk + 1, total + 1);
+      /* Parcela adiantada (05/11): "Já paguei" fica à frente da parcela do mês. Salvar sem mexer nele, ou mexendo só
+         no adiantado, não pode pular a parcela do mês pra frente: a dívida acabaria antes da hora nos totais. */
+      const mantemMes = pagasOk === i.paidInstallments || (parcelasAdiantadas(i) > 0 && pagasOk >= parcelaDoMes(i));
+      const parcela = Math.min(mantemMes ? parcelaDoMes(i) : estavaPaga ? pagasOk : pagasOk + 1, total + 1);
       return {
         ...i,
         description: rascunho.description.trim(),
@@ -223,7 +241,12 @@ export const InstallmentTracker = ({
         cardName: rascunho.cardName || i.cardName || "outro",
         category: rascunho.category || i.category || "outros",
       };
-    }));
+    });
+    gravar(editadas);
+    /* Corrigiu a 1ª parcela pra um mês futuro: avisa que o total do mês mudou. */
+    const editada = editadas.find((i) => i.id === editandoId);
+    const inicio = editada && editada.date !== original?.date ? mesDeInicio(carimbar(editada, mesDaChave)) : null;
+    if (inicio) avisarInicio(inicio);
     setEditandoId(null);
   };
 
@@ -231,8 +254,18 @@ export const InstallmentTracker = ({
      "paguei mais uma" no toque — nunca refletia nada e não desfazia. Agora
      marca/desmarca a parcela DESTE mês. */
   const marcarPaga = (id: string, paga: boolean) => {
+    const antes = installments;
+    const tinhaAdiantada = installments.some((i) => i.id === id && parcelasAdiantadas(i) > 0);
     gravar(installments.map((i) => (i.id === id ? marcarParcelaDoMes(i, paga, mesDaChave) : i)));
+    // a baixa é em sequência: desmarcar o mês leva junto as de depois, então avisa e deixa voltar
+    if (!paga && tinhaAdiantada) avisarApagado("As parcelas adiantadas também foram desmarcadas", () => gravar(antes));
   };
+
+  /* Antecipar (05/11, lib/finance-parcelas). Só na planilha que manda na parcela: o retrato de um mês passado é
+     história, e mexer nele não chegaria ao balde (o mês seguinte continuaria igual). */
+  const planilhaEditavel = mesesEntre(mesCorrenteId(), mesDaChave) >= 0;
+  const adiantar = (id: string) => gravar(installments.map((i) => (i.id === id ? adiantarParcela(i, mesDaChave) : i)));
+  const desfazerAdiantamento = (id: string) => gravar(installments.map((i) => (i.id === id ? desfazerAdiantada(i, mesDaChave) : i)));
 
   // Lista que aparece: as do mês (editáveis) + as previstas de outros meses
   const previstas = new Set(projetadas.map((p) => p.id));
@@ -248,7 +281,7 @@ export const InstallmentTracker = ({
           <span className="font-bold text-sm tracking-wide">CARTÃO DE CRÉDITO — PARCELAMENTOS</span>
         </div>
         <p className="px-4 py-1.5 text-[10px] text-muted-foreground border-b border-border/60">
-          Cada parcela aparece sozinha nos meses seguintes até quitar. O ✓ marca a parcela deste mês como paga.
+          Cada parcela aparece sozinha nos meses seguintes até quitar. O ✓ marca a parcela deste mês; depois dele, dá pra adiantar as próximas.
         </p>
 
         {/* NO CELULAR (26/09, varredura): a tabela tinha 650px fixos e, num
@@ -279,6 +312,11 @@ export const InstallmentTracker = ({
                 const prevista = previstas.has(inst.id);
                 const k = parcelaDoMes(inst);
                 const paga = parcelaPagaNoMes(inst);
+                const antecipa = planilhaEditavel && !prevista && !inst.levada;
+                const adiantadas = antecipa ? parcelasAdiantadas(inst) : 0;
+                const comeca = mesDeInicio(inst);
+                const ultimaPaga = Math.min(inst.paidInstallments, inst.totalInstallments);
+                const mesCurtoDa = (numero: number) => nomeDoMes(mesDaParcela(inst, mesDaChave, numero), true);
                 if (editandoId === inst.id && !prevista) return (
                   <tr key={inst.id} className="border-b border-border/50 bg-primary/[0.04]">
                     <td colSpan={7} className="px-3 py-3">
@@ -348,6 +386,7 @@ export const InstallmentTracker = ({
                         <span className="flex items-center gap-1.5 flex-wrap">
                           {inst.description}
                           <span className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground" title="Vem de outro mês — edite lá">previsto</span>
+                          {paga && <span className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-600 dark:text-green-400" title="Paga adiantada">paga</span>}
                         </span>
                       ) : (
                         <button onClick={() => comecarEdicao(inst)} aria-label={`Editar ${inst.description}`} className="flex items-center gap-1.5 text-left hover:underline min-h-[44px] -my-2">
@@ -359,6 +398,26 @@ export const InstallmentTracker = ({
                       <span className={`sm:hidden block text-[10px] font-normal ${isDone ? "text-green-500" : "text-muted-foreground"}`}>
                         {`${isDone ? "quitado" : `parcela ${k} de ${inst.totalInstallments}`} · ${getCardLabel(inst.cardName)}`}
                       </span>
+                      {comeca && (
+                        <span className="block text-[11px] font-normal text-muted-foreground" data-testid="comeca-em">Começa em {nomeDoMes(comeca)}</span>
+                      )}
+                      {antecipa && (adiantadas > 0 || podeAdiantar(inst)) && (
+                        <span className="flex flex-wrap items-center gap-x-3 text-[11px] font-normal" data-testid="adiantar-parcela">
+                          {adiantadas > 0 && (
+                            <>
+                              <span className="text-muted-foreground">Paga até {mesCurtoDa(ultimaPaga)}</span>
+                              <button onClick={() => desfazerAdiantamento(inst.id)} aria-label={`Desfazer a parcela de ${mesCurtoDa(ultimaPaga)} de ${inst.description}`} className="min-h-[36px] font-semibold text-muted-foreground underline underline-offset-2">
+                                Desfazer
+                              </button>
+                            </>
+                          )}
+                          {podeAdiantar(inst) && (
+                            <button onClick={() => adiantar(inst.id)} aria-label={`Marcar a parcela de ${mesCurtoDa(ultimaPaga + 1)} de ${inst.description} como paga`} className="min-h-[36px] text-left font-semibold text-primary underline underline-offset-2">
+                              {adiantadas > 0 ? `+ ${mesCurtoDa(ultimaPaga + 1)}` : `+ Paguei a de ${mesCurtoDa(ultimaPaga + 1)}`}
+                            </button>
+                          )}
+                        </span>
+                      )}
                     </td>
                     <td className="hidden sm:table-cell px-3 py-2 text-center">
                       <span className={`text-xs font-mono whitespace-nowrap ${isDone ? "text-green-500" : ""}`} title={`${inst.paidInstallments} de ${inst.totalInstallments} pagas`}>
@@ -383,7 +442,8 @@ export const InstallmentTracker = ({
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex items-center justify-center gap-2">
-                        {!isDone && !prevista && (
+                        {/* quitada com parcela ainda vencendo neste mês (a última, ou adiantou tudo): o ✓ fica pra poder voltar atrás */}
+                        {!prevista && !comeca && (!isDone || (planilhaEditavel && parcelaAtiva(inst))) && (
                           // Alvo de 44px: o checkbox de 16px era outra "área não
                           // clicável" da avaliação — o dedo não acertava.
                           <label className="min-h-[44px] min-w-[44px] -my-2 flex items-center justify-center cursor-pointer" title={paga ? "Parcela deste mês paga" : "Marcar parcela deste mês como paga"}>
@@ -449,7 +509,7 @@ export const InstallmentTracker = ({
                   <Input type="number" inputMode="numeric" min={0} placeholder="0" value={newItem.paidInstallments} onChange={(e) => setNewItem({ ...newItem, paidInstallments: e.target.value })} className="text-xs mt-0.5" />
                 </label>
                 <label className="text-[10px] text-muted-foreground min-w-0">
-                  Data
+                  1ª parcela
                   <Input type="date" value={newItem.date} onChange={(e) => setNewItem({ ...newItem, date: e.target.value })} className="text-xs mt-0.5" />
                 </label>
               </div>

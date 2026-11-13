@@ -30,16 +30,21 @@ export const RetrospectivaNaHome = ({ agora: agoraFixo }: { agora?: Date }) => {
   const agoraDaMontagem = useRef(new Date());
   const agora = agoraFixo ?? agoraDaMontagem.current;
   const { user } = useAuth();
-  const { get } = useUserData();
+  const { get, loaded } = useUserData();
   const navigate = useNavigate();
   const [dispensada, setDispensada] = usePersistedState<string>("retro-home-dispensada", "");
 
+  /* 07/11 (desempenho, lente "toque"): a retrospectiva do MÊS PASSADO era reconstruída a CADA escrita no store (o `get`
+   * muda com ele) — ~20 ms por toque na Home da conta cheia (CPU 4×), pra mostrar um mês que não muda. Agora é
+   * calculada na montagem e de novo quando a conta chega (`loaded`); uma escrita no mês passado feita nesta mesma
+   * visita à Home (marcar ontem no dia 1º) só atualiza a contagem de páginas na próxima vez que a Home montar. */
   const retro = useMemo(() => {
     if (!user?.id || agora.getDate() > DIAS_NA_HOME) return null;
     const { ano, mesIdx } = mesAnterior(agora);
     const ler: Leitor = (chave) => get<unknown>(chave, undefined);
     return construirRetroMes(ano, mesIdx, user.id, undefined, { ler, agora });
-  }, [user?.id, get, agora]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, agora, loaded]);
 
   const id = retro ? `${retro.ano}-${String(retro.mesIdx + 1).padStart(2, "0")}` : "";
   const visivel = !!retro && dispensada !== id;

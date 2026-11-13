@@ -124,6 +124,34 @@ describe("Meu mês: o mês ATUAL do Finanças", () => {
     expect(lerMesDoPlanner(loja({ ...base, "finance-perfil-ativo": "__todos__" }), AGORA)!.totalGastos).toBe(70);
     expect(lerMesDoPlanner(loja({ ...base, "finance-perfis": [] }), AGORA)!.totalGastos).toBe(70); // pj-1 não existe mais
   });
+  it("crítica r1 do dois-numeros (07/11): Despesas e Orçamento pela regra da fatura, como a tela; a lista de gastos segue pela data", () => {
+    // hoje 07/11; Nubank fecha 25, Itaú fecha 5. TV R$ 1.000 em 28/10 no Nubank → fatura de novembro;
+    // Farmácia R$ 80 em 06/11 no Itaú → fatura de dezembro; Padaria R$ 15 no Pix em 06/11.
+    const hoje = new Date(2026, 10, 7, 10);
+    const dados = {
+      "finance-last-seen-month": "Novembro-2026",
+      "finance-card-config": { nubank: { closingDay: 25, dueDay: 5 }, itau: { closingDay: 5, dueDay: 12 } },
+      "finance-2026-outubro-expenses": [
+        { id: "mercado", description: "Mercado", category: "mercado", value: 200, date: "2026-10-10", paymentMethod: "pix" },
+        { id: "tv", description: "TV", category: "eletronicos", value: 1000, date: "2026-10-28", paymentMethod: "credito", cardName: "nubank" },
+      ],
+      "finance-expenses": [
+        { id: "farmacia", description: "Farmácia", category: "farmacia", value: 80, date: "2026-11-06", paymentMethod: "credito", cardName: "itau" },
+        { id: "padaria", description: "Padaria", category: "alimentacao", value: 15, date: "2026-11-06", paymentMethod: "pix" },
+      ],
+      "finance-category-budgets": { eletronicos: 500 },
+    };
+    const m = lerMesDoPlanner(loja(dados), hoje)!;
+    expect(m.totalDespesas).toBe(1015); // = getMonthTotals e a tela (TV 1.000 + Padaria 15)
+    expect(m.orcamento).toEqual([{ nome: "Eletrônicos", gastei: 1000, limite: 500 }]); // = aba LIMITES
+    expect(m.gastos.map((g) => g.nome)).toEqual(["Farmácia", "Padaria"]); // o que ela lançou em novembro, como a tabela do app
+    expect(m.totalGastos).toBe(95); // o TOTAL da lista (o TOTAL da tabela do app)
+    // "Tudo junto" também
+    expect(lerMesDoPlanner(loja({ ...dados, "finance-perfil-ativo": "__todos__" }), hoje)!.totalDespesas).toBe(1015);
+    // virada pendente (o balde ainda é de outubro, sem arquivo): segue o filtro pela data de hoje
+    const pendente = lerMesDoPlanner(loja({ ...dados, "finance-last-seen-month": "Outubro-2026", "finance-2026-outubro-expenses": [] }), hoje)!;
+    expect(pendente.totalDespesas).toBe(95);
+  });
   it("conta vazia (ou lixo) = null", () => {
     expect(lerMesDoPlanner(loja({}), AGORA)).toBeNull();
     expect(lerMesDoPlanner(<T,>() => "lixo" as unknown as T, AGORA)).toBeNull();

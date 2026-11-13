@@ -55,6 +55,7 @@ describe("a trava do preparar-loja (jsComEnvVazado)", () => {
   });
 });
 
+const rotas0 = (c: { rewrites: unknown }) => c.rewrites as Array<{ source: string; destination: string }>;
 describe("cabeçalhos de segurança do site (vercel.json)", () => {
   const cfg = JSON.parse(readFileSync(resolve(RAIZ, "vercel.json"), "utf8")) as {
     headers?: Array<{ source: string; headers: Array<{ key: string; value: string }> }>;
@@ -79,7 +80,10 @@ describe("cabeçalhos de segurança do site (vercel.json)", () => {
     // 07–10/11: /vitalicio e /vitalicio/ passaram a ir pra /conhecer.html; + /vitalicio/demo(/) → /conhecer-demo.html e
     //   (10/11) /instalar, /instalar/, /instalar/demo, /instalar/demo/ (o funil de download das lojas)
     // 09/11: o catch-all deixa /assets de fora ("/((?!assets(?:/|$)).*)" → /index.html): arquivo de build que sumiu dá 404, não o app
-    expect(cfg.rewrites).toHaveLength(20);
+    // 11/11 (main): + /simples, /simples/, /tiktok e /tiktok/ → /landing.html (a LP de uma tela e o link do TikTok)
+    expect(cfg.rewrites).toHaveLength(24);
+    expect(rotas0(cfg).find((r) => r.source === "/simples")?.destination).toBe("/landing.html");
+    expect(rotas0(cfg).find((r) => r.source === "/tiktok")?.destination).toBe("/landing.html");
     const rotas = (cfg.rewrites as Array<{ source: string; destination: string }>);
     expect(rotas[rotas.length - 1]).toEqual({ source: "/((?!assets(?:/|$)).*)", destination: "/index.html" });
     expect(rotas.find((r) => r.source === "/vitalicio")?.destination).toBe("/conhecer.html");

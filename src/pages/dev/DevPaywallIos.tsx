@@ -1,5 +1,7 @@
 import type { CSSProperties } from "react";
 import { PaywallIOS } from "@/pages/funis/ios/PaywallIOS";
+import { PaywallW } from "@/pages/funis/w/PaywallW";
+import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
 import type { AreaKey } from "@/lib/funnel";
 
 /**
@@ -14,6 +16,9 @@ import type { AreaKey } from "@/lib/funnel";
  *   ?paywall-minimalista=on|off|auto → o paywall minimalista (17/10, lib/paywall-minimalista)
  *   ?titulo-paywall=on|off|ab|auto → o teste de título (06/11, lib/titulo-paywall); com ?area= conta como porta escolhida
  *   ?moldura=gate     → a moldura do gate do TrialBanner (conta logada sem assinatura, modo="gate")
+ *   ?moldura=gate-w   → 12/11: o gate do iPhone sem teste (PaywallW modo "gate", a moldura do TrialBanner)
+ *   ?moldura=planos-w → 12/11: o "Ver planos" (AppPurchaseSheet de verdade, que no iPhone sem teste abre o PaywallW)
+ *   (o braço da oferta: ?paywall-oferta=anual|vitalicio)
  * 16/10: a moldura é a MESMA do passo "offer" do funil (px-5 pt-4, coluna cheia) — o herói do
  * curto sangra com -mx-5/-mt-4. 17/10: com o tema claro FORÇADO do funil (LIGHT_VARS + tema-claro),
  * pra o print com o app no escuro mostrar o que o funil mostra; o gate não força (é o TrialBanner).
@@ -33,6 +38,14 @@ export default function DevPaywallIos() {
     else localStorage.removeItem("__rc_mock_offering");
   } catch { /* noop */ }
   const area = (q.get("area") ?? "dinheiro") as AreaKey;
+  if (q.get("moldura") === "gate-w") {
+    return (
+      <div className="px-5 bg-white min-h-[100dvh]" style={{ paddingTop: "var(--app-safe-top, 0px)" }}>
+        <PaywallW modo="gate" semTeste area={area} answers={{}} onPagoSemConta={() => { /* nada: é só pra olhar */ }} />
+      </div>
+    );
+  }
+  if (q.get("moldura") === "planos-w") return <AppPurchaseSheet onClose={() => { /* nada: é só pra olhar */ }} />;
   if (q.get("moldura") === "gate") {
     // a mesma moldura do TrialBanner (gateCurto): bg-white, sem as variáveis claras forçadas
     return (

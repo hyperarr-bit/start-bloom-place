@@ -140,6 +140,8 @@ const offeringSemTeste = () => {
     { identifier: "$rc_annual", packageType: "ANNUAL", product: produtoMock(ehIos() ? "core_anual_97_direto" : "core_anual_99:coreanual99") },
     { identifier: "$rc_monthly", packageType: "MONTHLY", product: produtoMock(ehIos() ? "core_mensal_34" : "core_mensal_34:coremensal34") },
     { identifier: "presente_69", packageType: "CUSTOM", product: produtoMock(ehIos() ? "core_anual_69_direto" : "core_anual_69_direto:coreanual69direto") },
+    // 12/11 (A/B paywall_oferta, só iPhone): o pacote `vitalicio` = core_vitalicio_97, compra única, como no painel
+    ...(ehIos() ? [{ identifier: "vitalicio", packageType: "CUSTOM", product: produtoMock("core_vitalicio_97") }] : []),
   ] } };
 };
 const PRECOS: Record<string, string> = new Proxy(PRECOS_BASE, {

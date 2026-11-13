@@ -70,6 +70,9 @@ const esperarPrecos = () => waitFor(() => expect(screen.getByText(/Economize 77%
 beforeEach(() => {
   delete (globalThis as { __PAYWALL_TESTE__?: string }).__PAYWALL_TESTE__;
   localStorage.clear(); // conta VAZIA, aparelho novo: nenhum seed
+  // 12/11: este arquivo testa o braço ANUAL do desenho android; o A/B da oferta (anual × vitalício) tem o próprio
+  // arquivo (paywall-oferta-ab.test.tsx) — aqui a força de QA fixa o anual
+  localStorage.setItem("paywall-oferta-force", "anual");
   window.history.replaceState({}, "", "/");
   _zerarChavePaywallTeste();
   _zerarPaywallVisual();
@@ -90,7 +93,14 @@ describe("a chave `paywall_visual` (só iPhone)", () => {
     expect(android / n).toBeGreaterThan(0.45);
     expect(android / n).toBeLessThan(0.55);
   });
-  it("padrão = ab: sorteia 1x, grava no aparelho e repete na reabertura", () => {
+  it("padrão (12/11) = android: todo iPhone vê o desenho do Android, sem sortear nem gravar braço", () => {
+    expect(visualDoPaywall()).toBe("android");
+    expect(localStorage.getItem(CHAVE_PAYWALL_VISUAL_BRACO)).toBeNull();
+    registrarPaywallTesteRemoto({ current: { metadata: {} }, all: {} });
+    expect(visualDoPaywall()).toBe("android");
+  });
+  it("chave remota = ab (volta o sorteio): sorteia 1x, grava no aparelho e repete na reabertura", () => {
+    registrarPaywallTesteRemoto({ current: { metadata: { paywall_visual: "ab" } }, all: {} });
     const b = visualDoPaywall();
     expect(localStorage.getItem(CHAVE_PAYWALL_VISUAL_BRACO)).toBe(b);
     _zerarPaywallVisual(); // fechou o app
@@ -143,7 +153,7 @@ describe("a chave `paywall_visual` (só iPhone)", () => {
     expect(CHAVES_DO_APARELHO.has(CHAVE_PAYWALL_VISUAL_BRACO)).toBe(true);
   });
   it("o anual sem teste é core_anual_97_direto (nunca o core_anual_97 com teste, nem o 99)", () => {
-    expect(PRODUTOS_SEM_TESTE).toEqual({ anual: "core_anual_97_direto", mensal: "core_mensal_34", presente: "core_anual_69_direto" });
+    expect(PRODUTOS_SEM_TESTE).toEqual({ anual: "core_anual_97_direto", mensal: "core_mensal_34", presente: "core_anual_69_direto", vitalicio: "core_vitalicio_97" });
   });
 });
 

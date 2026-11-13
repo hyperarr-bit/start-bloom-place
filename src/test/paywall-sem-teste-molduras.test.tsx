@@ -38,7 +38,7 @@ vi.mock("@capacitor/app", () => ({ App: { addListener: async () => ({ remove: as
 vi.mock("@/components/paywall/PaywallSemTeste", () => ({
   PaywallSemTeste: ({ modo = "funil" }: { modo?: string }) => <div data-testid="sem-teste" data-modo={modo}>sem teste</div>,
 }));
-vi.mock("@/pages/funis/w/PaywallW", () => ({ PaywallW: ({ semTeste }: { semTeste?: boolean }) => <div data-testid={semTeste ? "paywall-w-sem-teste" : "paywall-w"}>paywall</div> }));
+vi.mock("@/pages/funis/w/PaywallW", () => ({ PaywallW: ({ semTeste, modo = "funil" }: { semTeste?: boolean; modo?: string }) => <div data-testid={semTeste ? "paywall-w-sem-teste" : "paywall-w"} data-modo={modo}>paywall</div> }));
 vi.mock("@/pages/funis/ios/PaywallIOS", () => ({ PaywallIOS: ({ modo = "funil" }: { modo?: string }) => <div data-testid="paywall-ios" data-modo={modo}>paywall ios</div> }));
 vi.mock("@/pages/funis/ios/SinoIOS", () => ({ AntesDoPaywallIOS: ({ children }: { children?: ReactNode }) => <div data-testid="antes-do-paywall">{children}</div> }));
 vi.mock("@/pages/funis/ios/CadastroIOS", () => ({ SignupIOS: () => <div />, ConfirmIOS: () => <div />, LiberandoIOS: () => <div /> }));
@@ -144,11 +144,18 @@ describe("funil (ComecarW, passo offer)", () => {
 
 describe("gate do app (TrialBanner)", () => {
   beforeEach(() => { estado.auth.user = conta(); });
-  it("iPhone, chave off: PaywallSemTeste modo gate, sem o presente do bloqueio por cima", async () => {
+  it("iPhone, chave off (12/11): o desenho do Android (PaywallW modo gate), sem o presente do bloqueio por cima", async () => {
     gate();
-    expect((await screen.findByTestId("sem-teste")).dataset.modo).toBe("gate");
+    expect((await screen.findByTestId("paywall-w-sem-teste")).dataset.modo).toBe("gate");
+    expect(screen.queryByTestId("sem-teste")).toBeNull();
     expect(screen.queryByTestId("presente-bloqueio")).toBeNull();
     expect(screen.queryByTestId("paywall-assinatura")).toBeNull();
+  });
+  it("iPhone, chave off + paywall_visual = enxovaly (RevenueCat): volta o PaywallSemTeste modo gate", async () => {
+    localStorage.setItem("paywall-visual-force", "enxovaly");
+    gate();
+    expect((await screen.findByTestId("sem-teste")).dataset.modo).toBe("gate");
+    expect(screen.queryByTestId("paywall-w-sem-teste")).toBeNull();
   });
   it("ANDROID, chave off: o gate de hoje (PaywallAssinatura + presente do bloqueio), nada sem teste", async () => {
     plataforma("android");
@@ -162,7 +169,7 @@ describe("gate do app (TrialBanner)", () => {
   it("conta da Porta, chave off: sem o 'Você ganhou 3 dias grátis'", async () => {
     estado.auth.user = { ...conta(), user_metadata: { porta: { area: "dinheiro" } } };
     gate();
-    expect(await screen.findByTestId("sem-teste")).toBeInTheDocument();
+    expect(await screen.findByTestId("paywall-w-sem-teste")).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/dias grátis/i);
   });
   it("chave on: o gate de hoje (PaywallAssinatura + presente do bloqueio)", async () => {
@@ -184,6 +191,7 @@ describe("FECHAR E REABRIR O APP", () => {
     const { unmount } = gate();
     await espera();
     expect(screen.queryByTestId("sem-teste")).toBeNull();
+    expect(screen.queryByTestId("paywall-w-sem-teste")).toBeNull();
     expect(screen.queryByTestId("paywall-ios")).toBeNull();
     expect(screen.queryByTestId("paywall-assinatura")).toBeNull();
     unmount();

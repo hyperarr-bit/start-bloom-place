@@ -112,7 +112,7 @@ describe("a chave `paywall_teste` (lib/paywall-teste)", () => {
 describe("os produtos novos nas offerings (lerPacotesSemTeste)", () => {
   const pac = (id: string) => ({ identifier: id, product: { identifier: id, priceString: "x" } });
   it("um lugar só pros ids", () => {
-    expect(PRODUTOS_SEM_TESTE).toEqual({ anual: "core_anual_97_direto", mensal: "core_mensal_34", presente: "core_anual_69_direto" });
+    expect(PRODUTOS_SEM_TESTE).toEqual({ anual: "core_anual_97_direto", mensal: "core_mensal_34", presente: "core_anual_69_direto", vitalicio: "core_vitalicio_97" });
   });
   it("lê a offering `sem_teste` (que NÃO é a atual) — iPhone", () => {
     const r = lerPacotesSemTeste({

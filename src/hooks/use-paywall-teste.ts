@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { EVENTO_PAYWALL_TESTE, guardarForcaPaywallTeste, paywallComTeste, visualDoPaywall, type VisualPaywall } from "@/lib/paywall-teste";
+import { EVENTO_PAYWALL_TESTE, guardarForcaPaywallTeste, ofertaDoPaywall, paywallComTeste, visualDoPaywall, type OfertaPaywall, type VisualPaywall } from "@/lib/paywall-teste";
 
 /**
  * "O paywall do app é o COM teste (o de hoje)?" — lido na hora (força de QA > RevenueCat > última resposta do aparelho >
@@ -30,4 +30,21 @@ export function usePaywallVisual(ativo = true): VisualPaywall {
     return () => window.removeEventListener(EVENTO_PAYWALL_TESTE, aoMudar);
   }, [ativo]);
   return visual;
+}
+
+/**
+ * 12/11 (dono): o braço do A/B da OFERTA do paywall sem teste (só iPhone; fora dele = "anual"). `ativo` false = nem
+ * sorteia (quem não vai ver o paywall sem teste não ganha braço gravado). Relido quando a metadata do RevenueCat chega
+ * — é assim que `paywall_oferta` = "anual"/"vitalicio" põe o vencedor em 100% sem build.
+ */
+export function usePaywallOferta(ativo = true): OfertaPaywall {
+  const [oferta, setOferta] = useState<OfertaPaywall>(() => (ativo ? ofertaDoPaywall() : "anual"));
+  useEffect(() => {
+    if (!ativo) return;
+    const aoMudar = () => setOferta(ofertaDoPaywall());
+    window.addEventListener(EVENTO_PAYWALL_TESTE, aoMudar);
+    aoMudar();
+    return () => window.removeEventListener(EVENTO_PAYWALL_TESTE, aoMudar);
+  }, [ativo]);
+  return oferta;
 }

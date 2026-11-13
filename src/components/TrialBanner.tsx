@@ -24,7 +24,9 @@ import { entrouPeloLinkDaPorta } from "@/lib/porta-sessao";
 const PaywallIOS = lazy(() => import("@/pages/funis/ios/PaywallIOS").then((m) => ({ default: m.PaywallIOS })));
 // 12/11 (1.0.26 / Android 138): chave `paywall_teste` off (padrão) = o gate do app é o paywall SEM teste, nas duas lojas
 const PaywallSemTeste = lazy(() => import("@/components/paywall/PaywallSemTeste").then((m) => ({ default: m.PaywallSemTeste })));
-import { usePaywallComTeste } from "@/hooks/use-paywall-teste";
+// 12/11 (dono): o gate do iPhone sem teste usa o desenho do Android (PaywallW, modo "gate"), com o A/B anual × vitalício
+const PaywallW = lazy(() => import("@/pages/funis/w/PaywallW").then((m) => ({ default: m.PaywallW })));
+import { usePaywallComTeste, usePaywallVisual } from "@/hooks/use-paywall-teste";
 
 /** Tela do intervalo entre pagar e o crédito cair. Não é paywall e não é o
  *  app: é a resposta honesta pra quem acabou de pagar e voltou. Ela some
@@ -125,6 +127,8 @@ export const TrialBanner = () => {
    * assinatura → "Você ganhou 3 dias grátis" antes do paywall, 1x por sessão do app. */
   const [parabensFeito, setParabensFeito] = useState(() => parabensJaVisto());
   const paywallComTeste = usePaywallComTeste();
+  // só iPhone sem teste (no Android a chave paywall_teste é sempre "on"): o desenho do gate — "android" (padrão) ou "enxovaly"
+  const paywallVisual = usePaywallVisual(isNativeShell() && !paywallComTeste);
 
   // Rescue do Purchase: quem paga o Pix sai do app pra abrir o banco e volta
   // já liberado (webhook gravou a assinatura) — a tela de confirmação não
@@ -223,7 +227,18 @@ export const TrialBanner = () => {
                 {!paywallComTeste
                   ? (
                     <Suspense fallback={<div className="min-h-[100dvh] bg-white" />}>
-                      <PaywallSemTeste modo="gate" area={getFunnelArea() ?? "dinheiro"} onPagoSemConta={() => { window.location.href = "/"; }} />
+                      {paywallVisual === "android"
+                        ? (
+                          /* a mesma moldura do passo "offer" do funil (px-5), descontando a faixa do status bar */
+                          <div
+                            className="px-5 bg-white min-h-[100dvh]"
+                            style={{ paddingTop: "var(--app-safe-top, 0px)" }}
+                            data-testid="gate-ios-paywall-w"
+                          >
+                            <PaywallW modo="gate" semTeste area={getFunnelArea() ?? "dinheiro"} answers={{}} onPagoSemConta={() => { window.location.href = "/"; }} />
+                          </div>
+                        )
+                        : <PaywallSemTeste modo="gate" area={getFunnelArea() ?? "dinheiro"} onPagoSemConta={() => { window.location.href = "/"; }} />}
                     </Suspense>
                   )
                   : ehApple() && !parabensFeito && (contaDaPorta(user.user_metadata) || entrouPeloLinkDaPorta())

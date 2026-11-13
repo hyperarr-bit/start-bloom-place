@@ -117,7 +117,8 @@ export function SignupIOS({
       const [tipo, rcAtivo] = await Promise.all([
         lerAcessoAnteriorDaConta(uid),
         (async () => {
-          try { const rc = await import("@/lib/revenuecat"); return (await rc.compraAssinaturaLocal()) || rc.ultimaCompraAnualFoiTrial(); }
+          // 12/11: + o vitalício 97,90 da App Store (A/B paywall_oferta) — compra única não é "assinatura ativa"
+          try { const rc = await import("@/lib/revenuecat"); return (await rc.compraAssinaturaLocal()) || rc.ultimaCompraAnualFoiTrial() || (await rc.compraVitaliciaLocal()); }
           catch { return false; }
         })(),
       ]);

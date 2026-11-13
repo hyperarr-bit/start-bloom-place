@@ -36,7 +36,7 @@ import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
 import { CaixaDePresente } from "@/components/paywall/CaixaDePresente";
 import { STACKS } from "@/pages/funis/dia14/stacks";
 import { bracoTitulo, guardarForcaTitulo, tituloDaArea } from "@/lib/titulo-paywall";
-import { PRECOS_RESERVA_SEM_TESTE, PRODUTOS_SEM_TESTE, visualDoPaywall } from "@/lib/paywall-teste";
+import { PRECOS_RESERVA_SEM_TESTE, PRODUTOS_SEM_TESTE, anotarOfertaDaFolha, visualDoPaywall } from "@/lib/paywall-teste";
 import type { DadosSemTeste } from "@/lib/revenuecat";
 
 export const TITULO_SEM_TESTE = "Libere o CORE completo";
@@ -116,8 +116,11 @@ export function PaywallSemTeste({
   // 12/11 noite: o braço do A/B do visual (só iPhone) em TODO evento; gate e /planos mostram este desenho pros dois
   // braços, então levam também o braço do aparelho (`paywall_visual_braco`) pra separar na conta
   const [bracoAparelho] = useState(() => visualDoPaywall());
-  const campos = { funil: FUNIL, loja, area, paywall_teste: "off", paywall_visual: "enxovaly", ...(modo !== "funil" ? { paywall_visual_braco: bracoAparelho } : {}), ...(tituloBraco ? { titulo_area: tituloBraco } : {}) };
+  // 12/11: o A/B da oferta (anual × vitalício) mora no desenho android; este desenho só vende o anual
+  const campos = { funil: FUNIL, loja, area, paywall_teste: "off", paywall_visual: "enxovaly", paywall_oferta: "anual", ...(modo !== "funil" ? { paywall_visual_braco: bracoAparelho } : {}), ...(tituloBraco ? { titulo_area: tituloBraco } : {}) };
 
+  /* as folhas abertas daqui levam paywall_oferta: "anual" (folha_apple_resultado nasce no revenuecat.ts) */
+  useEffect(() => { anotarOfertaDaFolha("anual"); return () => anotarOfertaDaFolha(null); }, []);
   /* a loja: preços reais + o presente já carregado (o toque em sair não espera rede) */
   useEffect(() => {
     vivoRef.current = true;

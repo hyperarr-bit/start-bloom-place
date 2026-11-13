@@ -1,9 +1,11 @@
-import { useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { trackEvent } from "@/lib/analytics";
 import { PaywallAssinatura } from "@/components/paywall/PaywallAssinatura";
 import { PaywallSemTeste } from "@/components/paywall/PaywallSemTeste";
-import { usePaywallComTeste } from "@/hooks/use-paywall-teste";
+import { usePaywallComTeste, usePaywallVisual } from "@/hooks/use-paywall-teste";
+// lazy: o PaywallW puxa o PaywallDia14 inteiro — só o iPhone sem teste paga esse peso, e só ao abrir o /planos
+const PaywallW = lazy(() => import("@/pages/funis/w/PaywallW").then((m) => ({ default: m.PaywallW })));
 import { getFunnelArea } from "@/lib/funnel";
 
 /**
@@ -53,6 +55,22 @@ export function AppPurchaseSheet({ onClose }: { onClose: () => void }) {
   /* 12/11 (1.0.26 / Android 138): chave `paywall_teste` off (padrão) = o paywall SEM teste em tela cheia; o Voltar
      redondo (e o do Android, pelo histórico fantasma acima) fecha. "on" = o sheet de hoje. */
   const comTeste = usePaywallComTeste();
+  /* 12/11 (dono): no iPhone sem teste o "Ver planos" usa o desenho do Android (PaywallW, modo "planos") com o A/B
+     anual × vitalício; "enxovaly" (só pela chave remota paywall_visual) volta o PaywallSemTeste. */
+  const visual = usePaywallVisual(!comTeste);
+  if (!comTeste && visual === "android") {
+    return (
+      <div
+        className="fixed inset-0 z-[300] overflow-y-auto bg-white px-5"
+        style={{ paddingTop: "var(--app-safe-top, env(safe-area-inset-top, 0px))" }}
+        data-testid="planos-ios-paywall-w"
+      >
+        <Suspense fallback={null}>
+          <PaywallW modo="planos" semTeste area={getFunnelArea() ?? "dinheiro"} answers={{}} onVoltar={onClose} onPagoSemConta={() => { window.location.href = "/"; }} />
+        </Suspense>
+      </div>
+    );
+  }
   if (!comTeste) {
     return <PaywallSemTeste modo="planos" area={getFunnelArea() ?? "dinheiro"} onVoltar={onClose} onPagoSemConta={() => { window.location.href = "/"; }} />;
   }

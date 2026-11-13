@@ -23,7 +23,8 @@ import { Button } from "@/components/ui/button";
 import { APP_PRECOS } from "@/lib/native-shell";
 import { ehApple, pelaLoja, temEscadaPix, formasDePagamento, erroFolhaNaoConcluiu, avisoRenovacao, erroJaAtivo, erroNaoPermitido } from "@/lib/loja";
 import { PresenteDireto, economiaDoAnual, ECONOMIA_RESERVA, ANUAL_MES_RESERVA } from "@/components/paywall/PaywallSemTeste";
-import { ID_MENSAL_ANDROID, PRECOS_RESERVA_SEM_TESTE, PRODUTOS_SEM_TESTE } from "@/lib/paywall-teste";
+import { ID_MENSAL_ANDROID, PRECOS_RESERVA_SEM_TESTE, PRODUTOS_SEM_TESTE, anotarOfertaDaFolha, type PlanoSemTeste } from "@/lib/paywall-teste";
+import { usePaywallOferta } from "@/hooks/use-paywall-teste";
 import type { DadosSemTeste } from "@/lib/revenuecat";
 import { AppLegalFooter } from "@/components/paywall/PaywallFlow";
 import { PixCheckout } from "@/components/paywall/PixCheckout";
@@ -227,7 +228,9 @@ function LifetimeCardW({ naWeb = false }: { naWeb?: boolean }) {
  *  zero depois). É a lição do sábado — quando as colunas antigas só diziam
  *  "24,90" × "97,90" sem a matemática, o barato levava 92% do mix. */
 /** 12/11 noite (iPhone, paywall sem teste): as MESMAS colunas com o anual no lugar do vitalício. */
-type SemTesteColunas = { anual: string; anualMes: string; mensal: string; economia: number };
+/** 12/11 (dono, A/B `paywall_oferta`): `grande` = o plano da coluna grande — "anual" (1 ano, 97,90/ano) ou "vitalicio"
+ *  (o MESMO cartão do Android: "Pra sempre", 97,90, vitalício · uma única vez, "N meses de mensal = CORE pra sempre"). */
+type SemTesteColunas = { anual: string; anualMes: string; mensal: string; economia: number; grande: "anual" | "vitalicio"; vitalicio: string; mesesDeMensal: number };
 /** 12/11 (dono): o mensal com renovação do Android é o core_mensal_34 (R$ 34,90). 97,90 ÷ 34,90 = 2,8 → "3 meses de mensal". */
 const MESES_MENSAL_34 = Math.ceil(97.9 / PRECOS_RESERVA_SEM_TESTE.mensal.valor);
 function PrecosLadoALadoW({ plano, onSelect, naWeb = false, semTeste = null, mensalApp = null }: { plano: "vitalicio" | "mensal"; onSelect: (p: "vitalicio" | "mensal") => void; naWeb?: boolean; semTeste?: SemTesteColunas | null; /** Android: o preço do mensal de 34,90 (da loja) */ mensalApp?: string | null }) {
@@ -235,6 +238,7 @@ function PrecosLadoALadoW({ plano, onSelect, naWeb = false, semTeste = null, men
     `rounded-3xl p-[2px] transition-all ${ativo
       ? "bg-gradient-to-br from-accent via-accent/45 to-accent/15 shadow-[0_14px_40px_-16px_hsl(var(--accent)/0.5)]"
       : "bg-black/10"}`;
+  const anualSemTeste = semTeste?.grande === "anual" ? semTeste : null;
   return (
     <div className="grid grid-cols-2 gap-2.5 items-stretch">
       <div onClick={() => onSelect("mensal")} role="button" className={moldura(plano === "mensal")}>
@@ -263,16 +267,16 @@ function PrecosLadoALadoW({ plano, onSelect, naWeb = false, semTeste = null, men
           <span className={`-mx-3 text-[10px] font-extrabold tracking-[0.08em] py-[5px] ${plano === "vitalicio" ? "bg-accent text-accent-foreground" : "bg-accent/10 text-accent"}`}>
             MELHOR ESCOLHA
           </span>
-          <span className="text-[21px] font-black leading-[1.05] mt-1.5 px-1 tracking-tight">{semTeste ? "1 ano" : "Pra sempre"}</span>
+          <span className="text-[21px] font-black leading-[1.05] mt-1.5 px-1 tracking-tight">{anualSemTeste ? "1 ano" : "Pra sempre"}</span>
           {/* 06/09: a web vende o vitalício a PRECO_WEB (47,90); o app segue no
               preço da loja. A âncora "N meses de mensal" acompanha: 47,90 ÷ 24,90 ≈ 2. */}
-          <span className="text-[17px] font-extrabold mt-1.5">{semTeste ? semTeste.anual : naWeb ? `R$ ${PRECO_WEB}` : APP_PRECOS.vitalicio97.preco}</span>
-          <span className="text-[10px] font-semibold text-black/40">{semTeste ? `por ano · ${semTeste.anualMes}/mês` : "vitalício · uma única vez"}</span>
+          <span className="text-[17px] font-extrabold mt-1.5">{anualSemTeste ? semTeste.anual : semTeste ? semTeste.vitalicio : naWeb ? `R$ ${PRECO_WEB}` : APP_PRECOS.vitalicio97.preco}</span>
+          <span className="text-[10px] font-semibold text-black/40">{anualSemTeste ? `por ano · ${semTeste.anualMes}/mês` : "vitalício · uma única vez"}</span>
           <span className="mx-3 my-2 border-t border-black/10" aria-hidden />
           <span className="text-[10.5px] font-semibold text-black/45 pb-1 px-1 leading-tight mt-auto">
-            {semTeste
+            {anualSemTeste
               ? <>Economize {semTeste.economia}%<br /><b className="text-black/60">contra o mensal</b></>
-              : <>{mensalApp ? MESES_MENSAL_34 : 4} meses de mensal =<br /><b className="text-black/60">CORE pra sempre</b></>}
+              : <>{semTeste ? semTeste.mesesDeMensal : mensalApp ? MESES_MENSAL_34 : 4} meses de mensal =<br /><b className="text-black/60">CORE pra sempre</b></>}
           </span>
         </div>
       </div>
@@ -281,8 +285,12 @@ function PrecosLadoALadoW({ plano, onSelect, naWeb = false, semTeste = null, men
 }
 
 export function PaywallW({
-  area, answers, onPagoSemConta, naWeb = false, semTeste = false, onVoltar,
+  area, answers, onPagoSemConta, naWeb = false, semTeste = false, onVoltar, modo = "funil",
 }: { area: AreaKey; answers: Record<string, string>; onPagoSemConta: () => void;
+  /* 12/11 (dono): no iPhone sem teste, o gate (conta logada sem acesso) e o "Ver planos" (/planos) também usam este
+   * desenho. Sem funil antes: título neutro (o do gate do Android), sem a avaliação/ValueStack do funil; o gate não
+   * tem Voltar (bloqueia o app) e ganha "Entrar com outra conta · Excluir conta"; o /planos fecha no Voltar. */
+  modo?: "funil" | "gate" | "planos";
   /* 12/11 noite (dono, SÓ iPhone, braço "android" do A/B `paywall_visual`): o MESMO desenho vendendo o paywall sem
    * teste — anual 97,90 (core_anual_97_direto) no lugar do vitalício, mensal 34,90, nada de "pra sempre"/"único", e
    * na saída (Voltar redondo ou folha cancelada) o presente 69,90/ano sem teste no lugar da escada de resgate. */
@@ -345,7 +353,11 @@ export function PaywallW({
   // Disponibilidade real: otimista até resposta NEGATIVA da loja (regra v81).
   const [vitalicioNaLoja, setVitalicioNaLoja] = useState<boolean | null>(null);
   /* semTeste: os preços da loja (o texto fixo é só reserva) e o presente de saída (1x por paywall aberto) */
-  const [lojaSemTeste, setLojaSemTeste] = useState<{ anual: DadosSemTeste | null; mensal: DadosSemTeste | null }>({ anual: null, mensal: null });
+  const [lojaSemTeste, setLojaSemTeste] = useState<{ anual: DadosSemTeste | null; mensal: DadosSemTeste | null; vitalicio?: DadosSemTeste | null }>({ anual: null, mensal: null, vitalicio: null });
+  /* 12/11 (dono): o A/B da OFERTA, só iPhone (lib/paywall-teste `paywall_oferta`): o plano grande é o anual 97,90 ou o
+   * vitalício 97,90. O braço é do aparelho (o mesmo no funil, no gate e no /planos); a chave remota vence o sorteio. */
+  const oferta = usePaywallOferta(semTeste);
+  const grande: PlanoSemTeste = semTeste && oferta === "vitalicio" ? "vitalicio" : "anual";
   const [presente, setPresente] = useState<DadosSemTeste | null>(null);
   const presenteTentadoRef = useRef(false);
   const presenteAbertoRef = useRef(false);
@@ -354,14 +366,32 @@ export function PaywallW({
   const compraFeitaRef = useRef(false);
   const anualTxt = lojaSemTeste.anual?.preco ?? PRECOS_RESERVA_SEM_TESTE.anual.preco;
   const mensalTxt = lojaSemTeste.mensal?.preco ?? PRECOS_RESERVA_SEM_TESTE.mensal.preco;
+  const vitalicioTxt = lojaSemTeste.vitalicio?.preco ?? PRECOS_RESERVA_SEM_TESTE.vitalicio.preco;
+  /** o preço do plano grande da vez (anual ou vitalício), sempre o priceString da loja quando ela respondeu */
+  const grandeTxt = grande === "vitalicio" ? vitalicioTxt : anualTxt;
   const colunasSemTeste: SemTesteColunas | null = semTeste ? {
     anual: anualTxt,
     anualMes: lojaSemTeste.anual?.precoMes ?? ANUAL_MES_RESERVA,
     mensal: mensalTxt,
     economia: economiaDoAnual(lojaSemTeste.anual?.valor ?? PRECOS_RESERVA_SEM_TESTE.anual.valor, lojaSemTeste.mensal?.valor ?? PRECOS_RESERVA_SEM_TESTE.mensal.valor) ?? ECONOMIA_RESERVA,
+    grande: grande === "vitalicio" ? "vitalicio" : "anual",
+    vitalicio: vitalicioTxt,
+    // "3 meses de mensal = CORE pra sempre" (97,90 ÷ 34,90 = 2,8), a mesma conta do Android
+    mesesDeMensal: Math.ceil((lojaSemTeste.vitalicio?.valor ?? PRECOS_RESERVA_SEM_TESTE.vitalicio.valor) / (lojaSemTeste.mensal?.valor ?? PRECOS_RESERVA_SEM_TESTE.mensal.valor)),
   } : null;
-  /** os campos de todo evento do semTeste (o braço do A/B vai em todos) */
-  const camposSemTeste = { funil: "ios", loja: "ios", area, paywall_teste: "off", paywall_visual: "android" };
+  /** os campos de todo evento do semTeste (os braços dos A/B vão em todos) */
+  const camposSemTeste = { funil: modo === "gate" ? "gate_ios" : modo === "planos" ? "planos" : "ios", loja: "ios", area, paywall_teste: "off", paywall_visual: "android", paywall_oferta: oferta, ...(modo !== "funil" ? { modo } : {}) };
+  /* os efeitos que montam 1x (saída, Voltar) leem SEMPRE os campos e o plano grande de agora — a chave remota pode
+     trocar o braço com a tela aberta */
+  const camposRef = useRef(camposSemTeste);
+  camposRef.current = camposSemTeste;
+  const grandeRef = useRef(grande);
+  grandeRef.current = grande;
+  useEffect(() => {
+    if (!semTeste) return;
+    anotarOfertaDaFolha(oferta);
+    return () => anotarOfertaDaFolha(null);
+  }, [semTeste, oferta]);
   /* 12/11 (dono): no app do Android o mensal com renovação é o core_mensal_34 — preço da loja, reserva "R$ 34,90".
    * O iPhone (fluxo com teste) e o site seguem no de sempre. */
   const mensal34 = !naWeb && !ehApple();
@@ -400,7 +430,7 @@ export function PaywallW({
   useEffect(() => {
     vivoRef.current = true;
     if (semTeste) {
-      trackEvent("funnel_view", { step: "offer", ...camposSemTeste, perfil: simples ? "simples" : "topo" });
+      trackEvent("funnel_view", { step: "offer", ...camposSemTeste, ...(modo === "funil" ? { perfil: simples ? "simples" : "topo" } : {}) });
       let retrySem: number | null = null;
       void (async () => {
         try {
@@ -409,11 +439,12 @@ export function PaywallW({
           await rc.prefetchSemTeste();
           const ler = () => {
             if (!vivoRef.current) return;
-            const a = rc.dadosSemTeste("anual"), m = rc.dadosSemTeste("mensal");
-            setLojaSemTeste({ anual: a, mensal: m });
-            trackEvent("paywall_oferta_vista", { ...camposSemTeste, produto: PRODUTOS_SEM_TESTE.anual, preco: a?.preco ?? null, preco_mensal: m?.preco ?? null, offering: a?.offering ?? null, trial: false });
+            const a = rc.dadosSemTeste("anual"), m = rc.dadosSemTeste("mensal"), v = rc.dadosSemTeste("vitalicio");
+            setLojaSemTeste({ anual: a, mensal: m, vitalicio: v });
+            const g = grandeRef.current === "vitalicio" ? v : a;
+            trackEvent("paywall_oferta_vista", { ...camposRef.current, produto: PRODUTOS_SEM_TESTE[grandeRef.current], preco: g?.preco ?? null, preco_mensal: m?.preco ?? null, offering: g?.offering ?? null, trial: false });
           };
-          if (!rc.dadosSemTeste("anual")) retrySem = window.setTimeout(async () => { await rc.prefetchSemTeste(); ler(); }, 2500);
+          if (!rc.dadosSemTeste(grandeRef.current)) retrySem = window.setTimeout(async () => { await rc.prefetchSemTeste(); ler(); }, 2500);
           else ler();
         } catch { /* a reserva de texto segura a tela */ }
       })();
@@ -498,7 +529,7 @@ export function PaywallW({
     const sair = (beacon: boolean) => {
       if (saiuSemTesteRef.current || compraFeitaRef.current) return;
       saiuSemTesteRef.current = true;
-      (beacon ? trackEventBeacon : trackEvent)("paywall_saiu", { ...camposSemTeste, segundos_na_tela: Math.round((Date.now() - abertoEmRef.current) / 1000), viu_oferta: presenteTentadoRef.current });
+      (beacon ? trackEventBeacon : trackEvent)("paywall_saiu", { ...camposRef.current, segundos_na_tela: Math.round((Date.now() - abertoEmRef.current) / 1000), viu_oferta: presenteTentadoRef.current });
     };
     const aoEsconder = () => { if (document.visibilityState === "hidden" && !comprandoRef.current) sair(true); };
     document.addEventListener("visibilitychange", aoEsconder);
@@ -515,18 +546,20 @@ export function PaywallW({
       if (!rc.dadosSemTeste("presente")) await rc.prefetchSemTeste();
       const d = rc.dadosSemTeste("presente");
       if (!d || !vivoRef.current) return false;
-      // downsell é MAIS BARATO que a vitrine (regra do dono, 16/10)
-      const vitrine = rc.dadosSemTeste("anual")?.valor ?? PRECOS_RESERVA_SEM_TESTE.anual.valor;
+      // downsell é MAIS BARATO que a vitrine (regra do dono, 16/10) — a vitrine é o plano grande da vez (anual ou vitalício)
+      const g = grandeRef.current;
+      const vitrine = rc.dadosSemTeste(g)?.valor ?? PRECOS_RESERVA_SEM_TESTE[g].valor;
       if (d.valor && d.valor >= vitrine) return false;
-      trackEvent("presente69_view", { ...camposSemTeste, lugar, preco: d.preco, de: anualTxt, trial: false, direto: true });
+      trackEvent("presente69_view", { ...camposRef.current, lugar, preco: d.preco, de: rc.dadosSemTeste(g)?.preco ?? PRECOS_RESERVA_SEM_TESTE[g].preco, trial: false, direto: true });
       setPresente(d);
       return true;
     } catch { return false; }
   };
 
-  const concluirSemTeste = (produto: string, oferta: string, preco: string | null) => {
+  const concluirSemTeste = (produto: string, ofertaRC: string, preco: string | null) => {
     compraFeitaRef.current = true;
-    trackEvent("app_sheet_success", { ...camposSemTeste, produto, oferta, preco, trial: false });
+    // gate e /planos recarregam logo depois: o sucesso vai por beacon (o insert normal morria na recarga)
+    (modo === "funil" ? trackEvent : trackEventBeacon)("app_sheet_success", { ...camposRef.current, produto, oferta: ofertaRC, preco, trial: false });
     void import("@/lib/notificacoes").then((n) => { void n.cancelarResgateDoPlano(); }).catch(() => { /* noop */ });
     onPagoSemConta();
   };
@@ -537,15 +570,16 @@ export function PaywallW({
     comprandoRef.current = true;
     setComprando(true);
     setErro(null);
-    const p = escolha === "mensal" ? "mensal" : "anual";
+    const p: PlanoSemTeste = escolha === "mensal" ? "mensal" : grande;
     try {
       const rc = await import("@/lib/revenuecat");
+      await identificarContaLogada(rc);
       rc.marcarToqueDeCompra?.();
-      const ok = await rc.comprarSemTeste(p, "ios");
+      const ok = await rc.comprarSemTeste(p, camposSemTeste.funil);
       comprandoRef.current = false;
       if (!vivoRef.current) return;
       setComprando(false);
-      if (ok) { concluirSemTeste(PRODUTOS_SEM_TESTE[p], `sem_teste_${p}`, p === "anual" ? anualTxt : mensalTxt); return; }
+      if (ok) { concluirSemTeste(PRODUTOS_SEM_TESTE[p], `sem_teste_${p}`, p === "mensal" ? mensalTxt : grandeTxt); return; }
       const motivo = rc.motivoUltimaCompra();
       if (motivo === "pendente") setPendente(true);
       else if (motivo === "ja_ativo") setErro(erroJaAtivo());
@@ -559,7 +593,28 @@ export function PaywallW({
     }
   };
 
-  /** semTeste: o Voltar redondo — o presente abre por cima? então fica; senão recua um passo. */
+  /** gate e /planos: a compra é da CONTA logada (o RevenueCat precisa estar nela antes da folha). No funil a compra é
+   *  anônima e o cadastro vem depois — nada a fazer. */
+  const identificarContaLogada = async (rc: typeof import("@/lib/revenuecat")) => {
+    if (modo === "funil") return;
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const uid = (await supabase.auth.getSession()).data.session?.user?.id;
+      if (uid) await rc.identificarRevenueCat(uid);
+    } catch { /* o init já usa a sessão */ }
+  };
+
+  /** gate: sair desta conta e entrar com outra (o gate bloqueia o app — sem isso a pessoa fica presa) */
+  const trocarConta = async () => {
+    trackEvent("gate_trocar_conta", { funil: camposSemTeste.funil });
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      await supabase.auth.signOut();
+    } catch { /* sem rede: o /entrar resolve */ }
+    window.location.href = "/entrar";
+  };
+
+  /** semTeste: o Voltar redondo — o presente abre por cima? então fica; senão recua um passo (funil) / fecha (/planos). */
   const voltarSemTeste = () => {
     trackEvent("funnel_click", { cta: "paywall_voltar", ...camposSemTeste });
     window.dispatchEvent(new CustomEvent("core:voltar"));
@@ -680,9 +735,10 @@ export function PaywallW({
   }
 
   return (
-    <div className="relative w-full max-w-sm mx-auto text-center pb-40 pt-8" {...(semTeste ? { "data-testid": "paywall-w-sem-teste", "data-plano": plano === "mensal" ? "mensal" : "anual" } : {})}>
-      {/* semTeste (iPhone): o iPhone não tem Voltar físico — o mesmo botão redondo do paywall sem teste (rola junto, não cobre o texto) */}
-      {semTeste && onVoltar && (
+    <div className="relative w-full max-w-sm mx-auto text-center pb-40 pt-8" {...(semTeste ? { "data-testid": "paywall-w-sem-teste", "data-plano": plano === "mensal" ? "mensal" : grande, "data-oferta": oferta, "data-modo": modo } : {})}>
+      {/* semTeste (iPhone): o iPhone não tem Voltar físico — o mesmo botão redondo do paywall sem teste (rola junto, não cobre o texto).
+          O gate não tem Voltar: ele bloqueia o app (a saída é "Entrar com outra conta", no rodapé). */}
+      {semTeste && onVoltar && modo !== "gate" && (
         <button
           type="button" aria-label="Voltar" data-testid="paywall-w-voltar" onClick={voltarSemTeste}
           className="absolute left-0 z-[76] w-11 h-11 rounded-full bg-white/90 backdrop-blur text-[#16121c] grid place-items-center shadow-[0_6px_18px_-8px_rgba(0,0,0,.35)] active:scale-95 transition-transform"
@@ -691,23 +747,38 @@ export function PaywallW({
           <ArrowLeft className="w-5 h-5" strokeWidth={2.5} />
         </button>
       )}
-      {/* Reveal (web) */}
-      <motion.div
-        initial={{ scale: 0.4, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 220, damping: 15 }}
-        className="w-14 h-14 rounded-full bg-accent text-accent-foreground grid place-items-center mx-auto mb-4 shadow-[0_8px_28px_-6px_hsl(var(--accent)/0.55)]"
-      >
-        <Check className="w-7 h-7" strokeWidth={3} />
-      </motion.div>
-      <h1 className="text-[27px] font-bold tracking-tight leading-[1.12] mb-2">
-        Seu plano pra<br /><span className="text-accent">{vitoria[area]}</span><br />está pronto
-      </h1>
-      <p className="text-muted-foreground text-sm leading-relaxed mb-3">
-        {simples
-          ? "Do jeito simples: 5 minutos por dia, e o CORE cuida do resto."
-          : "Você já viu como funciona. Agora é com os seus números de verdade."}
-      </p>
+      {modo === "funil" ? (
+        <>
+          {/* Reveal (web) */}
+          <motion.div
+            initial={{ scale: 0.4, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 220, damping: 15 }}
+            className="w-14 h-14 rounded-full bg-accent text-accent-foreground grid place-items-center mx-auto mb-4 shadow-[0_8px_28px_-6px_hsl(var(--accent)/0.55)]"
+          >
+            <Check className="w-7 h-7" strokeWidth={3} />
+          </motion.div>
+          <h1 className="text-[27px] font-bold tracking-tight leading-[1.12] mb-2">
+            Seu plano pra<br /><span className="text-accent">{vitoria[area]}</span><br />está pronto
+          </h1>
+          <p className="text-muted-foreground text-sm leading-relaxed mb-3">
+            {simples
+              ? "Do jeito simples: 5 minutos por dia, e o CORE cuida do resto."
+              : "Você já viu como funciona. Agora é com os seus números de verdade."}
+          </p>
+        </>
+      ) : (
+        <>
+          {/* gate e /planos (12/11): sem funil antes — o título neutro do gate do Android (PaywallAssinatura) */}
+          <div className="mt-1 mb-2.5">
+            <span className="inline-flex items-center px-3 py-1 rounded-full bg-accent/10 text-accent text-[11px] font-bold uppercase tracking-wider" data-testid="paywall-w-selo">
+              {modo === "planos" ? "Seu acesso" : "Último passo"}
+            </span>
+          </div>
+          <h1 className="text-[27px] font-bold tracking-tight leading-[1.12] mb-2" data-testid="paywall-w-titulo">Sua vida inteira organizada</h1>
+          <p className="text-muted-foreground text-sm leading-relaxed mb-3">Dinheiro, rotina, corpo e metas num app só.</p>
+        </>
+      )}
       {/* PROVA NA DOBRA (04/09): 84% das saídas e 75% dos toques acontecem em
           <30s e 4 em 5 nunca chegam ao mural lá embaixo. Uma avaliação real,
           curta, junto do preço. No iPhone a loja não é citada (3.1.1). */}
@@ -725,10 +796,12 @@ export function PaywallW({
             // mudar de coluna. No braço A é sempre o vitalício.
             const mostraMensal = duasColunas && plano === "mensal";
             if (semTeste) {
-              // 12/11 noite: a âncora do anual sem teste — preço da loja (já com a moeda), "por ano", nada de "pra sempre"
-              const preco = mostraMensal ? mensalTxt : anualTxt;
-              const precoSub = mostraMensal ? "por mês" : "por ano";
-              const precoTitulo = mostraMensal ? <>CORE mensal,<br />pra começar hoje</> : <>CORE anual,<br />pra enxergar tudo</>;
+              // 12/11 noite: a âncora do anual sem teste — preço da loja (já com a moeda), "por ano", nada de "pra sempre".
+              // Braço vitalício: a âncora do Android (97,90 "1x, pra sempre", título padrão do cartão).
+              const vit = grande === "vitalicio";
+              const preco = mostraMensal ? mensalTxt : grandeTxt;
+              const precoSub = mostraMensal ? "por mês" : vit ? "1x, pra sempre" : "por ano";
+              const precoTitulo = mostraMensal ? <>CORE mensal,<br />pra começar hoje</> : vit ? undefined : <>CORE anual,<br />pra enxergar tudo</>;
               return area === "dinheiro"
                 ? <AnchorCard gasto={answers?.gasto ?? ""} preco={preco} precoSub={precoSub} precoTitulo={precoTitulo} prefixo="" />
                 : <AreaAnchorCard area={area as Exclude<AreaKey, "dinheiro">} preco={preco} precoSub={precoSub} precoTitulo={mostraMensal ? precoTitulo : undefined} prefixo="" />;
@@ -757,7 +830,7 @@ export function PaywallW({
               plano={plano}
               semTeste={colunasSemTeste}
               mensalApp={mensal34 ? mensalTxt : null}
-              onSelect={(p) => { setPlano(p); tocouPlano.current = true; if (!naWeb) guardarChave(CHAVES_FUNIL_W.plano, p); trackEvent("funnel_click", semTeste ? { cta: "paywall_plano", plano: p === "mensal" ? "mensal" : "anual", ...camposSemTeste } : { cta: "w_plano", plano: p, braco: bracoEvento, funil: "w" }); }}
+              onSelect={(p) => { setPlano(p); tocouPlano.current = true; if (!naWeb) guardarChave(CHAVES_FUNIL_W.plano, p); trackEvent("funnel_click", semTeste ? { cta: "paywall_plano", plano: p === "mensal" ? "mensal" : grande, ...camposSemTeste } : { cta: "w_plano", plano: p, braco: bracoEvento, funil: "w" }); }}
             />
           ) : (
             <LifetimeCardW naWeb={naWeb} />
@@ -769,7 +842,8 @@ export function PaywallW({
         {!simples && <ValueStack area={area} />}
         <motion.div {...stagger(3)}>{area === "dinheiro" ? <CompareTable /> : <ModulesIncludedCard />}</motion.div>
 
-        <MuralDepoimentos area={area} soAssinatura={semTeste} />
+        {/* braço vitalício: os depoimentos de sempre do Android (inclui "pagamento único") */}
+        <MuralDepoimentos area={area} soAssinatura={semTeste && grande !== "vitalicio"} />
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl border border-border bg-card py-3.5 text-center">
             <div className="text-[13px] text-[#f0a500] tracking-wide" aria-label="5 estrelas">★★★★★</div>
@@ -812,6 +886,12 @@ export function PaywallW({
           restaurar continua onde sempre esteve (/planos e o gate).
         */}
         {ehApple() && <AppLegalFooter />}
+        {/* gate (12/11): o mesmo par do gate de antes — sem isso, quem entrou na conta errada fica preso no bloqueio */}
+        {semTeste && modo === "gate" && (
+          <p className="text-center text-[11px] text-muted-foreground -mt-1">
+            <button type="button" className="underline underline-offset-2" data-testid="paywall-w-trocar-conta" onClick={() => void trocarConta()}>Entrar com outra conta</button>
+          </p>
+        )}
       </div>
 
       {/* CTA sticky — motor RC + escada de resgate */}
@@ -879,8 +959,8 @@ export function PaywallW({
                 const escolha = duasColunas ? plano : "vitalicio";
                 if (!naWeb) guardarChave(CHAVES_FUNIL_W.plano, escolha);
                 if (semTeste) {
-                  const p = escolha === "mensal" ? "mensal" : "anual";
-                  trackEvent("funnel_click", { cta: "app_paywall_cta", ...camposSemTeste, plano: p, produto: PRODUTOS_SEM_TESTE[p], preco: p === "anual" ? anualTxt : mensalTxt });
+                  const p: PlanoSemTeste = escolha === "mensal" ? "mensal" : grande;
+                  trackEvent("funnel_click", { cta: "app_paywall_cta", ...camposSemTeste, plano: p, produto: PRODUTOS_SEM_TESTE[p], preco: p === "mensal" ? mensalTxt : grandeTxt });
                 } else
                 trackEvent("funnel_click", { cta: "app_paywall_cta", produto: naWeb ? (escolha === "mensal" ? OFERTA_WEB_MES : OFERTA_WEB) : escolha === "mensal" ? (mensal34 ? ID_MENSAL_ANDROID : "core_mensal") : "core_vitalicio_97", funil: "w", braco: bracoEvento });
                 void comprar(escolha);
@@ -891,7 +971,9 @@ export function PaywallW({
                 : semTeste
                   ? (plano === "mensal"
                     ? <>Começar por {mensalTxt}/mês <ArrowRight className="w-4 h-4" /></>
-                    : <>Quero o anual — {anualTxt}/ano <ArrowRight className="w-4 h-4" /></>)
+                    : grande === "vitalicio"
+                      ? <>Quero pra sempre — {vitalicioTxt} <ArrowRight className="w-4 h-4" /></>
+                      : <>Quero o anual — {anualTxt}/ano <ArrowRight className="w-4 h-4" /></>)
                 : duasColunas && plano === "mensal"
                   ? <>Começar por {mensalAppTxt}{naWeb ? "" : "/mês"} <ArrowRight className="w-4 h-4" /></>
                   : <>Quero pra sempre — {naWeb ? PRECO_WEB : APP_PRECOS.vitalicio97.preco} <ArrowRight className="w-4 h-4" /></>}
@@ -905,7 +987,9 @@ export function PaywallW({
               {/* Na WEB não existe loja: quem cobra é o Pix. Dizer "pelo Google
                 * Play" aqui seria mentira na tela que pede o dinheiro — e o
                 * comprador que lê "Google Play" e vê um QR de Pix desiste. */}
-              {semTeste
+              {semTeste && grande === "vitalicio" && plano !== "mensal"
+                ? <>Pagamento <strong className="text-foreground font-semibold">único</strong> de {vitalicioTxt} {pelaLoja()} · sem mensalidade</>
+                : semTeste
                 ? <>Assinatura de {plano === "mensal" ? `${mensalTxt}/mês` : `${anualTxt}/ano`} {pelaLoja()} · {avisoRenovacao()}</>
                 : naWeb && duasColunas && plano === "mensal"
                 ? <>Pagamento <strong className="text-foreground font-semibold">único</strong> no Pix · <strong className="text-foreground font-semibold">30 dias</strong> de acesso · garantia de 7 dias, devolve em 1 mensagem</>
@@ -930,13 +1014,15 @@ export function PaywallW({
       {semTeste && presente && (
         <PresenteDireto
           oferta={presente}
-          precoDe={anualTxt}
+          /* braço vitalício: sem "de R$ 97,90" riscado — o 97,90 de lá é o vitalício, não um ano */
+          precoDe={grande === "vitalicio" ? null : anualTxt}
           onFechar={() => { trackEvent("presente69_fechou", { ...camposSemTeste, direto: true }); setPresente(null); }}
           onComprar={async () => {
             const rc = await import("@/lib/revenuecat");
+            await identificarContaLogada(rc);
             trackEvent("presente69_toque", { ...camposSemTeste, direto: true });
             rc.marcarToqueDeCompra?.();
-            const ok = await rc.comprarSemTeste("presente", "ios");
+            const ok = await rc.comprarSemTeste("presente", camposSemTeste.funil);
             if (ok) {
               trackEvent("presente69_sucesso", { ...camposSemTeste, preco: presente.preco, direto: true });
               concluirSemTeste(PRODUTOS_SEM_TESTE.presente, "presente69_direto", presente.preco);

@@ -106,6 +106,8 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-paywall-teste", // 12/11 (1.0.26): a última resposta do RevenueCat pro paywall com/sem teste (metadata paywall_teste: on|off)
   "core-paywall-visual", // 12/11 noite (1.0.26, só iPhone): a última resposta do RevenueCat pro visual do paywall sem teste (metadata paywall_visual)
   "core-paywall-visual-braco", // 12/11 noite: o braço sorteado do A/B do visual (android|enxovaly), estável no aparelho
+  "core-paywall-oferta", // 12/11 (1.0.26, só iPhone): a última resposta do RevenueCat pra oferta do paywall sem teste (metadata paywall_oferta: anual|vitalicio|ab)
+  "core-paywall-oferta-braco", // 12/11: o braço sorteado do A/B da oferta (anual|vitalicio), estável no aparelho
   "core-titulo-paywall", // 06/11: a última resposta do RevenueCat pro teste de título do paywall (metadata titulo_paywall: off|on|ab)
   "core-titulo-braco", // 06/11: o braço sorteado no modo "ab" do titulo_paywall (com|sem), estável entre aberturas
   "core-sino-visto", // 1.0.18: a tela do sino já apareceu neste aparelho (nunca repete: voltar, reabrir, deep link)

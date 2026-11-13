@@ -64,7 +64,7 @@ import { registrarHomeNovaRemoto } from "@/lib/home-nova";
 import { registrarFluxoEnxutoRemoto } from "@/lib/fluxo-enxuto";
 import { registrarAbasRemoto } from "@/lib/abas-caderno";
 import { registrarInicioDoTesteNoSdk } from "@/lib/meta-inicio-teste-ios";
-import { OFFERING_SEM_TESTE, PRODUTOS_SEM_TESTE, registrarPaywallTesteRemoto, type PlanoSemTeste } from "@/lib/paywall-teste";
+import { OFFERING_SEM_TESTE, PRODUTOS_SEM_TESTE, camposDaOfertaNaFolha, registrarPaywallTesteRemoto, type PlanoSemTeste } from "@/lib/paywall-teste";
 
 /** As chaves que viajam no metadata das offerings (um lugar só, chamado em toda leitura de offerings):
  *  ofertas de saída (10/10), Conquistas 2 (16/10, `conquistas2`), a intro do módulo (16/10, `intro_modulo`), o
@@ -860,24 +860,24 @@ export async function desfechoDaFalha(e: unknown, produto: string): Promise<bool
   // Pix/boleto escolhido NA FOLHA: compra fica pendente, o webhook libera.
   if (codigo === "20" || /pending/i.test(msg)) {
     ultimoMotivo = "pendente";
-    trackEvent("app_compra_pendente", { produto });
+    trackEvent("app_compra_pendente", { produto, ...camposDaOfertaNaFolha() });
     return false;
   }
   if (codigo === "6" || /already (active|own|purchased)/i.test(msg)) {
-    trackEvent("app_compra_ja_ativa", { produto });
+    trackEvent("app_compra_ja_ativa", { produto, ...camposDaOfertaNaFolha() });
     if (await restaurar()) { ultimoMotivo = null; return true; }
     ultimoMotivo = "ja_ativo";
-    trackEvent("app_compra_falhou", { motivo: "ja_ativo", produto, erro: msg.slice(0, 160) });
+    trackEvent("app_compra_falhou", { motivo: "ja_ativo", produto, erro: msg.slice(0, 160), ...camposDaOfertaNaFolha() });
     return false;
   }
   if (codigo === "3" || /not allowed to make the purchase/i.test(msg)) {
     ultimoMotivo = "nao_permitido";
-    trackEvent("app_compra_falhou", { motivo: "nao_permitido", produto, erro: msg.slice(0, 160), codigo: codigo || null, tipo: "bloqueado" });
+    trackEvent("app_compra_falhou", { motivo: "nao_permitido", produto, erro: msg.slice(0, 160), codigo: codigo || null, tipo: "bloqueado", ...camposDaOfertaNaFolha() });
     return false;
   }
   const cancelou = /cancel/i.test(msg) || codigo === "1";
   ultimoMotivo = cancelou ? "cancelou" : "billing_erro";
-  trackEvent("app_compra_falhou", { motivo: ultimoMotivo, produto, erro: msg.slice(0, 160), codigo: codigo || null, tipo: ultimoTipo, transitorio: !cancelou && erroTransitorioDaLoja(e) });
+  trackEvent("app_compra_falhou", { motivo: ultimoMotivo, produto, erro: msg.slice(0, 160), codigo: codigo || null, tipo: ultimoTipo, transitorio: !cancelou && erroTransitorioDaLoja(e), ...camposDaOfertaNaFolha() });
   return false;
 }
 
@@ -936,6 +936,7 @@ function registrarResultadoDaFolha(resultado: ResultadoDaFolha, produto: string)
     ms_desde_toque: base ? agora - base : null,
     segunda_chance: ultimaFolhaFalhouEm != null && agora - ultimaFolhaFalhouEm < SEGUNDA_CHANCE_JANELA_MS,
     ...camposDoTituloNaFolha(),
+    ...camposDaOfertaNaFolha(), // 12/11: o braço do A/B anual × vitalício (só quando o paywall sem teste anotou)
   });
   ultimaFolhaFalhouEm = resultado === "sucesso" ? null : agora;
   toqueDaFolhaEm = null;
@@ -1671,6 +1672,7 @@ export function lerPacotesSemTeste(offerings: unknown): Partial<Record<PlanoSemT
   for (const [k, v] of Object.entries(todas)) if (k !== OFFERING_SEM_TESTE && v !== o?.current) ordem.push([k, v]);
   const achados: Partial<Record<PlanoSemTeste, { pacote: PacoteRC; offering: string | null }>> = {};
   for (const plano of Object.keys(PRODUTOS_SEM_TESTE) as PlanoSemTeste[]) {
+    if (plano === "vitalicio" && plataformaApp() !== "ios") continue; // o vitalício sem teste é só do iPhone
     for (const [nome, off] of ordem) {
       const p = (off?.availablePackages ?? []).find((x) => casaIdDaLoja(PRODUTOS_SEM_TESTE[plano], x?.product?.identifier));
       if (p) { achados[plano] = { pacote: p, offering: nome }; break; }
@@ -1690,17 +1692,29 @@ export async function prefetchSemTeste(): Promise<void> {
       if (a?.pacote?.product) itensSemTeste[plano] = { pacote: a.pacote, produto: a.pacote.product, offering: a.offering };
     }
   } catch { /* segue pra loja direto */ }
-  const faltam = (Object.keys(PRODUTOS_SEM_TESTE) as PlanoSemTeste[]).filter((p) => !itensSemTeste[p]);
+  const faltam = planosSemTesteDaLoja().filter((p) => !itensSemTeste[p]);
   if (!faltam.length) return;
   try {
     const mod = await import("@revenuecat/purchases-capacitor");
-    const { products } = await Purchases.getProducts({ productIdentifiers: faltam.map((p) => PRODUTOS_SEM_TESTE[p]), type: mod.PRODUCT_CATEGORY.SUBSCRIPTION });
-    for (const plano of faltam) {
-      const produto = (products ?? []).find((p) => casaIdDaLoja(PRODUTOS_SEM_TESTE[plano], p?.identifier));
-      if (produto) itensSemTeste[plano] = { pacote: null, produto, offering: null };
+    /* 12/11: o vitalício é compra única (NON_SUBSCRIPTION na Apple) — a loja só devolve cada um na categoria dele */
+    const grupos: Array<[PlanoSemTeste[], unknown]> = [
+      [faltam.filter((p) => p !== "vitalicio"), mod.PRODUCT_CATEGORY.SUBSCRIPTION],
+      [faltam.filter((p) => p === "vitalicio"), mod.PRODUCT_CATEGORY.NON_SUBSCRIPTION],
+    ];
+    for (const [planos, type] of grupos) {
+      if (!planos.length) continue;
+      const { products } = await Purchases.getProducts({ productIdentifiers: planos.map((p) => PRODUTOS_SEM_TESTE[p]), type: type as never });
+      for (const plano of planos) {
+        const produto = (products ?? []).find((p) => casaIdDaLoja(PRODUTOS_SEM_TESTE[plano], p?.identifier));
+        if (produto) itensSemTeste[plano] = { pacote: null, produto, offering: null };
+      }
     }
   } catch { /* a tela usa a reserva de texto e o toque tenta de novo */ }
 }
+/** Os planos sem teste que esta loja vende: o vitalício (A/B `paywall_oferta`) só no iPhone — no Android ele é o
+ *  vitalício de sempre (comprarVitalicio), e a busca aqui só gastaria uma ida à loja. */
+const planosSemTesteDaLoja = (): PlanoSemTeste[] =>
+  (Object.keys(PRODUTOS_SEM_TESTE) as PlanoSemTeste[]).filter((p) => p !== "vitalicio" || plataformaApp() === "ios");
 
 export type DadosSemTeste = { produto: string; preco: string; valor: number | null; precoMes: string | null; offering: string | null; pacote: boolean };
 /** O que a loja serviu pra um plano sem teste; null = ainda não carregou (ou não existe na loja). */
@@ -1713,7 +1727,7 @@ export function dadosSemTeste(plano: PlanoSemTeste): DadosSemTeste | null {
     produto: PRODUTOS_SEM_TESTE[plano],
     preco: p.priceString,
     valor,
-    precoMes: valor && plano !== "mensal" ? formatarMoeda(valor / 12, p.currencyCode || "BRL") : null,
+    precoMes: valor && plano !== "mensal" && plano !== "vitalicio" ? formatarMoeda(valor / 12, p.currencyCode || "BRL") : null,
     offering: it.offering,
     pacote: !!it.pacote,
   };
@@ -1725,7 +1739,7 @@ export async function comprarSemTeste(plano: PlanoSemTeste, lugar: string): Prom
   const alvo = PRODUTOS_SEM_TESTE[plano];
   if (!(await garantirPronto())) {
     ultimoMotivo = "catalogo";
-    trackEvent("app_compra_falhou", { motivo: "rc_" + estado, produto: alvo, oferta: `sem_teste_${plano}`, lugar, retentou: true });
+    trackEvent("app_compra_falhou", { motivo: "rc_" + estado, produto: alvo, oferta: `sem_teste_${plano}`, lugar, retentou: true, ...camposDaOfertaNaFolha() });
     return false;
   }
   try {
@@ -1733,7 +1747,7 @@ export async function comprarSemTeste(plano: PlanoSemTeste, lugar: string): Prom
     const it = itensSemTeste[plano];
     if (!it) {
       ultimoMotivo = "produto_ausente";
-      trackEvent("app_compra_falhou", { motivo: "produto_ausente", produto: alvo, oferta: `sem_teste_${plano}`, lugar });
+      trackEvent("app_compra_falhou", { motivo: "produto_ausente", produto: alvo, oferta: `sem_teste_${plano}`, lugar, ...camposDaOfertaNaFolha() });
       return false;
     }
     /* Android: o plano BASE explícito (sem fase grátis nenhuma). Na Apple a lista vem vazia e a compra é o pacote. */
@@ -1749,6 +1763,7 @@ export async function comprarSemTeste(plano: PlanoSemTeste, lugar: string): Prom
       offering: it.offering,
       lugar,
       pacote: !!it.pacote,
+      ...camposDaOfertaNaFolha(),
     });
     const P = Purchases as NonNullable<typeof Purchases>;
     const resultado = await folhaComRetentativa(alvo, () => (base

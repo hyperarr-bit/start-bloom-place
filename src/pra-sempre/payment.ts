@@ -33,5 +33,5 @@ export function initPixel(){
 }
 export async function openPayment(voltaDoBanco?: {pi:string;status:string}){
  const {abrirCheckout}=await import('@/landing/stripe-checkout');
- await abrirCheckout({pk:'pk_live_51TJnAQQdjmrIbUhHDSWqG1trOT6mFfV87AC4Vv47kFJTAFOhYsNmvryGRnf3x824Ke3mXSsWiFCovKPIR6Kqx0IX00VcuAawhC',precoCentavos:2790,parcelasMax:1,producao:!QA,pedeCpf:false,somentePix:false,layout:'novo',storagePrefix:QA?'lp27-qa':'lp27',pagina:'lp27',trocaCartao:false,medirCarteira:false,voltaDoBanco,evento:event,pixel:(name,data,id)=>{if(!QA && (name==='Purchase'||name==='InitiateCheckout'||name==='ViewContent'||name==='CompleteRegistration'))fireMetaEvent(name,data,id)},atrib,sessao:session,aparelho:device,urlChegada:source.url,fbclid:params.get('fbclid')});
+ await abrirCheckout({pk:'pk_live_51TJnAQQdjmrIbUhHDSWqG1trOT6mFfV87AC4Vv47kFJTAFOhYsNmvryGRnf3x824Ke3mXSsWiFCovKPIR6Kqx0IX00VcuAawhC',precoCentavos:2790,parcelasMax:1,producao:!QA,pedeCpf:false,somentePix:true,layout:'novo',storagePrefix:QA?'lp27-qa':'lp27',pagina:'lp27',trocaCartao:false,medirCarteira:false,voltaDoBanco,evento:event,pixel:(name,data,id)=>{if(!QA && (name==='Purchase'||name==='InitiateCheckout'||name==='ViewContent'||name==='CompleteRegistration'))fireMetaEvent(name,data,id)},atrib,sessao:session,aparelho:device,urlChegada:source.url,fbclid:params.get('fbclid')});
 }

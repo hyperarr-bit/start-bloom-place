@@ -941,6 +941,8 @@ export default function ComecarW() {
                     area={areaOuPadrao}
                     answers={answers}
                     naWeb={naWeb}
+                    /* 14/11 (Android 139): o X do paywall do Android recua um passo, o mesmo destino do Voltar físico */
+                    onVoltar={naWeb ? undefined : recuarDoPaywall}
                     /* Pagou. No app sempre vai pro cadastro. Na web depende de
                      * QUEM é a sessão: anônima (comprou sem conta) vai pro
                      * cadastro pra ser batizada — o SignupScreen põe e-mail e

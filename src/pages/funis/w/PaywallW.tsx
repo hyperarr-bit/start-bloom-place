@@ -17,7 +17,7 @@
  *    a âncora honesta do app é "4 meses de mensal = seu pra sempre".
  */
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Loader2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, ShieldCheck, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { APP_PRECOS } from "@/lib/native-shell";
@@ -395,6 +395,8 @@ export function PaywallW({
   /* 12/11 (dono): no app do Android o mensal com renovação é o core_mensal_34 — preço da loja, reserva "R$ 34,90".
    * O iPhone (fluxo com teste) e o site seguem no de sempre. */
   const mensal34 = !naWeb && !ehApple();
+  /** 14/11 (Android 139): o app do Android (o paywall de hoje, sem o semTeste do iPhone) — ganha o X e a linha do plano */
+  const androidApp = !naWeb && !semTeste && !ehApple();
   const mensalAppTxt = mensal34 ? mensalTxt : APP_PRECOS.mensal.preco;
   // A/B do preço: A = só vitalício · B = vitalício + mensal visível.
   // No iPhone não há sorteio: é sempre o layout de duas colunas (ver
@@ -621,6 +623,18 @@ export function PaywallW({
     if (onVoltar) window.setTimeout(() => { if (vivoRef.current && !presenteAbertoRef.current && !comprandoRef.current) onVoltar(); }, 450);
   };
 
+  /* 14/11 (Android 139): a Play recusou a 138 por "botão de dispensar incorreto ou invisível" — no app do Android o
+   * paywall do funil só saía pelo Voltar físico. Agora tem um X visível no canto. O efeito é o do Voltar físico
+   * hoje (core:voltar desarma a reabertura da folha do resgate) e recua um passo do funil (o mesmo recuoDoPaywall).
+   * O Android não tem oferta de saída no Voltar: o resgate dele é a escada depois da folha cancelada e o aviso 2h/24h,
+   * que continuam iguais. Só Android app (nem iPhone, nem site). */
+  const fecharAndroid = androidApp && modo === "funil" && onVoltar ? () => {
+    if (comprando) return;
+    trackEvent("funnel_click", { cta: "w_x_fechar", funil: "w", braco: bracoEvento });
+    window.dispatchEvent(new CustomEvent("core:voltar"));
+    onVoltar();
+  } : null;
+
   const comprar = async (produto: "vitalicio" | "mensal") => {
     if (semTeste) { await comprarSemTeste(produto); return; }
     if (comprando) return;
@@ -747,6 +761,17 @@ export function PaywallW({
           <ArrowLeft className="w-5 h-5" strokeWidth={2.5} />
         </button>
       )}
+      {/* 14/11 (Android 139, recusa da Play): o X de fechar, fixo no canto de cima, sempre à vista — 44 px, ícone escuro
+          em círculo branco com borda. Mesmo efeito do Voltar físico (ver fecharAndroid). */}
+      {fecharAndroid && (
+        <button
+          type="button" aria-label="Fechar" data-testid="paywall-w-fechar" onClick={fecharAndroid}
+          className="fixed right-4 z-[76] w-11 h-11 rounded-full bg-white border border-black/20 text-[#16121c] grid place-items-center shadow-[0_4px_14px_-6px_rgba(0,0,0,.35)] active:scale-95 transition-transform"
+          style={{ top: "calc(var(--app-safe-top, 0px) + 10px)" }}
+        >
+          <X className="w-[22px] h-[22px]" strokeWidth={2.5} />
+        </button>
+      )}
       {modo === "funil" ? (
         <>
           {/* Reveal (web) */}
@@ -766,6 +791,12 @@ export function PaywallW({
               ? "Do jeito simples: 5 minutos por dia, e o CORE cuida do resto."
               : "Você já viu como funciona. Agora é com os seus números de verdade."}
           </p>
+          {/* 14/11 (Android 139, política de assinaturas da Play): dizer que o app precisa de um plano pago pra usar */}
+          {androidApp && (
+            <p className="text-[12.5px] font-semibold text-foreground/75 leading-snug mb-3" data-testid="paywall-w-precisa-plano">
+              Pra usar o CORE você escolhe um plano: mensal ou pra sempre.
+            </p>
+          )}
         </>
       ) : (
         <>

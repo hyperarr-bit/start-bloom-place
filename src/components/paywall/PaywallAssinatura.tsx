@@ -77,7 +77,7 @@ function RodapeEnxuto({ contexto, trocarConta }: { contexto: ContextoPaywall; tr
   const item = "underline underline-offset-2";
   return (
     <p className="mt-3 text-center text-[10.5px] leading-relaxed text-muted-foreground/80" data-testid="rodape-enxuto">
-      {contexto === "gate" && user && (
+      {contexto === "gate" && user && ehApple() && (
         <>
           <span className="whitespace-nowrap">Já tem conta? <button type="button" className={`${item} font-semibold`} onClick={trocarConta} data-testid="gate-trocar-conta">Entrar</button></span>
           {" · "}
@@ -713,21 +713,32 @@ export function PaywallAssinatura({
       {contexto === "planos" && onFechar && (
         <button
           aria-label="Fechar"
+          data-testid={apple ? undefined : "paywall-fechar"}
           onClick={() => {
             trackEvent("app_sheet_close", { via: "x", contexto });
             onFechar();
           }}
-          className="absolute right-0 -top-1 w-8 h-8 rounded-full bg-black/[0.06] grid place-items-center text-muted-foreground z-[1]"
+          /* 14/11 (Android 139, recusa da Play "botão de dispensar invisível"): no Android o X é de 44 px, ícone escuro
+             com borda. O iPhone fica como estava. */
+          className={apple
+            ? "absolute right-0 -top-1 w-8 h-8 rounded-full bg-black/[0.06] grid place-items-center text-muted-foreground z-[1]"
+            : "absolute right-0 -top-1.5 w-11 h-11 rounded-full bg-white border border-black/20 shadow-[0_4px_14px_-6px_rgba(0,0,0,.35)] grid place-items-center text-[#16121c] z-[1]"}
         >
-          <X className="w-4 h-4" strokeWidth={2.25} />
+          <X className={apple ? "w-4 h-4" : "w-[22px] h-[22px]"} strokeWidth={apple ? 2.25 : 2.5} />
         </button>
       )}
 
-      <div className="text-center mb-3.5 [@media(max-height:700px)]:mb-2.5">
+      <div className={`text-center mb-3.5 [@media(max-height:700px)]:mb-2.5${!apple && contexto === "planos" && onFechar ? " pt-11" : ""}`}>
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 text-accent text-[11px] font-bold uppercase tracking-wider mb-2 [@media(max-height:700px)]:mb-1.5">
           {selo}
         </div>
         <h2 className="text-[25px] [@media(max-height:700px)]:text-[22px] font-bold tracking-tight leading-[1.15]">{titulo}</h2>
+        {/* 14/11 (Android 139, política de assinaturas da Play): dizer que o app precisa de um plano pago pra usar */}
+        {!apple && (
+          <p className="mt-1.5 text-[12.5px] font-semibold text-foreground/75 leading-snug" data-testid="paywall-precisa-plano">
+            Pra usar o CORE você escolhe um plano: mensal ou {vitalicio ? "pra sempre" : "anual"}.
+          </p>
+        )}
       </div>
 
       {/* Recap (endowment). v83: LIGADO também no funil quando a DEMO
@@ -850,7 +861,24 @@ export function PaywallAssinatura({
           na conta errada — ou criou uma sem querer no "Crie agora" do login
           antigo (80 contas assim em 17–24/09) — ficava entre pagar de novo e
           apagar o app. Mostra em que conta a pessoa está e deixa trocar. */}
-      {!enxuto && contexto === "gate" && user && (
+      {/* 14/11 (Android 139, recusa da Play): no Android a saída do gate é um botão de verdade, sempre à vista (com ou
+          sem o enxuto). O gate continua bloqueando o app — sem X que entre sem pagar. */}
+      {!apple && contexto === "gate" && user && (
+        <div className="mt-4 text-center" data-testid="gate-saida-android">
+          <p className="text-[12px] leading-snug text-muted-foreground mb-2">
+            Você está na conta <b className="text-foreground break-all">{user.email ?? "sem e-mail"}</b>.
+          </p>
+          <button
+            type="button"
+            data-testid="gate-trocar-conta"
+            className="w-full min-h-[44px] rounded-full border-2 border-[#16121c]/80 bg-white text-[#16121c] text-[14px] font-bold active:scale-[0.98] transition-transform"
+            onClick={() => void trocarConta()}
+          >
+            Entrar com outra conta
+          </button>
+        </div>
+      )}
+      {apple && !enxuto && contexto === "gate" && user && (
         <p className="mt-3 text-center text-[12px] leading-snug text-muted-foreground" data-testid="gate-trocar-conta">
           Você está na conta <b className="text-foreground break-all">{user.email ?? "sem e-mail"}</b>.{" "}
           <button

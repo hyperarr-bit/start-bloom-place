@@ -856,7 +856,8 @@ export function PaywallW({
             <div className="text-[10.5px] text-muted-foreground font-semibold">acesso liberado</div>
           </div>
         </div>
-        <motion.div {...stagger(4)}><TrustChips /></motion.div>
+        {/* 14/11 (1.0.27): braço vitalício com o vitalício marcado = compra única → sem "Cancele quando quiser" */}
+        <motion.div {...stagger(4)}><TrustChips unico={semTeste && grande === "vitalicio" && plano !== "mensal"} /></motion.div>
 
         {/* "Segue e ganha 7 dias" (14/09): quem veio do Instagram com código
             entra por aqui. Só confere e guarda — a conta ainda não existe;

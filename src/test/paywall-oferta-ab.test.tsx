@@ -222,6 +222,7 @@ describe("braço anual (conta vazia)", () => {
     expect(tela().textContent).toContain("Quero o anual — R$ 97,90/ano");
     expect(tela().textContent).not.toMatch(TEXTO_TESTE);
     expect(tela().textContent).not.toMatch(TEXTO_VITALICIO);
+    expect(tela().textContent).toContain("Cancele quando quiser"); // 1.0.27: o selo do anual (assinatura) fica como hoje
     fireEvent.click(screen.getByText(/Quero o anual/));
     await waitFor(() => expect(onPago).toHaveBeenCalled());
     expect(comprarSemTeste).toHaveBeenCalledWith("anual", "ios");
@@ -249,6 +250,19 @@ describe("braço vitalício (conta vazia)", () => {
     expect(t).not.toMatch(/R\$ 8,16|Economize 77%|\/ano|1 ano|24,90|99,90/);
     expect(eventos("funnel_view")[0]).toMatchObject({ step: "offer", paywall_oferta: "vitalicio", paywall_visual: "android", paywall_teste: "off" });
     expect(eventos("paywall_oferta_vista")[0]).toMatchObject({ produto: "core_vitalicio_97", preco: "R$ 97,90", paywall_oferta: "vitalicio", trial: false });
+  });
+  it("1.0.27: com o vitalício marcado o selo \"Cancele quando quiser\" vira \"Pagamento único. Sem mensalidade.\"; marcando o mensal volta", async () => {
+    montar();
+    await espera();
+    const selos = () => [...tela().querySelectorAll("span.rounded-full")].map((e) => e.textContent?.trim() ?? "");
+    expect(selos().some((t) => t.includes("Pagamento único. Sem mensalidade."))).toBe(true);
+    expect(selos().some((t) => /Cancele quando quiser/.test(t))).toBe(false);
+    // a única "cancele quando quiser" que sobra é a da coluna do MENSAL (que é assinatura)
+    expect(screen.getAllByText(/cancele quando quiser/i)).toHaveLength(1);
+    fireEvent.click(screen.getAllByText(/cancele quando quiser/i)[0]);
+    expect(tela().dataset.plano).toBe("mensal");
+    expect(selos().some((t) => t.includes("Cancele quando quiser"))).toBe(true);
+    expect(selos().some((t) => t.includes("Pagamento único. Sem mensalidade."))).toBe(false);
   });
   it("loja calada: a reserva de texto (97,90 vitalício / 34,90) e ainda nenhum texto de teste", async () => {
     const v = loja.vitalicio, m = loja.mensal;

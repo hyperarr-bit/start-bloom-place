@@ -583,8 +583,16 @@ const TRUST_CHIPS_WEB_ANUAL = [
   { emoji: "📅", label: "1 ano, não renova sozinho" },
 ];
 
-export function TrustChips({ anual = false }: { anual?: boolean } = {}) {
-  const chips = ehApple() ? TRUST_CHIPS_IOS : isNativeShell() ? TRUST_CHIPS : anual ? TRUST_CHIPS_WEB_ANUAL : TRUST_CHIPS_WEB;
+/** 14/11 (1.0.27): iPhone com o VITALÍCIO marcado (braço vitalício do `paywall_oferta`) — compra única não é
+ *  assinatura, então "Cancele quando quiser" sai e entra o que ela é. */
+const TRUST_CHIPS_IOS_UNICO = [
+  TRUST_CHIPS_IOS[0],
+  TRUST_CHIPS_IOS[1],
+  { emoji: "♾️", label: "Pagamento único. Sem mensalidade." },
+];
+
+export function TrustChips({ anual = false, unico = false }: { anual?: boolean; /** iPhone: o plano marcado é compra única (vitalício) */ unico?: boolean } = {}) {
+  const chips = ehApple() ? (unico ? TRUST_CHIPS_IOS_UNICO : TRUST_CHIPS_IOS) : isNativeShell() ? TRUST_CHIPS : anual ? TRUST_CHIPS_WEB_ANUAL : TRUST_CHIPS_WEB;
   return (
     <div className="flex items-center justify-center gap-2 flex-wrap">
       {chips.map((c) => (

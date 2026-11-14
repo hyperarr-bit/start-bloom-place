@@ -114,14 +114,29 @@ serve(async (req) => {
     const canUsePause = !usedTypes.has("pause");
     const canUseExtension = !usedTypes.has("extend_7d");
 
-    const { data: sub } = await admin
+    const COLS = "id, status, plan, current_period_end, abacatepay_subscription_id, abacatepay_billing_id, payment_method, revenuecat_subscription_id";
+    /* 14/11 (revisão): o MENSAL da Stripe vem primeiro e em qualquer estado que ainda cobra (active, past_due — a Stripe
+     * segue tentando —, cancel_scheduled): a linha "active/trialing" de antes deixava o past_due de fora e o fluxo dizia
+     * "cancelado" sem cancelar nada na Stripe. */
+    const { data: mensalStripe } = await admin
       .from("subscriptions")
-      .select("id, status, plan, current_period_end, abacatepay_subscription_id, abacatepay_billing_id, payment_method, revenuecat_subscription_id")
+      .select(COLS)
+      .eq("user_id", user.id)
+      .eq("payment_method", "stripe")
+      .like("abacatepay_billing_id", "sub_%")
+      .in("status", ["active", "past_due", "cancel_scheduled"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const { data: subComum } = mensalStripe ? { data: null } : await admin
+      .from("subscriptions")
+      .select(COLS)
       .eq("user_id", user.id)
       .in("status", ["active", "trialing"])
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+    const sub = mensalStripe ?? subComum;
 
     /* 24/09: assinatura de LOJA (App Store / Google Play) NÃO se cancela
      * aqui — só a loja cobra e só a loja cancela. Este fluxo gravava pausa,

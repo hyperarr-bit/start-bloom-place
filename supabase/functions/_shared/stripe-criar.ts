@@ -123,6 +123,11 @@ export function respostaStatus(pi: { metadata?: Record<string, string> | null; s
   return { ok: true, status: pi.status, pago: pi.status === "succeeded", metodo: lc?.payment_method_details?.type ?? null };
 }
 
+/** 14/11 (revisão): linhas do banco sem ordem garantida → a mais nova primeiro (created_at; empate = a ordem que veio, de trás pra frente) */
+export function maisNovoPrimeiro<T extends { created_at?: string }>(linhas: T[]): T[] {
+  return linhas.map((l, i) => ({ l, i })).sort((a, b) => (String(b.l.created_at ?? "") > String(a.l.created_at ?? "") ? 1 : String(b.l.created_at ?? "") < String(a.l.created_at ?? "") ? -1 : b.i - a.i)).map((x) => x.l);
+}
+
 /* ───────── o fluxo do stripe-criar (revisão 05/11), com a Stripe e o banco injetados (testado no vitest) ───────── */
 /** 14/11: `versao` = header Stripe-Version (só as chamadas de assinatura do funil app web pedem uma versão fixa) */
 export type ChamarStripe = (caminho: string, pares: Array<[string, string]> | null, idem?: string, versao?: string) => Promise<{ ok: boolean; j: Record<string, unknown> }>;
@@ -141,13 +146,18 @@ export async function criarOuReaproveitar(
   if (!pi) {
     try {
       // o MAIS NOVO desta ref (um PI cancelado dá lugar a outro: -2, -3…)
-      const { data: ja } = await admin.from("analytics_events").select("event_data").eq("event_name", "stripe_order_created").eq("event_data->>ref", p.ref).limit(10);
-      const achado = ((ja ?? []) as Array<{ event_data?: { pi?: string } }>).map((l) => l.event_data?.pi).filter((x): x is string => typeof x === "string" && /^pi_/.test(x)).at(-1);
+      const { data: ja } = await admin.from("analytics_events").select("event_data, created_at").eq("event_name", "stripe_order_created").eq("event_data->>ref", p.ref).limit(50);
+      const achado = maisNovoPrimeiro((ja ?? []) as Array<{ event_data?: { pi?: string }; created_at?: string }>).map((l) => l.event_data?.pi).find((x): x is string => typeof x === "string" && /^pi_/.test(x));
       if (achado) pi = achado;
     } catch { /* cria (a chave de idempotência ainda segura o 2º) */ }
   }
   const registrar = async (id: unknown) => {
     try { await admin.from("analytics_events").insert({ event_name: "stripe_order_created", user_id: ctx.userId, session_id: p.landing_session_id, event_data: { ref: p.ref, pi: id, pagina: oferta.pagina, ...(ctx.ip ? { client_ip: ctx.ip } : {}), ...p.atrib } }); } catch { /* o PI existe; a próxima recarga acha pela chave */ }
+  };
+  /** o PI como está AGORA na Stripe (a resposta de uma chave repetida é a foto antiga) */
+  const estadoReal = async (x: Record<string, unknown>): Promise<Record<string, unknown>> => {
+    const g = await stripe(`payment_intents/${String(x.id)}`, null);
+    return g.ok && g.j.id === x.id ? g.j : x;
   };
   let j: Record<string, unknown> | null = null;
   if (pi) {
@@ -160,14 +170,16 @@ export async function criarOuReaproveitar(
     if (!(await ipPodeCriar(admin, ctx.ip, deps.agoraMs))) { log("limite por IP"); return { status: 429, corpo: { ok: false, limite: true } }; }
     const r = await stripe("payment_intents", paramsCriar(p.ref, oferta), `${oferta.idem}-${p.ref}`);
     if (!r.ok || typeof r.j.client_secret !== "string") { log("criar falhou", { code: String((r.j.error as Record<string, unknown> | undefined)?.code ?? "") }); return { status: 502, corpo: { ok: false } }; }
-    j = r.j;
-    await registrar(j.id);
+    j = await estadoReal(r.j);
+    if (String(j.status) !== "canceled") await registrar(j.id);
   }
-  // 05/11 (revisão 2): PI cancelado não serve pra pagar → um novo pra mesma ref, com outra chave (oferta-<ref>-2, -3…)
-  for (let n = 2; String(j.status) === "canceled" && n <= 6; n++) {
+  // 05/11 (revisão 2): PI cancelado não serve pra pagar → um novo pra mesma ref, com outra chave (oferta-<ref>-2, -3…).
+  // 14/11 (revisão): a Idempotency-Key devolve a FOTO de quando o PI nasceu (status antigo) — depois de criar, relê o PI;
+  // se aquela chave já era de um PI cancelado (Pix → cartão → Pix → cartão), segue pra próxima. Antes: 502 e a ref travava.
+  for (let n = 2; String(j.status) === "canceled" && n <= 12; n++) {
     const r = await stripe("payment_intents", paramsCriar(p.ref, oferta), `${oferta.idem}-${p.ref}-${n}`);
     if (!r.ok || typeof r.j.client_secret !== "string") { log("recriar falhou", { n }); return { status: 502, corpo: { ok: false } }; }
-    j = r.j;
+    j = await estadoReal(r.j);
     if (String(j.status) !== "canceled") await registrar(j.id);
   }
   if (String(j.status) === "canceled") return { status: 502, corpo: { ok: false } };

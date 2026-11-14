@@ -5,7 +5,8 @@
  * parcelas). Na Stripe: Developers → Webhooks → endpoint https://itoylenzvahbscgjgtqf.supabase.co/functions/v1/stripe-webhook,
  * eventos payment_intent.succeeded, charge.refunded, charge.dispute.created.
  * 14/11 (mensal do /funil-app): + invoice.paid, invoice.payment_failed, customer.subscription.updated, customer.subscription.deleted
- * (adicionar no MESMO endpoint na Stripe). A chave precisa de leitura em Subscriptions.
+ * (adicionar no MESMO endpoint na Stripe). A chave precisa de leitura em Subscriptions/Invoices e ESCRITA em Subscriptions
+ * (estorno do mensal cancela a assinatura; mensal em dobro ou vitalício por cima cancelam a renovação).
  */
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
@@ -55,6 +56,34 @@ serve(async (req) => {
       if (!sk || !/^sub_[A-Za-z0-9]+$/.test(sub)) return null;
       const res = await fetch(`https://api.stripe.com/v1/subscriptions/${sub}`, { headers: { Authorization: `Bearer ${sk}`, "Stripe-Version": "2024-06-20" } });
       return res.ok ? await res.json() as Record<string, unknown> : null;
+    },
+    // 14/11 (revisão): a assinatura de um pagamento de fatura (estorno/contestação do mensal, PI de renovação)
+    assinaturaDoPagamento: async (pi, invoice) => {
+      const sk = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
+      if (!sk) return null;
+      const h = { Authorization: `Bearer ${sk}`, "Stripe-Version": "2024-06-20" };
+      let inv = invoice;
+      if (!inv && /^pi_[A-Za-z0-9]+$/.test(pi)) {
+        const r = await fetch(`https://api.stripe.com/v1/payment_intents/${pi}`, { headers: h });
+        if (!r.ok) throw new Error("pi_ilegivel");
+        const j = await r.json() as { invoice?: string | null };
+        inv = typeof j.invoice === "string" ? j.invoice : null;
+      }
+      if (!inv || !/^in_[A-Za-z0-9]+$/.test(inv)) return null;
+      const r = await fetch(`https://api.stripe.com/v1/invoices/${inv}`, { headers: h });
+      if (!r.ok) throw new Error("fatura_ilegivel");
+      const j = await r.json() as { subscription?: string | { id?: string } | null };
+      return typeof j.subscription === "string" ? j.subscription : j.subscription?.id ?? null;
+    },
+    // 14/11 (revisão): cancelar a assinatura na Stripe (estorno = já; mensal em dobro / comprou o vitalício = no fim do período)
+    cancelarAssinatura: async (sub, imediato) => {
+      const sk = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
+      if (!sk || !/^sub_[A-Za-z0-9]+$/.test(sub)) return false;
+      const h = { Authorization: `Bearer ${sk}`, "Stripe-Version": "2024-06-20", "Content-Type": "application/x-www-form-urlencoded" };
+      const r = imediato
+        ? await fetch(`https://api.stripe.com/v1/subscriptions/${sub}`, { method: "DELETE", headers: h })
+        : await fetch(`https://api.stripe.com/v1/subscriptions/${sub}`, { method: "POST", headers: h, body: "cancel_at_period_end=true" });
+      return r.ok;
     },
     log,
   }, { assinatura: req.headers.get("stripe-signature"), corpo });

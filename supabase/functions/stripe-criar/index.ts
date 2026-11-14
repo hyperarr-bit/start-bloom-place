@@ -36,7 +36,8 @@ serve(async (req) => {
     if (!p) return json({ ok: false }, 400);
     // 14/11 (/funil-app): as ações da folha do paywall do app na web — só com pagina "app_web"
     const acao = p.pagina === "app_web" ? validarAcaoAppWeb(corpoCru) : null;
-    if (p.pagina === "app_web" && (corpoCru as Record<string, unknown> | null)?.acao !== undefined && !acao) return json({ ok: false }, 400);
+    // 14/11 (revisão): o /funil-app só cobra pelas ações (pix/cartao/assinar, parcelas 1–3 conferidas); sem ação não há PI pra ele
+    if (p.pagina === "app_web" && !acao) return json({ ok: false }, 400);
     const admin = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false } });
     let userId: string | null = null;
     const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");

@@ -18,7 +18,7 @@
  * Quem libera o acesso é sempre o stripe-webhook (payment_intent.succeeded pro vitalício, invoice.paid pro mensal).
  * Daqui só sai o estado pra tela. Nada de e-mail/segredo no log.
  */
-import { criarOuReaproveitar, formUrl, pixDoIntento, type ChamarStripe, type PedidoStripe } from "./stripe-criar.ts";
+import { criarOuReaproveitar, formUrl, maisNovoPrimeiro, pixDoIntento, type ChamarStripe, type PedidoStripe } from "./stripe-criar.ts";
 import { MENSAL_APP_WEB, OFERTAS_STRIPE, precoMensalConfere } from "./stripe-ofertas.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -40,44 +40,51 @@ export const PARCELAS_MAX_APP_WEB = OFERTAS_STRIPE.app_web.parcelasMax;
 /** o PI tem um Pix pendente (QR vivo)? */
 const temPixVivo = (j: Record<string, unknown>) => !!pixDoIntento(j);
 
-/** o PI mais novo registrado pra esta ref (stripe_order_created) */
-async function piDaRef(admin: ClienteMin, ref: string): Promise<string | null> {
+/** o PI mais novo registrado pra esta ref (stripe_order_created). "erro" = o banco não respondeu (as travas param aí). */
+async function piDaRef(admin: ClienteMin, ref: string): Promise<string | null | "erro"> {
   try {
-    const { data } = await admin.from("analytics_events").select("event_data").eq("event_name", "stripe_order_created").eq("event_data->>ref", ref).limit(10);
-    return ((data ?? []) as Array<{ event_data?: { pi?: string; pagina?: string } }>).filter((l) => l.event_data?.pagina === "app_web").map((l) => l.event_data?.pi).filter((x): x is string => typeof x === "string" && /^pi_/.test(x)).at(-1) ?? null;
-  } catch { return null; }
+    const { data, error } = await admin.from("analytics_events").select("event_data, created_at").eq("event_name", "stripe_order_created").eq("event_data->>ref", ref).limit(50);
+    if (error) return "erro";
+    return maisNovoPrimeiro((data ?? []) as Array<{ event_data?: { pi?: string; pagina?: string }; created_at?: string }>).filter((l) => l.event_data?.pagina === "app_web").map((l) => l.event_data?.pi).find((x): x is string => typeof x === "string" && /^pi_/.test(x)) ?? null;
+  } catch { return "erro"; }
 }
-/** a assinatura mais nova desta ref (stripe_assinatura_criada) */
-async function assinaturaDaRef(admin: ClienteMin, ref: string): Promise<{ sub: string; cus: string | null } | null> {
+/** as assinaturas desta ref (stripe_assinatura_criada), a mais nova primeiro. "erro" = o banco não respondeu. */
+async function assinaturasDaRef(admin: ClienteMin, ref: string): Promise<Array<{ sub: string; cus: string | null }> | "erro"> {
   try {
-    const { data } = await admin.from("analytics_events").select("event_data").eq("event_name", "stripe_assinatura_criada").eq("event_data->>ref", ref).limit(10);
-    const l = ((data ?? []) as Array<{ event_data?: { sub?: string; cus?: string } }>).filter((x) => typeof x.event_data?.sub === "string" && /^sub_/.test(x.event_data.sub)).at(-1);
-    return l ? { sub: l.event_data!.sub!, cus: typeof l.event_data!.cus === "string" ? l.event_data!.cus : null } : null;
-  } catch { return null; }
+    const { data, error } = await admin.from("analytics_events").select("event_data, created_at").eq("event_name", "stripe_assinatura_criada").eq("event_data->>ref", ref).limit(50);
+    if (error) return "erro";
+    return maisNovoPrimeiro((data ?? []) as Array<{ event_data?: { sub?: string; cus?: string }; created_at?: string }>)
+      .filter((x) => typeof x.event_data?.sub === "string" && /^sub_/.test(x.event_data.sub))
+      .map((x) => ({ sub: x.event_data!.sub!, cus: typeof x.event_data!.cus === "string" ? x.event_data!.cus : null }));
+  } catch { return "erro"; }
 }
 
-/** a assinatura desta ref já está paga (active/trialing)? Ou incompleta (reaproveitar)? */
-async function estadoDaAssinatura(deps: DepsAppWeb, ref: string): Promise<{ estado: "paga" | "incompleta" | "nenhuma"; sub?: Record<string, unknown>; cus?: string | null }> {
-  const a = await assinaturaDaRef(deps.admin, ref);
-  if (!a) return { estado: "nenhuma" };
+/** a assinatura desta ref já está paga (active/trialing/past_due)? Ou incompleta (reaproveitar)? "erro" = não deu pra saber → não cobra */
+async function estadoDaAssinatura(deps: DepsAppWeb, ref: string): Promise<{ estado: "paga" | "incompleta" | "nenhuma" | "erro"; sub?: Record<string, unknown>; cus?: string | null; total?: number }> {
+  const todas = await assinaturasDaRef(deps.admin, ref);
+  if (todas === "erro") return { estado: "erro" };
+  const a = todas[0];
+  if (!a) return { estado: "nenhuma", total: 0 };
   const r = await deps.stripe(`subscriptions/${a.sub}?expand[]=latest_invoice.payment_intent`, null, undefined, V);
-  if (!r.ok) return { estado: "nenhuma" };
+  if (!r.ok) return { estado: "erro" };
   const st = String(r.j.status ?? "");
-  if (st === "active" || st === "trialing" || st === "past_due") return { estado: "paga", sub: r.j, cus: a.cus };
-  if (st === "incomplete") return { estado: "incompleta", sub: r.j, cus: a.cus ?? (typeof r.j.customer === "string" ? r.j.customer : null) };
-  return { estado: "nenhuma" };
+  const cus = a.cus ?? (typeof r.j.customer === "string" ? r.j.customer : null);
+  if (st === "active" || st === "trialing" || st === "past_due") return { estado: "paga", sub: r.j, cus, total: todas.length };
+  if (st === "incomplete") return { estado: "incompleta", sub: r.j, cus, total: todas.length };
+  return { estado: "nenhuma", cus, total: todas.length };
 }
 
 /**
  * A TRAVA contra pagar 2×: o Pix vivo da ref morre antes de qualquer cartão/assinatura.
  * "pago" = o vitalício desta ref já pagou (não cobra mais nada); "ok" = não há Pix vivo; "erro" = não deu pra matar o Pix
- * (a tela fica no Pix, nunca abre o cartão com QR pagável).
+ * OU não deu pra saber (banco/Stripe sem resposta) — a tela fica no Pix, nunca abre o cartão com QR pagável.
  */
 export async function matarPixDaRef(deps: DepsAppWeb, ref: string): Promise<"ok" | "pago" | "erro"> {
   const pi = await piDaRef(deps.admin, ref);
+  if (pi === "erro") return "erro";
   if (!pi) return "ok";
   const atual = await deps.stripe(`payment_intents/${pi}`, null);
-  if (!atual.ok) return "ok";
+  if (!atual.ok) return "erro";
   if (String(atual.j.status) === "succeeded") return "pago";
   if (!temPixVivo(atual.j)) return "ok";
   const c = await deps.stripe(`payment_intents/${pi}/cancel`, [["cancellation_reason", "abandoned"]]);
@@ -87,6 +94,38 @@ export async function matarPixDaRef(deps: DepsAppWeb, ref: string): Promise<"ok"
   if (depois.ok && String(depois.j.status) === "canceled") return "ok";
   deps.log("Pix vivo NÃO cancelou", { pi, code: String(erroDe(c.j).code ?? "") });
   return "erro";
+}
+
+/**
+ * 14/11 (revisão): UMA cobrança por vez por ref (2 abas: cartão vitalício + mensal, ou 2 mensais, ao mesmo tempo). Trava
+ * atômica em webhook_events (id único `appweb-cobrando:<ref>`); a 2ª aba recebe "em_andamento" e tenta de novo — e aí as
+ * travas de sempre (PI pago / assinatura paga) respondem "pago" em vez de cobrar de novo. A trava vence em 2 min (aba que
+ * morreu no meio não prende a ref pra sempre).
+ */
+const TRAVA_MS = 120_000;
+async function travarRef(admin: ClienteMin, ref: string, agoraMs = Date.now()): Promise<boolean> {
+  const id = `appweb-cobrando:${ref}`;
+  for (let tentativa = 0; tentativa < 2; tentativa++) {
+    try {
+      const { error } = await admin.from("webhook_events").insert({ id, source: "stripe", event: `trava:${agoraMs}` });
+      if (!error) return true;
+      if ((error as { code?: string }).code !== "23505") return false;
+      const { data } = await admin.from("webhook_events").select("id, event").eq("id", id).maybeSingle();
+      const m = /^trava:(\d+)$/.exec(String((data as { event?: string } | null)?.event ?? ""));
+      const desde = m ? Number(m[1]) : NaN;
+      // sem conseguir ler a hora da trava, ela vale (nunca solta a trava de outra aba no escuro)
+      if (!Number.isFinite(desde) || agoraMs - desde < TRAVA_MS) return false;
+      await admin.from("webhook_events").delete().eq("id", id); // trava velha (aba morreu): solta e tenta 1×
+    } catch { return false; }
+  }
+  return false;
+}
+async function soltarRef(admin: ClienteMin, ref: string) { try { await admin.from("webhook_events").delete().eq("id", `appweb-cobrando:${ref}`); } catch { /* vence sozinha */ } }
+const EM_ANDAMENTO: RespostaAppWeb = { status: 409, corpo: { ok: false, erro: "em_andamento" } };
+const INDISPONIVEL: RespostaAppWeb = { status: 503, corpo: { ok: false, erro: "indisponivel" } };
+async function comTrava(deps: DepsAppWeb, ref: string, fazer: () => Promise<RespostaAppWeb>): Promise<RespostaAppWeb> {
+  if (!(await travarRef(deps.admin, ref, deps.agoraMs))) return EM_ANDAMENTO;
+  try { return await fazer(); } finally { await soltarRef(deps.admin, ref); }
 }
 
 /** o que a tela recebe de um PI depois de confirmar (pago / 3DS / recusado / esperando) */
@@ -108,7 +147,11 @@ function resultadoDoErro(j: Record<string, unknown>, extra: Record<string, unkno
 /* ───────────────────────── Pix (vitalício) ───────────────────────── */
 export async function pixAppWeb(deps: DepsAppWeb, p: PedidoStripe, md: Record<string, string>, ctx: Ctx): Promise<RespostaAppWeb> {
   if (!p.email) return { status: 400, corpo: { ok: false, erro: "email" } };
+  return comTrava(deps, p.ref, () => pixSemTrava(deps, p, md, ctx));
+}
+async function pixSemTrava(deps: DepsAppWeb, p: PedidoStripe, md: Record<string, string>, ctx: Ctx): Promise<RespostaAppWeb> {
   const sub = await estadoDaAssinatura(deps, p.ref);
+  if (sub.estado === "erro") return INDISPONIVEL;
   if (sub.estado === "paga") return { status: 200, corpo: { ok: true, pago: true, plano: "mensal" } };
   const r = await criarOuReaproveitar(deps, { ...p, pagina: "app_web" }, md, ctx);
   if (r.status !== 200) return r;
@@ -130,7 +173,11 @@ export type PedidoCartao = { pm: string; parcelas: number; returnUrl: string };
 export async function cartaoAppWeb(deps: DepsAppWeb, p: PedidoStripe, md: Record<string, string>, ctx: Ctx, c: PedidoCartao): Promise<RespostaAppWeb> {
   if (!p.email) return { status: 400, corpo: { ok: false, erro: "email" } };
   if (!Number.isInteger(c.parcelas) || c.parcelas < 1 || c.parcelas > PARCELAS_MAX_APP_WEB) return { status: 400, corpo: { ok: false, erro: "parcelas" } };
+  return comTrava(deps, p.ref, () => cartaoSemTrava(deps, p, md, ctx, c));
+}
+async function cartaoSemTrava(deps: DepsAppWeb, p: PedidoStripe, md: Record<string, string>, ctx: Ctx, c: PedidoCartao): Promise<RespostaAppWeb> {
   const sub = await estadoDaAssinatura(deps, p.ref);
+  if (sub.estado === "erro") return INDISPONIVEL;
   if (sub.estado === "paga") return { status: 200, corpo: { ok: true, pago: true, plano: "mensal" } };
   const morto = await matarPixDaRef(deps, p.ref);
   if (morto === "pago") return { status: 200, corpo: { ok: true, pago: true, plano: "vitalicio", metodo: "pix" } };
@@ -168,12 +215,19 @@ export async function assinarAppWeb(deps: DepsAppWeb, p: PedidoStripe, md: Recor
   if (!deps.precoMensal || !/^price_[A-Za-z0-9]+$/.test(deps.precoMensal)) { log("sem STRIPE_PRECO_MENSAL_34"); return { status: 503, corpo: { ok: false, erro: "mensal_indisponivel" } }; }
   const preco = await stripe(`prices/${deps.precoMensal}`, null, undefined, V);
   if (!preco.ok || !precoMensalConfere(preco.j)) { log("preço mensal não confere (3490 BRL/mês)", { ok: preco.ok }); return { status: 503, corpo: { ok: false, erro: "mensal_indisponivel" } }; }
+  return comTrava(deps, p.ref, () => assinarSemTrava(deps, p, md, ctx, c));
+}
+async function assinarSemTrava(deps: DepsAppWeb, p: PedidoStripe, md: Record<string, string>, ctx: Ctx, c: { pm: string; returnUrl: string }): Promise<RespostaAppWeb> {
+  const { stripe, log } = deps;
+  const precoMensal = deps.precoMensal!;
+  // 14/11 (revisão): o vitalício desta ref já pagou (cartão numa aba, mensal na outra) → não assina por cima
   const morto = await matarPixDaRef(deps, p.ref);
   if (morto === "pago") return { status: 200, corpo: { ok: true, pago: true, plano: "vitalicio", metodo: "pix" } };
   if (morto === "erro") return { status: 409, corpo: { ok: false, erro: "pix_vivo" } };
 
   const mdSub: Array<[string, string]> = Object.entries({ ...md, pagina: MENSAL_APP_WEB.pagina }).map(([k, v]) => [`metadata[${k}]`, v]);
   const atual = await estadoDaAssinatura(deps, p.ref);
+  if (atual.estado === "erro") return INDISPONIVEL;
   if (atual.estado === "paga") return { status: 200, corpo: { ok: true, pago: true, plano: "mensal", sub: atual.sub?.id } };
 
   let sub: Record<string, unknown>;
@@ -189,18 +243,25 @@ export async function assinarAppWeb(deps: DepsAppWeb, p: PedidoStripe, md: Recor
     }
   } else {
     if (!(await ipPodeAssinar(deps.admin, ctx.ip, deps.agoraMs))) { log("limite por IP (assinar)"); return { status: 429, corpo: { ok: false, limite: true } }; }
-    const cr = await stripe("customers", [
-      ["email", p.email], ["payment_method", c.pm], ["invoice_settings[default_payment_method]", c.pm],
-      ["metadata[ref]", p.ref], ...(md.user_id ? [["metadata[user_id]", md.user_id] as [string, string]] : []),
-    ], `appweb-cus-${p.ref}-${c.pm}`, V);
-    if (!cr.ok) return resultadoDoErro(cr.j, { plano: "mensal" });
-    cus = String(cr.j.id);
+    // 14/11 (revisão): o cliente da ref é reaproveitado (assinatura anterior vencida); a chave da assinatura é por ref +
+    // tentativa (nº de assinaturas já registradas), nunca pelo cartão — 2 cliques com cartões diferentes não viram 2 assinaturas
+    // (a trava da ref já serializa; a chave cobre o reenvio do mesmo pedido)
+    cus = atual.cus ?? null;
+    if (!cus) {
+      const cr = await stripe("customers", [
+        ["email", p.email!], ["metadata[ref]", p.ref], ...(md.user_id ? [["metadata[user_id]", md.user_id] as [string, string]] : []),
+      ], `appweb-cus-${p.ref}`, V);
+      if (!cr.ok) return resultadoDoErro(cr.j, { plano: "mensal" });
+      cus = String(cr.j.id);
+    }
+    const at = await stripe(`payment_methods/${c.pm}/attach`, [["customer", cus]], undefined, V);
+    if (!at.ok) return resultadoDoErro(at.j, { plano: "mensal" });
     const sr = await stripe("subscriptions", [
-      ["customer", cus], ["items[0][price]", deps.precoMensal], ["default_payment_method", c.pm],
+      ["customer", cus], ["items[0][price]", precoMensal], ["default_payment_method", c.pm],
       ["payment_behavior", "default_incomplete"], ["payment_settings[payment_method_types][0]", "card"],
       ["payment_settings[save_default_payment_method]", "on_subscription"], ["expand[0]", "latest_invoice.payment_intent"],
       ["description", "CORE mensal"], ...mdSub,
-    ], `appweb-sub-${p.ref}-${c.pm}`, V);
+    ], `appweb-sub-${p.ref}-${(atual.total ?? 0) + 1}`, V);
     if (!sr.ok) return resultadoDoErro(sr.j, { plano: "mensal" });
     sub = sr.j;
     try { await deps.admin.from("analytics_events").insert({ event_name: "stripe_assinatura_criada", user_id: ctx.userId, session_id: p.landing_session_id, event_data: { ref: p.ref, sub: sub.id, cus, pagina: MENSAL_APP_WEB.pagina, ...(ctx.ip ? { client_ip: ctx.ip } : {}), ...p.atrib } }); } catch { /* a assinatura existe; a recarga acha pela chave de idempotência */ }

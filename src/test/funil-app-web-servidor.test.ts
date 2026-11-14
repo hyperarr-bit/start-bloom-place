@@ -10,6 +10,8 @@
  */
 import { describe, it, expect } from "vitest";
 import { createHmac } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { tratarStripe, type DepsStripe } from "../../supabase/functions/_shared/stripe";
 import { criarOuReaproveitar, metadataDoPedido, paramsCriar, respostaStatus, validarPedidoStripe, type ChamarStripe } from "../../supabase/functions/_shared/stripe-criar";
 import { assinarAppWeb, cartaoAppWeb, pixAppWeb, validarAcaoAppWeb, type DepsAppWeb } from "../../supabase/functions/_shared/stripe-app-web";
@@ -32,8 +34,8 @@ function bancoFalso() {
       await new Promise((r) => setTimeout(r, 0));
       const casa = (r: Linha) => filtros.every((f) => f(r));
       if (tabela === "webhook_events") {
-        if (op.tipo === "insert") { const id = String(op.dados!.id); if (db.webhook_events.has(id)) return { error: { code: "23505", message: "duplicate" } }; db.webhook_events.set(id, "x"); return { error: null }; }
-        const linhas = [...db.webhook_events.keys()].map((id) => ({ id }));
+        if (op.tipo === "insert") { const id = String(op.dados!.id); if (db.webhook_events.has(id)) return { error: { code: "23505", message: "duplicate" } }; db.webhook_events.set(id, String(op.dados!.event ?? "")); return { error: null }; }
+        const linhas = [...db.webhook_events.entries()].map(([id, event]) => ({ id, event }));
         if (op.tipo === "delete") { for (const l of linhas.filter(casa)) db.webhook_events.delete(l.id); return { error: null }; }
         const a = linhas.filter(casa); return { data: unico ? a[0] ?? null : a, error: null };
       }
@@ -69,6 +71,7 @@ function stripeFalsa() {
   const pis = new Map<string, Linha>();
   const subs = new Map<string, Linha>();
   const idems = new Map<string, string>();
+  const fotos = new Map<string, string>();
   const chamadas: Array<{ caminho: string; pares: Array<[string, string]> | null; idem?: string; versao?: string }> = [];
   const ctl = { preco: { id: PRECO, unit_amount: 3490, currency: "brl", recurring: { interval: "month", interval_count: 1 }, active: true } as Linha, cancelarFalha: false, pagarPixAoCancelar: false };
   let n = 0;
@@ -81,14 +84,16 @@ function stripeFalsa() {
     const [base] = caminho.split("?");
     const partes = base.split("/");
     if (base === "payment_intents" && pares) {
-      if (idem && idems.has(idem)) return { ok: true, j: pis.get(idems.get(idem)!)! };
+      // como a Stripe de verdade (com fotoIdem): a chave repetida devolve a FOTO de quando o PI nasceu, não o estado de agora
+      if (idem && idems.has(idem)) return { ok: true, j: (ctl as Linha).fotoIdem ? JSON.parse(fotos.get(idem)!) : pis.get(idems.get(idem)!)! };
       const p = novoPi({ amount: Number(kv.amount), currency: kv.currency, metadata: md, description: kv.description });
-      if (idem) idems.set(idem, String(p.id));
+      if (idem) { idems.set(idem, String(p.id)); fotos.set(idem, JSON.stringify(p)); }
       return { ok: true, j: p };
     }
     if (partes[0] === "payment_intents" && partes.length === 2) {
       const p = pis.get(partes[1]); if (!p) return { ok: false, j: { error: { code: "resource_missing" } } };
       if (!pares) return { ok: true, j: p };
+      if (p.status === "canceled") return { ok: false, j: { error: { type: "invalid_request_error", code: "payment_intent_unexpected_state" } } };
       if (kv.payment_method) {
         p.payment_method = kv.payment_method;
         const planos = kv.payment_method === "pm_semparc" ? [] : [1, 2, 3, 6, 12].filter((x) => x > 1).map((count) => ({ count, interval: "month", type: "fixed_count" }));
@@ -106,6 +111,7 @@ function stripeFalsa() {
     }
     if (partes[0] === "payment_intents" && partes[2] === "confirm") {
       const p = pis.get(partes[1])!;
+      if (p.status === "canceled") return { ok: false, j: { error: { type: "invalid_request_error", code: "payment_intent_unexpected_state" } } };
       if (kv["payment_method_data[type]"] === "pix") { p.status = "requires_action"; p.next_action = pixNa(String(p.id)); return { ok: true, j: p }; }
       const pm = kv.payment_method ?? String(p.payment_method ?? "");
       p.payment_method = pm;
@@ -311,7 +317,13 @@ function montarWebhook() {
     buscarCobranca: async () => ({ metodo: "card", parcelas: 3 }),
     log: () => {}, agora: () => AGORA,
   };
-  return { ...b, deps, saida };
+  /* a Stripe "de agora" (14/11, revisão): o estado atual de cada assinatura, a assinatura de cada pagamento de fatura e o
+     que foi cancelado — os eventos fora de ordem são conferidos aqui */
+  const stripeAgora = { subs: new Map<string, Linha>(), pagamentos: new Map<string, string>(), cancelados: [] as Array<{ sub: string; imediato: boolean }>, falhar: false };
+  deps.buscarAssinatura = async (sub) => (stripeAgora.falhar ? null : stripeAgora.subs.get(sub) ?? { id: sub, status: "active", metadata: {} });
+  deps.assinaturaDoPagamento = async (pi) => { if (stripeAgora.falhar) throw new Error("fora"); return stripeAgora.pagamentos.get(pi) ?? null; };
+  deps.cancelarAssinatura = async (sub, imediato) => { stripeAgora.cancelados.push({ sub, imediato }); return true; };
+  return { ...b, deps, saida, stripeAgora };
 }
 let nEvt = 0;
 const evento = (type: string, object: Linha) => JSON.stringify({ id: `evt_${++nEvt}`, type, livemode: true, data: { object } });
@@ -344,10 +356,17 @@ describe("webhook: vitalício app_web", () => {
     const m = montarWebhook();
     const r = await mandar(m, evento("payment_intent.succeeded", { id: "pi_fat", amount: 3490, currency: "brl", status: "succeeded", livemode: true, metadata: { ref: REF, pagina: "app_web_mensal" } }));
     expect(r.corpo).toMatchObject({ ignorado: "fatura" });
+    // renovação: sem página, mas a assinatura do pagamento é NOSSA (metadata app_web_mensal) → silêncio
+    m.stripeAgora.pagamentos.set("pi_ren", "sub_nossa");
+    m.stripeAgora.subs.set("sub_nossa", { id: "sub_nossa", status: "active", metadata: { pagina: "app_web_mensal" } });
     const r2 = await mandar(m, evento("payment_intent.succeeded", { id: "pi_ren", amount: 3490, currency: "brl", status: "succeeded", livemode: true, customer: "cus_1", description: "Subscription update", metadata: {} }));
     expect(r2.corpo).toMatchObject({ ignorado: "fatura" });
     expect(m.saida.push).toHaveLength(0);
     expect(m.db.subscriptions).toHaveLength(0);
+    // revisão 9: PI sem página com customer que NÃO é de assinatura nossa → o alarme de sempre (push)
+    const r3 = await mandar(m, evento("payment_intent.succeeded", { id: "pi_estranho", amount: 5000, currency: "brl", status: "succeeded", livemode: true, customer: "cus_9", metadata: {} }));
+    expect(r3.corpo).toMatchObject({ ignorado: "outra_pagina" });
+    expect(m.saida.push).toHaveLength(1);
   });
 });
 
@@ -378,8 +397,10 @@ describe("webhook: mensal", () => {
     const m = montarWebhook();
     m.db.users.set("u_anon", { id: "u_anon", email: null });
     await mandar(m, evento("invoice.paid", fatura()));
+    m.stripeAgora.subs.set("sub_1", { id: "sub_1", status: "past_due" }); // a Stripe confirma: está devendo
     await mandar(m, evento("invoice.payment_failed", fatura({ id: "in_2", billing_reason: "subscription_cycle", amount_paid: 0, attempt_count: 1 })));
     expect(m.db.subscriptions[0].status).toBe("past_due");
+    m.stripeAgora.subs.set("sub_1", { id: "sub_1", status: "active" });
     const r = await mandar(m, evento("invoice.paid", fatura({ id: "in_2", billing_reason: "subscription_cycle", lines: { data: [{ period: { start: 1765724400, end: 1768402800 } }] } })));
     expect(r.corpo).toMatchObject({ renovado: true });
     expect(m.db.subscriptions).toHaveLength(1);
@@ -390,10 +411,14 @@ describe("webhook: mensal", () => {
     const m = montarWebhook();
     m.db.users.set("u_anon", { id: "u_anon", email: null });
     await mandar(m, evento("invoice.paid", fatura()));
-    await mandar(m, evento("customer.subscription.updated", { id: "sub_1", status: "active", cancel_at_period_end: true, items: { data: [{ current_period_end: 1765724400 }] } }));
+    const agendada = { id: "sub_1", status: "active", cancel_at_period_end: true, items: { data: [{ current_period_end: 1765724400 }] } };
+    m.stripeAgora.subs.set("sub_1", agendada);
+    await mandar(m, evento("customer.subscription.updated", agendada));
     expect(m.db.subscriptions[0].status).toBe("cancel_scheduled");
+    m.stripeAgora.subs.set("sub_1", { id: "sub_1", status: "active", cancel_at_period_end: false });
     await mandar(m, evento("customer.subscription.updated", { id: "sub_1", status: "active", cancel_at_period_end: false }));
     expect(m.db.subscriptions[0].status).toBe("active");
+    m.stripeAgora.subs.set("sub_1", { id: "sub_1", status: "canceled" });
     await mandar(m, evento("customer.subscription.deleted", { id: "sub_1", status: "canceled" }));
     expect(m.db.subscriptions[0].status).toBe("canceled");
   });
@@ -404,5 +429,162 @@ describe("webhook: mensal", () => {
     const outra = fatura({ id: "in_9", parent: { subscription_details: { subscription: "sub_9", metadata: { pagina: "outra" } } } });
     expect((await mandar(m, evento("invoice.paid", outra))).corpo).toMatchObject({ ignorado: "outra_assinatura" });
     expect(m.db.subscriptions).toHaveLength(0);
+  });
+});
+
+/* ───────── revisão independente (14/11): os cenários do crítico, com a Stripe falsa que devolve a FOTO na idempotência
+   e recusa mexer em PI cancelado (como a de verdade) ───────── */
+describe("revisão: dinheiro", () => {
+  it("4 (C1): Pix → cartão recusado → Pix → cartão: a ref não trava (a chave repetida devolve PI cancelado → relê e segue pra -n)", async () => {
+    const m = montar(); (m.s.ctl as Linha).fotoIdem = true;
+    expect((await pixAppWeb(m.deps, pedido(), md(), ctx)).corpo.ok).toBe(true);
+    expect((await cartaoAppWeb(m.deps, pedido(), md(), ctx, { pm: "pm_recusa", parcelas: 1, returnUrl: "x" })).corpo).toMatchObject({ recusado: true });
+    const r3 = await pixAppWeb(m.deps, pedido(), md(), ctx);
+    expect(r3.corpo).toMatchObject({ ok: true });
+    const r4 = await cartaoAppWeb(m.deps, pedido(), md(), ctx, { pm: "pm_okcard", parcelas: 1, returnUrl: "x" });
+    expect(r4.corpo).toMatchObject({ ok: true, pago: true });
+    // só UM PI pago na ref; os outros cancelados ou sem cobrança
+    expect([...m.s.pis.values()].filter((p) => p.status === "succeeded")).toHaveLength(1);
+    expect((await pixAppWeb(m.deps, pedido(), md(), ctx)).corpo).toMatchObject({ pago: true });
+  });
+  it("5 (C2): duas abas assinando AO MESMO TEMPO (cartões diferentes) → 1 assinatura; a outra aba ouve 'em_andamento'", async () => {
+    const m = montar();
+    const [a, b] = await Promise.all([
+      assinarAppWeb(m.deps, pedido(), md(), ctx, { pm: "pm_aaaaaa1", returnUrl: "x" }),
+      assinarAppWeb(m.deps, pedido(), md(), ctx, { pm: "pm_bbbbbb2", returnUrl: "x" }),
+    ]);
+    expect(m.s.subs.size).toBe(1);
+    expect([a.corpo.erro, b.corpo.erro]).toContain("em_andamento");
+    // a aba que esperou tenta de novo → "pago" (não assina de novo)
+    expect((await assinarAppWeb(m.deps, pedido(), md(), ctx, { pm: "pm_bbbbbb2", returnUrl: "x" })).corpo).toMatchObject({ pago: true, plano: "mensal" });
+    expect(m.s.subs.size).toBe(1);
+    expect(m.s.chamadas.filter((c) => c.caminho === "subscriptions").every((c) => !/pm_/.test(String(c.idem)))).toBe(true);
+  });
+  it("5 (C2b): cartão vitalício numa aba + mensal na outra, ao mesmo tempo → só UM cobra; o outro vira 'pago' na nova tentativa", async () => {
+    const m = montar();
+    await Promise.all([
+      cartaoAppWeb(m.deps, pedido(), md(), ctx, { pm: "pm_aaaaaa1", parcelas: 1, returnUrl: "x" }),
+      assinarAppWeb(m.deps, pedido(), md(), ctx, { pm: "pm_bbbbbb2", returnUrl: "x" }),
+    ]);
+    const pagos = [...m.s.pis.values()].filter((p) => p.status === "succeeded");
+    expect(pagos).toHaveLength(1);
+    const r = await assinarAppWeb(m.deps, pedido(), md(), ctx, { pm: "pm_bbbbbb2", returnUrl: "x" });
+    const r2 = await cartaoAppWeb(m.deps, pedido(), md(), ctx, { pm: "pm_aaaaaa1", parcelas: 1, returnUrl: "x" });
+    expect([r.corpo.pago, r2.corpo.pago]).toEqual([true, true]);
+    expect([...m.s.pis.values()].filter((p) => p.status === "succeeded")).toHaveLength(1);
+  });
+  it("5: a trava vence em 2 min (aba que morreu no meio não prende a ref)", async () => {
+    const m = montar();
+    m.db.webhook_events.set(`appweb-cobrando:${REF}`, "trava:0"); // trava de 1970 = velha
+    expect((await pixAppWeb(m.deps, pedido(), md(), ctx)).corpo.ok).toBe(true);
+    m.db.webhook_events.set(`appweb-cobrando:${REF}`, "ilegivel"); // sem hora legível = vale (não solta no escuro)
+    expect((await pixAppWeb(m.deps, pedido(), md(), ctx)).corpo).toMatchObject({ erro: "em_andamento" });
+    m.db.webhook_events.delete(`appweb-cobrando:${REF}`);
+    expect((await pixAppWeb(m.deps, pedido(), md(), ctx)).corpo.ok).toBe(true);
+  });
+  it("7: banco ou Stripe sem resposta → as travas PARAM (nada é cobrado)", async () => {
+    const m = montar();
+    await pixAppWeb(m.deps, pedido(), md(), ctx);
+    const original = m.s.f;
+    m.deps.stripe = async (c, p, i, v) => (c === "payment_intents/pi_1" && !p ? { ok: false, j: {} } : original(c, p, i, v));
+    expect((await cartaoAppWeb(m.deps, pedido(), md(), ctx, { pm: "pm_visa4242", parcelas: 1, returnUrl: "x" })).corpo).toMatchObject({ ok: false });
+    expect(m.s.chamadas.some((c) => c.caminho.endsWith("/confirm") && c.caminho !== "payment_intents/pi_1/confirm")).toBe(false);
+    // assinatura registrada mas a Stripe não responde → 503, sem criar outra
+    const m2 = montar();
+    await assinarAppWeb(m2.deps, pedido(), md(), ctx, { pm: "pm_recusa", returnUrl: "x" });
+    const orig2 = m2.s.f;
+    m2.deps.stripe = async (c, p, i, v) => (c.startsWith("subscriptions/") && !p ? { ok: false, j: {} } : orig2(c, p, i, v));
+    expect((await assinarAppWeb(m2.deps, pedido(), md(), ctx, { pm: "pm_visa4242", returnUrl: "x" })).status).toBe(503);
+    expect(m2.s.subs.size).toBe(1);
+  });
+});
+
+describe("revisão: webhook", () => {
+  it("6 (C4): payment_failed ATRASADO de uma fatura já paga → a linha segue active", async () => {
+    const m = montarWebhook();
+    m.db.users.set("u_anon", { id: "u_anon", email: null });
+    await mandar(m, evento("invoice.paid", fatura()));
+    await mandar(m, evento("invoice.paid", fatura({ id: "in_2", billing_reason: "subscription_cycle", lines: { data: [{ period: { start: 1765724400, end: 1768402800 } }] } })));
+    m.stripeAgora.subs.set("sub_1", { id: "sub_1", status: "active" });
+    const r = await mandar(m, evento("invoice.payment_failed", fatura({ id: "in_2", billing_reason: "subscription_cycle", amount_paid: 0 })));
+    expect(r.corpo).toMatchObject({ ignorado: "em_dia" });
+    expect(m.db.subscriptions[0].status).toBe("active");
+  });
+  it("6: subscription.updated velho (agendava cancelamento) chega depois de desfeito → vale o estado ATUAL; Stripe fora → 500", async () => {
+    const m = montarWebhook();
+    m.db.users.set("u_anon", { id: "u_anon", email: null });
+    await mandar(m, evento("invoice.paid", fatura()));
+    m.stripeAgora.subs.set("sub_1", { id: "sub_1", status: "active", cancel_at_period_end: false });
+    await mandar(m, evento("customer.subscription.updated", { id: "sub_1", status: "active", cancel_at_period_end: true }));
+    expect(m.db.subscriptions[0].status).toBe("active");
+    m.stripeAgora.falhar = true;
+    expect((await mandar(m, evento("customer.subscription.updated", { id: "sub_1", status: "active", cancel_at_period_end: true }))).status).toBe(500);
+  });
+  it("2 (C5): estorno e contestação de fatura do MENSAL → assinatura cancelada JÁ na Stripe + linha canceled", async () => {
+    const m = montarWebhook();
+    m.db.users.set("u_anon", { id: "u_anon", email: null });
+    await mandar(m, evento("invoice.paid", fatura()));
+    m.stripeAgora.pagamentos.set("pi_fatura1", "sub_1");
+    const r = await mandar(m, evento("charge.refunded", { id: "ch_1", payment_intent: "pi_fatura1", refunded: true, invoice: "in_1" }));
+    expect(r.corpo).toMatchObject({ desligado: true, sub: "sub_1" });
+    expect(m.db.subscriptions[0].status).toBe("canceled");
+    expect(m.stripeAgora.cancelados).toEqual([{ sub: "sub_1", imediato: true }]);
+    // cancelar na Stripe falhou → 500 (a Stripe reenvia), nada de "desligado"
+    const m2 = montarWebhook();
+    m2.db.users.set("u_anon", { id: "u_anon", email: null });
+    await mandar(m2, evento("invoice.paid", fatura()));
+    m2.stripeAgora.pagamentos.set("pi_fatura1", "sub_1");
+    m2.deps.cancelarAssinatura = async () => false;
+    expect((await mandar(m2, evento("charge.dispute.created", { id: "dp_1", payment_intent: "pi_fatura1", charge: "ch_1" }))).status).toBe(500);
+    expect(m2.db.subscriptions[0].status).toBe("active");
+  });
+  it("5 (C6): mesmo e-mail, 2º mensal → pago_em_dobro + renovação cancelada + aviso, SEM 2º Purchase; vitalício por cima → mensais cancelados no fim", async () => {
+    const m = montarWebhook();
+    m.db.users.set("u_x", { id: "u_x", email: "maria@exemplo.com" });
+    await mandar(m, evento("invoice.paid", fatura({ id: "in_a", parent: { subscription_details: { subscription: "sub_a", metadata: { ...META_SUB, user_id: "" } } } })));
+    await mandar(m, evento("invoice.paid", fatura({ id: "in_b", parent: { subscription_details: { subscription: "sub_b", metadata: { ...META_SUB, user_id: "", ref: "outra-ref-123456" } } } })));
+    expect(m.saida.capi).toHaveLength(1);
+    expect(m.db.analytics_events.filter((e) => e.event_name === "pix_pago_em_dobro")).toHaveLength(1);
+    expect(m.stripeAgora.cancelados).toContainEqual({ sub: "sub_b", imediato: false });
+    expect(m.saida.push.some((t) => /em dobro/.test(t))).toBe(true);
+    const pi = { id: "pi_vit", amount: 9790, amount_received: 9790, currency: "brl", status: "succeeded", livemode: true, latest_charge: "ch_9", metadata: { ref: "ref3-12345678", pagina: "app_web", email: "maria@exemplo.com", url: "https://www.coreaplicativo.com.br/funil-app" } };
+    await mandar(m, evento("payment_intent.succeeded", pi));
+    expect(m.stripeAgora.cancelados).toContainEqual({ sub: "sub_a", imediato: false });
+    expect(m.db.subscriptions.find((l) => l.abacatepay_billing_id === "sub_a")!.status).toBe("cancel_scheduled");
+    expect(m.db.subscriptions.find((l) => l.abacatepay_billing_id === "pi_vit")).toMatchObject({ plan: "lifetime", status: "active" });
+  });
+});
+
+import { decidirGrantPix, ehDaLoja, linhaParaEscrever } from "../../supabase/functions/_shared/linha-pix";
+describe("revisão: a linha do mensal Stripe é intocável (Pix/Cakto/código/suporte)", () => {
+  const mensal = { id: "stripe_mensal", status: "active", plan: "monthly", billing_period: "monthly", payment_method: "stripe", current_period_end: "2026-12-14T00:00:00Z", abacatepay_billing_id: "sub_X" };
+  it("3 (C3): vitalício e mês do Pix INSEREM outra linha; o vitalício da Stripe (lifetime) segue própria", () => {
+    expect(decidirGrantPix([mensal], { dias: null }, AGORA, "pix_123")).toMatchObject({ acao: "inserir" });
+    expect(decidirGrantPix([mensal], { dias: 30 }, AGORA, "pix_456")).toMatchObject({ acao: "inserir" });
+    expect(linhaParaEscrever([mensal])).toBeNull();
+    expect(ehDaLoja({ ...mensal, abacatepay_billing_id: null })).toBe(true); // pix-reconcile não seleciona o id
+    expect(ehDaLoja({ id: "v", payment_method: "stripe", plan: "lifetime", billing_period: "lifetime", abacatepay_billing_id: "pi_1" })).toBe(false);
+  });
+  it("3: vitalício pago por Pix com o mensal Stripe ativo → chamado no Suporte pra cancelar a renovação (1×)", async () => {
+    const { creditarPedido } = await import("../../supabase/functions/_shared/grant-pix");
+    const b = bancoFalso();
+    b.db.subscriptions.push({ ...mensal, user_id: "u1" });
+    const r = await creditarPedido(b.admin as never, { userId: "u1", orderId: "pix_1", gateway: "asaas", concessao: { dias: null }, agora: AGORA, montarPayload: (fim) => ({ user_id: "u1", status: "active", plan: "lifetime", billing_period: "lifetime", payment_method: "pix", abacatepay_billing_id: "pix_1", current_period_end: fim }) });
+    expect(r).toMatchObject({ r: "creditado", acao: "inserir" });
+    expect(b.db.subscriptions.find((l) => l.id === "stripe_mensal")).toMatchObject({ plan: "monthly", abacatepay_billing_id: "sub_X" });
+    expect(b.db.analytics_events.filter((e) => e.event_name === "stripe_mensal_com_vitalicio")).toHaveLength(1);
+    expect(b.db.analytics_events.filter((e) => e.source === "stripe_mensal_com_vitalicio")).toHaveLength(1); // o chamado (support_tickets cai na mesma tabela falsa)
+  });
+});
+
+describe("revisão: cancel-subscription-flow e stripe-criar (fonte)", () => {
+  const ler = (f: string) => readFileSync(resolve(__dirname, "../..", f), "utf8");
+  it("1: o mensal Stripe é achado em active/past_due/cancel_scheduled e o cancelar nunca diz sucesso sem a Stripe confirmar", () => {
+    const fn = ler("supabase/functions/cancel-subscription-flow/index.ts");
+    expect(fn).toMatch(/\.like\("abacatepay_billing_id", "sub_%"\)\s*\n\s*\.in\("status", \["active", "past_due", "cancel_scheduled"\]\)/);
+    expect(fn).toMatch(/if \(!r\?\.ok\) \{[\s\S]{0,120}return jsonResponse\(\{ error: "cancelamento_falhou" \}, 502\)/);
+  });
+  it("8 (C7): pagina app_web SEM acao → 400 (nunca devolve PI com parcelas livres)", () => {
+    expect(ler("supabase/functions/stripe-criar/index.ts")).toContain('if (p.pagina === "app_web" && !acao) return json({ ok: false }, 400);');
   });
 });

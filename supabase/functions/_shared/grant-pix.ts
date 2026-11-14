@@ -16,9 +16,9 @@
  * Sem Deno: o cliente é uma interface mínima — testado no vitest com um banco falso (src/test/pix-um-credito.test.ts),
  * inclusive dois caminhos AO MESMO TEMPO.
  */
-import { COLUNAS_DECISAO, decidirGrantPix, pedidoJaCreditado, type Concessao, type LinhaAssinatura } from "./linha-pix.ts";
+import { COLUNAS_DECISAO, decidirGrantPix, mensalStripeVivo, pedidoJaCreditado, type Concessao, type LinhaAssinatura } from "./linha-pix.ts";
 import { marcarCreditado, pedidoComMarca, pegarTrava, soltarTrava } from "./trava-grant.ts";
-import { registrarPagoEmDobro } from "./landing-travas.ts";
+import { avisarMensalStripeComVitalicio, registrarPagoEmDobro } from "./landing-travas.ts";
 
 // deno-lint-ignore no-explicit-any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -64,7 +64,8 @@ export async function creditarPedido(admin: ClienteMin, args: {
   } catch { /* sem a consulta, segue a regra de sempre */ }
   // 06/11: a marca vem antes da decisão: pedido que já valeu e teve a linha reescrita não pode virar "pago em dobro"
   if (await pedidoComMarca(admin, args.gateway, args.orderId)) return { r: "ja_creditado" };
-  const decisao = decidirGrantPix(await ler(), args.concessao, args.agora, args.orderId, { protegerVitalicio: args.protegerVitalicio });
+  const linhasAntes = await ler();
+  const decisao = decidirGrantPix(linhasAntes, args.concessao, args.agora, args.orderId, { protegerVitalicio: args.protegerVitalicio });
   if (decisao.acao === "preservar") {
     if (decisao.motivo === "vitalicio_pagou_de_novo") {
       let amount: number | null = null;
@@ -92,5 +93,8 @@ export async function creditarPedido(admin: ClienteMin, args: {
     return { r: "erro", msg: String((error as { message?: string }).message ?? error).slice(0, 200) };
   }
   if (trava === "pegou") await marcarCreditado(admin, args.gateway, args.orderId);
+  // 14/11: vitalício por cima de um mensal da Stripe que segue cobrando → chamado pra cancelar a renovação (a linha do mensal fica)
+  const mensal = args.concessao.dias === null ? mensalStripeVivo(linhasAntes) : null;
+  if (mensal?.abacatepay_billing_id) await avisarMensalStripeComVitalicio(admin, { userId: args.userId, sub: mensal.abacatepay_billing_id, pedido: args.orderId, agora: args.agora }).catch(() => false);
   return { r: "creditado", acao, jaLiberado: decisao.jaLiberado, fim: decisao.fim };
 }

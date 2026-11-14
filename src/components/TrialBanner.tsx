@@ -89,6 +89,9 @@ export const TrialBanner = () => {
     // /comece é a Porta iPhone (10/10): a conta nasce lá, SEM assinatura, e a
     // tela seguinte é "baixe o app". O "Assine no app" por cima apagaria isso.
     location.pathname.startsWith("/comece") ||
+    // /funil-app (14/11): o funil do app na web — paywall e folha de pagamento próprios; a sessão anônima nasce ao pagar
+    // e, sem esta linha, o "Assine no app" cobria o Pix vivo / o pós-compra na volta ao site.
+    location.pathname.startsWith("/funil-app") ||
     // /abrir?h=<código> (10/10): a reserva do "Abrir o CORE" da Porta — mesma conta recém-criada.
     location.pathname.startsWith("/abrir") ||
     // /experimente (14/10): o funil-demo da campanha nova — demo + conta + "baixe o app", como a Porta.

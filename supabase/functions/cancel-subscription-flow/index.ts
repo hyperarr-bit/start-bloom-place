@@ -116,7 +116,7 @@ serve(async (req) => {
 
     const { data: sub } = await admin
       .from("subscriptions")
-      .select("id, status, plan, current_period_end, abacatepay_subscription_id, payment_method, revenuecat_subscription_id")
+      .select("id, status, plan, current_period_end, abacatepay_subscription_id, abacatepay_billing_id, payment_method, revenuecat_subscription_id")
       .eq("user_id", user.id)
       .in("status", ["active", "trialing"])
       .order("created_at", { ascending: false })
@@ -133,11 +133,16 @@ serve(async (req) => {
       ? (/Aap/.test(String(sub.revenuecat_subscription_id ?? "")) ? "app_store" : "google_play")
       : null;
 
+    /* 14/11 (mensal do /funil-app): assinatura recorrente na STRIPE. Pausa/desconto/+7 dias só mexeriam no NOSSO banco
+     * (a Stripe seguiria cobrando) — ficam fora; o cancelamento é de verdade, na Stripe, no fim do período (o webhook
+     * customer.subscription.updated grava cancel_scheduled; aqui grava junto pra tela já mostrar). */
+    const stripeMensal = sub?.payment_method === "stripe" && /^sub_/.test(String((sub as Record<string, unknown>).abacatepay_billing_id ?? ""));
+
     if (body.action === "eligibility") {
       return jsonResponse({
-        canUseDiscount,
-        canUsePause,
-        canUseExtension,
+        canUseDiscount: canUseDiscount && !stripeMensal,
+        canUsePause: canUsePause && !stripeMensal,
+        canUseExtension: canUseExtension && !stripeMensal,
         subscription: sub ?? null,
         loja,
       });
@@ -158,9 +163,9 @@ serve(async (req) => {
       logStep("attempt_opened", { attemptId: attempt.id, loja });
       return jsonResponse({
         attemptId: attempt.id,
-        canUseDiscount,
-        canUsePause,
-        canUseExtension,
+        canUseDiscount: canUseDiscount && !stripeMensal,
+        canUsePause: canUsePause && !stripeMensal,
+        canUseExtension: canUseExtension && !stripeMensal,
         subscription: sub ?? null,
         loja,
       });
@@ -188,6 +193,9 @@ serve(async (req) => {
       });
       logStep("loja_bloqueada", { userId: user.id, action: body.action, loja });
       return jsonResponse({ error: "assinatura_da_loja", loja }, 409);
+    }
+    if (stripeMensal && ["extend_trial", "apply_discount", "pause_subscription"].includes(body.action)) {
+      return jsonResponse({ error: "so_cancelar" }, 409);
     }
 
     if (body.action === "log_reason") {
@@ -367,6 +375,21 @@ serve(async (req) => {
         // Cancela a RENOVAÇÃO; o acesso continua até current_period_end
         // (check-subscription honra "cancel_scheduled" até lá; o cron
         // grace-cleanup vira pra "canceled" quando o período acabar).
+        if (stripeMensal) {
+          // cancela a renovação NA STRIPE (no fim do período); sem isso a Stripe seguiria cobrando
+          const sk = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
+          const subStripe = String((sub as Record<string, unknown>).abacatepay_billing_id);
+          const r = sk ? await fetch(`https://api.stripe.com/v1/subscriptions/${subStripe}`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${sk}`, "Content-Type": "application/x-www-form-urlencoded", "Stripe-Version": "2024-06-20" },
+            body: "cancel_at_period_end=true",
+          }).catch(() => null) : null;
+          if (!r?.ok) {
+            logStep("stripe_cancel_falhou", { status: r?.status ?? null });
+            return jsonResponse({ error: "cancelamento_falhou" }, 502);
+          }
+          logStep("stripe_cancel_agendado", { userId: user.id });
+        }
         await admin
           .from("subscriptions")
           .update({ status: "cancel_scheduled" })

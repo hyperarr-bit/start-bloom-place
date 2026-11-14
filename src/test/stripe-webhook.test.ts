@@ -268,7 +268,9 @@ describe("stripe-criar / stripe-status", () => {
     const fn = readFileSync(resolve(__dirname, "../../supabase/functions/stripe-criar/index.ts"), "utf8");
     expect(fn).toContain('"Idempotency-Key"');
     expect(fn).toContain("criarOuReaproveitar(");
-    expect(readFileSync(resolve(__dirname, "../../supabase/functions/_shared/stripe-criar.ts"), "utf8")).toContain("`oferta-${p.ref}`");
+    // 14/11: a chave vem da tabela de ofertas — a da /oferta continua "oferta-<ref>" (src/test/funil-app-web-servidor.test.ts confere a chamada)
+    expect(readFileSync(resolve(__dirname, "../../supabase/functions/_shared/stripe-criar.ts"), "utf8")).toContain("`${oferta.idem}-${p.ref}`");
+    expect(readFileSync(resolve(__dirname, "../../supabase/functions/_shared/stripe-ofertas.ts"), "utf8")).toMatch(/pagina: "oferta", centavos: 6790, idem: "oferta"/);
   });
   it(`limite de ${LIMITE_POR_IP} PaymentIntents por IP em 10 min`, async () => {
     const m = montar();

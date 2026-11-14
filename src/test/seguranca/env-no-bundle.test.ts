@@ -81,7 +81,8 @@ describe("cabeçalhos de segurança do site (vercel.json)", () => {
     //   (10/11) /instalar, /instalar/, /instalar/demo, /instalar/demo/ (o funil de download das lojas)
     // 09/11: o catch-all deixa /assets de fora ("/((?!assets(?:/|$)).*)" → /index.html): arquivo de build que sumiu dá 404, não o app
     // 11/11 (main): + /simples, /simples/, /tiktok e /tiktok/ → /landing.html (a LP de uma tela e o link do TikTok)
-    expect(cfg.rewrites).toHaveLength(24);
+    // 13/11 (main 77233b10): + /completo e /completo/ → /completo.html (a jornada do vitalício com o checkout Stripe novo)
+    expect(cfg.rewrites).toHaveLength(26);
     expect(rotas0(cfg).find((r) => r.source === "/simples")?.destination).toBe("/landing.html");
     expect(rotas0(cfg).find((r) => r.source === "/tiktok")?.destination).toBe("/landing.html");
     const rotas = (cfg.rewrites as Array<{ source: string; destination: string }>);

@@ -145,6 +145,10 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   // 11/11 (trava da build 1.0.25): o Pix pendente do pagamento da /vitalicio (src/conhecer/checkout-state, 7 dias) — quem
   // gerou o Pix e voltou tem que achar o mesmo pedido; nunca é prova de pagamento (o pedido é conferido de novo no servidor)
   "core-conhecer-checkout-v1",
+  // 14/11 (/funil-app): o pedido da folha de pagamento (ref, Pix vivo, pago sem senha — lib/stripe-app-web, 2 dias; pago 7) — fechar
+  // e reabrir tem que achar o MESMO Pix (nunca é prova de pagamento: o servidor confere) — e a força de QA da chave FUNIL_APP_WEB
+  "core-appweb-pedido",
+  "core-funil-app-web-force",
 ]);
 
 /** Famílias de chaves do aparelho (prefixo + id). */
@@ -227,6 +231,8 @@ export const CHAVES_REVISADAS_DA_CONTA_OU_TRANSITORIAS: Readonly<Record<string, 
   // DE PROPÓSITO SÓ ATÉ A PRÓXIMA ABERTURA / QA: o "Agora não" do aviso de cobrança (modo antigo),
   // a fila offline (ninguém enfileira) e as forças de QA do paywall.
   transitorias: [
+    // 14/11 (/funil-app): o InitiateCheckout 1× por pedido (sessionStorage), a sessão da aba e o "servidor" simulado fora de produção
+    "core-appweb-ic-*", "core-appweb-sessao",
     "core-aviso-cobranca-fechado-ate", "core-offline-queue",
     "core-debug-loja", "core-debug-pix-vence", "core-debug-resgate-pix",
   ],

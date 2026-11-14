@@ -1,10 +1,10 @@
 /**
  * /oferta (04/11) — o corpo do stripe-criar → os parâmetros do PaymentIntent (puro; testado em src/test/stripe-webhook.test.ts).
- * O VALOR é SEMPRE o do servidor (STRIPE_PRECO_CENTAVOS): o corpo da página nunca leva preço que vale.
+ * O VALOR é SEMPRE o do servidor (a oferta da tabela _shared/stripe-ofertas.ts): o corpo da página nunca leva preço que vale.
  * Metadata (≤ 500 caracteres cada, só texto): ref, pagina "oferta", e-mail, user_id da sessão, fbp, fbc, fbclid, url, IP, UA,
  * utm/ad e o momento — o webhook usa pra achar a conta e pra CAPI (o webhook é chamado pela Stripe: IP/UA só existem aqui).
  */
-import { PAGINA_STRIPE, STRIPE_PRECO_CENTAVOS } from "./stripe.ts";
+import { OFERTAS_STRIPE, ofertaDaPagina, type OfertaStripe } from "./stripe-ofertas.ts";
 import { cpfValido, soDigitosCpf } from "./cpf.ts";
 
 export type PedidoStripe = {
@@ -12,7 +12,11 @@ export type PedidoStripe = {
   landing_session_id: string | null; landing_device_id: string | null; atrib: Record<string, string>;
   /** CPF (nota fiscal), só dígitos e válido — vai SÓ pra metadata[cpf] do PI pelo atualizar; nunca pra banco/log */
   cpf: string | null;
+  /** 14/11: a oferta (metadata.pagina) — "app_web" (/funil-app) ou "oferta" (o de sempre, também quando não vem nada) */
+  pagina: string;
 };
+/** a oferta do pedido (a tabela de _shared/stripe-ofertas.ts) */
+export const ofertaDoPedido = (p: Pick<PedidoStripe, "pagina">): OfertaStripe => ofertaDaPagina(p.pagina) ?? OFERTAS_STRIPE.oferta;
 const t = (v: unknown, n: number): string | null => (typeof v === "string" && v.trim() ? v.trim().slice(0, n) : null);
 const ATRIB = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "c_id", "as_id", "ad_id", "pl", "braco_lp_oferta"]; // 06/11: o braço da página (AB_OFERTA_LP) vira metadata do PI
 const SITES = ["https://www.coreaplicativo.com.br/", "https://coreaplicativo.com.br/"];
@@ -35,13 +39,14 @@ export function validarPedidoStripe(body: unknown): PedidoStripe | null {
     ref, pi: pi && /^pi_[A-Za-z0-9]+$/.test(pi) ? pi : null, email: email && EMAIL_OK.test(email) ? email : null,
     fbp: t(b.fbp, 120), fbc: t(b.fbc, 400), fbclid: t(b.fbclid, 300), url: url && SITES.some((s) => url.startsWith(s)) ? url : null,
     landing_session_id: t(b.landing_session_id, 64), landing_device_id: t(b.landing_device_id, 64), atrib, cpf: cpfBruto,
+    pagina: b.pagina === "app_web" ? "app_web" : "oferta",
   };
 }
 
 /** metadata do PI (só texto, sem chave vazia) */
 export function metadataDoPedido(p: PedidoStripe, args: { userId: string | null; ip: string | null; ua: string | null; agoraIso: string }): Record<string, string> {
   const md: Record<string, string | null> = {
-    ref: p.ref, pagina: PAGINA_STRIPE, email: p.email, user_id: args.userId, fbp: p.fbp, fbc: p.fbc, fbclid: p.fbclid, url: p.url,
+    ref: p.ref, pagina: ofertaDoPedido(p).pagina, email: p.email, user_id: args.userId, fbp: p.fbp, fbc: p.fbc, fbclid: p.fbclid, url: p.url,
     ip: args.ip && args.ua ? args.ip : null, ua: args.ip && args.ua ? args.ua.slice(0, 450) : null, sessao: p.landing_session_id, aparelho: p.landing_device_id,
     criado_em: args.agoraIso, ...p.atrib,
   };
@@ -55,14 +60,14 @@ export function metadataDoPedido(p: PedidoStripe, args: { userId: string | null;
  * o MESMO PaymentIntent numa recarga; um campo que muda (hora, IP, UA, fbp) dava idempotency_error por 24 h. Pix + cartão;
  * parcelas no cartão (installments BR); Pix vale 30 min. Os sinais variáveis vão depois, pelo atualizar.
  */
-export function paramsCriar(ref: string): Array<[string, string]> {
+export function paramsCriar(ref: string, oferta: OfertaStripe = OFERTAS_STRIPE.oferta): Array<[string, string]> {
   return [
-    ["amount", String(STRIPE_PRECO_CENTAVOS)], ["currency", "brl"],
+    ["amount", String(oferta.centavos)], ["currency", "brl"],
     ["payment_method_types[]", "card"], ["payment_method_types[]", "pix"],
     ["payment_method_options[card][installments][enabled]", "true"],
     ["payment_method_options[pix][expires_after_seconds]", "1800"],
-    ["description", "CORE vitalicio"], ["statement_descriptor_suffix", "CORE"],
-    ["metadata[ref]", ref], ["metadata[pagina]", PAGINA_STRIPE],
+    ["description", oferta.descricao], ["statement_descriptor_suffix", "CORE"],
+    ["metadata[ref]", ref], ["metadata[pagina]", oferta.pagina],
   ];
 }
 
@@ -112,13 +117,15 @@ export async function ipPodeCriar(admin: ClienteMin, ip: string | null, agoraMs:
 
 /** stripe-status: o PI é desta ref? Devolve só o que a página precisa. */
 export function respostaStatus(pi: { metadata?: Record<string, string> | null; status?: string; latest_charge?: { payment_method_details?: { type?: string } } | string | null } | null, ref: string): { ok: boolean; status?: string; pago?: boolean; metodo?: string | null } {
-  if (!pi || pi.metadata?.ref !== ref || pi.metadata?.pagina !== PAGINA_STRIPE) return { ok: false };
+  // 14/11: qualquer oferta da tabela (e o mensal do funil app web, cujo PI da 1ª fatura ganha a mesma metadata)
+  if (!pi || pi.metadata?.ref !== ref || !(ofertaDaPagina(pi.metadata?.pagina) || pi.metadata?.pagina === "app_web_mensal")) return { ok: false };
   const lc = pi.latest_charge && typeof pi.latest_charge === "object" ? pi.latest_charge : null;
   return { ok: true, status: pi.status, pago: pi.status === "succeeded", metodo: lc?.payment_method_details?.type ?? null };
 }
 
 /* ───────── o fluxo do stripe-criar (revisão 05/11), com a Stripe e o banco injetados (testado no vitest) ───────── */
-export type ChamarStripe = (caminho: string, pares: Array<[string, string]> | null, idem?: string) => Promise<{ ok: boolean; j: Record<string, unknown> }>;
+/** 14/11: `versao` = header Stripe-Version (só as chamadas de assinatura do funil app web pedem uma versão fixa) */
+export type ChamarStripe = (caminho: string, pares: Array<[string, string]> | null, idem?: string, versao?: string) => Promise<{ ok: boolean; j: Record<string, unknown> }>;
 /**
  * 1º o PI que a página já tem (sessionStorage); 2º o desta ref (stripe_order_created); só então cria — com Idempotency-Key
  * oferta-<ref> e SÓ campos fixos (a recarga recebe o mesmo PI, nunca idempotency_error). Os sinais variáveis vão no atualizar,
@@ -129,6 +136,7 @@ export async function criarOuReaproveitar(
   p: PedidoStripe, md: Record<string, string>, ctx: { userId: string | null; ip: string | null },
 ): Promise<{ status: number; corpo: Record<string, unknown> }> {
   const { admin, stripe, log } = deps;
+  const oferta = ofertaDoPedido(p);
   let pi = p.pi;
   if (!pi) {
     try {
@@ -139,23 +147,25 @@ export async function criarOuReaproveitar(
     } catch { /* cria (a chave de idempotência ainda segura o 2º) */ }
   }
   const registrar = async (id: unknown) => {
-    try { await admin.from("analytics_events").insert({ event_name: "stripe_order_created", user_id: ctx.userId, session_id: p.landing_session_id, event_data: { ref: p.ref, pi: id, pagina: PAGINA_STRIPE, ...(ctx.ip ? { client_ip: ctx.ip } : {}), ...p.atrib } }); } catch { /* o PI existe; a próxima recarga acha pela chave */ }
+    try { await admin.from("analytics_events").insert({ event_name: "stripe_order_created", user_id: ctx.userId, session_id: p.landing_session_id, event_data: { ref: p.ref, pi: id, pagina: oferta.pagina, ...(ctx.ip ? { client_ip: ctx.ip } : {}), ...p.atrib } }); } catch { /* o PI existe; a próxima recarga acha pela chave */ }
   };
   let j: Record<string, unknown> | null = null;
   if (pi) {
     const atual = await stripe(`payment_intents/${pi}`, null);
-    if (!atual.ok || (atual.j.metadata as Record<string, string> | undefined)?.ref !== p.ref) return { status: 404, corpo: { ok: false } };
+    const mdAtual = (atual.j.metadata ?? {}) as Record<string, string>;
+    // 14/11: o PI tem que ser da MESMA ref e da MESMA oferta (um PI da /oferta nunca serve pro /funil-app e vice-versa)
+    if (!atual.ok || mdAtual.ref !== p.ref || (mdAtual.pagina ?? "oferta") !== oferta.pagina) return { status: 404, corpo: { ok: false } };
     j = atual.j;
   } else {
     if (!(await ipPodeCriar(admin, ctx.ip, deps.agoraMs))) { log("limite por IP"); return { status: 429, corpo: { ok: false, limite: true } }; }
-    const r = await stripe("payment_intents", paramsCriar(p.ref), `oferta-${p.ref}`);
+    const r = await stripe("payment_intents", paramsCriar(p.ref, oferta), `${oferta.idem}-${p.ref}`);
     if (!r.ok || typeof r.j.client_secret !== "string") { log("criar falhou", { code: String((r.j.error as Record<string, unknown> | undefined)?.code ?? "") }); return { status: 502, corpo: { ok: false } }; }
     j = r.j;
     await registrar(j.id);
   }
   // 05/11 (revisão 2): PI cancelado não serve pra pagar → um novo pra mesma ref, com outra chave (oferta-<ref>-2, -3…)
   for (let n = 2; String(j.status) === "canceled" && n <= 6; n++) {
-    const r = await stripe("payment_intents", paramsCriar(p.ref), `oferta-${p.ref}-${n}`);
+    const r = await stripe("payment_intents", paramsCriar(p.ref, oferta), `${oferta.idem}-${p.ref}-${n}`);
     if (!r.ok || typeof r.j.client_secret !== "string") { log("recriar falhou", { n }); return { status: 502, corpo: { ok: false } }; }
     j = r.j;
     if (String(j.status) !== "canceled") await registrar(j.id);

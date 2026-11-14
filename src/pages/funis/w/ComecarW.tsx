@@ -59,6 +59,8 @@ import {
 import { PromessasScreen, ContratoScreen } from "@/pages/funis/teste/ComecarTeste";
 import { SignupScreen, ConfirmScreen, LiberandoScreen, POS_COMPRA_OAUTH_KEY } from "@/pages/funis/radar/ComecarRadar";
 import { PaywallW } from "./PaywallW";
+/* 14/11 (/funil-app, chave FUNIL_APP_WEB): o MESMO funil na web, com o paywall cobrando pela Stripe. Só entra com a prop. */
+const PaywallWebStripe = lazy(() => import("./PaywallWebStripe").then((m) => ({ default: m.PaywallWebStripe })));
 /* Lazy de propósito: esta folha só existe dentro do app da loja, e o
    ComecarW é carregado ansiosamente na /inicio da WEB (velocidade da 1ª tela,
    02/09) — o vaul do Drawer não pode entrar no bundle de quem nunca vai vê-la. */
@@ -346,7 +348,10 @@ function CompromissosPorRota({ area, onDone }: { area: AreaKey; onDone: () => vo
 // As chaves e a retomada moram em ./retomada.ts (02/09): progresso em
 // localStorage com validade, pra sobreviver ao Android matar o app na folha.
 
-export default function ComecarW() {
+export default function ComecarW({ cobrancaWeb = false }: {
+  /** 14/11 (/funil-app): na web, o paywall vira o PaywallWebStripe (folha Pix | Cartão pela Stripe). Sem a prop, nada muda. */
+  cobrancaWeb?: boolean;
+} = {}) {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   // Init preguiçoso DIRETO da URL (bug do dono 30/08: a volta da demo pintava
@@ -908,7 +913,8 @@ export default function ComecarW() {
                   renderizar. A partir daqui o paywall do Android e o do iPhone
                   são produtos separados: mexer num não alcança o outro, e não
                   depende de ninguém lembrar de uma condicional. */}
-              {step === "offer" && (
+              {step === "offer" && cobrancaWeb && naWeb && <Suspense fallback={null}><PaywallWebStripe area={areaOuPadrao} answers={answers} /></Suspense>}
+              {step === "offer" && !(cobrancaWeb && naWeb) && (
                 ehApple() ? (
                   /* 10/10 (PAYWALL_CURTO, ramo v14-paywall-curto): o paywall curto tem um botão Voltar
                      redondo e chama `onVoltar` quando nenhuma oferta de saída abre — aqui ele recua um

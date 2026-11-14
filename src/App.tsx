@@ -562,6 +562,8 @@ const ComecarTeste = lazyPage(() => import("./pages/funis/teste/ComecarTeste"));
 // FUNIL W (29/08, desenho do dono): o funil da web que dava ROI dentro do
 // app — em rota de teste até aprovação; depois vira o /app do shell.
 const ComecarW = lazyPage(() => import("./pages/funis/w/ComecarW"));
+// 14/11: /funil-app — o funil do app na web com o paywall pela Stripe (chave FUNIL_APP_WEB, desligada: manda pra "/")
+const FunilAppWeb = lazyPage(() => import("./pages/funis/w/FunilAppWeb"));
 const ComecarFunilV1 = lazyPage(() => import("./pages/funis/v1/ComecarV1"));
 // Recepção do pagante (15/07): destino do e-mail de boas-vindas pós-Pix.
 const BemVindo = lazyPage(() => import("./pages/BemVindo"));
@@ -760,6 +762,7 @@ const AnimatedRoutes = () => {
         <Route path="/experimente" element={<SoNaWeb><RouteErrorBoundary routeName="experimente"><Experimente /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/abrir" element={<SoNaWeb><RouteErrorBoundary routeName="porta-abrir"><AbrirPorta /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/assinar" element={<SoNaWeb><RouteErrorBoundary routeName="venda-web"><VendaWeb /></RouteErrorBoundary></SoNaWeb>} />
+        <Route path="/funil-app" element={<SoNaWeb><RouteErrorBoundary routeName="funil-app-web"><FunilAppWeb /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/liberar" element={<SoNaWeb><RouteErrorBoundary routeName="liberar"><Liberar /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/organizar/demo" element={<SoNaWeb><RouteErrorBoundary routeName="landing-demo"><DemoDaLanding /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/assinatura" element={<SoNaWeb><RouteErrorBoundary routeName="assinatura-app"><AssinaturaApp /></RouteErrorBoundary></SoNaWeb>} />

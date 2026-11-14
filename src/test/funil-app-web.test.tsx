@@ -88,7 +88,7 @@ describe("a chave", () => {
     // o vercel.json não ganhou nada (a rota é do SPA) e as páginas da landing seguem com o checkout delas
     const v = ler("vercel.json");
     expect(v).not.toContain("funil-app");
-    expect(ler("src/landing/stripe-checkout.ts")).toContain('pagina: "oferta"');
+    expect(ler("src/landing/stripe-checkout.ts")).toContain('pagina: o.pagina ?? "oferta"'); // 14/11 (main f3af88ec): a /oferta não manda pagina → "oferta"; só a /pra-sempre manda "lp27"
   });
 });
 

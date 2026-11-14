@@ -41,7 +41,21 @@ export const COLUNAS_DECISAO =
  *  conta porque é a chave do upsert dele: uma linha que já foi "virada" pelo
  *  bug antigo (payment_method pix, mas com subAap…) continua sendo dele. */
 export const ehDaLoja = (l: LinhaAssinatura): boolean =>
-  l.payment_method === "play_store" || !!l.revenuecat_subscription_id;
+  l.payment_method === "play_store" || !!l.revenuecat_subscription_id || ehMensalStripe(l);
+
+/** 14/11 (/funil-app): o MENSAL da Stripe (assinatura recorrente, abacatepay_billing_id = sub_…) é do stripe-webhook —
+ *  intocável como a linha da loja: Pix, Cakto, código, resgate e "liberar vitalício" escrevem em OUTRA linha. Sem isso, o
+ *  vitalício do Pix reescrevia a linha do mensal (o pedido sub_ sumia) e a renovação seguinte da Stripe voltava ela pra
+ *  "monthly" com fim em 30 dias. Só o mensal: a linha do vitalício da Stripe (plan lifetime) segue própria como sempre. */
+export const ehMensalStripe = (l: LinhaAssinatura): boolean =>
+  l.payment_method === "stripe" && (l.billing_period === "monthly" || l.plan === "monthly" || /^sub_/.test(String(l.abacatepay_billing_id ?? "")));
+/** linhas que o SUPORTE move de conta (resolver_email mover_acesso): as próprias + o mensal da Stripe (a assinatura é da pessoa;
+ *  a renovação acha a linha pelo id sub_…, não pela conta). A da loja (RevenueCat) continua de fora. */
+export const linhasQueMudamDeConta = (linhas: LinhaAssinatura[]): LinhaAssinatura[] =>
+  linhas.filter((l) => !ehDaLoja(l) || ehMensalStripe(l));
+/** mensal da Stripe ainda cobrando (o que avisar/cancelar quando a pessoa compra o vitalício por outro caminho) */
+export const mensalStripeVivo = (linhas: LinhaAssinatura[]): LinhaAssinatura | null =>
+  linhas.find((l) => ehMensalStripe(l) && (l.status === "active" || l.status === "past_due")) ?? null;
 
 export const linhasProprias = (linhas: LinhaAssinatura[]): LinhaAssinatura[] =>
   linhas.filter((l) => !ehDaLoja(l));

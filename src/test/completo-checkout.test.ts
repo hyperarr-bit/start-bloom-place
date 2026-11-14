@@ -30,3 +30,17 @@ it('a succeeded return parameter still requires confirmation from the server',as
  expect(document.querySelector('[data-testid="oferta-recebido"]')?.textContent).toContain('Ainda não conseguimos confirmar');
  expect(pixel.mock.calls.some(c=>c[0]==='Purchase')).toBe(false);
 });
+
+it('lp27 sends the separate server catalog key and displays R$27.90 without changing the other checkout',async()=>{
+ await abrirCheckout({...options,pagina:'lp27',precoCentavos:2790,storagePrefix:'lp27'});await flush();
+ expect(criar.mock.calls[0][0]).toMatchObject({pagina:'lp27'});
+ expect(criar.mock.calls[0][0]).not.toHaveProperty('amount');
+ expect(document.querySelector('.oc-order-card')?.textContent).toContain('27,90');
+ expect(sessionStorage.getItem('lp27-stripe-ref')).toBeTruthy();expect(sessionStorage.getItem('oferta-stripe-ref')).toBeNull();
+});
+it('blocks lp27 checkout if the live server returns the old amount',async()=>{
+ criar.mockResolvedValue({ok:true,pi:'pi_wrong',clientSecret:'pi_wrong_secret_QA',amount:6790,currency:'brl',pagina:'oferta'});
+ await abrirCheckout({...options,producao:true,pagina:'lp27',precoCentavos:2790,storagePrefix:'lp27'});await flush();
+ expect(document.querySelector('#oc-erro')?.textContent).toContain('Não consegui abrir');
+ expect(confirmPixPayment).not.toHaveBeenCalled();expect(pixel.mock.calls.some(c=>c[0]==='Purchase')).toBe(false);
+});

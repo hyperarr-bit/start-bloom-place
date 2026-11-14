@@ -136,6 +136,26 @@ export async function registrarPagoEmDobro(admin: ClienteMin, args: {
   return true;
 }
 
+/**
+ * 14/11 (/funil-app): a pessoa comprou o VITALÍCIO (Pix/Cakto/código/suporte) com o MENSAL da Stripe ainda cobrando. A linha
+ * do mensal não é tocada (linha-pix: ehMensalStripe); aqui sai o registro + chamado no /admin → Suporte pra cancelar a
+ * renovação na Stripe (1x por assinatura). O vitalício pago PELA Stripe cancela sozinho (stripe-webhook).
+ */
+export async function avisarMensalStripeComVitalicio(admin: ClienteMin, args: { userId: string; sub: string; pedido: string | null; agora?: Date; /** de onde veio o outro pagamento (Cakto, suporte…) */ origem?: string }): Promise<boolean> {
+  if (!args.userId || !args.sub) return false;
+  if (!(await reservarUmaVez(admin, `stripe-mensal-com-vitalicio:${args.sub}`, "mensal_com_vitalicio"))) return false;
+  try { await admin.from("analytics_events").insert({ user_id: args.userId, event_name: "stripe_mensal_com_vitalicio", event_data: { sub: args.sub, pedido: args.pedido, origem: args.origem ?? null } }); } catch { /* o chamado é o que importa */ }
+  try {
+    await admin.from("support_tickets").insert({
+      user_id: args.userId, source: "stripe_mensal_com_vitalicio", status: "open",
+      message: [`Pagou outro acesso${args.origem ? ` (${args.origem})` : ""} com o mensal da Stripe ativo · ${horaBrasilia(args.agora ?? new Date())}`,
+        "Cancelar a renovação do mensal na Stripe (Assinaturas → cancelar no fim do período) e avaliar devolver o último mês.",
+        `Assinatura: ${args.sub}`, args.pedido ? `Pedido do vitalício: ${args.pedido}` : null].filter(Boolean).join("\n"),
+    });
+  } catch { /* noop */ }
+  return true;
+}
+
 /* ───────────────────────── o nome do pagador (Asaas) ───────────────────────── */
 
 type Buscar = (url: string, init?: { headers?: Record<string, string> }) => Promise<{ ok: boolean; json: () => Promise<unknown> }>;

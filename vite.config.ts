@@ -46,6 +46,7 @@ const rotaDaMissao = () => {
     if (/^\/conhecer\/?(\?|$)/.test(req.url ?? "")) { res.writeHead(302, { Location: (req.url ?? "").replace(/^\/conhecer\/?/, "/vitalicio") }); res.end(); return; }
     if (/^\/instalar\/demo\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/instalar\/demo\/?/, "/instalar-demo.html");
     else if (/^\/instalar\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/instalar\/?/, "/instalar.html");
+    else if (/^\/pra-sempre\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/pra-sempre\/?/, "/pra-sempre.html");
     else if (/^\/completo\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/completo\/?/, "/completo.html");
     else if (/^\/vitalicio\/demo\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/vitalicio\/demo\/?/, "/conhecer-demo.html");
     else if (/^\/vitalicio\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/vitalicio\/?/, "/conhecer.html");
@@ -138,6 +139,7 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, "index.html"),
+        praSempre: path.resolve(__dirname, "pra-sempre.html"),
         completo: path.resolve(__dirname, "completo.html"),
         conhecer: path.resolve(__dirname, "conhecer.html"),
         conhecerDemo: path.resolve(__dirname, "conhecer-demo.html"),

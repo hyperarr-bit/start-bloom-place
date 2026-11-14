@@ -31,6 +31,8 @@
     { "source": "/conhecer/", "destination": "/vitalicio", "permanent": false }
   ],
   "rewrites": [
+    { "source": "/pra-sempre", "destination": "/pra-sempre.html" },
+    { "source": "/pra-sempre/", "destination": "/pra-sempre.html" },
     { "source": "/completo", "destination": "/completo.html" },
     { "source": "/completo/", "destination": "/completo.html" },
     { "source": "/instalar", "destination": "/instalar.html" },

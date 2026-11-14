@@ -39,7 +39,7 @@ export function validarPedidoStripe(body: unknown): PedidoStripe | null {
     ref, pi: pi && /^pi_[A-Za-z0-9]+$/.test(pi) ? pi : null, email: email && EMAIL_OK.test(email) ? email : null,
     fbp: t(b.fbp, 120), fbc: t(b.fbc, 400), fbclid: t(b.fbclid, 300), url: url && SITES.some((s) => url.startsWith(s)) ? url : null,
     landing_session_id: t(b.landing_session_id, 64), landing_device_id: t(b.landing_device_id, 64), atrib, cpf: cpfBruto,
-    pagina: b.pagina === "app_web" ? "app_web" : "oferta",
+    pagina: b.pagina === "lp27" ? "lp27" : b.pagina === "app_web" ? "app_web" : "oferta",
   };
 }
 
@@ -194,5 +194,5 @@ export async function criarOuReaproveitar(
       if (p.email) return { status: 502, corpo: { ok: false } };
     }
   }
-  return { status: 200, corpo: { ok: true, client_secret: j.client_secret, pi: j.id, status: j.status, pix: pixDoIntento(j) } };
+  return { status: 200, corpo: { ok: true, client_secret: j.client_secret, pi: j.id, status: j.status, pix: pixDoIntento(j), ...(oferta.pagina === "lp27" ? { amount: j.amount, currency: j.currency, pagina: oferta.pagina } : {}) } };
 }

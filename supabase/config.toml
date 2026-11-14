@@ -69,3 +69,7 @@ verify_jwt = false
 # as outras ações (meu/nome/email/resgatar) conferem o JWT dentro da função.
 [functions.presente-resgatar]
 verify_jwt = false
+
+# LP /pra-sempre: fixed R$27.90 lifetime, no subscription actions.
+[functions.stripe-lp27-criar]
+verify_jwt = true

@@ -5,6 +5,7 @@
  * desliga só a linha; pago depois do estorno não libera; Pix tardio (webhook depois) libera; e-mail que falha → 500 até 5×.
  * stripe-criar: valor SEMPRE do servidor, Pix + cartão + parcelas, limite por IP; stripe-status não vaza; /vendas com Stripe.
  */
+import { OFERTAS_STRIPE } from "../../supabase/functions/_shared/stripe-ofertas";
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -495,4 +496,33 @@ describe("requires_action (3DS abandonado): a nova tentativa atualiza e-mail/CPF
     expect(s.chamadas.slice(antes)).toEqual(["GET payment_intents/pi_1", "POST payment_intents/pi_1"]);
     expect(s.pis.get("pi_1")!).toMatchObject({ receipt_email: "ana@exemplo.com", metadata: expect.objectContaining({ cpf: "52998224725", email: "ana@exemplo.com" }) });
   });
+});
+
+describe('LP 27,90 — catalog and signed webhook',()=>{
+ it('keeps all prior prices and creates lp27 at 2790 even if the browser sends 1 cent',()=>{
+  const p=validarPedidoStripe({ref:'lp27-test-20261114',pagina:'lp27',amount:1,preco_centavos:1})!;
+  expect(p.pagina).toBe('lp27');
+  expect(metadataDoPedido(p,{userId:null,ip:null,ua:null,agoraIso:AGORA.toISOString()}).pagina).toBe('lp27');
+  expect(paramsCriar(p.ref,OFERTAS_STRIPE[p.pagina])).toContainEqual(['amount','2790']);
+  expect(OFERTAS_STRIPE.oferta.centavos).toBe(6790);expect(OFERTAS_STRIPE.app_web.centavos).toBe(9790);
+ });
+ it('grants lifetime once and attributes exactly R$27.90 to lp27 after a valid signed payment',async()=>{
+  const m=montar();const body=evento('payment_intent.succeeded',pi({amount:2790,amount_received:2790,metadata:{pagina:'lp27',url:'https://www.coreaplicativo.com.br/pra-sempre'}}));
+  expect((await mandar(m,body)).status).toBe(200);await mandar(m,body);
+  expect(m.db.subscriptions).toHaveLength(1);expect(m.db.subscriptions[0]).toMatchObject({plan:'lifetime',status:'active',amount_cents:2790,payment_method:'stripe'});
+  expect(m.saida.emails).toHaveLength(1);expect(m.saida.capi).toHaveLength(1);
+  const ev=(m.saida.capi[0].data as Linha[])[0];expect(ev.event_id).toBe('pi_3Abc');expect(ev.custom_data).toMatchObject({value:27.9,currency:'BRL'});
+  expect(m.db.analytics_events.find(e=>e.event_name==='stripe_venda')?.event_data).toMatchObject({pagina:'lp27',valor_cents:2790});
+ });
+ it('rejects a 67.90 payment tagged lp27 and a 27.90 payment tagged oferta',async()=>{
+  for(const [pagina,amount]of [['lp27',6790],['oferta',2790]] as const){const m=montar();await mandar(m,evento('payment_intent.succeeded',pi({amount,amount_received:amount,metadata:{pagina}})));expect(m.db.subscriptions).toHaveLength(0);expect(m.saida.capi).toHaveLength(0)}
+ });
+ it('allows status lookup for lp27 only with the same request reference',()=>{
+  const p={metadata:{pagina:'lp27',ref:'lp27-test-ref'},status:'succeeded'};expect(respostaStatus(p,'lp27-test-ref')).toMatchObject({ok:true,pago:true});expect(respostaStatus(p,'someone-else')).toEqual({ok:false});
+ });
+});
+it('lp27 uses a dedicated creator without monthly subscription actions',()=>{
+ const endpoint=readFileSync(resolve(__dirname,'../../supabase/functions/stripe-lp27-criar/index.ts'),'utf8');
+ expect(endpoint).toContain('p.pagina !== "lp27"');expect(endpoint).not.toMatch(/assinarAppWeb|subscriptions|stripe-app-web/);
+ const client=readFileSync(resolve(__dirname,'../landing/stripe-checkout.ts'),'utf8');expect(client).toContain('c.pagina === "lp27" ? "stripe-lp27-criar" : "stripe-criar"');
 });

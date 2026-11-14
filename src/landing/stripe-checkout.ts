@@ -51,6 +51,8 @@ export type OpcoesCheckout = {
   somentePix?: boolean;
   layout?: "novo";
   storagePrefix?: string;
+  /** Server-owned catalog key; no client amount is trusted by stripe-criar. */
+  pagina?: "oferta" | "lp27";
   /** só testes: liga a medição da carteira sem mexer em MEDIR_CARTEIRA */
   medirCarteira?: boolean;
   /** só testes: mostra o "Prefiro pagar com cartão" sem mexer em PIX_TROCA_CARTAO */
@@ -61,7 +63,7 @@ export type OpcoesCheckout = {
   emailInicial?: string;
 };
 
-export type RespostaCriar = { ok: boolean; clientSecret?: string; pi?: string; erro?: string; status?: string; pix?: PixQr | null };
+export type RespostaCriar = { amount?: number; currency?: string; pagina?: string; ok: boolean; clientSecret?: string; pi?: string; erro?: string; status?: string; pix?: PixQr | null };
 export type RespostaStatus = { ok: boolean; status?: string; pago?: boolean; metodo?: string | null };
 export type ApiOferta = {
   criar: (corpo: Record<string, unknown>) => Promise<RespostaCriar>;
@@ -139,7 +141,7 @@ const postar = async (fn: string, corpo: Record<string, unknown>): Promise<Recor
   return r.ok ? j : { ...j, ok: false };
 };
 const apiReal: ApiOferta = {
-  criar: async (c) => { const j = await postar("stripe-criar", c); return { ok: j.ok === true, clientSecret: j.client_secret as string | undefined, pi: j.pi as string | undefined, erro: j.erro as string | undefined, status: j.status as string | undefined, pix: (j.pix as PixQr | null | undefined) ?? null }; },
+  criar: async (c) => { const j = await postar(c.pagina === "lp27" ? "stripe-lp27-criar" : "stripe-criar", c); return { amount: j.amount as number | undefined, currency: j.currency as string | undefined, pagina: j.pagina as string | undefined, ok: j.ok === true, clientSecret: j.client_secret as string | undefined, pi: j.pi as string | undefined, erro: j.erro as string | undefined, status: j.status as string | undefined, pix: (j.pix as PixQr | null | undefined) ?? null }; },
   status: async (c) => { const j = await postar("stripe-status", c); return { ok: j.ok === true, status: j.status as string | undefined, pago: j.pago === true, metodo: (j.metodo as string | null) ?? null }; },
 };
 /** fora do domínio de produção: nada sai pra Stripe. O Pix simulado "cai" 6 s depois de gerado. */
@@ -541,7 +543,7 @@ function erroGeral(m: string | null) { const e = raiz?.querySelector<HTMLElement
 function corpoDoPedido(email: string | null, cpf: string | null = null): Record<string, unknown> {
   const o = opc!;
   return {
-    ref: est!.ref, pi: est!.pi, email, pagina: "oferta", ...(cpf ? { cpf } : {}),
+    ref: est!.ref, pi: est!.pi, email, pagina: o.pagina ?? "oferta", ...(cpf ? { cpf } : {}),
     fbp: lerCookie("_fbp"), fbc: lerCookie("_fbc"), fbclid: o.fbclid, url: o.urlChegada.slice(0, 500),
     landing_session_id: o.sessao, landing_device_id: o.aparelho, atrib: o.atrib,
   };
@@ -558,6 +560,8 @@ async function garantirIntento(email: string | null, cpf: string | null = null):
   const o = opc!;
   const r = await criarComTeto(corpoDoPedido(email, cpf));
   if (!r.ok || !r.clientSecret) { o.evento("landing_erro", { onde: "stripe_criar", msg: String(r.erro ?? "falhou").slice(0, 80) }); return false; }
+  // A stale deployment must never silently charge the old 67.90 offer on the 27.90 LP.
+  if (o.producao && o.pagina === "lp27" && (r.amount !== o.precoCentavos || r.currency !== "brl" || r.pagina !== "lp27")) { o.evento("landing_erro", { onde: "stripe_preco_divergente" }); return false; }
   est!.clientSecret = r.clientSecret; est!.pi = r.pi ?? est!.pi;
   if (est!.pi) guardarPi(est!.ref, est!.pi);
   ultimaCriacao = r;

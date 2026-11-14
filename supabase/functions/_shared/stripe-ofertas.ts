@@ -28,6 +28,10 @@ export type OfertaStripe = {
 };
 
 export const OFERTAS_STRIPE: Record<string, OfertaStripe> = {
+  lp27: {
+    pagina: "lp27", centavos: 2790, idem: "lp27", descricao: "CORE vitalicio", parcelasMax: 1, offer: "ST_lp27",
+    contentName: "CORE vitalício (LP 27,90)", urlPadrao: "https://www.coreaplicativo.com.br/pra-sempre",
+  },
   oferta: {
     pagina: "oferta", centavos: 6790, idem: "oferta", descricao: "CORE vitalicio", parcelasMax: 12, offer: "ST_oferta",
     contentName: "CORE vitalício (Stripe)", urlPadrao: "https://www.coreaplicativo.com.br/oferta",

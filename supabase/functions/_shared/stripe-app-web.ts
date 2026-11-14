@@ -258,15 +258,27 @@ async function assinarSemTrava(deps: DepsAppWeb, p: PedidoStripe, md: Record<str
     }
     const at = await stripe(`payment_methods/${c.pm}/attach`, [["customer", cus]], undefined, V);
     if (!at.ok) return resultadoDoErro(at.j, { plano: "mensal" });
+    /* revisão 3: a chave é ref + tentativa, SEM o cartão. Se o registro da assinatura se perdeu (o insert abaixo falhou) e a
+     * pessoa tenta de novo com outro cartão, a Stripe recusa a MESMA chave com parâmetros diferentes (idempotency_error) em vez
+     * de criar a 2ª assinatura — e aí a assinatura desta ref é achada no cliente (metadata.ref) e reaproveitada. */
     const sr = await stripe("subscriptions", [
       ["customer", cus], ["items[0][price]", precoMensal], ["default_payment_method", c.pm],
       ["payment_behavior", "default_incomplete"], ["payment_settings[payment_method_types][0]", "card"],
       ["payment_settings[save_default_payment_method]", "on_subscription"], ["expand[0]", "latest_invoice.payment_intent"],
       ["description", "CORE mensal"], ...mdSub,
-    ], `appweb-sub-${p.ref}-${(atual.total ?? 0) + 1}-${c.pm}`, V); // revisão 2: + o cartão (outro cartão = outros parâmetros); a trava da ref segue impedindo 2
-    if (!sr.ok) return resultadoDoErro(sr.j, { plano: "mensal" });
-    sub = sr.j;
-    try { await deps.admin.from("analytics_events").insert({ event_name: "stripe_assinatura_criada", user_id: ctx.userId, session_id: p.landing_session_id, event_data: { ref: p.ref, sub: sub.id, cus, pagina: MENSAL_APP_WEB.pagina, ...(ctx.ip ? { client_ip: ctx.ip } : {}), ...p.atrib } }); } catch { /* a assinatura existe; a recarga acha pela chave de idempotência */ }
+    ], `appweb-sub-${p.ref}-${(atual.total ?? 0) + 1}`, V);
+    if (sr.ok) sub = sr.j;
+    else if (erroDe(sr.j).type === "idempotency_error") {
+      const achada = await assinaturaDaRefNoCliente(deps, cus, p.ref);
+      if (achada === "erro" || !achada) { log("chave repetida e a assinatura da ref não foi achada no cliente", { cus }); return INDISPONIVEL; }
+      const st = String(achada.status ?? "");
+      if (st === "active" || st === "trialing" || st === "past_due") { await registrarAssinatura(deps, p, ctx, String(achada.id), cus); return { status: 200, corpo: { ok: true, pago: true, plano: "mensal", sub: achada.id } }; }
+      if (st !== "incomplete") return INDISPONIVEL;
+      sub = achada;
+      await stripe(`subscriptions/${String(sub.id)}`, [["default_payment_method", c.pm]], undefined, V);
+      log("assinatura da ref reaproveitada pelo cliente (registro tinha se perdido)", { sub: String(sub.id) });
+    } else return resultadoDoErro(sr.j, { plano: "mensal" });
+    await registrarAssinatura(deps, p, ctx, String(sub.id), cus);
   }
   const fatura = (sub.latest_invoice ?? {}) as Record<string, unknown>;
   const piFat = (fatura.payment_intent && typeof fatura.payment_intent === "object" ? fatura.payment_intent : null) as Record<string, unknown> | null;
@@ -277,6 +289,23 @@ async function assinarSemTrava(deps: DepsAppWeb, p: PedidoStripe, md: Record<str
   const conf = await stripe(`payment_intents/${String(piFat.id)}/confirm`, [["payment_method", c.pm], ["return_url", c.returnUrl]], undefined, V);
   if (!conf.ok) return resultadoDoErro(conf.j, { plano: "mensal", sub: sub.id, pi: piFat.id });
   return resultadoDoPi(conf.j, { plano: "mensal", sub: sub.id });
+}
+
+/** grava ref → assinatura (é o que faz a recarga achar a assinatura). O supabase devolve { error } (não lança): confere e tenta 2×. */
+async function registrarAssinatura(deps: DepsAppWeb, p: PedidoStripe, ctx: Ctx, sub: string, cus: string | null): Promise<void> {
+  const linha = { event_name: "stripe_assinatura_criada", user_id: ctx.userId, session_id: p.landing_session_id, event_data: { ref: p.ref, sub, cus, pagina: MENSAL_APP_WEB.pagina, ...(ctx.ip ? { client_ip: ctx.ip } : {}), ...p.atrib } };
+  for (let i = 0; i < 2; i++) {
+    try { const { error } = await deps.admin.from("analytics_events").insert(linha); if (!error) return; } catch { /* tenta de novo */ }
+  }
+  deps.log("registro da assinatura NÃO gravou — a chave de idempotência + a busca no cliente seguram a 2ª", { sub });
+}
+
+/** a assinatura desta ref no cliente da Stripe (metadata.ref), a mais nova; "erro" = a Stripe não respondeu */
+async function assinaturaDaRefNoCliente(deps: DepsAppWeb, cus: string, ref: string): Promise<Record<string, unknown> | null | "erro"> {
+  const r = await deps.stripe(`subscriptions?customer=${encodeURIComponent(cus)}&status=all&limit=20&expand[]=data.latest_invoice.payment_intent`, null, undefined, V);
+  if (!r.ok) return "erro";
+  const lista = ((r.j.data ?? []) as Array<Record<string, unknown>>).filter((x) => ((x.metadata ?? {}) as Record<string, unknown>).ref === ref);
+  return lista.sort((a, b) => Number(b.created ?? 0) - Number(a.created ?? 0))[0] ?? null;
 }
 
 /** limite de assinaturas novas por IP (mesmos 20 em 10 min do criar) */

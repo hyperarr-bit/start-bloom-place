@@ -579,7 +579,8 @@ export function CancelFlowDialog({ open, onOpenChange, onCanceled, loja = null }
             <DialogHeader>
               <DialogTitle>Cancelamento confirmado</DialogTitle>
               <DialogDescription>
-                {accessUntil
+                {/* revisão 3 (14/11): data que já passou não vira "fica ativa até" (mensal atrasado cancela na hora) */}
+                {accessUntil && new Date(accessUntil).getTime() > Date.now()
                   ? `Sua assinatura fica ativa até ${new Date(accessUntil).toLocaleDateString("pt-BR")}.`
                   : "Sua assinatura foi cancelada."}{" "}
                 Vamos sentir sua falta — volte quando quiser. 💛

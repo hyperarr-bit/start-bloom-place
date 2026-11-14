@@ -474,7 +474,8 @@ serve(async (req) => {
 
       return jsonResponse({
         ok: true,
-        accessUntil: sub?.current_period_end ?? null,
+        // revisão 3: o mensal atrasado foi cancelado JÁ — não há "ativa até" (a data do período já passou)
+        accessUntil: sub && stripeMensal && sub.status === "past_due" ? null : sub?.current_period_end ?? null,
       });
     }
 

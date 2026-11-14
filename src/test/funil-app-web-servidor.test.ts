@@ -24,7 +24,7 @@ const REF = "7a1b2c3d-1111-4222-8333-944455556666";
 const PRECO = "price_mensal34";
 
 function bancoFalso() {
-  const db = { subscriptions: [] as Linha[], webhook_events: new Map<string, string>(), analytics_events: [] as Linha[], users: new Map<string, { id: string; email: string | null }>() };
+  const db = { subscriptions: [] as Linha[], webhook_events: new Map<string, string>(), analytics_events: [] as Linha[], support_tickets: [] as Linha[], users: new Map<string, { id: string; email: string | null }>() };
   let seq = 0;
   const from = (tabela: string) => {
     const filtros: Array<(r: Linha) => boolean> = [];
@@ -39,7 +39,7 @@ function bancoFalso() {
         if (op.tipo === "delete") { for (const l of linhas.filter(casa)) db.webhook_events.delete(l.id); return { error: null }; }
         const a = linhas.filter(casa); return { data: unico ? a[0] ?? null : a, error: null };
       }
-      const tb = tabela === "subscriptions" ? db.subscriptions : db.analytics_events;
+      const tb = tabela === "subscriptions" ? db.subscriptions : tabela === "support_tickets" ? db.support_tickets : db.analytics_events;
       if (contar) return { count: tb.filter(casa).length, error: null };
       if (op.tipo === "insert") { tb.push({ id: `l${++seq}`, created_at: new Date().toISOString(), ...op.dados }); return { error: null }; }
       if (op.tipo === "update") { for (const r of tb.filter(casa)) Object.assign(r, op.dados); return { error: null }; }
@@ -126,13 +126,23 @@ function stripeFalsa() {
       return { ok: true, j: p };
     }
     if (partes[0] === "prices") return { ok: partes[1] === ctl.preco.id, j: ctl.preco };
-    if (base === "customers" && pares) return { ok: true, j: { id: `cus_${++n}`, email: kv.email } };
+    if (base === "customers" && pares) {
+      if (idem && idems.has(idem)) return { ok: true, j: { id: idems.get(idem), email: kv.email } }; // a mesma chave = o MESMO cliente
+      const id = `cus_${++n}`; if (idem) idems.set(idem, id);
+      return { ok: true, j: { id, email: kv.email } };
+    }
     if (partes[0] === "customers" || partes[0] === "payment_methods") return { ok: true, j: { id: partes[1] } };
+    if (base === "subscriptions" && !pares && /customer=/.test(caminho)) {
+      const cus = decodeURIComponent(/customer=([^&]+)/.exec(caminho)![1]);
+      return { ok: true, j: { data: [...subs.values()].filter((x) => x.customer === cus).map(expandir) } };
+    }
     if (base === "subscriptions" && pares) {
+      // como a Stripe: a MESMA chave com parâmetros diferentes (outro cartão) = idempotency_error, não uma 2ª assinatura
+      if (idem && idems.has(idem) && fotos.get(`p:${idem}`) !== JSON.stringify(pares)) return { ok: false, j: { error: { type: "idempotency_error", message: "Keys for idempotent requests can only be used with the same parameters" } } };
       if (idem && idems.has(idem)) return { ok: true, j: expandir(subs.get(idems.get(idem)!)!) };
       const pi = novoPi({ amount: 3490, currency: "brl", description: "Subscription creation", customer: kv.customer });
-      const s = { id: `sub_${++n}`, status: "incomplete", customer: kv.customer, metadata: md, latest_invoice: { id: `in_${n}`, status: "open", payment_intent: pi.id } };
-      subs.set(String(s.id), s); if (idem) idems.set(idem, String(s.id));
+      const s = { id: `sub_${++n}`, created: n, status: "incomplete", customer: kv.customer, metadata: md, latest_invoice: { id: `in_${n}`, status: "open", payment_intent: pi.id } };
+      subs.set(String(s.id), s); if (idem) { idems.set(idem, String(s.id)); fotos.set(`p:${idem}`, JSON.stringify(pares)); }
       return { ok: true, j: expandir(s) };
     }
     if (partes[0] === "subscriptions") { const s = subs.get(partes[1]); return s ? { ok: true, j: expandir(s) } : { ok: false, j: {} }; }
@@ -462,7 +472,7 @@ describe("revisão: dinheiro", () => {
     expect(m.s.subs.size).toBe(1);
     // revisão 2 (R-E): a chave leva ref + tentativa + cartão (outro cartão = outros parâmetros, sem idempotency_error); quem
     // impede a 2ª assinatura é a trava da ref, não a chave
-    expect(m.s.chamadas.filter((c) => c.caminho === "subscriptions").map((c) => c.idem)).toEqual([`appweb-sub-${REF}-1-pm_aaaaaa1`]);
+    expect(m.s.chamadas.filter((c) => c.caminho === "subscriptions").map((c) => c.idem)).toEqual([`appweb-sub-${REF}-1`]);
     expect(m.s.chamadas.find((c) => c.caminho === "customers")!.idem).toMatch(new RegExp(`^appweb-cus-${REF}-[0-9a-f]{8}$`));
   });
   it("5 (C2b): cartão vitalício numa aba + mensal na outra, ao mesmo tempo → só UM cobra; o outro vira 'pago' na nova tentativa", async () => {
@@ -578,7 +588,7 @@ describe("revisão: a linha do mensal Stripe é intocável (Pix/Cakto/código/su
     expect(r).toMatchObject({ r: "creditado", acao: "inserir" });
     expect(b.db.subscriptions.find((l) => l.id === "stripe_mensal")).toMatchObject({ plan: "monthly", abacatepay_billing_id: "sub_X" });
     expect(b.db.analytics_events.filter((e) => e.event_name === "stripe_mensal_com_vitalicio")).toHaveLength(1);
-    expect(b.db.analytics_events.filter((e) => e.source === "stripe_mensal_com_vitalicio")).toHaveLength(1); // o chamado (support_tickets cai na mesma tabela falsa)
+    expect(b.db.support_tickets.filter((e) => e.source === "stripe_mensal_com_vitalicio")).toHaveLength(1); // o chamado
   });
 });
 
@@ -651,7 +661,7 @@ describe("revisão 2", () => {
     const pi = { id: "pi_vit", amount: 9790, amount_received: 9790, currency: "brl", status: "succeeded", livemode: true, latest_charge: "ch_9", metadata: { ref: "ref3-12345678", pagina: "app_web", email: "maria@exemplo.com", url: "https://www.coreaplicativo.com.br/funil-app" } };
     await mandar(m, evento("payment_intent.succeeded", pi));
     expect(m.stripeAgora.cancelados).toContainEqual({ sub: "sub_a", imediato: false });
-    expect(m.db.analytics_events.filter((e) => e.source === "stripe_mensal_com_vitalicio")).toHaveLength(0);
+    expect(m.db.support_tickets.filter((e) => e.source === "stripe_mensal_com_vitalicio")).toHaveLength(0);
     expect(m.saida.push.filter((t) => /comprou o vitalício/i.test(t))).toHaveLength(1);
   });
   it("2 + 4: linha-pix — o mensal Stripe muda de conta no suporte e barra o destino; Cakto/código/liberar abrem o chamado (fonte)", async () => {
@@ -673,5 +683,62 @@ describe("revisão 2", () => {
     await assinarAppWeb(m.deps, pedido(), md(), ctx, { pm: "pm_okcard", returnUrl: "x" });
     const fonte = readFileSync(resolve(__dirname, "../../supabase/functions/_shared/stripe-app-web.ts"), "utf8");
     expect(fonte.match(/\.order\("created_at", \{ ascending: false \}\)\.limit\(50\)/g)).toHaveLength(2);
+  });
+});
+
+/* ───────── revisão 3 (14/11) ───────── */
+describe("revisão 3", () => {
+  it("A10: o registro da 1ª assinatura se perdeu ({ error } do banco) e a pessoa assina de novo com outro cartão → NÃO cobra a 2ª", async () => {
+    const m = montar();
+    const orig = m.admin.from;
+    (m.deps as { admin: unknown }).admin = { ...m.admin, from: (t: string) => {
+      const q = orig(t) as Record<string, unknown>;
+      if (t === "analytics_events") { const ins = q.insert as (d: Linha) => Record<string, unknown>; q.insert = (d: Linha) => (d.event_name === "stripe_assinatura_criada" ? { then: (ok: (v: unknown) => unknown) => Promise.resolve({ error: { message: "timeout" } }).then(ok) } : ins(d)); }
+      return q;
+    } };
+    expect((await assinarAppWeb(m.deps, pedido(), md(), ctx, { pm: "pm_aaaaaa1", returnUrl: "x" })).corpo).toMatchObject({ pago: true });
+    const b = await assinarAppWeb(m.deps, pedido(), md(), ctx, { pm: "pm_aaaaaa2", returnUrl: "x" });
+    expect(b.corpo).toMatchObject({ ok: true, pago: true, plano: "mensal" });
+    expect(m.s.subs.size).toBe(1);
+    expect([...m.s.pis.values()].filter((p) => p.status === "succeeded")).toHaveLength(1);
+  });
+  it("A10b: registro perdido e a 1ª ficou INCOMPLETA (recusada) → a 2ª tentativa reaproveita a MESMA assinatura com o cartão novo", async () => {
+    const m = montar();
+    const orig = m.admin.from;
+    (m.deps as { admin: unknown }).admin = { ...m.admin, from: (t: string) => {
+      const q = orig(t) as Record<string, unknown>;
+      if (t === "analytics_events") { const ins = q.insert as (d: Linha) => Record<string, unknown>; q.insert = (d: Linha) => (d.event_name === "stripe_assinatura_criada" ? { then: (ok: (v: unknown) => unknown) => Promise.resolve({ error: { message: "timeout" } }).then(ok) } : ins(d)); }
+      return q;
+    } };
+    expect((await assinarAppWeb(m.deps, pedido(), md(), ctx, { pm: "pm_recusa", returnUrl: "x" })).corpo).toMatchObject({ recusado: true });
+    expect((await assinarAppWeb(m.deps, pedido(), md(), ctx, { pm: "pm_visa4242", returnUrl: "x" })).corpo).toMatchObject({ ok: true, pago: true });
+    expect(m.s.subs.size).toBe(1);
+  });
+  it("A2: fatura paga numa assinatura JÁ encerrada → avisa o dono (a pessoa pagou e não tem acesso)", async () => {
+    const m = montarWebhook();
+    m.db.users.set("u_anon", { id: "u_anon", email: null });
+    await mandar(m, evento("invoice.paid", fatura()));
+    m.stripeAgora.subs.set("sub_1", { id: "sub_1", status: "canceled" });
+    await mandar(m, evento("invoice.paid", fatura({ id: "in_2", billing_reason: "subscription_cycle" })));
+    expect(m.saida.push.some((t) => /assinatura encerrada/.test(t))).toBe(true);
+  });
+  it("cancelarMensalPorVitalicio não engole erro: sem conseguir ler as linhas, o dono é avisado", async () => {
+    const m = montarWebhook();
+    m.db.users.set("u_x", { id: "u_x", email: "maria@exemplo.com" });
+    let vezes = 0;
+    const orig = m.admin.from;
+    (m.deps as { admin: unknown }).admin = { ...m.admin, from: (t: string) => {
+      const q = orig(t) as Record<string, unknown>;
+      if (t === "subscriptions") { const sel = q.select as (c?: string) => Record<string, unknown>; q.select = (c?: string) => { if (c === "id, status, billing_period, payment_method, abacatepay_billing_id" && ++vezes === 1) throw new Error("caiu"); return sel(c); }; }
+      return q;
+    } };
+    const pi = { id: "pi_vit", amount: 9790, amount_received: 9790, currency: "brl", status: "succeeded", livemode: true, latest_charge: "ch_9", metadata: { ref: "ref3-12345678", pagina: "app_web", email: "maria@exemplo.com", url: "https://www.coreaplicativo.com.br/funil-app" } };
+    await mandar(m, evento("payment_intent.succeeded", pi));
+    expect(m.saida.push.some((t) => /não consegui conferir o mensal/.test(t))).toBe(true);
+  });
+  it("tela do cancelamento: data que já passou não vira 'fica ativa até'; o servidor manda null pro atrasado (fonte)", () => {
+    const ler = (f: string) => readFileSync(resolve(__dirname, "../..", f), "utf8");
+    expect(ler("src/components/retention/CancelFlowDialog.tsx")).toContain("accessUntil && new Date(accessUntil).getTime() > Date.now()");
+    expect(ler("supabase/functions/cancel-subscription-flow/index.ts")).toContain('accessUntil: sub && stripeMensal && sub.status === "past_due" ? null : sub?.current_period_end ?? null,');
   });
 });

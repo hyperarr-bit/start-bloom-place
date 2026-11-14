@@ -326,7 +326,11 @@ async function cancelarMensalPorVitalicio(deps: DepsStripe, userId: string, pedi
       if (!ok) await avisarMensalStripeComVitalicio(deps.admin as never, { userId, sub: String(l.abacatepay_billing_id), pedido, origem: "Stripe (cancelar falhou)" }).catch(() => false);
       await deps.avisarDono(ok ? "Mensal Stripe cancelado: comprou o vitalício" : "⚠️ Comprou o vitalício e o mensal Stripe NÃO cancelou", `Assinatura ${l.abacatepay_billing_id} · vitalício ${pedido}${ok ? " · a renovação não acontece mais" : " · cancele na Stripe"}`, `stripe-mensal-vit:${l.abacatepay_billing_id}`).catch(() => {});
     }
-  } catch { /* o chamado do grant-pix (avisarMensalStripeComVitalicio) cobre */ }
+  } catch (e) {
+    // revisão 3: nada de engolir — sem conferir o mensal, o dono é avisado (o mensal pode seguir cobrando por cima do vitalício)
+    deps.log("não deu pra conferir/cancelar o mensal (comprou o vitalício)", { pedido, msg: String((e as Error)?.message ?? e).slice(0, 80) });
+    await deps.avisarDono("⚠️ Comprou o vitalício: não consegui conferir o mensal Stripe", `Vitalício ${pedido} · confira na Stripe se há mensal cobrando e cancele`, `stripe-mensal-vit-erro:${pedido}`).catch(() => {});
+  }
 }
 
 type Fatura = { id: string; sub: string | null; meta: Record<string, string>; valor: number; moeda: string; fimS: number | null; inicioS: number | null; motivo: string; email: string | null; tentativa: number };
@@ -452,6 +456,8 @@ async function tratarAssinatura(deps: DepsStripe, tipo: string, obj: Record<stri
     // renovação (ou a 1ª fatura que chegou de novo): a MESMA linha, fim novo
     const { error } = await admin.from("subscriptions").update({ status: encerrada ? "canceled" : agendada ? "cancel_scheduled" : "active", current_period_end: fim, amount_cents: f.valor }).eq("id", linha.id);
     if (error) { await soltar(admin, `stripe-fatura:${f.id}`); throw new Error(String((error as Erro)?.message ?? error)); }
+    // revisão 3: pagou uma fatura de assinatura JÁ encerrada (a pessoa paga e não tem acesso) → o dono confere/devolve
+    if (encerrada) await deps.avisarDono("⚠️ Mensal Stripe: fatura paga numa assinatura encerrada", `Assinatura ${f.sub} · fatura ${f.id} · ${reais(f.valor)} · sem acesso — devolver ou reativar`, `stripe-paga-encerrada:${f.id}`).catch(() => {});
     try { await admin.from("analytics_events").insert({ event_name: "stripe_assinatura_renovou", user_id: linha.user_id, event_data: { sub: f.sub, fatura: f.id, valor_cents: f.valor, motivo: f.motivo } }); } catch { /* luxo */ }
     log("mensal renovado", base);
     return { status: 200, corpo: { ok: true, renovado: true } };

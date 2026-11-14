@@ -151,7 +151,9 @@ describe("App.tsx ligado do jeito certo (fonte)", () => {
   const src = readFileSync(join(process.cwd(), "src/App.tsx"), "utf8");
 
   it("só o /inicio tem `vende`, e é a INICIO_VENDE; ele renderiza o dia 14 EAGER de setembro", () => {
-    expect(src.match(/vende=\{/g)?.length).toBe(1);
+    // 14/11 noite: o /app ganhou o 2º `vende` (FUNIL_APP_WEB) — na web leva pro /funil-app
+    expect(src.match(/vende=\{/g)?.length).toBe(2);
+    expect(src).toContain('<Route path="/app" element={<FunilAposentado vende={FUNIL_APP_WEB === "on"}');
     expect(src).toContain('<Route path="/inicio" element={<FunilAposentado vende={INICIO_VENDE} web={INICIO_VENDE ? <RouteErrorBoundary routeName="funil"><ComecarDia14Eager /></RouteErrorBoundary>');
     expect(src).toContain('import ComecarDia14Eager from "./pages/funis/dia14/ComecarDia14";');
   });

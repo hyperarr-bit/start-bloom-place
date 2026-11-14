@@ -29,6 +29,7 @@ import { getFunnelArea, AREAS } from "@/lib/funnel";
 import { isNativeShell } from "@/lib/native-shell";
 import { ENTRADA_APP, INICIO_VENDE, VENDA_NA_WEB } from "@/lib/rotas-web";
 import { FunilAposentado } from "@/components/site/FunilAposentado";
+import { FUNIL_APP_WEB } from "@/lib/funil-app-web";
 import { TrilhoLateral } from "@/components/TrilhoLateral";
 import { BarraDeAbas } from "@/components/nav/BarraDeAbas";
 import { guardarForcaNavDaUrl, navAbasLigada } from "@/lib/nav-abas";
@@ -564,6 +565,12 @@ const ComecarTeste = lazyPage(() => import("./pages/funis/teste/ComecarTeste"));
 const ComecarW = lazyPage(() => import("./pages/funis/w/ComecarW"));
 // 14/11: /funil-app — o funil do app na web com o paywall pela Stripe (chave FUNIL_APP_WEB, desligada: manda pra "/")
 const FunilAppWeb = lazyPage(() => import("./pages/funis/w/FunilAppWeb"));
+/* 14/11 noite (dono: "usa o /app"): na WEB o /app leva pro /funil-app com utm/fbclid — o pagamento, a volta do 3DS e a
+   medição (jornada app_web) moram no /funil-app. No app nativo o /app segue o ComecarW. Chave off → /app volta pra "/". */
+function AppNaWebVaiProFunilAppWeb() {
+  const { search } = useLocation();
+  return <Navigate to={{ pathname: "/funil-app", search }} replace />;
+}
 const ComecarFunilV1 = lazyPage(() => import("./pages/funis/v1/ComecarV1"));
 // Recepção do pagante (15/07): destino do e-mail de boas-vindas pós-Pix.
 const BemVindo = lazyPage(() => import("./pages/BemVindo"));
@@ -877,7 +884,7 @@ const AnimatedRoutes = () => {
             vitalício foco único) vira A porta do shell — comparação
             dia-contra-dia com o funil de colunas do v84. Rollback = trocar
             ComecarW por ComecarTeste aqui. */}
-        <Route path="/app" element={<FunilAposentado nativo={<PageTransition><RouteErrorBoundary routeName="funil-app"><ComecarW /></RouteErrorBoundary></PageTransition>} web={<PageTransition><RouteErrorBoundary routeName="funil-app"><ComecarRadar /></RouteErrorBoundary></PageTransition>} />} />
+        <Route path="/app" element={<FunilAposentado vende={FUNIL_APP_WEB === "on"} nativo={<PageTransition><RouteErrorBoundary routeName="funil-app"><ComecarW /></RouteErrorBoundary></PageTransition>} web={<AppNaWebVaiProFunilAppWeb />} />} />
         {/* Funil W em teste: só no shell (vende via RC; na web quebraria). */}
         <Route path="/funil-w" element={<FunilAposentado nativo={<PageTransition><RouteErrorBoundary routeName="funil-w"><ComecarW /></RouteErrorBoundary></PageTransition>} web={<Navigate to="/lp" replace />} />} />
         <Route path="/funil-v1" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-v1"><ComecarFunilV1 /></RouteErrorBoundary></PageTransition>} />} />

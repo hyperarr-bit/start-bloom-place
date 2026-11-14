@@ -17,7 +17,7 @@
  * (funnel_view …, funil "w") e os da folha (`appweb_*`, funil "app_web"). A régua do estudo é R$ líquido por visita.
  */
 export type ModoFunilAppWeb = "off" | "on";
-export const FUNIL_APP_WEB: ModoFunilAppWeb = "off";
+export const FUNIL_APP_WEB: ModoFunilAppWeb = "on"; // 14/11 noite, dono: "apenas suba pro ar e usa o /app" — rollback: "off" + deploy
 
 export const ROTA_FUNIL_APP_WEB = "/funil-app";
 export const PARAM_FUNIL_APP_WEB = "funil-app-web";

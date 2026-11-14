@@ -114,7 +114,7 @@ describe("App.tsx está ligado do jeito certo (fonte)", () => {
   });
 
   it("o nativo do /app e do /funil-w continua sendo o ComecarW com o mesmo boundary", () => {
-    expect(src).toContain('<Route path="/app" element={<FunilAposentado nativo={<PageTransition><RouteErrorBoundary routeName="funil-app"><ComecarW /></RouteErrorBoundary></PageTransition>}');
+    expect(src).toContain('<Route path="/app" element={<FunilAposentado vende={FUNIL_APP_WEB === "on"} nativo={<PageTransition><RouteErrorBoundary routeName="funil-app"><ComecarW /></RouteErrorBoundary></PageTransition>}');
     expect(src).toContain('<Route path="/funil-w" element={<FunilAposentado nativo={<PageTransition><RouteErrorBoundary routeName="funil-w"><ComecarW /></RouteErrorBoundary></PageTransition>}');
   });
 

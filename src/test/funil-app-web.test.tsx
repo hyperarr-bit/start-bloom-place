@@ -47,11 +47,16 @@ beforeEach(() => { localStorage.clear(); sessionStorage.clear(); eventos.length 
 afterEach(() => { cleanup(); delete (window as J).__appWebApi; delete (window as J).__appWebStripe; vi.useRealTimers(); });
 
 describe("a chave", () => {
-  it("nasce DESLIGADA: /funil-app vai pra home do site", async () => {
-    expect(FUNIL_APP_WEB).toBe("off");
+  it("LIGADA (14/11 noite, dono): /funil-app abre o funil pra todo mundo", async () => {
+    expect(FUNIL_APP_WEB).toBe("on");
     rota("/funil-app");
-    expect(await screen.findByTestId("home-site")).toBeTruthy();
-    expect(screen.queryByTestId("comecar-w")).toBeNull();
+    const c = await screen.findByTestId("comecar-w");
+    expect(c.getAttribute("data-cobranca")).toBe("true");
+  });
+  it("na web o /app leva pro /funil-app com utm/fbclid; no app nativo segue o ComecarW", () => {
+    const app = ler("src/App.tsx");
+    expect(app).toContain('<Route path="/app" element={<FunilAposentado vende={FUNIL_APP_WEB === "on"} nativo={<PageTransition><RouteErrorBoundary routeName="funil-app"><ComecarW /></RouteErrorBoundary></PageTransition>} web={<AppNaWebVaiProFunilAppWeb />} />} />');
+    expect(app).toContain('return <Navigate to={{ pathname: "/funil-app", search }} replace />;');
   });
   it("?funil-app-web=on liga NESTE aparelho (o ComecarW com cobrancaWeb); =off desliga", async () => {
     rota("/funil-app?funil-app-web=on");

@@ -54,6 +54,7 @@ import { registrarMenuNovoRemoto } from "@/lib/menu-novo";
 import { registrarSinoRemoto } from "@/lib/sino-paywall";
 import { camposDoTituloNaFolha, registrarTituloRemoto } from "@/lib/titulo-paywall";
 import { registrarSkanTrialSdkRemoto } from "@/lib/skan-trial-sdk";
+import { registrarMetaCompraSdkRemoto, registrarCompraNoSdk } from "@/lib/meta-compra-sdk-ios";
 import { registrarCardRecusaRemoto } from "@/lib/card-recusa";
 import { registrarDias23Remoto } from "@/lib/dias23";
 import { registrarAvaliacaoTesteDia2Remoto } from "@/lib/avaliacao-teste-dia2";
@@ -96,6 +97,7 @@ const registrarChavesDasOfferings = (offerings: unknown): void => {
     registrarRetroOutubroRemoto, // 23/10: `retro_outubro` (on|off, padrão off) — a retrospectiva de outubro em cards animados, a partir de 01/11 (lib/retro-outubro)
     registrarHomeNovaRemoto, // 1.0.19: `home_nova` (off|admin|on|ab|novas|novas+admin; sem a chave = padrão: app "novas+admin", site "off") — a Home do carrossel do dia (lib/home-nova)
     registrarSkanTrialSdkRemoto, // 1.0.19 (varredura 26/10): `skan_trial_sdk` (on|off, padrão off) — o StartTrial pelo SDK da Meta no iPhone (lib/skan-trial-sdk)
+    registrarMetaCompraSdkRemoto, // 14/11: `meta_compra_sdk` (on|off, padrão on) — o Purchase pelo SDK da Meta no iPhone, compra paga do paywall sem teste (lib/meta-compra-sdk-ios)
     registrarFluxoEnxutoRemoto, // 1.0.21: `fluxo_enxuto` (on|off|ab; sem a chave = padrão: iPhone "on", site/Android "off"; só vale no iPhone) — lib/fluxo-enxuto
     registrarAbasRemoto, // 07/11: `abas_enxutas` (on|off|sumario|ab|ac|abc, padrão on) + `abas_visual` (hoje|fixa|caderno, padrão hoje) + `abas_medicao` (on|off, padrão off); só iPhone — lib/abas-caderno
     registrarConstruiuRemoto, // 29/10: `construiu_ab` (ab|a|b, padrão ab) — o A/B do resumo dos 3 dias (lib/construiu-ab)
@@ -1774,6 +1776,8 @@ export async function comprarSemTeste(plano: PlanoSemTeste, lugar: string): Prom
     registrarResultadoDaFolha("sucesso", alvo);
     // a verdade da loja: compra direta não é teste (o lembrete "acaba amanhã" não arma)
     anotarTrialDaCompra(resultado, false);
+    // 14/11: a compra PAGA vai também pelo SDK da Meta no iPhone (o "Comprar" da campanha de iPhone) — 1x por transação
+    void registrarCompraNoSdk(resultado, it.produto as { identifier?: string; price?: number; currencyCode?: string }, `sem_teste_${plano}`);
     await sincronizarAssinatura();
     return true;
   } catch (e) {

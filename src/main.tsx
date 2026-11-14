@@ -15,6 +15,7 @@ import { guardarForcaCardRecusa } from "@/lib/card-recusa";
 import { guardarForcaFluxoEnxuto } from "@/lib/fluxo-enxuto";
 import { guardarForcaAbasCaderno } from "@/lib/abas-caderno";
 import { guardarForcaSkanTrialSdk } from "@/lib/skan-trial-sdk";
+import { guardarForcaMetaCompraSdk } from "@/lib/meta-compra-sdk-ios";
 import { guardarForcaDegrau2, guardarForcaMotivos } from "@/lib/mensal-degraus";
 import { guardarForcaDaAvaliacaoV14 } from "@/lib/avaliacao-v14";
 import { guardarForcaAvaliacaoTesteDia2 } from "@/lib/avaliacao-teste-dia2";
@@ -45,6 +46,7 @@ guardarForcaDaCobrancaV14();
 guardarForcaDegrau2(); // 1.0.18: `?recusa-degrau2=on|off|auto|agora[,recomecar]` — o 2º degrau da recusa (mensal 19,90)
 guardarForcaMotivos(); // 1.0.18: `?motivos-folha=on|off|ab|auto` — a folha "O que te fez parar?" no paywall do funil
 guardarForcaSkanTrialSdk(); // 1.0.19 (varredura 26/10): `?skan-trial-sdk=on|off|auto` — o StartTrial pelo SDK da Meta no iPhone (padrão off)
+guardarForcaMetaCompraSdk(); // 14/11: `?meta-compra-sdk=on|off|auto` — o Purchase pelo SDK da Meta no iPhone, compra paga do paywall sem teste (padrão on)
 guardarForcaFluxoEnxuto(); // 1.0.21: `?fluxo-enxuto=on|off|ab|auto` — o fluxo enxuto (sem montar/tutoriais/dicas; Parabéns no pós-compra)
 guardarForcaAbasCaderno(); // 07/11: `?abas-braco=hoje|todas|sumario|auto`, `?abas-visual=hoje|fixa|caderno|auto`, `?abas-medicao=on|off|auto` (lib/abas-caderno)
 guardarForcaCardRecusa(); // 1.0.18: `?card-recusa=on|off|auto[,recomecar]` — o card de tela inteira do cartão recusado

@@ -127,6 +127,8 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-montar-rotina", // 1.0.16: "Rotina pronta em 3 toques" feito/pulado (+ vistas, rascunho, 1º quadradinho); a mesma chave vai pra conta
   "core-skan-trial-sdk", // 1.0.19 (varredura 26/10): a última resposta do RevenueCat pra chave skan_trial_sdk (on|off, padrão off) — o StartTrial pelo SDK da Meta (lib/skan-trial-sdk)
   "core-skan-trial-enviado", // 1.0.19: ids das transações cujo StartTrial já saiu pelo SDK da Meta (lib/meta-inicio-teste-ios) — nunca repetir
+  "core-meta-compra-sdk", // 14/11: a última resposta do RevenueCat pra chave meta_compra_sdk (on|off, padrão on) — o Purchase pelo SDK da Meta no iPhone (lib/meta-compra-sdk-ios)
+  "core-meta-compra-enviada", // 14/11: ids das transações cujo Purchase já saiu pelo SDK da Meta (lib/meta-compra-sdk-ios) — nunca repetir
   "core-back-variante", // 21/10: o texto do BACK dos funis web (a|b) sorteado no aparelho — braço de A/B, não pode trocar (lib/back-funil)
   "core-home-nova", // 1.0.19: a última resposta do RevenueCat pra Home nova (metadata home_nova: off|admin|on|ab, lib/home-nova)
   "core-home-nova-braco", // 1.0.19: o braço sorteado no modo "ab" da home_nova (nova|atual), estável entre aberturas

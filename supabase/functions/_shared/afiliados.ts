@@ -44,6 +44,11 @@ export const BRUTO_POR_PRODUTO_CENTS: Record<string, number> = {
   core_anual_69: 6990,
   core_anual_119: 11990, // 17/10: preços novos do iPhone (líquido oficial ainda não lido da ASC)
   core_mensal_19: 1990,
+  core_anual_99: 9990, // 12/11: paywall sem teste (líquido oficial ainda não lido da ASC)
+  core_anual_97_direto: 9790, // 12/11 noite: o anual sem teste do iPhone (97,90, cobra na hora)
+  core_anual_69_direto: 6990,
+  core_mensal_34: 3490,
+  core_vitalicio_97: 9790, // 12/11: o vitalício do iPhone (A/B paywall_oferta) — compra única, líquido 80,30 (ASC)
 };
 const RAZAO_LIQUIDA_PADRAO = 8030 / 9790;
 
@@ -173,6 +178,12 @@ export function classificarEvento(ev: EventoRC): Decisao {
   if (tipo === "INITIAL_PURCHASE") {
     if (periodo === "TRIAL" || preco === 0 || preco === null) return { tipo: "em_teste", ...base };
     // comprou direto com código sem teste (não é o desenho, mas se vier, é a 1ª cobrança)
+    const bruto = brutoCents(ev);
+    return { tipo: "pago", ...base, txCobranca: String(ev.transaction_id ?? "") || null, bruto, liquido: bruto === null ? null : liquidoCents(bruto, ev) };
+  }
+  if (tipo === "NON_RENEWING_PURCHASE") {
+    // 12/11: compra única (o vitalício 97,90 do iPhone) — não tem teste nem renovação: é paga na hora, uma vez
+    if (preco !== null && preco <= 0) return { tipo: "ignorar", motivo: "compra_unica_sem_valor" };
     const bruto = brutoCents(ev);
     return { tipo: "pago", ...base, txCobranca: String(ev.transaction_id ?? "") || null, bruto, liquido: bruto === null ? null : liquidoCents(bruto, ev) };
   }

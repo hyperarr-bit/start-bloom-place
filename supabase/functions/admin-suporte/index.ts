@@ -3,6 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { liberarPix, resolverColisao, trocarEmailAdmin } from "../_shared/admin-acoes-suporte.ts";
 import { COLUNAS_DECISAO, decidirGrantPix, mensalStripeVivo, type LinhaAssinatura } from "../_shared/linha-pix.ts";
 import { avisarMensalStripeComVitalicio } from "../_shared/landing-travas.ts";
+import { VALIDADE_MS, gerarCodigo, hashCodigo } from "../_shared/porta-handoff.ts";
+import { linkDeReserva, linkDoApp } from "../_shared/email-porta.ts";
 
 /**
  * Operações de SUPORTE do dono (17/07). Primeira: trocar o e-mail de login de
@@ -19,6 +21,8 @@ import { avisarMensalStripeComVitalicio } from "../_shared/landing-travas.ts";
  * POST { action: "resolver_email", modo, quemFica, quemSai, email, confirmar }
  *   → duas contas no mesmo e-mail: libera o e-mail ou move o acesso. Sem e-mail ao cliente.
  * POST { action: "status", email }           → uid/e-mail/assinatura (conferência)
+ * POST { action: "link_de_acesso", email | uid } → código de uso único (24 h) e os links
+ *   core://entrar?h=… e /abrir?h=… pra quem não recebe o código de 8 dígitos. Sem e-mail ao cliente.
  */
 
 const corsHeaders = {
@@ -188,6 +192,43 @@ serve(async (req) => {
         .select("key, updated_at").eq("user_id", uid).order("updated_at", { ascending: false }).limit(100);
       const keys = (dados ?? []).map((r: { key: string; updated_at: string }) => `${r.key} @ ${r.updated_at}`);
       return json({ found: true, uid, email: u?.user?.email, lastSignIn: u?.user?.last_sign_in_at, sub, userDataRows: keys.length, keys });
+    }
+
+    /* LINK DE ACESSO (12/11). Cliente que pagou e não recebe o código de 8 dígitos
+     * (e-mail que não chega): gera o MESMO código de uso único da Porta
+     * (porta_handoff, 24 h, 1 uso) pra conta dela e devolve os dois links — o do
+     * app (core://entrar?h=…, abre já logado) e o de reserva no site (/abrir?h=…).
+     * Não manda e-mail: o suporte manda pelo Gmail. Invalida os códigos anteriores
+     * não usados da conta, igual ao "criar" do porta-handoff. Assinante já logado
+     * em outra conta no aparelho não é trocado (regra do app). */
+    if (action === "link_de_acesso") {
+      const email = String(body.email ?? "").trim().toLowerCase();
+      const uid = String(body.uid ?? "") || (email ? await acharUid(email) : null);
+      if (!uid) return json({ error: "usuario_nao_encontrado" }, 404);
+      const { data: u } = await admin.auth.admin.getUserById(uid);
+      if (!u?.user) return json({ error: "usuario_nao_encontrado" }, 404);
+      if (!u.user.email) return json({ error: "sem_email" }, 400);
+
+      const agora = new Date();
+      await admin.from("porta_handoff")
+        .update({ usado_em: agora.toISOString(), usado_por: "substituido" })
+        .eq("user_id", uid).is("usado_em", null);
+      const expira = new Date(agora.getTime() + VALIDADE_MS).toISOString();
+      for (let i = 0; i < 3; i++) {
+        const codigo = gerarCodigo();
+        const { error } = await admin.from("porta_handoff").insert({
+          codigo_hash: await hashCodigo(codigo), user_id: uid, expira_em: expira,
+        });
+        if (!error) {
+          console.log(`[ADMIN-SUPORTE] link_de_acesso ${uid} por ${caller}`);
+          await admin.from("analytics_events").insert({
+            user_id: uid, event_name: "admin_link_de_acesso", event_data: { por: caller, expira_em: expira },
+          }).then(() => {}, () => {});
+          return json({ ok: true, uid, link_app: linkDoApp(codigo), link_site: linkDeReserva(codigo), expira_em: expira });
+        }
+        if (error.code !== "23505") return json({ error: `gravar: ${error.message}` }, 500);
+      }
+      return json({ error: "gravar" }, 500);
     }
 
     // Caso "cliente criou conta nova com o e-mail desejado": deleta a CASCA

@@ -93,3 +93,37 @@ describe("afiliados: bruto pelo produto quando o evento não traz BRL", () => {
     expect(brutoCents({ product_id: "core_anual_97" })).toBe(9790);
   });
 });
+
+/* 12/11 (paywall SEM teste, 1.0.26 / Android 138): sem linha própria, core_anual_99 casava "core_anual" (159,90) e
+ * core_mensal_34 casava "core_mensal" (24,90). Cada compra grava o preço certo, no iPhone e no Android (produto:plano_base). */
+describe.each(COM_MAPA)("%s: produtos do paywall sem teste", (f) => {
+  const info = infoProdutoDe(f);
+  it("anual 99,90 · mensal 34,90 · presente 69,90 direto (iPhone)", () => {
+    expect(info("core_anual_99")).toEqual({ billing: "annual", cents: 9990 });
+    expect(info("core_mensal_34")).toEqual({ billing: "monthly", cents: 3490 });
+    expect(info("core_anual_69_direto")).toEqual({ billing: "annual", cents: 6990 });
+  });
+  it("os mesmos no formato do Android (produto:plano_base)", () => {
+    expect(info("core_anual_99:coreanual99")).toEqual({ billing: "annual", cents: 9990 });
+    expect(info("core_mensal_34:coremensal34")).toEqual({ billing: "monthly", cents: 3490 });
+    expect(info("core_anual_69_direto:coreanual69direto")).toEqual({ billing: "annual", cents: 6990 });
+  });
+  it("o 69,90 de hoje (com teste) segue igual", () => {
+    expect(info("core_anual_69")).toEqual({ billing: "annual", cents: 6990 });
+  });
+  it("12/11 noite: o anual SEM teste do iPhone é core_anual_97_direto = 97,90 (linha própria, não o core_anual_97 com teste)", () => {
+    expect(info("core_anual_97_direto")).toEqual({ billing: "annual", cents: 9790 });
+    expect(info("core_anual_97")).toEqual({ billing: "annual", cents: 9790 });
+    const s = fonte(f);
+    expect(s).toMatch(/\n\s*core_anual_97_direto: \{ billing: "annual", cents: 9790 \}/);
+  });
+});
+
+describe("afiliados: bruto dos produtos sem teste", () => {
+  it("iPhone e Android", () => {
+    expect(brutoCents({ product_id: "core_anual_99" })).toBe(9990);
+    expect(brutoCents({ product_id: "core_mensal_34:coremensal34" })).toBe(3490);
+    expect(brutoCents({ product_id: "core_anual_69_direto" })).toBe(6990);
+    expect(brutoCents({ product_id: "core_anual_97_direto" })).toBe(9790);
+  });
+});

@@ -146,7 +146,7 @@ export async function criarOuReaproveitar(
   if (!pi) {
     try {
       // o MAIS NOVO desta ref (um PI cancelado dá lugar a outro: -2, -3…)
-      const { data: ja } = await admin.from("analytics_events").select("event_data, created_at").eq("event_name", "stripe_order_created").eq("event_data->>ref", p.ref).limit(50);
+      const { data: ja } = await admin.from("analytics_events").select("event_data, created_at").eq("event_name", "stripe_order_created").eq("event_data->>ref", p.ref).order("created_at", { ascending: false }).limit(50);
       const achado = maisNovoPrimeiro((ja ?? []) as Array<{ event_data?: { pi?: string }; created_at?: string }>).map((l) => l.event_data?.pi).find((x): x is string => typeof x === "string" && /^pi_/.test(x));
       if (achado) pi = achado;
     } catch { /* cria (a chave de idempotência ainda segura o 2º) */ }

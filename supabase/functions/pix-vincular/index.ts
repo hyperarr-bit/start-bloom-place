@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { COLUNAS_DECISAO, linhasProprias, type LinhaAssinatura } from "../_shared/linha-pix.ts";
+import { COLUNAS_DECISAO, linhasProprias, mensalStripeVivo, type LinhaAssinatura } from "../_shared/linha-pix.ts";
 import { copiarDadosDaAnonima } from "../_shared/copiar-dados-anonima.ts";
 
 /**
@@ -93,7 +93,8 @@ serve(async (req) => {
      * ser apagada (ver _shared/linha-pix.ts). */
     const { data: todasPara } = await admin.from("subscriptions").select(COLUNAS_DECISAO).eq("user_id", destino.id);
     const propriasPara = linhasProprias((todasPara ?? []) as LinhaAssinatura[]);
-    if (propriasPara.some((l) => l.status === "active")) return json({ ok: false, motivo: "destino_ja_tem_assinatura", dados });
+    // 14/11 (revisão 2): o mensal da Stripe vivo no destino também barra, como antes (2 pagamentos → o suporte decide)
+    if (propriasPara.some((l) => l.status === "active") || mensalStripeVivo((todasPara ?? []) as LinhaAssinatura[])) return json({ ok: false, motivo: "destino_ja_tem_assinatura", dados });
     for (const casca of propriasPara) await admin.from("subscriptions").delete().eq("id", casca.id); // casca expirada dá lugar à paga
 
     const { error } = await admin.from("subscriptions")

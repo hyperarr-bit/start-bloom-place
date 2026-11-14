@@ -53,6 +53,8 @@ function bancoFalso() {
       eq: (k: string, v: unknown) => { const [col, sub] = k.split("->>"); filtros.push((r) => (sub ? String((r[col] as Linha | undefined)?.[sub] ?? "") : r[k]) === v); return q; },
       gte: (k: string, v: string) => { filtros.push((r) => String(r[k] ?? "") >= v); return q; },
       limit: () => q,
+      order: () => q,
+      in: (k: string, vs: unknown[]) => { filtros.push((r) => vs.includes(r[k])); return q; },
       maybeSingle: () => { unico = true; return q; },
       then: (ok: (v: unknown) => unknown, erro: (e: unknown) => unknown) => exec().then(ok, erro),
     };
@@ -458,7 +460,10 @@ describe("revisão: dinheiro", () => {
     // a aba que esperou tenta de novo → "pago" (não assina de novo)
     expect((await assinarAppWeb(m.deps, pedido(), md(), ctx, { pm: "pm_bbbbbb2", returnUrl: "x" })).corpo).toMatchObject({ pago: true, plano: "mensal" });
     expect(m.s.subs.size).toBe(1);
-    expect(m.s.chamadas.filter((c) => c.caminho === "subscriptions").every((c) => !/pm_/.test(String(c.idem)))).toBe(true);
+    // revisão 2 (R-E): a chave leva ref + tentativa + cartão (outro cartão = outros parâmetros, sem idempotency_error); quem
+    // impede a 2ª assinatura é a trava da ref, não a chave
+    expect(m.s.chamadas.filter((c) => c.caminho === "subscriptions").map((c) => c.idem)).toEqual([`appweb-sub-${REF}-1-pm_aaaaaa1`]);
+    expect(m.s.chamadas.find((c) => c.caminho === "customers")!.idem).toMatch(new RegExp(`^appweb-cus-${REF}-[0-9a-f]{8}$`));
   });
   it("5 (C2b): cartão vitalício numa aba + mensal na outra, ao mesmo tempo → só UM cobra; o outro vira 'pago' na nova tentativa", async () => {
     const m = montar();
@@ -586,5 +591,87 @@ describe("revisão: cancel-subscription-flow e stripe-criar (fonte)", () => {
   });
   it("8 (C7): pagina app_web SEM acao → 400 (nunca devolve PI com parcelas livres)", () => {
     expect(ler("supabase/functions/stripe-criar/index.ts")).toContain('if (p.pagina === "app_web" && !acao) return json({ ok: false }, 400);');
+  });
+});
+
+/* ───────── revisão 2 (14/11): os cenários do 2º crítico ───────── */
+describe("revisão 2", () => {
+  it("1: renovação paga de quem agendou o cancelamento segue cancel_scheduled (não volta pra active)", async () => {
+    const m = montarWebhook();
+    m.db.users.set("u_anon", { id: "u_anon", email: null });
+    await mandar(m, evento("invoice.paid", fatura()));
+    m.stripeAgora.subs.set("sub_1", { id: "sub_1", status: "active", cancel_at_period_end: true });
+    await mandar(m, evento("customer.subscription.updated", { id: "sub_1", status: "active", cancel_at_period_end: true }));
+    await mandar(m, evento("invoice.paid", fatura({ id: "in_2", billing_reason: "subscription_cycle", lines: { data: [{ period: { start: 1765724400, end: 1768402800 } }] } })));
+    expect(m.db.subscriptions[0].status).toBe("cancel_scheduled");
+  });
+  it("1: cancelar o mensal ATRASADO (past_due) = DELETE já + canceled; em dia = fim do período (fonte)", () => {
+    const fn = readFileSync(resolve(__dirname, "../../supabase/functions/cancel-subscription-flow/index.ts"), "utf8");
+    expect(fn).toContain('const atrasado = stripeMensal && sub.status === "past_due";');
+    expect(fn).toMatch(/atrasado\s*\?\s*await fetch\(`https:\/\/api\.stripe\.com\/v1\/subscriptions\/\$\{subStripe\}`, \{ method: "DELETE"/);
+    expect(fn).toContain('.update({ status: atrasado ? "canceled" : "cancel_scheduled" })');
+  });
+  it("3 (R-C): estorno com o banco sem resposta → 500 (não responde 200 sem cortar)", async () => {
+    const m = montarWebhook();
+    const from = m.admin.from;
+    (m.admin as { from: (t: string) => unknown }).from = (t: string) => {
+      const q = from(t) as Record<string, unknown>;
+      if (t !== "subscriptions") return q;
+      const sel = q.select as (...a: unknown[]) => Record<string, unknown>;
+      q.select = (...a: unknown[]) => { const r = sel(...a); const eq = r.eq as (...x: unknown[]) => Record<string, unknown>; r.eq = (...x: unknown[]) => { const rr = eq(...x); rr.then = (ok: (v: unknown) => unknown) => Promise.resolve({ data: null, error: { message: "timeout" } }).then(ok); return rr; }; return r; };
+      return q;
+    };
+    expect((await mandar(m, evento("charge.refunded", { id: "ch_9", payment_intent: "pi_vit", refunded: true }))).status).toBe(500);
+  });
+  it("R-A (I2): estorno e depois contestação do mesmo mês → a 2ª não fica em 500 infinito (assinatura já encerrada = ok)", async () => {
+    const m = montarWebhook();
+    m.db.users.set("u_anon", { id: "u_anon", email: null });
+    await mandar(m, evento("invoice.paid", fatura()));
+    m.stripeAgora.pagamentos.set("pi_fatura1", "sub_1");
+    expect((await mandar(m, evento("charge.refunded", { id: "ch_1", payment_intent: "pi_fatura1", refunded: true, invoice: "in_1" }))).status).toBe(200);
+    m.stripeAgora.subs.set("sub_1", { id: "sub_1", status: "canceled" });
+    m.deps.cancelarAssinatura = async () => false; // a Stripe recusa DELETE em assinatura cancelada
+    const d = await mandar(m, evento("charge.dispute.created", { id: "dp_1", payment_intent: "pi_fatura1", charge: "ch_1" }));
+    expect(d.status).toBe(200);
+    expect(m.db.subscriptions[0].status).toBe("canceled");
+  });
+  it("R-D (I2c): estorno ANTES do 1º pago → o invoice.paid não cria linha ativa nem Purchase", async () => {
+    const m = montarWebhook();
+    m.db.users.set("u_anon", { id: "u_anon", email: null });
+    m.stripeAgora.subs.set("sub_1", { id: "sub_1", status: "canceled" });
+    const r = await mandar(m, evento("invoice.paid", fatura()));
+    expect(r.corpo).toMatchObject({ ignorado: "assinatura_encerrada" });
+    expect(m.db.subscriptions).toHaveLength(0);
+    expect(m.saida.capi).toHaveLength(0);
+  });
+  it("R-F (I5c): vitalício pela Stripe por cima do mensal → cancela a renovação e NÃO abre chamado repetido", async () => {
+    const m = montarWebhook();
+    m.db.users.set("u_x", { id: "u_x", email: "maria@exemplo.com" });
+    await mandar(m, evento("invoice.paid", fatura({ id: "in_a", parent: { subscription_details: { subscription: "sub_a", metadata: { ...META_SUB, user_id: "" } } } })));
+    const pi = { id: "pi_vit", amount: 9790, amount_received: 9790, currency: "brl", status: "succeeded", livemode: true, latest_charge: "ch_9", metadata: { ref: "ref3-12345678", pagina: "app_web", email: "maria@exemplo.com", url: "https://www.coreaplicativo.com.br/funil-app" } };
+    await mandar(m, evento("payment_intent.succeeded", pi));
+    expect(m.stripeAgora.cancelados).toContainEqual({ sub: "sub_a", imediato: false });
+    expect(m.db.analytics_events.filter((e) => e.source === "stripe_mensal_com_vitalicio")).toHaveLength(0);
+    expect(m.saida.push.filter((t) => /comprou o vitalício/i.test(t))).toHaveLength(1);
+  });
+  it("2 + 4: linha-pix — o mensal Stripe muda de conta no suporte e barra o destino; Cakto/código/liberar abrem o chamado (fonte)", async () => {
+    const { linhasQueMudamDeConta, mensalStripeVivo } = await import("../../supabase/functions/_shared/linha-pix");
+    const mensal = { id: "m", status: "active", plan: "monthly", billing_period: "monthly", payment_method: "stripe", abacatepay_billing_id: "sub_X" };
+    const loja = { id: "l", status: "active", payment_method: "play_store", revenuecat_subscription_id: "x" };
+    expect(linhasQueMudamDeConta([mensal, loja]).map((l) => l.id)).toEqual(["m"]);
+    expect(mensalStripeVivo([{ ...mensal, status: "past_due" }])).toBeTruthy();
+    const ler = (f: string) => readFileSync(resolve(__dirname, "../..", f), "utf8");
+    expect(ler("supabase/functions/_shared/admin-acoes-suporte.ts")).toContain("const proprias = linhasQueMudamDeConta(");
+    expect(ler("supabase/functions/_shared/admin-acoes-suporte.ts")).toContain("mensalStripeVivo((todasPara ?? []) as LinhaAssinatura[])");
+    expect(ler("supabase/functions/pix-vincular/index.ts")).toContain("mensalStripeVivo((todasPara ?? []) as LinhaAssinatura[])");
+    for (const f of ["supabase/functions/cakto-webhook/index.ts", "supabase/functions/resgatar-codigo/index.ts", "supabase/functions/admin-suporte/index.ts"]) expect(ler(f)).toContain("avisarMensalStripeComVitalicio(");
+  });
+  it("R2 do crítico: toda consulta a analytics_events nas ações tem event_name; e 'mais novo' vem ordenado", async () => {
+    const m = montar();
+    await pixAppWeb(m.deps, pedido(), md(), ctx);
+    await cartaoAppWeb(m.deps, pedido(), md(), ctx, { pm: "pm_recusa", parcelas: 1, returnUrl: "x" });
+    await assinarAppWeb(m.deps, pedido(), md(), ctx, { pm: "pm_okcard", returnUrl: "x" });
+    const fonte = readFileSync(resolve(__dirname, "../../supabase/functions/_shared/stripe-app-web.ts"), "utf8");
+    expect(fonte.match(/\.order\("created_at", \{ ascending: false \}\)\.limit\(50\)/g)).toHaveLength(2);
   });
 });

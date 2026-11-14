@@ -48,6 +48,8 @@ function bancoFalso() {
       eq: (k: string, v: unknown) => { const [col, sub] = k.split("->>"); filtros.push((r) => (sub ? String((r[col] as Linha | undefined)?.[sub] ?? "") : r[k]) === v); return q; },
       gte: (k: string, v: string) => { filtros.push((r) => String(r[k] ?? "") >= v); return q; },
       limit: () => q,
+      order: () => q,
+      in: (k: string, vs: unknown[]) => { filtros.push((r) => vs.includes(r[k])); return q; },
       maybeSingle: () => { unico = true; return q; },
       then: (ok: (v: unknown) => unknown, erro: (e: unknown) => unknown) => exec().then(ok, erro),
     };

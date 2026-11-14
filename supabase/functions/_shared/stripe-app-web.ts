@@ -34,6 +34,8 @@ export type Ctx = { userId: string | null; ip: string | null };
 export type RespostaAppWeb = { status: number; corpo: Record<string, unknown> };
 
 const V = MENSAL_APP_WEB.apiVersion;
+/** resumo curto e estável de um texto (FNV-1a, 8 hex) — pra chave de idempotência sem expor o e-mail */
+export const hashCurto = (t: string): string => { let h = 0x811c9dc5; for (const c of t.toLowerCase()) { h ^= c.charCodeAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, "0"); };
 const erroDe = (j: Record<string, unknown>) => (j.error ?? {}) as { code?: string; decline_code?: string; type?: string; message?: string; payment_intent?: Record<string, unknown> };
 export const PARCELAS_MAX_APP_WEB = OFERTAS_STRIPE.app_web.parcelasMax;
 
@@ -43,7 +45,7 @@ const temPixVivo = (j: Record<string, unknown>) => !!pixDoIntento(j);
 /** o PI mais novo registrado pra esta ref (stripe_order_created). "erro" = o banco não respondeu (as travas param aí). */
 async function piDaRef(admin: ClienteMin, ref: string): Promise<string | null | "erro"> {
   try {
-    const { data, error } = await admin.from("analytics_events").select("event_data, created_at").eq("event_name", "stripe_order_created").eq("event_data->>ref", ref).limit(50);
+    const { data, error } = await admin.from("analytics_events").select("event_data, created_at").eq("event_name", "stripe_order_created").eq("event_data->>ref", ref).order("created_at", { ascending: false }).limit(50);
     if (error) return "erro";
     return maisNovoPrimeiro((data ?? []) as Array<{ event_data?: { pi?: string; pagina?: string }; created_at?: string }>).filter((l) => l.event_data?.pagina === "app_web").map((l) => l.event_data?.pi).find((x): x is string => typeof x === "string" && /^pi_/.test(x)) ?? null;
   } catch { return "erro"; }
@@ -51,7 +53,7 @@ async function piDaRef(admin: ClienteMin, ref: string): Promise<string | null | 
 /** as assinaturas desta ref (stripe_assinatura_criada), a mais nova primeiro. "erro" = o banco não respondeu. */
 async function assinaturasDaRef(admin: ClienteMin, ref: string): Promise<Array<{ sub: string; cus: string | null }> | "erro"> {
   try {
-    const { data, error } = await admin.from("analytics_events").select("event_data, created_at").eq("event_name", "stripe_assinatura_criada").eq("event_data->>ref", ref).limit(50);
+    const { data, error } = await admin.from("analytics_events").select("event_data, created_at").eq("event_name", "stripe_assinatura_criada").eq("event_data->>ref", ref).order("created_at", { ascending: false }).limit(50);
     if (error) return "erro";
     return maisNovoPrimeiro((data ?? []) as Array<{ event_data?: { sub?: string; cus?: string }; created_at?: string }>)
       .filter((x) => typeof x.event_data?.sub === "string" && /^sub_/.test(x.event_data.sub))
@@ -250,7 +252,7 @@ async function assinarSemTrava(deps: DepsAppWeb, p: PedidoStripe, md: Record<str
     if (!cus) {
       const cr = await stripe("customers", [
         ["email", p.email!], ["metadata[ref]", p.ref], ...(md.user_id ? [["metadata[user_id]", md.user_id] as [string, string]] : []),
-      ], `appweb-cus-${p.ref}`, V);
+      ], `appweb-cus-${p.ref}-${hashCurto(p.email!)}`, V); // revisão 2: o e-mail entra (resumido) — trocar o e-mail não dá idempotency_error
       if (!cr.ok) return resultadoDoErro(cr.j, { plano: "mensal" });
       cus = String(cr.j.id);
     }
@@ -261,7 +263,7 @@ async function assinarSemTrava(deps: DepsAppWeb, p: PedidoStripe, md: Record<str
       ["payment_behavior", "default_incomplete"], ["payment_settings[payment_method_types][0]", "card"],
       ["payment_settings[save_default_payment_method]", "on_subscription"], ["expand[0]", "latest_invoice.payment_intent"],
       ["description", "CORE mensal"], ...mdSub,
-    ], `appweb-sub-${p.ref}-${(atual.total ?? 0) + 1}`, V);
+    ], `appweb-sub-${p.ref}-${(atual.total ?? 0) + 1}-${c.pm}`, V); // revisão 2: + o cartão (outro cartão = outros parâmetros); a trava da ref segue impedindo 2
     if (!sr.ok) return resultadoDoErro(sr.j, { plano: "mensal" });
     sub = sr.j;
     try { await deps.admin.from("analytics_events").insert({ event_name: "stripe_assinatura_criada", user_id: ctx.userId, session_id: p.landing_session_id, event_data: { ref: p.ref, sub: sub.id, cus, pagina: MENSAL_APP_WEB.pagina, ...(ctx.ip ? { client_ip: ctx.ip } : {}), ...p.atrib } }); } catch { /* a assinatura existe; a recarga acha pela chave de idempotência */ }

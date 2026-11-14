@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { liberarPix, resolverColisao, trocarEmailAdmin } from "../_shared/admin-acoes-suporte.ts";
-import { COLUNAS_DECISAO, decidirGrantPix, type LinhaAssinatura } from "../_shared/linha-pix.ts";
+import { COLUNAS_DECISAO, decidirGrantPix, mensalStripeVivo, type LinhaAssinatura } from "../_shared/linha-pix.ts";
+import { avisarMensalStripeComVitalicio } from "../_shared/landing-travas.ts";
 
 /**
  * Operações de SUPORTE do dono (17/07). Primeira: trocar o e-mail de login de
@@ -369,6 +370,9 @@ serve(async (req) => {
         ? await admin.from("subscriptions").update(payload).eq("id", decisao.linhaId)
         : await admin.from("subscriptions").insert(payload);
       if (grantErr) return json({ error: `grant: ${grantErr.message}` }, 500);
+      // 14/11 (revisão 2): vitalício liberado com o mensal da Stripe ainda cobrando → o mesmo chamado do creditarPedido
+      const mensalVivo = mensalStripeVivo((linhas ?? []) as LinhaAssinatura[]);
+      if (mensalVivo?.abacatepay_billing_id) await avisarMensalStripeComVitalicio(admin, { userId: alvo, sub: mensalVivo.abacatepay_billing_id, pedido: billing ?? null, agora: now, origem: "liberar_vitalicio" }).catch(() => false);
 
       // boas-vindas (não-bloqueante) — ela já tem login, mas reforça o acesso
       let emailEnviado = false;

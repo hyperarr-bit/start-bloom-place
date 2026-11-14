@@ -390,24 +390,26 @@ serve(async (req) => {
         // Cancela a RENOVAÇÃO; o acesso continua até current_period_end
         // (check-subscription honra "cancel_scheduled" até lá; o cron
         // grace-cleanup vira pra "canceled" quando o período acabar).
+        /* 14/11 (revisão 2): mensal da Stripe EM DIA → cancela a renovação no fim do período (cancel_scheduled, o mês pago
+         * segue). Mensal em ATRASO (past_due) → cancela JÁ (DELETE) e grava canceled: com cancel_at_period_end a Stripe seguia
+         * tentando cobrar a fatura aberta e a pessoa ficava com o mês que não pagou. Sem a Stripe confirmar → 502. */
+        const atrasado = stripeMensal && sub.status === "past_due";
         if (stripeMensal) {
-          // cancela a renovação NA STRIPE (no fim do período); sem isso a Stripe seguiria cobrando
           const sk = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
           const subStripe = String((sub as Record<string, unknown>).abacatepay_billing_id);
-          const r = sk ? await fetch(`https://api.stripe.com/v1/subscriptions/${subStripe}`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${sk}`, "Content-Type": "application/x-www-form-urlencoded", "Stripe-Version": "2024-06-20" },
-            body: "cancel_at_period_end=true",
-          }).catch(() => null) : null;
+          const h = { Authorization: `Bearer ${sk}`, "Content-Type": "application/x-www-form-urlencoded", "Stripe-Version": "2024-06-20" };
+          const r = !sk ? null : atrasado
+            ? await fetch(`https://api.stripe.com/v1/subscriptions/${subStripe}`, { method: "DELETE", headers: h }).catch(() => null)
+            : await fetch(`https://api.stripe.com/v1/subscriptions/${subStripe}`, { method: "POST", headers: h, body: "cancel_at_period_end=true" }).catch(() => null);
           if (!r?.ok) {
-            logStep("stripe_cancel_falhou", { status: r?.status ?? null });
+            logStep("stripe_cancel_falhou", { status: r?.status ?? null, atrasado });
             return jsonResponse({ error: "cancelamento_falhou" }, 502);
           }
-          logStep("stripe_cancel_agendado", { userId: user.id });
+          logStep(atrasado ? "stripe_cancelado_ja (atrasado)" : "stripe_cancel_agendado", { userId: user.id });
         }
         await admin
           .from("subscriptions")
-          .update({ status: "cancel_scheduled" })
+          .update({ status: atrasado ? "canceled" : "cancel_scheduled" })
           .eq("id", sub.id);
 
         // Best-effort cancel at AbacatePay (if API key + subscription id present)

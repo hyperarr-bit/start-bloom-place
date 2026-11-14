@@ -49,6 +49,10 @@ export const ehDaLoja = (l: LinhaAssinatura): boolean =>
  *  "monthly" com fim em 30 dias. Só o mensal: a linha do vitalício da Stripe (plan lifetime) segue própria como sempre. */
 export const ehMensalStripe = (l: LinhaAssinatura): boolean =>
   l.payment_method === "stripe" && (l.billing_period === "monthly" || l.plan === "monthly" || /^sub_/.test(String(l.abacatepay_billing_id ?? "")));
+/** linhas que o SUPORTE move de conta (resolver_email mover_acesso): as próprias + o mensal da Stripe (a assinatura é da pessoa;
+ *  a renovação acha a linha pelo id sub_…, não pela conta). A da loja (RevenueCat) continua de fora. */
+export const linhasQueMudamDeConta = (linhas: LinhaAssinatura[]): LinhaAssinatura[] =>
+  linhas.filter((l) => !ehDaLoja(l) || ehMensalStripe(l));
 /** mensal da Stripe ainda cobrando (o que avisar/cancelar quando a pessoa compra o vitalício por outro caminho) */
 export const mensalStripeVivo = (linhas: LinhaAssinatura[]): LinhaAssinatura | null =>
   linhas.find((l) => ehMensalStripe(l) && (l.status === "active" || l.status === "past_due")) ?? null;

@@ -30,7 +30,8 @@
  */
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { COLUNAS_DECISAO, linhaParaEscrever, type LinhaAssinatura } from "../_shared/linha-pix.ts";
+import { COLUNAS_DECISAO, linhaParaEscrever, mensalStripeVivo, type LinhaAssinatura } from "../_shared/linha-pix.ts";
+import { avisarMensalStripeComVitalicio } from "../_shared/landing-travas.ts";
 
 interface Codigo {
   dias: number;
@@ -146,6 +147,9 @@ serve(async (req) => {
       log("falha ao gravar", { erro: error.message });
       return json({ erro: "gravar" }, 500);
     }
+    // 14/11 (revisão 2): código resgatado por quem tem o mensal da Stripe cobrando → o mesmo chamado (o suporte avalia)
+    const mensalVivo = mensalStripeVivo(lista as LinhaAssinatura[]);
+    if (mensalVivo?.abacatepay_billing_id) await avisarMensalStripeComVitalicio(admin as never, { userId: user.id, sub: mensalVivo.abacatepay_billing_id, pedido: `codigo:${codigo}`, agora, origem: "código" }).catch(() => false);
 
     // relatório: quantos resgataram por código/origem (sem e-mail no evento)
     await admin.from("analytics_events").insert({

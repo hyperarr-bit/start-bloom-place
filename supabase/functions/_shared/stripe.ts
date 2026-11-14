@@ -21,7 +21,7 @@ import { creditarPedido } from "./grant-pix.ts";
 import { assuntoVenda, htmlVenda } from "./email-venda.ts";
 import { acharContaHotmart, eventoPurchaseHotmart, mascararEmail, type AdminHotmart, type RegistroHotmart } from "./hotmart.ts";
 import { MENSAL_APP_WEB, OFERTAS_STRIPE, ofertaDaPagina } from "./stripe-ofertas.ts";
-import { registrarPagoEmDobro } from "./landing-travas.ts";
+import { avisarMensalStripeComVitalicio, registrarPagoEmDobro } from "./landing-travas.ts";
 
 // deno-lint-ignore no-explicit-any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -148,7 +148,9 @@ export async function tratarStripe(deps: DepsStripe, req: { assinatura: string |
       const total = tipo === "charge.dispute.created" || obj.refunded === true;
       if (!pi || !total) { log("estorno parcial ou sem PI — nada a desligar", { tipo, pi }); return { status: 200, corpo: { ok: true, ignorado: "parcial" } }; }
       // 14/11: a linha pode ser do vitalício (pedido = PI) OU do mensal (pedido = a assinatura da fatura estornada)
-      const { data: doPi } = await admin.from("subscriptions").select("id").eq("abacatepay_billing_id", pi).eq("payment_method", GATEWAY_STRIPE);
+      const { data: doPi, error: erroDoPi } = await admin.from("subscriptions").select("id").eq("abacatepay_billing_id", pi).eq("payment_method", GATEWAY_STRIPE);
+      // revisão 2: banco sem resposta → 500 (a Stripe reenvia); nunca "nada a cortar" no escuro
+      if (erroDoPi) throw new Error(String((erroDoPi as Erro)?.message ?? erroDoPi));
       let alvo = pi;
       let sub: string | null = null;
       if (!((doPi ?? []) as unknown[]).length) {
@@ -165,8 +167,11 @@ export async function tratarStripe(deps: DepsStripe, req: { assinatura: string |
       }
       await reservar(admin, `stripe-estorno:${pi}`, tipo);
       if (sub) {
-        // mensal estornado/contestado: a Stripe não pode cobrar de novo — cancela JÁ; sem a confirmação dela, a Stripe reenvia
-        const ok = deps.cancelarAssinatura ? await deps.cancelarAssinatura(sub, true).catch(() => false) : false;
+        // mensal estornado/contestado: a Stripe não pode cobrar de novo — cancela JÁ; sem a confirmação dela, a Stripe reenvia.
+        // revisão 2: já encerrada na Stripe (cancelou antes, ou estorno + contestação) = ok — a Stripe recusa DELETE nela
+        const agora2 = deps.buscarAssinatura ? await deps.buscarAssinatura(sub).catch(() => null) : null;
+        const jaEncerrada = ["canceled", "incomplete_expired"].includes(String(agora2?.status ?? ""));
+        const ok = jaEncerrada || (deps.cancelarAssinatura ? await deps.cancelarAssinatura(sub, true).catch(() => false) : false);
         if (!ok) throw new Error("cancelar_assinatura_falhou");
       }
       const { error } = await admin.from("subscriptions").update({ status: "canceled" }).eq("abacatepay_billing_id", alvo).eq("payment_method", GATEWAY_STRIPE);
@@ -214,6 +219,8 @@ export async function tratarStripe(deps: DepsStripe, req: { assinatura: string |
     const g = await creditarPedido(admin, {
       userId: conta.userId, orderId: pi.id, gateway: GATEWAY_STRIPE, concessao: { dias: null }, agora,
       protegerVitalicio: true, offer: oferta.pagina === PAGINA_STRIPE ? OFERTA_STRIPE : oferta.offer, linhaNova: true,
+      // revisão 2: aqui a renovação do mensal é cancelada na Stripe (cancelarMensalPorVitalicio); o chamado só sai se falhar
+      avisarMensalStripe: false,
       montarPayload: (fim) => ({
         user_id: conta.userId, status: "active", plan: "lifetime", billing_period: "lifetime",
         payment_method: GATEWAY_STRIPE, abacatepay_billing_id: pi.id, customer_email: emailConta, amount_cents: valor,
@@ -311,11 +318,12 @@ async function cancelarMensalPorVitalicio(deps: DepsStripe, userId: string, pedi
   try {
     const { data } = await deps.admin.from("subscriptions").select("id, status, billing_period, payment_method, abacatepay_billing_id").eq("user_id", userId);
     const vivos = ((data ?? []) as Array<{ id: string; status?: string; billing_period?: string; payment_method?: string; abacatepay_billing_id?: string }>)
-      .filter((l) => l.payment_method === GATEWAY_STRIPE && l.billing_period === "monthly" && (l.status === "active" || l.status === "past_due") && /^sub_/.test(String(l.abacatepay_billing_id ?? "")));
+      .filter((l) => l.payment_method === GATEWAY_STRIPE && l.billing_period === "monthly" && (l.status === "active" || l.status === "past_due") && /^sub_/.test(String(l.abacatepay_billing_id ?? ""))); // cancel_scheduled já foi
     for (const l of vivos) {
       const ok = deps.cancelarAssinatura ? await deps.cancelarAssinatura(String(l.abacatepay_billing_id), false).catch(() => false) : false;
       if (ok) await deps.admin.from("subscriptions").update({ status: "cancel_scheduled" }).eq("id", l.id);
       deps.log(ok ? "mensal cancelado no fim do período (comprou o vitalício)" : "mensal NÃO cancelou (comprou o vitalício) — chamado aberto", { sub: l.abacatepay_billing_id, pedido });
+      if (!ok) await avisarMensalStripeComVitalicio(deps.admin as never, { userId, sub: String(l.abacatepay_billing_id), pedido, origem: "Stripe (cancelar falhou)" }).catch(() => false);
       await deps.avisarDono(ok ? "Mensal Stripe cancelado: comprou o vitalício" : "⚠️ Comprou o vitalício e o mensal Stripe NÃO cancelou", `Assinatura ${l.abacatepay_billing_id} · vitalício ${pedido}${ok ? " · a renovação não acontece mais" : " · cancele na Stripe"}`, `stripe-mensal-vit:${l.abacatepay_billing_id}`).catch(() => {});
     }
   } catch { /* o chamado do grant-pix (avisarMensalStripeComVitalicio) cobre */ }
@@ -431,15 +439,29 @@ async function tratarAssinatura(deps: DepsStripe, tipo: string, obj: Record<stri
   const fim = f.fimS ? iso(f.fimS) : new Date(agora.getTime() + 31 * 86400_000).toISOString();
   if (await reservar(admin, `stripe-fatura:${f.id}`, "fatura") === "ja") return { status: 200, corpo: { ok: true, duplicado: true } };
 
+  // revisão 2: o estado ATUAL da assinatura manda no status da linha — renovação de quem já agendou o cancelamento segue
+  // cancel_scheduled; assinatura já encerrada (estorno antes do 1º pago) não ganha linha ativa nem Purchase
+  let subAgora: Record<string, unknown> | null = null;
+  if (deps.buscarAssinatura) {
+    subAgora = await deps.buscarAssinatura(f.sub).catch(() => null);
+    if (!subAgora) { await soltar(admin, `stripe-fatura:${f.id}`); throw new Error("assinatura_ilegivel"); }
+  }
+  const encerrada = ["canceled", "incomplete_expired"].includes(String(subAgora?.status ?? ""));
+  const agendada = subAgora?.cancel_at_period_end === true;
   if (linha) {
     // renovação (ou a 1ª fatura que chegou de novo): a MESMA linha, fim novo
-    const { error } = await admin.from("subscriptions").update({ status: "active", current_period_end: fim, amount_cents: f.valor }).eq("id", linha.id);
+    const { error } = await admin.from("subscriptions").update({ status: encerrada ? "canceled" : agendada ? "cancel_scheduled" : "active", current_period_end: fim, amount_cents: f.valor }).eq("id", linha.id);
     if (error) { await soltar(admin, `stripe-fatura:${f.id}`); throw new Error(String((error as Erro)?.message ?? error)); }
     try { await admin.from("analytics_events").insert({ event_name: "stripe_assinatura_renovou", user_id: linha.user_id, event_data: { sub: f.sub, fatura: f.id, valor_cents: f.valor, motivo: f.motivo } }); } catch { /* luxo */ }
     log("mensal renovado", base);
     return { status: 200, corpo: { ok: true, renovado: true } };
   }
 
+  if (encerrada) {
+    log("1ª fatura de assinatura já encerrada (estorno antes do pago?) — sem linha, sem Purchase", base);
+    await deps.avisarDono("⚠️ Mensal Stripe pago numa assinatura já encerrada", `Assinatura ${f.sub} · fatura ${f.id} · confira estorno na Stripe`, `stripe-encerrada:${f.sub}`).catch(() => {});
+    return { status: 200, corpo: { ok: true, ignorado: "assinatura_encerrada" } };
+  }
   // 1ª fatura: a conta e a linha
   const email = (meta.email ?? f.email ?? "").toLowerCase() || null;
   const conta = await acharContaHotmart(admin, { refUserId: t(meta.user_id, 64), email: email && EMAIL_OK.test(email) ? email : null, acharConta: deps.acharConta });
@@ -456,6 +478,7 @@ async function tratarAssinatura(deps: DepsStripe, tipo: string, obj: Record<stri
   // e-mail): esta assinatura é dinheiro em dobro → pago_em_dobro (chamado pra devolver), a renovação dela é cancelada, o
   // dono é avisado e NÃO sai Purchase na Meta (vai ser devolvida). A linha entra mesmo assim (o registro do que foi cobrado).
   let dobro: string | null = null;
+  let dobroCancelado = false;
   try {
     const { data: linhas } = await admin.from("subscriptions").select("id, billing_period, status, payment_method, abacatepay_billing_id").eq("user_id", conta.userId);
     const ls = (linhas ?? []) as Array<{ billing_period?: string; status?: string; payment_method?: string; abacatepay_billing_id?: string }>;
@@ -466,11 +489,12 @@ async function tratarAssinatura(deps: DepsStripe, tipo: string, obj: Record<stri
       dobro = vit ? "vitalicio" : "mensal";
       await registrarPagoEmDobro(admin as never, { userId: conta.userId, orderId: f.sub, amountCents: f.valor, pedidoAnterior: anterior.abacatepay_billing_id ?? null, offer: MENSAL_APP_WEB.offer, agora }).catch(() => false);
       const ok = deps.cancelarAssinatura ? await deps.cancelarAssinatura(f.sub, false).catch(() => false) : false;
+      dobroCancelado = ok;
       await deps.avisarDono(`⚠️ Mensal Stripe em dobro (já tinha ${dobro})`, `Assinatura ${f.sub} · ${reais(f.valor)} · ${ok ? "renovação cancelada" : "CANCELE na Stripe"} · devolver pelo chamado`, `stripe-dobro:${f.sub}`).catch(() => {});
     }
   } catch { /* a linha nova sai mesmo assim */ }
   const { error } = await admin.from("subscriptions").insert({
-    user_id: conta.userId, status: "active", plan: "monthly", billing_period: "monthly", payment_method: GATEWAY_STRIPE,
+    user_id: conta.userId, status: agendada || dobroCancelado ? "cancel_scheduled" : "active", plan: "monthly", billing_period: "monthly", payment_method: GATEWAY_STRIPE,
     abacatepay_billing_id: f.sub, customer_email: emailConta, amount_cents: f.valor,
     current_period_start: f.inicioS ? iso(f.inicioS) : agora.toISOString(), current_period_end: fim,
   });

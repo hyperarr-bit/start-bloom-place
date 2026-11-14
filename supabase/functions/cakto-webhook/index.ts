@@ -2,7 +2,8 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { registroDoPedido } from "../_shared/registro-pedido.ts";
 import { assuntoVenda, htmlVenda, nomeDoProduto } from "../_shared/email-venda.ts";
-import { COLUNAS_DECISAO, linhaParaEscrever, type LinhaAssinatura } from "../_shared/linha-pix.ts";
+import { COLUNAS_DECISAO, linhaParaEscrever, mensalStripeVivo, type LinhaAssinatura } from "../_shared/linha-pix.ts";
+import { avisarMensalStripeComVitalicio } from "../_shared/landing-travas.ts";
 import { fetchNosPixels } from "../_shared/meta-pixels.ts";
 
 // ============================================================================
@@ -403,6 +404,9 @@ serve(async (req) => {
           return;
         }
       }
+      // 14/11 (revisão 2): pagou na Cakto com o mensal da Stripe ainda cobrando → chamado pra cancelar a renovação na Stripe
+      const mensalVivo = mensalStripeVivo((linhas ?? []) as LinhaAssinatura[]);
+      if (mensalVivo?.abacatepay_billing_id) await avisarMensalStripeComVitalicio(supabaseClient as never, { userId, sub: mensalVivo.abacatepay_billing_id, pedido: purchaseId ?? null, agora: now, origem: "cakto" }).catch(() => false);
 
       if (emitConversion) {
         try {

@@ -26,7 +26,7 @@
  */
 import { copiarDadosDaAnonima } from "./copiar-dados-anonima.ts";
 import { chaveSemEmail } from "./landing-travas.ts";
-import { COLUNAS_DECISAO, linhasProprias, type LinhaAssinatura } from "./linha-pix.ts";
+import { COLUNAS_DECISAO, linhasProprias, linhasQueMudamDeConta, mensalStripeVivo, type LinhaAssinatura } from "./linha-pix.ts";
 import { CONCESSAO_HOJE, PRECOS_HOJE } from "./ofertas-hoje.ts";
 import { registroDoPedido } from "./registro-pedido.ts";
 
@@ -142,7 +142,8 @@ export async function transferirCompraPix(
    * pagou o Pix anônimo PRECISA receber a linha) nem pode ser apagada. */
   const { data: todasPara } = await admin.from("subscriptions").select(COLUNAS_DECISAO).eq("user_id", paraUid);
   const propriasPara = linhasProprias((todasPara ?? []) as LinhaAssinatura[]);
-  if (propriasPara.some((l) => l.status === "active")) return { erro: "destino_ja_tem_assinatura" };
+  // 14/11 (revisão 2): o mensal da Stripe vivo no destino também barra (a pessoa ficaria com 2 pagamentos — o suporte decide)
+  if (propriasPara.some((l) => l.status === "active") || mensalStripeVivo((todasPara ?? []) as LinhaAssinatura[])) return { erro: "destino_ja_tem_assinatura" };
   for (const casca of propriasPara) await admin.from("subscriptions").delete().eq("id", casca.id);
 
   const emailPara = para.user.email ?? null;
@@ -238,7 +239,9 @@ const fimDoAcesso = (dias: number | null, inicio: Date): string => {
 
 async function destinoBloqueado(admin: Admin, dest: string, linhaId: string | null): Promise<boolean> {
   const { data } = await admin.from("subscriptions").select(COLUNAS_DECISAO).eq("user_id", dest);
-  return linhasProprias((lista(data) as unknown) as LinhaAssinatura[]).some((l) => l.status === "active" && l.id !== linhaId);
+  const todas = (lista(data) as unknown) as LinhaAssinatura[];
+  // 14/11 (revisão 2): o mensal da Stripe vivo no destino barra como barrava antes (2 pagamentos → o suporte decide)
+  return linhasProprias(todas).some((l) => l.status === "active" && l.id !== linhaId) || !!mensalStripeVivo(todas.filter((l) => l.id !== linhaId));
 }
 
 async function limparCascas(admin: Admin, dest: string): Promise<void> {
@@ -549,7 +552,8 @@ export async function resolverColisao(admin: Admin, args: {
     if (fica.temAcesso) return falha("destino_ja_tem_assinatura", 409);
     if (!sai.temAcesso) return falha("origem_sem_acesso", 409);
     const { data } = await admin.from("subscriptions").select(COLUNAS_DECISAO).eq("user_id", quemSai);
-    const proprias = linhasProprias((lista(data) as unknown) as LinhaAssinatura[]).filter((l) => l.status === "active" || l.status === "past_due" || l.status === "cancel_scheduled");
+    // 14/11 (revisão 2): o mensal da Stripe também muda de conta (antes: 409 origem_sem_acesso pra quem só tinha ele)
+    const proprias = linhasQueMudamDeConta((lista(data) as unknown) as LinhaAssinatura[]).filter((l) => l.status === "active" || l.status === "past_due" || l.status === "cancel_scheduled");
     if (!proprias.length) return falha("origem_sem_acesso", 409);
     for (const l of proprias) {
       const { error } = await admin.from("subscriptions").update({ user_id: quemFica, customer_email: email }).eq("id", l.id);

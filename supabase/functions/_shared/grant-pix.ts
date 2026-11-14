@@ -50,6 +50,8 @@ export async function creditarPedido(admin: ClienteMin, args: {
   protegerVitalicio?: boolean;
   /** a oferta (só pro registro do pagamento em dobro) */
   offer?: string | null;
+  /** 14/11: false = quem chama cuida do mensal da Stripe vivo (o stripe-webhook cancela a renovação ele mesmo) */
+  avisarMensalStripe?: boolean;
 }): Promise<ResultadoGrant> {
   const ler = async (): Promise<LinhaAssinatura[]> => {
     const { data } = await admin.from("subscriptions").select(COLUNAS_DECISAO).eq("user_id", args.userId);
@@ -94,7 +96,7 @@ export async function creditarPedido(admin: ClienteMin, args: {
   }
   if (trava === "pegou") await marcarCreditado(admin, args.gateway, args.orderId);
   // 14/11: vitalício por cima de um mensal da Stripe que segue cobrando → chamado pra cancelar a renovação (a linha do mensal fica)
-  const mensal = args.concessao.dias === null ? mensalStripeVivo(linhasAntes) : null;
+  const mensal = args.concessao.dias === null && args.avisarMensalStripe !== false ? mensalStripeVivo(linhasAntes) : null;
   if (mensal?.abacatepay_billing_id) await avisarMensalStripeComVitalicio(admin, { userId: args.userId, sub: mensal.abacatepay_billing_id, pedido: args.orderId, agora: args.agora }).catch(() => false);
   return { r: "creditado", acao, jaLiberado: decisao.jaLiberado, fim: decisao.fim };
 }

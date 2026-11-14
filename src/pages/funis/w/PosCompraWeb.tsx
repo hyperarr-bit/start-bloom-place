@@ -12,7 +12,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Eye, EyeOff, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/lib/analytics";
 import { limparBatismo } from "@/lib/sessao-anonima";
@@ -45,6 +45,7 @@ export function PosCompraWeb() {
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [verSenha, setVerSenha] = useState(false);
 
   useEffect(() => {
     if (etapa !== "liberando") return;
@@ -125,10 +126,16 @@ export function PosCompraWeb() {
           <div className="w-16 h-16 mx-auto rounded-full bg-[#16a34a] text-white grid place-items-center shadow-[0_0_0_10px_#ecfdf3]"><Check className="w-8 h-8" strokeWidth={3} /></div>
           <h1 className="mt-5 text-[24px] font-extrabold tracking-tight">Pronto! Seu CORE está liberado.</h1>
           {email && <p className="mt-2 text-[14px] text-muted-foreground">Seu e-mail: <b className="text-foreground break-all">{email}</b></p>}
-          <label htmlFor="appweb-senha" className="block text-left mt-6 mb-1.5 text-[14px] font-bold">Crie uma senha</label>
-          <input id="appweb-senha" data-testid="appweb-senha" type="password" autoComplete="new-password" minLength={6} value={senha}
-            onChange={(e) => { setSenha(e.target.value); setErro(null); }} onKeyDown={(e) => { if (e.key === "Enter") void criarSenha(); }}
-            className="w-full h-[50px] rounded-xl border-[1.5px] border-black/15 px-3.5 text-[16px] bg-white focus:outline-none focus:border-accent focus:ring-[3px] focus:ring-accent/15" placeholder="mínimo 6 caracteres" />
+          <label htmlFor="appweb-senha" className="block text-left mt-6 mb-1.5 text-[14px] font-bold">Crie uma senha pra entrar no app <span className="font-medium text-muted-foreground">(mínimo 6)</span></label>
+          <div className="relative">
+            <input id="appweb-senha" data-testid="appweb-senha" type={verSenha ? "text" : "password"} autoComplete="new-password" minLength={6} value={senha}
+              onChange={(e) => { setSenha(e.target.value); setErro(null); }} onKeyDown={(e) => { if (e.key === "Enter") void criarSenha(); }}
+              className="w-full h-[50px] rounded-xl border-[1.5px] border-black/15 pl-3.5 pr-12 text-[16px] bg-white focus:outline-none focus:border-accent focus:ring-[3px] focus:ring-accent/15" />
+            <button type="button" onClick={() => setVerSenha((v) => !v)} aria-label={verSenha ? "Esconder a senha" : "Mostrar a senha"} data-testid="appweb-ver-senha"
+              className="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 grid place-items-center text-black/50">
+              {verSenha ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+            </button>
+          </div>
           {erro && <p className="mt-1.5 text-left text-[13.5px] font-semibold text-[#b42318]" role="alert">{erro}</p>}
           <button type="button" disabled={salvando} onClick={() => void criarSenha()} data-testid="appweb-senha-continuar"
             className="mt-4 w-full min-h-[56px] rounded-full bg-[#16121c] text-white text-[17px] font-extrabold disabled:opacity-70 inline-flex items-center justify-center gap-2">
@@ -149,7 +156,9 @@ export function PosCompraWeb() {
             </a>
           </div>
           <div className="mt-6 rounded-2xl border-[1.5px] border-accent/30 bg-accent/5 px-4 py-3.5 text-[14px]" data-testid="appweb-entre-com-email">
-            Entre com este e-mail:{email ? <b className="block text-[16px] text-foreground break-all mt-0.5">{email}</b> : " o da compra"}
+            {contaExistente
+              ? <>Você já tinha conta: entre com sua senha ou receba um código por e-mail.{email ? <b className="block text-[16px] text-foreground break-all mt-0.5">{email}</b> : null}</>
+              : <>Entre com este e-mail e a senha que você criou:{email ? <b className="block text-[16px] text-foreground break-all mt-0.5">{email}</b> : null}</>}
             <span className="block mt-1.5 text-[12.5px] text-muted-foreground">No app, toque em “Já tenho conta? Entrar”.</span>
           </div>
           <button type="button" onClick={usarNoNavegador} data-testid="appweb-navegador"

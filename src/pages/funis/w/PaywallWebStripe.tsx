@@ -118,7 +118,7 @@ export function PaywallWebStripe({ area, answers }: { area: AreaKey; answers: Re
   const mensal = plano === "mensal";
 
   return (
-    <div className="relative w-full max-w-sm mx-auto text-center pb-44 pt-8" data-testid="appweb-paywall">
+    <div className="relative w-full max-w-sm mx-auto text-center pb-44 pt-4" data-testid="appweb-paywall">
       <motion.div
         initial={{ scale: 0.4, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -186,7 +186,10 @@ export function PaywallWebStripe({ area, answers }: { area: AreaKey; answers: Re
       </div>
 
       {/* CTA fixo (o mesmo lugar do app) */}
-      <div className="fixed inset-x-0 bottom-0 z-[75] bg-gradient-to-t from-white via-white/95 to-transparent pt-8" style={{ paddingBottom: "max(0.9rem, env(safe-area-inset-bottom))" }}>
+      {/* revisão 14/11: fundo BRANCO sólido atrás do botão e da linha legal (o degradê deixava texto fantasma atrás);
+          o degradê é só uma faixa fina acima */}
+      <div className="fixed inset-x-0 bottom-0 z-[75] bg-white pt-3" style={{ paddingBottom: "max(0.9rem, env(safe-area-inset-bottom))" }} data-testid="appweb-cta-fundo">
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-5 h-5 bg-gradient-to-t from-white to-transparent" />
         <div className="max-w-sm mx-auto px-5">
           <motion.div animate={{ scale: [1, 1.02, 1] }} transition={{ duration: 1.9, repeat: Infinity, ease: "easeInOut" }}>
             <Button

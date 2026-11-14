@@ -191,7 +191,12 @@ describe("folha: vitalício", () => {
     fireEvent.click(screen.getByTestId("appweb-aba-card"));
     await screen.findByTestId("cartao-falso");
     fireEvent.click(screen.getByTestId("appweb-parcela-3"));
-    await waitFor(() => expect(screen.getByTestId("appweb-pagar-cartao").textContent).toBe("Pagar 3x de R$ 32,63"));
+    await waitFor(() => expect(screen.getByTestId("appweb-pagar-cartao").textContent).toBe("Pagar R$ 97,90 em 3x"));
+    // revisão 7: 3 × 32,63 = 97,89 — a tela diz o total e marca a parcela aproximada; 2x é exato
+    expect(screen.getByTestId("appweb-parcela-3").textContent).toContain("≈ R$ 32,63");
+    expect(screen.getByTestId("appweb-parcela-2").textContent).not.toContain("≈");
+    expect(screen.getByTestId("appweb-parcelas-total").textContent).toContain("Total R$ 97,90");
+    expect(screen.getByTestId("appweb-parcelas-total").textContent).not.toMatch(/sem juros/);
     fireEvent.click(screen.getByTestId("appweb-pagar-cartao"));
     await screen.findByTestId("appweb-pago");
     expect(a.chamadas[0]).toMatchObject({ acao: "cartao", pm: "pm_teste4242", parcelas: 3 });
@@ -266,5 +271,88 @@ describe("folha: ir ao Cartão e voltar pro Pix vivo", () => {
     fireEvent.click(screen.getByTestId("appweb-aba-card"));
     a.pagar();
     expect(await screen.findByTestId("appweb-pago", {}, { timeout: 5000 })).toBeTruthy();
+  });
+});
+
+describe("revisão de tela (14/11)", () => {
+  it("1: recarregar com Pix vivo e ?step=compromissos (volta da demo) → pousa no paywall, não nas perguntas", async () => {
+    localStorage.setItem(CHAVE_FORCA_FUNIL_APP_WEB, "on");
+    gravarPedido({ ...pedidoNovo("vitalicio"), fase: "pix", pi: "pi_1", pix: { data: "00020126" }, email: "a@b.com" });
+    let busca = "";
+    render(
+      <MemoryRouter initialEntries={["/funil-app?step=compromissos"]}>
+        <Routes><Route path="/funil-app" element={<><FunilAppWeb /><Espiao onBusca={(b) => { busca = b; }} /></>} /></Routes>
+      </MemoryRouter>,
+    );
+    await screen.findByTestId("comecar-w");
+    expect(busca).toContain("step=offer");
+    expect(busca).not.toContain("compromissos");
+  });
+  it("1: SEM pedido pendente o ?step=compromissos fica (o funil de sempre)", async () => {
+    localStorage.setItem(CHAVE_FORCA_FUNIL_APP_WEB, "on");
+    let busca = "";
+    render(
+      <MemoryRouter initialEntries={["/funil-app?step=compromissos"]}>
+        <Routes><Route path="/funil-app" element={<><FunilAppWeb /><Espiao onBusca={(b) => { busca = b; }} /></>} /></Routes>
+      </MemoryRouter>,
+    );
+    await screen.findByTestId("comecar-w");
+    expect(busca).toContain("step=compromissos");
+  });
+  it("3+4: com Pix gerado: como pagar no celular, prazo junto do copiar e 'Trocar e-mail' (o MESMO Pix passa a liberar o e-mail novo)", async () => {
+    const a = apiFalsa(); (window as J).__appWebStripe = stripeFalso();
+    gravarPedido({ ...pedidoNovo("vitalicio"), fase: "pix", pi: "pi_1", pix: { data: "00020126", expires_at: 1763134200 }, email: "a@b.com" });
+    folha("vitalicio");
+    expect(screen.getByTestId("appweb-pix-como").textContent).toContain("Pix Copia e Cola");
+    expect(screen.getByTestId("appweb-pix-vence").textContent).toMatch(/Vale até/);
+    fireEvent.click(screen.getByTestId("appweb-trocar-email"));
+    fireEvent.change(screen.getByTestId("appweb-email"), { target: { value: "novo@exemplo.com" } });
+    fireEvent.click(screen.getByTestId("appweb-gerar-pix"));
+    expect(await screen.findByTestId("appweb-pix-qr")).toBeTruthy();
+    expect(a.chamadas[0]).toMatchObject({ acao: "pix", email: "novo@exemplo.com", ref: lerPedido()!.ref });
+    expect(lerPedido()!.email).toBe("novo@exemplo.com");
+  });
+  it("5: recusado no vitalício → 'Pagar no Pix' leva pra aba Pix mantendo o e-mail; no mensal → 'Prefere Pix? Vitalício'", async () => {
+    apiFalsa({ cartao: { ok: false, recusado: true, code: "generic_decline" }, assinar: { ok: false, recusado: true, code: "x" } }); (window as J).__appWebStripe = stripeFalso();
+    folha("vitalicio");
+    fireEvent.change(screen.getByTestId("appweb-email"), { target: { value: "maria@exemplo.com" } });
+    fireEvent.click(screen.getByTestId("appweb-aba-card"));
+    await screen.findByTestId("cartao-falso");
+    await waitFor(() => expect((screen.getByTestId("appweb-pagar-cartao") as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByTestId("appweb-pagar-cartao"));
+    fireEvent.click(await screen.findByTestId("appweb-recusado-pix"));
+    expect(screen.getByTestId("appweb-aba-pix").getAttribute("aria-checked")).toBe("true");
+    expect((screen.getByTestId("appweb-email") as HTMLInputElement).value).toBe("maria@exemplo.com");
+    cleanup(); localStorage.clear();
+    const onPlano = vi.fn();
+    folha("mensal", { onPlano });
+    fireEvent.change(screen.getByTestId("appweb-email"), { target: { value: "maria@exemplo.com" } });
+    await screen.findByTestId("cartao-falso");
+    await waitFor(() => expect((screen.getByTestId("appweb-pagar-cartao") as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByTestId("appweb-pagar-cartao"));
+    const link = await screen.findByTestId("appweb-recusado-pix");
+    expect(link.textContent).toBe("Prefere Pix? Vitalício por R$ 97,90");
+    fireEvent.click(link);
+    expect(onPlano).toHaveBeenCalledWith("vitalicio");
+  });
+  it("6+9+11: botão de pagar no rodapé fixo; garantia com o canal; subtítulo de 1 linha", () => {
+    apiFalsa(); (window as J).__appWebStripe = stripeFalso();
+    folha("vitalicio");
+    expect(screen.getByTestId("appweb-rodape").contains(screen.getByTestId("appweb-gerar-pix"))).toBe(true);
+    expect(screen.getByTestId("appweb-garantia").textContent).toContain("Garantia de 7 dias: 1 e-mail pra contato@coreaplicativo.com.br e devolvemos 100%.");
+    expect(screen.getByTestId("appweb-folha-subtitulo").textContent).toBe("App CORE completo, pra sempre. iPhone, Android e computador.");
+  });
+  it("2: atrás do 'Liberar meu CORE' o fundo é branco sólido (sem degradê translúcido)", () => {
+    const fonte = ler("src/pages/funis/w/PaywallWebStripe.tsx");
+    expect(fonte).toContain('className="fixed inset-x-0 bottom-0 z-[75] bg-white pt-3"');
+    expect(fonte).not.toContain("via-white/95");
+  });
+  it("8: senha com '(mínimo 6)' e olhinho; lojas com 'e a senha que você criou'", () => {
+    const fonte = ler("src/pages/funis/w/PosCompraWeb.tsx");
+    expect(fonte).toContain("Crie uma senha pra entrar no app");
+    expect(fonte).toContain("(mínimo 6)");
+    expect(fonte).toContain('data-testid="appweb-ver-senha"');
+    expect(fonte).toContain("Entre com este e-mail e a senha que você criou");
+    expect(fonte).toContain("Você já tinha conta: entre com sua senha ou receba um código por e-mail.");
   });
 });

@@ -16,7 +16,10 @@ export default function FunilAppWeb() {
   try { guardarForcaFunilAppWeb(search); } catch { /* noop */ }
   if (!funilAppWebLigado()) return <Navigate to="/" replace />;
   const p = new URLSearchParams(search);
-  if (!p.get("step") && pedidoPendente(lerPedido())) {
+  /* 14/11 (revisão): com Pix vivo ou pago sem senha, o /funil-app SEMPRE pousa no paywall (que reabre a folha / o pós-compra),
+   * venha a URL como vier — a volta da demo deixa ?step=compromissos na barra, e recarregar ali caía nas perguntas.
+   * Só aqui: o ComecarW das outras rotas não muda. */
+  if (p.get("step") !== "offer" && pedidoPendente(lerPedido())) {
     p.set("step", "offer");
     return <Navigate to={`/funil-app?${p.toString()}`} replace />;
   }

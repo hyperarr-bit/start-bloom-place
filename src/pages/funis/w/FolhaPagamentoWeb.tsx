@@ -31,8 +31,13 @@ const F = { funil: JORNADA_APP_WEB };
 /** "3x sem juros" na tela: DESLIGADO até o dono decidir (ver LEIA.md — quem paga a taxa do parcelamento na Stripe Brasil) */
 export const SEM_JUROS_NA_TELA = false;
 const ATRIB = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "c_id", "as_id", "ad_id", "pl"];
+/* Parcelas (revisão 14/11): a Stripe cobra o TOTAL (R$ 97,90) e quem divide é o banco do cartão (doc da Stripe: "o banco do
+ * cliente gerencia a cobrança dos valores ao longo do tempo") — o centavo que sobra de 97,90 ÷ 3 cai onde o banco decide.
+ * Por isso a tela diz o total e mostra a parcela com "≈" quando a divisão não é exata (3x ≈ R$ 32,63; 2x = R$ 48,95 exato). */
 const parcelaDe = (n: number) => reaisDe(Math.round(PRECO_VITALICIO_CENTAVOS / n));
+const parcelaExata = (n: number) => PRECO_VITALICIO_CENTAVOS % n === 0;
 const MSG_RECUSADO = "O banco recusou este cartão. Tente outro cartão";
+const GARANTIA = "Garantia de 7 dias: 1 e-mail pra contato@coreaplicativo.com.br e devolvemos 100%.";
 
 function sessaoDaAba(): string {
   try { let s = sessionStorage.getItem("core-appweb-sessao"); if (!s) { s = crypto.randomUUID(); sessionStorage.setItem("core-appweb-sessao", s); } return s; } catch { return "s"; }
@@ -52,6 +57,10 @@ export function FolhaPagamentoWeb({ plano, onPlano, onFechar, onPago, voltaDoBan
   const [email, setEmail] = useState(pedido.email);
   const [erroEmail, setErroEmail] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  /** o último erro foi cartão recusado → a mensagem ganha o atalho pro Pix */
+  const [recusado, setRecusado] = useState(false);
+  /** com Pix gerado: o campo de e-mail volta pra trocar (o MESMO Pix passa a liberar o e-mail novo) */
+  const [trocandoEmail, setTrocandoEmail] = useState(false);
   const [pagando, setPagando] = useState(false);
   const [fase, setFase] = useState<"form" | "pix" | "confirmando" | "pago">(() => (voltaDoBanco ? "confirmando" : pedido.fase === "pix" && pedido.pix ? "pix" : "form"));
   const [copiado, setCopiado] = useState(false);
@@ -134,7 +143,7 @@ export function FolhaPagamentoWeb({ plano, onPlano, onFechar, onPago, voltaDoBan
   useEffect(() => {
     if (!voltaDoBanco) return;
     setPedido((x) => ({ ...x, pi: voltaDoBanco.pi }));
-    if (voltaDoBanco.status === "failed") { setFase("form"); setErro(`O banco não aprovou. ${MSG_RECUSADO}${mensal ? "." : " ou pague no Pix."}`); trackEvent("appweb_cartao_recusado", { ...F, plano, code: "3ds_falhou" }); }
+    if (voltaDoBanco.status === "failed") { setFase("form"); setErro(`O banco não aprovou. ${MSG_RECUSADO}.`); setRecusado(true); trackEvent("appweb_cartao_recusado", { ...F, plano, code: "3ds_falhou" }); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -174,14 +183,14 @@ export function FolhaPagamentoWeb({ plano, onPlano, onFechar, onPago, voltaDoBan
     if (r.acao && r.client_secret && stripeRef.current) {
       setPedido((x) => ({ ...x, pi: r.pi ?? x.pi, sub: r.sub ?? x.sub }));
       const a = await stripeRef.current.handleNextAction({ clientSecret: r.client_secret });
-      if (a.error) { setErro(a.error.message ?? `${MSG_RECUSADO}.`); trackEvent("appweb_cartao_recusado", { ...F, plano, code: String(a.error.code ?? "3ds").slice(0, 40) }); return; }
+      if (a.error) { setErro(a.error.message ?? `${MSG_RECUSADO}.`); setRecusado(true); trackEvent("appweb_cartao_recusado", { ...F, plano, code: String(a.error.code ?? "3ds").slice(0, 40) }); return; }
       if (a.paymentIntent?.status === "succeeded") return concluir({ metodo: "card", plano, pi: r.pi ?? null, sub: r.sub ?? null, parcelas });
       setFase("confirmando");
       return;
     }
     if (r.processando) { setPedido((x) => ({ ...x, pi: r.pi ?? x.pi, sub: r.sub ?? x.sub })); setFase("confirmando"); return; }
     if (r.recusado) {
-      setErro(`${MSG_RECUSADO}${mensal ? "." : " ou pague no Pix."}`);
+      setErro(`${MSG_RECUSADO}.`); setRecusado(true);
       trackEvent("appweb_cartao_recusado", { ...F, plano, code: String(r.code ?? "").slice(0, 40) });
       return;
     }
@@ -201,12 +210,14 @@ export function FolhaPagamentoWeb({ plano, onPlano, onFechar, onPago, voltaDoBan
   const gerarPix = async () => {
     if (pagando) return;
     const e = validarEmail(); if (!e) return;
-    setPagando(true); setErro(null);
+    setPagando(true); setErro(null); setRecusado(false);
     trackEvent("appweb_pagar", { ...F, metodo: "pix", plano: "vitalicio" });
     try {
       await comSessao();
+      const trocando = trocandoEmail;
       const r = await api().acao(corpo("pix"));
       await tratarResposta(r, "pix");
+      if (trocando && r.ok) { setTrocandoEmail(false); trackEvent("appweb_email_trocado", { ...F, mesmo_pix: !!r.mesmo }); }
     } catch { setErro("Não deu pra gerar o Pix. Tente de novo."); trackEvent("appweb_erro", { ...F, etapa: "pix_excecao" }); }
     finally { setPagando(false); }
   };
@@ -216,7 +227,7 @@ export function FolhaPagamentoWeb({ plano, onPlano, onFechar, onPago, voltaDoBan
     const e = validarEmail(); if (!e) return;
     const s = stripeRef.current, els = elementosRef.current;
     if (!s || !els || !cartaoPronto) { setErro("O cartão ainda está carregando. Tente de novo em instantes."); return; }
-    setPagando(true); setErro(null);
+    setPagando(true); setErro(null); setRecusado(false);
     trackEvent("appweb_pagar", { ...F, metodo: "card", plano, parcelas: mensal ? 1 : parcelas });
     try {
       const sub = await els.submit();
@@ -231,7 +242,7 @@ export function FolhaPagamentoWeb({ plano, onPlano, onFechar, onPago, voltaDoBan
 
   const escolherMetodo = (m: Metodo) => {
     if (mensal || m === metodo || pagando) return;
-    setErro(null);
+    setErro(null); setRecusado(false);
     setPedido((x) => ({ ...x, metodo: m }));
     trackEvent("appweb_metodo", { ...F, metodo: m, via: "toque", pix_vivo: fase === "pix" });
     if (fase === "pix" && m === "card") setFase("form"); // o Pix continua salvo; o servidor cancela ele se o cartão for pago
@@ -249,9 +260,37 @@ export function FolhaPagamentoWeb({ plano, onPlano, onFechar, onPago, voltaDoBan
     trackEvent("appweb_pix_copiado", { ...F, ok });
   };
 
+  /* o teclado do celular: o rodapé com o botão de pagar sobe junto (visualViewport), sem cobrir o campo */
+  const [teclado, setTeclado] = useState(0);
+  useEffect(() => {
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    if (!vv) return;
+    const medir = () => setTeclado(Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)));
+    vv.addEventListener("resize", medir); vv.addEventListener("scroll", medir); medir();
+    return () => { vv.removeEventListener("resize", medir); vv.removeEventListener("scroll", medir); };
+  }, []);
+
   const titulo = mensal ? `CORE mensal · ${reaisDe(PRECO_MENSAL_CENTAVOS)}/mês` : `CORE vitalício · ${reaisDe(PRECO_VITALICIO_CENTAVOS)}`;
+  const subtitulo = mensal ? "App CORE completo. iPhone, Android e computador. Cancele quando quiser." : "App CORE completo, pra sempre. iPhone, Android e computador.";
   const sugestao = sugestaoDeEmail(email);
   const vence = pedido.pix?.expires_at ? new Date(pedido.pix.expires_at * 1000).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }) : null;
+  const pixNaTela = !mensal && metodo === "pix" && fase === "pix" && !!pedido.pix && !trocandoEmail;
+  const mostraCampoEmail = !(fase === "pix" && pedido.email) || trocandoEmail;
+  /* o botão principal mora no rodapé fixo da folha (acompanha o teclado): Gerar Pix / Salvar e-mail / Pagar */
+  const rodape: { texto: string; acao: () => void; testid: string; desligado: boolean } | null =
+    fase !== "form" && fase !== "pix" ? null
+      : !mensal && metodo === "pix"
+        ? (pixNaTela ? null : { texto: trocandoEmail ? "Salvar e-mail" : `Gerar Pix de ${reaisDe(PRECO_VITALICIO_CENTAVOS)}`, acao: () => void gerarPix(), testid: "appweb-gerar-pix", desligado: pagando })
+        : {
+          texto: cartaoFalhou ? "Tentar de novo" : mensal ? `Assinar por ${reaisDe(PRECO_MENSAL_CENTAVOS)}/mês` : parcelas > 1 ? `Pagar ${reaisDe(PRECO_VITALICIO_CENTAVOS)} em ${parcelas}x` : `Pagar ${reaisDe(PRECO_VITALICIO_CENTAVOS)}`,
+          acao: () => (cartaoFalhou ? (elementoRef.current = null, void montarCartao()) : void pagarCartao()),
+          testid: "appweb-pagar-cartao", desligado: pagando || (!cartaoPronto && !cartaoFalhou),
+        };
+  const irProPix = () => {
+    setErro(null); setRecusado(false);
+    if (mensal) { onPlano("vitalicio"); setPedido((x) => ({ ...x, plano: "vitalicio", metodo: "pix" })); trackEvent("appweb_metodo", { ...F, metodo: "pix", via: "recusado_mensal" }); return; }
+    escolherMetodo("pix");
+  };
 
   return (
     <div className="fixed inset-0 z-[90] flex flex-col bg-black/40 text-left" role="dialog" aria-modal="true" aria-labelledby="appweb-folha-titulo" data-testid="appweb-folha">
@@ -262,7 +301,7 @@ export function FolhaPagamentoWeb({ plano, onPlano, onFechar, onPago, voltaDoBan
           </button>
           <span className="inline-flex items-center gap-1.5 pr-3 text-[12.5px] font-semibold text-black/55"><Lock className="w-3.5 h-3.5" /> Pagamento seguro</span>
         </div>
-        <div className="flex-1 overflow-y-auto overscroll-contain px-5 pt-5" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
+        <div className="flex-1 overflow-y-auto overscroll-contain px-5 pt-5" style={{ paddingBottom: rodape ? `${96 + teclado}px` : "max(1.5rem, env(safe-area-inset-bottom))" }}>
           <div className="max-w-sm mx-auto">
             {fase === "pago" ? (
               <div className="text-center pt-10" data-testid="appweb-pago">
@@ -279,11 +318,13 @@ export function FolhaPagamentoWeb({ plano, onPlano, onFechar, onPago, voltaDoBan
             ) : (
               <>
                 <h2 id="appweb-folha-titulo" className="text-[19px] font-extrabold tracking-tight" data-testid="appweb-folha-titulo">{titulo}</h2>
-                {mensal && <p className="mt-1 text-[13.5px] text-black/55">{reaisDe(PRECO_MENSAL_CENTAVOS)} por mês no cartão. Cancele quando quiser.</p>}
+                <p className="mt-1 text-[13.5px] text-black/55" data-testid="appweb-folha-subtitulo">{subtitulo}</p>
 
-                {fase === "pix" && pedido.email ? (
+                {!mostraCampoEmail ? (
                   <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border-[1.5px] border-black/10 px-3.5 py-2.5 text-[13px] text-black/55">
                     <span className="min-w-0 break-all">O acesso chega em <b className="block text-[15px] text-[#16121c]">{pedido.email}</b></span>
+                    <button type="button" className="flex-none min-h-[44px] pl-2 text-[14px] font-bold text-accent" data-testid="appweb-trocar-email"
+                      onClick={() => { setTrocandoEmail(true); setEmail(pedido.email); setPedido((x) => ({ ...x, metodo: "pix" })); trackEvent("appweb_email_trocar", { ...F }); }}>Trocar e-mail</button>
                   </div>
                 ) : (
                   <>
@@ -294,6 +335,7 @@ export function FolhaPagamentoWeb({ plano, onPlano, onFechar, onPago, voltaDoBan
                       onChange={(ev) => { setEmail(ev.target.value); setErroEmail(null); }}
                       className="w-full h-[50px] rounded-xl border-[1.5px] border-black/15 px-3.5 text-[16px] bg-white focus:outline-none focus:border-accent focus:ring-[3px] focus:ring-accent/15"
                     />
+                    {trocandoEmail && <p className="mt-1.5 text-[12.5px] text-black/55">O mesmo Pix continua valendo: o acesso vai pro e-mail novo.</p>}
                     {sugestao && <button type="button" className="mt-1.5 text-[13.5px] font-bold text-accent" onClick={() => setEmail(sugestao)}>Você quis dizer {sugestao}?</button>}
                     {erroEmail && <p className="mt-1.5 text-[13.5px] font-semibold text-[#b42318]" role="alert" data-testid="appweb-erro-email">{erroEmail}</p>}
                   </>
@@ -310,8 +352,8 @@ export function FolhaPagamentoWeb({ plano, onPlano, onFechar, onPago, voltaDoBan
                   </div>
                 )}
 
-                {/* Pix */}
-                {!mensal && metodo === "pix" && (fase === "pix" && pedido.pix ? (
+                {/* Pix: o QR + copiar + como pagar no próprio celular */}
+                {pixNaTela && pedido.pix && (
                   <div className="mt-4 text-center" data-testid="appweb-pix-qr">
                     <span className="inline-flex items-center gap-2 rounded-full bg-[#fff7e6] text-[#8a5a00] text-[13px] font-bold px-3 py-1.5"><i className="w-2 h-2 rounded-full bg-[#f59e0b] animate-pulse" />Esperando o Pix</span>
                     <div className="mx-auto mt-3 w-[212px] h-[212px] rounded-2xl border-[1.5px] border-black/10 grid place-items-center bg-white">
@@ -321,15 +363,11 @@ export function FolhaPagamentoWeb({ plano, onPlano, onFechar, onPago, voltaDoBan
                       className="mt-3 w-full h-[52px] rounded-2xl bg-accent text-accent-foreground font-extrabold text-[16px] inline-flex items-center justify-center gap-2">
                       <Copy className="w-4 h-4" /> {copiado ? "Código copiado ✓" : "Copiar código Pix"}
                     </button>
-                    <p className="mt-3 text-[14px] text-black/60">Confirmamos sozinhos em segundos.</p>
-                    {vence && <p className="mt-1 text-[12.5px] text-black/45">Vale até {vence}.</p>}
+                    {vence && <p className="mt-1.5 text-[12.5px] text-black/50" data-testid="appweb-pix-vence">Vale até {vence}.</p>}
+                    <p className="mt-3 text-[14px] text-black/70" data-testid="appweb-pix-como">Copie o código → app do banco → <b>Pix Copia e Cola</b>.</p>
+                    <p className="mt-1 text-[14px] text-black/55">Volte aqui: a gente confirma sozinho.</p>
                   </div>
-                ) : (
-                  <button type="button" disabled={pagando} onClick={() => void gerarPix()} data-testid="appweb-gerar-pix"
-                    className="mt-5 w-full min-h-[56px] rounded-2xl bg-[#16121c] text-white text-[17px] font-extrabold shadow-[0_8px_20px_-6px_rgba(0,0,0,.35)] disabled:opacity-70 inline-flex items-center justify-center gap-2">
-                    {pagando ? <><Loader2 className="w-4 h-4 animate-spin" /> Gerando…</> : `Gerar Pix de ${reaisDe(PRECO_VITALICIO_CENTAVOS)}`}
-                  </button>
-                ))}
+                )}
 
                 {/* Cartão (montado sempre que já foi aberto; some quando o Pix está marcado) */}
                 <div className={metodo === "card" ? "mt-4" : "hidden"} data-testid="appweb-painel-cartao">
@@ -348,35 +386,42 @@ export function FolhaPagamentoWeb({ plano, onPlano, onFechar, onPago, voltaDoBan
                             data-testid={`appweb-parcela-${n}`}
                             onClick={() => { setParcelas(n); setPedido((x) => ({ ...x, parcelas: n })); trackEvent("appweb_parcelas", { ...F, parcelas: n }); }}
                             className={`rounded-xl px-1 py-2 text-[12.5px] leading-tight border-[1.5px] disabled:opacity-40 ${parcelas === n ? "border-accent border-2 bg-accent/5 text-accent font-extrabold" : "border-black/15 font-semibold"}`}>
-                            {n}x<br /><span className="text-[11.5px]">{parcelaDe(n)}</span>
+                            {n}x<br /><span className="text-[11.5px]">{parcelaExata(n) ? "" : "≈ "}{parcelaDe(n)}</span>
                           </button>
                         ))}
                       </div>
-                      {SEM_JUROS_NA_TELA && <p className="mt-1 text-[11.5px] text-black/50 text-center">sem juros</p>}
+                      <p className="mt-1.5 text-[11.5px] text-black/50 text-center" data-testid="appweb-parcelas-total">Total {reaisDe(PRECO_VITALICIO_CENTAVOS)} em qualquer opção{SEM_JUROS_NA_TELA ? ", sem juros" : ""}. Quem divide é o banco do cartão.</p>
                     </div>
                   )}
-                  <button type="button" disabled={pagando || (!cartaoPronto && !cartaoFalhou)} onClick={() => (cartaoFalhou ? (elementoRef.current = null, void montarCartao()) : void pagarCartao())} data-testid="appweb-pagar-cartao"
-                    className="mt-4 w-full min-h-[56px] rounded-2xl bg-[#16121c] text-white text-[17px] font-extrabold shadow-[0_8px_20px_-6px_rgba(0,0,0,.35)] disabled:opacity-60 inline-flex items-center justify-center gap-2">
-                    {pagando ? <><Loader2 className="w-4 h-4 animate-spin" /> Processando…</>
-                      : cartaoFalhou ? "Tentar de novo"
-                      : mensal ? `Assinar por ${reaisDe(PRECO_MENSAL_CENTAVOS)}/mês`
-                      : parcelas > 1 ? `Pagar ${parcelas}x de ${parcelaDe(parcelas)}` : `Pagar ${reaisDe(PRECO_VITALICIO_CENTAVOS)}`}
-                  </button>
                 </div>
 
-                {erro && <p className="mt-3 text-[13.5px] font-semibold text-[#b42318]" role="alert" data-testid="appweb-erro">{erro}</p>}
-                {mensal && (
+                {erro && (
+                  <p className="mt-3 text-[13.5px] font-semibold text-[#b42318]" role="alert" data-testid="appweb-erro">
+                    {erro}{recusado && <> {" "}<button type="button" className="underline font-extrabold" data-testid="appweb-recusado-pix" onClick={irProPix}>{mensal ? `Prefere Pix? Vitalício por ${reaisDe(PRECO_VITALICIO_CENTAVOS)}` : "Pagar no Pix"}</button></>}
+                  </p>
+                )}
+                {mensal && !recusado && (
                   <button type="button" className="block mx-auto mt-4 min-h-[44px] text-[14px] font-bold text-black/70 underline underline-offset-2" data-testid="appweb-prefere-pix"
                     onClick={() => { onPlano("vitalicio"); setPedido((x) => ({ ...x, plano: "vitalicio", metodo: "pix" })); setErro(null); trackEvent("appweb_metodo", { ...F, metodo: "pix", via: "prefere_pix" }); }}>
                     Prefere Pix? Vitalício por {reaisDe(PRECO_VITALICIO_CENTAVOS)}
                   </button>
                 )}
-                <p className="mt-4 text-center text-[12.5px] text-black/60" data-testid="appweb-garantia">🛡️ Garantia de 7 dias: não gostou, devolvemos 100%.</p>
+                <p className="mt-4 text-center text-[12.5px] text-black/60" data-testid="appweb-garantia">🛡️ {GARANTIA}</p>
                 <p className="mt-2 text-center text-[11px] text-black/40">Processado pela Stripe · CORE · CNPJ 55.041.112/0001-82</p>
               </>
             )}
           </div>
         </div>
+        {rodape && (
+          <div className="fixed inset-x-0 z-[91] bg-white border-t border-black/10 px-5 pt-3" style={{ bottom: teclado, paddingBottom: teclado ? "0.75rem" : "max(0.75rem, env(safe-area-inset-bottom))" }} data-testid="appweb-rodape">
+            <div className="max-w-sm mx-auto">
+              <button type="button" disabled={rodape.desligado} onClick={rodape.acao} data-testid={rodape.testid}
+                className="w-full min-h-[56px] rounded-2xl bg-[#16121c] text-white text-[17px] font-extrabold shadow-[0_8px_20px_-6px_rgba(0,0,0,.35)] disabled:opacity-60 inline-flex items-center justify-center gap-2">
+                {pagando ? <><Loader2 className="w-4 h-4 animate-spin" /> {metodo === "pix" && !mensal ? "Gerando…" : "Processando…"}</> : rodape.texto}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

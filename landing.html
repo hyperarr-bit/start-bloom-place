@@ -121,7 +121,7 @@
         // Stripe e, depois do pago, cartão = "Sim, adicionar" cobra 24,90 no mesmo cartão (1 toque); Pix = um Pix novo de 24,90 (Stripe).
         // QA: ?upoferta=on|off (fica: localStorage + cookie), ?upoferta=auto desfaz. Vira html[data-up-oferta="on"]. Rollback: "off".
         // Antes de ligar: deploy stripe-presente + stripe-criar + stripe-webhook (+ presente-resgatar). Ver RELATORIO-UPSELL.md.
-        var UPSELL_OFERTA = "off";
+        var UPSELL_OFERTA = "on"; // 15/11 ~19h50 (dono: "pode publicar aí msm sobe e acompanha a 1 compra"); rollback = "off"
         var CHECKOUT_ORG_V2 = "off"; // 08/11: checkout novo do /organizar (cara do checkout v2, o Pix do Asaas de hoje) construído e DESLIGADO — "on" = todo o /organizar, nos 2 braços do AB_LP (sem sorteio) · rollback "off"
         var STRIPE_PK = "pk_live_51TJnAQQdjmrIbUhHDSWqG1trOT6mFfV87AC4Vv47kFJTAFOhYsNmvryGRnf3x824Ke3mXSsWiFCovKPIR6Kqx0IX00VcuAawhC"; // a chave PUBLICÁVEL (pk_live_…); com "PREENCHER" = comportamento off
         var STRIPE_PRECO_CENTAVOS = 6790; // só pra exibir — o valor cobrado vem SEMPRE do servidor (stripe-criar)

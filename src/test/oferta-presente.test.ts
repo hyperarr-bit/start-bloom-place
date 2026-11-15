@@ -13,7 +13,10 @@ import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 
 const raiz = resolve(__dirname, "../..");
-const HTML = readFileSync(resolve(raiz, "landing.html"), "utf8");
+// 15/11 ~19h50: a chave foi LIGADA no landing.html (dono). Os testes de comportamento rodam a página com a chave "off"
+// (o mesmo HTML com a linha trocada) e ligam por ?upoferta=on / troca explícita, como antes; o 1º teste confere o arquivo real.
+const HTML_REAL = readFileSync(resolve(raiz, "landing.html"), "utf8");
+const HTML = HTML_REAL.replace(/var UPSELL_OFERTA = "on";[^\n]*/, 'var UPSELL_OFERTA = "off";');
 const cabeca = HTML.match(/<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
 
 function rodar(fonte: string, url: string, store: Record<string, string> = {}) {
@@ -31,7 +34,7 @@ const semSorteio = (a: Record<string, string>) => { const { "data-pix": _p, "dat
 const semChave = cabeca.replace(/\s*\/\/ 15\/11: o presente de 24,90 no pós-pago \(UPSELL_OFERTA\)[\s\S]*?\n          \}\n/, "\n");
 
 describe("o <head>: UPSELL_OFERTA", () => {
-  it("no código: off", () => { expect(HTML).toMatch(/var UPSELL_OFERTA = "off";/); });
+  it("no código: on (ligada 15/11, rollback = \"off\")", () => { expect(HTML_REAL).toMatch(/var UPSELL_OFERTA = "on";/); });
   it("off = a /oferta de hoje: os MESMOS atributos e a MESMA memória de antes da chave existir", () => {
     expect(semChave).not.toBe(cabeca);
     for (const url of ["/oferta", "/oferta?utm_content=c7", "/vitalicio", "/organizar", "/simples"]) {

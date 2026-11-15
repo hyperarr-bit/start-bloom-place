@@ -103,7 +103,7 @@ describe("as regras puras", () => {
   it("os textos: curtos, sem gênero, sem pressão (sem 'só hoje', contagem, brinde, desconto riscado)", () => {
     const tudo = [TITULO_PRESENTE_LP, SUB_PRESENTE_LP, ...PASSOS_PRESENTE_LP, NOTA_PRESENTE_LP].join(" ");
     expect(TITULO_PRESENTE_LP).toBe("Leve alguém junto");
-    expect(SUB_PRESENTE_LP).toBe("Dê o CORE pra sempre pra quem você quer bem.");
+    expect(SUB_PRESENTE_LP).toBe("Dê o CORE vitalício pra quem você quer bem.");
     expect(tudo).not.toMatch(/só hoje|hoje|últim|acaba|minutos|grátis|brinde|\bamig[oa]\b|\bele\b|\bela\b|namorad/i);
   });
   it("o cartão usa o MESMO link e a MESMA mensagem da /presente/dar (src/lib/presente reexporta ./presente-link)", () => {
@@ -199,7 +199,7 @@ describe("UPSELL_POS \"presente\": a página própria → Pix → cartão do Wha
         expect(pag.getAttribute("role")).toBe("dialog");
         expect(pag.querySelector('[data-testid="presente-faixa"]')!.textContent).toBe("Pagamento confirmado · o CORE é seu pra sempre");
         expect(oferta.querySelector("h1")!.textContent).toBe("Leve alguém junto");
-        expect(oferta.textContent).toContain("Dê o CORE pra sempre pra quem você quer bem.");
+        expect(oferta.textContent).toContain("Dê o CORE vitalício pra quem você quer bem.");
         expect([...oferta.querySelectorAll('[data-testid="presente-passos"] li')].map((l) => l.textContent)).toEqual(["1Você paga o Pix", "2Manda o link no WhatsApp", "3A pessoa abre e cria a conta dela"]);
         expect(oferta.textContent).toContain("Vale pra 1 pessoa que ainda não tem o CORE.");
         const barra = pag.querySelector('[data-testid="presente-barra"]')!;

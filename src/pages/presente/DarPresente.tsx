@@ -302,7 +302,7 @@ export function DarPresente() {
           {topo}
           <div className="pv-cena pv-cena-pequena"><IlustraPresente size={112} /></div>
           <h1 className="pv-titulo">Leve alguém <em>junto</em></h1>
-          <p className="pv-sub">Dê o CORE pra sempre pra quem você quer bem. <b>{precoTxt}, uma vez.</b> Sem mensalidade.</p>
+          <p className="pv-sub">Dê o CORE vitalício pra quem você quer bem. <b>{precoTxt}, uma vez.</b> Sem mensalidade.</p>
           <p className="dp-preco" data-testid="dar-preco-presente">Preço de presente, só pra quem já tem o CORE.</p>
           {copiado ? (
             <div className="dp-volte" data-testid="dar-volte" role="status">
@@ -349,7 +349,7 @@ export function DarPresente() {
           {topo}
           <div className="pv-cena pv-cena-pequena"><IlustraPresente size={112} /></div>
           <h1 className="pv-titulo">Leve alguém <em>junto</em></h1>
-          <p className="pv-sub">Dê o CORE pra sempre pra quem você quer bem. <b>{precoTxt}, uma vez.</b> Sem mensalidade.</p>
+          <p className="pv-sub">Dê o CORE vitalício pra quem você quer bem. <b>{precoTxt}, uma vez.</b> Sem mensalidade.</p>
           <p className="dp-preco" data-testid="dar-preco-presente">Preço de presente, só pra quem já tem o CORE.</p>
           <div className="pv-como"><div><b>1</b>Você confirma aqui</div><div><b>2</b>Manda o link</div><div><b>3</b>A pessoa cria a conta</div></div>
           {recusou && <p className="dp-preco" role="alert" data-testid="dar-recusado" style={{ marginTop: 12, color: "#b42318", fontWeight: 600 }}>{recusou}</p>}

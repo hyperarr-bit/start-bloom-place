@@ -72,7 +72,7 @@ export type ResultadoUmToque = { pago: true; pedido: string; codigo: string | nu
 
 /* ───────── os textos (curtos, sem gênero, sem "só hoje", sem contagem, sem brinde) ───────── */
 export const TITULO_PRESENTE_LP = "Leve alguém junto";
-export const SUB_PRESENTE_LP = "Dê o CORE pra sempre pra quem você quer bem.";
+export const SUB_PRESENTE_LP = "Dê o CORE vitalício pra quem você quer bem.";
 export const PASSOS_PRESENTE_LP = ["Você paga o Pix", "Manda o link no WhatsApp", "A pessoa abre e cria a conta dela"] as const;
 export const NOTA_PRESENTE_LP = "Vale pra 1 pessoa que ainda não tem o CORE. É separado do seu.";
 export const PRECO_TXT_PRESENTE_LP = "uma vez, sem mensalidade";

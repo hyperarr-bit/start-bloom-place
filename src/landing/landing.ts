@@ -2158,9 +2158,21 @@ function apiPresenteOferta(c: CompraPaga): ApiOfertaPresente {
 let presenteOferta: import("./upsell-2027").Upsell2027 | null = null;
 /** revisão B5: a compra fica na aba (sessionStorage) — a recarga depois de pagar reabre o presente onde parou (oferta, QR ou cartão) */
 const CHAVE_COMPRA_PRESENTE = "oferta-presente-compra";
-const guardarCompraPresente = (c: CompraPaga) => { try { sessionStorage.setItem(CHAVE_COMPRA_PRESENTE, JSON.stringify(c)); } catch { /* heap */ } };
+/** revisão 2 (B-novo-1): a recarga só reabre o presente nas primeiras horas (uma aba velha do Instagram não traz a oferta de volta) */
+const REABRE_PRESENTE_MS = 3 * 3600e3;
+const guardarCompraPresente = (c: CompraPaga) => {
+  try {
+    const ja = JSON.parse(sessionStorage.getItem(CHAVE_COMPRA_PRESENTE) || "null") as { pi?: string; em?: number } | null;
+    sessionStorage.setItem(CHAVE_COMPRA_PRESENTE, JSON.stringify({ ...c, em: ja?.pi === c.pi && typeof ja.em === "number" ? ja.em : Date.now() }));
+  } catch { /* heap */ }
+};
 const lerCompraPresente = (): CompraPaga | null => {
-  try { const c = JSON.parse(sessionStorage.getItem(CHAVE_COMPRA_PRESENTE) || "null") as CompraPaga | null; return c && typeof c.pi === "string" && /^pi_/.test(c.pi) && typeof c.ref === "string" ? c : null; } catch { return null; }
+  try {
+    const c = JSON.parse(sessionStorage.getItem(CHAVE_COMPRA_PRESENTE) || "null") as (CompraPaga & { em?: number }) | null;
+    if (!c || typeof c.pi !== "string" || !/^pi_/.test(c.pi) || typeof c.ref !== "string") return null;
+    if (typeof c.em !== "number" || Date.now() - c.em > REABRE_PRESENTE_MS) return null;
+    return c;
+  } catch { return null; }
 };
 let presenteOfertaPago = false;
 let abrindoPresente: string | null = null;
@@ -2193,7 +2205,7 @@ const abrirPresenteOferta = (c: CompraPaga) => {
     u.render();
     // revisão A2: a compra principal não ficou ligada a uma conta (o webhook ignorou) → o presente sai da tela, sem cobrar nada
     if (!SIMULADO) void postarPresente({ acao: "estado", ref: c.ref, pi: c.pi }).then((e) => { if (e.motivo === "sem_conta" && presenteOferta === u) { evento("landing_presente_sem_acesso", { motivo: "sem_conta", pagina: "oferta" }); presenteOferta = null; u.parar(); } }).catch(() => null);
-  }, () => evento("landing_erro", { onde: "chunk_presente_oferta" }));
+  }, () => { abrindoPresente = null; evento("landing_erro", { onde: "chunk_presente_oferta" }); }); // revisão 2 (B-novo-2): a falha não prende a marca
 };
 if (UP_OFERTA) window.setTimeout(() => {
   const c = lerCompraPresente();

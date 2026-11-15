@@ -64,6 +64,17 @@ O que **não** mudou: título, ilustração, passos 2 e 3, a nota "Vale pra 1 pe
 - **Mantido:** o commit fce990d5 (subtítulo "Dê o CORE vitalício pra quem você quer bem.").
 - **Ficou de fora:** depois do "Agora não", uma recarga mostra a página de venda (comportamento de hoje da /oferta depois de pagar, sem LPO). Fica pra outra rodada, se o dono quiser.
 
+## Consertos da 2ª revisão (antes de ligar pra todos)
+- **M-novo-1 (presente podia ir pra outra conta da mesma pessoa):** o webhook do presente procura o dono nesta ordem:
+  1. a linha da compra principal;
+  2. o registro de pago em dobro;
+  3. o `user_id` da sessão gravado no PI do presente (a mesma conta que a compra principal prefere), se essa conta existir.
+  O **e-mail** só entra no **5º envio**, depois de esperar a compra principal.
+- **B-novo-1:** a compra guardada na aba leva a hora. A recarga só reabre o presente nas primeiras **3 horas**, então uma aba velha do Instagram não traz a oferta de volta.
+- **B-novo-2:** se o módulo do presente falhar ao carregar, a marca de "abrindo" é limpa e a próxima tentativa funciona.
+- **B-novo-4:** a compra que foi ignorada e depois creditada (a linha existe) volta a valer pro presente.
+- **B-novo-3 (busca de usuários lenta):** fica como está. É a mesma busca da compra principal e agora só roda no último envio.
+
 ## O que falta pra ir ao ar
 1. **Deploy, nesta ordem (trava da revisão M2):**
    1. `stripe-webhook`. **Sempre primeiro**: o antigo trata `pagina=presente_oferta` como "outra_pagina" (alarme + 200, sem reenvio, e o presente ficaria sem código).

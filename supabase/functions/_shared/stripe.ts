@@ -217,11 +217,17 @@ export async function tratarStripe(deps: DepsStripe, req: { assinatura: string |
       if (await existe(admin, `stripe-estorno:${pi.id}`)) return ignorar("estornada");
       const principal = t(md.pi_principal, 80);
       // revisão A2: a conta da compra também pelo pago em dobro e pelo e-mail (só leitura); sem ela, alarme pro dono — nunca 3 dias de reenvio mudo
-      const dono = principal ? await donoDaCompra(admin as unknown as ClienteMin, principal, { email, acharConta: deps.acharConta }) : null;
+      // revisão 2 (M-novo-1): 1º a linha da compra / o pago em dobro / o user_id da sessão (o mesmo que a principal prefere); o e-mail só no
+      // ÚLTIMO envio, depois de esperar a compra principal (senão o presente podia ir pra outra conta da mesma pessoa)
+      const contaExiste = async (uid: string) => { const u = await (admin as unknown as { auth?: { admin?: { getUserById?: (id: string) => Promise<{ data?: { user?: unknown } }> } } }).auth?.admin?.getUserById?.(uid).catch(() => null); return !!u?.data?.user; };
+      let dono = principal ? await donoDaCompra(admin as unknown as ClienteMin, principal, { userId: t(md.user_id, 64), existe: contaExiste }) : null;
       if (!dono) {
         const ignorada = principal ? await compraIgnorada(admin as unknown as ClienteMin, principal) : true;
         const n = ignorada ? MAX_ESPERA_PRESENTE : await contarEsperaPresente(admin, pi.id);
         if (n < MAX_ESPERA_PRESENTE) throw new Error("presente_sem_conta_da_compra"); // a compra principal ainda não chegou: a Stripe reenvia
+        if (principal && !ignorada) dono = await donoDaCompra(admin as unknown as ClienteMin, principal, { email, acharConta: deps.acharConta });
+      }
+      if (!dono) {
         log("presente pago SEM conta da compra — alarme", { pi: pi.id, principal });
         if (await reservar(admin, `stripe-presente-sem-conta:${pi.id}`, "alarme") === "ok") {
           try { await admin.from("analytics_events").insert({ event_name: "stripe_presente_sem_conta", user_id: null, event_data: { pi: pi.id, pi_principal: principal, valor_cents: valor, email: mascararEmail(email) } }); } catch { /* o push ainda sai */ }

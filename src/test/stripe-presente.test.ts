@@ -275,10 +275,29 @@ describe("revisão A2: compra principal sem conta", () => {
     expect((await mandar(b, "evt_a")).corpo).toMatchObject({ ok: true, presente: true });
     expect(b.db.presentes[0]).toMatchObject({ comprador_id: "u7" });
   });
-  it("pelo e-mail da compra (só leitura)", async () => {
+  it("pelo e-mail da compra (só leitura) — só no ÚLTIMO envio, depois de esperar a compra principal (revisão 2 M-novo-1)", async () => {
     const b = banco();
-    expect((await mandar(b, "evt_b", { acharConta: async (e) => (e === "ana@exemplo.com" ? "u8" : null) })).corpo).toMatchObject({ presente: true });
+    const acharConta = async (e: string) => (e === "ana@exemplo.com" ? "u8" : null);
+    for (let i = 1; i <= 4; i++) expect((await mandar(b, `evt_b${i}`, { acharConta })).status).toBe(500);
+    expect(b.db.presentes).toHaveLength(0);
+    expect((await mandar(b, "evt_b5", { acharConta })).corpo).toMatchObject({ presente: true });
     expect(b.db.presentes[0]).toMatchObject({ comprador_id: "u8" });
+  });
+  it("o user_id da sessão gravado no PI do presente vem antes do e-mail (a mesma conta que a compra principal prefere)", async () => {
+    const b = banco();
+    const UID = "11111111-2222-4333-8444-555555555555";
+    (b.admin as Record<string, unknown>).auth = { admin: { getUserById: async (id: string) => ({ data: { user: id === UID ? { id } : null } }) } };
+    const c = JSON.stringify({ id: "evt_u", type: "payment_intent.succeeded", livemode: true, data: { object: { id: "pi_p9", amount: 2490, amount_received: 2490, currency: "brl", status: "succeeded", metadata: { pagina: "presente_oferta", pi_principal: "pi_main", email: "ana@exemplo.com", user_id: UID } } } });
+    const t = Math.floor(Date.now() / 1000);
+    expect((await tratarStripe(depsWh(b, { acharConta: async () => "u_outra" }), { corpo: c, assinatura: assinar(c, t) })).corpo).toMatchObject({ presente: true });
+    expect(b.db.presentes[0]).toMatchObject({ comprador_id: UID });
+  });
+  it("compra ignorada e depois creditada (a linha existe) = vale (revisão 2 B-novo-4)", async () => {
+    const b = banco(), s = stripe();
+    b.db.analytics_events.push({ event_name: "stripe_venda_ignorada", event_data: { pi: "pi_main" } });
+    b.db.subscriptions.push({ user_id: "u1", abacatepay_billing_id: "pi_main", payment_method: "stripe" });
+    const c = (await compraPorRef(deps(b, s), REF, "pi_main"))!;
+    expect((await estadoPresente(deps(b, s), c)).corpo).toMatchObject({ ok: true });
   });
   it("compra ignorada → alarme pro dono e 200 (sem 3 dias de reenvio mudo)", async () => {
     const b = banco();

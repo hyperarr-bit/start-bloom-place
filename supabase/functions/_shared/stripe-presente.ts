@@ -83,7 +83,11 @@ export async function compraDoDono(deps: DepsPresente, dono: string): Promise<Co
  * A conta da compra principal. 1º a linha que o webhook criou; revisão A2: a compra que NÃO gerou linha (pago em dobro → "preservado")
  * fica no registro pix_pago_em_dobro (order_id = o PI); por fim a conta do e-mail da compra (só leitura). null = ainda não chegou.
  */
-export async function donoDaCompra(admin: ClienteMin, piPrincipal: string, extra: { email?: string | null; acharConta?: (email: string) => Promise<string | null> } = {}): Promise<string | null> {
+export async function donoDaCompra(admin: ClienteMin, piPrincipal: string, extra: {
+  /** revisão 2 (M-novo-1): o user_id da sessão gravado no PI do presente (o mesmo que a compra principal prefere) — antes do e-mail */
+  userId?: string | null; existe?: (uid: string) => Promise<boolean>;
+  email?: string | null; acharConta?: (email: string) => Promise<string | null>;
+} = {}): Promise<string | null> {
   try {
     const { data } = await admin.from("subscriptions").select("user_id").eq("abacatepay_billing_id", piPrincipal).eq("payment_method", "stripe");
     const l = (Array.isArray(data) ? data[0] : data) as { user_id?: string } | undefined;
@@ -94,11 +98,17 @@ export async function donoDaCompra(admin: ClienteMin, piPrincipal: string, extra
     const l = (Array.isArray(data) ? data[0] : data) as { user_id?: string } | undefined;
     if (l?.user_id) return l.user_id;
   } catch { /* segue */ }
+  if (extra.userId && /^[0-9a-f-]{36}$/i.test(extra.userId) && (!extra.existe || await extra.existe(extra.userId).catch(() => false))) return extra.userId;
   if (extra.email && extra.acharConta) { try { return await extra.acharConta(extra.email.toLowerCase()); } catch { /* null */ } }
   return null;
 }
 /** revisão A2: a compra principal foi IGNORADA pelo webhook (sem conta, valor…)? Aí o presente não é oferecido nem cobrado. */
 export async function compraIgnorada(admin: ClienteMin, piPrincipal: string): Promise<boolean> {
+  try {
+    // revisão 2 (B-novo-4): ignorada uma vez e creditada depois (reenvio/à mão) = vale — a linha da compra manda
+    const { data: linha } = await admin.from("subscriptions").select("user_id").eq("abacatepay_billing_id", piPrincipal).eq("payment_method", "stripe");
+    if (Array.isArray(linha) ? linha.length > 0 : !!linha) return false;
+  } catch { /* segue pro registro */ }
   try {
     const { data } = await admin.from("analytics_events").select("id").eq("event_name", "stripe_venda_ignorada").eq("event_data->>pi", piPrincipal);
     return Array.isArray(data) ? data.length > 0 : !!data;

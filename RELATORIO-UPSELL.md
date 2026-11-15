@@ -45,9 +45,34 @@ O que **não** mudou: título, ilustração, passos 2 e 3, a nota "Vale pra 1 pe
 - **Chave off:** os mesmos atributos e a mesma memória do `<head>` de antes da chave existir. O pedido não leva `salvar_cartao` e nada do presente aparece.
 - Já falhava antes deste ramo, e não fui eu: `seguranca/env-no-bundle.test.ts` ("as rotas continuam as mesmas", o vercel.json tem 30 rotas e o teste espera 28).
 
+## Consertos da revisão (15/11, 2ª rodada)
+- **A1 (link repassado cobrava o cartão do dono):** pelo token (a /presente/dar), o 1 toque só funciona com o **JWT do próprio dono** (o usuário logado tem que ser a conta do token). Sem isso: `cartao` responde `login`, a página vai pro Pix, e o `estado` não mostra bandeira nem final. Pela aba da compra (`ref`+`pi`) segue igual.
+- **A2 (presente pago sem código):**
+  - O dono agora também é achado pelo registro `pix_pago_em_dobro` (compra que virou "preservado") e pelo e-mail da compra (`acharConta`, só leitura).
+  - Compra principal **ignorada** pelo webhook → nenhum presente oferecido nem cobrado: o `estado`, o `cartao` e o `pix` respondem `sem_conta`, e a página fecha o presente.
+  - No webhook: compra ignorada → alarme pro dono + 200. Conta que ainda não chegou → 500 nos 4 primeiros reenvios e, no 5º, alarme ("⚠️ Presente Stripe pago SEM conta") + 200.
+- **A3 (o cartão salvo podia derrubar a venda):** se a Stripe recusar o atualizar com `setup_future_usage` (ex.: junto com parcelas), o stripe-criar repete **sem ele** e a venda segue (o presente cai pro Pix). A página só manda `salvar_cartao` quando ela paga no **cartão** (no Pix nunca). Tem teste da falha.
+- **M1 (mudança sem chave na /presente/dar):** nova env do servidor **`PRESENTE_STRIPE`** (padrão off). Sem `"on"`:
+  - a porta do token do `stripe-presente` responde `compra`, e a /presente/dar segue igual à de hoje (14,90);
+  - o `presente-resgatar` não recusa o Pix de 14,90 pra comprador da /oferta.
+  A porta da aba (upsell) depende só da chave `UPSELL_OFERTA` da página.
+- **M2:** a ordem do deploy ficou na seção abaixo.
+- **B1:** a Idempotency-Key do 1 toque passou a ser por tentativa (`presente-cartao-<pi>-<n>`, reservada em webhook_events, no máximo 3). Uma recusa não prende mais 24 h, e o return_url diferente entre /oferta e /presente/dar não dá erro de idempotência.
+- **B2:** o PI do presente fica guardado com chave única em `webhook_events` (`presente-pi:<pi principal>`), lido antes do analytics. Nunca nasce um 2º PI.
+- **B3:** sem o Stripe.js no 3DS, a mensagem é neutra ("Não deu pra confirmar agora…"), não "O banco não aprovou".
+- **B5:** a compra fica na aba (`sessionStorage`). Recarregar depois de pagar reabre o presente onde parou (oferta, QR ou cartão), com trava contra abrir 2 vezes.
+- **Mantido:** o commit fce990d5 (subtítulo "Dê o CORE vitalício pra quem você quer bem.").
+- **Ficou de fora:** depois do "Agora não", uma recarga mostra a página de venda (comportamento de hoje da /oferta depois de pagar, sem LPO). Fica pra outra rodada, se o dono quiser.
+
 ## O que falta pra ir ao ar
-1. **Deploy das functions** (nesta ordem): `stripe-webhook`, depois `stripe-presente` (nova), depois `stripe-criar`, depois `presente-resgatar`. Sem o webhook novo, o presente pago cairia no alarme "Venda Stripe IGNORADA". Não há migração.
-2. **Secret:** nenhum novo. A `STRIPE_SECRET_KEY` precisa de escrita em **Customers** e **PaymentMethods** (a do /funil-app já pede isso). Confirmar que a conta aceita Pix com `expires_after_seconds=86400`.
+1. **Deploy, nesta ordem (trava da revisão M2):**
+   1. `stripe-webhook`. **Sempre primeiro**: o antigo trata `pagina=presente_oferta` como "outra_pagina" (alarme + 200, sem reenvio, e o presente ficaria sem código).
+   2. `stripe-criar`.
+   3. `stripe-presente` (nova).
+   4. `presente-resgatar` **junto com o site**.
+   5. Só então a env `PRESENTE_STRIPE=on` (liga a /presente/dar a 24,90).
+   Não há migração.
+2. **Secret/env:** a env nova `PRESENTE_STRIPE` (off por padrão; ver o passo 1). A `STRIPE_SECRET_KEY` precisa de escrita em **Customers** e **PaymentMethods** (a do /funil-app já pede isso). Confirmar que a conta aceita Pix com `expires_after_seconds=86400`.
 3. **Site (Vercel):** sobe inerte com as chaves off.
 4. **Ligar:** `UPSELL_OFERTA = "on"` no `landing.html`. A entrada e a linha do "Agora não" ligam com `PRESENTE_ENTRADA = "web"` em `src/lib/presente-entrada.ts`. QA sem ligar: `/oferta?upoferta=on` e `?presente-entrada=on`. Rollback: "off".
 5. **Compra real de teste nos 2 caminhos (é sua):** (a) `/oferta?upoferta=on` no cartão → "Sim, adicionar" (confere que anexar o cartão depois do pagamento funciona na sua conta Stripe; se falhar, a tela cai sozinha no Pix); (b) `/oferta?upoferta=on` no Pix → Pix de 24,90. Depois, a /presente/dar pela entrada e o estorno.

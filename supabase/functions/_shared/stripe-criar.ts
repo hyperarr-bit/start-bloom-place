@@ -193,7 +193,13 @@ export async function criarOuReaproveitar(
   // requires_action (3DS abandonado / Pix gerado) também aceita mudar metadata e receipt_email na Stripe — só quando é uma NOVA
   // tentativa de pagar (veio e-mail ou CPF); a recarga só lê (o Pix pendente fica intacto)
   if (PODE_ATUALIZAR.has(String(j.status)) || (String(j.status) === "requires_action" && (p.email || p.cpf))) {
-    const up = await stripe(`payment_intents/${j.id}`, paramsAtualizar(md, p.email, (j.metadata ?? {}) as Record<string, string>, p.cpf, p.salvarCartao === true && oferta.pagina === "oferta" && !!p.email));
+    const salvar = p.salvarCartao === true && oferta.pagina === "oferta" && !!p.email;
+    let up = await stripe(`payment_intents/${j.id}`, paramsAtualizar(md, p.email, (j.metadata ?? {}) as Record<string, string>, p.cpf, salvar));
+    // revisão A3: a Stripe recusou o setup_future_usage (ex.: junto com parcelas) → repete SEM ele e a venda segue (o presente cai pro Pix)
+    if (!up.ok && salvar) {
+      log("atualizar com cartão salvo falhou — sem salvar", { code: String((up.j.error as Record<string, unknown> | undefined)?.code ?? "") });
+      up = await stripe(`payment_intents/${j.id}`, paramsAtualizar(md, p.email, (j.metadata ?? {}) as Record<string, string>, p.cpf, false));
+    }
     if (up.ok) j = up.j;
     else {
       log("atualizar falhou", { code: String((up.j.error as Record<string, unknown> | undefined)?.code ?? "") });

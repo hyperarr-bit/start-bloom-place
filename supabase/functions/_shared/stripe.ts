@@ -22,7 +22,7 @@ import { assuntoVenda, htmlVenda } from "./email-venda.ts";
 import { acharContaHotmart, eventoPurchaseHotmart, mascararEmail, type AdminHotmart, type RegistroHotmart } from "./hotmart.ts";
 import { MENSAL_APP_WEB, OFERTAS_STRIPE, ofertaDaPagina } from "./stripe-ofertas.ts";
 import { avisarMensalStripeComVitalicio, registrarPagoEmDobro } from "./landing-travas.ts";
-import { PRESENTE_STRIPE, donoDaCompra } from "./stripe-presente.ts";
+import { PRESENTE_STRIPE, compraIgnorada, donoDaCompra } from "./stripe-presente.ts";
 import { garantirPresente, mandarLinkPorEmail } from "./presente.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -120,6 +120,16 @@ async function contarFalhaEmail(admin: ClienteMin, pi: string): Promise<number> 
   }
   return MAX_TENTATIVAS_EMAIL;
 }
+/** revisão A2: o presente que chega antes da compra principal espera até 5 reenvios da Stripe; depois, alarme */
+export const MAX_ESPERA_PRESENTE = 5;
+async function contarEsperaPresente(admin: ClienteMin, pi: string): Promise<number> {
+  for (let n = 1; n <= MAX_ESPERA_PRESENTE; n++) {
+    const r = await reservar(admin, `stripe-presente-espera:${pi}:${n}`, "espera");
+    if (r === "ok") return n;
+    if (r === "erro") return 1;
+  }
+  return MAX_ESPERA_PRESENTE;
+}
 const reais = (c: number) => `R$ ${(c / 100).toFixed(2).replace(".", ",")}`;
 
 export async function tratarStripe(deps: DepsStripe, req: { assinatura: string | null; corpo: string }): Promise<Resposta> {
@@ -206,8 +216,19 @@ export async function tratarStripe(deps: DepsStripe, req: { assinatura: string |
       if (pi.currency !== "brl" || valor !== PRESENTE_STRIPE.centavos) return ignorar("valor_presente");
       if (await existe(admin, `stripe-estorno:${pi.id}`)) return ignorar("estornada");
       const principal = t(md.pi_principal, 80);
-      const dono = principal ? await donoDaCompra(admin as unknown as ClienteMin, principal) : null;
-      if (!dono) throw new Error("presente_sem_conta_da_compra");
+      // revisão A2: a conta da compra também pelo pago em dobro e pelo e-mail (só leitura); sem ela, alarme pro dono — nunca 3 dias de reenvio mudo
+      const dono = principal ? await donoDaCompra(admin as unknown as ClienteMin, principal, { email, acharConta: deps.acharConta }) : null;
+      if (!dono) {
+        const ignorada = principal ? await compraIgnorada(admin as unknown as ClienteMin, principal) : true;
+        const n = ignorada ? MAX_ESPERA_PRESENTE : await contarEsperaPresente(admin, pi.id);
+        if (n < MAX_ESPERA_PRESENTE) throw new Error("presente_sem_conta_da_compra"); // a compra principal ainda não chegou: a Stripe reenvia
+        log("presente pago SEM conta da compra — alarme", { pi: pi.id, principal });
+        if (await reservar(admin, `stripe-presente-sem-conta:${pi.id}`, "alarme") === "ok") {
+          try { await admin.from("analytics_events").insert({ event_name: "stripe_presente_sem_conta", user_id: null, event_data: { pi: pi.id, pi_principal: principal, valor_cents: valor, email: mascararEmail(email) } }); } catch { /* o push ainda sai */ }
+          await deps.avisarDono("⚠️ Presente Stripe pago SEM conta", `PI ${pi.id} · ${reais(valor)} · compra ${principal ?? "?"} · gere o código à mão ou devolva`, `stripe-presente-sem-conta:${pi.id}`).catch(() => {});
+        }
+        return { status: 200, corpo: { ok: true, presente: true, sem_conta: true } };
+      }
       const g = await garantirPresente(admin as unknown as ClienteMin, { orderId: pi.id, compradorId: dono, valorCentavos: PRESENTE_STRIPE.centavos });
       if (!g) throw new Error("presente_nao_gravou");
       if (await reservar(admin, `stripe-venda:${pi.id}`, "venda") === "ok") {

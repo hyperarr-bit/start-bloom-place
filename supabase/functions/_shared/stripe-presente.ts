@@ -30,7 +30,15 @@ export const PRESENTE_STRIPE = { pagina: "presente_oferta", centavos: 2490, idem
 export const OFERTA_DO_PRESENTE = OFERTAS_STRIPE.oferta;
 export const RETORNO_PRESENTE = "https://www.coreaplicativo.com.br/oferta";
 
-export type DepsPresente = { admin: ClienteMin; stripe: ChamarStripe; log: (m: string, d?: Record<string, unknown>) => void };
+export type DepsPresente = {
+  admin: ClienteMin; stripe: ChamarStripe; log: (m: string, d?: Record<string, unknown>) => void;
+  /** revisão A2: achar a conta pelo e-mail da compra (só LÊ: listUsers) quando a compra não gerou linha */
+  acharConta?: (email: string) => Promise<string | null>;
+};
+/** revisão A1: quem pediu pelo TOKEN é o próprio dono logado? (sem isso: só Pix, e o estado não mostra o cartão) */
+export type Quem = { podeCartao: boolean };
+/** revisão M1: chave do servidor (env PRESENTE_STRIPE). Sem "on", a porta do token (a /presente/dar e a entrada) fica como hoje (14,90) */
+export const presenteStripeLigado = (v: string | null | undefined): boolean => v === "on";
 export type RespostaPresente = { status: number; corpo: Record<string, unknown> };
 type J = Record<string, unknown>;
 const ok = (corpo: J): RespostaPresente => ({ status: 200, corpo: { ok: true, preco: PRESENTE_STRIPE.centavos, ...corpo } });
@@ -71,13 +79,30 @@ export async function compraDoDono(deps: DepsPresente, dono: string): Promise<Co
     return l ? await lerCompra(deps, String(l.abacatepay_billing_id)) : null;
   } catch { return null; }
 }
-/** a conta da compra principal (a linha que o webhook criou). null = ainda não chegou */
-export async function donoDaCompra(admin: ClienteMin, piPrincipal: string): Promise<string | null> {
+/**
+ * A conta da compra principal. 1º a linha que o webhook criou; revisão A2: a compra que NÃO gerou linha (pago em dobro → "preservado")
+ * fica no registro pix_pago_em_dobro (order_id = o PI); por fim a conta do e-mail da compra (só leitura). null = ainda não chegou.
+ */
+export async function donoDaCompra(admin: ClienteMin, piPrincipal: string, extra: { email?: string | null; acharConta?: (email: string) => Promise<string | null> } = {}): Promise<string | null> {
   try {
     const { data } = await admin.from("subscriptions").select("user_id").eq("abacatepay_billing_id", piPrincipal).eq("payment_method", "stripe");
     const l = (Array.isArray(data) ? data[0] : data) as { user_id?: string } | undefined;
-    return l?.user_id ?? null;
-  } catch { return null; }
+    if (l?.user_id) return l.user_id;
+  } catch { /* segue */ }
+  try {
+    const { data } = await admin.from("analytics_events").select("user_id").eq("event_name", "pix_pago_em_dobro").eq("event_data->>order_id", piPrincipal);
+    const l = (Array.isArray(data) ? data[0] : data) as { user_id?: string } | undefined;
+    if (l?.user_id) return l.user_id;
+  } catch { /* segue */ }
+  if (extra.email && extra.acharConta) { try { return await extra.acharConta(extra.email.toLowerCase()); } catch { /* null */ } }
+  return null;
+}
+/** revisão A2: a compra principal foi IGNORADA pelo webhook (sem conta, valor…)? Aí o presente não é oferecido nem cobrado. */
+export async function compraIgnorada(admin: ClienteMin, piPrincipal: string): Promise<boolean> {
+  try {
+    const { data } = await admin.from("analytics_events").select("id").eq("event_name", "stripe_venda_ignorada").eq("event_data->>pi", piPrincipal);
+    return Array.isArray(data) ? data.length > 0 : !!data;
+  } catch { return false; }
 }
 
 /** o cartão salvo da compra principal (só se foi no cartão E o PI tinha setup_future_usage) */
@@ -112,9 +137,18 @@ export function paramsPresente(c: Compra, n = 1): { pares: Array<[string, string
 }
 const doPresente = (j: J, c: Compra) => ((j.metadata ?? {}) as Record<string, string>).pi_principal === c.id && ((j.metadata ?? {}) as Record<string, string>).pagina === PRESENTE_STRIPE.pagina;
 
+export const chavePiPresente = (piPrincipal: string) => `presente-pi:${piPrincipal}`;
 /** o PI do presente desta compra que já existe (sem criar). "erro" = não deu pra saber */
 export async function presenteExistente(deps: DepsPresente, c: Compra): Promise<J | null | "erro"> {
   try {
+    // revisão B2: 1º a chave única em webhook_events (sempre gravada antes de usar o PI); o analytics é só o reserva
+    const { data: w } = await deps.admin.from("webhook_events").select("id, event").eq("id", chavePiPresente(c.id));
+    const linha = (Array.isArray(w) ? w[0] : w) as { event?: string } | undefined;
+    if (linha?.event && /^pi_/.test(linha.event)) {
+      const r = await deps.stripe(`payment_intents/${linha.event}`, null);
+      if (!r.ok) return "erro";
+      if (doPresente(r.j, c)) return r.j;
+    }
     const { data, error } = await deps.admin.from("analytics_events").select("event_data, created_at").eq("event_name", "stripe_presente_criado").eq("event_data->>pi_principal", c.id).order("created_at", { ascending: false }).limit(20);
     if (error) return "erro";
     const pi = maisNovoPrimeiro((data ?? []) as Array<{ event_data?: { pi?: string }; created_at?: string }>).map((l) => l.event_data?.pi).find((x): x is string => typeof x === "string" && /^pi_/.test(x));
@@ -136,6 +170,11 @@ export async function garantirPiPresente(deps: DepsPresente, c: Compra): Promise
     const atual = await deps.stripe(`payment_intents/${String(r.j.id)}`, null);
     const j = atual.ok ? atual.j : r.j;
     if (j.status === "canceled") continue;
+    // revisão B2: a chave única (a 1ª gravada vale; um PI cancelado é trocado pelo novo)
+    try {
+      const { error } = await deps.admin.from("webhook_events").insert({ id: chavePiPresente(c.id), source: "stripe", event: String(j.id) });
+      if (error) await deps.admin.from("webhook_events").update({ event: String(j.id) }).eq("id", chavePiPresente(c.id));
+    } catch { /* o analytics abaixo e a chave de idempotência ainda seguram */ }
     try { await deps.admin.from("analytics_events").insert({ event_name: "stripe_presente_criado", user_id: null, event_data: { pi: j.id, pi_principal: c.id, valor_cents: PRESENTE_STRIPE.centavos } }); } catch { /* a chave ainda segura por 24 h */ }
     return j;
   }
@@ -148,7 +187,7 @@ export async function codigoDoPago(deps: DepsPresente, piPresente: string, piPri
     const ja = await presentePorPedido(deps.admin, piPresente);
     if (ja) return { codigo: ja.codigo, de: ja.de_nome ?? null };
     const dono = await donoDaCompra(deps.admin, piPrincipal);
-    if (!dono) return { codigo: null, de: null };
+    if (!dono) return { codigo: null, de: null }; // o webhook acha a conta por outros caminhos (e-mail / pago em dobro)
     const g = await garantirPresente(deps.admin, { orderId: piPresente, compradorId: dono, valorCentavos: PRESENTE_STRIPE.centavos });
     return { codigo: g?.codigo ?? null, de: null };
   } catch { return { codigo: null, de: null }; }
@@ -161,9 +200,10 @@ const pixDe = (j: J) => { const p = pixDoIntento(j); return p ? { orderId: Strin
 
 /* ───────────────────────── as ações ───────────────────────── */
 /** o que a tela precisa (sem criar nada): o preço, o cartão salvo (marca/final), o Pix vivo, ou já pago + o código */
-export async function estadoPresente(deps: DepsPresente, c: Compra): Promise<RespostaPresente> {
-  const cs = cartaoSalvo(c.pi);
+export async function estadoPresente(deps: DepsPresente, c: Compra, quem: Quem = { podeCartao: true }): Promise<RespostaPresente> {
+  const cs = quem.podeCartao ? cartaoSalvo(c.pi) : null;
   const cartao = cs ? { marca: cs.marca, final: cs.final } : null;
+  if (await compraIgnorada(deps.admin, c.id)) return nao("sem_conta");
   const ja = await presenteExistente(deps, c);
   if (ja && ja !== "erro") {
     if (ja.status === "succeeded") return pagoCom(deps, ja, c, "estado");
@@ -174,9 +214,11 @@ export async function estadoPresente(deps: DepsPresente, c: Compra): Promise<Res
 }
 
 /** 1 toque no cartão salvo */
-export async function cartaoPresente(deps: DepsPresente, c: Compra, retorno: string = RETORNO_PRESENTE): Promise<RespostaPresente> {
+export async function cartaoPresente(deps: DepsPresente, c: Compra, retorno: string = RETORNO_PRESENTE, quem: Quem = { podeCartao: true }): Promise<RespostaPresente> {
+  if (!quem.podeCartao) return nao("login");
   const cs = cartaoSalvo(c.pi);
   if (!cs) return nao("sem_cartao");
+  if (await compraIgnorada(deps.admin, c.id)) return nao("sem_conta");
   const j = await garantirPiPresente(deps, c);
   if (!j) return nao("indisponivel", 503);
   if (j.status === "succeeded") return pagoCom(deps, j, c, "cartao");
@@ -203,7 +245,11 @@ export async function cartaoPresente(deps: DepsPresente, c: Compra, retorno: str
     const u = await deps.stripe(`payment_intents/${String(j.id)}`, [["customer", cus!]]);
     if (!u.ok) return nao("indisponivel", 503);
   }
-  const conf = await deps.stripe(`payment_intents/${String(j.id)}/confirm`, [["payment_method", cs.pm], ["return_url", retorno]], `presente-cartao-${String(j.id)}`);
+  // revisão B1: a chave é por TENTATIVA (n reservado em webhook_events): 2 toques ao mesmo tempo = 2 confirms no MESMO PI (a Stripe
+  // só deixa um pagar); depois de uma recusa confirmada, outra tentativa não fica presa 24 h na resposta antiga. Máximo 3.
+  const n = await proximaTentativa(deps.admin, String(j.id));
+  if (!n) return nao("recusado", 200, { recusado: true, code: "tentativas", pedido: j.id });
+  const conf = await deps.stripe(`payment_intents/${String(j.id)}/confirm`, [["payment_method", cs.pm], ["return_url", retorno]], `presente-cartao-${String(j.id)}-${n}`);
   if (!conf.ok) {
     const e = erroDe(conf.j);
     if (e.type === "card_error") return { status: 200, corpo: { ok: false, motivo: "recusado", recusado: true, code: String(e.decline_code ?? e.code ?? "recusado").slice(0, 40), pedido: j.id } };
@@ -220,8 +266,21 @@ export async function cartaoPresente(deps: DepsPresente, c: Compra, retorno: str
   return { status: 200, corpo: { ok: false, motivo: "recusado", recusado: true, code: String(le.decline_code ?? le.code ?? "recusado").slice(0, 40), pedido: j.id } };
 }
 
+export const MAX_TENTATIVAS_CARTAO = 3;
+async function proximaTentativa(admin: ClienteMin, pi: string): Promise<number | null> {
+  for (let n = 1; n <= MAX_TENTATIVAS_CARTAO; n++) {
+    try {
+      const { error } = await admin.from("webhook_events").insert({ id: `presente-cartao:${pi}:${n}`, source: "stripe", event: "tentativa" });
+      if (!error) return n;
+      if ((error as { code?: string }).code !== "23505") return null;
+    } catch { return null; }
+  }
+  return null;
+}
+
 /** o Pix do presente (o MESMO, se vivo) */
 export async function pixPresente(deps: DepsPresente, c: Compra): Promise<RespostaPresente> {
+  if (await compraIgnorada(deps.admin, c.id)) return nao("sem_conta");
   const j = await garantirPiPresente(deps, c);
   if (!j) return nao("indisponivel", 503);
   if (j.status === "succeeded") return pagoCom(deps, j, c, "pix");

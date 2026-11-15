@@ -295,6 +295,8 @@ async function pedidoDoDono(admin: ClienteMin, pedido: string, dono: string): Pr
  */
 export async function estadoDia3(admin: ClienteMin, a: {
   t: unknown; pedido?: unknown; gerar?: boolean; criarQr: CriarQr; /** só com `conferir` (a página pede de vez em quando, não a cada 4 s) */ pagamento?: PagamentoNaAsaas; agora?: () => number;
+  /** revisão M1: a env PRESENTE_STRIPE=on (só aí a compra da /oferta deixa de pagar 14,90 aqui). Sem ela: como sempre */
+  stripeLigado?: boolean;
 }): Promise<RespostaDia3> {
   const agora = a.agora ?? (() => Date.now());
   try {
@@ -330,7 +332,7 @@ export async function estadoDia3(admin: ClienteMin, a: {
     const { data: linhas } = await admin.from("subscriptions").select("status, plan, billing_period, current_period_end, abacatepay_billing_id, payment_method, amount_cents").eq("user_id", dono);
     if (!temPraSempre((linhas ?? []) as LinhaMin[])) return { ok: false, motivo: "sem_acesso" };
     // 15/11: quem comprou a R$ 67,90 na /oferta (Stripe) dá o presente a R$ 24,90 pela função stripe-presente — nunca o Pix de 14,90
-    if (compraOfertaStripe((linhas ?? []) as LinhaComValor[])) return { ok: false, motivo: "stripe" };
+    if (a.stripeLigado && compraOfertaStripe((linhas ?? []) as LinhaComValor[])) return { ok: false, motivo: "stripe" };
     const pix = await garantirPixUpsell(admin, {
       chave: chavePresenteDia3(dono), dono, oferta: OFERTA_PRESENTE, valorCentavos: PRECO_PRESENTE_CENTAVOS, descricao: "CORE de presente",
       criarQr: a.criarQr, extraPedido: { origem: "dia3" }, agora,

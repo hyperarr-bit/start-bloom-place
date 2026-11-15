@@ -69,7 +69,7 @@ serve(async (req) => {
     if (acao === "dia3") {
       const apiKey = Deno.env.get("ASAAS_API_KEY") ?? "";
       const r = await estadoDia3(admin, {
-        t: body.t, pedido: body.pedido, gerar: body.gerar === true,
+        t: body.t, pedido: body.pedido, gerar: body.gerar === true, stripeLigado: Deno.env.get("PRESENTE_STRIPE") === "on", // 15/11 (revisão M1)
         criarQr: criarQrAsaas(apiKey, log), pagamento: body.conferir === true ? pagamentoNaAsaas(fetch as never, apiKey) : undefined,
       });
       if (!r.ok) log("Dia 3 recusado", { motivo: r.motivo });

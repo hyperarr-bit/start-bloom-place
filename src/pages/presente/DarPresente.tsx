@@ -52,13 +52,13 @@ export function stripeComoDia3(r: RespStripePresente | null): Awaited<ReturnType
   const p = r.pix;
   return { ok: true, pago: false, pix: p && p.orderId && p.qrCode ? { orderId: p.orderId, qrCode: p.qrCode, qrCodeBase64: null, expiresAt: p.expiresAt } : null };
 }
-/** o 3DS do 1 toque: o Stripe.js de js.stripe.com (só aqui, só quando o banco pede) */
-async function terminar3ds(clientSecret: string): Promise<boolean> {
+/** o 3DS do 1 toque: o Stripe.js de js.stripe.com (só aqui, só quando o banco pede). "sem_stripe" = não carregou (não é recusa) */
+async function terminar3ds(clientSecret: string): Promise<boolean | "sem_stripe"> {
   const w = window as unknown as { Stripe?: (pk: string) => { handleNextAction: (o: { clientSecret: string }) => Promise<{ error?: unknown }> } };
   if (!w.Stripe) {
     await new Promise<void>((ok, falha) => { const s = document.createElement("script"); s.src = "https://js.stripe.com/v3"; s.onload = () => ok(); s.onerror = () => falha(new Error("stripe.js")); document.head.appendChild(s); }).catch(() => null);
   }
-  if (!w.Stripe) return false;
+  if (!w.Stripe) return "sem_stripe";
   const r = await w.Stripe(STRIPE_PK_DAR).handleNextAction({ clientSecret }).catch(() => ({ error: true }));
   return !r.error;
 }
@@ -178,6 +178,8 @@ export function DarPresente() {
       const s = await presenteStripe(t, "estado");
       if (!vivo) return;
       const ehStripe = s?.ok === true && typeof s.preco === "number";
+      // revisão A2: a compra da /oferta não ficou ligada a uma conta → nada de cobrar presente
+      if (s?.motivo === "sem_conta") { setFase("sem_acesso"); return; }
       if (!viu.current) { viu.current = true; trackEvent("presente_d3_view", { origem: origem.current, preco: ehStripe ? s!.preco : 1490 }); }
       if (!ehStripe) { void gerar(); return; }
       setStripe({ preco: s!.preco!, cartao: s!.cartao ?? null });
@@ -196,7 +198,10 @@ export function DarPresente() {
     trackEvent("presente_d3_cartao", { origem: origem.current });
     let r = await presenteStripe(t, "cartao");
     if (r?.ok === true && r.acao === true && typeof r.client_secret === "string") {
-      if (!(await terminar3ds(r.client_secret))) r = { ok: false, recusado: true };
+      const fim = await terminar3ds(r.client_secret);
+      // revisão B3: sem o Stripe.js não é recusa do banco
+      if (fim === "sem_stripe") { setCobrando(false); setRecusou("Não deu pra confirmar agora. Tente de novo em instantes."); return; }
+      if (!fim) r = { ok: false, recusado: true };
     }
     if (r?.recusado === true) {
       setCobrando(false);
@@ -204,7 +209,7 @@ export function DarPresente() {
       setRecusou("O banco não aprovou este valor. Dá pra pagar no Pix.");
       return;
     }
-    if (r && ["sem_cartao", "cartao_nao_salvo", "outro_cliente", "pix_vivo"].includes(String(r.motivo))) { setCobrando(false); setStripe((x) => (x ? { ...x, cartao: null } : x)); void gerarStripe(); return; }
+    if (r && ["sem_cartao", "cartao_nao_salvo", "outro_cliente", "pix_vivo", "login"].includes(String(r.motivo))) { setCobrando(false); setStripe((x) => (x ? { ...x, cartao: null } : x)); void gerarStripe(); return; }
     // pagou (ou o banco terminou o 3DS): espera o código do presente
     for (let i = 0; i < 6; i++) {
       const e = stripeComoDia3(i === 0 && r?.pago ? r : await presenteStripe(t, "estado"));

@@ -168,6 +168,8 @@ describe("o pós-pago da /oferta", () => {
     await esperar('[data-testid="presente-quero"]');
     expect(presente()!.textContent).toContain("R$ 24,90");
     expect(document.querySelector('[data-testid="presente-quero"]')!.textContent).toBe("Quero · copiar o Pix");
+    for (const c of criadas) expect(c).not.toHaveProperty("salvar_cartao"); // revisão A3: no Pix o cartão não é salvo
+    expect(JSON.parse(sessionStorage.getItem("oferta-presente-compra") || "{}")).toMatchObject({ pi: "pi_123", metodo: "pix" }); // revisão B5
     expect(dos("landing_presente_view")[0]).toMatchObject({ pagina: "oferta", valor: 2490, via: "pix" });
     document.querySelector<HTMLButtonElement>('[data-testid="presente-agora-nao"]')!.click();
     await dormir(50);

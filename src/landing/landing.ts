@@ -2122,13 +2122,16 @@ function apiPresenteOferta(c: CompraPaga): ApiOfertaPresente {
       const j = await postarPresente({ acao: "cartao", ...prova }).catch(() => ({ ok: false, motivo: "rede" }) as Record<string, unknown>);
       if (j.ok === true && j.pago === true) return pagoDe(j);
       if (j.recusado === true) return { recusado: true as const };
-      if (["sem_cartao", "cartao_nao_salvo", "outro_cliente", "pix_vivo"].includes(String(j.motivo))) return { semCartao: true as const };
+      if (["sem_cartao", "cartao_nao_salvo", "outro_cliente", "pix_vivo", "login"].includes(String(j.motivo))) return { semCartao: true as const };
+      if (j.motivo === "sem_conta") return { erro: "sem_conta" };
       if (j.ok === true && (j.acao === true || j.processando === true)) {
         // o banco pediu 3DS: o Stripe.js da MESMA camada termina; depois o servidor diz se pagou
         if (j.acao === true && typeof j.client_secret === "string") {
           const m = await carregarStripeCheckout();
           const s = m.stripeDaCamada();
-          const r = s?.handleNextAction ? await s.handleNextAction({ clientSecret: j.client_secret }).catch(() => ({ error: { code: "falhou" } })) : { error: { code: "sem_stripe" } };
+          // revisão B3: sem o Stripe.js não é recusa do banco — mensagem neutra (o "tente de novo")
+          if (!s?.handleNextAction) return { erro: "sem_stripe" };
+          const r = await s.handleNextAction({ clientSecret: j.client_secret }).catch(() => ({ error: { code: "falhou" } }));
           if (r.error) return { recusado: true as const };
         }
         for (let i = 0; i < 4; i++) {
@@ -2153,8 +2156,18 @@ function apiPresenteOferta(c: CompraPaga): ApiOfertaPresente {
   };
 }
 let presenteOferta: import("./upsell-2027").Upsell2027 | null = null;
+/** revisão B5: a compra fica na aba (sessionStorage) — a recarga depois de pagar reabre o presente onde parou (oferta, QR ou cartão) */
+const CHAVE_COMPRA_PRESENTE = "oferta-presente-compra";
+const guardarCompraPresente = (c: CompraPaga) => { try { sessionStorage.setItem(CHAVE_COMPRA_PRESENTE, JSON.stringify(c)); } catch { /* heap */ } };
+const lerCompraPresente = (): CompraPaga | null => {
+  try { const c = JSON.parse(sessionStorage.getItem(CHAVE_COMPRA_PRESENTE) || "null") as CompraPaga | null; return c && typeof c.pi === "string" && /^pi_/.test(c.pi) && typeof c.ref === "string" ? c : null; } catch { return null; }
+};
 let presenteOfertaPago = false;
+let abrindoPresente: string | null = null;
 const abrirPresenteOferta = (c: CompraPaga) => {
+  if (abrindoPresente === c.pi) return; // a recarga e o pago podem chamar juntos: 1 página só
+  abrindoPresente = c.pi;
+  guardarCompraPresente(c);
   void carregarComRetry(() => import("./upsell-presente"), { recarregar: false }).then((m) => {
     if (presenteOferta) return;
     const api = apiPresenteOferta(c);
@@ -2178,8 +2191,14 @@ const abrirPresenteOferta = (c: CompraPaga) => {
     if (!u.ativo()) return;
     presenteOferta = u;
     u.render();
+    // revisão A2: a compra principal não ficou ligada a uma conta (o webhook ignorou) → o presente sai da tela, sem cobrar nada
+    if (!SIMULADO) void postarPresente({ acao: "estado", ref: c.ref, pi: c.pi }).then((e) => { if (e.motivo === "sem_conta" && presenteOferta === u) { evento("landing_presente_sem_acesso", { motivo: "sem_conta", pagina: "oferta" }); presenteOferta = null; u.parar(); } }).catch(() => null);
   }, () => evento("landing_erro", { onde: "chunk_presente_oferta" }));
 };
+if (UP_OFERTA) window.setTimeout(() => {
+  const c = lerCompraPresente();
+  if (c && !presenteOferta && lerEstadoPresenteLp(c.pi).etapa !== "fim") abrirPresenteOferta(c);
+}, 0);
 const opcoesStripe = () => ({
   ...(UP_OFERTA ? { presente: { abrir: abrirPresenteOferta } } : {}),
   pk: ST_PK, precoCentavos: ST_PRECO, parcelasMax: Number(w.__landing?.stripe_parcelas_max) || 12, producao: PRODUCAO, pedeCpf: w.__landing?.stripe_pede_cpf === true,

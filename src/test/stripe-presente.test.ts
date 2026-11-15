@@ -9,8 +9,10 @@
  */
 import { describe, it, expect } from "vitest";
 import { createHmac } from "node:crypto";
-import { paramsAtualizar, paramsCriar, validarPedidoStripe, type ChamarStripe } from "../../supabase/functions/_shared/stripe-criar";
-import { cartaoPresente, cartaoSalvo, compraDoDono, compraPorRef, estadoPresente, nomePresente, pixPresente, PRESENTE_STRIPE, type DepsPresente } from "../../supabase/functions/_shared/stripe-presente";
+import { criarOuReaproveitar, paramsAtualizar, paramsCriar, validarPedidoStripe, type ChamarStripe } from "../../supabase/functions/_shared/stripe-criar";
+import { cartaoPresente, cartaoSalvo, compraDoDono, compraPorRef, estadoPresente, nomePresente, pixPresente, presenteStripeLigado, PRESENTE_STRIPE, type DepsPresente } from "../../supabase/functions/_shared/stripe-presente";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { tratarStripe, type DepsStripe } from "../../supabase/functions/_shared/stripe";
 import { compraOfertaStripe } from "../../supabase/functions/_shared/presente-dia3";
 
@@ -226,4 +228,110 @@ describe("webhook: presente_oferta", () => {
     expect((await tratarStripe(depsWh(b), { corpo: c2, assinatura: assinar(c2, t) })).corpo).toMatchObject({ ignorado: "valor_presente" });
   });
   it("o preço é do servidor", () => { expect(PRESENTE_STRIPE.centavos).toBe(2490); });
+});
+
+/* ───────── consertos da revisão (15/11) ───────── */
+describe("revisão A1: pelo token, cartão só com o dono logado", () => {
+  it("sem o JWT do dono: estado sem marca/final e o 1 toque recusa (só Pix)", async () => {
+    const b = banco(), s = stripe();
+    const c = (await compraPorRef(deps(b, s), REF, "pi_main"))!;
+    expect((await estadoPresente(deps(b, s), c, { podeCartao: false })).corpo).toMatchObject({ ok: true, cartao: null });
+    expect((await cartaoPresente(deps(b, s), c, undefined, { podeCartao: false })).corpo).toMatchObject({ ok: false, motivo: "login" });
+    expect(s.chamadas.some((x) => /\/confirm$/.test(x.caminho))).toBe(false);
+    expect((await estadoPresente(deps(b, s), c, { podeCartao: true })).corpo.cartao).toMatchObject({ final: "4242" });
+  });
+  it("a função confere o JWT contra o dono do token e a porta do token tem chave do servidor (off)", () => {
+    const f = readFileSync(resolve(__dirname, "../../supabase/functions/stripe-presente/index.ts"), "utf8");
+    expect(f).toMatch(/quem = \{ podeCartao: logado === dono \}/);
+    expect(f).toMatch(/presenteStripeLigado\(Deno\.env\.get\("PRESENTE_STRIPE"\)\)/);
+    expect(presenteStripeLigado(undefined)).toBe(false);
+    expect(presenteStripeLigado("on")).toBe(true);
+    const r = readFileSync(resolve(__dirname, "../../supabase/functions/presente-resgatar/index.ts"), "utf8");
+    expect(r).toMatch(/stripeLigado: Deno\.env\.get\("PRESENTE_STRIPE"\) === "on"/);
+  });
+});
+
+describe("revisão A2: compra principal sem conta", () => {
+  it("compra ignorada pelo webhook → sem oferta e sem cobrança", async () => {
+    const b = banco(), s = stripe();
+    b.db.analytics_events.push({ event_name: "stripe_venda_ignorada", event_data: { pi: "pi_main", motivo: "sem_conta" } });
+    const c = (await compraPorRef(deps(b, s), REF, "pi_main"))!;
+    expect((await estadoPresente(deps(b, s), c)).corpo).toMatchObject({ ok: false, motivo: "sem_conta" });
+    expect((await cartaoPresente(deps(b, s), c)).corpo).toMatchObject({ ok: false, motivo: "sem_conta" });
+    expect((await pixPresente(deps(b, s), c)).corpo).toMatchObject({ ok: false, motivo: "sem_conta" });
+    expect(s.chamadas.some((x) => x.caminho === "payment_intents" && x.pares)).toBe(false);
+  });
+  const WH = "whsec_t";
+  const assinar = (corpo: string, t: number) => `t=${t},v1=${createHmac("sha256", WH).update(`${t}.${corpo}`).digest("hex")}`;
+  const evento = (id: string) => JSON.stringify({ id, type: "payment_intent.succeeded", livemode: true, data: { object: { id: "pi_p9", amount: 2490, amount_received: 2490, currency: "brl", status: "succeeded", metadata: { pagina: "presente_oferta", pi_principal: "pi_main", email: "ana@exemplo.com" } } } });
+  const depsWh = (b: ReturnType<typeof banco>, extra: Partial<DepsStripe> = {}): DepsStripe => ({
+    admin: b.admin as never, secret: WH, acharConta: async () => null, enviarEmail: async () => true, mandarCapi: async () => false,
+    avisarVenda: async () => {}, avisarDono: async () => {}, buscarCobranca: async () => null, log: () => {}, ...extra,
+  });
+  const mandar = (b: ReturnType<typeof banco>, id: string, extra: Partial<DepsStripe> = {}) => { const c = evento(id), t = Math.floor(Date.now() / 1000); return tratarStripe(depsWh(b, extra), { corpo: c, assinatura: assinar(c, t) }); };
+  it("pago em dobro (sem linha): o dono vem do registro pix_pago_em_dobro", async () => {
+    const b = banco();
+    b.db.analytics_events.push({ event_name: "pix_pago_em_dobro", user_id: "u7", event_data: { order_id: "pi_main" } });
+    expect((await mandar(b, "evt_a")).corpo).toMatchObject({ ok: true, presente: true });
+    expect(b.db.presentes[0]).toMatchObject({ comprador_id: "u7" });
+  });
+  it("pelo e-mail da compra (só leitura)", async () => {
+    const b = banco();
+    expect((await mandar(b, "evt_b", { acharConta: async (e) => (e === "ana@exemplo.com" ? "u8" : null) })).corpo).toMatchObject({ presente: true });
+    expect(b.db.presentes[0]).toMatchObject({ comprador_id: "u8" });
+  });
+  it("compra ignorada → alarme pro dono e 200 (sem 3 dias de reenvio mudo)", async () => {
+    const b = banco();
+    b.db.analytics_events.push({ event_name: "stripe_venda_ignorada", event_data: { pi: "pi_main" } });
+    const avisos: string[] = [];
+    const r = await mandar(b, "evt_c", { avisarDono: async (t) => { avisos.push(t); } });
+    expect(r.status).toBe(200);
+    expect(r.corpo).toMatchObject({ sem_conta: true });
+    expect(avisos[0]).toMatch(/Presente Stripe pago SEM conta/);
+  });
+  it("conta ainda não chegou: 500 nos 4 primeiros reenvios, no 5º alarme + 200", async () => {
+    const b = banco();
+    const avisos: string[] = [];
+    for (let i = 1; i <= 4; i++) expect((await mandar(b, `evt_d${i}`)).status).toBe(500);
+    const r = await mandar(b, "evt_d5", { avisarDono: async (t) => { avisos.push(t); } });
+    expect(r.status).toBe(200);
+    expect(avisos).toHaveLength(1);
+  });
+});
+
+describe("revisão A3: o cartão salvo nunca derruba a venda", () => {
+  it("a Stripe recusa o setup_future_usage → repete SEM ele e a venda segue", async () => {
+    const b = banco();
+    const chamadas: Array<Array<[string, string]> | null> = [];
+    const f: ChamarStripe = async (caminho, pares) => {
+      chamadas.push(pares);
+      if (caminho === "payment_intents" && pares) return { ok: true, j: { id: "pi_n1", client_secret: "pi_n1_s", status: "requires_payment_method", metadata: { ref: REF, pagina: "oferta" } } };
+      if (caminho === "payment_intents/pi_n1" && !pares) return { ok: true, j: { id: "pi_n1", client_secret: "pi_n1_s", status: "requires_payment_method", metadata: { ref: REF, pagina: "oferta" } } };
+      if (caminho === "payment_intents/pi_n1" && pares!.some(([k]) => k.includes("setup_future_usage"))) return { ok: false, j: { error: { code: "parameter_invalid_empty" } } };
+      return { ok: true, j: { id: "pi_n1", client_secret: "pi_n1_s", status: "requires_payment_method", metadata: { ref: REF, pagina: "oferta" } } };
+    };
+    const p = validarPedidoStripe({ ref: REF, email: "a@b.com", salvar_cartao: true })!;
+    const r = await criarOuReaproveitar({ admin: b.admin, stripe: f, log: () => {} }, p, { email: "a@b.com" }, { userId: null, ip: null });
+    expect(r.corpo).toMatchObject({ ok: true, pi: "pi_n1" });
+    const ups = chamadas.filter((x) => x && x.some(([k]) => k === "receipt_email"));
+    expect(ups).toHaveLength(2);
+    expect(ups[1]!.some(([k]) => k.includes("setup_future_usage"))).toBe(false);
+  });
+  it("a página só pede salvar_cartao no CARTÃO", () => {
+    const f = readFileSync(resolve(__dirname, "../landing/stripe-checkout.ts"), "utf8");
+    expect(f).toContain("...(o.presente && cartao ? { salvar_cartao: true } : {})");
+    expect(f).toContain("garantirIntento(email, cpf, true), stripe.createPaymentMethod(");
+  });
+});
+
+describe("revisão B1/B2: tentativas e o PI guardado", () => {
+  it("depois de uma recusa, outra tentativa usa outra chave (máx. 3); o PI fica em webhook_events", async () => {
+    const b = banco(), s = stripe({ pm: "pm_recusa" });
+    const c = (await compraPorRef(deps(b, s), REF, "pi_main"))!;
+    for (let i = 0; i < 3; i++) expect((await cartaoPresente(deps(b, s), c)).corpo).toMatchObject({ recusado: true });
+    expect(s.chamadas.filter((x) => /\/confirm$/.test(x.caminho)).map((x) => x.idem)).toEqual(["presente-cartao-pi_p1-1", "presente-cartao-pi_p1-2", "presente-cartao-pi_p1-3"]);
+    expect((await cartaoPresente(deps(b, s), c)).corpo).toMatchObject({ recusado: true, code: "tentativas" });
+    expect(b.db.webhook_events.find((w) => w.id === "presente-pi:pi_main")).toMatchObject({ event: "pi_p1" });
+    expect(s.chamadas.filter((x) => x.caminho === "payment_intents" && x.pares)).toHaveLength(1);
+  });
 });

@@ -267,7 +267,7 @@ export function criarUpsellPresente(compra: string, ctx: CtxPresente): Upsell202
       render(); return;
     }
     ev("landing_presente_erro", { onde: "cartao", msg: r.erro });
-    erro = "Não deu pra confirmar agora. Tente de novo em instantes.";
+    erro = r.erro === "sem_conta" ? "Não deu pra adicionar agora. Sua compra do CORE continua garantida." : "Não deu pra confirmar agora. Tente de novo em instantes.";
     render();
   }
 

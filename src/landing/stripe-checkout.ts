@@ -550,10 +550,10 @@ function erroEmail(m: string | null) { if (m) mostrarCampoEmail(); const e = rai
 function erroCpf(m: string | null) { const e = raiz?.querySelector<HTMLElement>("#oc-cpf-erro"); if (e) { e.hidden = !m; e.textContent = m ?? ""; } }
 function erroGeral(m: string | null) { const e = raiz?.querySelector<HTMLElement>("#oc-erro"); if (e) { e.hidden = !m; e.textContent = m ?? ""; } }
 
-function corpoDoPedido(email: string | null, cpf: string | null = null): Record<string, unknown> {
+function corpoDoPedido(email: string | null, cpf: string | null = null, cartao = false): Record<string, unknown> {
   const o = opc!;
   return {
-    ref: est!.ref, pi: est!.pi, email, pagina: o.pagina ?? "oferta", ...(cpf ? { cpf } : {}), ...(o.presente ? { salvar_cartao: true } : {}),
+    ref: est!.ref, pi: est!.pi, email, pagina: o.pagina ?? "oferta", ...(cpf ? { cpf } : {}), ...(o.presente && cartao ? { salvar_cartao: true } : {}), // revisão A3: só quando ela paga no CARTÃO
     fbp: lerCookie("_fbp"), fbc: lerCookie("_fbc"), fbclid: o.fbclid, url: o.urlChegada.slice(0, 500),
     landing_session_id: o.sessao, landing_device_id: o.aparelho, atrib: o.atrib,
   };
@@ -566,9 +566,9 @@ function criarComTeto(corpo: Record<string, unknown>): Promise<RespostaCriar> {
   return Promise.race([api!.criar(corpo).catch(() => ({ ok: false } as RespostaCriar)), estourou]).finally(() => window.clearTimeout(teto));
 }
 
-async function garantirIntento(email: string | null, cpf: string | null = null): Promise<boolean> {
+async function garantirIntento(email: string | null, cpf: string | null = null, cartao = false): Promise<boolean> {
   const o = opc!;
-  const r = await criarComTeto(corpoDoPedido(email, cpf));
+  const r = await criarComTeto(corpoDoPedido(email, cpf, cartao));
   if (!r.ok || !r.clientSecret) { o.evento("landing_erro", { onde: "stripe_criar", msg: String(r.erro ?? "falhou").slice(0, 80) }); return false; }
   // A stale deployment must never silently charge the old 67.90 offer on the 27.90 LP.
   if (o.producao && o.pagina === "lp27" && (r.amount !== o.precoCentavos || r.currency !== "brl" || r.pagina !== "lp27")) { o.evento("landing_erro", { onde: "stripe_preco_divergente" }); return false; }
@@ -706,7 +706,7 @@ async function pagar() {
     // cartão: confere os campos antes de ir ao servidor; o PaymentMethod e o e-mail no PI vão juntos
     const sub = await elementos!.submit();
     if (sub?.error) { erroGeral(sub.error.message ?? "Confira os dados do pagamento."); erroAoPagar("validar", sub.error); return; }
-    const [temIntento, criado] = await Promise.all([garantirIntento(email, cpf), stripe.createPaymentMethod({ elements: elementos, params: { billing_details: { email } } })]);
+    const [temIntento, criado] = await Promise.all([garantirIntento(email, cpf, true), stripe.createPaymentMethod({ elements: elementos, params: { billing_details: { email } } })]);
     if (criado.error || !criado.paymentMethod) { erroGeral(criado.error?.message ?? "Confira os dados do cartão."); erroAoPagar("cartao", criado.error); return; }
     cartaoUsado = criado.paymentMethod.card ? { marca: criado.paymentMethod.card.brand ?? null, final: criado.paymentMethod.card.last4 ?? null } : null;
     if (!temIntento) { erroGeral("Não consegui registrar o pagamento. Tente de novo em instantes."); erroAoPagar("criar"); return; }

@@ -22,6 +22,8 @@ import { assuntoVenda, htmlVenda } from "./email-venda.ts";
 import { acharContaHotmart, eventoPurchaseHotmart, mascararEmail, type AdminHotmart, type RegistroHotmart } from "./hotmart.ts";
 import { MENSAL_APP_WEB, OFERTAS_STRIPE, ofertaDaPagina } from "./stripe-ofertas.ts";
 import { avisarMensalStripeComVitalicio, registrarPagoEmDobro } from "./landing-travas.ts";
+import { PRESENTE_STRIPE, donoDaCompra } from "./stripe-presente.ts";
+import { garantirPresente, mandarLinkPorEmail } from "./presente.ts";
 
 // deno-lint-ignore no-explicit-any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -198,6 +200,27 @@ export async function tratarStripe(deps: DepsStripe, req: { assinatura: string |
     if (pi.status !== "succeeded") return ignorar("status");
     // 14/11: o PI de uma FATURA de assinatura (o mensal do /funil-app) é tratado no invoice.paid — sem alarme aqui
     if (await ehPiDeFaturaNossa(deps, obj, md, pi.id)) { log("PI de fatura de assinatura — fica pro invoice.paid", { pi: pi.id }); return { status: 200, corpo: { ok: true, ignorado: "fatura" } }; }
+    // 15/11: o PRESENTE de R$ 24,90 da /oferta (_shared/stripe-presente.ts) — vira o código do presente na conta de quem comprou;
+    // NÃO libera nada pra quem pagou e NÃO manda Purchase pra Meta (upsell). Sem a conta da compra principal ainda → 500 (a Stripe reenvia).
+    if (md.pagina === PRESENTE_STRIPE.pagina) {
+      if (pi.currency !== "brl" || valor !== PRESENTE_STRIPE.centavos) return ignorar("valor_presente");
+      if (await existe(admin, `stripe-estorno:${pi.id}`)) return ignorar("estornada");
+      const principal = t(md.pi_principal, 80);
+      const dono = principal ? await donoDaCompra(admin as unknown as ClienteMin, principal) : null;
+      if (!dono) throw new Error("presente_sem_conta_da_compra");
+      const g = await garantirPresente(admin as unknown as ClienteMin, { orderId: pi.id, compradorId: dono, valorCentavos: PRESENTE_STRIPE.centavos });
+      if (!g) throw new Error("presente_nao_gravou");
+      if (await reservar(admin, `stripe-venda:${pi.id}`, "venda") === "ok") {
+        const cob = pi.latest_charge ? await deps.buscarCobranca(pi.latest_charge).catch(() => null) : null;
+        try { await admin.from("analytics_events").insert({ event_name: "stripe_presente_venda", user_id: dono, event_data: { pi: pi.id, pi_principal: principal, pagina: PRESENTE_STRIPE.pagina, valor_cents: valor, metodo: cob?.metodo ?? null, ref: md.ref ?? null } }); } catch { /* registro é luxo */ }
+      }
+      const r = await mandarLinkPorEmail(admin as unknown as ClienteMin, {
+        orderId: pi.id, codigo: g.codigo, para: email, de: "",
+        enviar: (c) => deps.enviarEmail(String((c.to as string[])[0]), String(c.subject), String(c.html)),
+      });
+      log("presente (Stripe) pago", { pi: pi.id, novo: g.novo, email: r });
+      return { status: 200, corpo: { ok: true, presente: true, novo: g.novo } };
+    }
     const oferta = ofertaDaPagina(md.pagina);
     if (!oferta) return ignorar("outra_pagina");
     if (pi.currency !== "brl" || valor !== oferta.centavos) return ignorar("valor");

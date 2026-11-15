@@ -116,6 +116,12 @@
         // braco_topo_oferta em todo evento da /oferta. QA: ?otp=anuncio|atual (fica: localStorage + cookie), ?otp=auto desfaz. Rollback: "off".
         // 11/11 17h (dono: "liga"): ligado em 50/50. Rollback: "off".
         var AB_OFERTA_TOPO = "on";
+        // 15/11 (dono: "bota um up de 24,90 tanto pra pix e cartao"): o PRESENTE "Leve alguém junto" a R$ 24,90 no pós-pago da /oferta
+        // (só /oferta, nunca o /vitalicio). "off" = a /oferta de hoje, IDÊNTICA (nem o cartão é salvo). "on" = o cartão da compra fica salvo na
+        // Stripe e, depois do pago, cartão = "Sim, adicionar" cobra 24,90 no mesmo cartão (1 toque); Pix = um Pix novo de 24,90 (Stripe).
+        // QA: ?upoferta=on|off (fica: localStorage + cookie), ?upoferta=auto desfaz. Vira html[data-up-oferta="on"]. Rollback: "off".
+        // Antes de ligar: deploy stripe-presente + stripe-criar + stripe-webhook (+ presente-resgatar). Ver RELATORIO-UPSELL.md.
+        var UPSELL_OFERTA = "off";
         var CHECKOUT_ORG_V2 = "off"; // 08/11: checkout novo do /organizar (cara do checkout v2, o Pix do Asaas de hoje) construído e DESLIGADO — "on" = todo o /organizar, nos 2 braços do AB_LP (sem sorteio) · rollback "off"
         var STRIPE_PK = "pk_live_51TJnAQQdjmrIbUhHDSWqG1trOT6mFfV87AC4Vv47kFJTAFOhYsNmvryGRnf3x824Ke3mXSsWiFCovKPIR6Kqx0IX00VcuAawhC"; // a chave PUBLICÁVEL (pk_live_…); com "PREENCHER" = comportamento off
         var STRIPE_PRECO_CENTAVOS = 6790; // só pra exibir — o valor cobrado vem SEMPRE do servidor (stripe-criar)
@@ -223,6 +229,20 @@
           if (!STRIPE_PARCELAS_TEXTO) d.setAttribute("data-hm-sem-parcelas", "");
           mem.pagina = "oferta"; mem.checkout_ext = "stripe"; mem.ab_stripe = CHECKOUT_STRIPE;
           mem.stripe_pk = STRIPE_PK; mem.stripe_preco_centavos = STRIPE_PRECO_CENTAVOS; mem.stripe_parcelas_max = STRIPE_PARCELAS_MAX; mem.stripe_parcelas = STRIPE_PARCELAS_TEXTO; mem.stripe_pede_cpf = STRIPE_PEDE_CPF === true;
+          // 15/11: o presente de 24,90 no pós-pago (UPSELL_OFERTA). Só a /oferta; ?upoferta=on|off força (localStorage + cookie), auto desfaz
+          if (!LINK_NOVA) {
+            var puo = pega("upoferta"), ckuo = null;
+            try { var csuo = String(document.cookie || "").split(";"); for (var iuo = 0; iuo < csuo.length; iuo++) { var juo = csuo[iuo].indexOf("="); if (juo > 0 && csuo[iuo].slice(0, juo).trim() === "landing_upoferta_force") ckuo = csuo[iuo].slice(juo + 1).trim(); } } catch (euo0) {}
+            if (puo === "on" || puo === "off" || puo === "auto") {
+              try { if (puo === "auto") localStorage.removeItem("landing-upoferta-force"); else localStorage.setItem("landing-upoferta-force", puo); } catch (euo1) {}
+              try { document.cookie = "landing_upoferta_force=" + (puo === "auto" ? "; Max-Age=0" : puo + "; Max-Age=2592000") + "; Path=/; SameSite=Lax"; } catch (euo2) {}
+            }
+            var luo = null; try { luo = localStorage.getItem("landing-upoferta-force"); } catch (euo3) {}
+            var uo = (puo === "on" || puo === "off") ? puo : puo === "auto" ? null : (luo || ckuo);
+            if (uo === "on" || uo === "off") mem.up_oferta_forcado = true;
+            if (uo !== "on" && uo !== "off") uo = UPSELL_OFERTA === "on" ? "on" : "off";
+            if (uo === "on") { d.setAttribute("data-up-oferta", "on"); mem.up_oferta = "on"; }
+          }
         }
         // 11/11 (dono: "faz uma nova LP, vai ser só isso aí do print… quando clica no botão vai para o checkout"; "cria em uma nova, não substitui"):
         // /simples = a LP de UMA TELA num link próprio. Título + 3 celulares + "R$ 27,90 · Vitalício" + botão, e mais nada; o botão abre o

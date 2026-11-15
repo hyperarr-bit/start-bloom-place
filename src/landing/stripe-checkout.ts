@@ -61,7 +61,12 @@ export type OpcoesCheckout = {
   voltaDoBanco?: { pi: string; status: string };
   /** 11/11 (AB_OFERTA_EMAIL, braço "pagina"): o e-mail já digitado no cartão da oferta. O formulário abre com ele numa linha ("Trocar" devolve o campo). */
   emailInicial?: string;
+  /** 15/11 (UPSELL_OFERTA "on"): o presente de 24,90 no pós-pago. Só com isto o pedido leva `salvar_cartao` (o servidor salva o cartão
+   *  pro 1 toque) e o pago chama `abrir` (a página do presente entra POR CIMA da tela de pago de sempre, que fica embaixo). Sem isto: nada muda. */
+  presente?: { abrir: (c: CompraPaga) => void };
 };
+/** 15/11: a compra que acabou de pagar (pro presente): a ref e o PI são a prova pro servidor (a mesma do stripe-status) */
+export type CompraPaga = { ref: string; pi: string; metodo: string; email: string | null; cartao: { marca: string | null; final: string | null } | null };
 
 export type RespostaCriar = { amount?: number; currency?: string; pagina?: string; ok: boolean; clientSecret?: string; pi?: string; erro?: string; status?: string; pix?: PixQr | null };
 export type RespostaStatus = { ok: boolean; status?: string; pago?: boolean; metodo?: string | null };
@@ -78,7 +83,9 @@ type Elementos = { create: (tipo: "payment", o?: Record<string, unknown>) => Ele
 type PedidoCarteira = { canMakePayment: () => Promise<{ applePay?: boolean; googlePay?: boolean } | null> };
 export type StripeLike = {
   elements: (o: Record<string, unknown>) => Elementos;
-  createPaymentMethod: (o: Record<string, unknown>) => Promise<{ error?: ErroStripe; paymentMethod?: { id: string } }>;
+  createPaymentMethod: (o: Record<string, unknown>) => Promise<{ error?: ErroStripe; paymentMethod?: { id: string; card?: { brand?: string; last4?: string } } }>;
+  /** 15/11: o 3DS do presente de 1 toque (Stripe.js handleNextAction) */
+  handleNextAction?: (o: { clientSecret: string }) => Promise<ResultadoStripe>;
   paymentRequest?: (o: Record<string, unknown>) => PedidoCarteira;
   confirmPayment: (o: Record<string, unknown>) => Promise<ResultadoStripe>;
   confirmPixPayment: (clientSecret: string, dados?: Record<string, unknown>, opcoes?: Record<string, unknown>) => Promise<ResultadoStripe>;
@@ -167,7 +174,8 @@ function stripeSimulado(): StripeLike {
   };
   return {
     elements: () => ({ create: () => el, submit: async () => ({}) }),
-    createPaymentMethod: async () => ({ paymentMethod: { id: "pm_sim" } }),
+    createPaymentMethod: async () => ({ paymentMethod: { id: "pm_sim", card: { brand: "visa", last4: "4242" } } }),
+    handleNextAction: async () => ({ paymentIntent: { id: "pi_sim_presente", status: "succeeded" } }),
     confirmPayment: async () => ({ paymentIntent: { id: "pi_sim", status: "succeeded" } }),
     confirmPixPayment: async () => ({ paymentIntent: { id: "pi_sim", status: "requires_action", next_action: { type: "pix_display_qr_code", pix_display_qr_code: { data: QR_SIM, expires_at: Math.floor(Date.now() / 1000) + 1800 } } } }),
   };
@@ -339,6 +347,8 @@ let consulta: number | null = null;
 let pagando = false;
 let comHistorico = false;
 let ultimaCriacao: RespostaCriar | null = null;
+/** 15/11: a marca e o final do cartão que pagou (só pro texto "no mesmo cartão Visa •••• 4242" do presente) */
+let cartaoUsado: { marca: string | null; final: string | null } | null = null;
 const icNoHeap = new Set<string>();
 let vigiaDesde = 0;
 /** revisão 2 (4): respostas ok:false SEGUIDAS na espera do cartão (1 erro isolado não basta) */
@@ -543,7 +553,7 @@ function erroGeral(m: string | null) { const e = raiz?.querySelector<HTMLElement
 function corpoDoPedido(email: string | null, cpf: string | null = null): Record<string, unknown> {
   const o = opc!;
   return {
-    ref: est!.ref, pi: est!.pi, email, pagina: o.pagina ?? "oferta", ...(cpf ? { cpf } : {}),
+    ref: est!.ref, pi: est!.pi, email, pagina: o.pagina ?? "oferta", ...(cpf ? { cpf } : {}), ...(o.presente ? { salvar_cartao: true } : {}),
     fbp: lerCookie("_fbp"), fbc: lerCookie("_fbc"), fbclid: o.fbclid, url: o.urlChegada.slice(0, 500),
     landing_session_id: o.sessao, landing_device_id: o.aparelho, atrib: o.atrib,
   };
@@ -698,6 +708,7 @@ async function pagar() {
     if (sub?.error) { erroGeral(sub.error.message ?? "Confira os dados do pagamento."); erroAoPagar("validar", sub.error); return; }
     const [temIntento, criado] = await Promise.all([garantirIntento(email, cpf), stripe.createPaymentMethod({ elements: elementos, params: { billing_details: { email } } })]);
     if (criado.error || !criado.paymentMethod) { erroGeral(criado.error?.message ?? "Confira os dados do cartão."); erroAoPagar("cartao", criado.error); return; }
+    cartaoUsado = criado.paymentMethod.card ? { marca: criado.paymentMethod.card.brand ?? null, final: criado.paymentMethod.card.last4 ?? null } : null;
     if (!temIntento) { erroGeral("Não consegui registrar o pagamento. Tente de novo em instantes."); erroAoPagar("criar"); return; }
     const retorno = new URL(location.href); retorno.search = ""; retorno.hash = "";
     for (const [k, v] of new URLSearchParams(location.search)) if (!/^(payment_intent|payment_intent_client_secret|redirect_status)$/.test(k)) retorno.searchParams.set(k, v);
@@ -832,6 +843,20 @@ function mostrarPago(metodo: string) {
   o.evento("landing_stripe_pago", { metodo, pi: est.pi });
   if (est.pi) o.pixel("Purchase", { value: o.precoCentavos / 100, currency: "BRL", content_name: "oferta_stripe" }, est.pi);
   telaPago();
+  // 15/11 (UPSELL_OFERTA): o presente entra por cima; a tela de pago de sempre fica embaixo (é o "depois" dele). Nada aqui pode quebrar o pago.
+  if (o.presente && est.pi) {
+    try { o.presente.abrir({ ref: est.ref, pi: est.pi, metodo, email: est.email || null, cartao: metodo === "card" ? cartaoUsado : null }); } catch { /* fica o pago */ }
+  }
+}
+/** 15/11: o Stripe.js desta camada (o 3DS do presente de 1 toque usa o MESMO) */
+export const stripeDaCamada = (): StripeLike | null => stripe;
+/** 15/11: uma linha pequena no fim da tela de pago (ex.: "Dá pra dar de presente depois…"). Só se a tela de pago está aí. */
+export function notaNoPago(texto: string): void {
+  const alvo = raiz?.querySelector<HTMLElement>("[data-testid='oferta-pago']");
+  if (!alvo || alvo.querySelector("[data-nota-presente]")) return;
+  const p = document.createElement("p");
+  p.className = "oc-contato"; p.setAttribute("data-nota-presente", ""); p.textContent = texto;
+  alvo.appendChild(p);
 }
 
 /** só desenha: reabrir depois de pago volta aqui, sem evento nem Purchase de novo */
@@ -943,4 +968,4 @@ function fecharJa(_via: string) {
 }
 
 /** testes: zera o módulo entre páginas */
-export function _zerar() { pararVigia(); raiz?.remove(); raiz = null; est = null; ultimoEmailInicial = null; ultimaCriacao = null; icNoHeap.clear(); aberta = false; opc = null; api = null; stripe = null; elementos = null; elementoCartao = null; montagem += 1; pixPronto = false; cartaoPronto = false; cargaFalhou = false; cartaoFalhou = false; carteiraMedida = false; emailMedido.comecou = ""; emailMedido.valido = ""; fechandoPelaTela = false; saiuEm = null; carregandoStripe = null; soltarTeto(); trocandoPix = false; window.removeEventListener("popstate", aoVoltarNavegador); vigiarSaida(false); soltar(); }
+export function _zerar() { cartaoUsado = null; pararVigia(); raiz?.remove(); raiz = null; est = null; ultimoEmailInicial = null; ultimaCriacao = null; icNoHeap.clear(); aberta = false; opc = null; api = null; stripe = null; elementos = null; elementoCartao = null; montagem += 1; pixPronto = false; cartaoPronto = false; cargaFalhou = false; cartaoFalhou = false; carteiraMedida = false; emailMedido.comecou = ""; emailMedido.valido = ""; fechandoPelaTela = false; saiuEm = null; carregandoStripe = null; soltarTeto(); trocandoPix = false; window.removeEventListener("popstate", aoVoltarNavegador); vigiarSaida(false); soltar(); }

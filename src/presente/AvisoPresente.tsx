@@ -10,6 +10,8 @@ import {
   type LinhaDoAviso, type MarcaAviso,
 } from "@/lib/presente-aviso";
 import { tokenDia3 } from "./api";
+import { entradaLigadaAqui } from "@/lib/presente-entrada";
+import { EntradaPresente } from "./EntradaPresente";
 
 /**
  * O AVISO DO PRESENTE na página Você (31/10) — uma linha discreta logo abaixo da conta/plano, nunca na Home. Mora nos
@@ -19,6 +21,12 @@ import { tokenDia3 } from "./api";
  * na próxima visita (crítica r2: "1 vez" — a marca guarda a sessão em que apareceu). Eventos: presente_aviso_view · presente_aviso_toque · presente_aviso_fechar.
  */
 export function AvisoPresente({ estilo }: { estilo: "classico" | "e" | "menu" }) {
+  // 15/11: com a ENTRADA FIXA ligada (src/lib/presente-entrada.ts), ela ocupa o lugar do aviso fechável (nunca os dois)
+  const [entrada] = useState(() => entradaLigadaAqui());
+  return entrada ? <EntradaPresente estilo={estilo} /> : <AvisoFechavel estilo={estilo} />;
+}
+
+function AvisoFechavel({ estilo }: { estilo: "classico" | "e" | "menu" }) {
   const { user } = useAuth();
   const { get, set } = useUserData();
   const navigate = useNavigate();

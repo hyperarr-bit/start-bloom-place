@@ -109,14 +109,14 @@ const agora = () => Math.round(performance.now());
 type Janela = Window & {
   __landingCliqueLoja?: (e: MouseEvent) => void;
   __landingSimularJaTem?: boolean;
-  __landing?: { uma?: boolean; cko_forcado?: boolean; otp_forcado?: boolean; oem_forcado?: boolean; lpo_forcado?: boolean; lpo_link?: boolean; ab_lp_oferta?: string; lpo_stripe_cedo?: string; pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null };
+  __landing?: { uma?: boolean; cko_forcado?: boolean; otp_forcado?: boolean; oem_forcado?: boolean; lpo_forcado?: boolean; lpo_link?: boolean; ab_lp_oferta?: string; lpo_stripe_cedo?: string; pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; up_oferta?: string; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null };
   __eventosLanding?: Record<string, unknown>[];
   /** 02/11 (dev/testes): voltou() = "voltei do banco" (≥ 5 s fora) sem trocar de aba; vencer() = o QR vence em 1,5 s */
   __landingSimular?: { pagar: () => void; pagarU2027?: () => void; voltou?: () => void; vencer?: () => void };
   /** 02/11 (dev/testes): o "Já paguei" simulado NÃO confirma (o caminho do Asaas atrasado / de quem não pagou) */
   __landingSimularPixNaoCaiu?: boolean;
   /** 31/10 (dev/testes): o Pix simulado do 2027 falha / sai pra outra conta / sem sessão (o link do e-mail noutro navegador) */
-  __landingSimularU2027?: { falhar?: boolean; outraConta?: boolean; semSessao?: boolean };
+  __landingSimularU2027?: { falhar?: boolean; outraConta?: boolean; semSessao?: boolean; recusar?: boolean; tresDS?: boolean };
   /** 30/10: diagnóstico de tempo (medição de desempenho; nada vai pro banco por aqui) */
   __landingDiag?: { terceirosEm: number | null; demoEm: number | null; demoVia: string | null };
   fbq?: (...a: unknown[]) => void;
@@ -2083,7 +2083,105 @@ const aoPagarStripe = () => {
 const eventoStripe: typeof evento = LPO_NOVA || LPO_ATIVO
   ? (nome, dados) => { evento(nome, dados); if (nome === "landing_stripe_pagar") guardarEmailPagando(); if (nome === "landing_stripe_pago") { try { aoPagarStripe(); } catch { /* o Purchase vem logo depois: nada aqui pode impedir */ } } }
   : evento;
+/* ── 15/11 (UPSELL_OFERTA "on", só a /oferta): o presente "Leve alguém junto" a R$ 24,90 no pós-pago. Off = nada daqui roda (opcoesStripe
+ *    não leva `presente`, o pedido não leva salvar_cartao). Pagou no cartão → "Sim, adicionar" (1 toque, stripe-presente acao "cartao");
+ *    no Pix → um Pix novo de 24,90 da Stripe. O valor é do servidor; aqui é só exibição. Sem Purchase pra Meta. ── */
+const UP_OFERTA = STRIPE && w.__landing?.up_oferta === "on" && !LPO_LINK;
+const VALOR_PRESENTE_OFERTA = 24.9;
+type CompraPaga = import("./stripe-checkout").CompraPaga;
+const postarPresente = async (corpo: Record<string, unknown>): Promise<Record<string, unknown>> => {
+  const r = await fetch("https://itoylenzvahbscgjgtqf.supabase.co/functions/v1/stripe-presente", {
+    method: "POST", headers: { "Content-Type": "application/json", apikey: ANON_PRESENTE, Authorization: `Bearer ${ANON_PRESENTE}` }, body: JSON.stringify(corpo),
+  });
+  const j = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+  return r.ok ? j : { ...j, ok: false };
+};
+const ANON_PRESENTE = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0b3lsZW56dmFoYnNjZ2pndHFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMTc4NzUsImV4cCI6MjA4OTg5Mzg3NX0.G3bJEdD5B5lmc1cic6UYGeu2xv4XrbmZ9MA_afoYnLg";
+type ApiOfertaPresente = import("./upsell-presente").ApiPresente & { cobrar: () => Promise<import("./upsell-presente").ResultadoUmToque> };
+const CODIGO_SIMULADO_PRESENTE_OFERTA = "00020101021226870014br.gov.bcb.pix2565qr.stripe.com/pix/SIMULADO-PRESENTE-SEM-COBRANCA5204000053039865405" + "24.905802BR5904CORE6009SAO PAULO62070503***6304ABCD";
+function apiPresenteOferta(c: CompraPaga): ApiOfertaPresente {
+  if (SIMULADO) {
+    const sim = () => w.__landingSimularU2027 ?? {};
+    return {
+      simulado: true,
+      cobrar: () => espera(1200).then(() => (sim().recusar ? { recusado: true as const } : sim().falhar ? { erro: "simulado" } : { pago: true as const, pedido: `pi_sim_presente_${c.pi.slice(-6)}`, codigo: null, de: null })),
+      gerar: () => espera(600).then(() => (sim().falhar
+        ? { erro: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.", onde: "simulado" }
+        : { orderId: `pi_sim_presente_${c.pi.slice(-6)}`, qrCode: CODIGO_SIMULADO_PRESENTE_OFERTA, qrCodeBase64: null, expiresAt: new Date(Date.now() + 24 * 3600e3).toISOString(), donoIgual: true })),
+      conferir: async () => ({ pago: false, codigo: null }),
+      buscar: (pedido) => espera(500).then(() => ({ codigo: `SMPX${pedido.toUpperCase().replace(/[^A-HJKMNP-Z2-9]/g, "").slice(-4).padStart(4, "X")}`, de: null })),
+      gravarNome: async () => true,
+    };
+  }
+  const prova = { ref: c.ref, pi: c.pi };
+  const estadoAgora = () => postarPresente({ acao: "estado", ...prova }).catch(() => ({ ok: false }) as Record<string, unknown>);
+  const pagoDe = (j: Record<string, unknown>) => ({ pago: true as const, pedido: String(j.pedido ?? ""), codigo: typeof j.codigo === "string" ? j.codigo : null, de: typeof j.de === "string" ? j.de : null });
+  return {
+    simulado: false,
+    cobrar: async () => {
+      const j = await postarPresente({ acao: "cartao", ...prova }).catch(() => ({ ok: false, motivo: "rede" }) as Record<string, unknown>);
+      if (j.ok === true && j.pago === true) return pagoDe(j);
+      if (j.recusado === true) return { recusado: true as const };
+      if (["sem_cartao", "cartao_nao_salvo", "outro_cliente", "pix_vivo"].includes(String(j.motivo))) return { semCartao: true as const };
+      if (j.ok === true && (j.acao === true || j.processando === true)) {
+        // o banco pediu 3DS: o Stripe.js da MESMA camada termina; depois o servidor diz se pagou
+        if (j.acao === true && typeof j.client_secret === "string") {
+          const m = await carregarStripeCheckout();
+          const s = m.stripeDaCamada();
+          const r = s?.handleNextAction ? await s.handleNextAction({ clientSecret: j.client_secret }).catch(() => ({ error: { code: "falhou" } })) : { error: { code: "sem_stripe" } };
+          if (r.error) return { recusado: true as const };
+        }
+        for (let i = 0; i < 4; i++) {
+          const e = await estadoAgora();
+          if (e.ok === true && e.pago === true) return pagoDe(e);
+          await espera(1500);
+        }
+        return { erro: "sem_confirmacao" };
+      }
+      return { erro: String(j.motivo ?? "falhou") };
+    },
+    gerar: async () => {
+      const j = await postarPresente({ acao: "pix", ...prova }).catch(() => ({ ok: false }) as Record<string, unknown>);
+      if (j.ok === true && j.pago === true) { const p = pagoDe(j); return { presentePago: true as const, pedido: p.pedido, codigo: p.codigo ?? "", de: p.de }; }
+      const px = j.pix as { orderId?: string; qrCode?: string; expiresAt?: string } | undefined;
+      if (j.ok === true && px?.orderId && px.qrCode && px.expiresAt) return { orderId: px.orderId, qrCode: px.qrCode, qrCodeBase64: null, expiresAt: px.expiresAt, donoIgual: true };
+      return { erro: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.", onde: String(j.motivo ?? "stripe_presente") };
+    },
+    conferir: async () => { const e = await estadoAgora(); return { pago: e.ok === true && e.pago === true, codigo: typeof e.codigo === "string" ? e.codigo : null }; },
+    buscar: async () => { const e = await estadoAgora(); return e.ok === true && typeof e.codigo === "string" ? { codigo: e.codigo, de: typeof e.de === "string" ? e.de : null } : null; },
+    gravarNome: async (pedido, nome) => { const j = await postarPresente({ acao: "nome", ...prova, pedido, nome }).catch(() => ({ ok: false })); return (j as { ok?: boolean }).ok === true; },
+  };
+}
+let presenteOferta: import("./upsell-2027").Upsell2027 | null = null;
+let presenteOfertaPago = false;
+const abrirPresenteOferta = (c: CompraPaga) => {
+  void carregarComRetry(() => import("./upsell-presente"), { recarregar: false }).then((m) => {
+    if (presenteOferta) return;
+    const api = apiPresenteOferta(c);
+    const fora = document.createElement("div");
+    const rotulo = c.cartao?.final ? `${c.cartao.marca ? `${c.cartao.marca.charAt(0).toUpperCase()}${c.cartao.marca.slice(1)} ` : ""}•••• ${c.cartao.final}` : null;
+    const u = m.criarUpsellPresente(c.pi, {
+      caixa: fora, card: fora, api, evento, copiarNoToque, copiarTexto: (x) => copiarTexto(x), desenharQr: (alvo, p) => desenharQr(alvo, p),
+      email: () => c.email,
+      valorPago: () => ST_PRECO / 100,
+      aoTerminar: () => {
+        presenteOferta = null;
+        // "Agora não": a linha de "dá pra dar depois" só quando a entrada da página Você existe (nunca mandar procurar o que não há)
+        if (!presenteOfertaPago) void import("@/lib/presente-entrada").then((pe) => { if (pe.entradaLigadaAqui()) void carregarStripeCheckout().then((sc) => sc.notaNoPago(pe.NOTA_DEPOIS)); }).catch(() => null);
+      },
+      aoMudar: () => { if (presenteOferta?.etapa() === "pronto") presenteOfertaPago = true; },
+      faixaConfirmada: () => "o CORE é seu pra sempre",
+      valor: VALOR_PRESENTE_OFERTA, ancora: ST_PRECO / 100, semHistorico: true,
+      extraEvento: { pagina: "oferta", valor: Math.round(VALOR_PRESENTE_OFERTA * 100) },
+      umToque: c.metodo === "card" ? { rotulo, cobrar: api.cobrar } : undefined,
+    });
+    if (!u.ativo()) return;
+    presenteOferta = u;
+    u.render();
+  }, () => evento("landing_erro", { onde: "chunk_presente_oferta" }));
+};
 const opcoesStripe = () => ({
+  ...(UP_OFERTA ? { presente: { abrir: abrirPresenteOferta } } : {}),
   pk: ST_PK, precoCentavos: ST_PRECO, parcelasMax: Number(w.__landing?.stripe_parcelas_max) || 12, producao: PRODUCAO, pedeCpf: w.__landing?.stripe_pede_cpf === true,
   evento: eventoStripe, pixel: pixelStripe, atrib: LPO_ATIVO ? { ...atrib, braco_lp_oferta: String(BRACO_LP_OFERTA) } : atrib, sessao, aparelho, urlChegada: URL_DE_CHEGADA, fbclid: BUSCA.get("fbclid"),
 });

@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/use-auth";
 import type { EstadoPresente } from "@/lib/presente";
 import { IlustraPresente } from "@/presente/IlustraPresente";
 import { TelaCartao } from "@/presente/FluxoPresente";
-import { copiarTexto, estadoDia3, nomeDia3, sairDia3, tokenDia3, type PixDia3 } from "@/presente/api";
+import { copiarTexto, estadoDia3, nomeDia3, presenteStripe, sairDia3, tokenDia3, type PixDia3, type RespStripePresente } from "@/presente/api";
 import "@/pages/hoje/funil-hoje.css";
 import "@/presente/presente.css";
 
@@ -34,7 +34,34 @@ import "@/presente/presente.css";
  * (+ os do cartão com origem "dia3": presente_whatsapp, presente_link_copiado). Nenhum Purchase (recomendação, confirmar com o dono:
  * upsell não manda Purchase pra Meta; o servidor manda só a UTMify).
  */
-type Fase = "carregando" | "pix" | "pago" | "sem_link" | "token" | "sem_acesso" | "erro" | "saiu";
+type Fase = "carregando" | "pix" | "pago" | "sem_link" | "token" | "sem_acesso" | "erro" | "saiu" | "cartao";
+
+/**
+ * 15/11: quem comprou a R$ 67,90 na /oferta (Stripe) — o servidor (stripe-presente) responde pelo MESMO token com o preço dela
+ * (R$ 24,90). Cartão salvo na compra → "Sim, dar de presente" (1 toque; 3DS pelo Stripe.js); senão (ou recusado) → Pix da Stripe.
+ * A função não respondeu / não é compra da /oferta → o presente de sempre (14,90, Pix Asaas). Eventos ganham `preco`.
+ */
+const STRIPE_PK_DAR = "pk_live_51TJnAQQdjmrIbUhHDSWqG1trOT6mFfV87AC4Vv47kFJTAFOhYsNmvryGRnf3x824Ke3mXSsWiFCovKPIR6Kqx0IX00VcuAawhC";
+type ModoStripe = { preco: number; cartao: { marca: string | null; final: string | null } | null };
+const reaisDar = (centavos: number) => `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
+/** a resposta do stripe-presente no formato do dia 3 (o laço e o cartão são os mesmos). Pago sem código ainda = espera. */
+export function stripeComoDia3(r: RespStripePresente | null): Awaited<ReturnType<typeof estadoDia3>> {
+  if (!r) return { ok: false, motivo: "rede" };
+  if (r.ok !== true) return { ok: false, motivo: r.motivo === "token" ? "token" : "pix" };
+  if (r.pago === true && typeof r.codigo === "string") return { ok: true, pago: true, pedido: String(r.pedido ?? ""), codigo: r.codigo, de: r.de ?? null, resgatado: false };
+  const p = r.pix;
+  return { ok: true, pago: false, pix: p && p.orderId && p.qrCode ? { orderId: p.orderId, qrCode: p.qrCode, qrCodeBase64: null, expiresAt: p.expiresAt } : null };
+}
+/** o 3DS do 1 toque: o Stripe.js de js.stripe.com (só aqui, só quando o banco pede) */
+async function terminar3ds(clientSecret: string): Promise<boolean> {
+  const w = window as unknown as { Stripe?: (pk: string) => { handleNextAction: (o: { clientSecret: string }) => Promise<{ error?: unknown }> } };
+  if (!w.Stripe) {
+    await new Promise<void>((ok, falha) => { const s = document.createElement("script"); s.src = "https://js.stripe.com/v3"; s.onload = () => ok(); s.onerror = () => falha(new Error("stripe.js")); document.head.appendChild(s); }).catch(() => null);
+  }
+  if (!w.Stripe) return false;
+  const r = await w.Stripe(STRIPE_PK_DAR).handleNextAction({ clientSecret }).catch(() => ({ error: true }));
+  return !r.error;
+}
 
 /** O "Código copiado" sobrevive à recarga do banco (o Instagram/Safari recarregam a aba na volta). Por pedido. */
 const CHAVE_COPIADO = "presente-d3-copiado";
@@ -73,6 +100,10 @@ export function DarPresente() {
   const [copiaFalhou, setCopiaFalhou] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const [gerando, setGerando] = useState(false);
+  /** 15/11: a compra é da /oferta (Stripe): o preço e o cartão salvo vêm do servidor */
+  const [stripe, setStripe] = useState<ModoStripe | null>(null);
+  const [cobrando, setCobrando] = useState(false);
+  const [recusou, setRecusou] = useState<string | null>(null);
   const origem = useRef<string>((() => { try { return new URLSearchParams(window.location.search).get("utm_source") ?? "direto"; } catch { return "direto"; } })());
 
   /* noindex + título */
@@ -126,6 +157,14 @@ export function DarPresente() {
     setGerando(false);
     aplicar(r, true);
   }, [t, aplicar]);
+  /* 15/11: o Pix de 24,90 da Stripe (o MESMO enquanto vale) */
+  const gerarStripe = useCallback(async () => {
+    if (!t) return;
+    setGerando(true);
+    const r = await presenteStripe(t, "pix");
+    setGerando(false);
+    aplicar(stripeComoDia3(r), true);
+  }, [t, aplicar]);
   const viu = useRef(false);
   useEffect(() => {
     if (!t) return;
@@ -133,13 +172,53 @@ export function DarPresente() {
       void sairDia3(t).then((ok) => { trackEvent("presente_d3_sair", { ok }); setFase(ok ? "saiu" : "token"); });
       return;
     }
-    if (!viu.current) { viu.current = true; trackEvent("presente_d3_view", { origem: origem.current }); }
-    void gerar();
-  }, [t, gerar]);
+    let vivo = true;
+    void (async () => {
+      // 15/11: 1º o presente da /oferta (24,90); não é compra de lá (ou a função não respondeu) → o de sempre (14,90)
+      const s = await presenteStripe(t, "estado");
+      if (!vivo) return;
+      const ehStripe = s?.ok === true && typeof s.preco === "number";
+      if (!viu.current) { viu.current = true; trackEvent("presente_d3_view", { origem: origem.current, preco: ehStripe ? s!.preco : 1490 }); }
+      if (!ehStripe) { void gerar(); return; }
+      setStripe({ preco: s!.preco!, cartao: s!.cartao ?? null });
+      const como = stripeComoDia3(s);
+      if (como.ok && (como.pago || ("pix" in como && como.pix))) { aplicar(como, false); return; }
+      if (s!.cartao) { setFase("cartao"); return; }
+      void gerarStripe();
+    })();
+    return () => { vivo = false; };
+  }, [t, gerar, gerarStripe, aplicar]);
+
+  /* 15/11: "Sim, dar de presente" — 1 toque no cartão salvo da compra (o servidor não cobra 2×) */
+  const cobrar = async () => {
+    if (!t || cobrando) return;
+    setCobrando(true); setRecusou(null);
+    trackEvent("presente_d3_cartao", { origem: origem.current });
+    let r = await presenteStripe(t, "cartao");
+    if (r?.ok === true && r.acao === true && typeof r.client_secret === "string") {
+      if (!(await terminar3ds(r.client_secret))) r = { ok: false, recusado: true };
+    }
+    if (r?.recusado === true) {
+      setCobrando(false);
+      trackEvent("presente_d3_recusado", { origem: origem.current });
+      setRecusou("O banco não aprovou este valor. Dá pra pagar no Pix.");
+      return;
+    }
+    if (r && ["sem_cartao", "cartao_nao_salvo", "outro_cliente", "pix_vivo"].includes(String(r.motivo))) { setCobrando(false); setStripe((x) => (x ? { ...x, cartao: null } : x)); void gerarStripe(); return; }
+    // pagou (ou o banco terminou o 3DS): espera o código do presente
+    for (let i = 0; i < 6; i++) {
+      const e = stripeComoDia3(i === 0 && r?.pago ? r : await presenteStripe(t, "estado"));
+      if (e.ok && e.pago) { setCobrando(false); aplicar(e, false); return; }
+      await new Promise((ok) => window.setTimeout(ok, 1500));
+    }
+    setCobrando(false);
+    setRecusou("Não deu pra confirmar agora. Tente de novo em instantes.");
+  };
 
   /* confere sozinha (LACO_DAR): 4 s nos 10 primeiros minutos (Asaas 1 a cada 3), 30 s até 30 min (Asaas sempre), depois
    * para; só com a aba à vista. A volta do app do banco e o "Já paguei" conferem na Asaas e religam o laço (dentro dos 30 min). */
   const pedidoNaTela = pix?.orderId ?? null;
+  const stripeLigado = !!stripe;
   const conferirAgora = useRef<() => Promise<boolean>>(async () => false);
   useEffect(() => {
     if (!t || fase !== "pix" || !pedidoNaTela) return;
@@ -153,7 +232,7 @@ export function DarPresente() {
       rodando = true;
       const lento = Date.now() - desde >= LACO_DAR.viraLentoMs;
       try {
-        const r = await estadoDia3(t, { pedido: pedidoNaTela, conferir: forcar || lento || ++n % LACO_DAR.asaasCada === 0 });
+        const r = stripeLigado ? stripeComoDia3(await presenteStripe(t, "estado")) : await estadoDia3(t, { pedido: pedidoNaTela, conferir: forcar || lento || ++n % LACO_DAR.asaasCada === 0 });
         aplicar(r, false);
         return r.ok === true && r.pago === true;
       } finally { rodando = false; }
@@ -180,7 +259,7 @@ export function DarPresente() {
       document.removeEventListener("visibilitychange", aoVoltar);
       window.removeEventListener("pageshow", aoVoltar);
     };
-  }, [t, fase, pedidoNaTela, aplicar]);
+  }, [t, fase, pedidoNaTela, aplicar, stripeLigado]);
 
   const copiar = async () => {
     if (!pix) return;
@@ -201,6 +280,7 @@ export function DarPresente() {
     <div className="pv-topo"><span className="pv-marca"><i />CORE</span></div>
   );
 
+  const precoTxt = stripe ? reaisDar(stripe.preco) : "R$ 14,90";
   let corpo: JSX.Element;
   if (fase === "pago" && pago) {
     const estado: EstadoPresente = { v: 1, compra: "dia3", etapa: "cartao", pix: null, pedido: pago.pedido, codigo: pago.codigo, de: pago.de, plano30: null };
@@ -210,8 +290,8 @@ export function DarPresente() {
         onCodigo={() => { /* o código já veio com o "pago" */ }}
         onNome={(de) => setPago((x) => (x ? { ...x, de } : x))}
         buscarPresente={async () => ({ codigo: pago.codigo, de: pago.de })}
-        gravarNome={(pedido, nome) => (t ? nomeDia3(t, pedido, nome) : Promise.resolve(false))}
-        rotuloContinuar="Pronto" onContinuar={() => navigate(ENTRADA_APP)}
+        gravarNome={(pedido, nome) => (!t ? Promise.resolve(false) : stripe ? presenteStripe(t, "nome", { pedido, nome }).then((r) => r?.ok === true) : nomeDia3(t, pedido, nome))}
+        rotuloContinuar="Pronto" onContinuar={() => navigate(ENTRADA_APP)} valor={stripe ? stripe.preco / 100 : undefined}
         nota="O link também foi pro seu e-mail, se você fechar antes de mandar." />
     );
   } else if (fase === "pix" && pix) {
@@ -222,7 +302,7 @@ export function DarPresente() {
           {topo}
           <div className="pv-cena pv-cena-pequena"><IlustraPresente size={112} /></div>
           <h1 className="pv-titulo">Leve alguém <em>junto</em></h1>
-          <p className="pv-sub">Dê o CORE pra sempre pra quem você quer bem. <b>R$ 14,90, uma vez.</b> Sem mensalidade.</p>
+          <p className="pv-sub">Dê o CORE pra sempre pra quem você quer bem. <b>{precoTxt}, uma vez.</b> Sem mensalidade.</p>
           <p className="dp-preco" data-testid="dar-preco-presente">Preço de presente, só pra quem já tem o CORE.</p>
           {copiado ? (
             <div className="dp-volte" data-testid="dar-volte" role="status">
@@ -252,10 +332,38 @@ export function DarPresente() {
         <div className="pv-rodape">
           <button type="button" className="pv-cta" data-testid="dar-copiar" data-ok={copiado ? "" : undefined}
             style={copiado ? { background: "#16a34a" } : undefined} onClick={() => { void copiar(); }}>
-            {copiado ? <><Check size={19} strokeWidth={3} /><span>Copiado · copiar de novo</span></> : <><Copy size={19} strokeWidth={2.4} /><span>Copiar o Pix · R$ 14,90</span></>}
+            {copiado ? <><Check size={19} strokeWidth={3} /><span>Copiado · copiar de novo</span></> : <><Copy size={19} strokeWidth={2.4} /><span>Copiar o Pix · {precoTxt}</span></>}
           </button>
           {(copiado || copiaFalhou) && <button type="button" className="pv-nao" data-testid="dar-ja-paguei" onClick={() => { void jaPaguei(); }}>Já paguei</button>}
           <p className="pv-miuda" data-testid="dar-cnpj" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}><ShieldCheck size={13} strokeWidth={2.4} style={{ color: "#16a34a", flexShrink: 0 }} /><span>CORE · CNPJ {EMPRESA.cnpj}</span></p>
+        </div>
+      </div>
+    );
+  } else if (fase === "cartao" && stripe?.cartao) {
+    // 15/11: 1 toque no cartão salvo da compra da /oferta
+    const c = stripe.cartao;
+    const rotulo = c.final ? `${c.marca ? `${c.marca.charAt(0).toUpperCase()}${c.marca.slice(1)} ` : ""}•••• ${c.final}` : "";
+    corpo = (
+      <div className="pv-tela" data-testid="dar-cartao">
+        <div className="pv-col">
+          {topo}
+          <div className="pv-cena pv-cena-pequena"><IlustraPresente size={112} /></div>
+          <h1 className="pv-titulo">Leve alguém <em>junto</em></h1>
+          <p className="pv-sub">Dê o CORE pra sempre pra quem você quer bem. <b>{precoTxt}, uma vez.</b> Sem mensalidade.</p>
+          <p className="dp-preco" data-testid="dar-preco-presente">Preço de presente, só pra quem já tem o CORE.</p>
+          <div className="pv-como"><div><b>1</b>Você confirma aqui</div><div><b>2</b>Manda o link</div><div><b>3</b>A pessoa cria a conta</div></div>
+          {recusou && <p className="dp-preco" role="alert" data-testid="dar-recusado" style={{ marginTop: 12, color: "#b42318", fontWeight: 600 }}>{recusou}</p>}
+        </div>
+        <div className="pv-rodape">
+          {recusou ? (
+            <button type="button" className="pv-cta" data-testid="dar-pix-stripe" onClick={() => { setRecusou(null); void gerarStripe(); }}>Pagar com Pix · {precoTxt}</button>
+          ) : (
+            <button type="button" className="pv-cta" data-testid="dar-sim" disabled={cobrando} onClick={() => { void cobrar(); }}>
+              {cobrando ? <><Loader2 size={18} className="fn-gira" /><span>Confirmando…</span></> : <span>Sim, dar de presente · {precoTxt}</span>}
+            </button>
+          )}
+          {!recusou && <p className="pv-miuda" data-testid="dar-mesmo-cartao">No mesmo cartão{rotulo ? ` ${rotulo}` : ""}, sem digitar nada.</p>}
+          {!recusou && !cobrando && <button type="button" className="pv-nao" data-testid="dar-prefiro-pix" onClick={() => { void gerarStripe(); }}>Prefiro pagar no Pix</button>}
         </div>
       </div>
     );
@@ -271,14 +379,14 @@ export function DarPresente() {
       </div>
     );
   } else {
-    const textos: Record<Exclude<Fase, "carregando" | "pix" | "pago">, { titulo: string; texto: string; botao: string; acao: () => void }> = {
+    const textos: Record<Exclude<Fase, "carregando" | "pix" | "pago" | "cartao">, { titulo: string; texto: string; botao: string; acao: () => void }> = {
       // crítica r2 (honestidade): a recusa só vale pra este e-mail (o único de oferta hoje) — não prometer mais que isso
       saiu: { titulo: "Pronto, esse e-mail não chega mais", texto: "Os e-mails da sua conta continuam chegando.", botao: "Abrir o CORE", acao: () => navigate(ENTRADA_APP) },
       // crítica r2: a linha "Leve alguém junto" da página Você quase nunca existe (chave off, só site, some no ×) — não mandar procurar
       sem_link: { titulo: "Abra pelo link do e-mail", texto: "O botão do e-mail “Leve alguém junto” abre esta página. Dúvidas: contato@coreaplicativo.com.br", botao: "Abrir o CORE", acao: () => navigate(ENTRADA_APP) },
       token: { titulo: "Esse link venceu", texto: "Fale com a gente: contato@coreaplicativo.com.br", botao: "Abrir o CORE", acao: () => navigate(ENTRADA_APP) },
       sem_acesso: { titulo: "O presente é pra quem tem o CORE pra sempre", texto: "Dúvidas: contato@coreaplicativo.com.br", botao: "Abrir o CORE", acao: () => navigate(ENTRADA_APP) },
-      erro: { titulo: "Não consegui gerar o Pix agora", texto: "Tenta de novo em alguns segundos.", botao: "Tentar de novo", acao: () => { void gerar(); } },
+      erro: { titulo: "Não consegui gerar o Pix agora", texto: "Tenta de novo em alguns segundos.", botao: "Tentar de novo", acao: () => { void (stripe ? gerarStripe() : gerar()); } },
     };
     const x = textos[fase as keyof typeof textos] ?? textos.erro;
     corpo = (

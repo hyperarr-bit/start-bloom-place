@@ -14,6 +14,8 @@ export type PedidoStripe = {
   cpf: string | null;
   /** 14/11: a oferta (metadata.pagina) — "app_web" (/funil-app) ou "oferta" (o de sempre, também quando não vem nada) */
   pagina: string;
+  /** 15/11 (UPSELL_OFERTA, chave da página): salvar o cartão da compra pro presente de 1 toque — SÓ /oferta, só quando a página pede */
+  salvarCartao?: boolean;
 };
 /** a oferta do pedido (a tabela de _shared/stripe-ofertas.ts) */
 export const ofertaDoPedido = (p: Pick<PedidoStripe, "pagina">): OfertaStripe => ofertaDaPagina(p.pagina) ?? OFERTAS_STRIPE.oferta;
@@ -40,6 +42,7 @@ export function validarPedidoStripe(body: unknown): PedidoStripe | null {
     fbp: t(b.fbp, 120), fbc: t(b.fbc, 400), fbclid: t(b.fbclid, 300), url: url && SITES.some((s) => url.startsWith(s)) ? url : null,
     landing_session_id: t(b.landing_session_id, 64), landing_device_id: t(b.landing_device_id, 64), atrib, cpf: cpfBruto,
     pagina: b.pagina === "lp27" ? "lp27" : b.pagina === "app_web" ? "app_web" : "oferta",
+    ...(b.salvar_cartao === true && b.pagina !== "lp27" && b.pagina !== "app_web" ? { salvarCartao: true } : {}),
   };
 }
 
@@ -73,8 +76,12 @@ export function paramsCriar(ref: string, oferta: OfertaStripe = OFERTAS_STRIPE.o
 
 /** O POST /v1/payment_intents/<id> (atualizar): o e-mail e os sinais do navegador (variáveis). O valor NUNCA é reenviado.
  *  `jaTem` = a metadata atual do PI: o criado_em só vai na 1ª vez (o fbc do fbclid usa esse horário). */
-export function paramsAtualizar(md: Record<string, string>, email: string | null, jaTem: Record<string, string> = {}, cpf: string | null = null): Array<[string, string]> {
+export function paramsAtualizar(md: Record<string, string>, email: string | null, jaTem: Record<string, string> = {}, cpf: string | null = null, salvarCartao = false): Array<[string, string]> {
   const out: Array<[string, string]> = [];
+  // 15/11: o cartão fica salvo pro presente de 1 toque (só no cartão; o Pix não muda). Vai no ATUALIZAR, nunca no criar idempotente
+  // (a chave oferta-<ref> continua com os mesmos campos). Sem customer: a doc da Stripe deixa anexar o cartão a um customer depois
+  // do pagamento quando o PI tem setup_future_usage — quem anexa é o stripe-presente, só se ela tocar em "Sim, adicionar".
+  if (salvarCartao) out.push(["payment_method_options[card][setup_future_usage]", "on_session"]);
   if (email) out.push(["receipt_email", email]);
   if (cpf) out.push(["metadata[cpf]", cpf]); // nota fiscal: SÓ aqui (nunca no criar idempotente, nunca no banco)
   for (const [k, v] of Object.entries(md)) {
@@ -186,7 +193,7 @@ export async function criarOuReaproveitar(
   // requires_action (3DS abandonado / Pix gerado) também aceita mudar metadata e receipt_email na Stripe — só quando é uma NOVA
   // tentativa de pagar (veio e-mail ou CPF); a recarga só lê (o Pix pendente fica intacto)
   if (PODE_ATUALIZAR.has(String(j.status)) || (String(j.status) === "requires_action" && (p.email || p.cpf))) {
-    const up = await stripe(`payment_intents/${j.id}`, paramsAtualizar(md, p.email, (j.metadata ?? {}) as Record<string, string>, p.cpf));
+    const up = await stripe(`payment_intents/${j.id}`, paramsAtualizar(md, p.email, (j.metadata ?? {}) as Record<string, string>, p.cpf, p.salvarCartao === true && oferta.pagina === "oferta" && !!p.email));
     if (up.ok) j = up.j;
     else {
       log("atualizar falhou", { code: String((up.j.error as Record<string, unknown> | undefined)?.code ?? "") });

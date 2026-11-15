@@ -276,7 +276,7 @@ async function lerLinhaExiste(admin: ClienteMin, id: string): Promise<boolean> {
 
 export type PixDia3 = { orderId: string; qrCode: string; qrCodeBase64: string | null; expiresAt: string };
 export type RespostaDia3 =
-  | { ok: false; motivo: "token" | "sem_acesso" | "pix" }
+  | { ok: false; motivo: "token" | "sem_acesso" | "pix" | "stripe" }
   | { ok: true; pago: true; pedido: string; codigo: string; de: string | null; resgatado: boolean }
   | { ok: true; pago: false; pix: PixDia3 | null };
 
@@ -327,8 +327,10 @@ export async function estadoDia3(admin: ClienteMin, a: {
       const vivo = g && typeof g.orderId === "string" && typeof g.payload === "string" && typeof g.expiresAt === "string" && Date.parse(g.expiresAt) > agora();
       return { ok: true, pago: false, pix: vivo ? { orderId: g!.orderId as string, qrCode: g!.payload as string, qrCodeBase64: null, expiresAt: g!.expiresAt as string } : null };
     }
-    const { data: linhas } = await admin.from("subscriptions").select("status, plan, billing_period, current_period_end, abacatepay_billing_id").eq("user_id", dono);
+    const { data: linhas } = await admin.from("subscriptions").select("status, plan, billing_period, current_period_end, abacatepay_billing_id, payment_method, amount_cents").eq("user_id", dono);
     if (!temPraSempre((linhas ?? []) as LinhaMin[])) return { ok: false, motivo: "sem_acesso" };
+    // 15/11: quem comprou a R$ 67,90 na /oferta (Stripe) dá o presente a R$ 24,90 pela função stripe-presente — nunca o Pix de 14,90
+    if (compraOfertaStripe((linhas ?? []) as LinhaComValor[])) return { ok: false, motivo: "stripe" };
     const pix = await garantirPixUpsell(admin, {
       chave: chavePresenteDia3(dono), dono, oferta: OFERTA_PRESENTE, valorCentavos: PRECO_PRESENTE_CENTAVOS, descricao: "CORE de presente",
       criarQr: a.criarQr, extraPedido: { origem: "dia3" }, agora,
@@ -337,6 +339,11 @@ export async function estadoDia3(admin: ClienteMin, a: {
     return { ok: true, pago: false, pix: { orderId: pix.orderId, qrCode: pix.qrCode, qrCodeBase64: pix.qrCodeBase64, expiresAt: pix.expiresAt } };
   } catch { return { ok: false, motivo: "pix" }; }
 }
+
+type LinhaComValor = LinhaMin & { payment_method?: string | null; amount_cents?: number | null };
+/** 15/11: a conta tem o vitalício da /oferta (Stripe, R$ 67,90) ativo? O preço do presente dela é outro (24,90, stripe-presente). */
+export const compraOfertaStripe = (linhas: LinhaComValor[]): boolean =>
+  linhas.some((l) => l.payment_method === "stripe" && l.status === "active" && (l.billing_period === "lifetime" || l.plan === "lifetime") && Number(l.amount_cents) === 6790);
 
 /** O nome no cartão pelo token (só o comprador e só antes do resgate). */
 export async function nomeDia3(admin: ClienteMin, a: { t: unknown; pedido: unknown; nome: unknown }): Promise<{ ok: boolean; de?: string | null }> {

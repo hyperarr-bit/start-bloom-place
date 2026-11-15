@@ -92,3 +92,13 @@ export async function copiarTexto(texto: string): Promise<boolean> {
     document.body.appendChild(ta); ta.select(); const ok = document.execCommand("copy"); ta.remove(); return ok;
   } catch { return false; }
 }
+
+/* ───────── 15/11: o presente de 24,90 de quem comprou na /oferta (função stripe-presente, pelo MESMO token) ───────── */
+export type RespStripePresente = Record<string, unknown> & { ok?: boolean; motivo?: string; preco?: number; pago?: boolean; pedido?: string; codigo?: string | null; de?: string | null; pix?: { orderId: string; qrCode: string; expiresAt: string } | null; cartao?: { marca: string | null; final: string | null } | null; recusado?: boolean; acao?: boolean; client_secret?: string };
+/** null = a função não respondeu (não publicada / rede): a página segue o presente de sempre */
+export async function presenteStripe(t: string, acao: "estado" | "cartao" | "pix" | "nome", extra: Record<string, unknown> = {}): Promise<RespStripePresente | null> {
+  try {
+    const { data } = await supabase.functions.invoke("stripe-presente", { body: { acao, t, ...extra } });
+    return (data as RespStripePresente) ?? null;
+  } catch { return null; }
+}

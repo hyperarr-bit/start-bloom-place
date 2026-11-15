@@ -160,13 +160,15 @@ const reais = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
 /* ───────────────────────── o cartão (presente pago) ───────────────────────── */
 
 /** 31/10: exportado pra página /presente/dar (presente do dia 3) — lá não tem sessão: `buscarPresente`/`gravarNome` vão pelo token. */
-export function TelaCartao({ estado, nomeSugerido, evento, onCodigo, onNome, onContinuar, buscarPresente = meuPresente, gravarNome = gravarNomeDoPresente, rotuloContinuar = "Continuar", nota }: {
+export function TelaCartao({ estado, nomeSugerido, evento, onCodigo, onNome, onContinuar, buscarPresente = meuPresente, gravarNome = gravarNomeDoPresente, rotuloContinuar = "Continuar", nota, valor = VALOR_PRESENTE }: {
   estado: EstadoPresente; nomeSugerido: string | null;
   evento: (nome: string, extra?: Record<string, unknown>) => void;
   onCodigo: (codigo: string, de: string | null) => void; onNome: (de: string) => void; onContinuar: () => void;
   buscarPresente?: (pedido: string) => Promise<{ codigo: string; de: string | null } | null>;
   gravarNome?: (pedido: string, nome: string) => Promise<boolean>;
   rotuloContinuar?: string;
+  /** 15/11: o preço pago (a /presente/dar de quem comprou na /oferta: 24,90); sem isto = VALOR_PRESENTE */
+  valor?: number;
   /** uma linha miúda embaixo do cartão (o dia 3: "O link também foi pro seu e-mail.") */
   nota?: string;
 }) {
@@ -218,7 +220,7 @@ export function TelaCartao({ estado, nomeSugerido, evento, onCodigo, onNome, onC
       <div className="pv-col">
         <div className="pv-topo">
           <span className="pv-marca"><i />CORE</span>
-          <span className="pv-ok"><Check size={14} strokeWidth={3.4} />Presente pago · {reais(VALOR_PRESENTE)}</span>
+          <span className="pv-ok"><Check size={14} strokeWidth={3.4} />Presente pago · {reais(valor)}</span>
         </div>
         <h1 className="pv-titulo" style={{ marginTop: 18 }}>Agora é só <em>mandar</em> 💌</h1>
         <p className="pv-sub">O link vale pra 1 pessoa: abre, cria a conta e pronto</p>

@@ -57,7 +57,18 @@ export type CtxPresente = {
   contaPronta?: () => Promise<void>;
   /** a faixa da oferta: "o CORE é seu pra sempre" */
   faixaConfirmada?: () => string;
+  /** 15/11 (/oferta): o preço do presente (reais). Sem isto = VALOR_PRESENTE_LP (14,90, /organizar e /simples — nada muda lá) */
+  valor?: number;
+  /** 15/11 (/oferta): o preço "de verdade" ao lado (ex.: 67,90 → "em vez de R$ 67,90") */
+  ancora?: number;
+  /** 15/11 (/oferta): campos a mais em TODO evento (pagina "oferta", valor 2490) */
+  extraEvento?: Record<string, unknown>;
+  /** 15/11 (/oferta, pagou no cartão salvo): "Sim, adicionar" cobra no MESMO cartão, sem digitar. Recusa → o Pix aparece como saída. */
+  umToque?: { rotulo: string | null; cobrar: () => Promise<ResultadoUmToque> };
+  /** 15/11 (/oferta): a página do presente não mexe no histórico (o checkout da Stripe por baixo já cuida do Voltar) */
+  semHistorico?: boolean;
 };
+export type ResultadoUmToque = { pago: true; pedido: string; codigo: string | null; de: string | null } | { recusado: true } | { semCartao: true } | { erro: string };
 
 /* ───────── os textos (curtos, sem gênero, sem "só hoje", sem contagem, sem brinde) ───────── */
 export const TITULO_PRESENTE_LP = "Leve alguém junto";
@@ -65,6 +76,8 @@ export const SUB_PRESENTE_LP = "Dê o CORE pra sempre pra quem você quer bem.";
 export const PASSOS_PRESENTE_LP = ["Você paga o Pix", "Manda o link no WhatsApp", "A pessoa abre e cria a conta dela"] as const;
 export const NOTA_PRESENTE_LP = "Vale pra 1 pessoa que ainda não tem o CORE. É separado do seu.";
 export const PRECO_TXT_PRESENTE_LP = "uma vez, sem mensalidade";
+/** 15/11 (/oferta, 1 toque): o 1º passo é confirmar aqui, não pagar um Pix */
+export const PASSOS_PRESENTE_CARTAO = ["Você confirma aqui", "Manda o link no WhatsApp", "A pessoa abre e cria a conta dela"] as const;
 
 /** O laço de conferência (o mesmo do 2027: LACO_U2027 — sem importar o módulo dele). */
 export const LACO_PRESENTE_LP = { rapidoMs: 3000, lentoMs: 30_000, viraLentoMs: 10 * 60e3, paraMs: 30 * 60e3 } as const;
@@ -107,6 +120,7 @@ const CSS = `
 .prp-preco b{font-size:22px;font-weight:850;letter-spacing:-.02em}
 .prp-preco span{font-size:13px;font-weight:650;color:#6b6670}
 .prp-barra button.lp-cta{min-height:52px}
+.prp-cartao-txt{margin:6px 0 0;text-align:center;font-size:12.5px;color:#6b6670}
 .prp-nao{display:block;width:100%;min-height:44px;margin-top:4px;border:0;background:none;color:#6b6670;font-size:14.5px;font-weight:700;font-family:inherit;cursor:pointer}
 .prp .lp-erro{margin:8px 0 0;text-align:center}
 /* o QR do presente (o mesmo desenho do QR do 2027) */
@@ -164,6 +178,11 @@ function pintar(alvo: HTMLElement, html: string): boolean {
 
 export function criarUpsellPresente(compra: string, ctx: CtxPresente): Upsell2027 {
   garantirCss();
+  const VALOR = ctx.valor ?? VALOR_PRESENTE_LP;
+  /** 15/11: o 1 toque vale até a 1ª recusa; depois, o Pix (o mesmo PI no servidor) */
+  let viaCartao = !!ctx.umToque;
+  let cobrando = false;
+  let recusou = false;
   let e: EstadoPresenteLp = lerEstadoPresenteLp(compra);
   let promessa: Promise<GeradoPresente> | null = null;
   let tPre = 0;
@@ -185,7 +204,7 @@ export function criarUpsellPresente(compra: string, ctx: CtxPresente): Upsell202
   let semCodigo = false;
   let buscando = false;
   const fora = () => e.pix?.donoIgual === false;
-  const base = () => ({ order_id: compra, pedido_presente: e.pedido ?? e.pix?.orderId ?? null, upsell_pos: "presente" });
+  const base = () => ({ order_id: compra, pedido_presente: e.pedido ?? e.pix?.orderId ?? null, upsell_pos: "presente", ...(ctx.extraEvento ? { ...ctx.extraEvento, via: viaCartao ? "cartao_1toque" : "pix" } : {}) });
   const ev = (n: string, d: Record<string, unknown> = {}) => ctx.evento(n, { ...base(), ...d });
 
   const salvar = (novo: Partial<EstadoPresenteLp>) => {
@@ -203,13 +222,13 @@ export function criarUpsellPresente(compra: string, ctx: CtxPresente): Upsell202
   function pagoCom(pedido: string, codigo: string | null, de: string | null = null) {
     if (e.etapa === "cartao" || e.etapa === "fim") return;
     parar();
-    ev("landing_presente_pago", { valor: VALOR_PRESENTE_LP, pedido_presente: pedido });
+    ev("landing_presente_pago", { valor: VALOR, pedido_presente: pedido });
     if (de && !nome) { nome = de; nomeSalvo = de; }
     salvar({ etapa: "cartao", pedido, codigo: codigo ?? null, ...(de ? { de } : {}), pix: null });
   }
 
   function preaquecer() {
-    if (promessa || e.etapa !== "oferta") return;
+    if (promessa || e.etapa !== "oferta" || viaCartao) return; // 15/11: no 1 toque não nasce Pix nenhum (só se o cartão for recusado)
     if (e.pix && Date.parse(e.pix.expiresAt) - Date.now() > 60_000) { promessa = Promise.resolve(e.pix); return; }
     tPre = Date.now();
     const conta = ctx.contaPronta ? Promise.race([ctx.contaPronta(), new Promise<void>((ok) => { window.setTimeout(ok, 8000); })]) : Promise.resolve();
@@ -231,9 +250,31 @@ export function criarUpsellPresente(compra: string, ctx: CtxPresente): Upsell202
     });
   }
 
-  async function quero() {
-    if (gerando) return;
+  /** 15/11: "Sim, adicionar" — cobra no cartão salvo (o servidor decide o valor e não cobra 2×) */
+  async function cobrarCartao() {
+    if (cobrando || !ctx.umToque) return;
     ev("landing_presente_quero");
+    erro = null; cobrando = true; render();
+    const r = await ctx.umToque.cobrar().catch((x): ResultadoUmToque => ({ erro: String(x).slice(0, 80) }));
+    cobrando = false;
+    if ("pago" in r) { pagoCom(r.pedido, r.codigo, r.de); return; }
+    // o cartão não ficou salvo (PI antigo, outra conta…): o Pix, sem mensagem de erro
+    if ("semCartao" in r) { viaCartao = false; ev("landing_presente_sem_cartao"); render(); void quero(false); return; }
+    if ("recusado" in r) {
+      recusou = true; viaCartao = false;
+      ev("landing_presente_recusado");
+      erro = "O banco não aprovou este valor. Sua compra do CORE continua garantida.";
+      render(); return;
+    }
+    ev("landing_presente_erro", { onde: "cartao", msg: r.erro });
+    erro = "Não deu pra confirmar agora. Tente de novo em instantes.";
+    render();
+  }
+
+  async function quero(contar = true) {
+    if (gerando) return;
+    if (viaCartao) { void cobrarCartao(); return; }
+    if (contar) ev("landing_presente_quero");
     erro = null;
     if (!promessa) preaquecer();
     const p = promessa!;
@@ -373,10 +414,18 @@ export function criarUpsellPresente(compra: string, ctx: CtxPresente): Upsell202
     document.removeEventListener("keydown", teclaPagina);
     if (empilharNoLoad) { window.removeEventListener("load", empilharNoLoad); empilharNoLoad = null; }
     try { document.documentElement.style.removeProperty("overflow"); } catch { /* noop */ }
-    if (marcaNoHist()) { ignorarPop = true; try { history.back(); } catch { ignorarPop = false; pousarNaConta(); } }
+    if (!ctx.semHistorico && marcaNoHist()) { ignorarPop = true; try { history.back(); } catch { ignorarPop = false; pousarNaConta(); } }
     else pousarNaConta();
   };
   const aoPop = () => {
+    // 15/11 (/oferta): o Voltar fecha o checkout por baixo — a página do presente sai junto (conta como "Agora não" / "Pronto")
+    if (ctx.semHistorico) {
+      if (!pagina || e.etapa === "fim") return;
+      if (e.etapa === "cartao") ev("landing_presente_continuar", { de: "voltar" });
+      else ev("landing_presente_nao", { de: "voltar", etapa: e.etapa });
+      salvar({ etapa: "fim" });
+      return;
+    }
     if (ignorarPop) { ignorarPop = false; pousarNaConta(); return; }
     if (!pagina || marcaNoHist() || e.etapa === "fim") return;
     if (e.etapa === "cartao") ev("landing_presente_continuar", { de: "voltar" });
@@ -409,7 +458,8 @@ export function criarUpsellPresente(compra: string, ctx: CtxPresente): Upsell202
           history.pushState({ ...h, [MARCA]: compra }, "");
         } catch { /* sem histórico: fecha só pelos botões */ }
       };
-      if (document.readyState === "complete") empilhar();
+      if (ctx.semHistorico) { /* 15/11: o checkout da Stripe por baixo cuida do Voltar */ }
+      else if (document.readyState === "complete") empilhar();
       else { empilharNoLoad = empilhar; window.addEventListener("load", empilhar, { once: true }); }
     }
     pagina.dataset.etapa = e.etapa;
@@ -448,18 +498,25 @@ export function criarUpsellPresente(compra: string, ctx: CtxPresente): Upsell202
           <div class="prp-cena">${ilustra(120, "o")}</div>
           <h1 tabindex="-1">Leve alguém <em>junto</em></h1>
           <p class="prp-sub">${SUB_PRESENTE_LP}</p>
-          <ol class="prp-passos" data-testid="presente-passos">${PASSOS_PRESENTE_LP.map((t, i) => `<li><b>${i + 1}</b><span>${t}</span></li>`).join("")}</ol>
+          <ol class="prp-passos" data-testid="presente-passos">${(viaCartao ? PASSOS_PRESENTE_CARTAO : PASSOS_PRESENTE_LP).map((t, i) => `<li><b>${i + 1}</b><span>${t}</span></li>`).join("")}</ol>
           <p class="prp-nota" data-testid="presente-nota-oferta">${NOTA_PRESENTE_LP}</p>
         </div>`)) {
         const h1 = c.querySelector<HTMLElement>("h1");
         try { h1?.focus({ preventScroll: true }); } catch { /* noop */ }
       }
       barra.hidden = false;
-      if (pintar(barra.firstElementChild as HTMLElement, `<div data-testid="presente-barra"><div class="prp-preco"><b data-testid="presente-preco">${reais(VALOR_PRESENTE_LP)}</b><span>${PRECO_TXT_PRESENTE_LP}</span></div>
-        ${gerando
+      const precoTxt = ctx.ancora ? `em vez de ${reais(ctx.ancora)} · uma vez` : PRECO_TXT_PRESENTE_LP;
+      const botao = viaCartao
+        ? (cobrando
+          ? '<button type="button" class="lp-cta" id="pr-quero" disabled data-testid="presente-cobrando"><i class="lp-gira"></i>Confirmando…</button>'
+          : `<button type="button" class="lp-cta" id="pr-quero" data-testid="presente-sim">Sim, adicionar · ${reais(VALOR)}</button>`)
+        : gerando
           ? '<button type="button" class="lp-cta" id="pr-quero" disabled><i class="lp-gira"></i>Gerando o Pix…</button>'
-          : '<button type="button" class="lp-cta" id="pr-quero" data-testid="presente-quero">Quero · copiar o Pix</button>'}
-        ${erro ? `<p class="lp-erro" role="alert">${esc(erro)}</p>` : ""}
+          : `<button type="button" class="lp-cta" id="pr-quero" data-testid="presente-quero">${recusou ? `Pagar com Pix · ${reais(VALOR)}` : "Quero · copiar o Pix"}</button>`;
+      const cartaoTxt = viaCartao ? `<p class="prp-cartao-txt" data-testid="presente-mesmo-cartao">No mesmo cartão${ctx.umToque?.rotulo ? ` ${esc(ctx.umToque.rotulo)}` : ""}, sem digitar nada.</p>` : "";
+      if (pintar(barra.firstElementChild as HTMLElement, `<div data-testid="presente-barra"><div class="prp-preco"><b data-testid="presente-preco">${reais(VALOR)}</b><span>${precoTxt}</span></div>
+        ${botao}${cartaoTxt}
+        ${erro ? `<p class="lp-erro" role="alert" data-testid="presente-erro">${esc(erro)}</p>` : ""}
         <button type="button" class="prp-nao" id="pr-nao" data-testid="presente-agora-nao">Agora não · ver minha conta</button></div>`)) {
         barra.querySelector<HTMLButtonElement>("#pr-quero")!.addEventListener("click", () => { void quero(); });
         barra.querySelector<HTMLButtonElement>("#pr-nao")!.addEventListener("click", () => { ev("landing_presente_nao", { de: "oferta" }); salvar({ etapa: "fim" }); });
@@ -475,7 +532,7 @@ export function criarUpsellPresente(compra: string, ctx: CtxPresente): Upsell202
       const comEmail = !!ctx.email();
       if (pintar(c, `
       <div class="prp-qrtela" data-testid="presente-qr">
-        <div class="prp-valor"><b>${reais(VALOR_PRESENTE_LP)}</b><span>Presente · CORE pra sempre</span></div>
+        <div class="prp-valor"><b>${reais(VALOR)}</b><span>Presente · CORE pra sempre</span></div>
         <div class="prp-copiado${copiado ? "" : " falta"}" data-testid="presente-copiado">${copiado ? ICO_CHECK : ICO_COPIAR}<span>${copiado
           ? "<b>Código copiado.</b>Cole no app do banco, em Pix Copia e Cola."
           : "<b>Copie o código</b>e cole no app do banco, em Pix Copia e Cola."}</span></div>
@@ -515,7 +572,7 @@ export function criarUpsellPresente(compra: string, ctx: CtxPresente): Upsell202
       const linkTxt = codigo ? `coreaplicativo.com.br/presente/<b>${esc(codigo)}</b>` : semCodigo ? "O link também chega no seu e-mail" : "Preparando o seu link…";
       const htmlCartao = `
       <div class="pv prp-cartao" data-testid="presente-cartao">
-        <div class="pv-topo"><span class="pv-marca"><i></i>CORE</span><span class="pv-ok">${ICO_CHECK.replace("<svg ", '<svg width="14" height="14" ')}Presente pago · ${reais(VALOR_PRESENTE_LP)}</span></div>
+        <div class="pv-topo"><span class="pv-marca"><i></i>CORE</span><span class="pv-ok">${ICO_CHECK.replace("<svg ", '<svg width="14" height="14" ')}Presente pago · ${reais(VALOR)}</span></div>
         <h1 class="pv-titulo" tabindex="-1">Agora é só <em>mandar</em> 💌</h1>
         <p class="pv-sub">O link vale pra 1 pessoa: abre, cria a conta e pronto</p>
         <div class="pv-cartao">

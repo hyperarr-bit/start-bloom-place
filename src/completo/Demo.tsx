@@ -36,8 +36,7 @@ export function Demo({initial,onOffer,onReady}:{initial:string;onOffer:()=>void;
   frame.current?.contentWindow?.postMessage({type:'core-real-navigate',module:next},location.origin);
  }
  return <div className="real-demo">
-  <div className="demo-toolbar"><label htmlFor="demo-module">Explorar</label><select id="demo-module" disabled={status==='loading'} value={module} onChange={e=>navigate(e.target.value)}>{Object.entries(moduleNames).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></div>
-  <p className="example-label">Demonstração com dados de exemplo</p>
+  <div className="demo-toolbar"><div className="demo-toolbar-context"><label htmlFor="demo-module">Área do app</label><p id="demo-example-note">Dados de exemplo</p></div><select aria-describedby="demo-example-note" id="demo-module" disabled={status==='loading'} value={module} onChange={e=>navigate(e.target.value)}>{Object.entries(moduleNames).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></div>
   <div className="demo-frame-wrap" aria-busy={status==='loading'}>
    {status==='loading'&&<div className="demo-status" role="status"><span className="spinner"/>Abrindo o CORE…</div>}
    {status==='error'&&<div className="demo-status"><strong>Não foi possível carregar a demonstração.</strong><p>Você pode tentar novamente ou conhecer o acesso.</p><button className="secondary" onClick={()=>{setStatus('loading');pending.current=module;desired.current=module;setSourceModule(module);setRetry(r=>r+1)}}>Tentar novamente</button><button className="text-button" onClick={onOffer}>Conhecer o acesso</button></div>}

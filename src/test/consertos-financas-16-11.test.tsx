@@ -56,6 +56,9 @@ describe("compra no dia do fechamento ou depois → fatura seguinte", () => {
 
   it("lançar em novembro → sai das despesas de novembro e entra nas de dezembro (o mesmo dinheiro em UM mês só)", () => {
     const configOf = () => FECHA2;
+    // relógio depois do id (id "do futuro" é descartado desde 16/11, como na virada)
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 21, 10, 0));
     // "b" anotada DEPOIS do corte da regra nova (id Date.now de 13 dígitos) — ver o bloco do corte
     const nov = [compra("a", "2026-11-01", 100), compra(DEPOIS_DO_CORTE, "2026-11-02", 30), compra("c", "2026-11-16", 70)];
     const vNov = variaveisDoMes(nov, [], "2026-11", configOf);
@@ -341,8 +344,18 @@ describe("revisão M2: corte da regra do dia do fechamento", () => {
     expect(mesDoGasto(compra("abc", "2026-11-25", 80), configOf, "2026-11")).toBe("2026-11");
   });
   it("compra no dia do fechamento anotada DEPOIS do corte vai pra fatura seguinte", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 21, 10, 0));
     expect(regraDoDiaDoFechamentoVale(DEPOIS_DO_CORTE)).toBe(true);
     expect(mesDoGasto(compra(DEPOIS_DO_CORTE, "2026-11-25", 80), configOf, "2026-11")).toBe("2026-12");
+  });
+  it("id 'do futuro' (relógio adiantado de outro aparelho) é descartado: regra antiga, igual à virada", () => {
+    // hoje 18/11; o id diz 20/11 → não serve de "anotado em"
+    expect(regraDoDiaDoFechamentoVale(DEPOIS_DO_CORTE, new Date(2026, 10, 18, 10, 0))).toBe(false);
+    expect(regraDoDiaDoFechamentoVale(DEPOIS_DO_CORTE, new Date(2026, 10, 21, 10, 0))).toBe(true);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 18, 10, 0));
+    expect(mesDoGasto(compra(DEPOIS_DO_CORTE, "2026-11-25", 80), configOf, "2026-11")).toBe("2026-11");
   });
   it("depois do fechamento é a seguinte pros dois lados (essa regra não mudou)", () => {
     expect(mesDoGasto(compra(ANTES_DO_CORTE, "2026-10-26", 80), configOf, "2026-10")).toBe("2026-11");
@@ -382,6 +395,10 @@ describe("revisão: aviso de data do mês passado", () => {
   const hoje = new Date(2026, 10, 16);
   it("mês passado avisa que fica no mês atual e onde lançar no mês da data", () => {
     expect(avisoDeMesPassado("2026-10-28", hoje)).toBe("Fica em novembro, o mês em que você anotou. Pra lançar em outubro, use a planilha de outubro (Orçamento mensal).");
+  });
+  it("data de OUTRO ano leva o ano junto", () => {
+    expect(avisoDeMesPassado("2025-12-20", hoje)).toBe("Fica em novembro, o mês em que você anotou. Pra lançar em dezembro de 2025, use a planilha de dezembro de 2025 (Orçamento mensal).");
+    expect(avisoDeMesPassado("2025-12-20", new Date(2026, 0, 5))).toBe("Fica em janeiro, o mês em que você anotou. Pra lançar em dezembro de 2025, use a planilha de dezembro de 2025 (Orçamento mensal).");
   });
   it("mês atual, futuro ou sem data: sem aviso", () => {
     expect(avisoDeMesPassado("2026-11-02", hoje)).toBeNull();

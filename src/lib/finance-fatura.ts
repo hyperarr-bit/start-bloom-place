@@ -90,10 +90,12 @@ const corteEmMs = (): number => {
   return new Date(a, m - 1, d).getTime();
 };
 
-/** A regra "no dia do fechamento já é a seguinte" vale pra este lançamento? (pelo id; ver o corte acima) */
-export const regraDoDiaDoFechamentoVale = (id: unknown): boolean => {
+/** A regra "no dia do fechamento já é a seguinte" vale pra este lançamento? (pelo id; ver o corte acima)
+ *  16/11 (baixa da crítica): id "do futuro" (relógio adiantado de outro aparelho) é descartado, igual à virada —
+ *  segue a regra antiga, em vez de passar no corte por engano. */
+export const regraDoDiaDoFechamentoVale = (id: unknown, hoje: Date = new Date()): boolean => {
   if (!FECHAMENTO_CONTA_NO_DIA) return false;
-  const ms = anotadoEmMs(id);
+  const ms = anotadoEmMs(id, hoje);
   return ms !== null && ms >= corteEmMs();
 };
 

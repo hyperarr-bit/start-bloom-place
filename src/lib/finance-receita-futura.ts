@@ -66,6 +66,7 @@ export const avisoDeMesPassado = (data: string | undefined, hoje: Date = new Dat
   const ano = Number(m[1]), mes = Number(m[2]) - 1;
   if (mes < 0 || mes > 11) return null;
   if (ano > hoje.getFullYear() || (ano === hoje.getFullYear() && mes >= hoje.getMonth())) return null;
-  const nome = monthNames[mes];
-  return `Fica em ${monthNames[hoje.getMonth()].toLowerCase()}, o mês em que você anotou. Pra lançar em ${nome.toLowerCase()}, use a planilha de ${nome.toLowerCase()} (Orçamento mensal).`;
+  // 16/11 (baixa da crítica): data de OUTRO ano leva o ano junto ("dezembro de 2025"), senão parece o mês deste ano
+  const nome = monthNames[mes].toLowerCase() + (ano !== hoje.getFullYear() ? ` de ${ano}` : "");
+  return `Fica em ${monthNames[hoje.getMonth()].toLowerCase()}, o mês em que você anotou. Pra lançar em ${nome}, use a planilha de ${nome} (Orçamento mensal).`;
 };

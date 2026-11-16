@@ -315,9 +315,11 @@ describe("hotmart.ts, rotas e obrigado", () => {
     expect(vite).toContain('vidaObrigado: path.resolve(__dirname, "vida-obrigado.html")');
     expect(vite).toContain('replace(/^\\/vida\\/obrigado\\/?/, "/vida-obrigado.html")');
     const loja = readFileSync(resolve(raiz, "scripts/preparar-loja.mjs"), "utf8");
-    expect(loja).toMatch(/"vida-obrigado\.html"\];/); // I (revisão): a página de obrigado não vai pro app de loja
-    // 11/11 (revisão da 1.0.25): a lista das páginas que a trava confere virou SO_SITE — com a /vitalicio e a /instalar
-    expect(loja).toContain('const SO_SITE = ["landing.html", "vendas.html", "vida-obrigado.html", "conhecer.html", "conhecer-demo.html", "instalar.html", "instalar-demo.html"];');
+    // I (revisão): a página de obrigado não vai pro app de loja (16/11: a lista MORTO continua depois dela — /completo, /pra-sempre)
+    expect(loja).toMatch(/const MORTO = \[[\s\S]*?"vida-obrigado\.html",[\s\S]*?\];/);
+    // 11/11 (revisão da 1.0.25): a lista das páginas que a trava confere virou SO_SITE — com a /vitalicio e a /instalar;
+    // 16/11 (1.0.28): + /completo e /pra-sempre(-67)
+    expect(loja).toContain('const SO_SITE = ["landing.html", "vendas.html", "vida-obrigado.html", "conhecer.html", "conhecer-demo.html", "instalar.html", "instalar-demo.html",\n  "completo.html", "pra-sempre.html", "pra-sempre-67.html"];');
     expect(loja).toContain("SO_SITE.some((f) => existsSync(join(ASSETS, f)))");
   });
   it("loja (11/11): a /vitalicio (checkout do vitalício), a /instalar e as duas demos ficam fora do binário, com os pedaços de entrada delas", () => {

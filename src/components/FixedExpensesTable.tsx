@@ -414,7 +414,7 @@ export const FixedExpensesTable = ({ expenses, setExpenses, dueDays, setDueDays,
             className="h-9 text-xs flex-1"
           />
           <Input
-            type="number"
+            type="text"
             inputMode="decimal"
             placeholder="Valor"
             value={newExpense.value}
@@ -490,7 +490,7 @@ export const FixedExpensesTable = ({ expenses, setExpenses, dueDays, setDueDays,
                   placeholder="Descrição"
                 />
                 <Input
-                  type="number"
+                  type="text"
                   inputMode="decimal"
                   value={rascunho.value}
                   onChange={(e) => setRascunho({ ...rascunho, value: e.target.value })}

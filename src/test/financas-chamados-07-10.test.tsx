@@ -174,7 +174,9 @@ describe("(e) cartão sem fechamento com 'conta no mês do vencimento'", () => {
     // a linha do cartão agora diz de que fatura é, e o total é o de setembro (100), não o de outubro (40)
     expect(screen.getByText(/Fatura de outubro · vence dia 10/i)).toBeInTheDocument();
     expect(screen.getAllByText("R$ 100,00").length).toBeGreaterThanOrEqual(1);
-    expect(screen.queryByText("R$ 40,00")).not.toBeInTheDocument();
+    // (16/11) os R$ 40 de outubro não entram no total: aparecem só na linha da fatura seguinte
+    expect(screen.getByTestId("cartao-proxima-fatura")).toHaveTextContent(/fatura de novembro.*R\$ 40,00/);
+    expect(screen.getAllByText("R$ 40,00")).toHaveLength(1);
   });
 
   it("na tela: cartão NOVO nasce com a caixinha marcada; preencher fechamento esconde a caixinha e a chave não é gravada", () => {

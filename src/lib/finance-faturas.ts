@@ -1,4 +1,4 @@
-import { mesDoGasto, type CardConfig, type GastoDeCartao } from "@/lib/finance-fatura";
+import { mesDoGasto, contaNaFaturaDoMes, type CardConfig, type GastoDeCartao } from "@/lib/finance-fatura";
 import {
   somarMeses, valorDaParcelaNoMes, chaveArquivadaDeParcelas, mesesAnteriores, projetarParcelas, type Parcela,
 } from "@/lib/finance-parcelas";
@@ -89,8 +89,9 @@ export function faturasDoMes(e: EntradaFatura): FaturaDoMes[] {
     return porCartao.get(c)!;
   };
 
+  // (16/11) mesma régua do TOTAL POR CARTÃO e das despesas do mês: compra antiga anotada atrasada conta aqui
   for (const g of arr<GastoDeCartao>(e.variaveis)) {
-    if (g?.paymentMethod === "credito" && g.cardName && mesDoGasto(g, e.configOf, e.mes) === e.mes) conta(g.cardName).variaveis += Number(g.value) || 0;
+    if (g?.paymentMethod === "credito" && g.cardName && contaNaFaturaDoMes(g, e.configOf, e.mes, e.mes)) conta(g.cardName).variaveis += Number(g.value) || 0;
   }
   for (const g of arr<GastoDeCartao>(e.variaveisAnterior)) {
     if (g?.paymentMethod === "credito" && g.cardName && mesDoGasto(g, e.configOf, mesAnterior) === e.mes) conta(g.cardName).variaveis += Number(g.value) || 0;

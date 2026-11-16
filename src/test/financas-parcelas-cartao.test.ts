@@ -224,8 +224,9 @@ describe("Um total só entre a planilha do mês e o financeiro geral", () => {
  * mês, ao invés de ser somado na fatura do próximo mês… data de vencimento"
  * ============================================================ */
 describe("Mês da fatura pelo dia de fechamento", () => {
-  it("compra no dia do fechamento ou antes fica no mês; depois vai pro seguinte", () => {
-    expect(mesDaFatura("2026-09-20", 20)).toBe("2026-09");
+  it("compra ANTES do fechamento fica no mês; no dia do fechamento ou depois vai pro seguinte (16/11)", () => {
+    expect(mesDaFatura("2026-09-19", 20)).toBe("2026-09");
+    expect(mesDaFatura("2026-09-20", 20)).toBe("2026-10"); // 16/11: no dia do fechamento já é a seguinte
     expect(mesDaFatura("2026-09-21", 20)).toBe("2026-10");
     expect(mesDaFatura("2026-09-05", 20)).toBe("2026-09");
   });

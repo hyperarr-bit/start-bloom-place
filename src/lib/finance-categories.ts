@@ -85,6 +85,18 @@ export type CustomCategory = { value: string; label: string; palette: number; ar
 const norm = (s: string) => s.trim().toLowerCase();
 
 /**
+ * CATEGORIA PADRÃO DA OUTRA LISTA (16/11, chamado: "Financiamento está em custo fixo, quero em custo variável,
+ * mas não consigo porque fala que já tem essa categoria cadastrada"). As padrão do fixo não aparecem no
+ * seletor do variável (e vice-versa), e criar uma com o mesmo nome dava "Já existe". Quem chama USA a padrão
+ * que já existe (mesmo `value`, ex.: "financiamento") — nada de personalizada duplicada, que partiria a soma
+ * por categoria nos relatórios. Devolve a padrão com esse nome, ou undefined.
+ */
+export const categoriaPadraoComNome = (rawLabel: string): FinanceCategory | undefined => {
+  const label = norm(rawLabel.replace(/\s+/g, " "));
+  return [...VARIABLE_CATEGORIES, ...FIXED_CATEGORIES].find((c) => norm(c.label) === label);
+};
+
+/**
  * ORDEM ALFABÉTICA NA ESCOLHA (05/11, pedido de cliente). Só a exibição: as listas acima, o que está gravado e a
  * paleta das personalizadas não mudam. "Outros" fica no fim (pelo value, não pela posição). Gráfico e relatório não
  * passam por aqui: eles ordenam pelo valor e só leem labelOf/barOf.

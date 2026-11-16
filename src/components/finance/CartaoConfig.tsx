@@ -60,7 +60,7 @@ export const CartaoConfig = ({ card, label }: { card: string; label: string }) =
     setConfig(card, { closingDay: ok(f) ? f : undefined, dueDay: ok(v) ? v : undefined, mesDoVencimento: soVencimento && noVencimento });
     setAberto(false);
     const fatura = ok(f)
-      ? `compras depois do dia ${f} vão pra fatura do mês seguinte.`
+      ? `compras a partir do dia ${f} vão pra fatura do mês seguinte.`
       : soVencimento && noVencimento
         ? `sem fechamento — gasto conta no mês seguinte, o do vencimento (dia ${v}).`
         : "sem fechamento — gasto conta no mês da compra.";

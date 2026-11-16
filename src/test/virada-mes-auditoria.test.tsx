@@ -528,7 +528,8 @@ describe("OK: fatura com fechamento na virada", () => {
 
   it("compra de 28/09 com fechamento dia 25 é da fatura de OUTUBRO: sai de setembro, entra em outubro", () => {
     expect(mesDaFatura("2026-09-28", 25)).toBe("2026-10");
-    expect(mesDaFatura("2026-09-25", 25)).toBe("2026-09");
+    expect(mesDaFatura("2026-09-25", 25)).toBe("2026-10"); // 16/11: no dia do fechamento já é a seguinte
+    expect(mesDaFatura("2026-09-24", 25)).toBe("2026-09");
     const set = variaveisDoMes([compra("a", "2026-09-10", 100), compra("b", "2026-09-28", 50)], [], "2026-09", configOf);
     expect(set.total).toBe(100);
     expect(set.adiados.map((g) => g.id)).toEqual(["b"]);

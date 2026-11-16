@@ -1,3 +1,6 @@
+import { useContext, useState } from "react";
+import { UserDataContext } from "@/hooks/use-user-data";
+
 /**
  * ORDENAR as listas de Finanças (08/10, chamado: "ordenar os gastos por data ou
  * por nome"). Só de EXIBIÇÃO: a lista gravada segue na ordem de lançamento — o
@@ -8,6 +11,8 @@
 
 export type OrdemDosGastos = "lancamento" | "data" | "nome";
 export const CHAVE_ORDEM_GASTOS = "finance-ordem-gastos";
+/** (16/11) A mesma escolha pras RECEITAS, guardada à parte (a pessoa pode querer gastos por data e receitas na ordem). */
+export const CHAVE_ORDEM_RECEITAS = "finance-ordem-receitas";
 export const ORDENS_DOS_GASTOS: { valor: OrdemDosGastos; rotulo: string; titulo: string }[] = [
   { valor: "lancamento", rotulo: "Lançamento", titulo: "Na ordem em que você lançou" },
   { valor: "data", rotulo: "Data", titulo: "Mais recente primeiro" },
@@ -58,4 +63,16 @@ export function OrdenarChips<T extends string>({ valor, opcoes, onChange, testid
       ))}
     </div>
   );
+}
+
+/**
+ * A ordem escolhida, guardada na chave da preferência (16/11, receitas). Lê o store direto pelo contexto e,
+ * sem provider (tabela montada solta em teste), fica só na memória — a tabela não pode cair por uma preferência.
+ */
+export function useOrdemGuardada<T extends string>(chave: string, padrao: T): [T, (v: T) => void] {
+  const ctx = useContext(UserDataContext);
+  const [local, setLocal] = useState<T>(padrao);
+  if (!ctx) return [local, setLocal];
+  const v = ctx.get<T>(chave, padrao);
+  return [typeof v === "string" && v ? v : padrao, (nova: T) => ctx.set(chave, nova)];
 }

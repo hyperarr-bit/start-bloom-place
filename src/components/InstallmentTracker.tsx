@@ -12,6 +12,7 @@ import { CardSelect } from "@/components/finance/CardSelect";
 import { CategorySelect } from "@/components/finance/CategorySelect";
 import { TotalPorCartao } from "@/components/finance/TotalPorCartao";
 import { useFinanceCards } from "@/lib/finance-cards";
+import { dataDaPrimeiraParcela } from "@/lib/finance-fatura";
 import { useFinanceCategories } from "@/lib/finance-categories";
 import {
   type Parcela, adiantarParcela, carimbar, carimbarLista, desfazerAdiantada, marcarParcelaDoMes, mesDaParcela, mesDeInicio, mesesEntre,
@@ -84,7 +85,7 @@ const brl = (v: number) => (Number.isFinite(v) ? v : 0).toLocaleString("pt-BR", 
 export const InstallmentTracker = ({
   installments, setInstallments, variableExpenses = [], variableExpensesAnterior = [], mes, projetadas = [], fixos,
 }: InstallmentTrackerProps) => {
-  const { labelOf: getCardLabel, styleOf: getCardStyle } = useFinanceCards();
+  const { labelOf: getCardLabel, styleOf: getCardStyle, configOf } = useFinanceCards();
   const { labelOf: getCatLabel, styleOf: getCatStyle } = useFinanceCategories();
   const mesDaChave = mes ?? mesCorrenteId();
   const [showForm, setShowForm] = useState(false);
@@ -142,7 +143,9 @@ export const InstallmentTracker = ({
       totalInstallments,
       cardName: newItem.cardName || "outro",
       category: newItem.category || "outros",
-      date: newItem.date || localDayKey(),
+      /* (16/11) "1ª parcela" em branco = comprei HOJE: no cartão com fechamento, hoje no dia do fechamento ou
+         depois põe a 1ª parcela na fatura seguinte (lib/finance-fatura). Data digitada é a da 1ª parcela: fica. */
+      date: newItem.date || dataDaPrimeiraParcela(localDayKey(), configOf(newItem.cardName || "outro")),
     };
     gravar([...installments, nova]);
     const inicio = mesDeInicio(carimbar(nova, mesDaChave));
@@ -162,7 +165,7 @@ export const InstallmentTracker = ({
     const faltam = total - pagas;
     const valor = numeroBR(newItem.totalValue);
     const daParcela = Number.isFinite(valor) && valor > 0 ? ` (R$ ${brl(valor / total)})` : "";
-    const inicio = mesDeInicio({ date: newItem.date, startMonth: mesDaChave, parcelaDoMes: pagas + 1 } as Parcela);
+    const inicio = mesDeInicio({ date: newItem.date || dataDaPrimeiraParcela(localDayKey(), configOf(newItem.cardName || "outro")), startMonth: mesDaChave, parcelaDoMes: pagas + 1 } as Parcela);
     const ultima = nomeDoMes(somarMeses(inicio ?? mesDaChave, faltam - 1), true);
     const quando = inicio ? `Em ${nomeDoMes(inicio)}` : mes && mes !== mesCorrenteId() ? `Em ${nomeDoMes(mes)}` : "Este mês";
     return `${quando}: parcela ${pagas + 1} de ${total}${daParcela} · ${faltam === 1 ? "é a última" : `faltam ${faltam}, a última em ${ultima}`}`;
@@ -212,7 +215,7 @@ export const InstallmentTracker = ({
   };
 
   const salvarEdicao = () => {
-    const valor = parseFloat(rascunho.installmentValue);
+    const valor = numeroBR(rascunho.installmentValue);
     const total = parseInt(rascunho.totalInstallments, 10);
     const pagas = parseInt(rascunho.paidInstallments, 10);
     if (!rascunho.description.trim() || !Number.isFinite(valor) || !Number.isInteger(total) || total < 1) return;
@@ -331,7 +334,7 @@ export const InstallmentTracker = ({
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           <label className="text-[10px] text-muted-foreground">
                             Valor da parcela
-                            <Input type="number" inputMode="decimal" value={rascunho.installmentValue}
+                            <Input type="text" inputMode="decimal" value={rascunho.installmentValue}
                               onChange={(e) => setRascunho({ ...rascunho, installmentValue: e.target.value })}
                               className="h-9 text-xs mt-0.5" />
                           </label>
@@ -490,7 +493,7 @@ export const InstallmentTracker = ({
             <div className="space-y-2 p-3 rounded-lg bg-muted/30">
               <div className="grid grid-cols-2 gap-2">
                 <Input placeholder="Nome do item" value={newItem.description} onChange={(e) => setNewItem({ ...newItem, description: e.target.value })} className="text-xs" />
-                <Input type="number" placeholder="Valor total" value={newItem.totalValue} onChange={(e) => setNewItem({ ...newItem, totalValue: e.target.value })} className="text-xs" />
+                <Input type="text" inputMode="decimal" placeholder="Valor total" value={newItem.totalValue} onChange={(e) => setNewItem({ ...newItem, totalValue: e.target.value })} className="text-xs" />
               </div>
               {/* "JÁ PAGUEI" COM NOME (1.0.22, 28/10). Chamado de 24/10: "já estou na 2/5 parcela do meu cartão, porém no
                   app quando cadastra, ele gera automaticamente como se ainda tivesse 5 parcelas"; avaliação 3★: "a parte

@@ -32,7 +32,7 @@ import { doPerfil } from "@/lib/finance-perfil";
 import { CARD_CONFIG_KEY } from "@/lib/finance-cards-dados";
 
 export interface CardConfig {
-  /** Dia em que a fatura fecha (1-31). Compra DEPOIS dele vai pro mês seguinte. */
+  /** Dia em que a fatura fecha (1-31). Compra NESSE DIA ou depois vai pro mês seguinte (16/11). */
   closingDay?: number;
   /** Dia em que a fatura vence (1-31). Só informativo. */
   dueDay?: number;
@@ -68,6 +68,15 @@ export interface GastoDeCartao {
 const diaValido = (d: unknown): d is number => Number.isInteger(d) && (d as number) >= 1 && (d as number) <= 31;
 
 /**
+ * COMPRA NO DIA DO FECHAMENTO JÁ É DA FATURA SEGUINTE (16/11, chamados + Play 4★: "coloquei fechamento
+ * dia 2, então todas as compras depois disso deveriam ser cobradas apenas no mês seguinte"; "fecha dia 4,
+ * lanço no cartão no dia 8 e aparece na fatura atual"). É a regra dos bancos (Nubank, Itaú, Inter…): no
+ * dia do fechamento a fatura já fechou e a compra entra na próxima — o "melhor dia de compra". Até aqui
+ * só o dia SEGUINTE ao fechamento mudava de mês. Rollback: `false` volta à regra antiga (dia > fechamento).
+ */
+export const FECHAMENTO_CONTA_NO_DIA = true;
+
+/**
  * "YYYY-MM" da fatura em que uma compra de `date` ("YYYY-MM-DD") cai, dado o
  * dia de fechamento. Parse de texto de propósito — `new Date("2026-09-30")`
  * é UTC e no Brasil vira 29/09 (ver lib/virada-do-mes.ts). Data ilegível ou
@@ -80,7 +89,45 @@ export const mesDaFatura = (date: unknown, closingDay: unknown): string | null =
   const mes = `${m[1]}-${m[2]}`;
   const dia = Number(m[3]);
   if (!(Number(m[2]) >= 1 && Number(m[2]) <= 12) || !(dia >= 1 && dia <= 31)) return null;
-  return dia > closingDay ? somarMeses(mes, 1) : mes;
+  const fechou = FECHAMENTO_CONTA_NO_DIA ? dia >= closingDay : dia > closingDay;
+  return fechou ? somarMeses(mes, 1) : mes;
+};
+
+/**
+ * CONTA NA FATURA DESTE MÊS? (16/11, "o total de cartões tem R$ 300 a menos que os lançamentos") — a mesma
+ * régua de `variaveisDoMes`, pra quem soma por cartão (TOTAL POR CARTÃO, linha da fatura). Compra que mora
+ * na chave `mesDaChave`: conta em `mes` se a fatura dela é `mes` OU ANTERIOR (compra antiga lançada
+ * atrasada: o balde é o mês, na dúvida — a fatura dela já passou e nenhum outro mês a lê). Antes o total
+ * por cartão exigia fatura === mês: a compra de 01/10 anotada em novembro (fechamento dia 2) contava nas
+ * despesas de novembro e em NENHUM total de cartão.
+ */
+export const contaNaFaturaDoMes = (
+  gasto: GastoDeCartao,
+  configOf: (card: string) => CardConfig | undefined,
+  mesDaChave: string,
+  mes: string,
+): boolean => {
+  const fatura = mesDoGasto(gasto, configOf, mesDaChave);
+  return mesDaChave === mes ? mesesEntre(mes, fatura) <= 0 : fatura === mes;
+};
+
+/**
+ * 1ª PARCELA DE UMA COMPRA PARCELADA NO CARTÃO COM FECHAMENTO (16/11, Play 4★: "minha fatura fecha dia 4 e
+ * vence dia 10; se eu lanço um parcelado no cartão no dia 8, ele aparece na fatura atual, já mostrando o
+ * vencimento no dia 10"). A parcela não olhava o fechamento: a 1ª contava no mês da compra. Devolve a DATA
+ * da 1ª parcela pra gravar no campo `date` de sempre ("1ª parcela" na tela): compra antes do fechamento →
+ * a própria data; no dia do fechamento ou depois → no mês da fatura seguinte (dia do vencimento, ou o dia
+ * da compra, limitado ao fim do mês). É o mesmo campo que a parcela "que ainda não começou" (mesDeInicio,
+ * 07/11) já lê — formato igual, o app antigo entende. Cartão sem fechamento: a data como veio.
+ */
+export const dataDaPrimeiraParcela = (dataCompra: string, cfg: CardConfig | undefined): string => {
+  if (!cfg || !diaValido(cfg.closingDay)) return dataCompra;
+  const mes = mesDaFatura(dataCompra, cfg.closingDay);
+  if (!mes || dataCompra.startsWith(`${mes}-`)) return dataCompra;
+  const [ano, m] = mes.split("-").map(Number);
+  const ultimo = new Date(ano, m, 0).getDate();
+  const dia = Math.min(diaValido(cfg.dueDay) ? cfg.dueDay : Number(dataCompra.slice(8, 10)) || 1, ultimo);
+  return `${mes}-${String(dia).padStart(2, "0")}`;
 };
 
 /** "YYYY-MM" da data da compra, ou null se ilegível. */

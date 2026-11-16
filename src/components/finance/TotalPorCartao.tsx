@@ -1,7 +1,7 @@
 import { CartaoConfig } from "@/components/finance/CartaoConfig";
 import { useFinanceCards } from "@/lib/finance-cards";
 import { valorDaParcelaNoMes, nomeDoMes, somarMeses, type Parcela } from "@/lib/finance-parcelas";
-import { mesDoGasto, rotuloVencimento, contaNoMesDoVencimento } from "@/lib/finance-fatura";
+import { contaNaFaturaDoMes, rotuloVencimento, contaNoMesDoVencimento } from "@/lib/finance-fatura";
 import { ehEstimativaDaFatura } from "@/lib/finance-faturas";
 import { mesCorrenteId } from "@/lib/virada-contas";
 
@@ -54,11 +54,19 @@ export const TotalPorCartao = ({ parcelas, variableExpenses = [], variableExpens
      fechamento cadastrado: tudo do mês, como sempre). */
   const mesAnterior = somarMeses(mesDaChave, -1);
   const comprasNoCartao: Record<string, number> = {};
+  const valor = (e: { value?: unknown }) => { const v = Number(e?.value); return e?.value !== null && Number.isFinite(v) ? v : 0; };
+  /* (16/11, "total de cartões R$ 300 a menos que os lançamentos") a régua é a de `variaveisDoMes`
+     (`contaNaFaturaDoMes`): compra antiga anotada atrasada conta AQUI, como nas despesas do mês — antes
+     ela não entrava em total de cartão nenhum. E o que foi pra fatura do mês que vem aparece numa linha
+     própria embaixo do total, pra soma da lista bater com a conta. */
+  let proximaFatura = 0;
   for (const e of variableExpenses) {
-    if (e?.cardName && mesDoGasto(e, configOf, mesDaChave) === mesDaChave) comprasNoCartao[e.cardName] = (comprasNoCartao[e.cardName] || 0) + (e.value || 0);
+    if (!e?.cardName) continue;
+    if (contaNaFaturaDoMes(e, configOf, mesDaChave, mesDaChave)) comprasNoCartao[e.cardName] = (comprasNoCartao[e.cardName] || 0) + valor(e);
+    else proximaFatura += valor(e);
   }
   for (const e of variableExpensesAnterior) {
-    if (e?.cardName && mesDoGasto(e, configOf, mesAnterior) === mesDaChave) comprasNoCartao[e.cardName] = (comprasNoCartao[e.cardName] || 0) + (e.value || 0);
+    if (e?.cardName && contaNaFaturaDoMes(e, configOf, mesAnterior, mesDaChave)) comprasNoCartao[e.cardName] = (comprasNoCartao[e.cardName] || 0) + valor(e);
   }
   // a fatura chutada no Montar (custo fixo marcado) — vale todo mês, como o fixo que ela é
   const estimativa: Record<string, number> = {};
@@ -158,6 +166,12 @@ export const TotalPorCartao = ({ parcelas, variableExpenses = [], variableExpens
           </tfoot>
         </table>
       </div>
+      {proximaFatura > 0.005 && (
+        <p className="px-4 py-2 text-[11px] leading-snug border-t border-border text-muted-foreground flex justify-between gap-2" data-testid="cartao-proxima-fatura">
+          <span>Compras deste mês que vão pra fatura de {nomeDoMes(somarMeses(mesDaChave, 1))}</span>
+          <span className="tabular-nums whitespace-nowrap">R$ {brl(proximaFatura)}</span>
+        </p>
+      )}
       {semFechamento && (
         <p className="px-4 py-2 text-[11px] leading-snug border-t border-border text-muted-foreground" data-testid="dica-fechamento">
           Sem data de fechamento, a compra conta no mês em que foi feita. Toque em “fechamento” no cartão pra ela cair na fatura certa.

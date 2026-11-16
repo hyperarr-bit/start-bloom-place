@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Check, Pencil, Plus, Shield, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { numeroBR } from "@/lib/data-normalizers";
 import { Checkbox } from "@/components/ui/checkbox";
 import { computeMonthlyBalance, computeUnpaidBillsEstimate } from "@/lib/finance-totals";
 // 07/09: a parcela do mês agora é carimbada (startMonth/parcelaDoMes) — a conta
@@ -94,7 +95,7 @@ const dayInCurrentMonth = (date: string | undefined, now: Date): number | null =
 /** "12,50" (teclado pt-BR) e "12.50" viram 12.5; vazio vira undefined — sem
  *  valor a conta continua válida, como sempre foi. */
 const parseValor = (v: string): number | undefined => {
-  const n = parseFloat(String(v).replace(/\s/g, "").replace(",", "."));
+  const n = numeroBR(v);
   return Number.isFinite(n) && n > 0 ? n : undefined;
 };
 
@@ -437,7 +438,7 @@ export const MonthCalendar = ({
                     className="h-9 text-[13px] flex-1 rounded-lg border-sky-200 dark:border-sky-900/50"
                   />
                   <Input
-                    type="number"
+                    type="text"
                     inputMode="decimal"
                     value={rascunho.value}
                     onChange={(e) => setRascunho({ ...rascunho, value: e.target.value })}
@@ -519,7 +520,7 @@ export const MonthCalendar = ({
               className="h-9 text-[13px] flex-1 min-w-0 rounded-full border-sky-200 focus-visible:ring-sky-400 dark:border-sky-900/50"
             />
             <Input
-              type="number"
+              type="text"
               inputMode="decimal"
               value={newBillValue}
               onChange={(e) => setNewBillValue(e.target.value)}

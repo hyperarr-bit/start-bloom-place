@@ -5,6 +5,7 @@ import { localDayKey } from "@/lib/utils";
 import { avisarApagado } from "@/lib/desfazer";
 import { Plus, Trash2, Check, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { CHAVE_ORDEM_RECEITAS, ORDENS_DOS_GASTOS, OrdenarChips, ordenarGastos, useOrdemGuardada, type OrdemDosGastos } from "@/components/finance/ordenar";
 
 /**
  * O que a receita precisa pra entrar (26/09, varredura): nome de verdade (só
@@ -100,6 +101,7 @@ export const IncomeTable = ({ incomes, setIncomes, prefillExample = false, guard
   /** Edição na própria linha — o mesmo motivo descrito em ExpenseTable. */
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [rascunho, setRascunho] = useState({ description: "", value: "", date: "" });
+  const [ordem, setOrdem] = useOrdemGuardada<OrdemDosGastos>(CHAVE_ORDEM_RECEITAS, "lancamento");
 
   const comecarEdicao = (i: Income) => {
     setEditandoId(i.id);
@@ -150,7 +152,7 @@ export const IncomeTable = ({ incomes, setIncomes, prefillExample = false, guard
             className="h-9 text-xs flex-1"
           />
           <Input
-            type="number"
+            type="text"
             inputMode="decimal"
             placeholder="Valor"
             value={newIncome.value}
@@ -181,6 +183,9 @@ export const IncomeTable = ({ incomes, setIncomes, prefillExample = false, guard
         )}
       </div>
 
+      {/* ORDENAR (16/11, App Store 3★: "não organiza os rendimentos por ordem de data, só por ordem de lançamento"):
+          as mesmas pílulas dos gastos, só de exibição — a lista gravada não muda de ordem. */}
+      {incomes.length > 1 && <OrdenarChips<OrdemDosGastos> valor={ordem} opcoes={ORDENS_DOS_GASTOS} onChange={(v) => setOrdem(v)} testid="ordenar-receitas" />}
       {/* Lista */}
       <div>
         {incomes.length === 0 ? (
@@ -189,7 +194,7 @@ export const IncomeTable = ({ incomes, setIncomes, prefillExample = false, guard
             <p className="text-[10px] text-muted-foreground mt-1">Adicione seu salário, freelances, rendas extras...</p>
           </div>
         ) : (
-          incomes.map((income) => editandoId === income.id ? (
+          ordenarGastos(incomes, ordem).map((income) => editandoId === income.id ? (
             <div key={income.id} className="px-3 py-3 border-b border-border/50 bg-primary/[0.04] space-y-2">
               <div className="flex items-center gap-2">
                 <Input
@@ -200,7 +205,7 @@ export const IncomeTable = ({ incomes, setIncomes, prefillExample = false, guard
                   placeholder="Descrição"
                 />
                 <Input
-                  type="number"
+                  type="text"
                   inputMode="decimal"
                   value={rascunho.value}
                   onChange={(e) => setRascunho({ ...rascunho, value: e.target.value })}

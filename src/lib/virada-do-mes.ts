@@ -80,6 +80,34 @@ export const chaveArquivada = (ano: number, mes: number, sufixo: string) =>
   `finance-${ano}-${getMonthKey(MESES[mes])}-${sufixo}`;
 
 /**
+ * O LANÇAMENTO FICA NO MÊS EM QUE FOI ANOTADO (16/11, chamados: "quando coloco a data de uma compra no
+ * cartão, ele joga a informação pro mês anterior, mas o pagamento é feito no mês atual… pra permanecer
+ * somando no mês que eu anotar"; "alguns lançamentos do custo variável sumiram"). A virada roda a CADA
+ * abertura do app (a trava é por sessão), e separava só pela data: a compra de 28/10 anotada em 05/11
+ * aparecia em novembro, somava em novembro e, ao REABRIR o app, ia sozinha pra planilha de outubro —
+ * sumia da lista sem aviso. Agora o mês de um lançamento é o MAIS RECENTE entre o da data e o do dia em
+ * que ele foi anotado. O dia anotado vem do `id` que a tabela sempre gravou (`Date.now()`, 13 dígitos);
+ * id de outro formato (importação de extrato, lançamento de fora) segue a regra antiga, pela data. O
+ * defeito de 01/08 (balde que nunca virava, com gasto de maio em agosto) continua resolvido: aquele
+ * gasto foi ANOTADO em maio. Nada é regravado: só decide pra que chave o item vai quando o mês acaba.
+ * Rollback: `false`.
+ */
+export const VIRADA_PELO_MES_ANOTADO = true;
+
+/** Ano-mês (local) em que o lançamento foi anotado, pelo id `Date.now()`; null se o id não é desse tipo
+ *  ou aponta pro futuro (relógio de outro aparelho). */
+const anoMesDoId = (id: unknown, hoje: Date): { ano: number; mes: number } | null => {
+  const s = typeof id === "number" ? String(id) : id;
+  if (typeof s !== "string" || !/^\d{13}$/.test(s)) return null;
+  const ms = Number(s);
+  if (ms > hoje.getTime() || ms < Date.UTC(2024, 0, 1)) return null;
+  const d = new Date(ms);
+  return { ano: d.getFullYear(), mes: d.getMonth() };
+};
+
+const depois = (a: { ano: number; mes: number }, b: { ano: number; mes: number }) => a.ano > b.ano || (a.ano === b.ano && a.mes > b.mes);
+
+/**
  * Separa o balde corrente entre "é do mês atual" e "pertence a um mês
  * passado". Item sem data legível FICA — na dúvida não se mexe no dado de
  * ninguém.
@@ -97,7 +125,9 @@ export const separarPorMes = (
   const mesAtual = hoje.getMonth();
 
   for (const item of Array.isArray(itens) ? itens : []) {
-    const quando = anoMesDe(item?.date);
+    const pelaData = anoMesDe(item?.date);
+    const anotado = VIRADA_PELO_MES_ANOTADO && pelaData ? anoMesDoId(item?.id, hoje) : null;
+    const quando = pelaData && anotado && depois(anotado, pelaData) ? anotado : pelaData;
     if (!quando || (quando.ano === anoAtual && quando.mes === mesAtual)) {
       ficam.push(item);
       continue;

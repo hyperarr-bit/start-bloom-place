@@ -303,7 +303,7 @@ export const DividasEntrePessoas = ({ perfil = PERFIL_PESSOAL, perfis = [], onRe
             className="h-9 text-xs flex-1"
           />
           <Input
-            type="number"
+            type="text"
             inputMode="decimal"
             placeholder="Valor"
             value={nova.valor}
@@ -342,7 +342,7 @@ export const DividasEntrePessoas = ({ perfil = PERFIL_PESSOAL, perfis = [], onRe
             </label>
             <label className="text-[10px] text-muted-foreground flex flex-col gap-0.5">
               Juros % ao mês
-              <Input type="number" inputMode="decimal" min={0} step="0.1" placeholder="Ex: 2" value={nova.juros} onChange={(e) => setNova({ ...nova, juros: e.target.value })} className="h-8 text-xs" aria-label="Juros ao mês em porcento" />
+              <Input type="text" inputMode="decimal" min={0} step="0.1" placeholder="Ex: 2" value={nova.juros} onChange={(e) => setNova({ ...nova, juros: e.target.value })} className="h-8 text-xs" aria-label="Juros ao mês em porcento" />
             </label>
             {/* PRAZO (07/11): opcional; o rótulo segue a direção ("Pagar até" / "Receber até") */}
             <label className="text-[10px] text-muted-foreground flex flex-col gap-0.5">
@@ -520,7 +520,7 @@ export const DividasEntrePessoas = ({ perfil = PERFIL_PESSOAL, perfis = [], onRe
                     <div className="flex items-center gap-2">
                       <Input
                         autoFocus
-                        type="number"
+                        type="text"
                         inputMode="decimal"
                         placeholder={movimento.sinal === -1 ? "Quanto foi abatido?" : "Quanto aumentou?"}
                         value={movimento.valor}

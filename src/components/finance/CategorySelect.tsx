@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, Sele
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useFinanceCategories } from "@/lib/finance-categories";
+import { categoriaPadraoComNome, useFinanceCategories } from "@/lib/finance-categories";
 
 const CREATE = "__create__";
 
@@ -25,8 +25,12 @@ export const CategorySelect = ({
   placeholder?: string;
   className?: string;
 }) => {
-  const { variableCats, fixedCats, addCustom, nextPalette } = useFinanceCategories();
-  const cats = kind === "fixed" ? fixedCats : variableCats;
+  const { variableCats, fixedCats, addCustom, nextPalette, byValue } = useFinanceCategories();
+  const daLista = kind === "fixed" ? fixedCats : variableCats;
+  /* (16/11) categoria escolhida que é da OUTRA lista (ex.: "Financiamento", padrão do fixo, num gasto
+     variável) entra no fim do seletor — senão o campo aparecia vazio com a categoria gravada. */
+  const daOutra = value && !daLista.some((c) => c.value === value) ? byValue.get(value) : undefined;
+  const cats = daOutra ? [...daLista, daOutra] : daLista;
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
 
@@ -36,6 +40,14 @@ export const CategorySelect = ({
   };
 
   const confirmCreate = () => {
+    // (16/11) nome de uma categoria padrão (do fixo ou do variável): usa ela, não dá "Já existe"
+    const padrao = categoriaPadraoComNome(name);
+    if (padrao) {
+      onValueChange(padrao.value);
+      setCreating(false);
+      toast.success(`Categoria "${padrao.label}" escolhida ✅`);
+      return;
+    }
     const { value: novo, error } = addCustom(name);
     if (error || !novo) { toast.error(error ?? "Não consegui criar a categoria."); return; }
     onValueChange(novo);

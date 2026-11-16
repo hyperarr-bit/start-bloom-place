@@ -12,7 +12,7 @@ import { useFinanceCategories } from "@/lib/finance-categories";
 import { useFinanceCards } from "@/lib/finance-cards";
 import { NOVO_PARCELAMENTO_EVENT, type Installment, type NovoParcelamentoDetalhe } from "@/components/InstallmentTracker";
 import { NOVO_CUSTO_FIXO_EVENT, type FixedExpense, type NovoCustoFixoDetalhe } from "@/components/FixedExpensesTable";
-import { mesDoGasto } from "@/lib/finance-fatura";
+import { mesDoGasto, dataDaPrimeiraParcela } from "@/lib/finance-fatura";
 import { mesesEntre, nomeDoMes } from "@/lib/finance-parcelas";
 import { mesCorrenteId } from "@/lib/virada-contas";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -207,6 +207,7 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes, guar
       toast.error("Diga em quantas vezes (de 2 a 99).");
       return;
     }
+    const cartao = cardParcela || newExpense.cardName || "outro";
     const nova: Installment = {
       id: Date.now().toString(),
       description: newExpense.description.trim(),
@@ -216,9 +217,11 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes, guar
       installmentValue: total / nParcelas,
       paidInstallments: 0,
       totalInstallments: nParcelas,
-      cardName: cardParcela || newExpense.cardName || "outro",
+      cardName: cartao,
       category: newExpense.category || "outros",
-      date: newExpense.date || localDayKey(),
+      // (16/11) a data aqui é a da COMPRA: no cartão com fechamento, compra no dia do fechamento ou depois
+      // tem a 1ª parcela na fatura seguinte (lib/finance-fatura `dataDaPrimeiraParcela`)
+      date: dataDaPrimeiraParcela(newExpense.date || localDayKey(), configOf(cartao)),
     };
     // Quem grava é o card de parcelamentos (dono da chave do mês aberto) —
     // ver NOVO_PARCELAMENTO_EVENT. `handled` volta true de forma síncrona.
@@ -386,7 +389,7 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes, guar
             className="h-9 text-xs flex-1"
           />
           <Input
-            type="number"
+            type="text"
             inputMode="decimal"
             placeholder={parcelando ? "Total" : "Valor"}
             title={parcelando ? "Valor TOTAL da compra — o app divide pelas parcelas" : undefined}
@@ -593,7 +596,7 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes, guar
                   placeholder="Descrição"
                 />
                 <Input
-                  type="number"
+                  type="text"
                   inputMode="decimal"
                   value={rascunho.value}
                   onChange={(e) => setRascunho({ ...rascunho, value: e.target.value })}

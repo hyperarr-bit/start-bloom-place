@@ -164,6 +164,15 @@ export function AbasOcultaveis<T extends AbaOcultavel>({ abas, ativa, onTrocar, 
     if (timer.current) { window.clearTimeout(timer.current); timer.current = null; }
   };
   useEffect(() => () => soltar(), []);
+  // 16/11 (App Store 4★ 06/11, "o deslizar da tela mexe ícones que não deveriam"): deslizar a FILEIRA de abas pro lado
+  // (ou a página) é rolagem nativa do iPhone, e nela o touchmove nem sempre chega ao botão — o tempo seguia correndo e
+  // as abas entravam no modo de editar (balançando, com o ×) no meio do deslizar. Agora qualquer rolagem (de qualquer
+  // contêiner: captura) e o touchcancel do sistema desarmam o "segurar", igual ao use-long-press dos widgets (28/10).
+  useEffect(() => {
+    const rolou = () => { if (timer.current) soltar(); };
+    window.addEventListener("scroll", rolou, true);
+    return () => window.removeEventListener("scroll", rolou, true);
+  }, []);
 
   const clicarAba = (id: string) => {
     if (segurou.current) { segurou.current = false; return; }
@@ -261,6 +270,7 @@ export function AbasOcultaveis<T extends AbaOcultavel>({ abas, ativa, onTrocar, 
                 onTouchStart={comecarSegurar}
                 onTouchEnd={soltar}
                 onTouchMove={soltar}
+                onTouchCancel={soltar}
                 className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 select-none ${
                   ativa === tab.id ? "notion-tab-active" : "hover:bg-muted"
                 } ${oculta ? "border-dashed" : ""}`}
@@ -491,6 +501,7 @@ function FileiraNova<T extends AbaOcultavel>(p: FileiraNovaProps<T>) {
                   onTouchStart={p.toque.comecarSegurar}
                   onTouchEnd={p.toque.soltar}
                   onTouchMove={p.toque.soltar}
+                  onTouchCancel={p.toque.soltar}
                   className={classeDaAba(tab, oculta)}
                 >
                   {caderno && ativa === tab.id && (

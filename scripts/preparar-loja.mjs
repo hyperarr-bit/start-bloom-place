@@ -57,9 +57,14 @@ const MORTO = ["v3-hero.mp4", "v3-hero-poster.jpg", "videos", "hero-phones.png",
   // duas demos entraram no build como entradas próprias (vite.config) em 09–10/11 — nenhuma rota do app chega nelas
   "conhecer.html", "conhecer-demo.html", "instalar.html", "instalar-demo.html",
   // 04/11: a página de obrigado da Hotmart (/vida/obrigado) — só no site
-  "vida-obrigado.html"];
+  "vida-obrigado.html",
+  // 16/11 (1.0.28/140): as páginas do vitalício na web com checkout Stripe (/completo, /pra-sempre, /pra-sempre-67)
+  // entraram no main em 14–15/11 como entradas próprias (vite.config) e iam de carona pro binário (+20 MB, checkout
+  // de fora dentro do app) — nenhuma rota do app chega nelas
+  "completo.html", "completo", "pra-sempre.html", "pra-sempre-67.html", "pra-sempre"];
 // as páginas do site que NUNCA podem ir no binário (a trava do fim confere)
-const SO_SITE = ["landing.html", "vendas.html", "vida-obrigado.html", "conhecer.html", "conhecer-demo.html", "instalar.html", "instalar-demo.html"];
+const SO_SITE = ["landing.html", "vendas.html", "vida-obrigado.html", "conhecer.html", "conhecer-demo.html", "instalar.html", "instalar-demo.html",
+  "completo.html", "pra-sempre.html", "pra-sempre-67.html"];
 
 // Rastreadores de anúncio que moram no index.html da WEB e vinham de carona
 // pro binário (o Capacitor copia a pasta public inteira).
@@ -288,7 +293,7 @@ for (const alvo of MORTO) {
 // servem o app). Journey e Checkout são os pedaços da /vitalicio (src/conhecer) — só conhecer.html chega neles.
 const tirados = [];
 for (const f of readdirSync(join(ASSETS, "assets"))) {
-  if (!/^(landing|vendas|conhecer|conhecerDemo|instalar|instalarDemo|Journey|Checkout)-[\w-]+\.(js|css)$/.test(f)) continue;
+  if (!/^(landing|vendas|conhecer|conhecerDemo|instalar|instalarDemo|Journey|Checkout|completo|praSempre|praSempre67)-[\w-]+\.(js|css)$/.test(f)) continue;
   console.log(`  − assets/${f}`);
   rmSync(join(ASSETS, "assets", f), { force: true });
   tirados.push(f);

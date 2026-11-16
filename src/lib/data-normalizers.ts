@@ -167,6 +167,13 @@ export const numeroBR = (v: any): number => {
   return Number.isFinite(n) ? Math.round(n * 100) / 100 : NaN;
 };
 
+/**
+ * O número salvo como TEXTO de campo de edição, com vírgula decimal (16/11, revisor da 1.0.28): o rascunho mostrava
+ * "1234.5" e, se a pessoa digitasse uma vírgula, o numeroBR lia os pontos como milhar ("1234.5,0" → 12345). Com a
+ * vírgula ("1234,5") o numeroBR lê certo de qualquer jeito.
+ */
+export const textoBR = (v: unknown): string => String(v ?? "").replace(".", ",");
+
 // Cura na LEITURA as listas de dinheiro (expenses/incomes/fixed): coage cada
 // `value` pra número — dado antigo corrompido sara sozinho no próximo boot.
 const normalizeMoneyList = (v: any) => {

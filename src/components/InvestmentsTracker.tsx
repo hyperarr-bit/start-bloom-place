@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { CampoDinheiro } from "@/components/ui/campo-dinheiro";
 import { toast } from "sonner";
 import { dataSegura, localDayKey } from "@/lib/utils";
-import { numeroBR } from "@/lib/data-normalizers";
+import { numeroBR, textoBR } from "@/lib/data-normalizers";
 import { avisarApagado } from "@/lib/desfazer";
 import { Plus, Trash2, TrendingUp, TrendingDown, PiggyBank, Percent, Calendar, Wallet, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -127,8 +127,8 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
     setRascunho({
       name: i.name,
       type: i.type,
-      investedAmount: String(i.investedAmount ?? 0),
-      monthlyContribution: String(i.monthlyContribution ?? 0),
+      investedAmount: textoBR(i.investedAmount ?? 0),
+      monthlyContribution: textoBR(i.monthlyContribution ?? 0),
       broker: i.broker ?? "",
     });
   };
@@ -512,7 +512,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                         inputMode="decimal"
                         aria-label={`Valor atual de ${inv.name}`}
                         className="h-8 text-xs mt-0.5"
-                        value={campos[chaveCampo(inv.id, "atual")] ?? String(inv.currentValue ?? "")}
+                        value={campos[chaveCampo(inv.id, "atual")] ?? textoBR(inv.currentValue ?? "")}
                         onChange={(e) => escrever(chaveCampo(inv.id, "atual"), e.target.value)}
                         onBlur={() => salvarValorAtual(inv)}
                         onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
@@ -525,7 +525,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                         inputMode="decimal"
                         aria-label={`Rentabilidade esperada de ${inv.name} (% ao ano)`}
                         className="h-8 text-xs mt-0.5"
-                        value={campos[chaveCampo(inv.id, "taxa")] ?? String(inv.expectedReturn ?? 10)}
+                        value={campos[chaveCampo(inv.id, "taxa")] ?? textoBR(inv.expectedReturn ?? 10)}
                         onChange={(e) => escrever(chaveCampo(inv.id, "taxa"), e.target.value)}
                         onBlur={() => salvarTaxa(inv)}
                         onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}

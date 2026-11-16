@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { numeroBR } from "@/lib/data-normalizers";
+import { numeroBR, textoBR } from "@/lib/data-normalizers";
 import { ShieldCheck, Pencil, Check, X, PiggyBank } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -66,7 +66,7 @@ export const EmergencyFund = ({ despesaMensal }: { despesaMensal: number }) => {
 
   const abrirEdicao = () => {
     setRascunhoMeses(String(reserva.meses));
-    setRascunhoGuardado(reserva.guardado ? String(reserva.guardado) : "");
+    setRascunhoGuardado(reserva.guardado ? textoBR(reserva.guardado) : "");
     setEditando(true);
   };
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { CampoDinheiro } from "@/components/ui/campo-dinheiro";
-import { numeroBR } from "@/lib/data-normalizers";
+import { numeroBR, textoBR } from "@/lib/data-normalizers";
 import { Plus, Trash2, ShoppingCart, TrendingUp, Calendar, Heart, AlertTriangle, ExternalLink, ImagePlus, Link2, Loader2, Link, CheckCircle2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -216,8 +216,8 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
     setEditandoId(i.id);
     setRascunho({
       name: i.name,
-      price: String(i.price),
-      savedAmount: String(i.savedAmount),
+      price: textoBR(i.price),
+      savedAmount: textoBR(i.savedAmount),
       link: i.link ?? "",
       targetDate: i.targetDate ?? "",
     });

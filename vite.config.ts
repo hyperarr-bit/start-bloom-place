@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs";
 import { componentTagger } from "lovable-tagger";
 import { medicaoTextos } from "./vite-plugin-medicao-textos";
+import { preloadDaHome } from "./vite-plugin-preload-home";
 
 /**
  * A versão do app, lida do build.gradle no momento do build (29/07).
@@ -159,7 +160,8 @@ export default defineConfig(({ mode }) => ({
   },
   // medicaoTextos (1.0.16): o dicionário de textos do código que a medição total usa como peneira de
   // privacidade — ver vite-plugin-medicao-textos.ts. Sai num pedaço próprio, carregado só nas telas do app.
-  plugins: [react(), medicaoTextos(path.resolve(__dirname)), mode === "development" && componentTagger(), rotaDaMissao()].filter(Boolean),
+  // preloadDaHome (07/11, desempenho): com sessão no aparelho, o HTML pede os pedaços da Home junto com a entrada — ver vite-plugin-preload-home.ts
+  plugins: [react(), medicaoTextos(path.resolve(__dirname)), preloadDaHome(path.resolve(__dirname)), mode === "development" && componentTagger(), rotaDaMissao()].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

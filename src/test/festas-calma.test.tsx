@@ -144,6 +144,22 @@ describe("conta nova faz 7 coisas que dão figurinha no dia 1", () => {
     expect(eventos.filter(([e]) => e === "festa_view")).toHaveLength(total);
   });
 
+  it("crítica r2 (10/11): duas figurinhas comuns de uma vez na conta nova → a 1ª ainda abre o envelope 'Seu álbum começou' (a calma não a rebaixa a aviso)", { timeout: 30_000 }, async () => {
+    const store = montarStore({ "core-user-name": "Ana" });
+    const r = abrirApp(store);
+    await espera(2000);
+    expect(festa()).toBeNull(); // linha de base: nada
+    // Primeira Despesa + Primeiro Salário no mesmo instante (como o copo d'água: "1 Dia Anotado" + "Primeiro gole")
+    await act(async () => { store.mexer("finance-expenses", gastos(1)); store.mexer("finance-incomes", rendas(1)); });
+    await espera(2300);
+    expect(festa()).not.toBeNull();
+    expect(screen.getByText("Seu álbum começou")).toBeTruthy();
+    // a outra comum entrou quieta no álbum (calma: 1 por abertura) — sem aviso por cima
+    const vistas = (store.dados["conquistas-vistas"] as { adesivos: string[] }).adesivos;
+    expect(vistas.filter((id) => id === "first-expense" || id === "first-income")).toHaveLength(1);
+    r.unmount();
+  });
+
   it("fora da calma (4º dia da conta): a fila de sempre (mais de 1 festa por abertura)", { timeout: 30_000 }, async () => {
     conta.criadoEm = "2026-09-20T09:00:00-03:00";
     const store = montarStore({ "core-user-name": "Ana" });

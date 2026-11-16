@@ -103,6 +103,11 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-att-braco", // 1.0.18: o braço sorteado no modo "ab" do att_momento (auto3s|comecar), estável entre aberturas
   "core-sino-paywall", // 1.0.18: a última resposta do RevenueCat pra tela do sino antes do paywall (metadata sino_paywall: off|on|ab)
   "core-sino-braco", // 1.0.18: o braço sorteado no modo "ab" do sino_paywall (com|sem), estável entre aberturas
+  "core-paywall-teste", // 12/11 (1.0.26): a última resposta do RevenueCat pro paywall com/sem teste (metadata paywall_teste: on|off)
+  "core-paywall-visual", // 12/11 noite (1.0.26, só iPhone): a última resposta do RevenueCat pro visual do paywall sem teste (metadata paywall_visual)
+  "core-paywall-visual-braco", // 12/11 noite: o braço sorteado do A/B do visual (android|enxovaly), estável no aparelho
+  "core-paywall-oferta", // 12/11 (1.0.26, só iPhone): a última resposta do RevenueCat pra oferta do paywall sem teste (metadata paywall_oferta: anual|vitalicio|ab)
+  "core-paywall-oferta-braco", // 12/11: o braço sorteado do A/B da oferta (anual|vitalicio), estável no aparelho
   "core-titulo-paywall", // 06/11: a última resposta do RevenueCat pro teste de título do paywall (metadata titulo_paywall: off|on|ab)
   "core-titulo-braco", // 06/11: o braço sorteado no modo "ab" do titulo_paywall (com|sem), estável entre aberturas
   "core-sino-visto", // 1.0.18: a tela do sino já apareceu neste aparelho (nunca repete: voltar, reabrir, deep link)
@@ -122,6 +127,8 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-montar-rotina", // 1.0.16: "Rotina pronta em 3 toques" feito/pulado (+ vistas, rascunho, 1º quadradinho); a mesma chave vai pra conta
   "core-skan-trial-sdk", // 1.0.19 (varredura 26/10): a última resposta do RevenueCat pra chave skan_trial_sdk (on|off, padrão off) — o StartTrial pelo SDK da Meta (lib/skan-trial-sdk)
   "core-skan-trial-enviado", // 1.0.19: ids das transações cujo StartTrial já saiu pelo SDK da Meta (lib/meta-inicio-teste-ios) — nunca repetir
+  "core-meta-compra-sdk", // 14/11: a última resposta do RevenueCat pra chave meta_compra_sdk (on|off, padrão on) — o Purchase pelo SDK da Meta no iPhone (lib/meta-compra-sdk-ios)
+  "core-meta-compra-enviada", // 14/11: ids das transações cujo Purchase já saiu pelo SDK da Meta (lib/meta-compra-sdk-ios) — nunca repetir
   "core-back-variante", // 21/10: o texto do BACK dos funis web (a|b) sorteado no aparelho — braço de A/B, não pode trocar (lib/back-funil)
   "core-home-nova", // 1.0.19: a última resposta do RevenueCat pra Home nova (metadata home_nova: off|admin|on|ab, lib/home-nova)
   "core-home-nova-braco", // 1.0.19: o braço sorteado no modo "ab" da home_nova (nova|atual), estável entre aberturas
@@ -134,6 +141,13 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-home-nova-dica-mais", // 1.0.19 (26/10): a dica do "+" já tocada/aparições (lib/dica-mais) — nunca volta; a mesma chave vai pra conta
   "core-fluxo-enxuto", // 1.0.21 (27/10): a última resposta do RevenueCat pro fluxo enxuto (metadata fluxo_enxuto: on|off|ab, lib/fluxo-enxuto)
   "core-fluxo-enxuto-braco", // 1.0.21: o braço sorteado no "ab" do fluxo enxuto (enxuto|atual), estável entre aberturas
+  // 07/11 (lib/abas-caderno): as últimas respostas do RevenueCat pras abas (abas_enxutas / abas_visual / abas_medicao), o braço
+  // sorteado ("<modo>:<braço>", estável entre aberturas) e o `uso_modulo` 1x por chave por dia ({ dia, chaves })
+  "core-abas-enxutas",
+  "core-abas-visual",
+  "core-abas-medicao",
+  "core-abas-braco",
+  "core-uso-modulo-dia",
   "core-construiu-ab", // 29/10: a última resposta do RevenueCat pro A/B do resumo dos 3 dias (metadata construiu_ab: ab|a|b, lib/construiu-ab)
   "core-construiu-braco", // 29/10: o braço do resumo dos 3 dias por conta ({hash da conta: a|b}), estável — não troca de braço
   "core-presente-aviso-v1", // 31/10: o aviso do presente na página Você ({ vistoEm, fechado }, lib/presente-aviso) — espelho da mesma chave da conta, não pisca de volta

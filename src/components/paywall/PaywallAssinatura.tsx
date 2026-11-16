@@ -44,6 +44,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowRight, Check, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { APP_PRECOS } from "@/lib/native-shell";
+import { ID_MENSAL_ANDROID, PRECOS_RESERVA_SEM_TESTE } from "@/lib/paywall-teste";
 import {
   ehApple, pelaLoja, sufixoPagamento, temEscadaPix,
   erroPagamentoNaoAchado, avisoAtualizarApp,
@@ -256,6 +257,10 @@ export function PaywallAssinatura({
   const [anualApple, setAnualApple] = useState<{ preco: string; mes: string; dias: number; trial: boolean; id: string; oferta: string; meses: number | null }>({
     preco: "R$ —", mes: "R$ —", dias: 3, trial: true, id: "core_anual_97", oferta: "anual_97", meses: null,
   });
+  /* 12/11 (dono): no Android o mensal com renovação é o core_mensal_34 — preço da loja, reserva "R$ 34,90".
+   * O 24,90 à vista (coremensalvista) fica só no resgate "ou começa com 1 mês". iPhone: o de sempre. */
+  const [precoMensal34, setPrecoMensal34] = useState<string | null>(null);
+  const precoMensalTxt = apple ? APP_PRECOS.mensal.preco : precoMensal34 ?? PRECOS_RESERVA_SEM_TESTE.mensal.preco;
   const cancelamentos = useRef(0);
   const pixVencendoJaFoi = useRef(false);
   const vivoRef = useRef(true);
@@ -283,6 +288,7 @@ export function PaywallAssinatura({
         mensalVista: rc.temMensalVista(),
       });
       ler();
+      if (!apple) void rc.prefetchSemTeste().then(() => { if (vivoRef.current) setPrecoMensal34(rc.dadosMensalAndroid()?.preco ?? null); });
       if (apple) {
         await rc.prefetchAnualIos();
         if (vivoRef.current && rc.temAnualIos()) {
@@ -517,15 +523,20 @@ export function PaywallAssinatura({
       };
   /* Âncora VIVA (v82): o mensal 24,90 vende de verdade (5 em 26/08) — pré-pago
    * quando a loja carregou; fallback recorrente com a promessa mudando junto. */
-  const colunaMensal = {
-    fn: (rc: typeof import("@/lib/revenuecat")) =>
-      loja.mensalVista ? rc.comprarMensalVista() : rc.comprar(APP_PRECOS.mensal.id, { semTrial: true }),
-    id: loja.mensalVista ? APP_PRECOS.mensalVista.id : APP_PRECOS.mensal.id,
-    cta: <>Continuar <ArrowRight className="w-4 h-4" /></>,
-    legal: apple
-      ? `Assinatura de ${APP_PRECOS.mensal.preco}/mês pela App Store · renova automaticamente até você cancelar`
-      : `${APP_PRECOS.mensal.preco} · 30 dias de acesso · ${loja.mensalVista ? "Pix ou cartão · renova só se você quiser" : "cancele quando quiser"}`,
-  };
+  const colunaMensal = apple
+    ? {
+        fn: (rc: typeof import("@/lib/revenuecat")) => rc.comprar(APP_PRECOS.mensal.id, { semTrial: true }),
+        id: APP_PRECOS.mensal.id,
+        cta: <>Continuar <ArrowRight className="w-4 h-4" /></>,
+        legal: `Assinatura de ${APP_PRECOS.mensal.preco}/mês pela App Store · renova automaticamente até você cancelar`,
+      }
+    : {
+        /* 12/11 (dono): Android = core_mensal_34 (34,90/mês com renovação), plano-base coremensal34 */
+        fn: (rc: typeof import("@/lib/revenuecat")) => rc.comprarMensalAndroid(contexto),
+        id: ID_MENSAL_ANDROID as string,
+        cta: <>Continuar <ArrowRight className="w-4 h-4" /></>,
+        legal: `Assinatura de ${precoMensalTxt}/mês ${pelaLoja()} · renova todo mês · cancele quando quiser`,
+      };
   const compraAtual = plano === "vitalicio" ? colunaDireita : colunaMensal;
   // O interval da contagem captura closure velha — o ref entrega sempre a atual.
   compraAtualRef.current = compraAtual;
@@ -534,7 +545,7 @@ export function PaywallAssinatura({
   // mecânica de Pix — governa as duas ramificações da escada (resgate e
   // "código vencendo") e o selo. Na App Store não existe Pix nem folha lenta
   // pra resgatar, então tudo isso morre aqui, num lugar só.
-  const folhaPrepaga = temEscadaPix() && (plano === "vitalicio" || loja.mensalVista);
+  const folhaPrepaga = temEscadaPix() && plano === "vitalicio"; // 12/11: o mensal do Android virou assinatura (34,90)
 
   const barraFixa = contexto !== "planos";
   /* 1.0.14 — PAYWALL_ENXUTO (só gate e /planos; o funil tem o paywall dele). A metadata do
@@ -617,7 +628,7 @@ export function PaywallAssinatura({
           disabled={comprando}
           onClick={async () => {
             trackEvent("app_resgate_mensal_toque", { contexto });
-            setPlano("mensal");
+            // 12/11: sem setPlano("mensal") — a coluna mensal agora é a de 34,90; este é o 24,90 à vista
             const rc = await import("@/lib/revenuecat");
             void pagou(() => (loja.mensalVista ? rc.comprarMensalVista() : rc.comprar(APP_PRECOS.mensal.id, { semTrial: true })), APP_PRECOS.mensalVista.id);
           }}
@@ -778,14 +789,14 @@ export function PaywallAssinatura({
           <span className="h-[22px]" aria-hidden />
           <span className="text-[30px] font-black leading-none">1</span>
           <span className="text-[12.5px] font-bold text-black/45">mês</span>
-          <span className="text-[16px] font-extrabold mt-2">{APP_PRECOS.mensal.preco}</span>
+          <span className="text-[16px] font-extrabold mt-2">{precoMensalTxt}</span>
           <span className="text-[10px] font-semibold text-black/40">por mês</span>
           <span className="mx-4 my-2 border-t border-black/10" aria-hidden />
           {/* v83.1 (dono): "todo mês, pra sempre" assustava o comprador DA
               coluna — âncora de aluguel mora na comparação do vitalício, não
               no produto. Verdade do pré-pago: renovação manual. */}
           <span className="text-[10.5px] font-semibold text-black/45 pb-3 px-2 leading-tight">
-            {apple ? <>renova sozinho<br />cancele quando quiser</> : loja.mensalVista ? "renova só se você quiser" : "cancele quando quiser"}
+            {apple ? <>renova sozinho<br />cancele quando quiser</> : "cancele quando quiser"}
           </span>
         </button>
         <button
@@ -808,7 +819,7 @@ export function PaywallAssinatura({
           <span className="text-[10.5px] font-semibold text-black/45 pb-3 px-2 leading-tight">
             {apple
               ? <>{anualApple.meses ?? "…"} meses de mensal =<br /><b className="text-black/60">1 ano inteiro</b></>
-              : vitalicio ? <>4 meses de mensal =<br /><b className="text-black/60">CORE pra sempre</b></> : <>{APP_PRECOS.anual97.preco} por 1 ano<br />sem renovação</>}
+              : vitalicio ? <>3 meses de mensal =<br /><b className="text-black/60">CORE pra sempre</b></> : <>{APP_PRECOS.anual97.preco} por 1 ano<br />sem renovação</>}
           </span>
         </button>
       </div>

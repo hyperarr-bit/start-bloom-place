@@ -19,6 +19,8 @@
  * `__RC_MOCK__` é false. Sem a constante, `assinaturaDoMock()` é SEMPRE null
  * (src/test/rc-mock-assinante.test.ts).
  */
+import { PRODUTOS_SEM_TESTE } from "@/lib/paywall-teste";
+
 declare const __RC_MOCK__: boolean | undefined;
 
 export const CHAVE_MOCK_ASSINANTE = "__rc_mock_assinante";
@@ -56,7 +58,8 @@ export function assinaturaDoMock(agora: number = Date.now()): AssinaturaDoMock |
     const compraEm = Number(localStorage.getItem(CHAVE_MOCK_COMPRA_EM)) || agora;
     const anual = /^core_anual/.test(produto);
     const vitalicio = /^core_vitalicio/.test(produto);
-    const emTeste = anual; // só o anual do iPhone tem a oferta introdutória no mock
+    // só o anual do iPhone tem a oferta introdutória no mock; 12/11: os do paywall SEM teste cobram na hora
+    const emTeste = anual && !(Object.values(PRODUTOS_SEM_TESTE) as string[]).some((id) => produto === id || produto.startsWith(id + ":"));
     const dias = emTeste ? DIAS_DO_TESTE_MOCK : anual || vitalicio ? 365 : 30;
     return {
       produto, compraEm, emTeste,

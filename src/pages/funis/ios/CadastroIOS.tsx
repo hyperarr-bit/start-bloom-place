@@ -29,6 +29,7 @@
  *
  * Coberto por `cadastro-pos-compra-ios.test.tsx`.
  */
+import { paywallComTeste } from "@/lib/paywall-teste"; // 12/11: sem teste, quem comprou leu "a assinatura"
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Check, Loader2, MailCheck, Lock, ShieldCheck } from "lucide-react";
@@ -116,7 +117,8 @@ export function SignupIOS({
       const [tipo, rcAtivo] = await Promise.all([
         lerAcessoAnteriorDaConta(uid),
         (async () => {
-          try { const rc = await import("@/lib/revenuecat"); return (await rc.compraAssinaturaLocal()) || rc.ultimaCompraAnualFoiTrial(); }
+          // 12/11: + o vitalício 97,90 da App Store (A/B paywall_oferta) — compra única não é "assinatura ativa"
+          try { const rc = await import("@/lib/revenuecat"); return (await rc.compraAssinaturaLocal()) || rc.ultimaCompraAnualFoiTrial() || (await rc.compraVitaliciaLocal()); }
           catch { return false; }
         })(),
       ]);
@@ -395,7 +397,7 @@ export function SignupIOS({
       </form>
 
       <div className="mt-4"><SelosIOS /></div>
-      {jaTinha && <AvisoJaTinhaAcesso tipo={jaTinha.tipo} oQue="teste" via="cadastro" onEntendi={() => { const seguir = jaTinha.seguir; setJaTinha(null); seguir(); }} />}
+      {jaTinha && <AvisoJaTinhaAcesso tipo={jaTinha.tipo} oQue={paywallComTeste() ? "teste" : "assinatura"} via="cadastro" onEntendi={() => { const seguir = jaTinha.seguir; setJaTinha(null); seguir(); }} />}
     </div>
   );
 }
@@ -459,6 +461,14 @@ export function LiberandoIOS() {
   }, [missaoPronta, vaiTerMissao, isSubscribed]);
 
   const spa = sincronizado === true && isSubscribed && (missaoPronta || !vaiTerMissao);
+  /* 12/11 (1.0.26, QA no Simulador): com a velocidade, a Home (e a Home nova) só eram pedidas ao chegar em "/", e o
+   * "Começar" das boas-vindas mostrava ~0,3 s de branco antes do convite da missão. Quem já pagou e está a 1 toque da
+   * Home: pede os pedaços agora (só baixa/compila; quem decide o que mostrar segue sendo a Home). */
+  useEffect(() => {
+    if (!spa) return;
+    import("@/pages/Home").catch(() => {});
+    import("@/components/home-nova/e/HomeE").catch(() => {});
+  }, [spa]);
   const pronto = sincronizado === false || spa || esperouDemais;
   const irPraHome = () => {
     if (spa) { trackEvent("app_pos_compra_home", { via: "rota", funil: "ios" }); navigate("/", { replace: true }); return; }

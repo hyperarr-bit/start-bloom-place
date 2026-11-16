@@ -89,7 +89,7 @@ beforeEach(() => { ln.agendados = []; ln.rodadas = 0; vi.useFakeTimers({ toFake:
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 describe("mudar a hora rearma os avisos no toque", () => {
-  it("às 06:50, 08:00 → 07:00 com o registro cheio: a fila do iPhone tem os avisos de hoje com as horas de antes e os de amanhã com as novas", async () => {
+  it("às 06:50, 08:00 → 07:00 com o registro cheio: a fila do iPhone já segue as horas novas (a das 07:00 fica 7 h depois da das 00:00 — regra simples, 11/11)", async () => {
     const novas = montarLinhas({ name: "Amoxicilina", stock: 14 }, gerarHorarios("08:00", 3), "2026-11-13", new Date(2026, 10, 5, 10).getTime());
     const [d1, d2, d3] = novas.map((l) => l.id);
     const log = { "2026-11-05": [d1, d2], "2026-11-06": [d3, d1, d2], "2026-11-07": [d3] };
@@ -101,6 +101,6 @@ describe("mudar a hora rearma os avisos no toque", () => {
     expect((store.estado.dados[CHAVE] as Remedio[]).map((l) => l.time)).toEqual(["07:00", "15:00", "23:00"]);
     expect(store.estado.dados[LOG]).toEqual(log); // nenhuma marca muda de lugar
     await waitFor(() => expect(ln.rodadas).toBeGreaterThan(0));
-    expect(fila().slice(0, 5)).toEqual(["07/08:00", "07/16:00", "08/00:00", "08/07:00", "08/15:00"]);
+    expect(fila().slice(0, 5)).toEqual(["07/07:00", "07/15:00", "07/23:00", "08/07:00", "08/15:00"]);
   });
 });

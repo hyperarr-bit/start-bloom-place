@@ -482,6 +482,10 @@
         function pixels() {
           if (feito) return; feito = true;
           if (location.pathname === "/organizar/demo") return; // 28/10: a demo dentro da landing nova não carrega pixel
+          // 11/11 (velocidade 1.0.26): dentro do app da loja nunca. O `npm run loja` já tira estes blocos do index.html do
+          // binário; esta linha segura se um `cap sync` depois da loja desfizer o strip. No app quem manda evento é o SDK
+          // nativo da Meta e o servidor (CAPI). No site (sem window.Capacitor nativo) nada muda.
+          try { var C = window.Capacitor; if (C && C.isNativePlatform && C.isNativePlatform()) return; } catch (e) {}
           carregar("https://connect.facebook.net/en_US/fbevents.js");
           carregar("https://www.googletagmanager.com/gtag/js?id=AW-18254888989");
           carregar("https://cdn.utmify.com.br/scripts/utms/latest.js", { "data-utmify-prevent-xcod-sck": "", "data-utmify-prevent-subids": "" });

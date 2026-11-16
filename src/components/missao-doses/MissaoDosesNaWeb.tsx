@@ -95,11 +95,8 @@ const pedirNotaDepois = (motivo: MotivoDaMissao): void => {
  * 1.0.16 (4.8): define o DONO da missão pra sessão ANTES das rotas renderizarem (App monta isto antes do
  * <Routes>) — assim a Home, o tour e os Momentos já leem a missão filtrada pela conta logada no 1º render.
  */
-export function DonoDaMissaoNaSessao() {
-  const auth = useAuthOpcional();
-  definirDonoDaMissao(auth?.user?.id);
-  return null;
-}
+// 11/11 (velocidade): mora na porta leve (o App importa de lá, sem puxar a missão inteira)
+export { DonoDaMissaoNaSessao } from "./MissaoDosesPortao";
 
 export function MissaoDosesNaWeb() {
   const { search } = useLocation();
@@ -109,7 +106,12 @@ export function MissaoDosesNaWeb() {
   guardarForcaDias23(search);
   guardarForcaConstruiu(search);
   const ligada = missaoDosesLigada();
-  return ligada ? <><Ligada /><VeuDaMissao /></> : null;
+  return ligada ? <MissaoDosesLigada /> : null;
+}
+
+/** 11/11 (velocidade): o que aparece com a missão ligada — o App carrega isto sob demanda pela MissaoDosesPortao. */
+export function MissaoDosesLigada() {
+  return <><Ligada /><VeuDaMissao /></>;
 }
 
 /* ── 1.0.17 — A PASSAGEM CALMA ENTRE TELAS (dono 19/10: "o corte entre Finanças e a Home é brusco — deixa agradável e

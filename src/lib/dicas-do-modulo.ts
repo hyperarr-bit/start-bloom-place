@@ -68,6 +68,13 @@ export interface Dica {
   organizarAbas?: true;
 }
 
+/** 07/11 (SPEC trial-abas §5.1): a 3ª dica no braço SUMÁRIO (lib/abas-caderno) — quem já começa enxuto não tem o que
+ *  ocultar; o toque abre o sumário (o mesmo evento da folha). */
+export const DICA_SUMARIO: Pick<Dica, "texto" | "textoSemToque"> = {
+  texto: "Abra o Sumário no fim das abas pra ver o resto",
+  textoSemToque: "O resto das abas fica no Sumário, no fim da fileira",
+};
+
 const ORGANIZAR: Dica = {
   texto: "Use só o que quiser: oculte as abas que não usa",
   textoSemToque: "Não usa uma aba? Oculte no ícone ao fim das abas",

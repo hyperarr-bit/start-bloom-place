@@ -61,6 +61,10 @@ import { SignupScreen, ConfirmScreen, LiberandoScreen, POS_COMPRA_OAUTH_KEY } fr
 import { PaywallW } from "./PaywallW";
 /* 14/11 (/funil-app, chave FUNIL_APP_WEB): o MESMO funil na web, com o paywall cobrando pela Stripe. Só entra com a prop. */
 const PaywallWebStripe = lazy(() => import("./PaywallWebStripe").then((m) => ({ default: m.PaywallWebStripe })));
+/* 12/11 (1.0.26): chave `paywall_teste` off (padrão) = o paywall SEM teste — SÓ no iPhone (12/11 noite: o Android fica
+   como hoje); o visual sai do A/B `paywall_visual` (lib/paywall-teste) */
+import { PaywallSemTeste } from "@/components/paywall/PaywallSemTeste";
+import { usePaywallComTeste, usePaywallVisual } from "@/hooks/use-paywall-teste";
 /* Lazy de propósito: esta folha só existe dentro do app da loja, e o
    ComecarW é carregado ansiosamente na /inicio da WEB (velocidade da 1ª tela,
    02/09) — o vaul do Drawer não pode entrar no bundle de quem nunca vai vê-la. */
@@ -665,6 +669,8 @@ export default function ComecarW({ cobrancaWeb = false }: {
    * pago 2h antes (21% dos armados-que-compraram em 03/09). Também não arma
    * com pagamento pendente de cadastro (posCompra). */
   const { user: usuarioLogado, isSubscribed: jaAssina } = useAuth();
+  const paywallComTeste = usePaywallComTeste();
+  const paywallVisual = usePaywallVisual(!naWeb && !paywallComTeste);
   useEffect(() => {
     if (naWeb || step !== "offer" || posCompra || (usuarioLogado && jaAssina)) return;
     void import("@/lib/notificacoes").then((m) => m.agendarResgateDoPlano(AREAS[areaOuPadrao].nome, { area: areaOuPadrao })).catch(() => { /* noop */ });
@@ -914,7 +920,14 @@ export default function ComecarW({ cobrancaWeb = false }: {
                   são produtos separados: mexer num não alcança o outro, e não
                   depende de ninguém lembrar de uma condicional. */}
               {step === "offer" && cobrancaWeb && naWeb && <Suspense fallback={null}><PaywallWebStripe area={areaOuPadrao} answers={answers} /></Suspense>}
-              {step === "offer" && !(cobrancaWeb && naWeb) && (
+              {/* 12/11: chave `paywall_teste` off (padrão) — o paywall SEM teste nas duas lojas, sem o sino antes
+                  ("A gente te avisa antes do teste acabar" não tem mais por quê). "on" = a bifurcação de hoje, intacta. */}
+              {/* 12/11 noite: A/B do visual, só iPhone — "android" = o PaywallW abaixo vendendo sem teste; "enxovaly" = PaywallSemTeste */}
+              {step === "offer" && !naWeb && !paywallComTeste && (paywallVisual === "android"
+                ? <PaywallW area={areaOuPadrao} answers={answers} semTeste onVoltar={recuarDoPaywall} onPagoSemConta={() => pagoSemConta()} />
+                : <PaywallSemTeste area={areaOuPadrao} answers={answers} onPagoSemConta={() => pagoSemConta()} onVoltar={recuarDoPaywall} />
+              )}
+              {step === "offer" && !(cobrancaWeb && naWeb) && (naWeb || paywallComTeste) && (
                 ehApple() ? (
                   /* 10/10 (PAYWALL_CURTO, ramo v14-paywall-curto): o paywall curto tem um botão Voltar
                      redondo e chama `onVoltar` quando nenhuma oferta de saída abre — aqui ele recua um

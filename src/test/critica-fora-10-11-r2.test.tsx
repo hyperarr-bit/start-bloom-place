@@ -104,12 +104,13 @@ describe("crítica de fora, 10/11, rodada 2", () => {
      passa pra 20:00. A virada do dia da dose das 00:00 é às 21:00 (3 h antes da de amanhã), então a 1ª
      nova tem que ser depois das 21:00 do dia 7 — 20:00 de hoje não serve e vai pra 20:00 do dia 8. E a
      das 00:00 desta noite (dia 8) não existe mais (antesAte = dia 7). */
-  it.fails("J1 1× 00:00 → 20:00 ao meio-dia (tomada à 00:00): a próxima dose vem em até 24 h, não 44 h", () => {
+  // 11/11, regra simples: consertado (hoje às 20:00)
+  it("J1 1× 00:00 → 20:00 ao meio-dia (tomada à 00:00): a próxima dose vem em até 24 h, não 44 h", () => {
     const store = criarStore({ [CHAVE]: simples("00:00"), [LOG]: { "2026-11-07": ["r1"] } });
     agoraEm(7, 12, 10);
     montar(store);
     fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "20:00" } });
-    expect(falas).toContain("Os horários novos valem a partir de amanhã, às 20:00."); // passa: é o que a tela diz
+    expect(falas).toContain("Próxima dose: hoje às 20:00.");
     const proxima = avisosEm(store)[0].quando;
     // hoje: "08/20:00" — nada às 00:00 desta noite, 44 h depois do último comprimido
     expect(horasEntre(new Date(2026, 10, 7, 0, 0), proxima)).toBeLessThanOrEqual(24);
@@ -121,10 +122,11 @@ describe("crítica de fora, 10/11, rodada 2", () => {
     montar(store);
     fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "21:00" } });
     expect(avisos(store)[0]).toBe("07/21:00");
-    expect(falas).toContain("Os horários novos valem a partir de hoje, às 21:00.");
+    expect(falas).toContain("Próxima dose: hoje às 21:00.");
   });
 
-  it.fails("J1b 00:30 → 21:00 (e às 21:40, perto da meia-noite, 00:00 → 19:00): nunca mais de 24 h + a diferença entre os horários", () => {
+  // 11/11, regra simples: consertado
+  it("J1b 00:30 → 21:00 (e às 21:40, perto da meia-noite, 00:00 → 19:00): nunca mais de 24 h + a diferença entre os horários", () => {
     const a = mudarHorarios(simples("00:30"), ["21:00"], agoraEm(7, 12, 10));
     // hoje: 2026-11-08T21:00 — 44 h 30 depois da das 00:30 do dia 7
     expect(a.novoDesde).toBe("2026-11-07T21:00");
@@ -171,7 +173,8 @@ describe("crítica de fora, 10/11, rodada 2", () => {
      passa pra 02:00. A folga de 6 h conta das 20:00 (hora da dose), então 08/02:00 vale — 2 h 30 depois
      do comprimido. O registro não guarda a hora em que foi tomado; quando a última de antes já está
      marcada na hora da mudança, a única conta segura é a partir de agora. */
-  it.fails("J3 1× 20:00 tomada às 23:30 e mudada pra 02:00 às 23:35: a 1ª nova fica a 6 h ou mais do comprimido", () => {
+  // 11/11, regra simples: consertado (12 h da dose marcada → 09/02:00)
+  it("J3 1× 20:00 tomada às 23:30 e mudada pra 02:00 às 23:35: a 1ª nova fica a 6 h ou mais do comprimido", () => {
     const store = criarStore({ [CHAVE]: simples("20:00"), [LOG]: {} });
     agoraEm(7, 23, 30);
     montar(store);
@@ -183,11 +186,12 @@ describe("crítica de fora, 10/11, rodada 2", () => {
     expect(horasEntre(new Date(2026, 10, 7, 23, 30), avisosEm(store)[0].quando)).toBeGreaterThanOrEqual(6);
   });
 
-  it("J3 (controle) tomada na hora (20:00) e mudada às 20:05 pra 02:00: 6 h, o mínimo combinado", () => {
+  // 11/11, regra simples: meio intervalo do 1× ao dia é 12 h → 20:00 + 12 h = 08:00 do dia 8 → 02:00 do dia 9
+  it("J3 (controle) tomada na hora (20:00) e mudada às 20:05 pra 02:00: 12 h, a regra do dono", () => {
     const store = criarStore({ [CHAVE]: simples("20:00"), [LOG]: { "2026-11-07": ["r1"] } });
     agoraEm(7, 20, 5);
     montar(store);
     fireEvent.change(screen.getByLabelText("Horário de Losartana"), { target: { value: "02:00" } });
-    expect(avisos(store)[0]).toBe("08/02:00");
+    expect(avisos(store)[0]).toBe("09/02:00");
   });
 });

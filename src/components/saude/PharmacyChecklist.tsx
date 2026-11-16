@@ -56,6 +56,8 @@ const diaEmTexto = (quando: Date, agora: Date) => {
 const horaEmTexto = (x: Date) => `${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`;
 /** "amanhã, às 07:00" — o dia e a hora, pros avisos curtos (10/11, I4) */
 const diaEHoraEmTexto = (quando: Date, agora: Date) => `${diaEmTexto(quando, agora)}, às ${horaEmTexto(quando)}`;
+/** "hoje às 20:00" / "amanhã às 00:30" / "13/11 às 00:30" — a próxima dose depois de mudar o horário (11/11) */
+const proximaEmTexto = (quando: Date, agora: Date) => `${diaEmTexto(quando, agora)} às ${horaEmTexto(quando)}`;
 /** 1× ao dia: a caixa não marca a 1ª dose de um horário mudado com mais de 3 h de antecedência (10/11, I2) */
 const ANTECEDENCIA_DOSE_NOVA_MS = 3 * 3600_000;
 
@@ -331,24 +333,8 @@ export const PharmacyChecklist = () => {
     if (!time) return;
     const linha = supplements.find(s => s.id === id);
     if (!linha) return;
-    /* CHAVE DESLIGADA (11/11, crítica da build 1.0.25): a regra "a partir de amanhã" fica atrás da
-       REMEDIO_VEZES, junto com o cadastro de várias doses. Com ela off, mudar o horário vale NA HORA,
-       como na 1.0.24 e no site de hoje (troca a hora e rearma o aviso). Motivo: a regra nova ainda tem
-       erro aberto no 1× ao dia (J1: 00:00 → 20:00 ao meio-dia deixava 44 h sem dose e sem aviso;
-       J3: tomado atrasado e mudado logo depois, dose nova 2 h 30 depois do comprimido). Os campos de
-       uma troca antiga (horaAntes, antesAte, novoDesde, idAntes) saem da linha, senão a tela e os
-       avisos seguiam a troca velha. Nenhuma linha em produção tem esses campos. */
-    if (!vezesLigado) {
-      if (linha.time === time && !linha.horaAntes) return;
-      const lista = supplements.map(s => {
-        if (s.id !== id) return s;
-        const { horaAntes: _h, idAntes: _i, antesAte: _a, novoDesde: _n, ...resto } = s;
-        return { ...resto, time };
-      });
-      setSupplements(lista);
-      void rearmarLembretes(lista, false);
-      return;
-    }
+    /* 11/11 ("faz o simples"): com a chave REMEDIO_VEZES on ou off, a próxima dose é o 1º horário novo a pelo
+       menos meio intervalo do último comprimido marcado, nunca no passado (lib/remedios, mudarHorarios). */
     const doRemedio = supplements.filter(mesmoGrupo(linha));
     const i = doRemedio.findIndex(s => s.id === id);
     const atuais = doRemedio.map(s => s.time);
@@ -356,7 +342,7 @@ export const PharmacyChecklist = () => {
     if (novos.every((h, j) => h === atuais[j])) return;
     const chave = linha.grupo ? `g:${linha.grupo}` : `i:${raizDoId(linha.id)}`;
     const inicioDeAntes = comecoAoAbrir.current?.chave === chave ? comecoAoAbrir.current.inicio : undefined;
-    const { itens, novoDesde, semDoseNova } = mudarHorarios(doRemedio, novos, new Date(), inicioDeAntes);
+    const { itens, novoDesde, semDoseNova } = mudarHorarios(doRemedio, novos, new Date(), inicioDeAntes, supplementLog);
     const porId = new Map(doRemedio.map((s, j) => [s.id, itens[j]]));
     const lista = supplements.map(s => porId.get(s.id) ?? s);
     setSupplements(lista);
@@ -365,7 +351,7 @@ export const PharmacyChecklist = () => {
     if (semDoseNova) {
       toast("O tratamento termina antes de os horários novos começarem: até o fim valem os de antes.", { id: `remedio-horario-novo-${chave}`, duration: 5000 });
     } else if (comeco) {
-      toast(`Os horários novos valem a partir de ${diaEHoraEmTexto(comeco, new Date())}.`, { id: `remedio-horario-novo-${chave}`, duration: 4000 });
+      toast(`Próxima dose: ${proximaEmTexto(comeco, new Date())}.`, { id: `remedio-horario-novo-${chave}`, duration: 4000 });
     }
     void rearmarLembretes(lista, false);
   };
@@ -481,13 +467,12 @@ export const PharmacyChecklist = () => {
                   const comecoDoGrupo = abertoPraEditar && inicioDoGrupo && inicioDoGrupo.getTime() > agora.getTime() ? comecoEmTexto(inicioDoGrupo, agora) : "";
                   // horário mudado e os novos ainda não começaram (lib/remedios, mudarHorarios): a fileira diz quando começam
                   const troca = abertoPraEditar ? trocaDoGrupo(g) : undefined;
-                  const novosEm = troca && novosExistem(g, troca) && troca.novoDesde.getTime() > agora.getTime() ? comecoEmTexto(troca.novoDesde, agora) : "";
-                  /* 1× ao dia com horário mudado que ainda não começou (10/11, I4): o campo já mostra o horário
-                     novo, então embaixo dele vai a dose de hoje — "hoje 08:00 · 22:00 a partir de amanhã". */
+                  const novosEm = troca && novosExistem(g, troca) && troca.novoDesde.getTime() > agora.getTime() ? proximaEmTexto(troca.novoDesde, agora) : "";
+                  /* 1× ao dia com horário mudado que ainda não começou (10/11, I4; 11/11): embaixo do campo vai o dia e a
+                     hora exatos da próxima dose — "Próxima dose: hoje às 20:00". */
                   const trocaSimples = simples ? trocaDoGrupo(g) : undefined;
-                  const doseDeAntes = trocaSimples && doses[0] && doses[0].quando < trocaSimples.novoDesde.getTime() ? doses[0] : undefined;
                   const horarioDeHoje = trocaSimples && novosExistem(g, trocaSimples) && trocaSimples.novoDesde.getTime() > agora.getTime()
-                    ? `${doseDeAntes ? `${diaEmTexto(new Date(doseDeAntes.quando), agora)} ${doseDeAntes.time} · ` : ""}${linha.time} a partir de ${diaEmTexto(trocaSimples.novoDesde, agora)}`
+                    ? `Próxima dose: ${proximaEmTexto(trocaSimples.novoDesde, agora)}`
                     : "";
                   const linhas = [
                     <motion.tr
@@ -669,7 +654,7 @@ export const PharmacyChecklist = () => {
                             {/* enquanto não começou, o começo à vista, só texto (conserto final 07/11: mudar a 1ª
                                 dose depois de "Começa amanhã" desfazia a escolha, e esta fileira nem mostrava) */}
                             {comecoDoGrupo && <span data-testid="remedio-editar-comeca"> · começa {comecoDoGrupo}</span>}
-                            {novosEm && <span data-testid="remedio-editar-novos"> · os novos valem a partir de {novosEm}</span>}
+                            {novosEm && <span data-testid="remedio-editar-novos"> · próxima dose: {novosEm}</span>}
                           </span>
                           {g.itens.map((s, i) => (
                             <input

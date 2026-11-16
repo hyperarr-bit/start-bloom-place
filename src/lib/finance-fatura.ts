@@ -26,7 +26,7 @@
  */
 
 import { mesesEntre, somarMeses } from "@/lib/finance-parcelas";
-import { chaveArquivada } from "@/lib/virada-do-mes";
+import { chaveArquivada, anotadoEmMs } from "@/lib/virada-do-mes";
 import { mesCorrenteId } from "@/lib/virada-contas";
 import { doPerfil } from "@/lib/finance-perfil";
 import { CARD_CONFIG_KEY } from "@/lib/finance-cards-dados";
@@ -77,19 +77,40 @@ const diaValido = (d: unknown): d is number => Number.isInteger(d) && (d as numb
 export const FECHAMENTO_CONTA_NO_DIA = true;
 
 /**
+ * CORTE DA REGRA NOVA (revisão 16/11 — o dono não quer que mês passado mude). A compra no dia do fechamento
+ * só vai pra fatura seguinte se foi ANOTADA a partir deste dia (o "anotado em" sai do id `Date.now()` de 13
+ * dígitos que as tabelas gravam). Anotada antes, ou sem id desse tipo (extrato importado, lançamento de
+ * fora, dado antigo): regra antiga (dia > fechamento) — a retrospectiva, a comparação e o balanço de meses
+ * que já passaram não mudam. AJUSTE pra data em que o ramo for publicado ("AAAA-MM-DD", meia-noite local).
+ */
+export const CORTE_FECHAMENTO_NO_DIA = "2026-11-17";
+
+const corteEmMs = (): number => {
+  const [a, m, d] = CORTE_FECHAMENTO_NO_DIA.split("-").map(Number);
+  return new Date(a, m - 1, d).getTime();
+};
+
+/** A regra "no dia do fechamento já é a seguinte" vale pra este lançamento? (pelo id; ver o corte acima) */
+export const regraDoDiaDoFechamentoVale = (id: unknown): boolean => {
+  if (!FECHAMENTO_CONTA_NO_DIA) return false;
+  const ms = anotadoEmMs(id);
+  return ms !== null && ms >= corteEmMs();
+};
+
+/**
  * "YYYY-MM" da fatura em que uma compra de `date` ("YYYY-MM-DD") cai, dado o
  * dia de fechamento. Parse de texto de propósito — `new Date("2026-09-30")`
  * é UTC e no Brasil vira 29/09 (ver lib/virada-do-mes.ts). Data ilegível ou
  * fechamento inválido → null (quem chama usa o mês da chave).
  */
-export const mesDaFatura = (date: unknown, closingDay: unknown): string | null => {
+export const mesDaFatura = (date: unknown, closingDay: unknown, noDiaJaESeguinte: boolean = FECHAMENTO_CONTA_NO_DIA): string | null => {
   if (typeof date !== "string" || !diaValido(closingDay)) return null;
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(date.trim());
   if (!m) return null;
   const mes = `${m[1]}-${m[2]}`;
   const dia = Number(m[3]);
   if (!(Number(m[2]) >= 1 && Number(m[2]) <= 12) || !(dia >= 1 && dia <= 31)) return null;
-  const fechou = FECHAMENTO_CONTA_NO_DIA ? dia >= closingDay : dia > closingDay;
+  const fechou = noDiaJaESeguinte ? dia >= closingDay : dia > closingDay;
   return fechou ? somarMeses(mes, 1) : mes;
 };
 
@@ -157,7 +178,8 @@ export const mesDoGasto = (
   const cfg = configOf(gasto.cardName);
   if (!cfg) return mesDaChave;
   if (diaValido(cfg.closingDay)) {
-    const mes = mesDaFatura(gasto.date, cfg.closingDay) ?? mesDaChave;
+    // (revisão 16/11) a regra do dia do fechamento só pra compra anotada depois do corte — histórico não muda
+    const mes = mesDaFatura(gasto.date, cfg.closingDay, regraDoDiaDoFechamentoVale(gasto.id)) ?? mesDaChave;
     return mesesEntre(mesDaChave, mes) > 1 ? somarMeses(mesDaChave, 1) : mes;
   }
   if (contaNoMesDoVencimento(cfg)) {

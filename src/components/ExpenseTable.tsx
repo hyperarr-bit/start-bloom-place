@@ -14,6 +14,7 @@ import { NOVO_PARCELAMENTO_EVENT, type Installment, type NovoParcelamentoDetalhe
 import { NOVO_CUSTO_FIXO_EVENT, type FixedExpense, type NovoCustoFixoDetalhe } from "@/components/FixedExpensesTable";
 import { mesDoGasto, dataDaPrimeiraParcela } from "@/lib/finance-fatura";
 import { mesesEntre, nomeDoMes } from "@/lib/finance-parcelas";
+import { avisoDeMesPassado } from "@/lib/finance-receita-futura";
 import { mesCorrenteId } from "@/lib/virada-contas";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { CHAVE_ORDEM_GASTOS, ORDENS_DOS_GASTOS, OrdenarChips, ordenarGastos, type OrdemDosGastos } from "@/components/finance/ordenar";
@@ -273,6 +274,9 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes, guar
       return;
     }
     setExpenses([...expenses, novo]);
+    // (revisão 16/11) data de mês passado na tela do mês atual: fica aqui — 1 linha dizendo isso e o caminho
+    const avisoPassado = guardarEmOutroMes ? avisoDeMesPassado(novo.date) : null;
+    if (avisoPassado) toast(avisoPassado);
     limparForm();
     if (eraVazia) {
       onPrimeiroGasto?.({ id: novo.id, descricao: novo.description, valor: novo.value, categoria: getCategoryLabel(novo.category) });

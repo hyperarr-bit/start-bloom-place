@@ -54,3 +54,18 @@ export const guardarGastoNoMes = <T extends ItemComPerfil & { date?: string }>(
   set: Gravador,
   perfil: string,
 ): string | null => guardarNoMes(gasto, hoje, get, set, perfil, "expenses");
+
+/**
+ * AVISO DO MÊS PASSADO (revisão 16/11). Gasto/receita com data de um mês que JÁ PASSOU, lançado na tela do mês
+ * atual, fica no mês atual (lib/virada-do-mes, VIRADA_PELO_MES_ANOTADO) — o aviso diz isso em 1 linha e
+ * ensina o caminho pra quem queria o mês da data. Devolve o texto, ou null se a data não é de mês passado.
+ */
+export const avisoDeMesPassado = (data: string | undefined, hoje: Date = new Date()): string | null => {
+  const m = /^(\d{4})-(\d{2})/.exec(data ?? "");
+  if (!m) return null;
+  const ano = Number(m[1]), mes = Number(m[2]) - 1;
+  if (mes < 0 || mes > 11) return null;
+  if (ano > hoje.getFullYear() || (ano === hoje.getFullYear() && mes >= hoje.getMonth())) return null;
+  const nome = monthNames[mes];
+  return `Fica em ${monthNames[hoje.getMonth()].toLowerCase()}, o mês em que você anotou. Pra lançar em ${nome.toLowerCase()}, use a planilha de ${nome.toLowerCase()} (Orçamento mensal).`;
+};

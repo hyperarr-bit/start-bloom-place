@@ -97,15 +97,41 @@ export const VIRADA_PELO_MES_ANOTADO = true;
 /** Ano-mês (local) em que o lançamento foi anotado, pelo id `Date.now()`; null se o id não é desse tipo
  *  ou aponta pro futuro (relógio de outro aparelho). */
 const anoMesDoId = (id: unknown, hoje: Date): { ano: number; mes: number } | null => {
-  const s = typeof id === "number" ? String(id) : id;
-  if (typeof s !== "string" || !/^\d{13}$/.test(s)) return null;
-  const ms = Number(s);
-  if (ms > hoje.getTime() || ms < Date.UTC(2024, 0, 1)) return null;
+  const ms = anotadoEmMs(id, hoje);
+  if (ms === null) return null;
   const d = new Date(ms);
   return { ano: d.getFullYear(), mes: d.getMonth() };
 };
 
+/** Ms em que o lançamento foi anotado (id `Date.now()` de 13 dígitos), ou null. Exportado pro corte da regra
+ *  do fechamento (lib/finance-fatura, revisão 16/11). Sem `hoje`, só o formato e o piso de 2024. */
+export const anotadoEmMs = (id: unknown, hoje?: Date): number | null => {
+  const s = typeof id === "number" ? String(id) : id;
+  if (typeof s !== "string" || !/^\d{13}$/.test(s)) return null;
+  const ms = Number(s);
+  if (ms < Date.UTC(2024, 0, 1) || (hoje && ms > hoje.getTime())) return null;
+  return ms;
+};
+
 const depois = (a: { ano: number; mes: number }, b: { ano: number; mes: number }) => a.ano > b.ano || (a.ano === b.ano && a.mes > b.mes);
+
+/** Ano-mês em que o lançamento CONTA pela regra da virada: o mais recente entre o da data e o do dia em que
+ *  foi anotado (ver VIRADA_PELO_MES_ANOTADO); null sem data legível. */
+const anoMesDoLancamento = (item: Lancamento | null | undefined, hoje: Date): { ano: number; mes: number } | null => {
+  const pelaData = anoMesDe(item?.date);
+  const anotado = VIRADA_PELO_MES_ANOTADO && pelaData ? anoMesDoId(item?.id, hoje) : null;
+  return pelaData && anotado && depois(anotado, pelaData) ? anotado : pelaData;
+};
+
+/**
+ * "YYYY-MM" do MÊS DO LANÇAMENTO (revisão 16/11): a mesma conta da virada, pra quem lê o balde corrente
+ * procurando os itens de um mês passado (retrospectiva `lerFinancasDoMes`, insígnias, card de compartilhar).
+ * Pela data crua, o gasto de 28/10 anotado em 05/11 contava em outubro E em novembro.
+ */
+export const mesDoLancamento = (item: Lancamento | null | undefined, hoje: Date): string | null => {
+  const q = anoMesDoLancamento(item, hoje);
+  return q ? `${q.ano}-${String(q.mes + 1).padStart(2, "0")}` : null;
+};
 
 /**
  * Separa o balde corrente entre "é do mês atual" e "pertence a um mês
@@ -125,9 +151,7 @@ export const separarPorMes = (
   const mesAtual = hoje.getMonth();
 
   for (const item of Array.isArray(itens) ? itens : []) {
-    const pelaData = anoMesDe(item?.date);
-    const anotado = VIRADA_PELO_MES_ANOTADO && pelaData ? anoMesDoId(item?.id, hoje) : null;
-    const quando = pelaData && anotado && depois(anotado, pelaData) ? anotado : pelaData;
+    const quando = anoMesDoLancamento(item, hoje);
     if (!quando || (quando.ano === anoAtual && quando.mes === mesAtual)) {
       ficam.push(item);
       continue;

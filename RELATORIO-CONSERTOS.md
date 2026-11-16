@@ -25,7 +25,7 @@ Prints em 390×844, só das telas que mudaram, em `prints-consertos/`.
   - foi a compra do próprio dia 2.
   O texto de suporte abaixo pede para ela conferir isso.
 - **Teste:** "compra no dia do fechamento ou depois → fatura seguinte". Para o mesmo valor, novembro soma 100, a compra vai para dezembro e dezembro soma 100.
-- **Risco para clientes antigos:** médio-baixo. Compras feitas *exatamente* no dia do fechamento, inclusive em meses passados, mudam para o mês seguinte nos totais e nas comparações. Nenhum dado é regravado.
+- **Risco para clientes antigos:** nenhum no histórico, depois da revisão. A regra nova só vale para compras anotadas a partir de `CORTE_FECHAMENTO_NO_DIA`; ver "Consertos da revisão".
 
 ### 2. Play 4★: "fecha dia 4 e vence dia 10; lanço um parcelado no dia 8 e ele entra na fatura atual, já com vencimento dia 10"
 - **Causa:** a parcela não olhava o fechamento. A 1ª parcela contava no mês em que foi lançada:
@@ -191,3 +191,41 @@ Testes:
 
 **Vírgula dos centavos (iPhone):**
 > Oi! Obrigado por insistir nisso. Achamos o problema: nos campos de valor do Finanças, a vírgula do teclado do iPhone apagava o número. Já corrigimos, e a correção chega na próxima versão do app. Até lá, dá pra lançar pelo "+" da tela inicial (Gasto), que aceita a vírgula.
+
+---
+
+## Consertos da revisão (16/11)
+
+**MÉDIA 1: a retrospectiva, as insígnias e o card de compartilhar contavam o lançamento atrasado em dois meses.**
+- **Causa:** `lerFinancasDoMes` (`src/lib/retrospectiva.ts`, função `doBalde`) pegava da lista do mês atual os itens com *data* do mês passado. O gasto de R$ 300 com data 28/10, anotado em 05/11, entrava em outubro (400) e em novembro (350).
+- **Conserto:** `virada-do-mes.ts` passou a exportar `mesDoLancamento`, que faz a mesma conta da virada (o mês mais recente entre a data e o dia em que foi anotado). O `doBalde` agora só pega o item cujo mês, por essa regra, é o mês pedido (retrospectiva.ts:431).
+- As insígnias (`insignias.ts:409-411`) e o card de outubro (`retro-outubro-dados.ts:134`) leem por `lerFinancasDoMes`, então ficam certos junto.
+- **Teste:** "revisão M1". Gasto: outubro 100, novembro 350. Receita: outubro 3000, novembro 400. Com o código antigo dá 400 e 3400.
+
+**MÉDIA 2: a regra "no dia do fechamento vai pra fatura seguinte" mudava o histórico.**
+- **Conserto:** a regra nova só vale para compras **anotadas a partir de** `CORTE_FECHAMENTO_NO_DIA = "2026-11-17"` (finance-fatura.ts:86).
+  - **Ajuste esse valor para o dia em que o ramo for publicado.**
+  - O "anotado em" vem do id de 13 dígitos (`anotadoEmMs`, virada-do-mes.ts:108).
+  - Compra anotada antes do corte, ou sem id de 13 dígitos (extrato importado, dado antigo), segue a regra antiga, dia > fechamento (`regraDoDiaDoFechamentoVale`, finance-fatura.ts:94, usada em `mesDoGasto`, :182). Retrospectiva, comparação e balanço de meses passados não mudam.
+  - A 1ª parcela do parcelado (`dataDaPrimeiraParcela`) usa sempre a regra nova, porque só vale para parcela criada agora e não mexe no histórico.
+- **Teste:** "revisão M2".
+  - 25/10 anotada antes do corte continua em outubro.
+  - Sem id de 13 dígitos, regra antiga.
+  - Anotada depois do corte, vai para a fatura seguinte.
+  - Depois do fechamento, é a seguinte para os dois lados.
+  - Voltei ao valor original a afirmação do `credito-sem-data-07-11` (id "t" = regra antiga).
+
+**BAIXA: a vírgula no resto dos campos de dinheiro.**
+- Componente novo, `src/components/ui/campo-dinheiro.tsx` (`CampoDinheiro`): guarda o que foi digitado como texto e converte com `numeroBR`, no mesmo desenho do campo da Beleza. Ele vale para os campos que guardam o número a cada tecla.
+- Onde aplica:
+  - Reserva de emergência, "Já guardei": `type="text"` + `numeroBR`. Antes podia salvar 0 em silêncio.
+  - Gasto rápido do widget da Home (`FinancesWidget.tsx`): `numeroBR` e recusa valor vazio ou zero. Antes `parseFloat("12,50")` dava 12.
+  - Investimentos: o formulário novo (valor investido, valor atual, aporte, rentabilidade) usa o `CampoDinheiro`. A edição e o aporte passam a `type="text"` + `numeroBR`.
+  - Desejos: o formulário novo (preço, já guardei) usa o `CampoDinheiro`. A edição e o "+ Valor" passam a `type="text"` + `numeroBR`.
+- **Teste:** "revisão: vírgula no resto".
+  - No `CampoDinheiro`, "12,50" vira 12,5, "1.234,56" vira 1234,56 e campo vazio fica sem valor.
+  - Uma trava confere que nesses quatro arquivos não sobra `parseFloat` nem `type="number"` em campo de dinheiro. O `type="number"` que ficou na Reserva é o de "Quantos meses", que é inteiro.
+
+**OPCIONAL, feito: aviso de 1 linha.** Ao salvar gasto ou receita com data de mês passado na tela do mês atual, aparece: "Fica em novembro, o mês em que você anotou. Pra lançar em outubro, use a planilha de outubro (Orçamento mensal)."
+- O texto vem de `avisoDeMesPassado` (`src/lib/finance-receita-futura.ts`), chamado no ExpenseTable e no IncomeTable só quando a tabela é a do mês atual.
+- **Teste:** "revisão: aviso de data do mês passado".

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { CampoDinheiro } from "@/components/ui/campo-dinheiro";
+import { numeroBR } from "@/lib/data-normalizers";
 import { Plus, Trash2, ShoppingCart, TrendingUp, Calendar, Heart, AlertTriangle, ExternalLink, ImagePlus, Link2, Loader2, Link, CheckCircle2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -222,8 +224,8 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
   };
 
   const salvarEdicao = () => {
-    const preco = parseFloat(rascunho.price);
-    const guardado = parseFloat(rascunho.savedAmount);
+    const preco = numeroBR(rascunho.price);
+    const guardado = numeroBR(rascunho.savedAmount);
     if (!rascunho.name.trim() || !Number.isFinite(preco) || preco <= 0) return;
     setItems(items.map((i) => i.id !== editandoId ? i : {
       ...i,
@@ -239,8 +241,8 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
   };
 
   const addToSaved = (id: string) => {
-    const amount = parseFloat(addAmounts[id] || "0");
-    if (amount <= 0) return;
+    const amount = numeroBR(addAmounts[id] || "0");
+    if (!Number.isFinite(amount) || amount <= 0) return;
     setItems(items.map(i => i.id === id ? { ...i, savedAmount: Math.min(i.savedAmount + amount, i.price) } : i));
     setAddAmounts({ ...addAmounts, [id]: "" });
   };
@@ -430,7 +432,7 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
             )}
             <div className="flex-1 space-y-2">
               <Input placeholder="Nome do item" value={newItem.name || ""} onChange={(e) => setNewItem({ ...newItem, name: e.target.value })} className="h-8 text-xs" />
-              <Input type="number" placeholder="Preço (R$)" value={newItem.price || ""} onChange={(e) => setNewItem({ ...newItem, price: parseFloat(e.target.value) || 0 })} className="h-8 text-xs" />
+              <CampoDinheiro placeholder="Preço (R$)" valor={newItem.price} onValor={(n) => setNewItem({ ...newItem, price: n ?? 0 })} className="h-8 text-xs" />
             </div>
           </div>
 
@@ -466,7 +468,7 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
               />
             </div>
 
-            <Input type="number" placeholder="Já guardei (R$)" value={newItem.savedAmount || ""} onChange={(e) => setNewItem({ ...newItem, savedAmount: parseFloat(e.target.value) || 0 })} className="h-8 text-xs" />
+            <CampoDinheiro placeholder="Já guardei (R$)" valor={newItem.savedAmount} onValor={(n) => setNewItem({ ...newItem, savedAmount: n ?? 0 })} className="h-8 text-xs" />
           </div>
 
           <div className="flex gap-2">
@@ -570,13 +572,13 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
                       <div className="grid grid-cols-2 gap-2">
                         <label className="text-[10px] text-muted-foreground">
                           Preço
-                          <Input type="number" inputMode="decimal" value={rascunho.price}
+                          <Input type="text" inputMode="decimal" value={rascunho.price}
                             onChange={(e) => setRascunho({ ...rascunho, price: e.target.value })}
                             className="h-9 text-xs mt-0.5" />
                         </label>
                         <label className="text-[10px] text-muted-foreground">
                           Já guardei
-                          <Input type="number" inputMode="decimal" value={rascunho.savedAmount}
+                          <Input type="text" inputMode="decimal" value={rascunho.savedAmount}
                             onChange={(e) => setRascunho({ ...rascunho, savedAmount: e.target.value })}
                             className="h-9 text-xs mt-0.5" />
                         </label>
@@ -635,7 +637,8 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
                   {!isComplete && (
                     <div className="flex gap-1.5">
                       <Input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="+ Valor"
                         value={addAmounts[item.id] || ""}
                         onChange={(e) => setAddAmounts({ ...addAmounts, [item.id]: e.target.value })}

@@ -1,4 +1,5 @@
 import { getMonthKey, readMonthData } from "@/components/finance/storage-keys";
+import { mesDoLancamento } from "@/lib/virada-do-mes";
 import { doPerfil, doPerfilDueDays, perfilAtivoLocal } from "@/lib/finance-perfil";
 import { computeArchivedLooseBillsOutflow, computeLooseBillsOutflow, computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
 import {
@@ -425,7 +426,9 @@ export const lerFinancasDoMes = (
   const configOf = configOfDe(ler(CARD_CONFIG_KEY));
   const mesAnterior = somarMeses(mesId, -1);
   const doBalde = (chave: string, mes = mesId) =>
-    mesesEntre(mes, atual) > 0 ? lista<Item>(ler(chave)).filter((i) => typeof i?.date === "string" && i.date.trim().startsWith(`${mes}-`)) : [];
+    // (revisão 16/11) pelo MÊS DO LANÇAMENTO, a mesma conta da virada: o gasto de 28/10 anotado em 05/11 é de
+    // novembro (fica no balde e o mês corrente o conta) — pela data crua ele entrava em outubro TAMBÉM
+    mesesEntre(mes, atual) > 0 ? lista<Item>(ler(chave)).filter((i) => typeof i?.date === "string" && mesDoLancamento(i, agora) === mes) : [];
   const chaveDe = (mes: string, sufixo: string) => chaveDoMes(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)) - 1, sufixo);
   /** Os gastos gravados na chave de um mês, como a planilha dele lê: corrente = o balde; passado = arquivo ∪
    *  balde com a data dele (MÊS FRIO, acima); futuro = só a chave dele. */

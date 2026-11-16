@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { numeroBR } from "@/lib/data-normalizers";
 import { ShieldCheck, Pencil, Check, X, PiggyBank } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -73,7 +74,7 @@ export const EmergencyFund = ({ despesaMensal }: { despesaMensal: number }) => {
     const meses = Math.min(24, Math.max(1, parseInt(rascunhoMeses, 10) || 6));
     // Campo vazio = zero guardado, e ainda assim conta como REGISTRADA: dizer
     // "minha meta é 6 meses e hoje tenho nada" é uma declaração legítima.
-    const guardado = Math.max(0, parseFloat(rascunhoGuardado.replace(",", ".")) || 0);
+    const guardado = Math.max(0, (Number.isFinite(numeroBR(rascunhoGuardado)) ? numeroBR(rascunhoGuardado) : 0));
     setReserva({ meses, guardado, registrada: true });
     setEditando(false);
   };
@@ -117,7 +118,7 @@ export const EmergencyFund = ({ despesaMensal }: { despesaMensal: number }) => {
               <label className="block">
                 <span className="text-[10px] font-bold uppercase text-muted-foreground">Já guardei (R$)</span>
                 <Input
-                  type="number"
+                  type="text"
                   inputMode="decimal"
                   placeholder="0"
                   value={rascunhoGuardado}

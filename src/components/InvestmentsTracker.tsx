@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { CampoDinheiro } from "@/components/ui/campo-dinheiro";
 import { toast } from "sonner";
 import { dataSegura, localDayKey } from "@/lib/utils";
 import { numeroBR } from "@/lib/data-normalizers";
@@ -133,14 +134,14 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
   };
 
   const salvarEdicao = () => {
-    const aportado = parseFloat(rascunho.investedAmount);
+    const aportado = numeroBR(rascunho.investedAmount);
     if (!rascunho.name.trim() || !Number.isFinite(aportado) || aportado < 0) return;
     setInvestments(investments.map((i) => i.id !== editandoId ? i : {
       ...i,
       name: rascunho.name.trim(),
       type: rascunho.type,
       investedAmount: aportado,
-      monthlyContribution: Math.max(0, parseFloat(rascunho.monthlyContribution) || 0),
+      monthlyContribution: Math.max(0, numeroBR(rascunho.monthlyContribution) || 0),
       broker: rascunho.broker.trim() || undefined,
     }));
     setEditandoId(null);
@@ -346,36 +347,17 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                   <option key={key} value={key}>{info.icon} {info.label}</option>
                 ))}
               </select>
-              <Input
-                type="number"
-                placeholder="Valor investido"
-                value={newInvestment.investedAmount || ""}
-                onChange={(e) => setNewInvestment({ ...newInvestment, investedAmount: parseFloat(e.target.value) || 0 })}
-                className="h-8 text-xs"
-              />
-              <Input
-                type="number"
-                placeholder="Valor atual"
-                value={newInvestment.currentValue || ""}
-                onChange={(e) => setNewInvestment({ ...newInvestment, currentValue: parseFloat(e.target.value) || 0 })}
-                className="h-8 text-xs"
-              />
+              <CampoDinheiro placeholder="Valor investido" valor={newInvestment.investedAmount}
+                onValor={(n) => setNewInvestment({ ...newInvestment, investedAmount: n ?? 0 })} className="h-8 text-xs" />
+              <CampoDinheiro placeholder="Valor atual" valor={newInvestment.currentValue}
+                onValor={(n) => setNewInvestment({ ...newInvestment, currentValue: n ?? 0 })} className="h-8 text-xs" />
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-              <Input
-                type="number"
-                placeholder="Aporte mensal (R$)"
-                value={newInvestment.monthlyContribution || ""}
-                onChange={(e) => setNewInvestment({ ...newInvestment, monthlyContribution: parseFloat(e.target.value) || 0 })}
-                className="h-8 text-xs"
-              />
-              <Input
-                type="number"
-                placeholder="Rentabilidade esperada (% a.a.)"
-                value={newInvestment.expectedReturn !== undefined && newInvestment.expectedReturn !== 10 ? newInvestment.expectedReturn : ""}
-                onChange={(e) => setNewInvestment({ ...newInvestment, expectedReturn: e.target.value === "" ? undefined : (parseFloat(e.target.value) || 0) })}
-                className="h-8 text-xs"
-              />
+              <CampoDinheiro placeholder="Aporte mensal (R$)" valor={newInvestment.monthlyContribution}
+                onValor={(n) => setNewInvestment({ ...newInvestment, monthlyContribution: n ?? 0 })} className="h-8 text-xs" />
+              <CampoDinheiro placeholder="Rentabilidade esperada (% a.a.)"
+                valor={newInvestment.expectedReturn !== undefined && newInvestment.expectedReturn !== 10 ? newInvestment.expectedReturn : undefined}
+                onValor={(n) => setNewInvestment({ ...newInvestment, expectedReturn: n })} className="h-8 text-xs" />
               <CampoData
                 rotulo="Data início"
                 value={newInvestment.startDate || ""}
@@ -495,7 +477,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                         <label className="text-[10px] text-muted-foreground">
                           Valor investido
                           <Input
-                            type="number"
+                            type="text"
                             inputMode="decimal"
                             value={rascunho.investedAmount}
                             onChange={(e) => setRascunho({ ...rascunho, investedAmount: e.target.value })}
@@ -505,7 +487,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                         <label className="text-[10px] text-muted-foreground">
                           Aporte mensal
                           <Input
-                            type="number"
+                            type="text"
                             inputMode="decimal"
                             value={rascunho.monthlyContribution}
                             onChange={(e) => setRascunho({ ...rascunho, monthlyContribution: e.target.value })}
@@ -526,7 +508,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                     <label className="flex-1 min-w-0 text-[10px] text-muted-foreground">
                       Valor atual (R$)
                       <Input
-                        type="number"
+                        type="text"
                         inputMode="decimal"
                         aria-label={`Valor atual de ${inv.name}`}
                         className="h-8 text-xs mt-0.5"
@@ -539,7 +521,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                     <label className="w-16 shrink-0 text-[10px] text-muted-foreground">
                       Rent. % a.a.
                       <Input
-                        type="number"
+                        type="text"
                         inputMode="decimal"
                         aria-label={`Rentabilidade esperada de ${inv.name} (% ao ano)`}
                         className="h-8 text-xs mt-0.5"
@@ -553,7 +535,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                       Novo aporte (R$)
                       <div className="flex items-center gap-1 mt-0.5">
                         <Input
-                          type="number"
+                          type="text"
                           inputMode="decimal"
                           placeholder="R$"
                           aria-label={`Novo aporte em ${inv.name}`}

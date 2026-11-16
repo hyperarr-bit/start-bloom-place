@@ -70,7 +70,7 @@ describe("o relato: R$ 300 no crédito sem data, planilha de setembro, lançado 
 
   it("o que já funcionava não muda: até 1 mês à frente, compra antiga no balde, virada de ano, data ilegível, débito", () => {
     expect(mesDoGasto(tenis("2026-09-24"), configOf, "2026-09")).toBe("2026-09");
-    expect(mesDoGasto(tenis("2026-09-25"), configOf, "2026-09")).toBe("2026-10"); // 16/11: no dia do fechamento
+    expect(mesDoGasto(tenis("2026-09-25"), configOf, "2026-09")).toBe("2026-09"); // revisão 16/11: id antigo/sem carimbo segue a regra antiga
     expect(mesDoGasto(tenis("2026-09-26"), configOf, "2026-09")).toBe("2026-10");
     expect(mesDoGasto(tenis("2026-10-10"), configOf, "2026-09")).toBe("2026-10");
     expect(mesDoGasto(tenis("2026-07-02"), configOf, "2026-09")).toBe("2026-07"); // conta em setembro mesmo (o balde é o mês)

@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { numeroBR } from "@/lib/data-normalizers";
 import { localDayKey } from "@/lib/utils";
 import { DollarSign, Plus, TrendingDown, TrendingUp } from "lucide-react";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
@@ -20,14 +21,16 @@ export const FinancesWidget = ({ size = "small" }: { size?: WidgetSize }) => {
   const handleQuickExpense = (e: React.FormEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!quickName || !quickAmount) return;
+    // (revisão 16/11) "12,50" com a vírgula do iPhone: numeroBR (o parse antigo dava 12, ou NaN com o campo vazio)
+    const valor = numeroBR(quickAmount);
+    if (!quickName || !Number.isFinite(valor) || valor <= 0) return;
     const currentExpenses = get<any[]>("finance-expenses", []);
     const perfil = get<string>("finance-perfil-ativo", PERFIL_PESSOAL) || PERFIL_PESSOAL;
     const newExpense = etiquetar({
       id: Date.now().toString(),
       description: quickName,
       category: "outros",
-      value: parseFloat(quickAmount),
+      value: valor,
       date: localDayKey(),
     }, perfil);
     set("finance-expenses", [...currentExpenses, newExpense]);
@@ -105,8 +108,8 @@ export const FinancesWidget = ({ size = "small" }: { size?: WidgetSize }) => {
               value={quickAmount}
               onChange={e => setQuickAmount(e.target.value)}
               placeholder="Valor"
-              type="number"
-              step="0.01"
+              type="text"
+              inputMode="decimal"
               className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-input bg-background"
             />
             <button type="submit" className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium">

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { numeroBR } from "@/lib/data-normalizers";
+import { avisoDeMesPassado } from "@/lib/finance-receita-futura";
 import { localDayKey } from "@/lib/utils";
 import { avisarApagado } from "@/lib/desfazer";
 import { Plus, Trash2, Check, X } from "lucide-react";
@@ -75,7 +76,12 @@ export const IncomeTable = ({ incomes, setIncomes, prefillExample = false, guard
     };
     const guardadaEm = guardarEmOutroMes?.(nova) ?? null;
     if (guardadaEm) toast.success(`Receita guardada em ${guardadaEm}: entra no painel no dia 1º`);
-    else setIncomes([...incomes, nova]);
+    else {
+      setIncomes([...incomes, nova]);
+      // (revisão 16/11) data de mês passado na tela do mês atual: fica aqui — 1 linha dizendo isso e o caminho
+      const avisoPassado = guardarEmOutroMes ? avisoDeMesPassado(nova.date) : null;
+      if (avisoPassado) toast(avisoPassado);
+    }
     setNewIncome({ description: "", value: "", date: "" });
   };
 

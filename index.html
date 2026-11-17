@@ -447,7 +447,9 @@
       n.queue=[];/* 02/09: o fbevents.js entra no carregador adiado; aqui só a fila */}(window, document,'script',
       'https://connect.facebook.net/en_US/fbevents.js');
       // 28/10: a demo DENTRO da landing nova (/organizar → iframe /organizar/demo) não conta PageView: a página de fora já contou
-      if (location.pathname !== '/organizar/demo') {
+      // críticas 17/11: o painel de quem indica (/indique/<token>, /afiliado/<token>) tem o TOKEN na URL — é a senha dela. Nenhum pixel
+      // ali (o PageView manda a URL inteira pra Meta/Google/TikTok/UTMify). A mesma lista no carregador adiado abaixo.
+      if (!/^\/(organizar\/demo|indique|afiliado)(\/|$)/.test(location.pathname)) {
       fbq('init', '998037194527241');
       fbq('init', '1104688251942954'); // 19/10: pixel iris (conta de anúncios nova) — recebe os mesmos eventos
       fbq('track', 'PageView');
@@ -481,7 +483,8 @@
         }
         function pixels() {
           if (feito) return; feito = true;
-          if (location.pathname === "/organizar/demo") return; // 28/10: a demo dentro da landing nova não carrega pixel
+          // 28/10: a demo dentro da landing nova não carrega pixel; críticas 17/11: nem o painel de quem indica (o token na URL é a senha)
+          if (/^\/(organizar\/demo|indique|afiliado)(\/|$)/.test(location.pathname)) return;
           // 11/11 (velocidade 1.0.26): dentro do app da loja nunca. O `npm run loja` já tira estes blocos do index.html do
           // binário; esta linha segura se um `cap sync` depois da loja desfizer o strip. No app quem manda evento é o SDK
           // nativo da Meta e o servidor (CAPI). No site (sem window.Capacitor nativo) nada muda.

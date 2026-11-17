@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { navAbasLigada, lerTela } from "@/lib/nav-abas";
 import { consumirAvisoMenuNovo, menuNovoLigado } from "@/lib/menu-novo";
 import { useTheme } from "@/hooks/use-theme";
+import { BalaoNovoIndique, PontoNovoIndique, useAvisoNovoIndique } from "@/components/indique/AvisoNovoIndique";
 
 /** O aviso único do menu novo espera a Home assentar (e nenhuma camada por cima) e some sozinho. */
 const AVISO_ESPERA_MS = 1200;
@@ -54,6 +55,8 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
   const menuNovo = menuNovoLigado();
   const { mode, palette } = useTheme();
   const [aviso, setAviso] = useState(false);
+  // 17/11 (indique e ganhe, só o site): o "Novo" de 1 vez só preso à sua inicial (a Você da Home clássica) — nunca card na Home
+  const indique = useAvisoNovoIndique("avatar", !comAbas && !!user && !aviso);
 
   /* O AVISO ÚNICO: quem estava no escuro ou numa cor ≠ Original quando o menu novo aparece pela 1ª vez vê um balão
    * no avatar, uma vez por aparelho (gravado na hora em que aparece — reabrir o app não repete). Espera a Home
@@ -169,7 +172,11 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
             <span className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-background border border-border shadow-sm flex items-center justify-center">
               <ChevronDown className="w-2.5 h-2.5 text-muted-foreground" strokeWidth={3} />
             </span>
+            {indique.ponto && <PontoNovoIndique className="top-0 right-0" />}
           </motion.button>
+          {indique.balao && !aviso && (
+            <BalaoNovoIndique ponta="cima-direita" className="right-0 top-full mt-2.5" onToque={() => { indique.usar(); abrirMenu("avatar"); }} />
+          )}
           {aviso && (
             <motion.button
               type="button"

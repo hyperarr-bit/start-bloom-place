@@ -15,7 +15,9 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Check, Copy, Loader2, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { type LinhaPainel, type PainelAfiliada, diaComSemana, diaCurto, reais, textoSituacao } from "@/lib/afiliados";
+import { type LinhaPainel, type PainelAfiliada, type PainelIndique, diaComSemana, diaCurto, reais, textoSituacao } from "@/lib/afiliados";
+import { PainelIndiqueVista } from "./IndiquePainel";
+import { estiloIndique } from "@/lib/indique-estilo";
 
 const MAGENTA = "hsl(330 65% 50%)";
 
@@ -141,10 +143,21 @@ export function PainelAfiliadaVista({ p }: { p: PainelAfiliada }) {
   );
 }
 
+/** põe <meta name="referrer" content="no-referrer"> enquanto o painel está aberto (devolve a limpeza do efeito) */
+export function semReferrer(): () => void {
+  const m = document.createElement("meta");
+  m.name = "referrer"; m.content = "no-referrer"; m.setAttribute("data-painel", "1");
+  document.head.appendChild(m);
+  return () => m.remove();
+}
+
 export default function Afiliado() {
   const { token = "" } = useParams();
-  const [p, setP] = useState<PainelAfiliada | null>(null);
+  const [p, setP] = useState<PainelAfiliada | PainelIndique | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+
+  // críticas 17/11: o token na URL é a senha do painel — nenhum link que sai daqui (WhatsApp, Instagram, e-mail) leva a URL junto
+  useEffect(() => semReferrer(), []);
 
   useEffect(() => {
     let vivo = true;
@@ -153,7 +166,7 @@ export default function Afiliado() {
       const { data, error } = await supabase.functions.invoke("afiliados", { body: { action: "painel", token } });
       if (!vivo) return;
       if (error || !data || (typeof data === "object" && "error" in data)) { setErro((data as { error?: string } | null)?.error === "nao_encontrado" ? "link" : "rede"); return; }
-      setP(data as PainelAfiliada);
+      setP(data as PainelAfiliada | PainelIndique);
     })();
     return () => { vivo = false; };
   }, [token]);
@@ -169,5 +182,17 @@ export default function Afiliado() {
     );
   }
   if (!p) return <div className="min-h-screen grid place-items-center bg-background"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>;
-  return <PainelAfiliadaVista p={p} />;
+  // 23/11: quem indica pela web (indique e ganhe da /oferta) — o painel próprio, com a chave Pix pedida aqui
+  if ("origem" in p && p.origem === "comprador") {
+    const salvarPix = async (pix_tipo: string, pix_chave: string) => {
+      const { data, error } = await supabase.functions.invoke("afiliados", { body: { action: "indique_pix", token, pix_tipo, pix_chave } });
+      // 4xx: o motivo vem no corpo da resposta (o invoke devolve só o erro)
+      const ctx = (error as { context?: { json?: () => Promise<unknown> } } | null)?.context;
+      const corpo = data ?? (ctx?.json ? await ctx.json().catch(() => null) : null);
+      const d = (corpo ?? {}) as { ok?: boolean; motivo?: string; pix?: PainelIndique["pix"] };
+      return d.ok === true && d.pix ? { ok: true as const, pix: d.pix } : { ok: false as const, motivo: String(d.motivo ?? "erro") };
+    };
+    return <PainelIndiqueVista p={p} salvarPix={salvarPix} estilo={estiloIndique()} />;
+  }
+  return <PainelAfiliadaVista p={p as PainelAfiliada} />;
 }

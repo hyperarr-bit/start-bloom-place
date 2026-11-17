@@ -25,7 +25,7 @@ import { RodapeSite } from "@/components/site/RodapeSite";
  * ter. 08/09: a privacidade ganhou o item de fotos e mensagens de suporte (a
  * aba de suporte com anexo de print); termos e exclusão de conta não mudaram. */
 const ATUALIZADO = "24 de julho de 2026";
-const ATUALIZADO_PRIVACIDADE = "8 de setembro de 2026";
+const ATUALIZADO_PRIVACIDADE = "17 de novembro de 2026";
 const CONTATO = EMPRESA.email;
 
 function LegalShell({ titulo, children, atualizado = ATUALIZADO }: { titulo: string; children: ReactNode; atualizado?: string }) {
@@ -142,6 +142,22 @@ export function Privacidade() {
           exija guardar (por exemplo, dados fiscais de uma compra).
         </p>
       </Secao>
+
+      {/* críticas da subida 17/11 (LGPD): o Indique e ganhe guarda dados novos (chave Pix, IP, aparelho, identificador do cartão) — escrito aqui */}
+      <div id="indique" className="scroll-mt-4" data-testid="privacidade-indique">
+        <Secao titulo="4.1 Indique e ganhe">
+          <p>
+            Se você pega seu link de indicação, usamos alguns dados para pagar suas comissões e evitar que alguém indique a si mesmo:
+          </p>
+          <Lista itens={[
+            "De quem indica: a chave Pix que você cadastra (CPF, CNPJ, e-mail, telefone ou chave aleatória), o e-mail e a conta da sua compra, e, da compra feita no site, o endereço IP, um identificador do aparelho e o identificador do cartão que a Stripe fornece (não o número do cartão).",
+            "De quem compra pelo link: guardamos só um código embaralhado (hash) do e-mail, para conferir que não é a mesma pessoa que indicou.",
+            "Finalidade: calcular e pagar a comissão no Pix e prevenir fraude (autoindicação). Base legal: execução do contrato e legítimo interesse.",
+            "Compartilhamento: Asaas (envio do Pix para a sua chave) e Stripe (dados da compra). Nada disso vai para ferramentas de publicidade.",
+            "Prazo: os registros das comissões e dos Pix ficam 5 anos (obrigações fiscais). O IP e os identificadores do aparelho e do cartão são apagados em até 12 meses.",
+          ]} />
+        </Secao>
+      </div>
 
       <Secao titulo="5. Excluir sua conta e seus dados">
         <p>

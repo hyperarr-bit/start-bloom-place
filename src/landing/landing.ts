@@ -89,6 +89,8 @@ import { lerEstadoU2027, lerU2027Guardado } from "./u2027-estado";
 import { lerEstadoPresenteLp } from "./presente-estado";
 import { esquecerCompra, esquecerPixVivo, fixarAparelho, gravarCookie, gravarPixVivo, idDoAparelho, lerCompra, lerCookie, lerPixVivo, marcarCompra, temSessaoNoStorage, type MarcaCompra } from "./marcador";
 import { carregarComRetry, criarCarregadorCompartilhado } from "./carregar";
+import { abrirIndique, capturarIndicador, faixaJaComprou, lerCompraIndique, type ApiIndique } from "./indique";
+import { estiloIndique } from "@/lib/indique-estilo";
 import { capturarAtribuicao, linkPlayAtribuido, linkAppleAtribuido, ondeLinkLoja } from "./atribuicao";
 import { REF_OK, checkoutExtDoHtml, paginaDoHtml, pkStripeValida, reaisDeCentavos, urlCheckoutHotmart, urlHotmartValida } from "./hotmart";
 
@@ -109,7 +111,7 @@ const agora = () => Math.round(performance.now());
 type Janela = Window & {
   __landingCliqueLoja?: (e: MouseEvent) => void;
   __landingSimularJaTem?: boolean;
-  __landing?: { uma?: boolean; cko_forcado?: boolean; otp_forcado?: boolean; oem_forcado?: boolean; lpo_forcado?: boolean; lpo_link?: boolean; ab_lp_oferta?: string; lpo_stripe_cedo?: string; pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; up_oferta?: string; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null };
+  __landing?: { uma?: boolean; cko_forcado?: boolean; otp_forcado?: boolean; oem_forcado?: boolean; lpo_forcado?: boolean; lpo_link?: boolean; ab_lp_oferta?: string; lpo_stripe_cedo?: string; pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; up_oferta?: string; indique?: string; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null };
   __eventosLanding?: Record<string, unknown>[];
   /** 02/11 (dev/testes): voltou() = "voltei do banco" (≥ 5 s fora) sem trocar de aba; vencer() = o QR vence em 1,5 s */
   __landingSimular?: { pagar: () => void; pagarU2027?: () => void; voltou?: () => void; vencer?: () => void };
@@ -2086,9 +2088,42 @@ const eventoStripe: typeof evento = LPO_NOVA || LPO_ATIVO
 /* ── 15/11 (UPSELL_OFERTA "on", só a /oferta): o presente "Leve alguém junto" a R$ 24,90 no pós-pago. Off = nada daqui roda (opcoesStripe
  *    não leva `presente`, o pedido não leva salvar_cartao). Pagou no cartão → "Sim, adicionar" (1 toque, stripe-presente acao "cartao");
  *    no Pix → um Pix novo de 24,90 da Stripe. O valor é do servidor; aqui é só exibição. Sem Purchase pra Meta. ── */
-const UP_OFERTA = STRIPE && w.__landing?.up_oferta === "on" && !LPO_LINK;
+/* ── 23/11 (INDIQUE_OFERTA "on", só a /oferta): o INDIQUE E GANHE no lugar do presente (./indique.ts). Ligado, o presente some (nem o
+ *    cartão é salvo), o ?ref= da /oferta vai no pedido (atrib.indicador → metadata[indicador] do PI) e o pago abre a folha
+ *    "Indique 2 amigas e seu CORE sai de graça". Off = nada da TELA roda; o ?ref= continua indo no pedido (críticas 17/11). ── */
+const INDIQUE = STRIPE && w.__landing?.indique === "on" && !LPO_LINK;
+const UP_OFERTA = STRIPE && w.__landing?.up_oferta === "on" && !LPO_LINK && !INDIQUE;
 const VALOR_PRESENTE_OFERTA = 24.9;
 type CompraPaga = import("./stripe-checkout").CompraPaga;
+// críticas da subida 17/11: o ?ref= é lido e vai no pedido SEMPRE na /oferta da Stripe, mesmo com a chave INDIQUE_OFERTA off — esconder a
+// tela (rollback "esconder a vitrine") nunca pode perder a comissão de um link que já está no WhatsApp. O stripe-criar filtra o formato e
+// o webhook só grava com INDIQUE_WEB=on. Sem indicador na URL nem guardado, o pedido é o de sempre.
+const INDICADOR = STRIPE && !LPO_LINK ? capturarIndicador(location.search, storageAtrib, { ler: lerCookie, gravar: gravarCookie }) : null;
+if (INDICADOR) evento("landing_indicado", { indicador: INDICADOR, tela: INDIQUE ? "on" : "off" });
+const apiIndique = (): ApiIndique => SIMULADO
+  ? { pedirLink: (c) => espera(600).then(() => ((w as unknown as { __landingSimularIndique?: { falhar?: boolean } }).__landingSimularIndique?.falhar
+    ? { erro: "simulado" }
+    : { codigo: "ANA7K2", link: "https://www.coreaplicativo.com.br/oferta?ref=ANA7K2", painel: `https://www.coreaplicativo.com.br/indique/simulado-${c.pi.slice(-6)}` })) }
+  : {
+    pedirLink: async (c) => {
+      const r = await fetch("https://itoylenzvahbscgjgtqf.supabase.co/functions/v1/afiliados", {
+        method: "POST", headers: { "Content-Type": "application/json", apikey: ANON_PRESENTE, Authorization: `Bearer ${ANON_PRESENTE}` },
+        body: JSON.stringify({ action: "indique_link", ref: c.ref, pi: c.pi }),
+      });
+      const j = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+      if (r.ok && j.ok === true && typeof j.link === "string" && typeof j.painel === "string") return { codigo: String(j.codigo ?? ""), link: j.link, painel: j.painel, emailEnviado: j.email_enviado === true };
+      return { erro: String(j.motivo ?? `http_${r.status}`) };
+    },
+  };
+const depsIndique = () => ({ api: apiIndique(), evento, copiar: (t: string) => copiarTexto(t), estilo: estiloIndique() });
+const abrirIndiqueOferta = (c: CompraPaga) => {
+  abrirIndique({ ref: c.ref, pi: c.pi }, depsIndique());
+};
+// críticas 17/11: recarregou a aba depois de pagar → faixa no topo ("Você já comprou" · Como entrar no app · Seu link de indicação)
+if (INDIQUE) window.setTimeout(() => {
+  const c = lerCompraIndique();
+  if (c) faixaJaComprou(c, depsIndique(), "/como-entrar");
+}, 0);
 const postarPresente = async (corpo: Record<string, unknown>): Promise<Record<string, unknown>> => {
   const r = await fetch("https://itoylenzvahbscgjgtqf.supabase.co/functions/v1/stripe-presente", {
     method: "POST", headers: { "Content-Type": "application/json", apikey: ANON_PRESENTE, Authorization: `Bearer ${ANON_PRESENTE}` }, body: JSON.stringify(corpo),
@@ -2213,8 +2248,9 @@ if (UP_OFERTA) window.setTimeout(() => {
 }, 0);
 const opcoesStripe = () => ({
   ...(UP_OFERTA ? { presente: { abrir: abrirPresenteOferta } } : {}),
+  ...(INDIQUE ? { indique: { abrir: abrirIndiqueOferta } } : {}),
   pk: ST_PK, precoCentavos: ST_PRECO, parcelasMax: Number(w.__landing?.stripe_parcelas_max) || 12, producao: PRODUCAO, pedeCpf: w.__landing?.stripe_pede_cpf === true,
-  evento: eventoStripe, pixel: pixelStripe, atrib: LPO_ATIVO ? { ...atrib, braco_lp_oferta: String(BRACO_LP_OFERTA) } : atrib, sessao, aparelho, urlChegada: URL_DE_CHEGADA, fbclid: BUSCA.get("fbclid"),
+  evento: eventoStripe, pixel: pixelStripe, atrib: { ...atrib, ...(LPO_ATIVO ? { braco_lp_oferta: String(BRACO_LP_OFERTA) } : {}), ...(INDICADOR ? { indicador: INDICADOR } : {}) }, sessao, aparelho, urlChegada: URL_DE_CHEGADA, fbclid: BUSCA.get("fbclid"),
 });
 /* ── 11/11: braço "pagina" (AB_OFERTA_EMAIL): o e-mail no cartão da oferta, acima do botão. Sem e-mail válido o checkout não abre (o erro fica
  *    embaixo do campo); com ele, o checkout abre já preenchido. O e-mail nunca vai em evento. A aba guarda o que foi digitado (recarga / volta do banco). ── */

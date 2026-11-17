@@ -316,8 +316,11 @@ export function dataPrevistaPagamento(cobradoEm: string, diasCarencia = DIAS_CAR
   return proximaSegunda(new Date(libera.getTime() - 1));
 }
 
-export const elegivelParaPagar = (v: Pick<Venda, "status" | "cobrado_em" | "pagamento_id">, agora: Date, diasCarencia = DIAS_CARENCIA): boolean =>
-  v.status === "pago" && !v.pagamento_id && !!v.cobrado_em && new Date(v.cobrado_em).getTime() <= agora.getTime() - diasCarencia * 86400_000;
+/** 23/11 (indique e ganhe da web): `libera_em` na venda manda (Pix +7, cartão +30); sem ela, a régua de sempre (cobrança + 7) */
+export const elegivelParaPagar = (v: Pick<Venda, "status" | "cobrado_em" | "pagamento_id"> & { libera_em?: string | null }, agora: Date, diasCarencia = DIAS_CARENCIA): boolean =>
+  v.status === "pago" && !v.pagamento_id && !!v.cobrado_em && (v.libera_em
+    ? new Date(v.libera_em).getTime() <= agora.getTime()
+    : new Date(v.cobrado_em).getTime() <= agora.getTime() - diasCarencia * 86400_000);
 
 /* ------------------------------------------------------------ Pix semanal */
 
@@ -344,7 +347,7 @@ export interface PlanoPagamento {
  */
 export function planejarSemana(
   afiliados: AfiliadoResumido[],
-  vendas: Array<Pick<Venda, "id" | "afiliado_id" | "status" | "cobrado_em" | "pagamento_id" | "comissao_cents">>,
+  vendas: Array<Pick<Venda, "id" | "afiliado_id" | "status" | "cobrado_em" | "pagamento_id" | "comissao_cents"> & { libera_em?: string | null }>,
   agora: Date,
   diasCarencia = DIAS_CARENCIA,
 ): PlanoPagamento[] {
@@ -383,6 +386,8 @@ export interface LinhaPainel {
   situacao: "em_teste" | "prevista" | "paga" | "segurada" | "reembolsada" | "nao_pagou";
   /** "YYYY-MM-DD": quando foi/será paga */
   pagamento_dia: string | null;
+  /** 23/11 (web): "YYYY-MM-DD" em que a comissão libera (só vem quando a venda tem libera_em) */
+  libera_dia?: string;
 }
 
 export interface ResumoPainel {
@@ -403,7 +408,7 @@ export interface ResumoPainel {
  * valores, datas) — e devolve menos ainda. Nada aqui sabe quem é o cliente.
  */
 export function resumoPainel(
-  vendas: Array<Pick<Venda, "status" | "comissao_cents" | "cobrado_em" | "criado_em" | "pagamento_id">>,
+  vendas: Array<Pick<Venda, "status" | "comissao_cents" | "cobrado_em" | "criado_em" | "pagamento_id"> & { libera_em?: string | null }>,
   pagamentos: PagamentoResumido[],
   agora: Date,
   diasCarencia = DIAS_CARENCIA,
@@ -425,9 +430,9 @@ export function resumoPainel(
     if (pg && pg.status === "enviado") { linhas.push({ dia, comissao_cents: v.comissao_cents, situacao: "paga", pagamento_dia: diaBRT(pg.criado_em) }); continue; }
     aReceber += v.comissao_cents;
     if (pg && pg.status === "segurado") { linhas.push({ dia, comissao_cents: v.comissao_cents, situacao: "segurada", pagamento_dia: null }); continue; }
-    const prevista = v.cobrado_em ? dataPrevistaPagamento(v.cobrado_em, diasCarencia) : proxima;
+    const prevista = v.libera_em ? proximaSegunda(new Date(new Date(v.libera_em).getTime() - 1)) : v.cobrado_em ? dataPrevistaPagamento(v.cobrado_em, diasCarencia) : proxima;
     if (prevista.getTime() <= proxima.getTime()) valorProxima += v.comissao_cents;
-    linhas.push({ dia, comissao_cents: v.comissao_cents, situacao: "prevista", pagamento_dia: diaBRT(prevista) });
+    linhas.push({ dia, comissao_cents: v.comissao_cents, situacao: "prevista", pagamento_dia: diaBRT(prevista), ...(v.libera_em ? { libera_dia: diaBRT(v.libera_em) } : {}) });
   }
   linhas.sort((a, b) => (a.dia < b.dia ? 1 : a.dia > b.dia ? -1 : 0));
   return {

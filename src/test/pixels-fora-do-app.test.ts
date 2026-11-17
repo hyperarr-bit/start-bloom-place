@@ -31,6 +31,29 @@ describe("pixels do site fora do app da loja", () => {
     expect(srcs.some((s) => s.includes("utmify"))).toBe(true);
   });
 
+  // críticas 17/11: o token do painel na URL é a senha de quem indica — o PageView mandaria a URL inteira pra Meta/Google/TikTok/UTMify
+  it.each(["/indique/abcDEF123_-abcDEF123_-abcDEF123_-", "/indique", "/afiliado/abcDEF123_-abcDEF123_-abcDEF123_-"])("no painel de quem indica (%s): nenhum pixel", (rota) => {
+    const antes = location.pathname;
+    window.history.replaceState({}, "", rota);
+    try { expect(rodar()).toEqual([]); } finally { window.history.replaceState({}, "", antes); }
+  });
+
+  it("o bloco do PageView (fbq init) também pula o painel (as 2 regras iguais)", () => {
+    const bloco = (html.match(/<script>((?:(?!<\/script>)[\s\S])*fbq\('track', 'PageView'\)[\s\S]*?)<\/script>/) ?? [])[1] ?? "";
+    const fbq = Object.assign((...a: unknown[]) => { chamadas.push(a); }, { queue: [] as unknown[] });
+    const chamadas: unknown[][] = [];
+    const w = window as unknown as { fbq?: unknown; _fbq?: unknown };
+    for (const rota of ["/indique/tok_abcdefghijklmnopqrstuvwxyz0123", "/afiliado/tok_abcdefghijklmnopqrstuvwxyz0123", "/oferta"]) {
+      const antes = location.pathname;
+      window.history.replaceState({}, "", rota);
+      chamadas.length = 0; w.fbq = fbq; w._fbq = fbq;
+      // eslint-disable-next-line no-new-func
+      try { new Function(bloco)(); } finally { window.history.replaceState({}, "", antes); delete w.fbq; delete w._fbq; }
+      const pageView = chamadas.some((c) => c[0] === "track" && c[1] === "PageView");
+      expect([rota, pageView]).toEqual([rota, rota === "/oferta"]);
+    }
+  });
+
   it("no app da loja (Capacitor nativo): nenhum pixel", () => {
     (window as unknown as { Capacitor: unknown }).Capacitor = { isNativePlatform: () => true };
     expect(rodar()).toEqual([]);

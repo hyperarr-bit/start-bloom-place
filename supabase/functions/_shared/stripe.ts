@@ -24,6 +24,7 @@ import { MENSAL_APP_WEB, OFERTAS_STRIPE, ofertaDaPagina } from "./stripe-ofertas
 import { avisarMensalStripeComVitalicio, registrarPagoEmDobro } from "./landing-travas.ts";
 import { PRESENTE_STRIPE, compraIgnorada, donoDaCompra } from "./stripe-presente.ts";
 import { garantirPresente, mandarLinkPorEmail } from "./presente.ts";
+import { blocoIndiqueEmail, type VendaWeb } from "./indique.ts";
 
 // deno-lint-ignore no-explicit-any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -78,7 +79,7 @@ export function lerIntento(o: unknown): IntentoStripe | null {
 }
 
 /* ───────────────────────── o webhook ───────────────────────── */
-export type CobrancaStripe = { metodo: "pix" | "card" | string | null; parcelas: number | null; email?: string | null };
+export type CobrancaStripe = { metodo: "pix" | "card" | string | null; parcelas: number | null; email?: string | null; /** 23/11 (indique): digital do cartão */ cartaoFp?: string | null };
 export type DepsStripe = {
   admin: AdminHotmart;
   secret: string | null;
@@ -95,6 +96,14 @@ export type DepsStripe = {
   assinaturaDoPagamento?: (pi: string, invoice: string | null) => Promise<string | null>;
   /** 14/11: cancela a assinatura na Stripe (imediato = já; senão no fim do período). true = a Stripe confirmou */
   cancelarAssinatura?: (subId: string, imediato: boolean) => Promise<boolean>;
+  /** 23/11 (indique e ganhe, ./indique.ts): grava a venda indicada (metadata.indicador) e cancela no estorno. Erro → lança (500, a Stripe reenvia) */
+  indique?: {
+    registrar: (indicador: string, venda: VendaWeb) => Promise<unknown>;
+    /** parcial = devolução de parte do valor (críticas 17/11: também cancela a comissão, mas não pausa o link de ninguém) */
+    cancelar: (pi: string, opts?: { parcial?: boolean }) => Promise<unknown>;
+  };
+  /** 17/11: o bloco "Indique e ganhe" no e-mail de acesso da /oferta (envs INDIQUE_WEB=on + INDIQUE_EMAIL=on) — leva pra /indique */
+  indiqueNoEmail?: boolean;
   log: (passo: string, d?: Record<string, unknown>) => void;
   agora?: () => Date;
 };
@@ -131,6 +140,25 @@ async function contarEsperaPresente(admin: ClienteMin, pi: string): Promise<numb
   return MAX_ESPERA_PRESENTE;
 }
 const reais = (c: number) => `R$ ${(c / 100).toFixed(2).replace(".", ",")}`;
+/** 23/11: a comissão de indicação não gravou/cancelou — 1 alarme por PI (push + analytics), sem e-mail no corpo */
+async function alarmeIndique(deps: DepsStripe, pi: string, onde: "venda" | "estorno", e: unknown, indicador?: string | null): Promise<void> {
+  const msg = String((e as Error)?.message ?? e).replace(/[^\s@]+@[^\s@]+/g, "***").slice(0, 160);
+  deps.log("indique — FALHOU (alarme)", { pi, onde, msg });
+  if (await reservar(deps.admin, `stripe-indique-alarme:${onde}:${pi}`, "alarme") !== "ok") return;
+  // críticas 17/11: o evento guarda o indicador — o pagar_semana tenta de novo sozinho (e o /admin tem "Reprocessar comissão" pelo PI)
+  try { await deps.admin.from("analytics_events").insert({ event_name: "indique_falhou", user_id: null, event_data: { pi, onde, msg, ...(indicador ? { indicador: String(indicador).slice(0, 64) } : {}) } }); } catch { /* o push ainda sai */ }
+  await deps.avisarDono(`⚠️ Indique e ganhe: ${onde === "venda" ? "comissão NÃO gravou" : "estorno NÃO cancelou a comissão"}`, `PI ${pi} · ${onde === "venda" ? "o Pix de segunda tenta de novo; ou /admin/afiliados → Reprocessar" : "confira no /admin/afiliados"}`, `stripe-indique:${onde}:${pi}`).catch(() => {});
+}
+/** estorno (inteiro ou parcial) → a comissão cai; se o Pix dela JÁ saiu, push pro dono (o próximo Pix do link desconta) */
+async function cancelarIndique(deps: DepsStripe, pi: string, parcial: boolean): Promise<void> {
+  try {
+    const ci = await deps.indique!.cancelar(pi, parcial ? { parcial: true } : undefined) as { venda?: string; comissao_cents?: number } | null;
+    deps.log("indique — estorno", { pi, parcial, ...(ci && typeof ci === "object" ? ci as Record<string, unknown> : {}) });
+    if (ci?.venda === "ja_paga" && await reservar(deps.admin, `stripe-indique-ja-paga:${pi}`, "alarme") === "ok") {
+      await deps.avisarDono("⚠️ Indique e ganhe: devolução DEPOIS do Pix da comissão", `PI ${pi} · ${reais(Number(ci.comissao_cents ?? 0))} já pagos · o próximo Pix desse link desconta (ou segura, se não cobrir)`, `stripe-indique-ja-paga:${pi}`).catch(() => {});
+    }
+  } catch (e) { await alarmeIndique(deps, pi, "estorno", e); }
+}
 
 export async function tratarStripe(deps: DepsStripe, req: { assinatura: string | null; corpo: string }): Promise<Resposta> {
   const { admin, log } = deps;
@@ -158,7 +186,15 @@ export async function tratarStripe(deps: DepsStripe, req: { assinatura: string |
     if (tipo !== "payment_intent.succeeded") {
       const pi = t(obj.payment_intent, 80);
       const total = tipo === "charge.dispute.created" || obj.refunded === true;
-      if (!pi || !total) { log("estorno parcial ou sem PI — nada a desligar", { tipo, pi }); return { status: 200, corpo: { ok: true, ignorado: "parcial" } }; }
+      if (!pi || !total) {
+        // críticas 17/11: devolução PARCIAL também cancela a comissão (nunca 50% cheio de uma venda que rendeu menos); o acesso fica
+        if (pi && deps.indique && Number(obj.amount_refunded ?? 0) > 0) await cancelarIndique(deps, pi, true);
+        log("estorno parcial ou sem PI — nada a desligar", { tipo, pi });
+        return { status: 200, corpo: { ok: true, ignorado: "parcial" } };
+      }
+      // 23/11 (indique e ganhe): a comissão daquela venda cai; se era a compra de quem indica, o link dela é pausado
+      // (erro aqui não segura o corte do acesso: alarme pro dono conferir a comissão no /admin)
+      if (deps.indique) await cancelarIndique(deps, pi, false);
       // 14/11: a linha pode ser do vitalício (pedido = PI) OU do mensal (pedido = a assinatura da fatura estornada)
       const { data: doPi, error: erroDoPi } = await admin.from("subscriptions").select("id").eq("abacatepay_billing_id", pi).eq("payment_method", GATEWAY_STRIPE);
       // revisão 2: banco sem resposta → 500 (a Stripe reenvia); nunca "nada a cortar" no escuro
@@ -278,6 +314,18 @@ export async function tratarStripe(deps: DepsStripe, req: { assinatura: string |
       }),
     });
     if (g.r === "erro" || g.r === "em_andamento") throw new Error(g.r === "erro" ? g.msg : "em_andamento");
+    // 23/11 (indique e ganhe): a venda veio por um link de indicação → grava a comissão (1× por PI; as travas de autoindicação
+    // moram em ./indique.ts). Antes do "nada a creditar": num reenvio da Stripe a linha já existe e nada muda.
+    // Erro aqui NUNCA segura a entrega de quem comprou (e-mail, CAPI): alarme pro dono e segue.
+    if (deps.indique && md.indicador && oferta.pagina === PAGINA_STRIPE) {
+      try {
+        const ri = await deps.indique.registrar(md.indicador, {
+          pi: pi.id, valorCents: valor, email: emailConta ?? emailCompra, userId: conta.userId, aparelho: t(md.aparelho, 64), cpf: t(md.cpf, 14),
+          jaEraCliente: g.r === "preservado", metodo: cob?.metodo ?? null, cartaoFp: cob?.cartaoFp ?? null, ip: t(md.ip, 64),
+        });
+        log("indique — venda indicada", { pi: pi.id, ...(ri && typeof ri === "object" ? ri as Record<string, unknown> : {}) });
+      } catch (e) { await alarmeIndique(deps, pi.id, "venda", e, md.indicador); }
+    }
     if (g.r === "preservado" || (g.r === "creditado" && g.jaLiberado)) {
       log("nada a creditar (já tinha vitalício)", base);
       return { status: 200, corpo: { ok: true, liberado: true, novo: false } };
@@ -289,7 +337,7 @@ export async function tratarStripe(deps: DepsStripe, req: { assinatura: string |
     // 1 de cada por PI (reserva em webhook_events) — roda no crédito E no "já creditado" (reenvio)
     let emailFalhou = false;
     if (emailConta && await reservar(admin, `stripe-email:${pi.id}`, "email") === "ok") {
-      const ok = await deps.enviarEmail(emailConta, assuntoVenda("lifetime"), htmlVenda({ email: emailConta, nome: null, periodo: "lifetime", fim: g.r === "creditado" ? g.fim : null, hoje: true })).catch(() => false);
+      const ok = await deps.enviarEmail(emailConta, assuntoVenda("lifetime"), htmlVenda({ email: emailConta, nome: null, periodo: "lifetime", fim: g.r === "creditado" ? g.fim : null, hoje: true, ...(deps.indiqueNoEmail && oferta.pagina === PAGINA_STRIPE ? { extra: blocoIndiqueEmail() } : {}) })).catch(() => false);
       if (!ok) { await soltar(admin, `stripe-email:${pi.id}`); emailFalhou = true; }
       log(ok ? "e-mail da compra enviado" : "e-mail da compra FALHOU", { para: mascararEmail(emailConta) });
     }

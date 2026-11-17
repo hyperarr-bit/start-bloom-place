@@ -122,6 +122,12 @@
         // QA: ?upoferta=on|off (fica: localStorage + cookie), ?upoferta=auto desfaz. Vira html[data-up-oferta="on"]. Rollback: "off".
         // Antes de ligar: deploy stripe-presente + stripe-criar + stripe-webhook (+ presente-resgatar). Ver RELATORIO-UPSELL.md.
         var UPSELL_OFERTA = "off"; // 17/11 (dono: "tira isso de dar o core de presente de tudo"): DESLIGADO (~50 viram, 0 pagaram). Antes: 15/11 ~19h50 (dono: "pode publicar aí msm sobe e acompanha a 1 compra"); rollback = "off"
+        // 23/11: INDIQUE E GANHE no pós-pago da /oferta, NO LUGAR do presente de 24,90 (src/landing/indique.ts). "off" = a /oferta de hoje,
+        // IDÊNTICA (nem o ?ref= é lido). "on" = depois do pago, a folha "Indique 2 amigas e seu CORE sai de graça" → "Quero meu link"
+        // (função afiliados, indique_link) → link + WhatsApp; o ?ref= da /oferta vai pro pedido (metadata[indicador] do PI). Com "on" o
+        // presente NÃO aparece (nem o cartão é salvo). QA: ?indique=on|off (fica: localStorage + cookie), ?indique=auto desfaz. Vira
+        // html[data-indique="on"]. Antes de ligar: migração 20261123120000 + deploy afiliados/stripe-criar/stripe-webhook + env INDIQUE_WEB=on.
+        var INDIQUE_OFERTA = "off";
         var CHECKOUT_ORG_V2 = "off"; // 08/11: checkout novo do /organizar (cara do checkout v2, o Pix do Asaas de hoje) construído e DESLIGADO — "on" = todo o /organizar, nos 2 braços do AB_LP (sem sorteio) · rollback "off"
         var STRIPE_PK = "pk_live_51TJnAQQdjmrIbUhHDSWqG1trOT6mFfV87AC4Vv47kFJTAFOhYsNmvryGRnf3x824Ke3mXSsWiFCovKPIR6Kqx0IX00VcuAawhC"; // a chave PUBLICÁVEL (pk_live_…); com "PREENCHER" = comportamento off
         var STRIPE_PRECO_CENTAVOS = 6790; // só pra exibir — o valor cobrado vem SEMPRE do servidor (stripe-criar)
@@ -242,6 +248,18 @@
             if (uo === "on" || uo === "off") mem.up_oferta_forcado = true;
             if (uo !== "on" && uo !== "off") uo = UPSELL_OFERTA === "on" ? "on" : "off";
             if (uo === "on") { d.setAttribute("data-up-oferta", "on"); mem.up_oferta = "on"; }
+            // 23/11: o indique e ganhe no lugar do presente (INDIQUE_OFERTA). ?indique=on|off força (localStorage + cookie), auto desfaz
+            var pig = pega("indique"), ckig = null;
+            try { var csig = String(document.cookie || "").split(";"); for (var iig = 0; iig < csig.length; iig++) { var jig = csig[iig].indexOf("="); if (jig > 0 && csig[iig].slice(0, jig).trim() === "landing_indique_force") ckig = csig[iig].slice(jig + 1).trim(); } } catch (eig0) {}
+            if (pig === "on" || pig === "off" || pig === "auto") {
+              try { if (pig === "auto") localStorage.removeItem("landing-indique-force"); else localStorage.setItem("landing-indique-force", pig); } catch (eig1) {}
+              try { document.cookie = "landing_indique_force=" + (pig === "auto" ? "; Max-Age=0" : pig + "; Max-Age=2592000") + "; Path=/; SameSite=Lax"; } catch (eig2) {}
+            }
+            var lig = null; try { lig = localStorage.getItem("landing-indique-force"); } catch (eig3) {}
+            var ig = (pig === "on" || pig === "off") ? pig : pig === "auto" ? null : (lig || ckig);
+            if (ig === "on" || ig === "off") mem.indique_forcado = true;
+            if (ig !== "on" && ig !== "off") ig = INDIQUE_OFERTA === "on" ? "on" : "off";
+            if (ig === "on") { d.setAttribute("data-indique", "on"); mem.indique = "on"; }
           }
         }
         // 11/11 (dono: "faz uma nova LP, vai ser só isso aí do print… quando clica no botão vai para o checkout"; "cria em uma nova, não substitui"):

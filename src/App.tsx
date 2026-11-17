@@ -603,6 +603,8 @@ const AdminUso = lazyPage(() => import("./pages/admin/AdminUso"));
 const AdminAfiliados = lazyPage(() => import("./pages/admin/AdminAfiliados"));
 // 09/10: o painel público da afiliada (/afiliado/<token>) — chunk próprio, ninguém do app passa por ele
 const Afiliado = lazyPage(() => import("./pages/Afiliado"));
+// 17/11: /indique (sem token) — "perdi meu link": o e-mail da compra recebe o painel
+const IndiqueRecuperar = lazyPage(() => import("./pages/IndiqueRecuperar"));
 
 const queryClient = new QueryClient();
 
@@ -850,6 +852,9 @@ const AnimatedRoutes = () => {
         <Route path="/hoje/demo" element={<SoNaWeb><RouteErrorBoundary routeName="funil-hoje"><FunilHoje /></RouteErrorBoundary></SoNaWeb>} />
         {/* 09/10: painel público da afiliada — o token na URL é a senha; sem login, sem dado de cliente */}
         <Route path="/afiliado/:token" element={<SoNaWeb><RouteErrorBoundary routeName="afiliado"><Afiliado /></RouteErrorBoundary></SoNaWeb>} />
+        {/* 23/11: o painel de quem indica pela web (indique e ganhe da /oferta) — a mesma página; a função devolve origem "comprador" */}
+        <Route path="/indique" element={<SoNaWeb><RouteErrorBoundary routeName="indique-recuperar"><IndiqueRecuperar /></RouteErrorBoundary></SoNaWeb>} />
+        <Route path="/indique/:token" element={<SoNaWeb><RouteErrorBoundary routeName="indique"><Afiliado /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/" element={<RootGate />} />
         {/* LP aposentada — o funil (/comecar) é a entrada. Redireciona links/ads antigos. */}
         <Route path="/lp" element={<FunilAposentado web={<Navigate to="/comecar" replace />} />} />

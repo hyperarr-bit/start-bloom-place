@@ -64,6 +64,9 @@ export type OpcoesCheckout = {
   /** 15/11 (UPSELL_OFERTA "on"): o presente de 24,90 no pós-pago. Só com isto o pedido leva `salvar_cartao` (o servidor salva o cartão
    *  pro 1 toque) e o pago chama `abrir` (a página do presente entra POR CIMA da tela de pago de sempre, que fica embaixo). Sem isto: nada muda. */
   presente?: { abrir: (c: CompraPaga) => void };
+  /** 23/11 (INDIQUE_OFERTA "on"): o indique e ganhe no pós-pago (no lugar do presente — quem chama nunca passa os dois). O pago chama
+   *  `abrir` (a folha sobe POR CIMA da tela de pago de sempre). Não muda nada no pedido. Sem isto: nada muda. */
+  indique?: { abrir: (c: CompraPaga) => void };
 };
 /** 15/11: a compra que acabou de pagar (pro presente): a ref e o PI são a prova pro servidor (a mesma do stripe-status) */
 export type CompraPaga = { ref: string; pi: string; metodo: string; email: string | null; cartao: { marca: string | null; final: string | null } | null };
@@ -846,6 +849,8 @@ function mostrarPago(metodo: string) {
   // 15/11 (UPSELL_OFERTA): o presente entra por cima; a tela de pago de sempre fica embaixo (é o "depois" dele). Nada aqui pode quebrar o pago.
   if (o.presente && est.pi) {
     try { o.presente.abrir({ ref: est.ref, pi: est.pi, metodo, email: est.email || null, cartao: metodo === "card" ? cartaoUsado : null }); } catch { /* fica o pago */ }
+  } else if (o.indique && est.pi) {
+    try { o.indique.abrir({ ref: est.ref, pi: est.pi, metodo, email: est.email || null, cartao: null }); } catch { /* fica o pago */ }
   }
 }
 /** 15/11: o Stripe.js desta camada (o 3DS do presente de 1 toque usa o MESMO) */

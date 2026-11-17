@@ -20,6 +20,10 @@ interface Props {
   dica?: ReactNode;
   /** 1.0.21: o número de figurinhas novas no álbum (as que entraram quietas), no ícone das Conquistas */
   seloConquistas?: ReactNode;
+  /** 17/11: o pontinho "novo" do indique e ganhe na aba Você (src/components/indique/AvisoNovoIndique; só o site) */
+  seloVoce?: ReactNode;
+  /** 17/11: o balão "Novo: Indique e ganhe" em cima da aba Você (1 vez só) */
+  balaoVoce?: ReactNode;
 }
 
 /** O balão da dica do "+": pequeno, sem borda, sombra mínima, na paleta suave da Home nova; a ponta aponta pro "+". */
@@ -64,7 +68,7 @@ const AbaVidro = ({ id, ativa, rotulo, onIr, children }: { id: AbaNova; ativa: A
   );
 };
 
-export const BarraVidro = ({ ativa, iniciais, onIr, onMais, rotulos, dica, seloConquistas }: Props) => {
+export const BarraVidro = ({ ativa, iniciais, onIr, onMais, rotulos, dica, seloConquistas, seloVoce, balaoVoce }: Props) => {
   const nome = { ...PADRAO, ...(rotulos ?? {}) };
   /* 26/10: a aba (AbaVidro) é um componente de FORA — antes era criada dentro da barra, e cada re-render da barra
      desmontava e remontava os botões (um re-render no meio do toque, como o da dica do "+" saindo, arriscava o clique) */
@@ -76,10 +80,14 @@ export const BarraVidro = ({ ativa, iniciais, onIr, onMais, rotulos, dica, seloC
       style={{ bottom: "max(10px, calc(var(--app-safe-bottom, 0px) - 6px))" }}
       data-testid="hn-barra"
     >
-      <nav aria-label="Navegação principal" className="he-vidro rounded-full flex-1 h-[60px] p-1.5 flex items-center">
+      {/* 17/11: a pílula ganhou uma caixa em volta (relative) só pra o balão do indique ficar FORA dela — o vidro tem overflow hidden */}
+      <div className="hn-barra-pilula relative flex-1 h-[60px] min-w-0">
+      {balaoVoce}
+      <nav aria-label="Navegação principal" className="he-vidro rounded-full w-full h-full p-1.5 flex items-center">
         <AbaVidro id="inicio" ativa={ativa} rotulo={nome.inicio} onIr={onIr}><Home className="w-[22px] h-[22px]" strokeWidth={ativa === "inicio" ? 2.2 : 1.75} aria-hidden /></AbaVidro>
         <AbaVidro id="conquistas" ativa={ativa} rotulo={nome.conquistas} onIr={onIr}><span className="relative inline-grid"><Trophy className="w-[22px] h-[22px]" strokeWidth={ativa === "conquistas" ? 2.2 : 1.75} aria-hidden />{seloConquistas}</span></AbaVidro>
         <AbaVidro id="voce" ativa={ativa} rotulo={nome.voce} onIr={onIr}>
+          <span className="relative inline-grid">
           <span
             className="w-[22px] h-[22px] rounded-full grid place-items-center text-[9.5px] font-bold leading-none"
             style={{ background: "hsl(var(--fixo-tinta) / 0.12)", color: ativa === "voce" ? "hsl(var(--fixo-tinta))" : "hsl(var(--fixo-tinta) / 0.75)" }}
@@ -87,8 +95,11 @@ export const BarraVidro = ({ ativa, iniciais, onIr, onMais, rotulos, dica, seloC
           >
             {iniciais}
           </span>
+          {seloVoce}
+          </span>
         </AbaVidro>
       </nav>
+      </div>
       <span className="relative shrink-0">
       {dica}
       <button

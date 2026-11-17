@@ -16,6 +16,8 @@ export interface LinhaPainel {
   comissao_cents: number;
   situacao: SituacaoLinha;
   pagamento_dia: string | null;
+  /** 23/11 (web): o dia em que a comissão libera (Pix +7, cartão +30) */
+  libera_dia?: string;
 }
 
 export interface PainelAfiliada {
@@ -36,6 +38,52 @@ export interface PainelAfiliada {
   linhas: LinhaPainel[];
 }
 
+/** 23/11: o painel de quem indica pela web (/indique/:token) — origem "comprador" na resposta da função */
+export interface PainelIndique {
+  origem: "comprador";
+  codigo: string;
+  link: string;
+  pausado: boolean;
+  dias_carencia: number;
+  comissao_cents: number;
+  preco_cents: number;
+  pix: { cadastrado: boolean; tipo: string | null; final: string | null };
+  usaram: number;
+  pagaram: number;
+  reembolsadas: number;
+  nao_pagaram: number;
+  a_receber_cents: number;
+  ja_recebido_cents: number;
+  segurado_cents: number;
+  proximo_pagamento: { dia: string; valor_cents: number };
+  linhas: LinhaPainel[];
+}
+
+export const PAINEL_INDIQUE_EXEMPLO: PainelIndique = {
+  origem: "comprador",
+  codigo: "ANA7K2",
+  link: "https://www.coreaplicativo.com.br/oferta?ref=ANA7K2",
+  pausado: false,
+  dias_carencia: 7,
+  comissao_cents: 3395,
+  preco_cents: 6790,
+  pix: { cadastrado: true, tipo: "PHONE", final: "•••4321" },
+  usaram: 4,
+  pagaram: 3,
+  reembolsadas: 1,
+  nao_pagaram: 0,
+  a_receber_cents: 6790,
+  ja_recebido_cents: 3395,
+  segurado_cents: 0,
+  proximo_pagamento: { dia: "2026-11-30", valor_cents: 6790 },
+  linhas: [
+    { dia: "2026-11-20", comissao_cents: 3395, situacao: "prevista", pagamento_dia: "2026-11-30" },
+    { dia: "2026-11-19", comissao_cents: 3395, situacao: "prevista", pagamento_dia: "2026-11-30" },
+    { dia: "2026-11-12", comissao_cents: 3395, situacao: "paga", pagamento_dia: "2026-11-23" },
+    { dia: "2026-11-10", comissao_cents: 0, situacao: "reembolsada", pagamento_dia: null },
+  ],
+};
+
 /* ---------------------------------------------------------------- admin */
 
 export interface AfiliadaAdmin {
@@ -52,11 +100,13 @@ export interface AfiliadaAdmin {
   criado_em: string;
   link_painel: string;
   link_resgate: string;
+  /** 23/11: "comprador" = indique e ganhe da web (link /oferta?ref=); "influencer" = código da App Store (09/10) */
+  origem?: "influencer" | "comprador";
 }
 export interface VendaAdmin {
   id: string;
   afiliado_id: string;
-  plataforma: "ios" | "android";
+  plataforma: "ios" | "android" | "web";
   produto: string;
   valor_bruto_cents: number | null;
   valor_liquido_cents: number | null;
@@ -134,6 +184,12 @@ export const ROTULO_STATUS_PAGAMENTO: Record<PagamentoAdmin["status"], string> =
 };
 export const ROTULO_MOTIVO: Record<string, string> = {
   cartao_recusado: "cartão recusado", nao_pagou: "teste acabou sem pagar", cancelou_no_teste: "cancelou no teste", reembolso: "reembolso",
+  // 23/11: indique e ganhe da web
+  autoindicacao_email: "autoindicação (mesmo e-mail)", autoindicacao_conta: "autoindicação (mesma conta)", autoindicacao_aparelho: "autoindicação (mesmo aparelho)",
+  autoindicacao_cpf: "autoindicação (mesmo CPF)", autoindicacao_pix: "autoindicação (chave Pix = e-mail da compra)", ja_era_cliente: "já tinha o CORE",
+  reembolso_depois_do_pix: "reembolso DEPOIS do Pix (o próximo Pix do link desconta)", reembolso_descontado: "reembolso DEPOIS do Pix (já descontado)",
+  reembolso_parcial: "devolução parcial (comissão cancelada)", divida_reembolso: "segurado: devolução depois do Pix maior que a semana", desconto_reembolso: "com desconto de devolução",
+  revisar_autoindicacao: "revisar: mesmo aparelho ou IP", primeiro_pix: "1º Pix do link (aprovar)",
 };
 
 /* ---------------------------------------------------------------- exemplo (dev + testes) */

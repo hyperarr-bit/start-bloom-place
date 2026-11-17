@@ -6,6 +6,7 @@
  */
 import { OFERTAS_STRIPE, ofertaDaPagina, type OfertaStripe } from "./stripe-ofertas.ts";
 import { cpfValido, soDigitosCpf } from "./cpf.ts";
+import { normalizarCodigo } from "./afiliados.ts";
 
 export type PedidoStripe = {
   ref: string; pi: string | null; email: string | null; fbp: string | null; fbc: string | null; fbclid: string | null; url: string | null;
@@ -37,6 +38,10 @@ export function validarPedidoStripe(body: unknown): PedidoStripe | null {
   const a = (b.atrib && typeof b.atrib === "object" ? b.atrib : {}) as Record<string, unknown>;
   const atrib: Record<string, string> = {};
   for (const k of ATRIB) { const v = t(a[k], 200); if (v) atrib[k] = v; }
+  // 23/11 (INDIQUE_OFERTA, só /oferta): o código de quem indicou (?ref= da página, último clique) → metadata[indicador] do PI.
+  // Só letras/números maiúsculos (o formato de afiliados.codigo); qualquer outra coisa é descartada.
+  const ind = typeof a.indicador === "string" ? normalizarCodigo(a.indicador.slice(0, 64)) : null;
+  if (ind && b.pagina !== "lp27" && b.pagina !== "app_web") atrib.indicador = ind;
   return {
     ref, pi: pi && /^pi_[A-Za-z0-9]+$/.test(pi) ? pi : null, email: email && EMAIL_OK.test(email) ? email : null,
     fbp: t(b.fbp, 120), fbc: t(b.fbc, 400), fbclid: t(b.fbclid, 300), url: url && SITES.some((s) => url.startsWith(s)) ? url : null,

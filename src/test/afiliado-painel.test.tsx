@@ -7,7 +7,7 @@
  * conhece. E o link inválido dá uma tela honesta, não um spinner eterno.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { PAINEL_EXEMPLO, textoSituacao, type DadosAdminAfiliados } from "@/lib/afiliados";
 
@@ -17,7 +17,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import Afiliado, { PainelAfiliadaVista } from "@/pages/Afiliado";
-import { AdminAfiliadosVista, type AcoesAdminAfiliados } from "@/pages/admin/AdminAfiliados";
+import { AdminAfiliadosVista, resumoPagarSemana, type AcoesAdminAfiliados } from "@/pages/admin/AdminAfiliados";
 
 const TOKEN = "a".repeat(43);
 const renderRota = (token: string) =>
@@ -90,6 +90,34 @@ describe("AdminAfiliadosVista", () => {
     expect(screen.getByRole("button", { name: /Liberar Pix/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Pausar pagamentos/ })).toBeInTheDocument();
     expect(within(screen.getByTestId("vendas")).getByText("R$ 40,15")).toBeInTheDocument();
+  });
+  it("críticas 17/11 r2: 'Pagar a semana agora' (plano B do cron) pede confirmação e mostra o resultado", async () => {
+    const pagarSemanaAgora = vi.fn().mockResolvedValue("1 Pix enviado(s) (R$ 33,95) · 0 segurado(s) pra você aprovar (R$ 0,00).");
+    const confirmar = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    render(<AdminAfiliadosVista dados={dados} loading={false} erro={null} acoes={{ ...acoes, pagarSemanaAgora }} />);
+    const botao = screen.getByRole("button", { name: /Pagar a semana agora/ });
+    fireEvent.click(botao);
+    expect(pagarSemanaAgora).not.toHaveBeenCalled(); // recusou a confirmação → nada sai
+    fireEvent.click(botao);
+    await waitFor(() => expect(screen.getByTestId("pagou-semana")).toHaveTextContent("1 Pix enviado(s)"));
+    expect(pagarSemanaAgora).toHaveBeenCalledTimes(1);
+    confirmar.mockRestore();
+  });
+  it("sem a ação, o botão não aparece", () => {
+    render(<AdminAfiliadosVista dados={dados} loading={false} erro={null} acoes={acoes} />);
+    expect(screen.queryByRole("button", { name: /Pagar a semana agora/ })).toBeNull();
+  });
+  it("resumoPagarSemana: conta enviados, segurados, falhas e sem Pix", () => {
+    expect(resumoPagarSemana({ planos: [], presos_em_enviando: [] })).toMatch(/Nada pra pagar/);
+    const t = resumoPagarSemana({ planos: [
+      { decisao: "enviado", valor_cents: 3395 }, { decisao: "segurado", valor_cents: 6790 },
+      { decisao: "falhou", valor_cents: 100 }, { decisao: "sem_pix", valor_cents: 3395 },
+    ] });
+    const n = t.replace(/\u00a0/g, " "); // reais() usa espaço fino do Intl
+    expect(n).toContain("1 Pix enviado(s) (R$ 33,95)");
+    expect(n).toContain("1 segurado(s) pra você aprovar (R$ 67,90)");
+    expect(t).toContain("1 falhou");
+    expect(t).toContain("1 sem chave Pix");
   });
   it("formulário de nova afiliada abre com os campos pedidos", () => {
     render(<AdminAfiliadosVista dados={dados} loading={false} erro={null} acoes={acoes} abrirFormInicial />);

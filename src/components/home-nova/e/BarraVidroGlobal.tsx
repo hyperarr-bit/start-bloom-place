@@ -15,6 +15,7 @@ import { enxutoDaContaNovaNoSite, fluxoEnxutoLigado } from "@/lib/fluxo-enxuto";
 import { CHAVE_DICA_MAIS, ESPERA_DICA_MAIS_MS, dicaDoMaisDevida, dicaDoMaisEncerrada, encerrarDicaMais, registrarAparicaoDicaMais } from "@/lib/dica-mais";
 import { EVENTO_MISSAO_DOSES, lerMissao } from "@/lib/missao-doses";
 import { iniciaisDe } from "../HomeNova";
+import { BalaoNaAbaVoce, PontoNovoIndique, useAvisoNovoIndique } from "@/components/indique/AvisoNovoIndique";
 import type { AbaNova } from "../BarraFlutuante";
 import "../home-nova.css";
 import "./home-e.css";
@@ -173,6 +174,10 @@ export function BarraVidroGlobal() {
     return () => { document.removeEventListener("pointerdown", aoTocar, true); document.removeEventListener("click", aoClicar, true); window.clearTimeout(tirar); };
   }, [dicaNaTela, set]);
 
+  /* 17/11 (indique e ganhe, só o site): o "Novo" de 1 vez só — balão em cima da aba Você (só na Início, sem a dica do "+" na
+     tela) e o pontinho na aba até ela ver a linha (src/components/indique/AvisoNovoIndique) */
+  const indique = useAvisoNovoIndique("aba", !!visivel && aba === "inicio" && !dicaNaTela);
+
   if (!visivel || !aba) return null;
 
   const ir = (para: AbaNova) => {
@@ -203,7 +208,9 @@ export function BarraVidroGlobal() {
   const nome = nomeDaHome(get) || user?.email?.split("@")[0] || "";
   return (
     <div className="hn he he-so-vars" data-testid="barra-vidro-global">
-      <BarraVidro ativa={aba} iniciais={iniciaisDe(nome)} onIr={ir} onMais={mais} dica={dicaNaTela && dicaCandidata ? <DicaDoMais /> : null} seloConquistas={fluxoEnxutoLigado() && aba !== "conquistas" ? <SeloDasNovas /> : null} />
+      <BarraVidro ativa={aba} iniciais={iniciaisDe(nome)} onIr={ir} onMais={mais} dica={dicaNaTela && dicaCandidata ? <DicaDoMais /> : null} seloConquistas={fluxoEnxutoLigado() && aba !== "conquistas" ? <SeloDasNovas /> : null}
+        seloVoce={indique.ponto && aba !== "voce" ? <PontoNovoIndique className="-top-0.5 -right-1" /> : null}
+        balaoVoce={indique.balao && aba === "inicio" ? <BalaoNaAbaVoce onToque={() => { indique.usar(); ir("voce"); }} /> : null} />
     </div>
   );
 }

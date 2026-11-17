@@ -218,6 +218,72 @@ describe("payment_intent.succeeded", () => {
   });
 });
 
+/* ───────── 23/11: indique e ganhe — a venda indicada (metadata.indicador) e o estorno ───────── */
+describe("indique e ganhe no webhook", () => {
+  const comIndique = () => {
+    const m = montar();
+    const reg: Array<{ indicador: string; venda: Record<string, unknown> }> = [];
+    const canc: string[] = [];
+    let falhar = false;
+    let resultadoCancelar: Record<string, unknown> = { venda: "cancelada", pausou: false };
+    m.deps.indique = {
+      registrar: async (indicador, venda) => { if (falhar) throw new Error("banco caiu"); reg.push({ indicador, venda: venda as unknown as Record<string, unknown> }); return { r: "gravada" }; },
+      cancelar: async (p, o) => { canc.push(o?.parcial ? `${p}:parcial` : p); return resultadoCancelar; },
+    };
+    return { m, reg, canc, falhar: () => { falhar = true; }, cancelarDevolve: (r: Record<string, unknown>) => { resultadoCancelar = r; } };
+  };
+  it("venda com metadata.indicador → registra 1× com PI, valor, e-mail, conta e aparelho (cliente novo)", async () => {
+    const { m, reg } = comIndique();
+    const r = await mandar(m, evento("payment_intent.succeeded", pi({ metadata: { indicador: "ANA7K2", aparelho: "dev_bia_456" } })));
+    expect(r.corpo).toMatchObject({ liberado: true, novo: true });
+    expect(reg).toHaveLength(1);
+    expect(reg[0]).toMatchObject({ indicador: "ANA7K2", venda: { pi: "pi_3Abc", valorCents: 6790, email: "maria@exemplo.com", aparelho: "dev_bia_456", jaEraCliente: false } });
+    expect(reg[0].venda.userId).toBeTruthy();
+    expect(reg[0].venda).toMatchObject({ metodo: "card", ip: "200.1.2.3" }); // cartão → carência de 30 dias; IP pra trava "revisar"
+  });
+  it("sem indicador → nada; sem a env (deps.indique ausente) → o webhook de hoje", async () => {
+    const { m, reg } = comIndique();
+    await mandar(m, evento("payment_intent.succeeded", pi()));
+    expect(reg).toHaveLength(0);
+    const m2 = montar();
+    expect((await mandar(m2, evento("payment_intent.succeeded", pi({ metadata: { indicador: "ANA7K2" } })))).corpo).toMatchObject({ liberado: true, novo: true });
+  });
+  it("falha ao gravar a comissão NÃO segura a compra: acesso + e-mail saem, e o dono recebe alarme 1×", async () => {
+    const { m, falhar } = comIndique();
+    falhar();
+    const r = await mandar(m, evento("payment_intent.succeeded", pi({ metadata: { indicador: "ANA7K2" } })));
+    expect(r.status).toBe(200);
+    expect(m.saida.emails).toHaveLength(1);
+    expect(m.saida.push.filter((p) => p.titulo.includes("Indique"))).toHaveLength(1);
+  });
+  it("estorno total e contestação → cancela a comissão daquele PI; PARCIAL também cancela (críticas 17/11), sem cortar o acesso", async () => {
+    const { m, canc } = comIndique();
+    await mandar(m, evento("payment_intent.succeeded", pi({ metadata: { indicador: "ANA7K2" } })));
+    expect((await mandar(m, evento("charge.refunded", { id: "ch_1", payment_intent: "pi_3Abc", refunded: false, amount_refunded: 3395 }))).corpo).toMatchObject({ ignorado: "parcial" });
+    expect(canc).toEqual(["pi_3Abc:parcial"]);
+    expect(m.db.subscriptions.find((x) => x.abacatepay_billing_id === "pi_3Abc")!.status).toBe("active"); // o acesso fica
+    await mandar(m, evento("charge.refunded", { id: "ch_1", payment_intent: "pi_3Abc", refunded: true }));
+    await mandar(m, evento("charge.dispute.created", { id: "dp_1", payment_intent: "pi_3Abc" }));
+    expect(canc).toEqual(["pi_3Abc:parcial", "pi_3Abc", "pi_3Abc"]);
+  });
+  it("devolução DEPOIS do Pix da comissão → push pro dono 1× (antes: só ia pro log)", async () => {
+    const { m, cancelarDevolve } = comIndique();
+    await mandar(m, evento("payment_intent.succeeded", pi({ metadata: { indicador: "ANA7K2" } })));
+    cancelarDevolve({ venda: "ja_paga", pausou: false, comissao_cents: 3395 });
+    await mandar(m, evento("charge.refunded", { id: "ch_1", payment_intent: "pi_3Abc", refunded: true }));
+    await mandar(m, evento("charge.dispute.created", { id: "dp_1", payment_intent: "pi_3Abc" }));
+    const avisos = m.saida.push.filter((p) => p.titulo.includes("DEPOIS do Pix"));
+    expect(avisos).toHaveLength(1);
+  });
+  it("comissão que não gravou: o alarme guarda o indicador (o Pix de segunda tenta de novo; o /admin reprocessa pelo PI)", async () => {
+    const { m, falhar } = comIndique();
+    falhar();
+    await mandar(m, evento("payment_intent.succeeded", pi({ metadata: { indicador: "ANA7K2" } })));
+    const ev = (m.db.analytics_events ?? []).find((x) => x.event_name === "indique_falhou");
+    expect(ev?.event_data).toMatchObject({ pi: "pi_3Abc", onde: "venda", indicador: "ANA7K2" });
+  });
+});
+
 describe("estorno / chargeback", () => {
   it("charge.refunded (total) desliga só a linha do PI; parcial não desliga", async () => {
     const m = montar();

@@ -121,7 +121,9 @@ describe("a divisão 50/50 do /inicio (index.html)", () => {
     expect(new URL(volta, "https://x.br").searchParams.get("ld")).toBe("1");
   });
   it("a demo dentro da landing não conta PageView do pixel", () => {
-    expect(INDEX).toMatch(/if \(location\.pathname !== '\/organizar\/demo'\) \{\s*fbq\('init'/);
+    // críticas 17/11: a mesma regra agora também pula o painel de quem indica (/indique, /afiliado — o token na URL é a senha);
+    // o comportamento por rota é testado em pixels-fora-do-app.test.ts
+    expect(INDEX).toContain("if (!/^\\/(organizar\\/demo|indique|afiliado)(\\/|$)/.test(location.pathname)) {\n      fbq('init'");
   });
 });
 

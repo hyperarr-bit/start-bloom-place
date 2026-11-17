@@ -28,6 +28,7 @@ import { useEscolhaDaHome } from "@/hooks/use-escolha-da-home";
 import { PainelEscolhaDaHome } from "@/components/home-nova/EscolhaDaHome";
 import type { EscolhaDaHome } from "@/lib/home-nova";
 import { AvisoPresente } from "@/presente/AvisoPresente";
+import { EntradaIndique } from "@/components/indique/EntradaIndique";
 
 /* ───────────── 1.0.18: o MENU NOVO (lib/menu-novo) — 3 grupos, no desenho v1-menu ───────────── */
 
@@ -619,6 +620,8 @@ function MenuNovo({ isGuest, nome, email, iniciais, acoes, rotuloHome }: { isGue
       {/* 31/10: o aviso do presente (src/presente/AvisoPresente; chave PRESENTE_AVISO, off) — a página Você do site com a Home
           clássica é ESTE menu do avatar; 1 linha fechável logo abaixo da conta/plano. Nunca na Home. */}
       {!isGuest && <AvisoPresente estilo="menu" />}
+      {/* 17/11: a entrada do indique e ganhe (src/components/indique/EntradaIndique; chave INDIQUE_ENTRADA, off) — só o site */}
+      {!isGuest && <EntradaIndique estilo="menu" />}
 
       {/* (2) o app */}
       <section aria-label="App" data-testid="menu-grupo-app">

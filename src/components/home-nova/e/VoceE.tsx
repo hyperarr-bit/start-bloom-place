@@ -31,6 +31,8 @@ interface Props {
   onVersaoCincoToques?: () => void;
   /** 31/10: o aviso do presente (src/presente/AvisoPresente) — logo abaixo da conta; null/undefined = nada */
   aviso?: ReactNode;
+  /** 17/11: a entrada do indique e ganhe (src/components/indique/EntradaIndique; só o site) — logo abaixo do aviso */
+  indique?: ReactNode;
   children?: ReactNode;
 }
 
@@ -48,7 +50,7 @@ const Linha = ({ item }: { item: ItemVoce }) => (
   </li>
 );
 
-export function VoceE({ nome, email, iniciais, secoes, onConta, onSair, onAvaliar, versao, onVersaoCincoToques, aviso, children }: Props) {
+export function VoceE({ nome, email, iniciais, secoes, onConta, onSair, onAvaliar, versao, onVersaoCincoToques, aviso, indique, children }: Props) {
   useFundoDaTelaE(); // adendo 26/10: a faixa do relógio e a casca na cor da E
   const toques = useRef<number[]>([]);
   const tocarVersao = () => {
@@ -75,6 +77,7 @@ export function VoceE({ nome, email, iniciais, secoes, onConta, onSair, onAvalia
 
         {/* 31/10: o aviso do presente (src/presente/AvisoPresente) — logo abaixo da conta, nunca na Home */}
         {aviso}
+        {indique}
 
         {onAvaliar && (
           <button type="button" onClick={onAvaliar} data-testid="voce-avaliar" data-track="voce:avaliar" className="hn-card mt-3 w-full flex items-center gap-3.5 px-4 py-3.5 text-left active:scale-[0.99] transition-transform">

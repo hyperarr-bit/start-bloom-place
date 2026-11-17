@@ -20,9 +20,25 @@ import {
  *   · libera um pagamento SEGURADO (acima do limite) ou tenta de novo um que FALHOU
  *   · copia o link do painel dela e o link de resgate
  *   · "Prévia da segunda": roda o pagar_semana em ENSAIO (nada sai)
+ *   · "Pagar a semana agora" (críticas 17/11 r2): roda o pagar_semana DE VERDADE, com confirmação — é o plano B
+ *     quando o cron não está ligado. Rodar 2 vezes não paga 2 vezes: a venda paga sai da fila (pagamento_id) na 1ª.
  */
 
 /** "acima_do_limite_30000" → "acima do limite de R$ 300,00" */
+/** Resumo em português do pagar_semana de verdade (pro botão "Pagar a semana agora"). */
+export function resumoPagarSemana(r: { planos?: Array<Record<string, unknown>>; presos_em_enviando?: unknown[] }): string {
+  const planos = r.planos ?? [];
+  if (!planos.length && !(r.presos_em_enviando ?? []).length) return "Nada pra pagar agora: nenhuma comissão madura.";
+  const soma = (d: string) => planos.filter((p) => p.decisao === d);
+  const total = (l: Array<Record<string, unknown>>) => reais(l.reduce((t, p) => t + Number(p.valor_cents ?? 0), 0));
+  const enviados = soma("enviado"), segurados = soma("segurado"), falhou = planos.filter((p) => p.decisao === "falhou" || p.decisao === "erro"), semPix = soma("sem_pix");
+  const partes = [`${enviados.length} Pix enviado(s) (${total(enviados)})`, `${segurados.length} segurado(s) pra você aprovar (${total(segurados)})`];
+  if (falhou.length) partes.push(`${falhou.length} falhou (veja o motivo na afiliada)`);
+  if (semPix.length) partes.push(`${semPix.length} sem chave Pix (espera)`);
+  if ((r.presos_em_enviando ?? []).length) partes.push(`${(r.presos_em_enviando ?? []).length} preso(s) em enviando`);
+  return partes.join(" · ") + ".";
+}
+
 const textoMotivoPagamento = (m: string) => {
   const lim = m.match(/^acima_do_limite_(\d+)$/);
   return lim ? `acima do limite de ${reais(Number(lim[1]))}` : m.replace(/_/g, " ");
@@ -48,6 +64,35 @@ export interface AcoesAdminAfiliados {
   liberar: (pagamentoId: string) => Promise<string | null>;
   novoToken: (id: string) => Promise<string | null>;
   previaSemana: () => Promise<Array<Record<string, unknown>> | string>;
+  /** críticas 17/11 r2: plano B do cron — pagar_semana sem ensaio. Devolve o texto do resultado. */
+  pagarSemanaAgora?: () => Promise<string>;
+  /** críticas 17/11: comissão de indicação que não gravou (alarme) — lança de novo pelo PI da Stripe. Devolve o texto do resultado. */
+  reprocessar?: (pi: string) => Promise<string>;
+}
+
+const RESULTADO_REPROCESSAR: Record<string, string> = {
+  gravada: "Comissão gravada.", ja: "Essa venda já tinha comissão gravada (nada mudou).", estornada: "Gravada e já cancelada: a compra foi estornada.",
+  sem_indicador: "Essa compra não veio por link de indicação.", codigo_desconhecido: "O código do link não existe (ou não é de quem comprou).",
+  nao_pago: "Esse pagamento não está pago na Stripe.", outra_pagina: "Essa compra não é da /oferta.", sem_pi: "Não consegui ler esse PI na Stripe.",
+  sem_linha_da_compra: "A compra não tem linha no banco (o webhook ignorou ou a conta já tinha o CORE). Confira à mão.",
+};
+export const textoReprocessar = (r: string) => RESULTADO_REPROCESSAR[r] ?? r;
+
+function ReprocessarIndique({ reprocessar }: { reprocessar: (pi: string) => Promise<string> }) {
+  const [pi, setPi] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+  return (
+    <Panel title="Indique e ganhe: reprocessar comissão" sub="Quando chegar o alerta 'comissão NÃO gravou'. Cole o PI (pi_…) da compra. Rodar de novo não paga 2 vezes.">
+      <div className="flex items-center gap-2 flex-wrap">
+        <input value={pi} onChange={(e) => setPi(e.target.value.trim())} placeholder="pi_..." className="h-9 rounded-lg border border-border px-3 text-[13px] w-64" data-testid="reprocessar-pi" />
+        <Botao onClick={async () => { setOcupado(true); setMsg(await reprocessar(pi)); setOcupado(false); }} disabled={ocupado || !/^pi_[A-Za-z0-9]+$/.test(pi)}>
+          {ocupado ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Reprocessar
+        </Botao>
+        {msg && <span className="text-[12.5px]" data-testid="reprocessar-msg">{msg}</span>}
+      </div>
+    </Panel>
+  );
 }
 
 const FORM_VAZIO: NovaAfiliada = { nome: "", codigo: "", email: "", pix_chave: "", pix_tipo: "CPF", limite_semanal_cents: 50000 };
@@ -84,6 +129,7 @@ export function AdminAfiliadosVista({ dados, loading, erro, acoes, abrirFormInic
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [previa, setPrevia] = useState<Array<Record<string, unknown>> | null>(null);
+  const [pagou, setPagou] = useState<string | null>(null);
 
   const afiliados = dados?.afiliados ?? [];
   const porAfiliado = useMemo(() => {
@@ -214,6 +260,8 @@ export function AdminAfiliadosVista({ dados, loading, erro, acoes, abrirFormInic
                       </div>
                       <div className="text-[11.5px] text-muted-foreground mt-0.5 flex items-center gap-2">
                         <span>{r.usaram} usaram · {r.pagaram} pagaram · {reais(r.aReceber)} a pagar</span>
+                        {a.origem === "comprador" && <span className="px-1.5 py-0.5 rounded bg-pink-100 text-pink-700 dark:bg-pink-950/50 dark:text-pink-300 font-bold" title="Indique e ganhe da web (comprador da /oferta)">web</span>}
+                        {a.origem === "comprador" && a.pix_chave === "****" && <span className="px-1.5 py-0.5 rounded bg-muted font-bold">sem Pix</span>}
                         {a.pausado && <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 font-bold">pausada</span>}
                         {r.segurado > 0 && <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 font-bold">segurado</span>}
                       </div>
@@ -310,13 +358,25 @@ export function AdminAfiliadosVista({ dados, loading, erro, acoes, abrirFormInic
               </>
             )}
 
-            <Panel title="Prévia da segunda" sub="Roda a conta do Pix semanal em ENSAIO: mostra quem receberia quanto, sem mandar nada.">
+            <Panel title="Pix da segunda" sub="Prévia: roda a conta em ENSAIO, sem mandar nada. Pagar a semana agora: o mesmo, de verdade (plano B se o cron não estiver ligado).">
               <div className="flex items-center gap-3 flex-wrap">
                 <Botao onClick={async () => { setOcupado("previa"); const r = await acoes.previaSemana(); setOcupado(null); if (typeof r === "string") setAviso(r); else setPrevia(r); }} disabled={ocupado === "previa"}>
                   {ocupado === "previa" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Calcular prévia
                 </Botao>
+                {acoes.pagarSemanaAgora && (
+                  <Botao tom="forte" title="Plano B do cron: manda os Pix da semana agora" disabled={ocupado === "pagar-semana"}
+                    onClick={async () => {
+                      if (!window.confirm("Pagar a semana AGORA? Os Pix saem de verdade pelo Asaas (os 1ºs de cada link ficam segurados pra você aprovar). Rode a prévia antes.")) return;
+                      setOcupado("pagar-semana"); setPagou(null);
+                      const t = await acoes.pagarSemanaAgora!();
+                      setOcupado(null); setPagou(t);
+                    }}>
+                    {ocupado === "pagar-semana" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Pagar a semana agora
+                  </Botao>
+                )}
                 {previa && previa.length === 0 && <span className="text-[12.5px] text-muted-foreground">Nenhuma comissão madura (7+ dias) pra pagar agora.</span>}
               </div>
+              {pagou && <p className="mt-3 text-[13px]" data-testid="pagou-semana">{pagou}</p>}
               {previa && previa.length > 0 && (
                 <ul className="mt-3 divide-y divide-border text-[13px]" data-testid="previa">
                   {previa.map((p, i) => (
@@ -324,12 +384,13 @@ export function AdminAfiliadosVista({ dados, loading, erro, acoes, abrirFormInic
                       <span className="font-bold tracking-wider">{String(p.codigo)}</span>
                       <span className="tabular-nums font-semibold">{reais(Number(p.valor_cents ?? 0))}</span>
                       <span className="text-muted-foreground">{String(p.vendas)} venda(s)</span>
-                      <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${p.decisao === "pagar" ? COR_PAGAMENTO.enviado : COR_PAGAMENTO.segurado}`}>{p.decisao === "pagar" ? "vai pagar" : p.decisao === "segurar" ? "vai SEGURAR (acima do limite)" : "pausada"}</span>
+                      <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${p.decisao === "pagar" ? COR_PAGAMENTO.enviado : COR_PAGAMENTO.segurado}`}>{p.decisao === "pagar" ? "vai pagar" : p.decisao === "segurar" ? `vai SEGURAR${p.motivo ? ` (${ROTULO_MOTIVO[String(p.motivo)] ?? String(p.motivo)})` : ""}` : "pausada"}</span>
                     </li>
                   ))}
                 </ul>
               )}
             </Panel>
+            {acoes.reprocessar && <ReprocessarIndique reprocessar={acoes.reprocessar} />}
           </div>
         </div>
       )}
@@ -372,7 +433,9 @@ export default function AdminAfiliados() {
     pausar: async (id, pausado) => { const r = await chamar({ action: "pausar", id, pausado }); if (r.error) return traduzir(r.error); await recarregar(); return null; },
     liberar: async (id) => { const r = await chamar({ action: "liberar_pagamento", id }); await recarregar(); if (r.error) return traduzir(r.error); if (r.status === "falhou") return `O Asaas recusou: ${String(r.erro ?? "")}`; return null; },
     novoToken: async (id) => { const r = await chamar({ action: "novo_token", id }); if (r.error) return traduzir(r.error); await recarregar(); return null; },
+    pagarSemanaAgora: async () => { const r = await chamar({ action: "pagar_semana", ensaio: false }); await recarregar(); if (r.error) return traduzir(r.error); return resumoPagarSemana(r as Parameters<typeof resumoPagarSemana>[0]); },
     previaSemana: async () => { const r = await chamar({ action: "pagar_semana", ensaio: true }); if (r.error) return traduzir(r.error); return (r.planos as Array<Record<string, unknown>>) ?? []; },
+    reprocessar: async (pi) => { const r = await chamar({ action: "indique_reprocessar", pi }); if (r.error) return traduzir(r.error); await recarregar(); return textoReprocessar(String(r.r ?? "")); },
   }), [recarregar]);
 
   return <AdminAfiliadosVista dados={dados} loading={loading} erro={erro} acoes={acoes} />;

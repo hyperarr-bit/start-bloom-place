@@ -16,6 +16,7 @@ import { acharConta } from "../_shared/destino-hoje.ts";
 import { fetchNosPixels } from "../_shared/meta-pixels.ts";
 import { chavesVapidDoAmbiente, mandarParaTodos } from "../_shared/push-dono.ts";
 import { dadosPush } from "../_shared/aviso-venda.ts";
+import { cancelarIndicacaoWeb, registrarIndicacaoWeb, type VendaWeb } from "../_shared/indique.ts";
 
 const log = (passo: string, d?: Record<string, unknown>) => console.log(`[STRIPE-WEBHOOK] ${passo}${d ? ` - ${JSON.stringify(d)}` : ""}`);
 const json = (b: Record<string, unknown>, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { "Content-Type": "application/json" } });
@@ -47,8 +48,8 @@ serve(async (req) => {
       if (!sk) return null;
       const res = await fetch(`https://api.stripe.com/v1/charges/${ch}`, { headers: { Authorization: `Bearer ${sk}` } });
       if (!res.ok) return null;
-      const j = await res.json() as { billing_details?: { email?: string | null }; payment_method_details?: { type?: string; card?: { installments?: { plan?: { count?: number } | null } | null } } };
-      return { metodo: j.payment_method_details?.type ?? null, parcelas: j.payment_method_details?.card?.installments?.plan?.count ?? (j.payment_method_details?.type === "card" ? 1 : null), email: j.billing_details?.email ?? null };
+      const j = await res.json() as { billing_details?: { email?: string | null }; payment_method_details?: { type?: string; card?: { fingerprint?: string | null; installments?: { plan?: { count?: number } | null } | null } } };
+      return { metodo: j.payment_method_details?.type ?? null, parcelas: j.payment_method_details?.card?.installments?.plan?.count ?? (j.payment_method_details?.type === "card" ? 1 : null), email: j.billing_details?.email ?? null, cartaoFp: j.payment_method_details?.card?.fingerprint ?? null };
     },
     // 14/11 (mensal do /funil-app): a metadata da assinatura quando a fatura não traz (versões da API)
     buscarAssinatura: async (sub) => {
@@ -85,6 +86,16 @@ serve(async (req) => {
         : await fetch(`https://api.stripe.com/v1/subscriptions/${sub}`, { method: "POST", headers: h, body: "cancel_at_period_end=true" });
       return r.ok;
     },
+    // 23/11 (indique e ganhe, _shared/indique.ts): sem a migração 20261123120000 aplicada, o insert falharia → 500 e a Stripe
+    // reenviaria a venda. Por isso só liga com a env INDIQUE_WEB=on (setar DEPOIS da migração). Sem ela = o webhook de hoje.
+    ...(Deno.env.get("INDIQUE_WEB") === "on" ? {
+      indique: {
+        registrar: (indicador: string, venda: VendaWeb) => registrarIndicacaoWeb(admin, indicador, venda, new Date()),
+        cancelar: (pi: string, opts?: { parcial?: boolean }) => cancelarIndicacaoWeb(admin, pi, opts),
+      },
+    } : {}),
+    // 17/11: o bloco "Indique e ganhe" no e-mail de acesso da /oferta (as 2 envs; sem elas, o e-mail de hoje)
+    indiqueNoEmail: Deno.env.get("INDIQUE_WEB") === "on" && Deno.env.get("INDIQUE_EMAIL") === "on",
     log,
   }, { assinatura: req.headers.get("stripe-signature"), corpo });
   return json(r.corpo, r.status);

@@ -34,7 +34,7 @@ const semSorteio = (a: Record<string, string>) => { const { "data-pix": _p, "dat
 const semChave = cabeca.replace(/\s*\/\/ 15\/11: o presente de 24,90 no pós-pago \(UPSELL_OFERTA\)[\s\S]*?\n          \}\n/, "\n");
 
 describe("o <head>: UPSELL_OFERTA", () => {
-  it("no código: on (ligada 15/11, rollback = \"off\")", () => { expect(HTML_REAL).toMatch(/var UPSELL_OFERTA = "on";/); });
+  it("no código: off (17/11, dono tirou o presente; era on desde 15/11)", () => { expect(HTML_REAL).toMatch(/var UPSELL_OFERTA = "off";/); });
   it("off = a /oferta de hoje: os MESMOS atributos e a MESMA memória de antes da chave existir", () => {
     expect(semChave).not.toBe(cabeca);
     for (const url of ["/oferta", "/oferta?utm_content=c7", "/vitalicio", "/organizar", "/simples"]) {

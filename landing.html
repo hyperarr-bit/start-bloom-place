@@ -86,7 +86,7 @@
         var AB_PIX = "on"; // 03/11 00h (dono 02/11: "vou testar o A/B à meia-noite"): 50/50 enxuta (atual) × recibo (b). 02/11: braço "b" da TELA DO PIX = "Recibo da marca" (conceito 3 + juízes; novidades-guardadas/2026-11-02/pix-b). "off" = todo mundo no atual (COMO ESTÁ) · "on" = 50/50 estável por aparelho (bit próprio, independente do AB_LP/AB_CHECKOUT) · "b" = todo mundo no b. QA: ?pix=atual|b força (localStorage + cookie), ?pix=auto desfaz. Rollback: "off"
         var PIX_MOTIVO = "off"; // 02/11: no braço b, a pergunta de 1 toque "O que te travou?" quando a pessoa volta do banco sem pagar (chips). "on" liga; ?pixmotivo=on|off|auto
         var UPSELL_POS = "presente"; // 01/11 tarde (dono: "muda pra aquele outro up"): LIGADO o presente "Leve alguém junto" R$ 14,90 no pós-pago no lugar do 2027 (2027: 89 viram, 1 pagou). Rollback: "2027"
-        var UPSELL_2027 = "on"; // 31/10 ~18h (dono: "pode subir", sem compra de teste): LIGADO — "Seu 2027" R$ 19,90 no pós-pago, nos dois braços (rollback: "off")
+        var UPSELL_2027 = "off"; // 17/11 (dono: "tira isso de dar o core de presente de tudo"): DESLIGADO o pós-pago das outras páginas (era o presente R$ 14,90 via UPSELL_POS). Antes: 31/10 ~18h (dono: "pode subir", sem compra de teste): LIGADO — "Seu 2027" R$ 19,90 no pós-pago, nos dois braços (rollback: "off")
         // 04/11 (dono): /vida — a v3 num LINK PRÓPRIO pagando pela Hotmart. "off" = /vida com o Pix próprio de R$ 27,90 (fallback);
         // "on" = checkout Hotmart. O /organizar NÃO lê nada disto. Rollback: "off". Ver src/landing/hotmart.ts.
         var CHECKOUT_HOTMART = "on";
@@ -121,7 +121,7 @@
         // Stripe e, depois do pago, cartão = "Sim, adicionar" cobra 24,90 no mesmo cartão (1 toque); Pix = um Pix novo de 24,90 (Stripe).
         // QA: ?upoferta=on|off (fica: localStorage + cookie), ?upoferta=auto desfaz. Vira html[data-up-oferta="on"]. Rollback: "off".
         // Antes de ligar: deploy stripe-presente + stripe-criar + stripe-webhook (+ presente-resgatar). Ver RELATORIO-UPSELL.md.
-        var UPSELL_OFERTA = "on"; // 15/11 ~19h50 (dono: "pode publicar aí msm sobe e acompanha a 1 compra"); rollback = "off"
+        var UPSELL_OFERTA = "off"; // 17/11 (dono: "tira isso de dar o core de presente de tudo"): DESLIGADO (~50 viram, 0 pagaram). Antes: 15/11 ~19h50 (dono: "pode publicar aí msm sobe e acompanha a 1 compra"); rollback = "off"
         var CHECKOUT_ORG_V2 = "off"; // 08/11: checkout novo do /organizar (cara do checkout v2, o Pix do Asaas de hoje) construído e DESLIGADO — "on" = todo o /organizar, nos 2 braços do AB_LP (sem sorteio) · rollback "off"
         var STRIPE_PK = "pk_live_51TJnAQQdjmrIbUhHDSWqG1trOT6mFfV87AC4Vv47kFJTAFOhYsNmvryGRnf3x824Ke3mXSsWiFCovKPIR6Kqx0IX00VcuAawhC"; // a chave PUBLICÁVEL (pk_live_…); com "PREENCHER" = comportamento off
         var STRIPE_PRECO_CENTAVOS = 6790; // só pra exibir — o valor cobrado vem SEMPRE do servidor (stripe-criar)

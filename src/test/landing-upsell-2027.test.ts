@@ -126,8 +126,8 @@ describe("a chave no <head> do landing.html (UPSELL_2027, padrão off)", () => {
     );
     return { attrs, store, cookie, mem: win.__landing as Record<string, unknown> };
   }
-  it("31/10 ~18h LIGADO no código; desligado (rollback), nem o atributo existe (o braço atual fica igual)", () => {
-    expect(HTML).toMatch(/var UPSELL_2027 = "on";/);
+  it("17/11 DESLIGADO no código (dono tirou o presente); desligado, nem o atributo existe (o braço atual fica igual)", () => {
+    expect(HTML).toMatch(/var UPSELL_2027 = "off";/);
     const r = rodar("/organizar");
     expect(r.attrs["data-u2027"]).toBeUndefined();
     expect(r.mem).toMatchObject({ u2027: "off", ab_u2027: "off", u2027_forcado: false });

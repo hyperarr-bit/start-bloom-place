@@ -52,8 +52,12 @@ describe("/indique (perdi meu link)", () => {
 });
 
 describe("entrada no menu Você", () => {
-  it("só no site: iPhone e Android da loja nunca, nem forçando; chave off por padrão", () => {
-    expect(entradaIndiqueAqui({ plataforma: "web" })).toBe(false); // INDIQUE_ENTRADA = "off"
+  it("só no site: iPhone e Android da loja nunca, nem forçando; chave LIGADA no site (17/11), off desliga", () => {
+    expect(entradaIndiqueAqui({ plataforma: "web", forca: null })).toBe(true); // INDIQUE_ENTRADA = "web" (ligada na subida)
+    expect(entradaIndiqueAqui({ plataforma: "web", forca: null, modo: "off" })).toBe(false); // rollback "off"
+    expect(entradaIndiqueAqui({ plataforma: "web", forca: "off" })).toBe(false);
+    expect(entradaIndiqueAqui({ plataforma: "ios", forca: null })).toBe(false);
+    expect(entradaIndiqueAqui({ plataforma: "android", forca: null })).toBe(false);
     expect(entradaIndiqueAqui({ plataforma: "web", forca: "on" })).toBe(true);
     expect(entradaIndiqueAqui({ plataforma: "ios", forca: "on" })).toBe(false);
     expect(entradaIndiqueAqui({ plataforma: "android", forca: "on", modo: "web" })).toBe(false);

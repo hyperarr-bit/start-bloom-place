@@ -154,7 +154,8 @@ describe("a linha na Você do site", () => {
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(screen.queryByTestId("entrada-indique")).toBeNull();
   });
-  it("chave desligada (padrão): nem consulta", async () => {
+  it("chave desligada (?indique-entrada=off no aparelho, o mesmo efeito do rollback \"off\"): nem consulta", async () => {
+    localStorage.setItem("indique-entrada-force", "off");
     subsDaConta.data = pagante;
     render(<MemoryRouter><EntradaIndique estilo="menu" /></MemoryRouter>);
     await act(async () => { await Promise.resolve(); });

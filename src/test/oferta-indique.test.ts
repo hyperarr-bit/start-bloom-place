@@ -26,14 +26,22 @@ function rodar(fonte: string, url: string, store: Record<string, string> = {}) {
   return { attrs, mem: (window.__landing ?? {}) as Record<string, unknown> };
 }
 const semSorteio = (a: Record<string, string>) => { const { "data-pix": _p, "data-vida": _v, "data-lp": _l, "data-otp": _o, ...r } = a; return r; };
-const semChave = cabeca.replace(/\s*\/\/ 23\/11: o indique e ganhe no lugar do presente \(INDIQUE_OFERTA\)[\s\S]*?mem\.indique = "on"; \}\n/, "\n");
+// 17/11 (subida): a chave LIGADA no código. Os testes de "off" forçam a chave por aqui, sem depender do padrão do arquivo.
+const cabecaOff = cabeca.replace(/var INDIQUE_OFERTA = "(on|off)"/, 'var INDIQUE_OFERTA = "off"');
+const semChave = cabecaOff.replace(/\s*\/\/ 23\/11: o indique e ganhe no lugar do presente \(INDIQUE_OFERTA\)[\s\S]*?mem\.indique = "on"; \}\n/, "\n");
 
 describe("o <head>: INDIQUE_OFERTA", () => {
-  it('no código: "off" (nada vai pro ar ligado)', () => { expect(HTML).toMatch(/var INDIQUE_OFERTA = "off";/); });
+  it('no código: "on" (ligada na subida de 17/11; rollback = "off")', () => { expect(HTML).toMatch(/var INDIQUE_OFERTA = "on";/); });
+  it('ligada: a /oferta abre com o indique; ?indique=off desliga no aparelho; /vitalicio e /organizar nunca', () => {
+    expect(rodar(cabeca, "/oferta", {}).mem.indique).toBe("on");
+    expect(rodar(cabeca, "/oferta?indique=off", {}).mem.indique).toBeUndefined();
+    expect(rodar(cabeca, "/vitalicio", {}).mem.indique).toBeUndefined();
+    expect(rodar(cabeca, "/organizar", {}).mem.indique).toBeUndefined();
+  });
   it("off = a /oferta de hoje: os MESMOS atributos e a MESMA memória de antes da chave existir", () => {
     expect(semChave).not.toBe(cabeca);
     for (const url of ["/oferta", "/oferta?ref=ANA7K2", "/oferta?utm_content=c7", "/vitalicio", "/organizar", "/simples"]) {
-      const hoje = rodar(semChave, url), agora = rodar(cabeca, url);
+      const hoje = rodar(semChave, url), agora = rodar(cabecaOff, url);
       expect(semSorteio(agora.attrs)).toEqual(semSorteio(hoje.attrs));
       const { otp: _a, pix: _c, ...ma } = agora.mem; const { otp: _b, pix: _d, ...mb } = hoje.mem;
       expect(ma).toEqual(mb);
@@ -42,12 +50,12 @@ describe("o <head>: INDIQUE_OFERTA", () => {
   });
   it("?indique=on liga só na /oferta (fica no aparelho); auto desfaz; /vitalicio e /organizar nunca", () => {
     const store: Record<string, string> = {};
-    expect(rodar(cabeca, "/oferta?indique=on", store).mem).toMatchObject({ indique: "on", indique_forcado: true });
-    expect(rodar(cabeca, "/oferta", store).mem.indique).toBe("on");
-    expect(rodar(cabeca, "/oferta?indique=auto", store).mem.indique).toBeUndefined();
-    expect(rodar(cabeca, "/vitalicio?indique=on", {}).mem.indique).toBeUndefined();
-    expect(rodar(cabeca, "/organizar?indique=on", {}).mem.indique).toBeUndefined();
-    expect(rodar(cabeca.replace('var INDIQUE_OFERTA = "off"', 'var INDIQUE_OFERTA = "on"'), "/oferta", {}).mem.indique).toBe("on");
+    expect(rodar(cabecaOff, "/oferta?indique=on", store).mem).toMatchObject({ indique: "on", indique_forcado: true });
+    expect(rodar(cabecaOff, "/oferta", store).mem.indique).toBe("on");
+    expect(rodar(cabecaOff, "/oferta?indique=auto", store).mem.indique).toBeUndefined();
+    expect(rodar(cabecaOff, "/vitalicio?indique=on", {}).mem.indique).toBeUndefined();
+    expect(rodar(cabecaOff, "/organizar?indique=on", {}).mem.indique).toBeUndefined();
+    expect(rodar(cabecaOff.replace('var INDIQUE_OFERTA = "off"', 'var INDIQUE_OFERTA = "on"'), "/oferta", {}).mem.indique).toBe("on");
   });
 });
 

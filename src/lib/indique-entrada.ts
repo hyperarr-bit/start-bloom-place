@@ -19,7 +19,7 @@ import { plataformaApp, type PlataformaApp } from "@/lib/native-shell";
 import { ehPagante, type LinhaAssinatura } from "../../supabase/functions/_shared/indique";
 
 export type ModoEntradaIndique = "off" | "web";
-export const INDIQUE_ENTRADA: ModoEntradaIndique = "off";
+export const INDIQUE_ENTRADA: ModoEntradaIndique = "web";
 export const TEXTO_ENTRADA_INDIQUE = "Indique e ganhe";
 const CHAVE_FORCA = "indique-entrada-force";
 

@@ -16,7 +16,8 @@ const raiz = resolve(__dirname, "../..");
 // 15/11 ~19h50: a chave foi LIGADA no landing.html (dono). Os testes de comportamento rodam a página com a chave "off"
 // (o mesmo HTML com a linha trocada) e ligam por ?upoferta=on / troca explícita, como antes; o 1º teste confere o arquivo real.
 const HTML_REAL = readFileSync(resolve(raiz, "landing.html"), "utf8");
-const HTML = HTML_REAL.replace(/var UPSELL_OFERTA = "on";[^\n]*/, 'var UPSELL_OFERTA = "off";');
+// 17/11: com o INDIQUE_OFERTA ligado o presente fica de fora na /oferta; este teste é do presente, então força o indique "off"
+const HTML = HTML_REAL.replace(/var UPSELL_OFERTA = "on";[^\n]*/, 'var UPSELL_OFERTA = "off";').replace(/var INDIQUE_OFERTA = "(on|off)";/, 'var INDIQUE_OFERTA = "off";');
 const cabeca = HTML.match(/<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
 
 function rodar(fonte: string, url: string, store: Record<string, string> = {}) {

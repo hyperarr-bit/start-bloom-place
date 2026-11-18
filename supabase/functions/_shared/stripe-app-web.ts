@@ -33,6 +33,14 @@ export type Familia = { vitalicio: OfertaStripe; mensal: MensalStripe; prefixo: 
 export const FAMILIA_APP_WEB: Familia = { vitalicio: OFERTAS_STRIPE.app_web, mensal: MENSAL_APP_WEB, prefixo: "appweb", retorno: "https://www.coreaplicativo.com.br/funil-app?step=offer" };
 export const FAMILIA_PLANOS: Familia = { vitalicio: OFERTAS_STRIPE.planos, mensal: MENSAL_PLANOS, prefixo: "planos", retorno: "https://www.coreaplicativo.com.br/escolha" };
 export const familiaDaPagina = (pagina: string): Familia | null => (pagina === "app_web" ? FAMILIA_APP_WEB : pagina === "planos" ? FAMILIA_PLANOS : null);
+/**
+ * 18/11 (revisão /escolha): a TRAVA do servidor. Toda cobrança da família "planos" (vitalício 97,90 da /escolha, mensal 34,90 no
+ * cartão ou no Pix) responde 503 enquanto a env PLANOS_SERVIDOR não for exatamente "on" no Supabase — mesmo que a página seja
+ * ligada (ou chamada direto). A /oferta, o lp27 e o /funil-app nunca passam por aqui. O webhook não é travado.
+ */
+export const ENV_PLANOS_SERVIDOR = "PLANOS_SERVIDOR";
+export const planosTravadoNoServidor = (pagina: string, env: string | null | undefined): boolean =>
+  familiaDaPagina(pagina) === FAMILIA_PLANOS && env !== "on";
 
 export type DepsAppWeb = {
   admin: ClienteMin; stripe: ChamarStripe; log: (m: string, d?: Record<string, unknown>) => void;

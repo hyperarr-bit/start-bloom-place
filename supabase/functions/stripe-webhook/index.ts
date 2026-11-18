@@ -10,7 +10,8 @@
  */
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { tratarStripe } from "../_shared/stripe.ts";
+import { leitoresFaturaStripe, tratarStripe } from "../_shared/stripe.ts";
+import { API_PIX_AUTOMATICO } from "../_shared/stripe-ofertas.ts";
 import type { AdminHotmart } from "../_shared/hotmart.ts";
 import { acharConta } from "../_shared/destino-hoje.ts";
 import { fetchNosPixels } from "../_shared/meta-pixels.ts";
@@ -76,6 +77,15 @@ serve(async (req) => {
       const j = await r.json() as { subscription?: string | { id?: string } | null };
       return typeof j.subscription === "string" ? j.subscription : j.subscription?.id ?? null;
     },
+    // 18/11 (revisão /escolha): o PI da fatura paga (comissão do mensal) e a fatura de um PI (estorno), nas 2 formas da API
+    ...leitoresFaturaStripe(async (caminho, versao) => {
+      const sk = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
+      if (!sk) return null;
+      const r = await fetch(`https://api.stripe.com/v1/${caminho}`, { headers: { Authorization: `Bearer ${sk}`, "Stripe-Version": versao } });
+      if (r.status === 404) return null;
+      if (!r.ok) throw new Error(`stripe_${r.status}`);
+      return await r.json() as Record<string, unknown>;
+    }, API_PIX_AUTOMATICO),
     // 14/11 (revisão): cancelar a assinatura na Stripe (estorno = já; mensal em dobro / comprou o vitalício = no fim do período)
     cancelarAssinatura: async (sub, imediato) => {
       const sk = Deno.env.get("STRIPE_SECRET_KEY") ?? "";

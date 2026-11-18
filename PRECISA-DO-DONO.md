@@ -77,9 +77,11 @@ Adicionar no **mesmo** endpoint (se ainda não estiverem lá por causa do /funil
    - `supabase functions deploy afiliados` (o link de indicação passa a aceitar a compra do vitalício da /escolha)
 
    Depois do deploy, conferir que a /oferta segue vendendo normal: na 1ª venda, olhar o log do webhook.
+
+   **Trava do servidor (`PLANOS_SERVIDOR`):** depois do deploy, toda cobrança da /escolha (vitalício 97,90, mensal 34,90 no cartão ou no Pix) responde **503** enquanto a env não estiver ligada, mesmo com a página ligada ou com alguém chamando a função direto. A /oferta, o /funil-app e o webhook não passam pela trava.
 3. **Sem migração:** nenhuma tabela nova. O mensal usa a linha de `subscriptions` de sempre e a comissão usa `afiliado_vendas`.
 4. **Site** (merge do ramo, com as 2 chaves `off`): `/escolha` existe, mas vai para a `/oferta`.
-5. **Ligar a página:** `PLANOS_PAGINA = "on"` (1 commit). Antes de anunciar, **1 compra real de cada**, com reembolso depois:
+5. **Ligar a página:** primeiro `supabase secrets set PLANOS_SERVIDOR=on` (sem isso as compras de teste dão 503), depois `PLANOS_PAGINA = "on"` (1 commit). Antes de anunciar, **1 compra real de cada**, com reembolso depois:
    - vitalício no Pix;
    - vitalício no cartão em **12x**: confere se o seu banco cobrou juros e qual o valor real da parcela (a tela mostra 12x de R$ 8,16, o total dividido por 12, arredondado para cima);
    - mensal no cartão.
@@ -96,7 +98,9 @@ Adicionar no **mesmo** endpoint (se ainda não estiverem lá por causa do /funil
    - `PLANOS_PIX_MENSAL = "on"` (1 commit);
    - 1 assinatura real no Pix, conferindo que o banco pediu a autorização do débito mensal.
 
-**Rollback:** `PLANOS_PAGINA = "off"` (a página volta a mandar para a /oferta) ou `PLANOS_PIX_MENSAL = "off"`. As funções novas não mudam a /oferta.
+**Rollback:** `PLANOS_PAGINA = "off"` (a página volta a mandar para a /oferta) ou `PLANOS_PIX_MENSAL = "off"`. Pelo servidor, sem commit: `supabase secrets unset PLANOS_SERVIDOR` (toda cobrança nova da /escolha vira 503 na hora; quem já assinou continua sendo atendido pelo webhook). As funções novas não mudam a /oferta.
+
+**Estorno do mensal com indicação:** a comissão é gravada com o PI que pagou a 2ª fatura (o webhook busca na Stripe; por isso a chave restrita precisa de leitura em Invoices, já listada no 1.2). Se a Stripe falhar nessa hora, a comissão sai com o id da fatura (`in_…`), e o estorno também procura por ele. Se o estorno não conseguir ler a Stripe, chega o push "estorno NÃO cancelou a comissão": confira no /admin/afiliados.
 
 ## 4. Decisões que ficaram com você
 - **Carência de 7 dias no mensal que não pagou.** Hoje o app (`check-subscription`) dá 7 dias além do fim do período para quem está `active` ou `past_due`. Mantive o mesmo mecanismo, como pedido.

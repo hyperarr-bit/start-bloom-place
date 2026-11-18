@@ -15,6 +15,10 @@ import { metadataDoPedido, respostaStatus, validarPedidoStripe, type ChamarStrip
 import { assinarAppWeb, assinarPixPlanos, cartaoAppWeb, FAMILIA_APP_WEB, FAMILIA_PLANOS, familiaDaPagina, piDaFatura, pixAppWeb, validarAcaoAppWeb, type DepsAppWeb } from "../../supabase/functions/_shared/stripe-app-web";
 import { COMISSAO_FIXA_PLANOS_CENTS, MENSAL_PLANOS, OFERTAS_STRIPE, mensalDaPagina } from "../../supabase/functions/_shared/stripe-ofertas";
 import { decidirIndicacao, compraValeLink } from "../../supabase/functions/_shared/indique";
+import { leitoresFaturaStripe } from "../../supabase/functions/_shared/stripe";
+import { planosTravadoNoServidor } from "../../supabase/functions/_shared/stripe-app-web";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 type Linha = Record<string, unknown>;
 const WHSEC = "whsec_teste123";
@@ -419,5 +423,128 @@ describe("indique: comissão fixa e o link do comprador da /escolha", () => {
     expect(compraValeLink({ id: "pi_1", status: "succeeded", metadata: { ref: REF, pagina: "planos" } }, REF)).toBe(true);
     expect(compraValeLink({ id: "pi_1", status: "succeeded", metadata: { ref: REF, pagina: "planos_mensal" } }, REF)).toBe(false);
     expect(compraValeLink({ id: "pi_1", status: "succeeded", metadata: { ref: REF } }, REF)).toBe(true);
+  });
+});
+
+/* ───────── revisão 18/11: comissão do mensal no estorno (API nova) e a trava PLANOS_SERVIDOR ───────── */
+describe("revisão: comissão do mensal cai no estorno do 2º pagamento em diante", () => {
+  const fatura2SemPi = () => fatura({ id: "in_2", billing_reason: "subscription_cycle", payment_intent: null, payments: undefined }, META, P2);
+  const reembolso = (o: Linha = {}) => ({ id: "ch_r2", object: "charge", payment_intent: "pi_f2", refunded: true, amount_refunded: 3490, ...o });
+  async function renovado(m: ReturnType<typeof montarWebhook>) {
+    m.db.users.set("u_anon", { id: "u_anon", email: null });
+    m.stripeAgora.subs.set("sub_1", { id: "sub_1", status: "active", metadata: META });
+    await mandar(m, evento("invoice.paid", fatura()));
+    await mandar(m, evento("invoice.paid", fatura2SemPi()));
+  }
+  it("invoice.paid da API nova (payment_intent null, sem payments): a comissão é gravada com o PI REAL buscado na fatura", async () => {
+    const m = montarWebhook();
+    const pedidas: string[] = [];
+    m.deps.piDaFaturaPaga = async (inv) => { pedidas.push(inv); return "pi_f2"; };
+    await renovado(m);
+    expect(pedidas).toEqual(["in_2"]);
+    expect(m.saida.indicacoes).toHaveLength(1);
+    expect(m.saida.indicacoes[0].venda).toMatchObject({ pi: "pi_f2", comissaoFixaCents: 3395 });
+  });
+  it("sem conseguir o PI (Stripe falhou) → a comissão sai com o id da fatura e a renovação NÃO é segurada", async () => {
+    const m = montarWebhook();
+    m.deps.piDaFaturaPaga = async () => { throw new Error("stripe_500"); };
+    await renovado(m);
+    expect(m.saida.indicacoes[0].venda).toMatchObject({ pi: "in_2" });
+    expect(m.db.subscriptions[0]).toMatchObject({ status: "active", current_period_end: iso(P2.end) });
+  });
+  it("charge.refunded do PI: nada achado pelo PI → acha a fatura do pagamento e cancela pela fatura também (+ marca de estorno da fatura)", async () => {
+    const m = montarWebhook();
+    const cancelados: string[] = [];
+    m.deps.indique!.cancelar = async (chave) => { cancelados.push(chave); return { venda: chave === "in_2" ? "cancelada" : "nenhuma" }; };
+    m.deps.faturaDoPagamento = async (pi) => (pi === "pi_f2" ? "in_2" : null);
+    await mandar(m, evento("charge.refunded", reembolso()));
+    expect(cancelados).toEqual(["pi_f2", "in_2"]);
+    expect(m.db.webhook_events.has("stripe-estorno:in_2")).toBe(true);
+  });
+  it("a cobrança já traz o invoice (API antiga) → cancela pela fatura sem ler a Stripe", async () => {
+    const m = montarWebhook();
+    const cancelados: string[] = [];
+    let leu = 0;
+    m.deps.indique!.cancelar = async (chave) => { cancelados.push(chave); return { venda: "nenhuma" }; };
+    m.deps.faturaDoPagamento = async () => { leu++; return "in_outra"; };
+    await mandar(m, evento("charge.refunded", reembolso({ invoice: "in_2" })));
+    expect(cancelados).toEqual(["pi_f2", "in_2"]);
+    expect(leu).toBe(0);
+  });
+  it("estorno PARCIAL também cobre a fatura (parcial: true nas 2)", async () => {
+    const m = montarWebhook();
+    const chamadas: Array<[string, unknown]> = [];
+    m.deps.indique!.cancelar = async (chave, o) => { chamadas.push([chave, o]); return { venda: "nenhuma" }; };
+    m.deps.faturaDoPagamento = async () => "in_2";
+    await mandar(m, evento("charge.refunded", reembolso({ refunded: false, amount_refunded: 1000 })));
+    expect(chamadas).toEqual([["pi_f2", { parcial: true }], ["in_2", { parcial: true }]]);
+  });
+  it("comissão achada pelo PI (o vitalício / a /oferta) → não procura fatura nenhuma", async () => {
+    const m = montarWebhook();
+    const cancelados: string[] = [];
+    let leu = 0;
+    m.deps.indique!.cancelar = async (chave) => { cancelados.push(chave); return { venda: "cancelada" }; };
+    m.deps.faturaDoPagamento = async () => { leu++; return "in_x"; };
+    await mandar(m, evento("charge.refunded", reembolso({ payment_intent: "pi_vit1", amount_refunded: 9790 })));
+    expect(cancelados).toEqual(["pi_vit1"]);
+    expect(leu).toBe(0);
+  });
+  it("PI sem fatura (venda avulsa sem indicação) → só o cancelamento pelo PI; Stripe fora do ar na busca → alarme pro dono", async () => {
+    const m = montarWebhook();
+    const cancelados: string[] = [];
+    m.deps.indique!.cancelar = async (chave) => { cancelados.push(chave); return { venda: "nenhuma" }; };
+    m.deps.faturaDoPagamento = async () => null;
+    await mandar(m, evento("charge.refunded", reembolso({ payment_intent: "pi_avulso" })));
+    expect(cancelados).toEqual(["pi_avulso"]);
+    const m2 = montarWebhook();
+    m2.deps.indique!.cancelar = async () => ({ venda: "nenhuma" });
+    m2.deps.faturaDoPagamento = async () => { throw new Error("stripe_500"); };
+    await mandar(m2, evento("charge.refunded", reembolso()));
+    expect(m2.saida.push.some((t) => /estorno NÃO cancelou/.test(t))).toBe(true);
+  });
+  it("leitoresFaturaStripe: PI da fatura (formato novo e antigo) e fatura do PI (invoice_payments → payment_intents antigo)", async () => {
+    const pedidos: Array<[string, string]> = [];
+    const respostas: Record<string, Record<string, unknown> | null | "erro"> = {
+      "invoices/in_novo?expand[]=payments": { id: "in_novo", payment_intent: null, payments: { data: [{ payment: { type: "payment_intent", payment_intent: "pi_n" } }] } },
+      "invoices/in_velho?expand[]=payments": { id: "in_velho", payment_intent: "pi_v" },
+      "invoice_payments?payment[type]=payment_intent&payment[payment_intent]=pi_n&limit=1": { data: [{ invoice: "in_novo" }] },
+      "invoice_payments?payment[type]=payment_intent&payment[payment_intent]=pi_v&limit=1": "erro",
+      "payment_intents/pi_v": { id: "pi_v", invoice: "in_velho" },
+      "invoice_payments?payment[type]=payment_intent&payment[payment_intent]=pi_avulso&limit=1": { data: [] },
+      "payment_intents/pi_avulso": { id: "pi_avulso", invoice: null },
+    };
+    const l = leitoresFaturaStripe(async (c, v) => { pedidos.push([c, v]); const r = respostas[c]; if (r === "erro") throw new Error("400"); return r ?? null; }, "2026-10-28.endive");
+    expect(await l.piDaFaturaPaga("in_novo")).toBe("pi_n");
+    expect(await l.piDaFaturaPaga("in_velho")).toBe("pi_v");
+    expect(await l.piDaFaturaPaga("nada")).toBeNull();
+    expect(await l.faturaDoPagamento("pi_n")).toBe("in_novo");
+    expect(await l.faturaDoPagamento("pi_v")).toBe("in_velho");
+    expect(await l.faturaDoPagamento("pi_avulso")).toBeNull();
+    expect(pedidos.find(([c]) => c.startsWith("invoices/"))![1]).toBe("2026-10-28.endive");
+    expect(pedidos.find(([c]) => c === "payment_intents/pi_v")![1]).toBe("2024-06-20");
+  });
+});
+
+describe("revisão: trava PLANOS_SERVIDOR no servidor", () => {
+  it("família planos só cobra com PLANOS_SERVIDOR=on; /oferta, lp27 e /funil-app nunca travam", () => {
+    const pagina = (b: string | undefined) => validarPedidoStripe({ ref: REF, ...(b ? { pagina: b } : {}) })!.pagina;
+    for (const env of [undefined, null, "", "off", "ON", "true", " on"]) expect(planosTravadoNoServidor(pagina("planos"), env)).toBe(true);
+    expect(planosTravadoNoServidor(pagina("planos"), "on")).toBe(false);
+    for (const env of [undefined, "off", "on"]) {
+      expect(planosTravadoNoServidor(pagina(undefined), env)).toBe(false);
+      expect(planosTravadoNoServidor(pagina("oferta"), env)).toBe(false);
+      expect(planosTravadoNoServidor(pagina("lp27"), env)).toBe(false);
+      expect(planosTravadoNoServidor(pagina("app_web"), env)).toBe(false);
+    }
+  });
+  it("stripe-criar responde 503 ANTES de qualquer ação/Stripe; o webhook não conhece a trava", () => {
+    const criar = readFileSync(resolve(__dirname, "../../supabase/functions/stripe-criar/index.ts"), "utf8");
+    const trava = criar.indexOf("planosTravadoNoServidor(p.pagina, Deno.env.get(ENV_PLANOS_SERVIDOR))");
+    expect(trava).toBeGreaterThan(0);
+    expect(criar.slice(trava, trava + 250)).toMatch(/503/);
+    expect(trava).toBeLessThan(criar.indexOf("familiaDaPagina(p.pagina)"));
+    expect(trava).toBeLessThan(criar.indexOf("createClient("));
+    const webhook = readFileSync(resolve(__dirname, "../../supabase/functions/stripe-webhook/index.ts"), "utf8");
+    expect(webhook).not.toMatch(/PLANOS_SERVIDOR|planosTravado/);
   });
 });

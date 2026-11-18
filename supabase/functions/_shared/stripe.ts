@@ -100,6 +100,12 @@ export type DepsStripe = {
   assinaturaDoPagamento?: (pi: string, invoice: string | null) => Promise<string | null>;
   /** 14/11: cancela a assinatura na Stripe (imediato = já; senão no fim do período). true = a Stripe confirmou */
   cancelarAssinatura?: (subId: string, imediato: boolean) => Promise<boolean>;
+  /** 18/11 (revisão /escolha): o PI que pagou a fatura in_… (a API nova manda invoice.payment_intent = null no webhook; o PI fica em
+   *  invoice.payments, que só vem expandido). null = não achou. Ver leitoresFaturaStripe. */
+  piDaFaturaPaga?: (invoiceId: string) => Promise<string | null>;
+  /** 18/11 (revisão /escolha): a fatura in_… de um PI (estorno do mensal: a comissão pode ter sido gravada com o id da fatura).
+   *  null = o PI não é de fatura. Lança se a Stripe não respondeu. Ver leitoresFaturaStripe. */
+  faturaDoPagamento?: (pi: string) => Promise<string | null>;
   /** 23/11 (indique e ganhe, ./indique.ts): grava a venda indicada (metadata.indicador) e cancela no estorno. Erro → lança (500, a Stripe reenvia) */
   indique?: {
     registrar: (indicador: string, venda: VendaWeb) => Promise<unknown>;
@@ -154,14 +160,56 @@ async function alarmeIndique(deps: DepsStripe, pi: string, onde: "venda" | "esto
   await deps.avisarDono(`⚠️ Indique e ganhe: ${onde === "venda" ? "comissão NÃO gravou" : "estorno NÃO cancelou a comissão"}`, `PI ${pi} · ${onde === "venda" ? "o Pix de segunda tenta de novo; ou /admin/afiliados → Reprocessar" : "confira no /admin/afiliados"}`, `stripe-indique:${onde}:${pi}`).catch(() => {});
 }
 /** estorno (inteiro ou parcial) → a comissão cai; se o Pix dela JÁ saiu, push pro dono (o próximo Pix do link desconta) */
-async function cancelarIndique(deps: DepsStripe, pi: string, parcial: boolean): Promise<void> {
+async function cancelarIndique(deps: DepsStripe, pi: string, parcial: boolean, invoiceDoCharge: string | null = null): Promise<void> {
   try {
     const ci = await deps.indique!.cancelar(pi, parcial ? { parcial: true } : undefined) as { venda?: string; comissao_cents?: number } | null;
     deps.log("indique — estorno", { pi, parcial, ...(ci && typeof ci === "object" ? ci as Record<string, unknown> : {}) });
     if (ci?.venda === "ja_paga" && await reservar(deps.admin, `stripe-indique-ja-paga:${pi}`, "alarme") === "ok") {
       await deps.avisarDono("⚠️ Indique e ganhe: devolução DEPOIS do Pix da comissão", `PI ${pi} · ${reais(Number(ci.comissao_cents ?? 0))} já pagos · o próximo Pix desse link desconta (ou segura, se não cobrir)`, `stripe-indique-ja-paga:${pi}`).catch(() => {});
     }
+    // 18/11 (revisão /escolha): a comissão do MENSAL pode ter sido gravada com o id da FATURA (in_…) — webhook na API nova sem o PI
+    // na fatura. Nada achado pelo PI → acha a fatura do pagamento e cancela por ela também. A venda avulsa (/oferta) é achada pelo PI
+    // e nunca chega aqui com comissão; sem comissão, é 1 leitura a mais na Stripe (o PI não tem fatura → para).
+    if (ci && typeof ci === "object" && ci.venda !== "nenhuma") return;
+    const inv = invoiceDoCharge && /^in_/.test(invoiceDoCharge) ? invoiceDoCharge : deps.faturaDoPagamento ? await deps.faturaDoPagamento(pi) : null;
+    if (!inv) return;
+    // a marca segura uma comissão gravada DEPOIS deste estorno com o id da fatura (registrarIndicacaoWeb confere stripe-estorno:<chave>)
+    await reservar(deps.admin, `stripe-estorno:${inv}`, "estorno");
+    const cf = await deps.indique!.cancelar(inv, parcial ? { parcial: true } : undefined) as { venda?: string; comissao_cents?: number } | null;
+    deps.log("indique — estorno pela fatura", { pi, fatura: inv, parcial, ...(cf && typeof cf === "object" ? cf as Record<string, unknown> : {}) });
+    if (cf?.venda === "ja_paga" && await reservar(deps.admin, `stripe-indique-ja-paga:${inv}`, "alarme") === "ok") {
+      await deps.avisarDono("⚠️ Indique e ganhe: devolução DEPOIS do Pix da comissão", `Fatura ${inv} (PI ${pi}) · ${reais(Number(cf.comissao_cents ?? 0))} já pagos · o próximo Pix desse link desconta (ou segura, se não cobrir)`, `stripe-indique-ja-paga:${inv}`).catch(() => {});
+    }
   } catch (e) { await alarmeIndique(deps, pi, "estorno", e); }
+}
+
+/**
+ * 18/11 (revisão /escolha): as 2 leituras da fatura que o webhook usa na comissão do mensal, nas 2 formas da API:
+ *  - piDaFaturaPaga(in_…): GET /invoices/<id>?expand[]=payments (versão nova) → o PI de payments.data[].payment.payment_intent
+ *    (ou o invoice.payment_intent, se a conta responder no formato antigo);
+ *  - faturaDoPagamento(pi_…): GET /invoice_payments?payment[type]=payment_intent&payment[payment_intent]=<pi> (versão nova) →
+ *    data[0].invoice; se a lista não existir/estiver vazia, GET /payment_intents/<pi> na 2024-06-20 → o campo invoice.
+ * `get` devolve o JSON (ok) ou null (não achou / 404); lança quando a Stripe não respondeu (o estorno vira alarme pro dono).
+ */
+export function leitoresFaturaStripe(get: (caminho: string, versao: string) => Promise<Record<string, unknown> | null>, versaoNova: string, versaoAntiga = "2024-06-20") {
+  return {
+    piDaFaturaPaga: async (invoiceId: string): Promise<string | null> => {
+      if (!/^in_[A-Za-z0-9]+$/.test(invoiceId)) return null;
+      const j = await get(`invoices/${invoiceId}?expand[]=payments`, versaoNova);
+      return j ? piDaFaturaWebhook(j) : null;
+    },
+    faturaDoPagamento: async (pi: string): Promise<string | null> => {
+      if (!/^pi_[A-Za-z0-9]+$/.test(pi)) return null;
+      const lista = await get(`invoice_payments?payment[type]=payment_intent&payment[payment_intent]=${pi}&limit=1`, versaoNova).catch(() => null);
+      for (const x of ((lista?.data as Array<{ invoice?: unknown }> | undefined) ?? [])) {
+        const inv = typeof x.invoice === "string" ? x.invoice : String((x.invoice as { id?: string } | null | undefined)?.id ?? "");
+        if (/^in_/.test(inv)) return inv;
+      }
+      const p = await get(`payment_intents/${pi}`, versaoAntiga);
+      const inv = p ? (typeof p.invoice === "string" ? p.invoice : String((p.invoice as { id?: string } | null | undefined)?.id ?? "")) : "";
+      return /^in_/.test(inv) ? inv : null;
+    },
+  };
 }
 
 export async function tratarStripe(deps: DepsStripe, req: { assinatura: string | null; corpo: string }): Promise<Resposta> {
@@ -192,13 +240,13 @@ export async function tratarStripe(deps: DepsStripe, req: { assinatura: string |
       const total = tipo === "charge.dispute.created" || obj.refunded === true;
       if (!pi || !total) {
         // críticas 17/11: devolução PARCIAL também cancela a comissão (nunca 50% cheio de uma venda que rendeu menos); o acesso fica
-        if (pi && deps.indique && Number(obj.amount_refunded ?? 0) > 0) await cancelarIndique(deps, pi, true);
+        if (pi && deps.indique && Number(obj.amount_refunded ?? 0) > 0) await cancelarIndique(deps, pi, true, t(obj.invoice, 80));
         log("estorno parcial ou sem PI — nada a desligar", { tipo, pi });
         return { status: 200, corpo: { ok: true, ignorado: "parcial" } };
       }
       // 23/11 (indique e ganhe): a comissão daquela venda cai; se era a compra de quem indica, o link dela é pausado
       // (erro aqui não segura o corte do acesso: alarme pro dono conferir a comissão no /admin)
-      if (deps.indique) await cancelarIndique(deps, pi, false);
+      if (deps.indique) await cancelarIndique(deps, pi, false, t(obj.invoice, 80));
       // 14/11: a linha pode ser do vitalício (pedido = PI) OU do mensal (pedido = a assinatura da fatura estornada)
       const { data: doPi, error: erroDoPi } = await admin.from("subscriptions").select("id").eq("abacatepay_billing_id", pi).eq("payment_method", GATEWAY_STRIPE);
       // revisão 2: banco sem resposta → 500 (a Stripe reenvia); nunca "nada a cortar" no escuro
@@ -586,7 +634,10 @@ async function tratarAssinatura(deps: DepsStripe, tipo: string, obj: Record<stri
     // 18/11 (/escolha, indique e ganhe): a comissão do mensal nasce no 2º PAGAMENTO pago — a 1ª renovação (subscription_cycle). 1× por
     // assinatura (reserva própria): a 3ª, 4ª… nunca pagam de novo. Comissão FIXA (R$ 33,95). Erro aqui nunca segura a renovação.
     if (doPlanos && deps.indique && meta.indicador && f.motivo === "subscription_cycle" && !encerrada && await reservar(admin, `stripe-indique-mensal:${f.sub}`, "indique") === "ok") {
-      const chave = f.pi ?? f.id;
+      // revisão /escolha: na API nova o invoice.paid chega SEM o PI (payment_intent null; payments só expandido) → busca o PI
+      // real da fatura; só sem ele a chave é o id da fatura (o estorno cobre os 2 formatos: cancelarIndique acha a fatura do PI)
+      const piReal = f.pi ?? (deps.piDaFaturaPaga ? await deps.piDaFaturaPaga(f.id).catch(() => null) : null);
+      const chave = piReal ?? f.id;
       try {
         const ri = await deps.indique.registrar(meta.indicador, {
           pi: chave, valorCents: f.valor, email: (meta.email ?? f.email ?? null), userId: linha.user_id, aparelho: t(meta.aparelho, 64), cpf: null,

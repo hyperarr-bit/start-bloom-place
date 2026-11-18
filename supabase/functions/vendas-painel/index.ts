@@ -153,8 +153,10 @@ async function abaDias(admin: Admin, hoje: string) {
   // convertido cai no dia da cobrança; compra direta do paywall duro, no dia da compra), com o anúncio de app do MESMO dia.
   // As linhas da loja começam 3 dias antes de 28/10 pra pegar o teste que cobrou em 28–30/10.
   const [f, t] = await Promise.all([fontesDeVenda(admin, INICIO_DIAS), turmasDesde(admin, hoje, somaDias(INICIO_DIAS, -3))]);
-  const dias = t.turmas.filter((tu) => tu.dia >= INICIO_DIAS).map((tu) =>
-    resumoDoDia(vendasDoDia(f.pix, f.marcadores, f.linhaPorTx, f.renov, tu.dia, f.metodoStripe), tu.dia, t.gastoSite[tu.dia] ?? 0, iphoneDoDia(t.linhas, t.rc, t.gastoApp, tu.dia, hoje)));
+  const dias = t.turmas.filter((tu) => tu.dia >= INICIO_DIAS).map((tu) => {
+    const v = vendasDoDia(f.pix, f.marcadores, f.linhaPorTx, f.renov, tu.dia, f.metodoStripe);
+    return resumoDoDia(v, tu.dia, t.gastoSite[tu.dia] ?? 0, iphoneDoDia(v.itens, t.linhas, t.gastoApp, tu.dia, hoje));
+  });
   const soma = (g: (d: (typeof dias)[number]) => number) => Math.round(dias.reduce((s, d) => s + g(d), 0) * 100) / 100;
   return {
     dia: hoje, desde: INICIO_DIAS, dias,

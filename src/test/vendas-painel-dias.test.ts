@@ -65,35 +65,24 @@ describe("03/11: o iPhone do dia é a turma COBRADA nele (começou 3 dias antes)
   });
 });
 
-describe("18/11: o iPhone do dia pelo CAIXA (sem turma)", () => {
-  const ms = (dia: string, hm = "12:00") => Date.parse(`${dia}T${hm}:00-03:00`);
-  it("teste convertido entra no dia da cobrança; compra direta no dia da compra; sandbox e quem não pagou ficam fora; anúncio do mesmo dia", () => {
-    const linhas = normalizarLoja([
-      sub({ created_at: brt("2026-11-05", "14:35") }),             // teste que virou pago em 08/11
-      sub({ created_at: brt("2026-11-08", "10:00") }),             // compra direta (paywall duro) em 08/11
-      sub({ created_at: brt("2026-11-08", "11:00"), amount_cents: 6990 }), // compra direta 69,90 em 08/11
-      sub({ created_at: brt("2026-11-08", "12:00") }),             // sandbox (StoreKit de teste)
-      sub({ created_at: brt("2026-11-08", "13:00") }),             // teste que expirou sem pagar
-      sub({ created_at: brt("2026-11-08", "15:00"), billing_period: "monthly", amount_cents: 1990 }), // mensal pago em 08/11
-    ]);
-    const rc = new Map<string, EstadoRC>([
-      [linhas[0].tx, { status: "active", renova: "will_renew", gross: 17.79, cobradoEm: ms("2026-11-08", "14:35"), ambiente: "production" }],
-      [linhas[1].tx, { status: "active", renova: "will_renew", gross: 17.79, cobradoEm: ms("2026-11-08", "10:00"), ambiente: "production" }],
-      [linhas[2].tx, { status: "active", renova: "will_renew", gross: 12.8, cobradoEm: ms("2026-11-08", "11:00"), ambiente: "production" }],
-      [linhas[3].tx, { status: "active", renova: "will_renew", gross: 17.28, cobradoEm: ms("2026-11-08", "12:00"), ambiente: "sandbox" }],
-      [linhas[4].tx, { status: "expired", renova: "will_not_renew", gross: 0, cobradoEm: ms("2026-11-08", "13:00"), ambiente: "production" }],
-      [linhas[5].tx, { status: "active", renova: "will_renew", gross: 3.6, cobradoEm: ms("2026-11-08", "15:00"), ambiente: "production" }],
-    ]);
-    const gasto = { "2026-11-05": 300, "2026-11-08": 120 };
-    const d8 = iphoneDoDia(linhas, rc, gasto, "2026-11-08", "2026-11-10");
-    expect(d8.pagaram).toBe(4);
-    expect(d8.liquido).toBeCloseTo(80.3 + 80.3 + 57.34 + 16.32, 1);
-    expect(d8).toMatchObject({ gasto: 120, situacao: "fechada" });
-    const d5 = iphoneDoDia(linhas, rc, gasto, "2026-11-05", "2026-11-10");
-    expect(d5).toMatchObject({ pagaram: 0, liquido: 0, gasto: 300 });
-    expect(iphoneDoDia(linhas, rc, gasto, "2026-11-10", "2026-11-10").situacao).toBe("fecha_hoje");
-    const r = resumoDoDia(vendasDoDia([], [], new Map(), [], "2026-11-08"), "2026-11-08", 0, d8);
-    expect(r.iphone.gasto).toBe(120);
-    expect(r.iphone.liquido).toBeCloseTo(d8.liquido, 2);
+describe("18/11: o iPhone do dia pelo CAIXA (avisos de cobrança da Apple, 1 por tx)", () => {
+  it("Purchase + aviso de renovação da mesma cobrança contam 1 vez; anual recuperado é venda nova; anúncio do mesmo dia", () => {
+    const dia = "2026-11-18";
+    const marc = [{ event_name: "meta_capi_app_enviado", event_data: { tx: "subAapX1", valor: 97.9 }, created_at: brt(dia, "10:45") }];
+    const linhaPorTx = new Map<string, LinhaSub>([["subAapX1", sub({ revenuecat_subscription_id: "subAapX1", created_at: brt("2026-11-08") })]]);
+    const renov = [
+      { chave: "renov:subAapX1:2027-11-11", origem: "apple" as const, valor_cents: 9790, plano: "anual", criado_em: brt(dia, "10:43") },
+      { chave: "renov:subAapX2:2027-11-07", origem: "apple" as const, valor_cents: 9790, plano: "anual", criado_em: brt(dia, "08:40") },
+      { chave: "renov:subAapX3:2026-12-16", origem: "apple" as const, valor_cents: 2490, plano: "mensal", criado_em: brt(dia, "16:08") },
+    ];
+    const v = vendasDoDia([], marc, linhaPorTx, renov, dia);
+    const apple = v.itens.filter((i) => i.origem === "apple");
+    expect(apple).toHaveLength(3);
+    expect(v.total_cents).toBe(9790 + 9790 + 2490);
+    expect(apple.filter((i) => i.renovacao)).toHaveLength(1); // só o mensal é renovação
+    const i = iphoneDoDia(v.itens, [], { [dia]: 50 }, dia, "2026-11-20");
+    expect(i.pagaram).toBe(3);
+    expect(i.liquido).toBeCloseTo(80.3 + 80.3 + 20.42, 2);
+    expect(i).toMatchObject({ gasto: 50, situacao: "fechada" });
   });
 });

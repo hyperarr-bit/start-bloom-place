@@ -133,16 +133,15 @@ export function montarTurmas(linhas: LinhaLoja[], rc: Map<string, EstadoRC>, gas
  * (anual: dia de `cobradoEm`, serve pro teste convertido e pra compra direta do paywall duro; mensal: o dia da 1ª compra),
  * com o anúncio de app do MESMO dia. Renovação fica fora (só dinheiro novo). "fecha_hoje" = hoje, ainda caindo.
  */
-export function iphoneDoDia(linhas: LinhaLoja[], rc: Map<string, EstadoRC>, gastoAppPorDia: Record<string, number>, dia: string, hoje: string) {
+export function iphoneDoDia(itensDoDia: ItemVenda[], linhas: LinhaLoja[], gastoAppPorDia: Record<string, number>, dia: string, hoje: string) {
+  // 18/11 (2ª versão): o caixa vem dos AVISOS de cobrança da Apple do dia (Purchase + "renovação"), 1 por tx, e não do início
+  // do período no RevenueCat: a cobrança recuperada (cartão recusado que a Apple cobrou dias depois) mantém o período antigo
+  // e caía no dia errado. Inclui a renovação mensal (é dinheiro que entrou no dia).
   let pagaram = 0, liq = 0;
-  for (const l of linhas) {
-    if (l.loja !== "apple") continue;
-    const e = rc.get(l.tx);
-    if (desfecho(e) !== "pagou") continue;
-    const diaCobranca = l.billing === "annual" ? (e?.cobradoEm ? diaBRT(e.cobradoEm) : null) : l.dia;
-    if (diaCobranca !== dia) continue;
+  for (const i of itensDoDia) {
+    if (i.origem !== "apple") continue;
     pagaram++;
-    liq += liquidoCents(l.cents, "apple");
+    liq += liquidoCents(i.valor_cents, "apple");
   }
   return {
     dia,
@@ -335,6 +334,15 @@ export function funilOferta(eventos: EventoLanding[], vendasBrutas: VendaStripe[
 /* ------------------------------------------------------------------ vendas de hoje */
 
 export type ItemVenda = { hora: string; valor_cents: number; origem: Origem; plano: string; renovacao: boolean; gateway?: "hotmart" | "stripe"; metodo?: "pix" | "card" };
+/** O tx da loja dentro da chave do aviso ("loja:<tx>", "renov:<tx>:<fim>"). */
+export const txDaChave = (chave: string): string => String(chave ?? "").split(":")[1] ?? "";
+/**
+ * 18/11: o "aviso de renovação" de um ANUAL antes de set/2027 nunca é renovação. O app está na loja desde set/2026, então
+ * nenhum anual completou 1 ano. É a 1ª cobrança: teste que virou pago, ou cartão recusado que a Apple conseguiu cobrar
+ * depois (carência/nova tentativa). Conta como venda nova, no dia em que a Apple cobrou.
+ */
+export const ehPrimeiraCobrancaAnual = (plano: string, dia: string): boolean => /anual/i.test(plano ?? "") && dia < "2027-09-01";
+
 export function vendasDoDia(
   subsPix: LinhaSub[],
   marcadores: Array<{ event_name: string; event_data: { tx?: string; valor?: number } | null; created_at: string }>,
@@ -355,17 +363,23 @@ export function vendasDoDia(
     const met = v.gateway === "stripe" ? metodoStripe.get(String(s.abacatepay_billing_id ?? "")) : undefined;
     itens.push({ hora: hora(v.quando), valor_cents: v.valor_cents, origem: "pix", plano: v.plano, renovacao: false, ...(v.gateway ? { gateway: v.gateway } : {}), ...(met ? { metodo: met } : {}) });
   }
+  // 18/11: a mesma cobrança da loja pode vir pelo marcador (Purchase) E pelo aviso de "renovação" no mesmo dia → conta 1 vez por tx
+  const txVistos = new Set<string>();
   for (const m of marcadores) {
     if (diaBRT(m.created_at) !== hoje) continue;
     const v = vendaLoja(m, linhaPorTx.get(String(m.event_data?.tx ?? "")) ?? null);
     if (!v || vistas.has(v.chave)) continue;
     vistas.add(v.chave);
+    txVistos.add(String(m.event_data?.tx ?? ""));
     itens.push({ hora: hora(v.quando), valor_cents: v.valor_cents, origem: v.origem, plano: v.plano, renovacao: false });
   }
   for (const r of renovacoes) {
     if (diaBRT(r.criado_em) !== hoje || vistas.has(r.chave)) continue;
+    const tx = txDaChave(r.chave);
+    if (tx && txVistos.has(tx)) continue;
     vistas.add(r.chave);
-    itens.push({ hora: hora(r.criado_em), valor_cents: r.valor_cents, origem: r.origem, plano: r.plano, renovacao: true });
+    if (tx) txVistos.add(tx);
+    itens.push({ hora: hora(r.criado_em), valor_cents: r.valor_cents, origem: r.origem, plano: r.plano, renovacao: !ehPrimeiraCobrancaAnual(r.plano, hoje) });
   }
   itens.sort((a, b) => b.hora.localeCompare(a.hora));
   const porOrigem: Record<Origem, { n: number; cents: number }> = { pix: { n: 0, cents: 0 }, apple: { n: 0, cents: 0 }, play: { n: 0, cents: 0 } };

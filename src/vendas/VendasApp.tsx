@@ -382,7 +382,7 @@ function AbaDias({ d }: { d: RespDias }) {
               </li>
               <li>
                 <span className="v-tag v-chip-apple">iPhone</span>
-                <span className="v-plano">turma {x.iphone.turma ? ddmm(x.iphone.turma) : ""}: {x.iphone.testes} testes · {x.iphone.pagaram} pagaram{x.iphone.parcial ? " (cobrando hoje)" : ""}</span>
+                <span className="v-plano">{x.iphone.pagaram} {x.iphone.pagaram === 1 ? "cobrança" : "cobranças"}{x.iphone.parcial ? " (até agora)" : ""}</span>
                 <span className={`v-valor v-cor-${corLucro(x.iphone.lucro, x.iphone.parcial)}`}>{sinal(x.iphone.lucro)}</span>
               </li>
               {x.android.vendas > 0 && (
@@ -398,15 +398,15 @@ function AbaDias({ d }: { d: RespDias }) {
                 <Dado n={brl(x.site.bruto, 0)} r="site · vendido" />
                 <Dado n={brl(x.site.gasto, 0)} r="site · anúncio (Meta)" />
                 <Dado n={vezes(x.site.retorno)} r="site · retorno líquido" cor={x.site.cor} />
-                <Dado n={brl(x.iphone.liquido, 0)} r={`iPhone · turma ${x.iphone.turma ? ddmm(x.iphone.turma) : ""}`} />
-                <Dado n={brl(x.iphone.gasto, 0)} r={`iPhone · anúncio de ${x.iphone.turma ? ddmm(x.iphone.turma) : ""}`} />
+                <Dado n={brl(x.iphone.liquido, 0)} r="iPhone · cobrado no dia" />
+                <Dado n={brl(x.iphone.gasto, 0)} r="iPhone · anúncio do dia" />
                 <Dado n={brl(x.site.imposto + x.iphone.imposto + x.android.imposto, 0)} r="imposto 15,5%" />
               </div>
             )}
           </article>
         );
       })}
-      <p className="v-nota">Vendido = tudo que entrou no dia (Pix do site + Apple + Google Play, como no “Hoje”). Lucro = líquido − anúncio com o imposto da Meta (+12,15%) − 15,5% de imposto. Site = vendas e anúncio do próprio dia. iPhone = a turma COBRADA no dia (começou 3 dias antes), com o anúncio de app do dia em que ela começou; “parcial” = a cobrança ainda está caindo hoje. Toque num dia pra ver os detalhes.{d.semEstadoRC ? ` ${d.semEstadoRC} sem resposta do RevenueCat.` : ""}</p>
+      <p className="v-nota">Vendido = tudo que entrou no dia (Pix do site + Apple + Google Play, como no “Hoje”). Lucro = líquido − anúncio com o imposto da Meta (+12,15%) − 15,5% de imposto. Site = vendas e anúncio do próprio dia. iPhone = o que a Apple cobrou NO dia (teste que virou pago entra no dia da cobrança; compra direta, no dia da compra), com o anúncio de app do mesmo dia — sem turma. Renovação fica fora. “parcial” = hoje, ainda entrando. Toque num dia pra ver os detalhes.{d.semEstadoRC ? ` ${d.semEstadoRC} sem resposta do RevenueCat.` : ""}</p>
       <Erros e={d.errosMeta} />
     </section>
   );

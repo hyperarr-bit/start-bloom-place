@@ -16,7 +16,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { PAGAMENTOS_SITE, diaBRT, ehEmailTeste, inicioDiaBRT, somaDias, type LinhaSub, type Origem } from "../_shared/aviso-venda.ts";
 import {
-  desfecho, funilLanding, gastoPorDia, INICIO_DIAS, linhaCampanha, montarTurmasDesde, normalizarLoja, resumoDoDia, roiWeb, vendasDoDia,
+  desfecho, funilLanding, iphoneDoDia, gastoPorDia, INICIO_DIAS, linhaCampanha, montarTurmasDesde, normalizarLoja, resumoDoDia, roiWeb, vendasDoDia,
   vidaPorBraco, funilOferta, type VendaStripe, type EstadoRC, type EventoLanding, type EventoVida, type InfoCampanha, type InsightMeta,
 } from "../_shared/vendas-painel.ts";
 
@@ -68,7 +68,7 @@ async function insightsPorDia(desde: string, ate: string): Promise<{ linhas: Ins
 }
 
 /* ---------------------------------------------------------------- RevenueCat (estado de cada assinatura) */
-const rcCache = new Map<string, { at: number; ttl: number; itens: Array<{ id?: string; status?: string; auto_renewal_status?: string; total_revenue_in_usd?: { gross?: number } }> }>();
+const rcCache = new Map<string, { at: number; ttl: number; itens: Array<{ id?: string; status?: string; auto_renewal_status?: string; total_revenue_in_usd?: { gross?: number }; current_period_starts_at?: number; environment?: string }> }>();
 async function estadosRC(uids: string[]): Promise<Map<string, EstadoRC>> {
   const secret = Deno.env.get("REVENUECAT_SECRET_KEY") ?? "";
   const projeto = Deno.env.get("REVENUECAT_PROJECT_ID") ?? "proj1f095041";
@@ -90,7 +90,7 @@ async function estadosRC(uids: string[]): Promise<Map<string, EstadoRC>> {
           }
         } catch { /* sem estado = "?" na turma */ }
       }
-      for (const s of c?.itens ?? []) if (s.id) out.set(s.id, { status: s.status ?? null, renova: s.auto_renewal_status ?? null, gross: Number(s.total_revenue_in_usd?.gross ?? 0) });
+      for (const s of c?.itens ?? []) if (s.id) out.set(s.id, { status: s.status ?? null, renova: s.auto_renewal_status ?? null, gross: Number(s.total_revenue_in_usd?.gross ?? 0), cobradoEm: s.current_period_starts_at ?? null, ambiente: s.environment ?? null });
     }
   };
   await Promise.all(Array.from({ length: 6 }, trabalhador));
@@ -145,18 +145,16 @@ async function turmasDesde(admin: Admin, hoje: string, desde: string) {
   const rc = await estadosRC(doIphone.map((l) => l.uid));
   const ins = await insightsPorDia(desde, hoje);
   const gastoApp = gastoPorDia(ins.linhas, "app", SITE_EXTRA);
-  return { turmas: montarTurmasDesde(linhas, rc, gastoApp, hoje, desde), gastoApp, gastoSite: gastoPorDia(ins.linhas, "site", SITE_EXTRA), semEstadoRC: doIphone.filter((l) => !rc.has(l.tx)).length, errosMeta: ins.erros };
+  return { linhas, rc, turmas: montarTurmasDesde(linhas, rc, gastoApp, hoje, desde), gastoApp, gastoSite: gastoPorDia(ins.linhas, "site", SITE_EXTRA), semEstadoRC: doIphone.filter((l) => !rc.has(l.tx)).length, errosMeta: ins.erros };
 }
 
 async function abaDias(admin: Admin, hoje: string) {
-  // 03/11 (dono): cada dia mostra a turma do iPhone COBRADA nele (começou em D−3) → as turmas começam 3 dias antes de 28/10
+  // 18/11 (dono: "lucro de cada dia sem isso de turma"): CAIXA do dia — o iPhone é o que a Apple cobrou NAQUELE dia (teste
+  // convertido cai no dia da cobrança; compra direta do paywall duro, no dia da compra), com o anúncio de app do MESMO dia.
+  // As linhas da loja começam 3 dias antes de 28/10 pra pegar o teste que cobrou em 28–30/10.
   const [f, t] = await Promise.all([fontesDeVenda(admin, INICIO_DIAS), turmasDesde(admin, hoje, somaDias(INICIO_DIAS, -3))]);
-  const porDia = new Map(t.turmas.map((tu) => [tu.dia, tu]));
-  const vazia = { testes: 0, pagaram: 0, situacao: "fechada", liquido: 0, gasto: 0 };
-  const dias = t.turmas.filter((tu) => tu.dia >= INICIO_DIAS).map((tu) => {
-    const cobrada = porDia.get(somaDias(tu.dia, -3));
-    return resumoDoDia(vendasDoDia(f.pix, f.marcadores, f.linhaPorTx, f.renov, tu.dia, f.metodoStripe), tu.dia, t.gastoSite[tu.dia] ?? 0, cobrada ? { ...cobrada } : { ...vazia, dia: somaDias(tu.dia, -3) });
-  });
+  const dias = t.turmas.filter((tu) => tu.dia >= INICIO_DIAS).map((tu) =>
+    resumoDoDia(vendasDoDia(f.pix, f.marcadores, f.linhaPorTx, f.renov, tu.dia, f.metodoStripe), tu.dia, t.gastoSite[tu.dia] ?? 0, iphoneDoDia(t.linhas, t.rc, t.gastoApp, tu.dia, hoje)));
   const soma = (g: (d: (typeof dias)[number]) => number) => Math.round(dias.reduce((s, d) => s + g(d), 0) * 100) / 100;
   return {
     dia: hoje, desde: INICIO_DIAS, dias,

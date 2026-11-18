@@ -6,7 +6,7 @@
  * × 1,1215 − 15,5%; turmas de 28/10 até hoje com situação fechada / fecha hoje / aberta.
  */
 import { describe, expect, it } from "vitest";
-import { INICIO_DIAS, montarTurmasDesde, normalizarLoja, resumoDoDia, vendasDoDia, type EstadoRC } from "../../supabase/functions/_shared/vendas-painel";
+import { INICIO_DIAS, iphoneDoDia, montarTurmasDesde, normalizarLoja, resumoDoDia, vendasDoDia, type EstadoRC } from "../../supabase/functions/_shared/vendas-painel";
 import type { LinhaSub } from "../../supabase/functions/_shared/aviso-venda";
 
 const brt = (dia: string, hm = "12:00") => new Date(Date.parse(`${dia}T${hm}:00-03:00`)).toISOString();
@@ -62,5 +62,38 @@ describe("03/11: o iPhone do dia é a turma COBRADA nele (começou 3 dias antes)
     expect(fechou.iphone).toMatchObject({ turma: "2026-10-30", parcial: false, liquido: 619, gasto: 280 });
     const hoje = resumoDoDia(v, "2026-11-03", 0, { dia: "2026-10-31", testes: 33, pagaram: 5, situacao: "fecha_hoje", liquido: 401.5, gasto: 309 });
     expect(hoje.iphone.parcial).toBe(true);
+  });
+});
+
+describe("18/11: o iPhone do dia pelo CAIXA (sem turma)", () => {
+  const ms = (dia: string, hm = "12:00") => Date.parse(`${dia}T${hm}:00-03:00`);
+  it("teste convertido entra no dia da cobrança; compra direta no dia da compra; sandbox e quem não pagou ficam fora; anúncio do mesmo dia", () => {
+    const linhas = normalizarLoja([
+      sub({ created_at: brt("2026-11-05", "14:35") }),             // teste que virou pago em 08/11
+      sub({ created_at: brt("2026-11-08", "10:00") }),             // compra direta (paywall duro) em 08/11
+      sub({ created_at: brt("2026-11-08", "11:00"), amount_cents: 6990 }), // compra direta 69,90 em 08/11
+      sub({ created_at: brt("2026-11-08", "12:00") }),             // sandbox (StoreKit de teste)
+      sub({ created_at: brt("2026-11-08", "13:00") }),             // teste que expirou sem pagar
+      sub({ created_at: brt("2026-11-08", "15:00"), billing_period: "monthly", amount_cents: 1990 }), // mensal pago em 08/11
+    ]);
+    const rc = new Map<string, EstadoRC>([
+      [linhas[0].tx, { status: "active", renova: "will_renew", gross: 17.79, cobradoEm: ms("2026-11-08", "14:35"), ambiente: "production" }],
+      [linhas[1].tx, { status: "active", renova: "will_renew", gross: 17.79, cobradoEm: ms("2026-11-08", "10:00"), ambiente: "production" }],
+      [linhas[2].tx, { status: "active", renova: "will_renew", gross: 12.8, cobradoEm: ms("2026-11-08", "11:00"), ambiente: "production" }],
+      [linhas[3].tx, { status: "active", renova: "will_renew", gross: 17.28, cobradoEm: ms("2026-11-08", "12:00"), ambiente: "sandbox" }],
+      [linhas[4].tx, { status: "expired", renova: "will_not_renew", gross: 0, cobradoEm: ms("2026-11-08", "13:00"), ambiente: "production" }],
+      [linhas[5].tx, { status: "active", renova: "will_renew", gross: 3.6, cobradoEm: ms("2026-11-08", "15:00"), ambiente: "production" }],
+    ]);
+    const gasto = { "2026-11-05": 300, "2026-11-08": 120 };
+    const d8 = iphoneDoDia(linhas, rc, gasto, "2026-11-08", "2026-11-10");
+    expect(d8.pagaram).toBe(4);
+    expect(d8.liquido).toBeCloseTo(80.3 + 80.3 + 57.34 + 16.32, 1);
+    expect(d8).toMatchObject({ gasto: 120, situacao: "fechada" });
+    const d5 = iphoneDoDia(linhas, rc, gasto, "2026-11-05", "2026-11-10");
+    expect(d5).toMatchObject({ pagaram: 0, liquido: 0, gasto: 300 });
+    expect(iphoneDoDia(linhas, rc, gasto, "2026-11-10", "2026-11-10").situacao).toBe("fecha_hoje");
+    const r = resumoDoDia(vendasDoDia([], [], new Map(), [], "2026-11-08"), "2026-11-08", 0, d8);
+    expect(r.iphone.gasto).toBe(120);
+    expect(r.iphone.liquido).toBeCloseTo(d8.liquido, 2);
   });
 });

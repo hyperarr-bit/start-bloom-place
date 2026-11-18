@@ -31,11 +31,14 @@ const r2 = (x: number | null): number | null => (x === null ? null : Math.round(
 
 /* ------------------------------------------------------------------ turmas */
 
-export type EstadoRC = { status: string | null; renova: string | null; gross: number };
+/** 18/11: `cobradoEm` = início do período atual no RevenueCat (ms). No anual (sem renovação ainda) é o MOMENTO DA COBRANÇA:
+ *  teste convertido = início + 3 dias; compra direta (paywall duro, desde ~12/11) = a própria compra. `ambiente` sandbox nunca é venda. */
+export type EstadoRC = { status: string | null; renova: string | null; gross: number; cobradoEm?: number | null; ambiente?: string | null };
 
 /** desfecho() do coleta.mjs, igual. */
 export function desfecho(rc: EstadoRC | null | undefined): string {
   if (!rc) return "?";
+  if (rc.ambiente === "sandbox") return "sandbox";
   if (rc.gross > 0) return "pagou";
   if (rc.status === "trialing") return rc.renova === "will_not_renew" ? "teste_ja_cancelou" : "teste_vai_renovar";
   if (rc.status === "in_grace_period") return "recusada_carencia";
@@ -123,6 +126,32 @@ export function montarTurmas(linhas: LinhaLoja[], rc: Map<string, EstadoRC>, gas
     });
   }
   return out;
+}
+
+/**
+ * 18/11 (dono: "ver o lucro de cada dia sem isso de turma"): o iPhone do dia pelo CAIXA — o que a Apple cobrou NAQUELE dia
+ * (anual: dia de `cobradoEm`, serve pro teste convertido e pra compra direta do paywall duro; mensal: o dia da 1ª compra),
+ * com o anúncio de app do MESMO dia. Renovação fica fora (só dinheiro novo). "fecha_hoje" = hoje, ainda caindo.
+ */
+export function iphoneDoDia(linhas: LinhaLoja[], rc: Map<string, EstadoRC>, gastoAppPorDia: Record<string, number>, dia: string, hoje: string) {
+  let pagaram = 0, liq = 0;
+  for (const l of linhas) {
+    if (l.loja !== "apple") continue;
+    const e = rc.get(l.tx);
+    if (desfecho(e) !== "pagou") continue;
+    const diaCobranca = l.billing === "annual" ? (e?.cobradoEm ? diaBRT(e.cobradoEm) : null) : l.dia;
+    if (diaCobranca !== dia) continue;
+    pagaram++;
+    liq += liquidoCents(l.cents, "apple");
+  }
+  return {
+    dia,
+    testes: linhas.filter((l) => l.loja === "apple" && l.dia === dia && l.tipo === "teste_anual").length,
+    pagaram,
+    situacao: dia === hoje ? "fecha_hoje" : "fechada",
+    liquido: Math.round(liq) / 100,
+    gasto: Math.round((gastoAppPorDia[dia] ?? 0) * 100) / 100,
+  };
 }
 
 /* ------------------------------------------------------------------ campanhas */

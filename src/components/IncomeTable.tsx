@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { numeroBR } from "@/lib/data-normalizers";
+import { numeroBR, textoBR } from "@/lib/data-normalizers";
 import { avisoDeMesPassado } from "@/lib/finance-receita-futura";
 import { localDayKey } from "@/lib/utils";
 import { avisarApagado } from "@/lib/desfazer";
@@ -111,7 +111,7 @@ export const IncomeTable = ({ incomes, setIncomes, prefillExample = false, guard
 
   const comecarEdicao = (i: Income) => {
     setEditandoId(i.id);
-    setRascunho({ description: i.description, value: String(i.value), date: i.date });
+    setRascunho({ description: i.description, value: textoBR(i.value), date: i.date });
   };
 
   const salvarEdicao = () => {

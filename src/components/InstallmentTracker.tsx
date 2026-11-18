@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { avisarApagado } from "@/lib/desfazer";
-import { numeroBR } from "@/lib/data-normalizers";
+import { numeroBR, textoBR } from "@/lib/data-normalizers";
 import { localDayKey } from "@/lib/utils";
 import { Plus, Trash2, CreditCard, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -203,7 +203,7 @@ export const InstallmentTracker = ({
     setEditandoId(i.id);
     setRascunho({
       description: i.description,
-      installmentValue: String(i.installmentValue),
+      installmentValue: Number.isFinite(Number(i.installmentValue)) ? textoBR(Math.round(Number(i.installmentValue) * 100) / 100) : "",
       paidInstallments: String(i.paidInstallments),
       totalInstallments: String(i.totalInstallments),
       date: i.date ?? "",

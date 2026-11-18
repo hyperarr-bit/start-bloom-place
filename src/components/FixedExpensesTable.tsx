@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { numeroBR } from "@/lib/data-normalizers";
+import { numeroBR, textoBR } from "@/lib/data-normalizers";
 import { Plus, Trash2, ChevronDown, Check, X, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -239,7 +239,7 @@ export const FixedExpensesTable = ({ expenses, setExpenses, dueDays, setDueDays,
     setRascunho({
       description: e.description,
       category: e.category,
-      value: String(e.value),
+      value: textoBR(e.value),
       paymentMethod: e.paymentMethod,
       cardName: e.cardName ?? "",
       day: e.day ? String(e.day) : "",

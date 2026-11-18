@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { numeroBR } from "@/lib/data-normalizers";
+import { numeroBR, textoBR } from "@/lib/data-normalizers";
 import { localDayKey } from "@/lib/utils";
 import { avisarApagado } from "@/lib/desfazer";
 import { Plus, Trash2, ChevronDown, Check, X, CreditCard, Repeat } from "lucide-react";
@@ -329,7 +329,7 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes, guar
     setRascunho({
       description: e.description,
       category: e.category,
-      value: String(e.value),
+      value: textoBR(e.value),
       date: e.date,
       paymentMethod: e.paymentMethod,
       cardName: e.cardName ?? "",

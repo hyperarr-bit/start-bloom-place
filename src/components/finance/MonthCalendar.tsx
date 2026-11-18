@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Check, Pencil, Plus, Shield, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { numeroBR } from "@/lib/data-normalizers";
+import { numeroBR, textoBR } from "@/lib/data-normalizers";
 import { Checkbox } from "@/components/ui/checkbox";
 import { computeMonthlyBalance, computeUnpaidBillsEstimate } from "@/lib/finance-totals";
 // 07/09: a parcela do mês agora é carimbada (startMonth/parcelaDoMes) — a conta
@@ -229,7 +229,7 @@ export const MonthCalendar = ({
     setEditandoId(b.id);
     setRascunho({
       name: b.name,
-      value: typeof b.value === "number" && b.value > 0 ? String(b.value) : "",
+      value: typeof b.value === "number" && b.value > 0 ? textoBR(b.value) : "",
       day: String(day),
     });
   };

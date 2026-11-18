@@ -40,6 +40,11 @@ export const OFERTAS_STRIPE: Record<string, OfertaStripe> = {
     pagina: "app_web", centavos: 9790, idem: "appweb", descricao: "CORE vitalicio", parcelasMax: 3, offer: "ST_app_web",
     contentName: "CORE vitalício (funil app web)", urlPadrao: "https://www.coreaplicativo.com.br/funil-app",
   },
+  /** 18/11 (/escolha, chave PLANOS_PAGINA): o vitalício da página dos 2 planos — R$ 97,90, Pix + cartão até 12x */
+  planos: {
+    pagina: "planos", centavos: 9790, idem: "planos", descricao: "CORE vitalicio", parcelasMax: 12, offer: "ST_planos",
+    contentName: "CORE vitalício (planos)", urlPadrao: "https://www.coreaplicativo.com.br/escolha",
+  },
 };
 
 /** a oferta da página (desconhecida = null; o stripe-criar cai na "oferta" de sempre, o webhook ignora) */
@@ -58,6 +63,47 @@ export const MENSAL_APP_WEB = {
   /** a versão da API nas chamadas de assinatura (latest_invoice.payment_intent existe nela) */
   apiVersion: "2024-06-20",
 } as const;
+
+export type MensalStripe = {
+  pagina: string; centavos: number; envPreco: string; offer: string; contentName: string; urlPadrao: string; apiVersion: string;
+};
+
+/**
+ * 18/11 (/escolha): o MENSAL da página dos 2 planos. Mesmo preço da Stripe (STRIPE_PRECO_MENSAL_34, R$ 34,90/mês) e as mesmas regras
+ * de acesso do mensal do /funil-app (a MESMA linha de subscriptions: plan/billing_period "monthly", payment_method "stripe").
+ * Cartão (Subscription com card) ou Pix Automático (Subscription com pix + mandato: chave PLANOS_PIX_MENSAL na página E env
+ * STRIPE_PIX_RECORRENTE=on no servidor).
+ */
+export const MENSAL_PLANOS: MensalStripe = {
+  pagina: "planos_mensal",
+  centavos: 3490,
+  envPreco: "STRIPE_PRECO_MENSAL_34",
+  offer: "ST_planos_mensal",
+  contentName: "CORE mensal (planos)",
+  urlPadrao: "https://www.coreaplicativo.com.br/escolha",
+  apiVersion: "2024-06-20",
+};
+
+/** os mensais que a Stripe cobra (metadata.pagina da assinatura → regra). Fora desta tabela o webhook só loga. */
+export const MENSAIS_STRIPE: Record<string, MensalStripe> = {
+  app_web_mensal: MENSAL_APP_WEB,
+  planos_mensal: MENSAL_PLANOS,
+};
+export const mensalDaPagina = (pagina: unknown): MensalStripe | null =>
+  typeof pagina === "string" && Object.prototype.hasOwnProperty.call(MENSAIS_STRIPE, pagina) ? MENSAIS_STRIPE[pagina] : null;
+
+/**
+ * 18/11: Pix Automático na assinatura (docs.stripe.com/billing/subscriptions/pix). A doc de hoje usa a versão nova da API (a fatura
+ * não tem mais `payment_intent`: o PI vem em `latest_invoice.payments` e o segredo em `latest_invoice.confirmation_secret`). Só as
+ * chamadas do Pix mensal usam esta versão; o resto segue na 2024-06-20 (o que já está no ar).
+ */
+export const API_PIX_AUTOMATICO = "2026-10-28.endive";
+
+/**
+ * 18/11 (indique e ganhe na /escolha): comissão FIXA por venda indicada nesta página (dono: R$ 33,95). No vitalício nasce na compra;
+ * no mensal, só no 2º pagamento pago da assinatura.
+ */
+export const COMISSAO_FIXA_PLANOS_CENTS = 3395;
 
 /** o preço da Stripe confere com o mensal (R$ 34,90 BRL, mensal, recorrente)? Trava contra env com o preço errado. */
 export function precoMensalConfere(p: unknown): boolean {

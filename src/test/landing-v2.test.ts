@@ -143,6 +143,8 @@ describe("braço atual = a página de hoje (origin/main 30/10), sem tirar nem p�
     const tplNova = novo.querySelector("#lpo-nova")!; tplNova.nextElementSibling!.remove(); tplNova.remove();
     // 11/11 (/simples): idem — o template da LP de uma tela e o script dele só agem com html[data-uma]
     const tplUma = novo.querySelector("#lp-uma")!; tplUma.nextElementSibling!.remove(); tplUma.remove();
+    // 18/11 (/escolha): idem — o template dos 2 planos e o script dele só agem com html[data-pagina="planos"]
+    const tplPl = novo.querySelector("#pl-tpl"); if (tplPl) { tplPl.nextElementSibling!.remove(); tplPl.remove(); }
     novo.querySelectorAll('[data-so-lp="v2"]').forEach((el) => el.remove());
     novo.querySelectorAll("[data-so-lp]").forEach((el) => el.removeAttribute("data-so-lp"));
     // 04/11 (A/B da /vida): o que é só da Hotmart nunca aparece no /organizar (sem html[data-checkout-ext]); o atributo data-so-ext sai

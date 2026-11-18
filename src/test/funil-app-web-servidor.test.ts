@@ -600,7 +600,9 @@ describe("revisão: cancel-subscription-flow e stripe-criar (fonte)", () => {
     expect(fn).toMatch(/if \(!r\?\.ok\) \{[\s\S]{0,120}return jsonResponse\(\{ error: "cancelamento_falhou" \}, 502\)/);
   });
   it("8 (C7): pagina app_web SEM acao → 400 (nunca devolve PI com parcelas livres)", () => {
-    expect(ler("supabase/functions/stripe-criar/index.ts")).toContain('if (p.pagina === "app_web" && !acao) return json({ ok: false }, 400);');
+    // 18/11: a regra vale pra toda família de ações (app_web e a /escolha "planos"); app_web segue sendo uma delas
+    expect(ler("supabase/functions/stripe-criar/index.ts")).toContain('if (familia && !acao) return json({ ok: false }, 400);');
+    expect(ler("supabase/functions/_shared/stripe-app-web.ts")).toContain('familiaDaPagina = (pagina: string): Familia | null => (pagina === "app_web" ? FAMILIA_APP_WEB');
   });
 });
 

@@ -93,6 +93,7 @@ import { abrirIndique, capturarIndicador, faixaJaComprou, lerCompraIndique, type
 import { estiloIndique } from "@/lib/indique-estilo";
 import { capturarAtribuicao, linkPlayAtribuido, linkAppleAtribuido, ondeLinkLoja } from "./atribuicao";
 import { REF_OK, checkoutExtDoHtml, paginaDoHtml, pkStripeValida, reaisDeCentavos, urlCheckoutHotmart, urlHotmartValida } from "./hotmart";
+import { ehPlano, reaisPlanos, textoParcela, vitalicioMenosQue3Meses, type Plano } from "./planos-regras";
 
 // o Pix de verdade carrega sob demanda — declarado antes do observador dos blocos, que pode pré-aquecê-lo (com PIX_REAL).
 // 30/10: com 2ª chance; o pré-aquecimento (recarregar=false) nunca recarrega a página — só o toque em pagar.
@@ -111,7 +112,7 @@ const agora = () => Math.round(performance.now());
 type Janela = Window & {
   __landingCliqueLoja?: (e: MouseEvent) => void;
   __landingSimularJaTem?: boolean;
-  __landing?: { uma?: boolean; cko_forcado?: boolean; otp_forcado?: boolean; oem_forcado?: boolean; lpo_forcado?: boolean; lpo_link?: boolean; ab_lp_oferta?: string; lpo_stripe_cedo?: string; pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; up_oferta?: string; indique?: string; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null };
+  __landing?: { uma?: boolean; cko_forcado?: boolean; otp_forcado?: boolean; oem_forcado?: boolean; lpo_forcado?: boolean; lpo_link?: boolean; ab_lp_oferta?: string; lpo_stripe_cedo?: string; pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; up_oferta?: string; indique?: string; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null; planos_forcado?: boolean; ab_planos?: string; planos_vitalicio_centavos?: number; planos_mensal_centavos?: number; planos_parcelas_max?: number; planos_pix_mensal?: boolean };
   __eventosLanding?: Record<string, unknown>[];
   /** 02/11 (dev/testes): voltou() = "voltei do banco" (≥ 5 s fora) sem trocar de aba; vencer() = o QR vence em 1,5 s */
   __landingSimular?: { pagar: () => void; pagarU2027?: () => void; voltou?: () => void; vencer?: () => void };
@@ -166,9 +167,14 @@ const ST_PK = String(w.__landing?.stripe_pk ?? "");
 const STRIPE = PAGINA === "oferta" && EXT === "stripe" && pkStripeValida(ST_PK);
 const ST_PRECO = Number(w.__landing?.stripe_preco_centavos) > 0 ? Number(w.__landing?.stripe_preco_centavos) : 6790;
 const ST_PARCELAS = typeof w.__landing?.stripe_parcelas === "string" ? w.__landing.stripe_parcelas : "";
-const EXTERNO = HOTMART || STRIPE;
-const PRECO_EXT = STRIPE ? ST_PRECO : HM_PRECO;
-const PARCELAS_EXT = STRIPE ? ST_PARCELAS : HM_PARCELAS;
+/* 18/11: /escolha (PLANOS_PAGINA no <head>): a página da /oferta com os 2 planos e o checkout próprio (./planos-checkout.ts). Só com a
+ * chave e a pk de verdade (o <head> já mandou pra /oferta se não). Na /oferta, no /organizar e na /vida, PLANOS = false e nada muda. */
+const PLANOS = PAGINA === "planos" && EXT === "stripe" && pkStripeValida(ST_PK);
+const PL_VIT = Number(w.__landing?.planos_vitalicio_centavos) > 0 ? Number(w.__landing?.planos_vitalicio_centavos) : 9790;
+const PL_MENSAL = Number(w.__landing?.planos_mensal_centavos) > 0 ? Number(w.__landing?.planos_mensal_centavos) : 3490;
+const EXTERNO = HOTMART || STRIPE || PLANOS;
+const PRECO_EXT = STRIPE ? ST_PRECO : PLANOS ? PL_VIT : HM_PRECO;
+const PARCELAS_EXT = STRIPE ? ST_PARCELAS : PLANOS ? "" : HM_PARCELAS;
 /** 04/11: o braço da /vida (AB_VIDA no <head>): "v3" (a LP v3) | "atual" (a página do /organizar com a Hotmart). Só na /vida. */
 const BRACO_VIDA = PAGINA === "vida" ? (document.documentElement.getAttribute("data-vida") === "atual" ? "atual" : "v3") : null;
 /** o botão da Hotmart do braço na tela (v2: "Quero organizar minha vida"; atual: "Quero organizar tudo") */
@@ -255,7 +261,7 @@ const ua = navigator.userAgent || "";
 const plataforma = /iPhone|iPad|iPod/i.test(ua) ? "ios" : /Android/i.test(ua) ? "android" : "web";
 const inApp = /FBAN|FBAV|FB_IAB|FBIOS|Instagram/i.test(ua);
 const pixForcado = !!w.__landing?.pix_forcado; // 02/11 r1: ?pix=b do dono/QA fica no aparelho — todo evento diz, não só o landing_html (a análise exclui)
-const medicaoForçada = SIMULADO || ["lp_forcado", "pix_forcado", "oferta_forcada", "checkout_forcado", "t_forcado", "lpo_forcado", "oem_forcado", "otp_forcado"].some(k => (w.__landing as Record<string, unknown> | undefined)?.[k] === true);
+const medicaoForçada = SIMULADO || ["lp_forcado", "pix_forcado", "oferta_forcada", "checkout_forcado", "t_forcado", "lpo_forcado", "oem_forcado", "otp_forcado", "planos_forcado"].some(k => (w.__landing as Record<string, unknown> | undefined)?.[k] === true);
 const storageAtrib = (() => { try { return localStorage; } catch { return null; } })();
 const atrib = capturarAtribuicao(location.search, storageAtrib, Date.now(), medicaoForçada);
 const contextoAtribuicao = () => ({ landing_session_id: sessao, landing_device_id: aparelho, braco_lp: brLp, braco_pix: brPix, forçado: medicaoForçada, atrib });
@@ -831,7 +837,7 @@ const viuAOferta = (via?: string) => {
   ofertaVista = true;
   evento("landing_oferta_vista", { via: via ?? (V2 ? "botao_50" : "bloco_15") }); // 08/11: "checkout" = a camada do checkout novo abriu antes de o cartão aparecer
   if (brCheckout === "email" && !EXTERNO) evento("landing_email_antes_visto", {}); // 05/11: o braço Hotmart da /vida (e a /oferta) não tem a caixa de e-mail
-  pixel("ViewContent", { content_name: STRIPE ? "oferta_stripe" : HOTMART ? "vida_oferta" : "landing_oferta", value: EXTERNO ? PRECO_EXT / 100 : 27.9, currency: "BRL" });
+  pixel("ViewContent", { content_name: STRIPE ? "oferta_stripe" : PLANOS ? "planos" : HOTMART ? "vida_oferta" : "landing_oferta", value: EXTERNO ? PRECO_EXT / 100 : 27.9, currency: "BRL" });
   if (PIX_REAL && !SIMULADO && !EXTERNO) void pg(false).catch(() => null); // pré-aquece o Pix de verdade (sem recarregar a página se falhar)
   aoVerOferta?.();
 };
@@ -2333,6 +2339,75 @@ if (STRIPE) {
   // 06/11 (dono): o Stripe.js em segundo plano logo depois da 1ª tela, sem esperar a oferta (metade esperava mais de 3,8 s depois do toque)
   ocioso(() => { void carregarStripeCheckout().then((m) => m.preaquecerStripe(ST_PK, PRODUCAO)); }, 3000);
   aoVerOferta = () => ocioso(() => { void carregarStripeCheckout().then((m) => m.preaquecerStripe(ST_PK, PRODUCAO)); }, 2000);
+  if (ofertaVista) aoVerOferta();
+}
+
+/* ───────────────────────── 18/11: /escolha — os 2 planos (./planos-checkout.ts, chave PLANOS_PAGINA no <head>) ─────────────────────────
+ * O cartão da oferta vira "Escolha seu plano" (Vitalício em destaque, com as parcelas; Mensal com "cancele quando quiser"). O botão de
+ * sempre (#lp-hotmart-atual) abre o checkout em tela cheia JÁ no plano marcado (dá pra trocar lá dentro). O ?ref= do indique vai no
+ * pedido (atrib.indicador → metadata da compra); o pós-pago do vitalício abre a folha do indique (a mesma da /oferta).
+ * Fora da /escolha (PLANOS false) nada daqui roda. */
+type ModPlanos = typeof import("./planos-checkout");
+let modPlanos: Promise<ModPlanos> | null = null;
+const carregarPlanos = () => (modPlanos ??= import("./planos-checkout"));
+const INDICADOR_PLANOS = PLANOS ? capturarIndicador(location.search, storageAtrib, { ler: lerCookie, gravar: gravarCookie }) : null;
+if (INDICADOR_PLANOS) evento("landing_indicado", { indicador: INDICADOR_PLANOS, tela: "planos" });
+const CHAVE_PLANO = "planos-plano";
+let planoPagina: Plano = "vitalicio";
+if (PLANOS) {
+  try { const g = sessionStorage.getItem(CHAVE_PLANO); if (ehPlano(g)) planoPagina = g; } catch { /* noop */ }
+  // as peças da /escolha (o <template id="pl-tpl">): o script logo depois dele já pôs no lugar; se não rodou (HTML injetado), põe aqui
+  const tpl = document.getElementById("pl-tpl") as HTMLTemplateElement | null;
+  if (tpl && !tpl.hasAttribute("data-feito")) {
+    tpl.setAttribute("data-feito", "");
+    for (const el of [...(tpl.content.cloneNode(true) as DocumentFragment).children]) {
+      const alvo = document.querySelector(el.getAttribute("data-pl-depois") ?? "");
+      if (alvo) alvo.after(el);
+    }
+  }
+  const plMax = Math.max(1, Math.min(12, Number(w.__landing?.planos_parcelas_max) || 12));
+  document.querySelectorAll<HTMLElement>("[data-pl-preco]").forEach((el) => { el.textContent = reaisPlanos(el.dataset.plPreco === "mensal" ? PL_MENSAL : PL_VIT); });
+  document.querySelectorAll<HTMLElement>("[data-pl-parcela]").forEach((el) => { if (plMax > 1) el.textContent = `ou ${textoParcela(PL_VIT, plMax)}`; else el.remove(); });
+  if (!vitalicioMenosQue3Meses(PL_VIT, PL_MENSAL)) document.querySelector(".pl-compara")?.remove();
+  const botoesPlano = [...document.querySelectorAll<HTMLButtonElement>("[data-plano]")];
+  const marcarPlano = (p: Plano) => {
+    planoPagina = p;
+    try { sessionStorage.setItem(CHAVE_PLANO, p); } catch { /* noop */ }
+    botoesPlano.forEach((b) => { const sim = b.dataset.plano === p; b.setAttribute("aria-checked", String(sim)); b.tabIndex = sim ? 0 : -1; });
+  };
+  marcarPlano(planoPagina);
+  botoesPlano.forEach((b, i) => {
+    b.addEventListener("click", () => { const p = b.dataset.plano as Plano; if (p === planoPagina) return; marcarPlano(p); evento("landing_plano", { plano: p, onde: "cartao", via: "toque" }); });
+    b.addEventListener("keydown", (ev) => {
+      if (!/^Arrow(Left|Right|Up|Down)$/.test(ev.key)) return;
+      ev.preventDefault();
+      const outro = botoesPlano[(i + 1) % botoesPlano.length];
+      outro.focus(); outro.click();
+    });
+  });
+  const opcoesPlanos = (extra: Partial<import("./planos-checkout").OpcoesPlanos> = {}): import("./planos-checkout").OpcoesPlanos => ({
+    pk: ST_PK, producao: PRODUCAO, plano: planoPagina, vitalicioCentavos: PL_VIT, mensalCentavos: PL_MENSAL, parcelasMax: plMax,
+    pixMensal: w.__landing?.planos_pix_mensal === true,
+    evento, pixel, atrib: { ...atrib, ...(INDICADOR_PLANOS ? { indicador: INDICADOR_PLANOS } : {}) }, sessao, aparelho, urlChegada: URL_DE_CHEGADA, fbclid: BUSCA.get("fbclid"),
+    indique: { abrir: (c) => abrirIndique({ ref: c.ref, pi: c.pi }, depsIndique()) },
+    ...extra,
+  });
+  document.getElementById(ID_BOTAO_HM)?.addEventListener("click", () => {
+    evento("landing_cta", { onde: "planos", plano: planoPagina, fase: estado.fase });
+    void carregarPlanos().then((m) => m.abrirPlanos(opcoesPlanos()), () => evento("landing_erro", { onde: "chunk_planos" }));
+  });
+  // voltou de um 3DS por redirecionamento (?payment_intent=…&redirect_status=…): reabre o checkout no estado certo, com a URL limpa
+  if (BUSCA.get("payment_intent") && BUSCA.get("redirect_status")) {
+    try {
+      const limpa = new URL(location.href);
+      for (const k of ["payment_intent", "payment_intent_client_secret", "redirect_status"]) limpa.searchParams.delete(k);
+      history.replaceState(history.state, "", `${limpa.pathname}${limpa.search}${limpa.hash}`);
+    } catch { /* noop */ }
+    const voltaDoBanco = { pi: String(BUSCA.get("payment_intent")), status: String(BUSCA.get("redirect_status")) };
+    void carregarPlanos().then((m) => m.abrirPlanos(opcoesPlanos({ voltaDoBanco })));
+  }
+  ocioso(() => { void carregarPlanos(); }, 4000);
+  aoVerOferta = () => ocioso(() => { void carregarPlanos().then((m) => m.preaquecerPlanos(ST_PK, PRODUCAO)); }, 2000);
   if (ofertaVista) aoVerOferta();
 }
 

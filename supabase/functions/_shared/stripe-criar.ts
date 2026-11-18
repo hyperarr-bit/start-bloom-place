@@ -4,7 +4,7 @@
  * Metadata (≤ 500 caracteres cada, só texto): ref, pagina "oferta", e-mail, user_id da sessão, fbp, fbc, fbclid, url, IP, UA,
  * utm/ad e o momento — o webhook usa pra achar a conta e pra CAPI (o webhook é chamado pela Stripe: IP/UA só existem aqui).
  */
-import { OFERTAS_STRIPE, ofertaDaPagina, type OfertaStripe } from "./stripe-ofertas.ts";
+import { OFERTAS_STRIPE, mensalDaPagina, ofertaDaPagina, type OfertaStripe } from "./stripe-ofertas.ts";
 import { cpfValido, soDigitosCpf } from "./cpf.ts";
 import { normalizarCodigo } from "./afiliados.ts";
 
@@ -46,8 +46,9 @@ export function validarPedidoStripe(body: unknown): PedidoStripe | null {
     ref, pi: pi && /^pi_[A-Za-z0-9]+$/.test(pi) ? pi : null, email: email && EMAIL_OK.test(email) ? email : null,
     fbp: t(b.fbp, 120), fbc: t(b.fbc, 400), fbclid: t(b.fbclid, 300), url: url && SITES.some((s) => url.startsWith(s)) ? url : null,
     landing_session_id: t(b.landing_session_id, 64), landing_device_id: t(b.landing_device_id, 64), atrib, cpf: cpfBruto,
-    pagina: b.pagina === "lp27" ? "lp27" : b.pagina === "app_web" ? "app_web" : "oferta",
-    ...(b.salvar_cartao === true && b.pagina !== "lp27" && b.pagina !== "app_web" ? { salvarCartao: true } : {}),
+    // 18/11: "planos" = a /escolha (2 planos; só pelas ações, como o app_web). Qualquer outra coisa segue sendo a /oferta.
+    pagina: b.pagina === "lp27" ? "lp27" : b.pagina === "app_web" ? "app_web" : b.pagina === "planos" ? "planos" : "oferta",
+    ...(b.salvar_cartao === true && b.pagina !== "lp27" && b.pagina !== "app_web" && b.pagina !== "planos" ? { salvarCartao: true } : {}),
   };
 }
 
@@ -130,7 +131,8 @@ export async function ipPodeCriar(admin: ClienteMin, ip: string | null, agoraMs:
 /** stripe-status: o PI é desta ref? Devolve só o que a página precisa. */
 export function respostaStatus(pi: { metadata?: Record<string, string> | null; status?: string; latest_charge?: { payment_method_details?: { type?: string } } | string | null } | null, ref: string): { ok: boolean; status?: string; pago?: boolean; metodo?: string | null } {
   // 14/11: qualquer oferta da tabela (e o mensal do funil app web, cujo PI da 1ª fatura ganha a mesma metadata)
-  if (!pi || pi.metadata?.ref !== ref || !(ofertaDaPagina(pi.metadata?.pagina) || pi.metadata?.pagina === "app_web_mensal")) return { ok: false };
+  // 18/11: e o mensal da /escolha (planos_mensal: o PI da 1ª fatura, cartão ou Pix Automático)
+  if (!pi || pi.metadata?.ref !== ref || !(ofertaDaPagina(pi.metadata?.pagina) || mensalDaPagina(pi.metadata?.pagina))) return { ok: false };
   const lc = pi.latest_charge && typeof pi.latest_charge === "object" ? pi.latest_charge : null;
   return { ok: true, status: pi.status, pago: pi.status === "succeeded", metodo: lc?.payment_method_details?.type ?? null };
 }

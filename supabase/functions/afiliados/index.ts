@@ -564,7 +564,7 @@ async function comprasDaOferta(admin: Admin, filtro: { userId?: string; email?: 
 async function linkDeAlgumaCompra(admin: Admin, pis: string[]): Promise<LinkPronto | null> {
   for (const pi of pis) {
     const j = await lerPi(pi);
-    if (!j || j.status !== "succeeded" || (j.metadata?.pagina ?? "oferta") !== "oferta") continue;
+    if (!j || j.status !== "succeeded" || !["oferta", "planos"].includes(j.metadata?.pagina ?? "oferta")) continue; // 18/11: e o vitalício da /escolha
     const l = await linkDaCompra(admin, pi, j);
     if (l && l !== "estornada") return l;
   }

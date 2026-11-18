@@ -20,9 +20,10 @@ export function urlHotmartValida(url: string | null | undefined): boolean {
 }
 
 /** 04/11: "vida" (Hotmart) ou "oferta" (Stripe, ./stripe-checkout.ts); no /organizar, null. */
-export function paginaDoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): "vida" | "oferta" | null {
+export function paginaDoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): "vida" | "oferta" | "planos" | null {
   const p = el.getAttribute("data-pagina");
-  return p === "vida" ? "vida" : p === "oferta" ? "oferta" : null;
+  // 18/11: "planos" = a /escolha (2 planos, chave PLANOS_PAGINA no <head>)
+  return p === "vida" ? "vida" : p === "oferta" ? "oferta" : p === "planos" ? "planos" : null;
 }
 
 export function checkoutExtDoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): BracoCheckoutExt | null {

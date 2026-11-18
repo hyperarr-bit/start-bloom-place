@@ -218,7 +218,8 @@ export function preaquecerStripe(pk: string, producao: boolean): void {
 }
 
 /* ───────────────────────── a camada ───────────────────────── */
-const CSS = `
+/** 18/11: exportado só pra /escolha (./planos-checkout.ts) usar a MESMA cara do checkout da /oferta (nada aqui muda) */
+export const CSS = `
 .oc{position:fixed;inset:0;z-index:300;background:#fff;display:flex;flex-direction:column;height:100vh;height:100dvh;overscroll-behavior:contain;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--tx,#1c1a1f);animation:oc-sobe .22s ease}
 .oc[hidden]{display:none!important}
 @keyframes oc-sobe{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}

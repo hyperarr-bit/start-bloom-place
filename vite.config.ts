@@ -64,6 +64,8 @@ const rotaDaMissao = () => {
     else if (/^\/tiktok\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/tiktok\/?/, "/landing.html");
     // 04/11: /oferta = a mesma landing (o <head> vê a rota: página atual a R$ 67,90 + checkout Stripe; chave off → /organizar)
     else if (/^\/oferta\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/oferta\/?/, "/landing.html");
+    // 18/11: /escolha = a mesma landing com os 2 planos (o <head> vê a rota; chave PLANOS_PAGINA off → /oferta)
+    else if (/^\/escolha\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/escolha\/?/, "/landing.html");
     // 29/10: o painel do dono (/vendas → vendas.html, PWA própria com manifest e SW em /vendas/)
     else if (req.url === "/vendas" || req.url === "/vendas/" || req.url?.startsWith("/vendas?")) req.url = "/vendas.html" + (req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "");
     next();

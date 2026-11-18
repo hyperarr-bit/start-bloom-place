@@ -19,7 +19,7 @@
  */
 import { LIMITE_SEMANAL_PADRAO_CENTS, normalizarCodigo } from "./afiliados.ts";
 import { cpfValido, soDigitosCpf } from "./cpf.ts";
-import { OFERTAS_STRIPE } from "./stripe-ofertas.ts";
+import { COMISSAO_FIXA_PLANOS_CENTS, OFERTAS_STRIPE } from "./stripe-ofertas.ts";
 
 export const PCT_INDIQUE = 0.5;
 /** o preço da /oferta: o MESMO da tabela que o stripe-criar cobra (nunca um número solto) */
@@ -107,6 +107,8 @@ export type VendaWeb = {
   metodo?: string | null;
   /** digital do cartão (payment_method_details.card.fingerprint) e IP do checkout */
   cartaoFp?: string | null; ip?: string | null;
+  /** 18/11 (/escolha): comissão FIXA (no lugar dos 50% do valor pago) e o nome do produto no afiliado_vendas */
+  comissaoFixaCents?: number; produto?: string;
 };
 /**
  * pago + motivo "revisar_*" = conta, mas o Pix dessa semana fica SEGURADO pro dono olhar (mesmo aparelho ou mesmo IP pode ser
@@ -128,7 +130,7 @@ export function decidirIndicacao(q: QuemIndica, v: VendaWeb): Decisao {
   if (q.pix_tipo === "EMAIL" && ev && ev === emailComparavel(q.pix_chave)) return trava("autoindicacao_pix");
   if (v.jaEraCliente) return trava("ja_era_cliente");
   if (v.valorCents <= 0) return trava("sem_valor");
-  const comissao = comissaoWebCents(v.valorCents);
+  const comissao = typeof v.comissaoFixaCents === "number" && v.comissaoFixaCents > 0 ? Math.round(v.comissaoFixaCents) : comissaoWebCents(v.valorCents);
   if (v.aparelho && v.aparelho === q.aparelho) return { status: "pago", motivo: "revisar_aparelho", comissao_cents: comissao, liberaDias };
   if (v.ip && v.ip === q.ip) return { status: "pago", motivo: "revisar_ip", comissao_cents: comissao, liberaDias };
   return { status: "pago", motivo: null, comissao_cents: comissao, liberaDias };
@@ -157,7 +159,7 @@ export async function registrarIndicacaoWeb(admin: ClienteMin, indicador: string
   const d = decidirIndicacao(q as QuemIndica, v);
   const { error } = await admin.from("afiliado_vendas").insert({
     afiliado_id: (q as QuemIndica).id, user_id: v.userId, plataforma: "web", transaction_id: v.pi, transaction_id_cobranca: v.pi,
-    produto: v.metodo === "pix" ? "web_oferta_pix" : "web_oferta_cartao", valor_bruto_cents: v.valorCents, valor_liquido_cents: v.valorCents,
+    produto: v.produto ?? (v.metodo === "pix" ? "web_oferta_pix" : "web_oferta_cartao"), valor_bruto_cents: v.valorCents, valor_liquido_cents: v.valorCents,
     comissao_cents: d.comissao_cents, status: d.status, motivo: d.motivo, cobrado_em: agora.toISOString(),
     libera_em: new Date(agora.getTime() + d.liberaDias * 86400e3).toISOString(),
     comprador_email_hash: v.email ? await hashEmail(emailComparavel(v.email) ?? v.email) : null,
@@ -276,7 +278,9 @@ export async function reprocessarIndicacaoWeb(admin: ClienteMin, j: PiParaReproc
   if (!j || typeof j.id !== "string") return { r: "sem_pi" };
   const md = j.metadata ?? {};
   if (j.status !== "succeeded") return { r: "nao_pago" };
-  if ((md.pagina ?? "oferta") !== "oferta") return { r: "outra_pagina" };
+  const pagina = md.pagina ?? "oferta";
+  // 18/11: e o vitalício da /escolha (comissão fixa). O mensal da /escolha não passa por aqui (a comissão dele é do 2º pagamento).
+  if (pagina !== "oferta" && pagina !== OFERTAS_STRIPE.planos.pagina) return { r: "outra_pagina" };
   if (!md.indicador) return { r: "sem_indicador" };
   const { data: subs, error } = await admin.from("subscriptions").select("user_id, customer_email").eq("abacatepay_billing_id", j.id).eq("payment_method", "stripe").limit(1);
   if (error) throw new Error(`reprocessar_ler: ${(error as Erro)?.message ?? error}`);
@@ -291,6 +295,7 @@ export async function reprocessarIndicacaoWeb(admin: ClienteMin, j: PiParaReproc
     pi: j.id, valorCents: Number(j.amount_received || j.amount || 0), email: (sub.customer_email ?? t(md.email, 254) ?? j.receipt_email ?? null),
     userId: sub.user_id, aparelho: t(md.aparelho, 64), cpf: t(md.cpf, 14), jaEraCliente: false, metodo,
     cartaoFp: typeof fp === "string" ? fp : null, ip: t(md.ip, 64),
+    ...(pagina === OFERTAS_STRIPE.planos.pagina ? { comissaoFixaCents: COMISSAO_FIXA_PLANOS_CENTS, produto: "web_planos_vitalicio" } : {}),
   }, agora);
 }
 
@@ -374,7 +379,9 @@ export function ehPagante(linhas: LinhaAssinatura[] | null | undefined, agora: D
 export function compraValeLink(pi: { id?: unknown; status?: unknown; metadata?: Record<string, unknown> | null } | null, ref: string): boolean {
   if (!pi || typeof pi.id !== "string") return false;
   const md = pi.metadata ?? {};
-  return pi.status === "succeeded" && md.ref === ref && (md.pagina ?? "oferta") === "oferta";
+  // 18/11: o vitalício da /escolha também dá link (o mensal não: o link é de quem comprou o vitalício)
+  const pagina = md.pagina ?? "oferta";
+  return pi.status === "succeeded" && md.ref === ref && (pagina === "oferta" || pagina === OFERTAS_STRIPE.planos.pagina);
 }
 
 /**

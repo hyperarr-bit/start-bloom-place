@@ -20,7 +20,7 @@
 import { creditarPedido } from "./grant-pix.ts";
 import { assuntoVenda, htmlVenda } from "./email-venda.ts";
 import { acharContaHotmart, eventoPurchaseHotmart, mascararEmail, type AdminHotmart, type RegistroHotmart } from "./hotmart.ts";
-import { MENSAL_APP_WEB, OFERTAS_STRIPE, ofertaDaPagina } from "./stripe-ofertas.ts";
+import { COMISSAO_FIXA_PLANOS_CENTS, MENSAL_APP_WEB, MENSAL_PLANOS, OFERTAS_STRIPE, mensalDaPagina, ofertaDaPagina } from "./stripe-ofertas.ts";
 import { avisarMensalStripeComVitalicio, registrarPagoEmDobro } from "./landing-travas.ts";
 import { PRESENTE_STRIPE, compraIgnorada, donoDaCompra } from "./stripe-presente.ts";
 import { garantirPresente, mandarLinkPorEmail } from "./presente.ts";
@@ -34,6 +34,10 @@ type ClienteMin = { from: (t: string) => any };
  *  (_shared/stripe-ofertas.ts) manda — cada página só libera o preço DELA; estas constantes são a linha "oferta". */
 export const STRIPE_PRECO_CENTAVOS = OFERTAS_STRIPE.oferta.centavos;
 export const PAGINA_STRIPE = OFERTAS_STRIPE.oferta.pagina;
+/** 18/11: a /escolha (2 planos) — o vitalício dela tem indique e ganhe com comissão FIXA (COMISSAO_FIXA_PLANOS_CENTS) */
+export const PAGINA_PLANOS = OFERTAS_STRIPE.planos.pagina;
+/** as páginas cujo vitalício grava venda indicada (o ?ref= da página vira metadata[indicador] do PI) */
+const COM_INDIQUE = new Set([PAGINA_STRIPE, PAGINA_PLANOS]);
 export const GATEWAY_STRIPE = "stripe";
 export const OFERTA_STRIPE = "ST_oferta";
 export const TOLERANCIA_ASSINATURA_S = 300;
@@ -317,11 +321,13 @@ export async function tratarStripe(deps: DepsStripe, req: { assinatura: string |
     // 23/11 (indique e ganhe): a venda veio por um link de indicação → grava a comissão (1× por PI; as travas de autoindicação
     // moram em ./indique.ts). Antes do "nada a creditar": num reenvio da Stripe a linha já existe e nada muda.
     // Erro aqui NUNCA segura a entrega de quem comprou (e-mail, CAPI): alarme pro dono e segue.
-    if (deps.indique && md.indicador && oferta.pagina === PAGINA_STRIPE) {
+    if (deps.indique && md.indicador && COM_INDIQUE.has(oferta.pagina)) {
       try {
         const ri = await deps.indique.registrar(md.indicador, {
           pi: pi.id, valorCents: valor, email: emailConta ?? emailCompra, userId: conta.userId, aparelho: t(md.aparelho, 64), cpf: t(md.cpf, 14),
           jaEraCliente: g.r === "preservado", metodo: cob?.metodo ?? null, cartaoFp: cob?.cartaoFp ?? null, ip: t(md.ip, 64),
+          // 18/11 (/escolha): comissão FIXA de R$ 33,95 (no lugar dos 50% do valor pago)
+          ...(oferta.pagina === PAGINA_PLANOS ? { comissaoFixaCents: COMISSAO_FIXA_PLANOS_CENTS, produto: "web_planos_vitalicio" } : {}),
         });
         log("indique — venda indicada", { pi: pi.id, ...(ri && typeof ri === "object" ? ri as Record<string, unknown> : {}) });
       } catch (e) { await alarmeIndique(deps, pi.id, "venda", e, md.indicador); }
@@ -337,7 +343,7 @@ export async function tratarStripe(deps: DepsStripe, req: { assinatura: string |
     // 1 de cada por PI (reserva em webhook_events) — roda no crédito E no "já creditado" (reenvio)
     let emailFalhou = false;
     if (emailConta && await reservar(admin, `stripe-email:${pi.id}`, "email") === "ok") {
-      const ok = await deps.enviarEmail(emailConta, assuntoVenda("lifetime"), htmlVenda({ email: emailConta, nome: null, periodo: "lifetime", fim: g.r === "creditado" ? g.fim : null, hoje: true, ...(deps.indiqueNoEmail && oferta.pagina === PAGINA_STRIPE ? { extra: blocoIndiqueEmail() } : {}) })).catch(() => false);
+      const ok = await deps.enviarEmail(emailConta, assuntoVenda("lifetime"), htmlVenda({ email: emailConta, nome: null, periodo: "lifetime", fim: g.r === "creditado" ? g.fim : null, hoje: true, ...(deps.indiqueNoEmail && COM_INDIQUE.has(oferta.pagina) ? { extra: blocoIndiqueEmail() } : {}) })).catch(() => false);
       if (!ok) { await soltar(admin, `stripe-email:${pi.id}`); emailFalhou = true; }
       log(ok ? "e-mail da compra enviado" : "e-mail da compra FALHOU", { para: mascararEmail(emailConta) });
     }
@@ -400,7 +406,7 @@ export const EVENTOS_ASSINATURA = ["invoice.paid", "invoice.payment_failed", "cu
  *  a 1ª fatura tem metadata app_web_mensal; as renovações são achadas pela assinatura (linha nossa ou metadata dela).
  *  PI sem página que não for de assinatura nossa continua caindo no "Venda Stripe IGNORADA" (com push). */
 export async function ehPiDeFaturaNossa(deps: DepsStripe, obj: Record<string, unknown>, md: Record<string, string>, piId: string): Promise<boolean> {
-  if (md.pagina === MENSAL_APP_WEB.pagina) return true;
+  if (mensalDaPagina(md.pagina)) return true; // 18/11: o /funil-app e a /escolha
   if (md.pagina) return false;
   const pareceFatura = !!obj.invoice || /^Subscription/i.test(String(obj.description ?? "")) || (typeof obj.customer === "string" && !!obj.customer);
   if (!pareceFatura || !deps.assinaturaDoPagamento) return false;
@@ -408,7 +414,7 @@ export async function ehPiDeFaturaNossa(deps: DepsStripe, obj: Record<string, un
   if (!sub) return false;
   if (await linhaDaAssinatura(deps.admin as unknown as ClienteMin, sub)) return true;
   const s = deps.buscarAssinatura ? await deps.buscarAssinatura(sub).catch(() => null) : null;
-  return ((s?.metadata ?? {}) as Record<string, unknown>).pagina === MENSAL_APP_WEB.pagina;
+  return !!mensalDaPagina(((s?.metadata ?? {}) as Record<string, unknown>).pagina);
 }
 
 /** o vitalício entrou por cima de um mensal da Stripe vivo: cancela a renovação no fim do período (sem cobrar de novo) + avisa */
@@ -431,7 +437,7 @@ async function cancelarMensalPorVitalicio(deps: DepsStripe, userId: string, pedi
   }
 }
 
-type Fatura = { id: string; sub: string | null; meta: Record<string, string>; valor: number; moeda: string; fimS: number | null; inicioS: number | null; motivo: string; email: string | null; tentativa: number };
+type Fatura = { id: string; sub: string | null; meta: Record<string, string>; valor: number; moeda: string; fimS: number | null; inicioS: number | null; motivo: string; email: string | null; tentativa: number; /** 18/11: o PI que pagou a fatura (versão antiga: payment_intent; nova: payments) — a chave da comissão do mensal */ pi: string | null };
 export function lerFatura(o: Record<string, unknown>): Fatura | null {
   const id = t(o.id, 80);
   if (!id || !/^in_/.test(id)) return null;
@@ -446,7 +452,20 @@ export function lerFatura(o: Record<string, unknown>): Fatura | null {
     id, sub, meta, valor: Number(o.amount_paid) || 0, moeda: String(o.currency ?? "").toLowerCase(),
     fimS: Number(linha.period?.end) || Number(o.period_end) || null, inicioS: Number(linha.period?.start) || Number(o.period_start) || null,
     motivo: String(o.billing_reason ?? ""), email: t(o.customer_email, 254)?.toLowerCase() ?? null, tentativa: Number(o.attempt_count) || 0,
+    pi: piDaFaturaWebhook(o),
   };
+}
+/** 18/11: o PI de uma fatura, nas 2 formas da API (payment_intent | payments.data[].payment.payment_intent) */
+function piDaFaturaWebhook(o: Record<string, unknown>): string | null {
+  const v = o.payment_intent;
+  const direto = typeof v === "string" ? v : String((v as { id?: string } | null | undefined)?.id ?? "");
+  if (/^pi_/.test(direto)) return direto;
+  for (const x of ((o.payments as { data?: Array<{ payment?: { payment_intent?: unknown } }> } | undefined)?.data ?? [])) {
+    const p = x.payment?.payment_intent;
+    const id = typeof p === "string" ? p : String((p as { id?: string } | null | undefined)?.id ?? "");
+    if (/^pi_/.test(id)) return id;
+  }
+  return null;
 }
 /** o fim do período da assinatura (versões novas: no item) */
 function fimDaAssinatura(s: Record<string, unknown>): number | null {
@@ -511,7 +530,11 @@ async function tratarAssinatura(deps: DepsStripe, tipo: string, obj: Record<stri
     meta = {}; for (const [k, v] of Object.entries(m)) if (typeof v === "string") meta[k] = v.slice(0, 500);
   }
   const linha = await linhaDaAssinatura(admin, f.sub);
-  if (meta.pagina !== MENSAL_APP_WEB.pagina && !linha) { log("fatura de assinatura que não é do /funil-app", { tipo, sub: f.sub }); return { status: 200, corpo: { ok: true, ignorado: "outra_assinatura" } }; }
+  if (!mensalDaPagina(meta.pagina) && !linha) { log("fatura de assinatura que não é nossa (/funil-app ou /escolha)", { tipo, sub: f.sub }); return { status: 200, corpo: { ok: true, ignorado: "outra_assinatura" } }; }
+  // 18/11: a regra do mensal desta assinatura (/funil-app ou /escolha). Sem página (renovação de linha antiga) = a do /funil-app.
+  const mensal = mensalDaPagina(meta.pagina) ?? MENSAL_APP_WEB;
+  const doPlanos = mensal.pagina === MENSAL_PLANOS.pagina;
+  const metodoMensal = meta.metodo === "pix" ? "pix" : "card";
 
   if (tipo === "invoice.payment_failed") {
     // 14/11 (revisão): falha ATRASADA de uma fatura que já foi paga (2ª tentativa ok) não pode derrubar pra past_due
@@ -530,7 +553,7 @@ async function tratarAssinatura(deps: DepsStripe, tipo: string, obj: Record<stri
 
   // invoice.paid
   const base = { sub: f.sub, fatura: f.id, valor: f.valor, motivo: f.motivo };
-  if (f.moeda !== "brl" || f.valor !== MENSAL_APP_WEB.centavos) {
+  if (f.moeda !== "brl" || f.valor !== mensal.centavos) {
     log("fatura do mensal com valor diferente — ignorada", base);
     if (await reservar(admin, `stripe-ignorada:${f.id}`, "ignorada") === "ok") {
       try { await admin.from("analytics_events").insert({ event_name: "stripe_venda_ignorada", user_id: linha?.user_id ?? null, event_data: { motivo: "valor_mensal", fatura: f.id, sub: f.sub, valor_cents: f.valor, moeda: f.moeda } }); } catch { /* o push ainda sai */ }
@@ -552,12 +575,27 @@ async function tratarAssinatura(deps: DepsStripe, tipo: string, obj: Record<stri
   const agendada = subAgora?.cancel_at_period_end === true;
   if (linha) {
     // renovação (ou a 1ª fatura que chegou de novo): a MESMA linha, fim novo
-    const { error } = await admin.from("subscriptions").update({ status: encerrada ? "canceled" : agendada ? "cancel_scheduled" : "active", current_period_end: fim, amount_cents: f.valor }).eq("id", linha.id);
+    // 18/11: o fim só ANDA pra frente (uma fatura antiga paga atrasada — retentativa do Pix Automático — nunca encurta o acesso)
+    const fimFinal = linha.current_period_end && Date.parse(linha.current_period_end) > Date.parse(fim) ? new Date(Date.parse(linha.current_period_end)).toISOString() : fim;
+    const { error } = await admin.from("subscriptions").update({ status: encerrada ? "canceled" : agendada ? "cancel_scheduled" : "active", current_period_end: fimFinal, amount_cents: f.valor }).eq("id", linha.id);
     if (error) { await soltar(admin, `stripe-fatura:${f.id}`); throw new Error(String((error as Erro)?.message ?? error)); }
     // revisão 3: pagou uma fatura de assinatura JÁ encerrada (a pessoa paga e não tem acesso) → o dono confere/devolve
     if (encerrada) await deps.avisarDono("⚠️ Mensal Stripe: fatura paga numa assinatura encerrada", `Assinatura ${f.sub} · fatura ${f.id} · ${reais(f.valor)} · sem acesso — devolver ou reativar`, `stripe-paga-encerrada:${f.id}`).catch(() => {});
     try { await admin.from("analytics_events").insert({ event_name: "stripe_assinatura_renovou", user_id: linha.user_id, event_data: { sub: f.sub, fatura: f.id, valor_cents: f.valor, motivo: f.motivo } }); } catch { /* luxo */ }
     log("mensal renovado", base);
+    // 18/11 (/escolha, indique e ganhe): a comissão do mensal nasce no 2º PAGAMENTO pago — a 1ª renovação (subscription_cycle). 1× por
+    // assinatura (reserva própria): a 3ª, 4ª… nunca pagam de novo. Comissão FIXA (R$ 33,95). Erro aqui nunca segura a renovação.
+    if (doPlanos && deps.indique && meta.indicador && f.motivo === "subscription_cycle" && !encerrada && await reservar(admin, `stripe-indique-mensal:${f.sub}`, "indique") === "ok") {
+      const chave = f.pi ?? f.id;
+      try {
+        const ri = await deps.indique.registrar(meta.indicador, {
+          pi: chave, valorCents: f.valor, email: (meta.email ?? f.email ?? null), userId: linha.user_id, aparelho: t(meta.aparelho, 64), cpf: null,
+          jaEraCliente: false, metodo: metodoMensal, cartaoFp: null, ip: t(meta.ip, 64),
+          comissaoFixaCents: COMISSAO_FIXA_PLANOS_CENTS, produto: `web_planos_mensal_${metodoMensal}`,
+        });
+        log("indique — mensal no 2º pagamento", { sub: f.sub, pi: chave, ...(ri && typeof ri === "object" ? ri as Record<string, unknown> : {}) });
+      } catch (e) { await alarmeIndique(deps, chave, "venda", e, meta.indicador); }
+    }
     return { status: 200, corpo: { ok: true, renovado: true } };
   }
 
@@ -591,7 +629,7 @@ async function tratarAssinatura(deps: DepsStripe, tipo: string, obj: Record<stri
     const anterior = vit ?? outroMensal;
     if (anterior) {
       dobro = vit ? "vitalicio" : "mensal";
-      await registrarPagoEmDobro(admin as never, { userId: conta.userId, orderId: f.sub, amountCents: f.valor, pedidoAnterior: anterior.abacatepay_billing_id ?? null, offer: MENSAL_APP_WEB.offer, agora }).catch(() => false);
+      await registrarPagoEmDobro(admin as never, { userId: conta.userId, orderId: f.sub, amountCents: f.valor, pedidoAnterior: anterior.abacatepay_billing_id ?? null, offer: mensal.offer, agora }).catch(() => false);
       const ok = deps.cancelarAssinatura ? await deps.cancelarAssinatura(f.sub, false).catch(() => false) : false;
       dobroCancelado = ok;
       await deps.avisarDono(`⚠️ Mensal Stripe em dobro (já tinha ${dobro})`, `Assinatura ${f.sub} · ${reais(f.valor)} · ${ok ? "renovação cancelada" : "CANCELE na Stripe"} · devolver pelo chamado`, `stripe-dobro:${f.sub}`).catch(() => {});
@@ -610,14 +648,14 @@ async function tratarAssinatura(deps: DepsStripe, tipo: string, obj: Record<stri
     if (!ok) { await soltar(admin, `stripe-email:${f.sub}`); log("e-mail do mensal FALHOU", { para: mascararEmail(emailConta) }); }
   }
   if (await reservar(admin, `stripe-venda:${f.sub}`, "venda") === "ok") {
-    try { await admin.from("analytics_events").insert({ event_name: "stripe_venda", user_id: conta.userId, event_data: { sub: f.sub, fatura: f.id, pagina: "app_web", plano: "mensal", valor_cents: f.valor, metodo: "card", parcelas: 1, via: conta.via, ref: meta.ref ?? null } }); } catch { await soltar(admin, `stripe-venda:${f.sub}`); }
+    try { await admin.from("analytics_events").insert({ event_name: "stripe_venda", user_id: conta.userId, event_data: { sub: f.sub, fatura: f.id, pagina: doPlanos ? PAGINA_PLANOS : "app_web", plano: "mensal", valor_cents: f.valor, metodo: metodoMensal, parcelas: 1, via: conta.via, ref: meta.ref ?? null } }); } catch { await soltar(admin, `stripe-venda:${f.sub}`); }
   }
   if (!dobro && await reservar(admin, `stripe-capi:${f.sub}`, "capi") === "ok") {
     const reg: RegistroHotmart = { userId: null, dados: { fbp: meta.fbp, fbc: meta.fbc, fbclid: meta.fbclid, client_ip: meta.ip, user_agent: meta.ua, source_url: meta.url }, criadoEm: meta.criado_em ?? null, conflito: false };
     const corpo = await eventoPurchaseHotmart({ tx: f.sub, valorCents: f.valor, userId: conta.userId, email: emailConta, registro: reg, agoraMs: agora.getTime() });
     for (const d of (corpo.data as Array<Record<string, unknown>>)) {
-      (d.custom_data as Record<string, unknown>).content_name = MENSAL_APP_WEB.contentName;
-      if (!meta.url) d.event_source_url = MENSAL_APP_WEB.urlPadrao;
+      (d.custom_data as Record<string, unknown>).content_name = mensal.contentName;
+      if (!meta.url) d.event_source_url = mensal.urlPadrao;
     }
     const ok = await deps.mandarCapi(corpo).catch(() => false);
     log(ok ? "Purchase CAPI (mensal) enviado" : "Purchase CAPI (mensal) falhou", { sub: f.sub });

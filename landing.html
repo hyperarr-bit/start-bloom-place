@@ -128,6 +128,18 @@
         // presente NÃO aparece (nem o cartão é salvo). QA: ?indique=on|off (fica: localStorage + cookie), ?indique=auto desfaz. Vira
         // html[data-indique="on"]. Antes de ligar: migração 20261123120000 + deploy afiliados/stripe-criar/stripe-webhook + env INDIQUE_WEB=on.
         var INDIQUE_OFERTA = "on";
+        // 18/11 (dono): /escolha — a página dos 2 PLANOS (Mensal R$ 34,90/mês · Vitalício R$ 97,90) num LINK PRÓPRIO, pra uma campanha só
+        // dela (não é sorteio na /oferta). "off" = o /escolha não vende: vai pra /oferta com a mesma query (utm/fbclid). A /oferta, o
+        // /organizar, a /vida, o /vitalicio e o /simples não leem nada disto. QA só FORA do domínio de produção: ?planos=on.
+        // O checkout é src/landing/planos-checkout.ts (Pix + cartão até 12x no vitalício; cartão no mensal). Rollback: "off".
+        // Antes de ligar: PRECISA-DO-DONO.md (deploy das funções, permissões da chave, eventos do webhook, 1 compra real de cada).
+        var PLANOS_PAGINA = "off";
+        // 18/11: o Pix AUTOMÁTICO no mensal (o botão Pix aparece no plano mensal). "off" = mensal só no cartão. Ligar só depois de
+        // "Pagamentos recorrentes" do PIX ativo na Stripe (~3 dias) + env STRIPE_PIX_RECORRENTE=on. QA fora de produção: ?pixmensal=on.
+        var PLANOS_PIX_MENSAL = "off";
+        var PLANOS_VITALICIO_CENTAVOS = 9790; // só pra exibir — o valor cobrado vem SEMPRE do servidor (stripe-ofertas.ts "planos")
+        var PLANOS_MENSAL_CENTAVOS = 3490; // só pra exibir — o servidor confere o preço da Stripe (STRIPE_PRECO_MENSAL_34)
+        var PLANOS_PARCELAS_MAX = 12;
         var CHECKOUT_ORG_V2 = "off"; // 08/11: checkout novo do /organizar (cara do checkout v2, o Pix do Asaas de hoje) construído e DESLIGADO — "on" = todo o /organizar, nos 2 braços do AB_LP (sem sorteio) · rollback "off"
         var STRIPE_PK = "pk_live_51TJnAQQdjmrIbUhHDSWqG1trOT6mFfV87AC4Vv47kFJTAFOhYsNmvryGRnf3x824Ke3mXSsWiFCovKPIR6Kqx0IX00VcuAawhC"; // a chave PUBLICÁVEL (pk_live_…); com "PREENCHER" = comportamento off
         var STRIPE_PRECO_CENTAVOS = 6790; // só pra exibir — o valor cobrado vem SEMPRE do servidor (stripe-criar)
@@ -168,7 +180,7 @@
         }
 
         // 05/11: na /vida a oferta é sempre "sempre" (vitalício) — ignora ?oferta=ano e a força guardada (nenhum 27,90 do "ano" lá)
-        var naVida = /^\/(vida|oferta|vitalicio|simples|tiktok)\/?$/.test(location.pathname || ""); /* 11/11: e o /simples (a LP de uma tela é sempre vitalício) */ // 04/11: a /oferta também (vitalício, nada de 27,90); 07/11: e o /vitalicio
+        var naVida = /^\/(vida|oferta|vitalicio|simples|tiktok|escolha)\/?$/.test(location.pathname || ""); /* 18/11: e a /escolha (2 planos) */ /* 11/11: e o /simples (a LP de uma tela é sempre vitalício) */ // 04/11: a /oferta também (vitalício, nada de 27,90); 07/11: e o /vitalicio
         var po = naVida ? null : pega("oferta");
         if (po === "ano" || po === "sempre") grava("landing-oferta-force", po);
         var o = naVida ? "sempre" : (po === "ano" || po === "sempre") ? po : le("landing-oferta-force");
@@ -267,9 +279,28 @@
         // checkout em tela cheia do /organizar (./checkout-organizar.ts — o MESMO Pix de R$ 27,90 do Asaas), SEMPRE, sem ler CHECKOUT_ORG_V2
         // nem a força do ?cko. Por baixo é o /organizar no braço "atual" (sem sorteio do AB_LP nem força do ?lp): do QR em diante é o
         // cartão de hoje. Vira html[data-uma]; os eventos se separam pelo path "/simples" (+ braco_cko "v2"). O /organizar não muda.
+        // 18/11: /escolha — os 2 planos (PLANOS_PAGINA). Por baixo é a página de hoje da /oferta (braço "atual", sem nenhum sorteio da /oferta)
+        // com o cartão dos 2 planos e o checkout próprio. Desligada (ou pk no placeholder) → /oferta com a mesma query, sem data-pagina.
+        var PLANOS = /^\/escolha\/?$/.test(location.pathname || "");
+        if (PLANOS) {
+          var fora = !/(^|\.)coreaplicativo\.com\.br$/.test(location.hostname || "");
+          var plq = pega("planos");
+          var plPk = /^pk_(live|test)_[A-Za-z0-9]+$/.test(STRIPE_PK) && !/PREENCHER/i.test(STRIPE_PK);
+          if (!plPk || !(PLANOS_PAGINA === "on" || (fora && plq === "on"))) {
+            d.setAttribute("data-desligada", "");
+            try { location.replace("/oferta" + (location.search || "") + (location.hash || "")); } catch (epl) {}
+            return;
+          }
+          d.setAttribute("data-pagina", "planos");
+          d.setAttribute("data-checkout-ext", "stripe");
+          var ppm = pega("pixmensal");
+          mem.pagina = "planos"; mem.checkout_ext = "stripe"; mem.ab_planos = PLANOS_PAGINA; mem.planos_forcado = PLANOS_PAGINA !== "on";
+          mem.stripe_pk = STRIPE_PK; mem.planos_vitalicio_centavos = PLANOS_VITALICIO_CENTAVOS; mem.planos_mensal_centavos = PLANOS_MENSAL_CENTAVOS;
+          mem.planos_parcelas_max = PLANOS_PARCELAS_MAX; mem.planos_pix_mensal = PLANOS_PIX_MENSAL === "on" || (fora && ppm === "on");
+        }
         var UMA = /^\/(simples|tiktok)\/?$/.test(location.pathname || ""); /* 12/11: /tiktok = o MESMO /simples num link próprio (dono vai divulgar no TikTok; as vendas se separam pelo path "/tiktok") */
         if (UMA) { d.setAttribute("data-uma", ""); mem.uma = true; }
-        var plp = VIDA || OFERTA || UMA ? null : pega("lp");
+        var plp = VIDA || OFERTA || UMA || PLANOS ? null : pega("lp");
         if (plp === "v2" || plp === "atual") grava("landing-lp-force", plp);
         if (plp === "auto") grava("landing-lp-force", null);
         // 04/11: o braço da /vida (AB_VIDA): "v3" = página v2 · "atual" = a página de hoje do /organizar (com a Hotmart)
@@ -288,8 +319,8 @@
           d.setAttribute("data-vida", bvida);
           mem.vida = bvida; mem.ab_vida = AB_VIDA;
         }
-        var lp = OFERTA || UMA ? "atual" : VIDA ? (bvida === "atual" ? "atual" : "v2") : (plp === "v2" || plp === "atual") ? plp : le("landing-lp-force");
-        mem.lp_forcado = !VIDA && !OFERTA && !UMA && (lp === "v2" || lp === "atual");
+        var lp = OFERTA || UMA || PLANOS ? "atual" : VIDA ? (bvida === "atual" ? "atual" : "v2") : (plp === "v2" || plp === "atual") ? plp : le("landing-lp-force");
+        mem.lp_forcado = !VIDA && !OFERTA && !UMA && !PLANOS && (lp === "v2" || lp === "atual");
         if (lp !== "v2" && lp !== "atual") {
           lp = "atual";
           // outro bit da conta (o bit 0 do djb2 é só a paridade dos caracteres — seria o MESMO braço do checkout) → independente
@@ -435,7 +466,7 @@
         // Se um dia precisar de sorteio: bit 4 de "cko:"+id (os bits 0, 8, 12, 16, 20 e 24 já são de outros sorteios).
         // 11/11: no /simples a camada vale SEMPRE (sem chave, sem ?cko, sem ler nem gravar a força do /organizar).
         if (UMA) { d.setAttribute("data-cko", "v2"); mem.cko = "v2"; mem.cko_forcado = false; mem.ab_cko = "uma"; }
-        else if (!VIDA && !OFERTA) {
+        else if (!VIDA && !OFERTA && !PLANOS) {
           var pko = pega("cko"), cookieCko = null;
           try { var csc = String(document.cookie || "").split(";"); for (var ikc = 0; ikc < csc.length; ikc++) { var jkc = csc[ikc].indexOf("="); if (jkc > 0 && csc[ikc].slice(0, jkc).trim() === "landing_cko_force") cookieCko = csc[ikc].slice(jkc + 1).trim(); } } catch (ec0) {}
           if (pko === "v2" || pko === "atual" || pko === "auto") {
@@ -973,6 +1004,39 @@
          data-cko-falhou = o módulo da camada não carregou: o cartão volta a ser o de hoje, com o campo.
          aria-busy = tocou num botão que abre a camada antes de o módulo dela chegar: o botão esmaece na hora (como o da Hotmart). -->
     <style>html[data-cko="v2"]:not([data-cko-falhou]) .lp-email-antes { display: none !important; } html[data-cko="v2"] [data-ir="oferta"][aria-busy="true"], html[data-cko="v2"] #lp-pagar[aria-busy="true"] { opacity: .75; pointer-events: none; }</style>
+    <!-- 18/11: /escolha (html[data-pagina="planos"], chave PLANOS_PAGINA) = a página de hoje da /oferta com o cartão dos 2 planos. Fora do 1º <style>
+         (os testes da /oferta comparam o 1º <style> com o de hoje). As peças novas vêm do template "pl-tpl" (no fim do corpo da página); o que a /oferta
+         mostra e a /escolha não ("só hoje", "Pra sempre por", o preço único, o "Renova sozinho? Não") some aqui. Fora da /escolha nenhuma regra
+         daqui casa (todas começam por html[data-pagina="planos"], .pl- ou [data-so-planos]). -->
+    <style>
+      html:not([data-pagina="planos"]) [data-so-planos] { display: none !important; }
+      html[data-pagina="planos"] .lp-promo[data-so-lp="atual"],
+      html[data-pagina="planos"] #como .lp-passos > li[data-so-ext="hotmart"],
+      html[data-pagina="planos"] .lp-card-faixa > span[data-so-lp="atual"],
+      html[data-pagina="planos"] .lp-card-faixa > .lp-faixa-dir[data-so-lp="atual"],
+      html[data-pagina="planos"] .lp-preco-tit[data-so-ext="hotmart"][data-so-lp="atual"],
+      html[data-pagina="planos"] .lp-preco-sub[data-so-ext="hotmart"][data-so-lp="atual"],
+      html[data-pagina="planos"] .lp-checks > li[data-so-oferta="sempre"][data-so-lp="atual"],
+      html[data-pagina="planos"] #duvidas details[data-so-ext="hotmart"][data-so-oferta="sempre"],
+      html[data-pagina="planos"] #fim h2[data-so-ext="hotmart"][data-so-lp="atual"],
+      html[data-pagina="planos"] #lp-fixo button[data-so-ext="hotmart"][data-so-lp="atual"] { display: none !important; }
+      [data-so-planos][hidden] { display: none !important; }
+      .pl-planos { display: grid; gap: 12px; margin: 16px 0 18px; text-align: left; }
+      .pl-plano { position: relative; display: block; width: 100%; margin: 0; padding: 15px 16px 14px; border-radius: 16px; border: 1.5px solid #d9d4dd; background: #fff; color: var(--tx); font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+      .pl-plano[aria-checked="true"] { border: 2px solid var(--magenta); background: var(--magenta-suave, #fdf2f8); padding: 14.5px 15.5px 13.5px; box-shadow: 0 8px 22px -14px rgba(214, 51, 138, .55); }
+      .pl-plano:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(214, 51, 138, .25); }
+      .pl-selo { position: absolute; top: -11px; left: 14px; padding: 3px 10px; border-radius: 99px; background: var(--magenta); color: #fff; font-size: 11.5px; font-weight: 800; letter-spacing: .02em; }
+      .pl-linha { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+      .pl-nome { display: inline-flex; align-items: center; gap: 9px; font-size: 17px; font-weight: 800; }
+      .pl-nome::before { content: ""; flex: none; width: 18px; height: 18px; border-radius: 50%; border: 2px solid #c9c3cd; background: #fff; box-sizing: border-box; }
+      .pl-plano[aria-checked="true"] .pl-nome::before { border: 5.5px solid var(--magenta); }
+      .pl-preco { font-size: 22px; font-weight: 850; letter-spacing: -.02em; white-space: nowrap; }
+      .pl-preco small { font-size: 14px; font-weight: 700; color: var(--suave); letter-spacing: 0; }
+      .pl-parc { display: block; margin-top: 3px; font-size: 15.5px; font-weight: 800; color: var(--magenta-escuro, #b02a72); text-align: right; }
+      .pl-sub { display: block; margin: 4px 0 0 27px; font-size: 13.5px; color: var(--suave); }
+      .pl-compara { margin: 0; font-size: 13px; color: var(--suave); text-align: center; }
+      html[data-pagina="planos"] .pl-tit { margin-bottom: 0; }
+    </style>
     <!-- 11/11: /simples (html[data-uma]) = a LP de uma tela. Da página de hoje ficam só a marca, a 1ª tela nova (#uma, que nasce de um
          <template> logo depois da marca) e o cartão do Pix — e o cartão só aparece do QR em diante (data-uma-cartao, posto pelo landing.ts),
          com o "Seu 2027" na tela ou se a camada do checkout não carregou (data-cko-falhou: o cartão de hoje, com o campo do e-mail).
@@ -1625,6 +1689,34 @@
       <span class="lp2-fixo-p" data-so-lp="v2"><b>R$ 27,90</b><span>Vitalício<i> · Pix</i></span></span>
       <button type="button" class="lp-cta" data-ir="oferta" tabindex="-1" data-so-lp="v2">Quero organizar minha vida</button>
     </div>
+    <!-- 18/11: /escolha (html[data-pagina="planos"], chave PLANOS_PAGINA) = a página de hoje da /oferta com o cartão dos 2 planos. Tudo que é só
+         da /escolha mora AQUI, num template (fora da /escolha nada disto existe na página): o src/landing/landing.ts põe cada peça logo
+         DEPOIS do elemento de data-pl-depois. O que a /escolha esconde da /oferta está no estilo da /escolha, no cabeçalho. Os preços escritos
+         aqui são os do <head> (PLANOS_*_CENTAVOS; o landing.ts reescreve, o teste confere que batem). -->
+    <template id="pl-tpl">
+      <div class="lp-promo" role="note" data-so-planos data-pl-depois='.lp-promo[data-so-lp="atual"]'><b>CORE</b> <span>· App Store, Google Play e computador</span></div>
+      <li data-so-planos data-pl-depois='#como .lp-passos > li[data-so-ext="hotmart"]'><span class="lp-num">1</span><div class="lp-passo"><b>Escolha mensal ou vitalício</b><span>Pix ou cartão. O acesso chega no seu e-mail.</span></div></li>
+      <span data-so-planos data-pl-depois='.lp-card-faixa > span:first-child'>CORE · as 16 áreas da vida</span>
+      <h2 class="lp-preco-tit pl-tit" data-so-planos data-pl-depois='.lp-preco-tit[data-so-ext="hotmart"][data-so-lp="atual"]'>Escolha seu plano</h2>
+      <div class="pl-planos" id="pl-planos" role="radiogroup" aria-label="Escolha seu plano" data-so-planos data-pl-depois=".pl-tit">
+        <button type="button" class="pl-plano" role="radio" aria-checked="true" data-plano="vitalicio" id="pl-vitalicio">
+          <span class="pl-selo">Mais escolhido</span>
+          <span class="pl-linha"><span class="pl-nome">Vitalício</span><span class="pl-preco" data-pl-preco="vitalicio">R$&nbsp;97,90</span></span>
+          <span class="pl-parc" data-pl-parcela>ou 12x de R$&nbsp;8,16</span>
+          <span class="pl-sub">Pague uma vez, é seu pra sempre</span>
+        </button>
+        <button type="button" class="pl-plano" role="radio" aria-checked="false" data-plano="mensal" id="pl-mensal">
+          <span class="pl-linha"><span class="pl-nome">Mensal</span><span class="pl-preco"><span data-pl-preco="mensal">R$&nbsp;34,90</span><small>/mês</small></span></span>
+          <span class="pl-sub">Cancele quando quiser</span>
+        </button>
+        <p class="pl-compara">O vitalício custa menos que 3 meses do mensal.</p>
+      </div>
+      <li data-so-planos data-pl-depois='.lp-checks > li[data-so-oferta="sempre"][data-so-lp="atual"]'><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg><span><b>App de verdade:</b> App Store, Google Play e computador.</span></li>
+      <details data-so-planos data-pl-depois='#duvidas details[data-so-ext="hotmart"][data-so-oferta="sempre"]'><summary>Renova sozinho?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary><p>O vitalício, não: você paga uma vez e é seu pra sempre. O mensal renova todo mês até você cancelar; cancelou, o acesso vai até o fim do mês pago.</p></details>
+      <h2 data-so-planos data-pl-depois='#fim h2[data-so-ext="hotmart"][data-so-lp="atual"]'>Sua vida inteira num app só.</h2>
+      <button type="button" class="lp-cta" data-ir="oferta" tabindex="-1" data-so-planos data-pl-depois='#lp-fixo button[data-so-ext="hotmart"][data-so-lp="atual"]'>Quero organizar tudo</button>
+    </template>
+    <script>if (document.documentElement.getAttribute("data-pagina") === "planos") { (function () { var t = document.getElementById("pl-tpl"); if (!t || t.hasAttribute("data-feito")) return; t.setAttribute("data-feito", ""); var els = [].slice.call(t.content.cloneNode(true).children); for (var i = 0; i < els.length; i++) { var a = document.querySelector(els[i].getAttribute("data-pl-depois")); if (a) a.parentNode.insertBefore(els[i], a.nextSibling); } })(); }</script>
     <script type="module" src="/src/landing/landing.ts"></script>
   </body>
 </html>

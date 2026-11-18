@@ -10,7 +10,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { criarOuReaproveitar, formUrl, metadataDoPedido, validarPedidoStripe } from "../_shared/stripe-criar.ts";
-import { assinarAppWeb, cartaoAppWeb, pixAppWeb, RETORNO_APP_WEB, validarAcaoAppWeb } from "../_shared/stripe-app-web.ts";
+import { assinarAppWeb, assinarPixPlanos, cartaoAppWeb, familiaDaPagina, pixAppWeb, validarAcaoAppWeb } from "../_shared/stripe-app-web.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (b: Record<string, unknown>, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
@@ -35,9 +35,11 @@ serve(async (req) => {
     const p = validarPedidoStripe(corpoCru);
     if (!p) return json({ ok: false }, 400);
     // 14/11 (/funil-app): as ações da folha do paywall do app na web — só com pagina "app_web"
-    const acao = p.pagina === "app_web" ? validarAcaoAppWeb(corpoCru) : null;
-    // 14/11 (revisão): o /funil-app só cobra pelas ações (pix/cartao/assinar, parcelas 1–3 conferidas); sem ação não há PI pra ele
-    if (p.pagina === "app_web" && !acao) return json({ ok: false }, 400);
+    // 18/11 (/escolha): a página dos 2 planos (pagina "planos") cobra pelas MESMAS ações, com a família dela (+ "assinar_pix")
+    const familia = familiaDaPagina(p.pagina);
+    const acao = familia ? validarAcaoAppWeb(corpoCru) : null;
+    // 14/11 (revisão): o /funil-app só cobra pelas ações (pix/cartao/assinar, parcelas conferidas); sem ação não há PI pra ele
+    if (familia && !acao) return json({ ok: false }, 400);
     const admin = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false } });
     let userId: string | null = null;
     const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
@@ -45,12 +47,13 @@ serve(async (req) => {
     const ip = (req.headers.get("x-forwarded-for") ?? req.headers.get("cf-connecting-ip") ?? "").split(",")[0]?.trim() || null;
     const md = metadataDoPedido(p, { userId, ip, ua: req.headers.get("user-agent"), agoraIso: new Date().toISOString() });
 
-    if (acao) {
-      const deps = { admin, stripe, log, precoMensal: Deno.env.get("STRIPE_PRECO_MENSAL_34") ?? null };
+    if (acao && familia) {
+      const deps = { admin, stripe, log, precoMensal: Deno.env.get("STRIPE_PRECO_MENSAL_34") ?? null, familia, pixMensal: Deno.env.get("STRIPE_PIX_RECORRENTE") === "on" };
       const ctx = { userId, ip };
       const r = acao.acao === "pix" ? await pixAppWeb(deps, p, md, ctx)
-        : acao.acao === "cartao" ? await cartaoAppWeb(deps, p, md, ctx, { pm: acao.pm!, parcelas: acao.parcelas, returnUrl: RETORNO_APP_WEB })
-        : await assinarAppWeb(deps, p, md, ctx, { pm: acao.pm!, returnUrl: RETORNO_APP_WEB });
+        : acao.acao === "cartao" ? await cartaoAppWeb(deps, p, md, ctx, { pm: acao.pm!, parcelas: acao.parcelas, returnUrl: familia.retorno })
+        : acao.acao === "assinar_pix" ? await assinarPixPlanos(deps, p, md, ctx)
+        : await assinarAppWeb(deps, p, md, ctx, { pm: acao.pm!, returnUrl: familia.retorno });
       return json(r.corpo, r.status);
     }
     const r = await criarOuReaproveitar({ admin, stripe, log }, p, md, { userId, ip });

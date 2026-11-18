@@ -19,19 +19,34 @@
  * Daqui só sai o estado pra tela. Nada de e-mail/segredo no log.
  */
 import { criarOuReaproveitar, formUrl, maisNovoPrimeiro, pixDoIntento, type ChamarStripe, type PedidoStripe } from "./stripe-criar.ts";
-import { MENSAL_APP_WEB, OFERTAS_STRIPE, precoMensalConfere } from "./stripe-ofertas.ts";
+import { API_PIX_AUTOMATICO, MENSAL_APP_WEB, MENSAL_PLANOS, OFERTAS_STRIPE, precoMensalConfere, type MensalStripe, type OfertaStripe } from "./stripe-ofertas.ts";
 
 // deno-lint-ignore no-explicit-any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ClienteMin = { from: (t: string) => any };
+/**
+ * 18/11: a FAMÍLIA de ofertas que estas ações cobram. O /funil-app (app_web) é o padrão e segue IGUAL (mesmas páginas, mesmas chaves
+ * "appweb-…", mesma trava). A /escolha (planos) usa as mesmas regras com as páginas dela ("planos" / "planos_mensal"), as chaves
+ * "planos-…", parcelas até 12x e o Pix Automático no mensal.
+ */
+export type Familia = { vitalicio: OfertaStripe; mensal: MensalStripe; prefixo: string; retorno: string };
+export const FAMILIA_APP_WEB: Familia = { vitalicio: OFERTAS_STRIPE.app_web, mensal: MENSAL_APP_WEB, prefixo: "appweb", retorno: "https://www.coreaplicativo.com.br/funil-app?step=offer" };
+export const FAMILIA_PLANOS: Familia = { vitalicio: OFERTAS_STRIPE.planos, mensal: MENSAL_PLANOS, prefixo: "planos", retorno: "https://www.coreaplicativo.com.br/escolha" };
+export const familiaDaPagina = (pagina: string): Familia | null => (pagina === "app_web" ? FAMILIA_APP_WEB : pagina === "planos" ? FAMILIA_PLANOS : null);
+
 export type DepsAppWeb = {
   admin: ClienteMin; stripe: ChamarStripe; log: (m: string, d?: Record<string, unknown>) => void;
   /** o id do preço mensal (env STRIPE_PRECO_MENSAL_34) */
   precoMensal: string | null;
   agoraMs?: number;
+  /** 18/11: a família (padrão: o /funil-app, como sempre) */
+  familia?: Familia;
+  /** 18/11: o Pix Automático do mensal está liberado no servidor (env STRIPE_PIX_RECORRENTE=on)? Sem isto, assinar_pix = 503. */
+  pixMensal?: boolean;
 };
 export type Ctx = { userId: string | null; ip: string | null };
 export type RespostaAppWeb = { status: number; corpo: Record<string, unknown> };
+const fam = (deps: DepsAppWeb): Familia => deps.familia ?? FAMILIA_APP_WEB;
 
 const V = MENSAL_APP_WEB.apiVersion;
 /** resumo curto e estável de um texto (FNV-1a, 8 hex) — pra chave de idempotência sem expor o e-mail */
@@ -43,37 +58,80 @@ export const PARCELAS_MAX_APP_WEB = OFERTAS_STRIPE.app_web.parcelasMax;
 const temPixVivo = (j: Record<string, unknown>) => !!pixDoIntento(j);
 
 /** o PI mais novo registrado pra esta ref (stripe_order_created). "erro" = o banco não respondeu (as travas param aí). */
-async function piDaRef(admin: ClienteMin, ref: string): Promise<string | null | "erro"> {
+async function piDaRef(admin: ClienteMin, ref: string, pagina = "app_web"): Promise<string | null | "erro"> {
   try {
     const { data, error } = await admin.from("analytics_events").select("event_data, created_at").eq("event_name", "stripe_order_created").eq("event_data->>ref", ref).order("created_at", { ascending: false }).limit(50);
     if (error) return "erro";
-    return maisNovoPrimeiro((data ?? []) as Array<{ event_data?: { pi?: string; pagina?: string }; created_at?: string }>).filter((l) => l.event_data?.pagina === "app_web").map((l) => l.event_data?.pi).find((x): x is string => typeof x === "string" && /^pi_/.test(x)) ?? null;
+    return maisNovoPrimeiro((data ?? []) as Array<{ event_data?: { pi?: string; pagina?: string }; created_at?: string }>).filter((l) => l.event_data?.pagina === pagina).map((l) => l.event_data?.pi).find((x): x is string => typeof x === "string" && /^pi_/.test(x)) ?? null;
   } catch { return "erro"; }
 }
-/** as assinaturas desta ref (stripe_assinatura_criada), a mais nova primeiro. "erro" = o banco não respondeu. */
-async function assinaturasDaRef(admin: ClienteMin, ref: string): Promise<Array<{ sub: string; cus: string | null }> | "erro"> {
+type AssinaturaDaRef = { sub: string; cus: string | null; metodo: "card" | "pix" };
+/** as assinaturas desta ref (stripe_assinatura_criada), a mais nova primeiro. "erro" = o banco não respondeu.
+ *  18/11: só as da família (o registro antigo sem página conta como do /funil-app); `metodo` "pix" = Pix Automático. */
+async function assinaturasDaRef(admin: ClienteMin, ref: string, paginaMensal: string = MENSAL_APP_WEB.pagina): Promise<AssinaturaDaRef[] | "erro"> {
   try {
     const { data, error } = await admin.from("analytics_events").select("event_data, created_at").eq("event_name", "stripe_assinatura_criada").eq("event_data->>ref", ref).order("created_at", { ascending: false }).limit(50);
     if (error) return "erro";
-    return maisNovoPrimeiro((data ?? []) as Array<{ event_data?: { sub?: string; cus?: string }; created_at?: string }>)
+    return maisNovoPrimeiro((data ?? []) as Array<{ event_data?: { sub?: string; cus?: string; pagina?: string; metodo?: string }; created_at?: string }>)
       .filter((x) => typeof x.event_data?.sub === "string" && /^sub_/.test(x.event_data.sub))
-      .map((x) => ({ sub: x.event_data!.sub!, cus: typeof x.event_data!.cus === "string" ? x.event_data!.cus : null }));
+      .filter((x) => (x.event_data?.pagina ?? MENSAL_APP_WEB.pagina) === paginaMensal)
+      .map((x) => ({ sub: x.event_data!.sub!, cus: typeof x.event_data!.cus === "string" ? x.event_data!.cus : null, metodo: x.event_data!.metodo === "pix" ? "pix" as const : "card" as const }));
   } catch { return "erro"; }
 }
 
-/** a assinatura desta ref já está paga (active/trialing/past_due)? Ou incompleta (reaproveitar)? "erro" = não deu pra saber → não cobra */
-async function estadoDaAssinatura(deps: DepsAppWeb, ref: string): Promise<{ estado: "paga" | "incompleta" | "nenhuma" | "erro"; sub?: Record<string, unknown>; cus?: string | null; total?: number }> {
-  const todas = await assinaturasDaRef(deps.admin, ref);
+const PAGA = new Set(["active", "trialing", "past_due"]);
+/**
+ * A assinatura desta ref já está paga (active/trialing/past_due)? Ou incompleta (reaproveitar)? "erro" = não deu pra saber → não cobra.
+ * /funil-app: só a mais nova (como sempre). 18/11, /escolha: a ref pode ter uma do cartão e uma do Pix Automático — QUALQUER uma paga
+ * = "paga"; "incompleta" só a do mesmo método pedido (uma assinatura do Pix nunca é reaproveitada pro cartão e vice-versa).
+ */
+async function estadoDaAssinatura(deps: DepsAppWeb, ref: string, metodo: "card" | "pix" = "card"): Promise<{ estado: "paga" | "incompleta" | "nenhuma" | "erro"; sub?: Record<string, unknown>; cus?: string | null; total?: number }> {
+  const f = fam(deps);
+  const todas = await assinaturasDaRef(deps.admin, ref, f.mensal.pagina);
   if (todas === "erro") return { estado: "erro" };
-  const a = todas[0];
-  if (!a) return { estado: "nenhuma", total: 0 };
-  const r = await deps.stripe(`subscriptions/${a.sub}?expand[]=latest_invoice.payment_intent`, null, undefined, V);
-  if (!r.ok) return { estado: "erro" };
-  const st = String(r.j.status ?? "");
-  const cus = a.cus ?? (typeof r.j.customer === "string" ? r.j.customer : null);
-  if (st === "active" || st === "trialing" || st === "past_due") return { estado: "paga", sub: r.j, cus, total: todas.length };
-  if (st === "incomplete") return { estado: "incompleta", sub: r.j, cus, total: todas.length };
+  if (!todas.length) return { estado: "nenhuma", total: 0 };
+  const so1 = f.prefixo === FAMILIA_APP_WEB.prefixo;
+  let cus: string | null = todas[0].cus;
+  let incompleta: Record<string, unknown> | null = null;
+  for (const a of so1 ? todas.slice(0, 1) : todas) {
+    const r = await deps.stripe(`subscriptions/${a.sub}?expand[]=latest_invoice.payment_intent`, null, undefined, V);
+    if (!r.ok) return { estado: "erro" };
+    const st = String(r.j.status ?? "");
+    if (!cus) cus = a.cus ?? (typeof r.j.customer === "string" ? r.j.customer : null);
+    if (PAGA.has(st)) return { estado: "paga", sub: r.j, cus: a.cus ?? cus, total: todas.length };
+    if (st === "incomplete" && !incompleta && (so1 || a.metodo === metodo)) incompleta = r.j;
+  }
+  if (incompleta) return { estado: "incompleta", sub: incompleta, cus, total: todas.length };
   return { estado: "nenhuma", cus, total: todas.length };
+}
+
+/**
+ * 18/11 (/escolha): a TRAVA contra pagar 2× do lado do Pix Automático — o QR do mensal (a 1ª fatura de uma assinatura Pix ainda
+ * incompleta) morre antes de qualquer outra cobrança na mesma ref: a fatura é ANULADA (void), o que cancela o PI dela (e o QR).
+ * "pago" = a assinatura do Pix já pagou; "erro" = não deu pra anular nem pra saber → não cobra. No /funil-app nunca há assinatura Pix.
+ */
+export async function matarPixMensalDaRef(deps: DepsAppWeb, ref: string): Promise<"ok" | "pago" | "erro"> {
+  const f = fam(deps);
+  if (f.prefixo === FAMILIA_APP_WEB.prefixo) return "ok";
+  const todas = await assinaturasDaRef(deps.admin, ref, f.mensal.pagina);
+  if (todas === "erro") return "erro";
+  for (const a of todas.filter((x) => x.metodo === "pix")) {
+    const r = await deps.stripe(`subscriptions/${a.sub}`, null, undefined, API_PIX_AUTOMATICO);
+    if (!r.ok) return "erro";
+    const st = String(r.j.status ?? "");
+    if (PAGA.has(st)) return "pago";
+    if (st !== "incomplete") continue;
+    const fatura = typeof r.j.latest_invoice === "string" ? r.j.latest_invoice : String((r.j.latest_invoice as { id?: string } | null)?.id ?? "");
+    if (!/^in_/.test(fatura)) return "erro";
+    const v = await deps.stripe(`invoices/${fatura}/void`, [], undefined, API_PIX_AUTOMATICO);
+    if (v.ok) { deps.log("Pix mensal anulado (trocou de forma de pagar)", { sub: a.sub }); continue; }
+    // a anulação falhou: o Pix pode ter acabado de cair
+    const depois = await deps.stripe(`subscriptions/${a.sub}`, null, undefined, API_PIX_AUTOMATICO);
+    if (depois.ok && PAGA.has(String(depois.j.status ?? ""))) return "pago";
+    deps.log("Pix mensal NÃO anulou", { sub: a.sub, code: String(erroDe(v.j).code ?? "") });
+    return "erro";
+  }
+  return "ok";
 }
 
 /**
@@ -82,7 +140,7 @@ async function estadoDaAssinatura(deps: DepsAppWeb, ref: string): Promise<{ esta
  * OU não deu pra saber (banco/Stripe sem resposta) — a tela fica no Pix, nunca abre o cartão com QR pagável.
  */
 export async function matarPixDaRef(deps: DepsAppWeb, ref: string): Promise<"ok" | "pago" | "erro"> {
-  const pi = await piDaRef(deps.admin, ref);
+  const pi = await piDaRef(deps.admin, ref, fam(deps).vitalicio.pagina);
   if (pi === "erro") return "erro";
   if (!pi) return "ok";
   const atual = await deps.stripe(`payment_intents/${pi}`, null);
@@ -105,8 +163,8 @@ export async function matarPixDaRef(deps: DepsAppWeb, ref: string): Promise<"ok"
  * morreu no meio não prende a ref pra sempre).
  */
 const TRAVA_MS = 120_000;
-async function travarRef(admin: ClienteMin, ref: string, agoraMs = Date.now()): Promise<boolean> {
-  const id = `appweb-cobrando:${ref}`;
+async function travarRef(admin: ClienteMin, ref: string, agoraMs = Date.now(), prefixo = "appweb"): Promise<boolean> {
+  const id = `${prefixo}-cobrando:${ref}`;
   for (let tentativa = 0; tentativa < 2; tentativa++) {
     try {
       const { error } = await admin.from("webhook_events").insert({ id, source: "stripe", event: `trava:${agoraMs}` });
@@ -122,12 +180,12 @@ async function travarRef(admin: ClienteMin, ref: string, agoraMs = Date.now()): 
   }
   return false;
 }
-async function soltarRef(admin: ClienteMin, ref: string) { try { await admin.from("webhook_events").delete().eq("id", `appweb-cobrando:${ref}`); } catch { /* vence sozinha */ } }
+async function soltarRef(admin: ClienteMin, ref: string, prefixo = "appweb") { try { await admin.from("webhook_events").delete().eq("id", `${prefixo}-cobrando:${ref}`); } catch { /* vence sozinha */ } }
 const EM_ANDAMENTO: RespostaAppWeb = { status: 409, corpo: { ok: false, erro: "em_andamento" } };
 const INDISPONIVEL: RespostaAppWeb = { status: 503, corpo: { ok: false, erro: "indisponivel" } };
 async function comTrava(deps: DepsAppWeb, ref: string, fazer: () => Promise<RespostaAppWeb>): Promise<RespostaAppWeb> {
-  if (!(await travarRef(deps.admin, ref, deps.agoraMs))) return EM_ANDAMENTO;
-  try { return await fazer(); } finally { await soltarRef(deps.admin, ref); }
+  if (!(await travarRef(deps.admin, ref, deps.agoraMs, fam(deps).prefixo))) return EM_ANDAMENTO;
+  try { return await fazer(); } finally { await soltarRef(deps.admin, ref, fam(deps).prefixo); }
 }
 
 /** o que a tela recebe de um PI depois de confirmar (pago / 3DS / recusado / esperando) */
@@ -155,7 +213,11 @@ async function pixSemTrava(deps: DepsAppWeb, p: PedidoStripe, md: Record<string,
   const sub = await estadoDaAssinatura(deps, p.ref);
   if (sub.estado === "erro") return INDISPONIVEL;
   if (sub.estado === "paga") return { status: 200, corpo: { ok: true, pago: true, plano: "mensal" } };
-  const r = await criarOuReaproveitar(deps, { ...p, pagina: "app_web" }, md, ctx);
+  // 18/11 (/escolha): o QR do Pix Automático do mensal desta ref morre antes do Pix do vitalício
+  const pm = await matarPixMensalDaRef(deps, p.ref);
+  if (pm === "pago") return { status: 200, corpo: { ok: true, pago: true, plano: "mensal", metodo: "pix" } };
+  if (pm === "erro") return { status: 409, corpo: { ok: false, erro: "pix_vivo" } };
+  const r = await criarOuReaproveitar(deps, { ...p, pagina: fam(deps).vitalicio.pagina }, md, ctx);
   if (r.status !== 200) return r;
   const c = r.corpo as { pi: string; status: string; pix: unknown };
   if (c.status === "succeeded") return { status: 200, corpo: { ok: true, pago: true, pi: c.pi, plano: "vitalicio" } };
@@ -174,7 +236,7 @@ async function pixSemTrava(deps: DepsAppWeb, p: PedidoStripe, md: Record<string,
 export type PedidoCartao = { pm: string; parcelas: number; returnUrl: string };
 export async function cartaoAppWeb(deps: DepsAppWeb, p: PedidoStripe, md: Record<string, string>, ctx: Ctx, c: PedidoCartao): Promise<RespostaAppWeb> {
   if (!p.email) return { status: 400, corpo: { ok: false, erro: "email" } };
-  if (!Number.isInteger(c.parcelas) || c.parcelas < 1 || c.parcelas > PARCELAS_MAX_APP_WEB) return { status: 400, corpo: { ok: false, erro: "parcelas" } };
+  if (!Number.isInteger(c.parcelas) || c.parcelas < 1 || c.parcelas > fam(deps).vitalicio.parcelasMax) return { status: 400, corpo: { ok: false, erro: "parcelas" } };
   return comTrava(deps, p.ref, () => cartaoSemTrava(deps, p, md, ctx, c));
 }
 async function cartaoSemTrava(deps: DepsAppWeb, p: PedidoStripe, md: Record<string, string>, ctx: Ctx, c: PedidoCartao): Promise<RespostaAppWeb> {
@@ -184,7 +246,10 @@ async function cartaoSemTrava(deps: DepsAppWeb, p: PedidoStripe, md: Record<stri
   const morto = await matarPixDaRef(deps, p.ref);
   if (morto === "pago") return { status: 200, corpo: { ok: true, pago: true, plano: "vitalicio", metodo: "pix" } };
   if (morto === "erro") return { status: 409, corpo: { ok: false, erro: "pix_vivo" } };
-  const r = await criarOuReaproveitar(deps, { ...p, pagina: "app_web", pi: null }, md, ctx);
+  const mortoMensal = await matarPixMensalDaRef(deps, p.ref);
+  if (mortoMensal === "pago") return { status: 200, corpo: { ok: true, pago: true, plano: "mensal", metodo: "pix" } };
+  if (mortoMensal === "erro") return { status: 409, corpo: { ok: false, erro: "pix_vivo" } };
+  const r = await criarOuReaproveitar(deps, { ...p, pagina: fam(deps).vitalicio.pagina, pi: null }, md, ctx);
   if (r.status !== 200) return r;
   const k = r.corpo as { pi: string; status: string; pix: unknown };
   if (k.status === "succeeded") return { status: 200, corpo: { ok: true, pago: true, pi: k.pi, plano: "vitalicio" } };
@@ -197,7 +262,7 @@ async function cartaoSemTrava(deps: DepsAppWeb, p: PedidoStripe, md: Record<stri
   if (c.parcelas > 1) {
     const ok = planos.some((x) => x.count === c.parcelas && x.interval === "month" && x.type === "fixed_count");
     if (!ok) {
-      const max = Math.max(1, ...planos.filter((x) => x.interval === "month" && x.type === "fixed_count" && (x.count ?? 0) <= PARCELAS_MAX_APP_WEB).map((x) => x.count ?? 1));
+      const max = Math.max(1, ...planos.filter((x) => x.interval === "month" && x.type === "fixed_count" && (x.count ?? 0) <= fam(deps).vitalicio.parcelasMax).map((x) => x.count ?? 1));
       deps.log("parcelas indisponíveis neste cartão", { pi: k.pi, pediu: c.parcelas, max });
       return { status: 200, corpo: { ok: false, erro: "parcelas_indisponiveis", max, pi: k.pi } };
     }
@@ -226,9 +291,12 @@ async function assinarSemTrava(deps: DepsAppWeb, p: PedidoStripe, md: Record<str
   const morto = await matarPixDaRef(deps, p.ref);
   if (morto === "pago") return { status: 200, corpo: { ok: true, pago: true, plano: "vitalicio", metodo: "pix" } };
   if (morto === "erro") return { status: 409, corpo: { ok: false, erro: "pix_vivo" } };
+  const mortoMensal = await matarPixMensalDaRef(deps, p.ref);
+  if (mortoMensal === "pago") return { status: 200, corpo: { ok: true, pago: true, plano: "mensal", metodo: "pix" } };
+  if (mortoMensal === "erro") return { status: 409, corpo: { ok: false, erro: "pix_vivo" } };
 
-  const mdSub: Array<[string, string]> = Object.entries({ ...md, pagina: MENSAL_APP_WEB.pagina }).map(([k, v]) => [`metadata[${k}]`, v]);
-  const atual = await estadoDaAssinatura(deps, p.ref);
+  const mdSub: Array<[string, string]> = Object.entries({ ...md, pagina: fam(deps).mensal.pagina }).map(([k, v]) => [`metadata[${k}]`, v]);
+  const atual = await estadoDaAssinatura(deps, p.ref, "card");
   if (atual.estado === "erro") return INDISPONIVEL;
   if (atual.estado === "paga") return { status: 200, corpo: { ok: true, pago: true, plano: "mensal", sub: atual.sub?.id } };
 
@@ -252,7 +320,7 @@ async function assinarSemTrava(deps: DepsAppWeb, p: PedidoStripe, md: Record<str
     if (!cus) {
       const cr = await stripe("customers", [
         ["email", p.email!], ["metadata[ref]", p.ref], ...(md.user_id ? [["metadata[user_id]", md.user_id] as [string, string]] : []),
-      ], `appweb-cus-${p.ref}-${hashCurto(p.email!)}`, V); // revisão 2: o e-mail entra (resumido) — trocar o e-mail não dá idempotency_error
+      ], `${fam(deps).prefixo}-cus-${p.ref}-${hashCurto(p.email!)}`, V); // revisão 2: o e-mail entra (resumido) — trocar o e-mail não dá idempotency_error
       if (!cr.ok) return resultadoDoErro(cr.j, { plano: "mensal" });
       cus = String(cr.j.id);
     }
@@ -266,7 +334,7 @@ async function assinarSemTrava(deps: DepsAppWeb, p: PedidoStripe, md: Record<str
       ["payment_behavior", "default_incomplete"], ["payment_settings[payment_method_types][0]", "card"],
       ["payment_settings[save_default_payment_method]", "on_subscription"], ["expand[0]", "latest_invoice.payment_intent"],
       ["description", "CORE mensal"], ...mdSub,
-    ], `appweb-sub-${p.ref}-${(atual.total ?? 0) + 1}`, V);
+    ], `${fam(deps).prefixo}-sub-${p.ref}-${(atual.total ?? 0) + 1}`, V);
     if (sr.ok) sub = sr.j;
     else if (erroDe(sr.j).type === "idempotency_error") {
       const achada = await assinaturaDaRefNoCliente(deps, cus, p.ref);
@@ -285,15 +353,99 @@ async function assinarSemTrava(deps: DepsAppWeb, p: PedidoStripe, md: Record<str
   if (String(sub.status) === "active" || fatura.status === "paid") return { status: 200, corpo: { ok: true, pago: true, plano: "mensal", sub: sub.id } };
   if (!piFat?.id) { log("assinatura sem PI na 1ª fatura", { sub: String(sub.id) }); return { status: 502, corpo: { ok: false, plano: "mensal" } }; }
   // o PI da 1ª fatura ganha a ref/página: o stripe-status responde por ele e o webhook não confunde com venda avulsa
-  await stripe(`payment_intents/${String(piFat.id)}`, [["metadata[ref]", p.ref], ["metadata[pagina]", MENSAL_APP_WEB.pagina], ["metadata[sub]", String(sub.id)]], undefined, V);
+  await stripe(`payment_intents/${String(piFat.id)}`, [["metadata[ref]", p.ref], ["metadata[pagina]", fam(deps).mensal.pagina], ["metadata[sub]", String(sub.id)]], undefined, V);
   const conf = await stripe(`payment_intents/${String(piFat.id)}/confirm`, [["payment_method", c.pm], ["return_url", c.returnUrl]], undefined, V);
   if (!conf.ok) return resultadoDoErro(conf.j, { plano: "mensal", sub: sub.id, pi: piFat.id });
   return resultadoDoPi(conf.j, { plano: "mensal", sub: sub.id });
 }
 
+/* ───────────────────────── 18/11 (/escolha): mensal no PIX AUTOMÁTICO ─────────────────────────
+ * docs.stripe.com/billing/subscriptions/pix (Subscriptions API): Customer + Subscription com payment_behavior default_incomplete,
+ * payment_settings[payment_method_types] = pix e o mandato (payment_settings[payment_method_options][pix][mandate_options]: valor
+ * 3490 e cobrança mensal). A 1ª fatura gera o PI do Pix; o navegador confirma com stripe.confirmPixPayment(client_secret) e mostra o
+ * QR (handleActions:false, no nosso layout). A pessoa paga e autoriza o mandato no app do banco; as renovações saem sozinhas (o banco
+ * avisa 3 dias antes; o PI fica "processing" até cair). Quem libera é o stripe-webhook (invoice.paid), como no cartão.
+ * Versão da API: a da doc de hoje (API_PIX_AUTOMATICO) — a fatura traz o PI em latest_invoice.payments e o segredo em
+ * latest_invoice.confirmation_secret. Recarga = a MESMA assinatura incompleta e o MESMO QR (nunca 2 mandatos na mesma ref). */
+export async function assinarPixPlanos(deps: DepsAppWeb, p: PedidoStripe, md: Record<string, string>, ctx: Ctx): Promise<RespostaAppWeb> {
+  const { stripe, log } = deps;
+  if (fam(deps).prefixo === FAMILIA_APP_WEB.prefixo) return { status: 400, corpo: { ok: false } };
+  if (!p.email) return { status: 400, corpo: { ok: false, erro: "email" } };
+  if (!deps.pixMensal) { log("Pix mensal desligado (env STRIPE_PIX_RECORRENTE)"); return { status: 503, corpo: { ok: false, erro: "pix_mensal_indisponivel" } }; }
+  if (!deps.precoMensal || !/^price_[A-Za-z0-9]+$/.test(deps.precoMensal)) { log("sem STRIPE_PRECO_MENSAL_34"); return { status: 503, corpo: { ok: false, erro: "mensal_indisponivel" } }; }
+  const preco = await stripe(`prices/${deps.precoMensal}`, null, undefined, V);
+  if (!preco.ok || !precoMensalConfere(preco.j)) { log("preço mensal não confere (3490 BRL/mês)", { ok: preco.ok }); return { status: 503, corpo: { ok: false, erro: "mensal_indisponivel" } }; }
+  return comTrava(deps, p.ref, () => assinarPixSemTrava(deps, p, md, ctx));
+}
+/** o PI da fatura (versão nova: payments.data[].payment.payment_intent; antiga: payment_intent) */
+export function piDaFatura(fatura: Record<string, unknown> | null | undefined): string | null {
+  if (!fatura) return null;
+  const antigo = fatura.payment_intent;
+  if (typeof antigo === "string" && /^pi_/.test(antigo)) return antigo;
+  if (antigo && typeof antigo === "object" && /^pi_/.test(String((antigo as { id?: string }).id ?? ""))) return String((antigo as { id: string }).id);
+  const lista = ((fatura.payments as { data?: Array<{ payment?: { payment_intent?: unknown } }> } | undefined)?.data ?? []);
+  for (const x of lista) {
+    const v = x.payment?.payment_intent;
+    const id = typeof v === "string" ? v : String((v as { id?: string } | null | undefined)?.id ?? "");
+    if (/^pi_/.test(id)) return id;
+  }
+  return null;
+}
+async function assinarPixSemTrava(deps: DepsAppWeb, p: PedidoStripe, md: Record<string, string>, ctx: Ctx): Promise<RespostaAppWeb> {
+  const { stripe, log } = deps;
+  const f = fam(deps);
+  const VP = API_PIX_AUTOMATICO;
+  // o vitalício desta ref (Pix vivo) morre antes; se já pagou, não assina por cima
+  const morto = await matarPixDaRef(deps, p.ref);
+  if (morto === "pago") return { status: 200, corpo: { ok: true, pago: true, plano: "vitalicio", metodo: "pix" } };
+  if (morto === "erro") return { status: 409, corpo: { ok: false, erro: "pix_vivo" } };
+  const atual = await estadoDaAssinatura(deps, p.ref, "pix");
+  if (atual.estado === "erro") return INDISPONIVEL;
+  if (atual.estado === "paga") return { status: 200, corpo: { ok: true, pago: true, plano: "mensal", sub: atual.sub?.id } };
+
+  let subId: string;
+  if (atual.estado === "incompleta" && atual.sub) subId = String(atual.sub.id);
+  else {
+    if (!(await ipPodeAssinar(deps.admin, ctx.ip, deps.agoraMs))) { log("limite por IP (assinar pix)"); return { status: 429, corpo: { ok: false, limite: true } }; }
+    let cus = atual.cus ?? null;
+    if (!cus) {
+      const cr = await stripe("customers", [
+        ["email", p.email!], ["metadata[ref]", p.ref], ...(md.user_id ? [["metadata[user_id]", md.user_id] as [string, string]] : []),
+      ], `${f.prefixo}-cus-${p.ref}-${hashCurto(p.email!)}`, V);
+      if (!cr.ok) return resultadoDoErro(cr.j, { plano: "mensal", metodo: "pix" });
+      cus = String(cr.j.id);
+    }
+    const mdSub: Array<[string, string]> = Object.entries({ ...md, pagina: f.mensal.pagina, metodo: "pix" }).map(([k, v]) => [`metadata[${k}]`, v]);
+    const sr = await stripe("subscriptions", [
+      ["customer", cus], ["items[0][price]", deps.precoMensal!], ["payment_behavior", "default_incomplete"],
+      ["payment_settings[payment_method_types][0]", "pix"],
+      ["payment_settings[payment_method_options][pix][mandate_options][amount]", String(f.mensal.centavos)],
+      ["payment_settings[payment_method_options][pix][mandate_options][payment_schedule]", "monthly"],
+      ["payment_settings[save_default_payment_method]", "on_subscription"],
+      ["description", "CORE mensal"], ...mdSub,
+    ], `${f.prefixo}-subpix-${p.ref}-${(atual.total ?? 0) + 1}`, VP);
+    if (!sr.ok) { log("assinatura Pix não criou", { code: String(erroDe(sr.j).code ?? "") }); return resultadoDoErro(sr.j, { plano: "mensal", metodo: "pix" }); }
+    subId = String(sr.j.id);
+    await registrarAssinatura(deps, p, ctx, subId, cus, "pix");
+  }
+  const s = await stripe(`subscriptions/${subId}?expand[]=latest_invoice.payments&expand[]=latest_invoice.confirmation_secret`, null, undefined, VP);
+  if (!s.ok) return INDISPONIVEL;
+  if (PAGA.has(String(s.j.status ?? ""))) return { status: 200, corpo: { ok: true, pago: true, plano: "mensal", metodo: "pix", sub: subId } };
+  const fatura = (s.j.latest_invoice && typeof s.j.latest_invoice === "object" ? s.j.latest_invoice : null) as Record<string, unknown> | null;
+  const piFat = piDaFatura(fatura);
+  const segredo = String(((fatura?.confirmation_secret ?? {}) as { client_secret?: string }).client_secret ?? "");
+  if (!piFat || !segredo) { log("assinatura Pix sem PI/segredo na 1ª fatura", { sub: subId }); return { status: 502, corpo: { ok: false, plano: "mensal", metodo: "pix" } }; }
+  // o PI da 1ª fatura ganha a ref/página (o stripe-status responde por ele; o webhook não confunde com venda avulsa)
+  await stripe(`payment_intents/${piFat}`, [["metadata[ref]", p.ref], ["metadata[pagina]", f.mensal.pagina], ["metadata[sub]", subId], ["metadata[metodo]", "pix"]], undefined, VP);
+  const agora = await stripe(`payment_intents/${piFat}`, null, undefined, VP);
+  if (agora.ok && String(agora.j.status) === "succeeded") return { status: 200, corpo: { ok: true, pago: true, plano: "mensal", metodo: "pix", sub: subId, pi: piFat } };
+  const pix = agora.ok ? pixDoIntento(agora.j) : null;
+  return { status: 200, corpo: { ok: true, plano: "mensal", metodo: "pix", sub: subId, pi: piFat, client_secret: segredo, ...(pix ? { pix, mesmo: true } : {}) } };
+}
+
 /** grava ref → assinatura (é o que faz a recarga achar a assinatura). O supabase devolve { error } (não lança): confere e tenta 2×. */
-async function registrarAssinatura(deps: DepsAppWeb, p: PedidoStripe, ctx: Ctx, sub: string, cus: string | null): Promise<void> {
-  const linha = { event_name: "stripe_assinatura_criada", user_id: ctx.userId, session_id: p.landing_session_id, event_data: { ref: p.ref, sub, cus, pagina: MENSAL_APP_WEB.pagina, ...(ctx.ip ? { client_ip: ctx.ip } : {}), ...p.atrib } };
+async function registrarAssinatura(deps: DepsAppWeb, p: PedidoStripe, ctx: Ctx, sub: string, cus: string | null, metodo: "card" | "pix" = "card"): Promise<void> {
+  const linha = { event_name: "stripe_assinatura_criada", user_id: ctx.userId, session_id: p.landing_session_id, event_data: { ref: p.ref, sub, cus, pagina: fam(deps).mensal.pagina, ...(metodo === "pix" ? { metodo } : {}), ...(ctx.ip ? { client_ip: ctx.ip } : {}), ...p.atrib } };
   for (let i = 0; i < 2; i++) {
     try { const { error } = await deps.admin.from("analytics_events").insert(linha); if (!error) return; } catch { /* tenta de novo */ }
   }
@@ -304,7 +456,7 @@ async function registrarAssinatura(deps: DepsAppWeb, p: PedidoStripe, ctx: Ctx, 
 async function assinaturaDaRefNoCliente(deps: DepsAppWeb, cus: string, ref: string): Promise<Record<string, unknown> | null | "erro"> {
   const r = await deps.stripe(`subscriptions?customer=${encodeURIComponent(cus)}&status=all&limit=20&expand[]=data.latest_invoice.payment_intent`, null, undefined, V);
   if (!r.ok) return "erro";
-  const lista = ((r.j.data ?? []) as Array<Record<string, unknown>>).filter((x) => ((x.metadata ?? {}) as Record<string, unknown>).ref === ref);
+  const lista = ((r.j.data ?? []) as Array<Record<string, unknown>>).filter((x) => ((x.metadata ?? {}) as Record<string, unknown>).ref === ref && ((x.metadata ?? {}) as Record<string, unknown>).metodo !== "pix"); // 18/11: a do Pix Automático nunca serve pro cartão
   return lista.sort((a, b) => Number(b.created ?? 0) - Number(a.created ?? 0))[0] ?? null;
 }
 
@@ -321,9 +473,10 @@ async function ipPodeAssinar(admin: ClienteMin, ip: string | null, agoraMs: numb
 }
 
 /** o corpo de uma ação do funil app web (pm e parcelas validados aqui; o resto é o PedidoStripe de sempre) */
-export function validarAcaoAppWeb(b: unknown): { acao: "pix" | "cartao" | "assinar"; pm: string | null; parcelas: number } | null {
+export function validarAcaoAppWeb(b: unknown): { acao: "pix" | "cartao" | "assinar" | "assinar_pix"; pm: string | null; parcelas: number } | null {
   const x = (b ?? {}) as Record<string, unknown>;
-  const acao = x.acao === "pix" || x.acao === "cartao" || x.acao === "assinar" ? x.acao : null;
+  // 18/11: "assinar_pix" = o mensal no Pix Automático (só a /escolha; no /funil-app o assinarPixPlanos recusa)
+  const acao = x.acao === "pix" || x.acao === "cartao" || x.acao === "assinar" || x.acao === "assinar_pix" ? x.acao : null;
   if (!acao) return null;
   const pm = typeof x.pm === "string" && /^pm_[A-Za-z0-9_]{6,80}$/.test(x.pm) ? x.pm : null;
   if ((acao === "cartao" || acao === "assinar") && !pm) return null;

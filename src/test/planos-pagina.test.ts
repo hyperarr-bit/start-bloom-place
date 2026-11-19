@@ -40,8 +40,8 @@ function rodar(fonte: string, url: string, host = "www.coreaplicativo.com.br") {
 }
 
 describe("o <head> da /escolha", () => {
-  it("no código: PLANOS_PAGINA off e PLANOS_PIX_MENSAL off; preços 9790 / 3490; 12 parcelas", () => {
-    expect(HTML).toMatch(/var PLANOS_PAGINA = "off";/);
+  it("no código: PLANOS_PAGINA on (19/11, dono: pode subir) e PLANOS_PIX_MENSAL off; preços 9790 / 3490; 12 parcelas", () => {
+    expect(HTML).toMatch(/var PLANOS_PAGINA = "on";/);
     expect(HTML).toMatch(/var PLANOS_PIX_MENSAL = "off";/);
     expect(HTML).toMatch(/var PLANOS_VITALICIO_CENTAVOS = 9790;/);
     expect(HTML).toMatch(/var PLANOS_MENSAL_CENTAVOS = 3490;/);

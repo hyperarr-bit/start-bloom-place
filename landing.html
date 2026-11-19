@@ -133,7 +133,7 @@
         // /organizar, a /vida, o /vitalicio e o /simples não leem nada disto. QA só FORA do domínio de produção: ?planos=on.
         // O checkout é src/landing/planos-checkout.ts (Pix + cartão até 12x no vitalício; cartão no mensal). Rollback: "off".
         // Antes de ligar: PRECISA-DO-DONO.md (deploy das funções, permissões da chave, eventos do webhook, 1 compra real de cada).
-        var PLANOS_PAGINA = "off";
+        var PLANOS_PAGINA = "on";
         // 18/11: o Pix AUTOMÁTICO no mensal (o botão Pix aparece no plano mensal). "off" = mensal só no cartão. Ligar só depois de
         // "Pagamentos recorrentes" do PIX ativo na Stripe (~3 dias) + env STRIPE_PIX_RECORRENTE=on. QA fora de produção: ?pixmensal=on.
         var PLANOS_PIX_MENSAL = "off";

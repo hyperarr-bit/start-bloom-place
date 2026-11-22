@@ -143,7 +143,7 @@
         // cobra 2790 nela). Pós-compra = o mesmo da /oferta. A /oferta, a /vida,
         // o /simples, o /tiktok e a /escolha não leem isto. QA: ?orgstripe=on|off força neste aparelho (localStorage + cookie), ?orgstripe=auto
         // desfaz. Antes de ligar: deploy stripe-criar + stripe-webhook (+ vendas-painel) e 1 compra real (LEIA.md). Rollback: "off".
-        var ORGANIZAR_STRIPE = "off";
+        var ORGANIZAR_STRIPE = "on";
         // 22/11 (dono: "depois da compra tira tudo que é oferta/convite e leva DIRETO pro app, com um tutorial bonito"): PÓS-COMPRA = APP.
         // "on" = depois do pago, "Pronto! Seu CORE está liberado" + o passo a passo de entrar no app (src/landing/pos-compra-app.ts), SEM
         // indique e ganhe e SEM presente (o ?ref= continua indo no pedido). "off" = o pós-pago de hoje, IDÊNTICO. Só a /oferta lê.

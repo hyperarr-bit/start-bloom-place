@@ -1775,7 +1775,7 @@ function renderDoCartao() {
       campo.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && EMAIL_OK.test(campo.value.trim())) { ev.preventDefault(); salvarDoCampo(); } });
     }
     relogio = window.setInterval(() => {
-      if (!caixa.isConnected) { window.clearInterval(relogio!); return; } // a página foi trocada por baixo (só nos testes): o relógio velho cala
+      if (typeof document === "undefined" || !caixa.isConnected) { window.clearInterval(relogio!); return; } // a página foi trocada por baixo ou o ambiente de teste já fechou (só nos testes): o relógio velho cala
       const el = document.getElementById("lp-validade");
       const resta = venceEm(p) - Date.now();
       if (el) el.textContent = PIXB ? (resta > 0 ? `vale por ${mmss(resta)}` : "venceu") : resta > 0 ? `Este código vale por ${mmss(resta)}` : "Este código venceu.";

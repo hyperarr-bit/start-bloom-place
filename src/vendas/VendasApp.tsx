@@ -30,7 +30,7 @@ type Campanha = {
 };
 type RespCampanhas = { periodo: string; desde: string; ate: string; campanhas: Campanha[]; fusos: Record<string, string>; errosMeta: string[]; totais: { gasto: number; gastoApp: number; testes: number; custoPorTeste: number | null } };
 type PeriodoWeb = { vendas: number; receita: number; gasto: number; retorno: number | null; cor: Cor };
-type RespWeb = { dia: string; hoje: PeriodoWeb; semana: PeriodoWeb; dias: Array<PeriodoWeb & { dia: string }>; landing: { sessoes: number; viuOferta: number; gerouPix: number; pagou: number; robos: number }; oferta?: { visitas: number; abriramCheckout: number; pagaram: number; receita: number; porVisita: number | null; pix: number; cartao: number }; vida?: { sessoes: number; viuOferta: number; gerouPix: number; foiHotmart?: number; pagou: number; bracos?: Record<"v3" | "atual" | "sem_braco", BracoVida> }; errosMeta: string[] };
+type RespWeb = { dia: string; hoje: PeriodoWeb; semana: PeriodoWeb; dias: Array<PeriodoWeb & { dia: string }>; landing: { sessoes: number; viuOferta: number; gerouPix: number; pagou: number; robos: number }; oferta?: { visitas: number; abriramCheckout: number; pagaram: number; receita: number; porVisita: number | null; pix: number; cartao: number }; organizarStripe?: { visitas: number; abriramCheckout: number; pagaram: number; receita: number; porVisita: number | null; pix: number; cartao: number }; vida?: { sessoes: number; viuOferta: number; gerouPix: number; foiHotmart?: number; pagou: number; bracos?: Record<"v3" | "atual" | "sem_braco", BracoVida> }; errosMeta: string[] };
 
 type DiaResumo = {
   dia: string; vendido: number; vendas: number; porOrigem: Record<Origem, { n: number; valor: number }>;
@@ -558,6 +558,16 @@ function AbaWeb({ d }: { d: RespWeb }) {
           <ul className="v-lista">
             <li><span className="v-hora">visitas</span><span className="v-plano">{num(d.oferta.visitas)} · {num(d.oferta.abriramCheckout)} abriram o checkout · {num(d.oferta.pagaram)} pagaram</span><span className="v-valor">{d.oferta.porVisita === null ? "—" : `${brl(d.oferta.porVisita)}/visita`}</span></li>
             <li><span className="v-hora">método</span><span className="v-plano">{num(d.oferta.pix)} Pix · {num(d.oferta.cartao)} cartão</span><span className="v-valor">{brl(d.oferta.receita)}</span></li>
+          </ul>
+        </article>
+      )}
+      {d.organizarStripe && d.organizarStripe.visitas > 0 && (
+        <article className="v-cartao" data-testid="organizar-stripe">
+          {/* 22/11: o /organizar no checkout Stripe (chave ORGANIZAR_STRIPE, R$ 27,90) */}
+          <div className="v-titulo">Landing /organizar (Stripe) · hoje</div>
+          <ul className="v-lista">
+            <li><span className="v-hora">visitas</span><span className="v-plano">{num(d.organizarStripe.visitas)} · {num(d.organizarStripe.abriramCheckout)} abriram o checkout · {num(d.organizarStripe.pagaram)} pagaram</span><span className="v-valor">{d.organizarStripe.porVisita === null ? "—" : `${brl(d.organizarStripe.porVisita)}/visita`}</span></li>
+            <li><span className="v-hora">método</span><span className="v-plano">{num(d.organizarStripe.pix)} Pix · {num(d.organizarStripe.cartao)} cartão</span><span className="v-valor">{brl(d.organizarStripe.receita)}</span></li>
           </ul>
         </article>
       )}

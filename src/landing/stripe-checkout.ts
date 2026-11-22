@@ -52,12 +52,15 @@ export type OpcoesCheckout = {
   layout?: "novo";
   storagePrefix?: string;
   /** Server-owned catalog key; no client amount is trusted by stripe-criar. */
-  pagina?: "oferta" | "lp27";
+  pagina?: "oferta" | "lp27" | "organizar";
   /** 22/11 (AB_PRECO_OFERTA, só /oferta): o braço de preço (2790 | 4790 | 6790). Vai no pedido como braco_preco (o servidor só aceita os 3 e
    *  grava na metadata do PI); em produção a página confere que o PI veio com ESTE valor antes de deixar pagar. Sem isto: nada muda. */
   bracoPreco?: number;
-  /** só testes: liga a medição da carteira sem mexer em MEDIR_CARTEIRA */
+  /** liga a medição da carteira sem mexer em MEDIR_CARTEIRA (testes; e 22/11 o /organizar-Stripe, ORGANIZAR_STRIPE). Só mede: nada aparece */
   medirCarteira?: boolean;
+  /** 22/11 (/organizar-Stripe): no ANDROID, a tela do Pix gerado põe "Copiar código Pix" como o botão principal grande + 3 passos curtos.
+   *  No iPhone (e no computador) fica a tela de sempre. Sem isto: nada muda. */
+  pixCopiaPrimeiro?: boolean;
   /** só testes: mostra o "Prefiro pagar com cartão" sem mexer em PIX_TROCA_CARTAO */
   trocaCartao?: boolean;
   evento: Evento; pixel: Pixel; atrib: Record<string, string>; sessao: string; aparelho: string; urlChegada: string; fbclid: string | null;
@@ -289,6 +292,13 @@ export const CSS = `
 .oc-copia button{flex:none;height:48px;padding:0 16px;border-radius:12px;border:0;background:var(--magenta,#d6338a);color:#fff;font:inherit;font-weight:800;font-size:14.5px}
 .oc-trocar{display:block;min-height:44px;margin:10px auto 0;padding:0 12px;border:0;background:none;font-family:inherit;font-size:14.5px;font-weight:700;color:var(--tx,#1c1a1f);text-decoration:underline}
 .oc-trocar[aria-busy="true"]{opacity:.6;pointer-events:none}
+.oc-copiar-grande{margin-top:16px}
+.oc-copia-cod{margin:10px 0 0;font-size:12px;color:var(--suave,#6b6670);font-family:ui-monospace,Menlo,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.oc-passos3{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:8px;text-align:left}
+.oc-passos3 li{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600;color:var(--tx,#1c1a1f)}
+.oc-passos3 li i{flex:none;display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--magenta-suave,#fdf0f6);color:var(--magenta,#d6338a);font-style:normal;font-weight:900;font-size:13px}
+.oc-qr-menor{margin-top:16px}
+.oc-qr-menor summary{font-size:14px;font-weight:700;color:var(--suave,#6b6670);cursor:pointer}
 .oc-passos{text-align:left;margin:16px 0 0;padding:0 0 0 20px;font-size:14px;line-height:1.5;color:var(--tx,#1c1a1f)}
 .oc-pago{text-align:center}
 .oc-check{width:68px;height:68px;margin:6px auto 0;border-radius:50%;display:grid;place-items:center;background:var(--verde,#16a34a);color:#fff;box-shadow:0 0 0 10px var(--verde-suave,#ecfdf3)}
@@ -582,6 +592,8 @@ async function garantirIntento(email: string | null, cpf: string | null = null, 
   if (!r.ok || !r.clientSecret) { o.evento("landing_erro", { onde: "stripe_criar", msg: String(r.erro ?? "falhou").slice(0, 80) }); return false; }
   // A stale deployment must never silently charge the old 67.90 offer on the 27.90 LP.
   if (o.producao && o.pagina === "lp27" && (r.amount !== o.precoCentavos || r.currency !== "brl" || r.pagina !== "lp27")) { o.evento("landing_erro", { onde: "stripe_preco_divergente" }); return false; }
+  // 22/11 (ORGANIZAR_STRIPE): o /organizar só paga se o servidor devolver o PI de 27,90 da página "organizar" (servidor velho = /oferta 67,90)
+  if (o.producao && o.pagina === "organizar" && (r.amount !== o.precoCentavos || r.currency !== "brl" || r.pagina !== "organizar")) { o.evento("landing_erro", { onde: "stripe_preco_divergente" }); return false; }
   // 22/11 (AB_PRECO_OFERTA): com braço, o PI tem que vir com o MESMO valor que a página mostra (servidor velho ou travado = não paga)
   if (o.producao && o.bracoPreco && (r.amount !== o.bracoPreco || o.precoCentavos !== o.bracoPreco || r.currency !== "brl")) { o.evento("landing_erro", { onde: "stripe_preco_divergente" }); return false; }
   est!.clientSecret = r.clientSecret; est!.pi = r.pi ?? est!.pi;
@@ -711,7 +723,7 @@ async function pagar() {
       if (r.paymentIntent?.status === "succeeded") return mostrarPago("pix");
       if (!qr?.data && !qr?.image_url_png) { erroGeral("Não deu pra mostrar o Pix. Tente de novo."); erroAoPagar("pix", { code: "sem_qr" }); return; }
       est.pix = qr; est.fase = "pix";
-      o.evento("landing_stripe_pix_gerado", { pi: est.pi });
+      o.evento("landing_stripe_pix_gerado", { pi: est.pi, ...(pixCopiaPrimeiro() ? { layout_pix: "copia_primeiro" } : {}) });
       telaPix();
       return;
     }
@@ -741,12 +753,26 @@ async function pagar() {
   }
 }
 
+/** 22/11: a tela do Pix "copiar primeiro" (só com pixCopiaPrimeiro e só no Android) */
+const pixCopiaPrimeiro = (): boolean => !!opc?.pixCopiaPrimeiro && /Android/i.test(navigator.userAgent || "");
+
 function telaPix() {
   const o = opc!, p = est!.pix!;
   const alvo = raiz!.querySelector<HTMLElement>("#oc-in")!;
   const vence = p.expires_at ? new Date(p.expires_at * 1000) : null;
   const hora = vence ? vence.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }) : null;
-  alvo.innerHTML = `
+  const copiaPrimeiro = pixCopiaPrimeiro();
+  alvo.innerHTML = copiaPrimeiro ? `
+    <div class="oc-pix" data-testid="oferta-pix" data-layout="copia_primeiro">
+      <div class="oc-resumo" style="text-align:left"><div><h2 id="oc-tit">CORE · Acesso vitalício</h2><p>Pix · pagamento único</p></div><div class="oc-preco">${esc(preco())}</div></div>
+      <span class="oc-pilula"><i></i>Esperando o Pix · confirma sozinho</span>
+      <button type="button" class="oc-cta oc-copiar-grande" id="oc-copiar" data-testid="oferta-pix-copiar">Copiar código Pix</button>
+      <p class="oc-copia-cod" aria-hidden="true">${esc(p.data ?? "")}</p>
+      <input id="oc-codigo" readonly value="${esc(p.data ?? "")}" aria-label="Pix copia e cola" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0" tabindex="-1" />
+      <ol class="oc-passos3"><li><i>1</i>Abra o app do banco</li><li><i>2</i>Pix copia e cola</li><li><i>3</i>Volte aqui: libera sozinho</li></ol>
+      <details class="oc-qr-menor"><summary>Ver QR code</summary><div class="oc-qr" id="oc-qr" aria-label="QR code do Pix">${p.image_url_png ? `<img alt="QR code do Pix" src="${esc(p.image_url_png)}" width="180" height="180" />` : ""}</div></details>
+      ${hora ? `<p>Vale até ${esc(hora)}. O acesso também chega no seu e-mail.</p>` : "<p>O acesso também chega no seu e-mail.</p>"}
+    </div>` : `
     <div class="oc-pix" data-testid="oferta-pix">
       <div class="oc-resumo" style="text-align:left"><div><h2 id="oc-tit">CORE · Acesso vitalício</h2><p>Pix · pagamento único</p></div><div class="oc-preco">${esc(preco())}</div></div>
       <span class="oc-pilula"><i></i>Esperando o Pix · confirma sozinho</span>
@@ -762,8 +788,8 @@ function telaPix() {
     const b = alvo.querySelector<HTMLButtonElement>("#oc-copiar")!;
     let ok = false;
     try { await navigator.clipboard.writeText(p.data ?? ""); ok = true; } catch { const i = alvo.querySelector<HTMLInputElement>("#oc-codigo")!; i.select(); try { ok = document.execCommand("copy"); } catch { ok = false; } }
-    b.textContent = ok ? "Copiado ✓" : "Copie acima";
-    o.evento("landing_pix_copiado", { ok, via: "stripe" });
+    b.textContent = ok ? (copiaPrimeiro ? "Código copiado ✓" : "Copiado ✓") : copiaPrimeiro ? "Toque e segure o código acima" : "Copie acima";
+    o.evento("landing_pix_copiado", { ok, via: "stripe", ...(copiaPrimeiro ? { layout_pix: "copia_primeiro" } : {}) });
   });
   vigiar();
 }

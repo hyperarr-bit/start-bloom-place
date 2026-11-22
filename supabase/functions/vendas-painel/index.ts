@@ -220,10 +220,12 @@ async function abaWeb(admin: Admin, hoje: string) {
   const vida = { ...funilLanding(eventos, pagos, "vida"), pagou: hotmartHoje, bracos: vidaPorBraco(eventos as EventoVida[], (vendasHm ?? []) as Array<{ tx: string | null; braco: string | null; valor_cents: string | null }>, txHotmartAtivas) };
   // 04/11: a /oferta (Stripe) — só vale o PI ativo em subscriptions (forjado, estornado e teste ficam fora)
   const piStripeAtivos = new Set(subs.filter((s) => s.payment_method === "stripe" && s.status === "active" && s.abacatepay_billing_id && !ehEmailTeste(s.customer_email)).map((s) => String(s.abacatepay_billing_id)));
-  const { data: vendasSt } = await admin.from("analytics_events").select("pi:event_data->>pi,valor_cents:event_data->>valor_cents,metodo:event_data->>metodo")
+  const { data: vendasSt } = await admin.from("analytics_events").select("pi:event_data->>pi,valor_cents:event_data->>valor_cents,metodo:event_data->>metodo,pagina:event_data->>pagina")
     .eq("event_name", "stripe_venda").gte("created_at", inicioDiaBRT(hoje)).limit(2000);
   const oferta = funilOferta(eventos, (vendasSt ?? []) as VendaStripe[], piStripeAtivos);
-  return { dia: hoje, ...roi, landing: funilLanding(eventos, pagos), vida, oferta, errosMeta: ins.erros };
+  // 22/11 (ORGANIZAR_STRIPE): o /organizar pagando pela Stripe (eventos com pagina "organizar") num funil próprio, com as vendas dele
+  const organizarStripe = funilOferta(eventos, (vendasSt ?? []) as VendaStripe[], piStripeAtivos, "organizar");
+  return { dia: hoje, ...roi, landing: funilLanding(eventos, pagos), vida, oferta, organizarStripe, errosMeta: ins.erros };
 }
 
 /* ---------------------------------------------------------------- servidor */

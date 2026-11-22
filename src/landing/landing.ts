@@ -114,7 +114,7 @@ const agora = () => Math.round(performance.now());
 type Janela = Window & {
   __landingCliqueLoja?: (e: MouseEvent) => void;
   __landingSimularJaTem?: boolean;
-  __landing?: { uma?: boolean; cko_forcado?: boolean; otp_forcado?: boolean; oem_forcado?: boolean; lpo_forcado?: boolean; lpo_link?: boolean; ab_lp_oferta?: string; lpo_stripe_cedo?: string; pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; braco_preco?: string; preco_forcado?: boolean; ab_preco_oferta?: string; up_oferta?: string; indique?: string; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null; planos_forcado?: boolean; ab_planos?: string; planos_vitalicio_centavos?: number; planos_mensal_centavos?: number; planos_parcelas_max?: number; planos_pix_mensal?: boolean };
+  __landing?: { uma?: boolean; cko_forcado?: boolean; otp_forcado?: boolean; oem_forcado?: boolean; lpo_forcado?: boolean; lpo_link?: boolean; ab_lp_oferta?: string; lpo_stripe_cedo?: string; pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; braco_preco?: string; preco_forcado?: boolean; ab_preco_oferta?: string; org_stripe?: string; org_stripe_forcado?: boolean; ab_org_stripe?: string; up_oferta?: string; indique?: string; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null; planos_forcado?: boolean; ab_planos?: string; planos_vitalicio_centavos?: number; planos_mensal_centavos?: number; planos_parcelas_max?: number; planos_pix_mensal?: boolean };
   __eventosLanding?: Record<string, unknown>[];
   /** 02/11 (dev/testes): voltou() = "voltei do banco" (≥ 5 s fora) sem trocar de aba; vencer() = o QR vence em 1,5 s */
   __landingSimular?: { pagar: () => void; pagarU2027?: () => void; voltou?: () => void; vencer?: () => void };
@@ -166,7 +166,11 @@ const HM_PARCELAS = typeof w.__landing?.hotmart_parcelas === "string" ? w.__land
 /* 04/11: /oferta (Stripe, ./stripe-checkout.ts): a página atual a R$ 67,90 com o checkout em tela cheia. STRIPE só com a chave e a
  * pk de verdade (o <head> já mandou pro /organizar se não). EXTERNO = checkout de fora (Hotmart ou Stripe): some o Pix da página. */
 const ST_PK = String(w.__landing?.stripe_pk ?? "");
-const STRIPE = PAGINA === "oferta" && EXT === "stripe" && pkStripeValida(ST_PK);
+const STRIPE = (PAGINA === "oferta" || PAGINA === "organizar") && EXT === "stripe" && pkStripeValida(ST_PK);
+/** 22/11 (ORGANIZAR_STRIPE no <head>): o /organizar no MESMO checkout Stripe da /oferta, a R$ 27,90 fixo (o <head> já pôs 2790 em
+ *  stripe_preco_centavos). Pedido com pagina "organizar" (o servidor só aceita 2790 nela); os eventos saem com pagina "organizar";
+ *  o pós-compra é o MESMO da /oferta (abrirCheckout). Chave off: o /organizar não tem data-pagina e nada disto existe. */
+const ORG_STRIPE = STRIPE && PAGINA === "organizar";
 const ST_PRECO = Number(w.__landing?.stripe_preco_centavos) > 0 ? Number(w.__landing?.stripe_preco_centavos) : 6790;
 const ST_PARCELAS = typeof w.__landing?.stripe_parcelas === "string" ? w.__landing.stripe_parcelas : "";
 /* 18/11: /escolha (PLANOS_PAGINA no <head>): a página da /oferta com os 2 planos e o checkout próprio (./planos-checkout.ts). Só com a
@@ -270,7 +274,7 @@ const ua = navigator.userAgent || "";
 const plataforma = /iPhone|iPad|iPod/i.test(ua) ? "ios" : /Android/i.test(ua) ? "android" : "web";
 const inApp = /FBAN|FBAV|FB_IAB|FBIOS|Instagram/i.test(ua);
 const pixForcado = !!w.__landing?.pix_forcado; // 02/11 r1: ?pix=b do dono/QA fica no aparelho — todo evento diz, não só o landing_html (a análise exclui)
-const medicaoForçada = SIMULADO || ["lp_forcado", "pix_forcado", "oferta_forcada", "checkout_forcado", "t_forcado", "lpo_forcado", "oem_forcado", "otp_forcado", "planos_forcado", "preco_forcado"].some(k => (w.__landing as Record<string, unknown> | undefined)?.[k] === true);
+const medicaoForçada = SIMULADO || ["lp_forcado", "pix_forcado", "oferta_forcada", "checkout_forcado", "t_forcado", "lpo_forcado", "oem_forcado", "otp_forcado", "planos_forcado", "preco_forcado", "org_stripe_forcado"].some(k => (w.__landing as Record<string, unknown> | undefined)?.[k] === true);
 const storageAtrib = (() => { try { return localStorage; } catch { return null; } })();
 const atrib = capturarAtribuicao(location.search, storageAtrib, Date.now(), medicaoForçada);
 const contextoAtribuicao = () => ({ landing_session_id: sessao, landing_device_id: aparelho, braco_lp: brLp, braco_pix: brPix, forçado: medicaoForçada, atrib });
@@ -2113,7 +2117,7 @@ type CompraPaga = import("./stripe-checkout").CompraPaga;
 // críticas da subida 17/11: o ?ref= é lido e vai no pedido SEMPRE na /oferta da Stripe, mesmo com a chave INDIQUE_OFERTA off — esconder a
 // tela (rollback "esconder a vitrine") nunca pode perder a comissão de um link que já está no WhatsApp. O stripe-criar filtra o formato e
 // o webhook só grava com INDIQUE_WEB=on. Sem indicador na URL nem guardado, o pedido é o de sempre.
-const INDICADOR = STRIPE && !LPO_LINK ? capturarIndicador(location.search, storageAtrib, { ler: lerCookie, gravar: gravarCookie }) : null;
+const INDICADOR = STRIPE && !LPO_LINK && !ORG_STRIPE ? capturarIndicador(location.search, storageAtrib, { ler: lerCookie, gravar: gravarCookie }) : null;
 if (INDICADOR) evento("landing_indicado", { indicador: INDICADOR, tela: INDIQUE ? "on" : "off" });
 const apiIndique = (): ApiIndique => SIMULADO
   ? { pedirLink: (c) => espera(600).then(() => ((w as unknown as { __landingSimularIndique?: { falhar?: boolean } }).__landingSimularIndique?.falhar
@@ -2267,6 +2271,9 @@ const opcoesStripe = () => ({
   ...(INDIQUE ? { indique: { abrir: abrirIndiqueOferta } } : {}),
   ...(BRACO_PRECO ? { bracoPreco: Number(BRACO_PRECO) } : {}),
   pk: ST_PK, precoCentavos: ST_PRECO, parcelasMax: Number(w.__landing?.stripe_parcelas_max) || 12, producao: PRODUCAO, pedeCpf: w.__landing?.stripe_pede_cpf === true,
+  // 22/11 (ORGANIZAR_STRIPE): só 27,90, Pix marcado + cartão à vista (sem parcelas, sem CPF), o Pix "copiar primeiro" no Android e a
+  // medição da carteira (Apple/Google Pay — só mede, nada aparece). Vem DEPOIS das opções de sempre pra valer sobre elas.
+  ...(ORG_STRIPE ? { pagina: "organizar" as const, storagePrefix: "organizar", parcelasMax: 1, pedeCpf: false, pixCopiaPrimeiro: true, medirCarteira: true } : {}),
   evento: eventoStripe, pixel: pixelStripe, atrib: { ...atrib, ...(LPO_ATIVO ? { braco_lp_oferta: String(BRACO_LP_OFERTA) } : {}), ...(INDICADOR ? { indicador: INDICADOR } : {}) }, sessao, aparelho, urlChegada: URL_DE_CHEGADA, fbclid: BUSCA.get("fbclid"),
 });
 /* ── 11/11: braço "pagina" (AB_OFERTA_EMAIL): o e-mail no cartão da oferta, acima do botão. Sem e-mail válido o checkout não abre (o erro fica

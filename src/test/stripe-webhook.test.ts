@@ -739,3 +739,60 @@ describe("22/11 preço de 3 braços: webhook", () => {
     expect(tituloVenda(vendaPix(linha)!)).toContain("R$ 27,90");
   });
 });
+
+/* ───────── 22/11: o /organizar no checkout Stripe (ORGANIZAR_STRIPE) — servidor ───────── */
+describe("22/11 /organizar no Stripe: servidor", () => {
+  const REF = "0f8a5c2e-1111-4222-8333-944455556666";
+  it("pagina 'organizar' = R$ 27,90 fixo: o corpo nunca muda o valor; braço de preço é recusado; sem cartão salvo e sem indicador", () => {
+    const p = validarPedidoStripe({ ref: REF, pagina: "organizar", amount: 100, valor: 1, salvar_cartao: true, atrib: { indicador: "ANA7K2" } })!;
+    expect(p.pagina).toBe("organizar");
+    expect(p).not.toHaveProperty("salvarCartao");
+    expect(p.atrib.indicador).toBeUndefined();
+    expect(validarPedidoStripe({ ref: REF, pagina: "organizar", braco_preco: "2790" })).toBeNull();
+    expect(OFERTAS_STRIPE.organizar).toMatchObject({ pagina: "organizar", centavos: 2790, idem: "organizar" });
+    expect(paramsCriar(REF, OFERTAS_STRIPE.organizar)).toEqual(expect.arrayContaining([["amount", "2790"], ["metadata[pagina]", "organizar"]]));
+  });
+  it("criar: PI de 2790 com a chave organizar-<ref>; a resposta traz amount/currency/pagina (a página confere antes de pagar)", async () => {
+    const m = montar(); const s = stripeFalsa();
+    const p = validarPedidoStripe({ ref: REF, pagina: "organizar" })!;
+    const r = await criarOuReaproveitar({ admin: m.admin as never, stripe: s.f, log: () => {} }, p, metadataDoPedido(p, { userId: null, ip: "1.1.1.1", ua: "UA", agoraIso: "x" }), { userId: null, ip: "1.1.1.1" });
+    expect(r.corpo).toMatchObject({ ok: true, amount: 2790, currency: "brl", pagina: "organizar" });
+    expect(s.ctl.idems).toContain(`organizar-${REF}`);
+    // um PI da /oferta na mesma aba nunca serve pro /organizar (outra página → 404)
+    const pOf = validarPedidoStripe({ ref: REF })!;
+    await criarOuReaproveitar({ admin: montar().admin as never, stripe: s.f, log: () => {} }, pOf, {}, { userId: null, ip: null });
+    expect((await criarOuReaproveitar({ admin: m.admin as never, stripe: s.f, log: () => {} }, validarPedidoStripe({ ref: REF, pagina: "organizar", pi: "pi_2" })!, {}, { userId: null, ip: null })).status).toBe(404);
+  });
+  it("webhook: 2790 da pagina 'organizar' libera (linha stripe 2790, CAPI 27,90 com event_id = PI, stripe_venda pagina organizar); 6790 nela é ignorado", async () => {
+    const m = montar();
+    m.db.users.set("u_anon", { id: "u_anon", email: null });
+    const base = pi();
+    const r = await mandar(m, evento("payment_intent.succeeded", { ...base, amount: 2790, amount_received: 2790, metadata: { ...base.metadata, user_id: "u_anon", pagina: "organizar", url: "https://www.coreaplicativo.com.br/organizar?utm_content=c7" } }));
+    expect(r.corpo).toMatchObject({ liberado: true, novo: true });
+    expect(m.db.subscriptions[0]).toMatchObject({ amount_cents: 2790, payment_method: "stripe", plan: "lifetime", abacatepay_billing_id: "pi_3Abc" });
+    const ev = (m.saida.capi[0].data as Linha[])[0] as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+    expect(ev).toMatchObject({ event_name: "Purchase", event_id: "pi_3Abc", event_source_url: "https://www.coreaplicativo.com.br/organizar?utm_content=c7" });
+    expect(ev.custom_data).toMatchObject({ value: 27.9, currency: "BRL", content_name: "CORE vitalício (organizar Stripe)" });
+    const v = m.db.analytics_events.find((e) => e.event_name === "stripe_venda")!.event_data as Linha;
+    expect(v).toMatchObject({ pagina: "organizar", valor_cents: 2790 });
+    expect(v).not.toHaveProperty("braco_preco");
+    const m2 = montar();
+    m2.db.users.set("u_anon", { id: "u_anon", email: null });
+    const r2 = await mandar(m2, evento("payment_intent.succeeded", { ...base, metadata: { ...base.metadata, user_id: "u_anon", pagina: "organizar" } }));
+    expect(r2.corpo).toMatchObject({ ignorado: "valor" });
+    expect(m2.db.subscriptions).toHaveLength(0);
+  });
+  it("/vendas: o /organizar-Stripe tem funil próprio; a venda dele não entra no da /oferta (e vice-versa)", () => {
+    const ev = [
+      { event_name: "landing_html", sid: "a", pagina: "oferta" }, { event_name: "landing_html", sid: "b", pagina: "organizar" },
+      { event_name: "landing_stripe_aberto", sid: "b", pagina: "organizar" }, { event_name: "landing_html", sid: "c" },
+    ];
+    const vendas = [{ pi: "pi_1", valor_cents: 6790, metodo: "pix", pagina: "oferta" }, { pi: "pi_2", valor_cents: 2790, metodo: "card", pagina: "organizar" }];
+    const ativos = new Set(["pi_1", "pi_2"]);
+    expect(funilOferta(ev, vendas, ativos)).toMatchObject({ visitas: 1, pagaram: 1, receita: 67.9 });
+    expect(funilOferta(ev, vendas, ativos, "organizar")).toEqual({ visitas: 1, abriramCheckout: 1, pagaram: 1, receita: 27.9, porVisita: 27.9, pix: 0, cartao: 1 });
+    const fn = readFileSync(resolve(__dirname, "../../supabase/functions/vendas-painel/index.ts"), "utf8");
+    expect(fn).toContain('funilOferta(eventos, (vendasSt ?? []) as VendaStripe[], piStripeAtivos, "organizar")');
+    expect(fn).toContain("pagina:event_data->>pagina");
+  });
+});

@@ -43,9 +43,9 @@ export function validarPedidoStripe(body: unknown): PedidoStripe | null {
   // 23/11 (INDIQUE_OFERTA, só /oferta): o código de quem indicou (?ref= da página, último clique) → metadata[indicador] do PI.
   // Só letras/números maiúsculos (o formato de afiliados.codigo); qualquer outra coisa é descartada.
   const ind = typeof a.indicador === "string" ? normalizarCodigo(a.indicador.slice(0, 64)) : null;
-  if (ind && b.pagina !== "lp27" && b.pagina !== "app_web") atrib.indicador = ind;
+  if (ind && b.pagina !== "lp27" && b.pagina !== "app_web" && b.pagina !== "organizar") atrib.indicador = ind;
   // 22/11 (AB_PRECO_OFERTA): só a /oferta tem braço de preço; veio braço que não é um dos 3 = pedido recusado (nunca um valor arbitrário)
-  const paginaOk = b.pagina === "lp27" ? "lp27" : b.pagina === "app_web" ? "app_web" : b.pagina === "planos" ? "planos" : "oferta";
+  const paginaOk = b.pagina === "lp27" ? "lp27" : b.pagina === "app_web" ? "app_web" : b.pagina === "planos" ? "planos" : b.pagina === "organizar" ? "organizar" : "oferta";
   let bracoPreco: BracoPrecoOferta | null = null;
   if (b.braco_preco !== undefined && b.braco_preco !== null && b.braco_preco !== "") {
     if (paginaOk !== "oferta") return null;
@@ -57,8 +57,9 @@ export function validarPedidoStripe(body: unknown): PedidoStripe | null {
     fbp: t(b.fbp, 120), fbc: t(b.fbc, 400), fbclid: t(b.fbclid, 300), url: url && SITES.some((s) => url.startsWith(s)) ? url : null,
     landing_session_id: t(b.landing_session_id, 64), landing_device_id: t(b.landing_device_id, 64), atrib, cpf: cpfBruto,
     // 18/11: "planos" = a /escolha (2 planos; só pelas ações, como o app_web). Qualquer outra coisa segue sendo a /oferta.
-    pagina: b.pagina === "lp27" ? "lp27" : b.pagina === "app_web" ? "app_web" : b.pagina === "planos" ? "planos" : "oferta",
-    ...(b.salvar_cartao === true && b.pagina !== "lp27" && b.pagina !== "app_web" && b.pagina !== "planos" ? { salvarCartao: true } : {}),
+    // 22/11: "organizar" = o /organizar no checkout Stripe (ORGANIZAR_STRIPE), só R$ 27,90 (tabela de ofertas)
+    pagina: paginaOk,
+    ...(b.salvar_cartao === true && paginaOk === "oferta" ? { salvarCartao: true } : {}),
     ...(bracoPreco ? { bracoPreco } : {}),
   };
 }
@@ -246,5 +247,5 @@ export async function criarOuReaproveitar(
       if (p.email) return { status: 502, corpo: { ok: false } };
     }
   }
-  return { status: 200, corpo: { ok: true, client_secret: j.client_secret, pi: j.id, status: j.status, pix: pixDoIntento(j), ...(oferta.pagina === "lp27" ? { amount: j.amount, currency: j.currency, pagina: oferta.pagina } : {}), ...(bracoPreco ? { amount: j.amount, currency: j.currency, braco_preco: String(bracoPreco) } : {}) } };
+  return { status: 200, corpo: { ok: true, client_secret: j.client_secret, pi: j.id, status: j.status, pix: pixDoIntento(j), ...(oferta.pagina === "lp27" || oferta.pagina === "organizar" ? { amount: j.amount, currency: j.currency, pagina: oferta.pagina } : {}), ...(bracoPreco ? { amount: j.amount, currency: j.currency, braco_preco: String(bracoPreco) } : {}) } };
 }

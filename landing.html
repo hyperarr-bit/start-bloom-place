@@ -136,6 +136,13 @@
         // Antes de ligar: deploy stripe-criar + stripe-webhook + env PRECO_OFERTA_SERVIDOR=on (sem ela, 27,90 e 47,90 dão erro no
         // checkout em vez de cobrar). Ver novidades-guardadas/2026-11-22/preco-3/LEIA.md. Rollback: "off".
         var AB_PRECO_OFERTA = "off";
+        // 22/11 (dono): o /organizar (R$ 27,90) pagando pelo MESMO checkout Stripe em tela cheia da /oferta (Pix + cartão), valor fixo 27,90.
+        // "off" = o /organizar de hoje, IDÊNTICO (Pix próprio do Asaas no cartão da página). "on" = a página atual do /organizar (braço "atual"
+        // do AB_LP, oferta "sempre") vira html[data-pagina="organizar"] + data-checkout-ext="stripe": o preço 27,90 em todo lugar e o botão abre
+        // o checkout Stripe (pagina "organizar" no stripe-criar, que só cobra 2790 nela). Pós-compra = o mesmo da /oferta. A /oferta, a /vida,
+        // o /simples, o /tiktok e a /escolha não leem isto. QA: ?orgstripe=on|off força neste aparelho (localStorage + cookie), ?orgstripe=auto
+        // desfaz. Antes de ligar: deploy stripe-criar + stripe-webhook (+ vendas-painel) e 1 compra real (LEIA.md). Rollback: "off".
+        var ORGANIZAR_STRIPE = "off";
         // 18/11 (dono): /escolha — a página dos 2 PLANOS (Mensal R$ 34,90/mês · Vitalício R$ 97,90) num LINK PRÓPRIO, pra uma campanha só
         // dela (não é sorteio na /oferta). "off" = o /escolha não vende: vai pra /oferta com a mesma query (utm/fbclid). A /oferta, o
         // /organizar, a /vida, o /vitalicio e o /simples não leem nada disto. QA só FORA do domínio de produção: ?planos=on.
@@ -509,6 +516,27 @@
           if (o !== "sempre") bko = "atual"; // o banner diz "vitalício": o "ano" (só por ?oferta=ano) fica no Pix de hoje
           d.setAttribute("data-cko", bko);
           mem.cko = bko; mem.ab_cko = CHECKOUT_ORG_V2;
+        }
+        // 22/11: o /organizar no checkout Stripe (ORGANIZAR_STRIPE). Só a página atual do /organizar (nunca /vida, /oferta, /vitalicio,
+        // /simples, /tiktok, /escolha, nem o braço v2 do AB_LP ou a oferta "ano"). Chave off e sem ?orgstripe= → nada aqui acontece.
+        if (!VIDA && !OFERTA && !UMA && !PLANOS && lp === "atual" && o === "sempre") {
+          var pos2 = pega("orgstripe"), ckos = null;
+          try { var csos = String(document.cookie || "").split(";"); for (var ios = 0; ios < csos.length; ios++) { var jos = csos[ios].indexOf("="); if (jos > 0 && csos[ios].slice(0, jos).trim() === "landing_orgstripe_force") ckos = csos[ios].slice(jos + 1).trim(); } } catch (eos0) {}
+          if (pos2 === "on" || pos2 === "off" || pos2 === "auto") {
+            grava("landing-orgstripe-force", pos2 === "auto" ? null : pos2);
+            try { document.cookie = "landing_orgstripe_force=" + (pos2 === "auto" ? "; Max-Age=0" : pos2 + "; Max-Age=2592000") + "; Path=/; SameSite=Lax"; } catch (eos1) {}
+          }
+          var bos = (pos2 === "on" || pos2 === "off") ? pos2 : pos2 === "auto" ? null : (le("landing-orgstripe-force") || ckos);
+          var osForcado = bos === "on" || bos === "off";
+          if (!osForcado) bos = ORGANIZAR_STRIPE === "on" ? "on" : "off";
+          var osPk = /^pk_(live|test)_[A-Za-z0-9]+$/.test(STRIPE_PK) && !/PREENCHER/i.test(STRIPE_PK);
+          if (bos === "on" && osPk) {
+            d.setAttribute("data-pagina", "organizar");
+            d.setAttribute("data-checkout-ext", "stripe");
+            if (!STRIPE_PARCELAS_TEXTO) d.setAttribute("data-hm-sem-parcelas", "");
+            mem.pagina = "organizar"; mem.checkout_ext = "stripe"; mem.org_stripe = "on"; mem.org_stripe_forcado = osForcado; mem.ab_org_stripe = ORGANIZAR_STRIPE;
+            mem.stripe_pk = STRIPE_PK; mem.stripe_preco_centavos = 2790; mem.stripe_parcelas_max = STRIPE_PARCELAS_MAX; mem.stripe_parcelas = STRIPE_PARCELAS_TEXTO; mem.stripe_pede_cpf = STRIPE_PEDE_CPF === true;
+          }
         }
         mem.t = t; mem.oferta = o; mem.ab_titulo = AB_TITULO; mem.ab_oferta = AB_OFERTA;
         mem.divisao = pega("ld") === "1" ? "inicio" : null;

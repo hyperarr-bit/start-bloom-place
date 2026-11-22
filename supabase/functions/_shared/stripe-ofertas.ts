@@ -36,6 +36,12 @@ export const OFERTAS_STRIPE: Record<string, OfertaStripe> = {
     pagina: "oferta", centavos: 6790, idem: "oferta", descricao: "CORE vitalicio", parcelasMax: 12, offer: "ST_oferta",
     contentName: "CORE vitalício (Stripe)", urlPadrao: "https://www.coreaplicativo.com.br/oferta",
   },
+  /** 22/11 (ORGANIZAR_STRIPE, chave do <head>): o /organizar pagando pelo MESMO checkout Stripe da /oferta — vitalício R$ 27,90, Pix + cartão.
+   *  Só este valor nesta página; a página só diz pagina "organizar" (o preço nunca vem dela). Chave off = o /organizar com o Pix do Asaas. */
+  organizar: {
+    pagina: "organizar", centavos: 2790, idem: "organizar", descricao: "CORE vitalicio", parcelasMax: 1, offer: "ST_organizar",
+    contentName: "CORE vitalício (organizar Stripe)", urlPadrao: "https://www.coreaplicativo.com.br/organizar",
+  },
   app_web: {
     pagina: "app_web", centavos: 9790, idem: "appweb", descricao: "CORE vitalicio", parcelasMax: 3, offer: "ST_app_web",
     contentName: "CORE vitalício (funil app web)", urlPadrao: "https://www.coreaplicativo.com.br/funil-app",

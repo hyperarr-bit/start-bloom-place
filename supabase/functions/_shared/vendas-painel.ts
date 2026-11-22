@@ -311,18 +311,20 @@ export function vidaPorBraco(eventos: EventoVida[], vendasBrutas: Array<{ braco?
 
 /* 04/11: a /oferta (Stripe) — visitas, abriram o checkout, pagaram (stripe_venda com PI ativo em subscriptions), R$ por visita,
  * Pix × cartão. */
-export type VendaStripe = { pi?: string | null; valor_cents?: number | string | null; metodo?: string | null };
-export function funilOferta(eventos: EventoLanding[], vendasBrutas: VendaStripe[], piValidos: Set<string>) {
+export type VendaStripe = { pi?: string | null; valor_cents?: number | string | null; metodo?: string | null; pagina?: string | null };
+/** 22/11: `pagina` = qual página do checkout Stripe ("oferta" de sempre; "organizar" = o /organizar com ORGANIZAR_STRIPE). A venda com
+ *  pagina (stripe_venda.pagina) só conta na página dela; venda sem o campo conta na "oferta" (como antes). */
+export function funilOferta(eventos: EventoLanding[], vendasBrutas: VendaStripe[], piValidos: Set<string>, pagina = "oferta") {
   const robos = new Set<string>();
   for (const e of eventos) if (e.sid && /right_column/i.test(e.termo ?? "")) robos.add(e.sid);
   const visitas = new Set<string>(), abriram = new Set<string>();
   for (const e of eventos) {
-    if (!e.sid || robos.has(e.sid) || e.pagina !== "oferta") continue;
+    if (!e.sid || robos.has(e.sid) || e.pagina !== pagina) continue;
     visitas.add(e.sid);
     if (e.event_name === "landing_stripe_aberto") abriram.add(e.sid);
   }
   const vistos = new Set<string>();
-  const vendas = vendasBrutas.filter((v) => { const p = String(v.pi ?? ""); if (!p || !piValidos.has(p) || vistos.has(p)) return false; vistos.add(p); return true; });
+  const vendas = vendasBrutas.filter((v) => { const p = String(v.pi ?? ""); if (!p || !piValidos.has(p) || vistos.has(p) || (v.pagina || "oferta") !== pagina) return false; vistos.add(p); return true; });
   const receita = Math.round(vendas.reduce((s, v) => s + Number(v.valor_cents ?? 0), 0)) / 100;
   return {
     visitas: visitas.size, abriramCheckout: abriram.size, pagaram: vendas.length, receita,

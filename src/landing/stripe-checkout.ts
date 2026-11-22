@@ -39,6 +39,7 @@
  */
 import { EMAIL_OK, URL_APP_STORE, sugestaoDeEmail, urlPlay } from "./regras";
 import { reaisDeCentavos } from "./hotmart";
+import { faixaPosCompra, montarPosCompra } from "./pos-compra-app";
 import { cpfValido, mascararCpf, soDigitosCpf } from "../../supabase/functions/_shared/cpf";
 
 export type Evento = (nome: string, dados?: Record<string, unknown>) => void;
@@ -67,6 +68,9 @@ export type OpcoesCheckout = {
   /** 23/11 (INDIQUE_OFERTA "on"): o indique e ganhe no pós-pago (no lugar do presente — quem chama nunca passa os dois). O pago chama
    *  `abrir` (a folha sobe POR CIMA da tela de pago de sempre). Não muda nada no pedido. Sem isto: nada muda. */
   indique?: { abrir: (c: CompraPaga) => void };
+  /** 22/11 (POS_COMPRA_APP "on"): o pago vira "Pronto! Seu CORE está liberado" + o passo a passo de entrar no app
+   *  (./pos-compra-app.ts), sem presente nem indique. Sem isto: o pago de sempre. */
+  posApp?: boolean;
 };
 /** 15/11: a compra que acabou de pagar (pro presente): a ref e o PI são a prova pro servidor (a mesma do stripe-status) */
 export type CompraPaga = { ref: string; pi: string; metodo: string; email: string | null; cartao: { marca: string | null; final: string | null } | null };
@@ -847,6 +851,7 @@ function mostrarPago(metodo: string) {
   o.evento("landing_stripe_pago", { metodo, pi: est.pi });
   if (est.pi) o.pixel("Purchase", { value: o.precoCentavos / 100, currency: "BRL", content_name: "oferta_stripe" }, est.pi);
   telaPago();
+  if (o.posApp) return; // 22/11: pós-compra = só o caminho pro app (nada por cima)
   // 15/11 (UPSELL_OFERTA): o presente entra por cima; a tela de pago de sempre fica embaixo (é o "depois" dele). Nada aqui pode quebrar o pago.
   if (o.presente && est.pi) {
     try { o.presente.abrir({ ref: est.ref, pi: est.pi, metodo, email: est.email || null, cartao: metodo === "card" ? cartaoUsado : null }); } catch { /* fica o pago */ }
@@ -870,6 +875,14 @@ function telaPago() {
   const o = opc!;
   const e = est!.email;
   const alvo = raiz!.querySelector<HTMLElement>("#oc-in")!;
+  if (o.posApp) {
+    try {
+      montarPosCompra(alvo, { email: e || null, pi: est!.pi, evento: o.evento }, { pele: raiz });
+      const selo = raiz!.querySelector<HTMLElement>(".oc-barra span"); if (selo) selo.textContent = "Compra confirmada ✓";
+      raiz!.querySelector<HTMLElement>(".oc-corpo")!.scrollTop = 0; return;
+    }
+    catch { /* nada pode deixar a tela de pago em branco: cai no pago de sempre */ }
+  }
   alvo.innerHTML = `
     <div class="oc-pago" data-testid="oferta-pago">
       <div class="oc-check">${ICO_CHECK}</div>
@@ -971,6 +984,8 @@ function fecharJa(_via: string) {
   if (raiz) raiz.hidden = true;
   soltar();
   focoAntes?.focus?.();
+  // 22/11: fechou a camada depois de pagar → a faixa "Você já comprou ✓ · Ver como entrar no app" no topo da página
+  if (opc?.posApp && est?.fase === "pago") { const o = opc, e = est; try { faixaPosCompra({ email: e.email || null, pi: e.pi, evento: o.evento }); } catch { /* noop */ } }
 }
 
 /** testes: zera o módulo entre páginas */

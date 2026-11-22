@@ -128,6 +128,11 @@
         // presente NÃO aparece (nem o cartão é salvo). QA: ?indique=on|off (fica: localStorage + cookie), ?indique=auto desfaz. Vira
         // html[data-indique="on"]. Antes de ligar: migração 20261123120000 + deploy afiliados/stripe-criar/stripe-webhook + env INDIQUE_WEB=on.
         var INDIQUE_OFERTA = "on";
+        // 22/11 (dono: "depois da compra tira tudo que é oferta/convite e leva DIRETO pro app, com um tutorial bonito"): PÓS-COMPRA = APP.
+        // "on" = depois do pago, "Pronto! Seu CORE está liberado" + o passo a passo de entrar no app (src/landing/pos-compra-app.ts), SEM
+        // indique e ganhe e SEM presente (o ?ref= continua indo no pedido). "off" = o pós-pago de hoje, IDÊNTICO. Só a /oferta lê.
+        // QA: ?poscompra=on|off (fica: localStorage + cookie), ?poscompra=auto desfaz. Vira html[data-pos-app="on"]. Rollback: "off".
+        var POS_COMPRA_APP = "on";
         // 18/11 (dono): /escolha — a página dos 2 PLANOS (Mensal R$ 34,90/mês · Vitalício R$ 97,90) num LINK PRÓPRIO, pra uma campanha só
         // dela (não é sorteio na /oferta). "off" = o /escolha não vende: vai pra /oferta com a mesma query (utm/fbclid). A /oferta, o
         // /organizar, a /vida, o /vitalicio e o /simples não leem nada disto. QA só FORA do domínio de produção: ?planos=on.
@@ -272,6 +277,18 @@
             if (ig === "on" || ig === "off") mem.indique_forcado = true;
             if (ig !== "on" && ig !== "off") ig = INDIQUE_OFERTA === "on" ? "on" : "off";
             if (ig === "on") { d.setAttribute("data-indique", "on"); mem.indique = "on"; }
+            // 22/11: o pós-compra que leva pro app (POS_COMPRA_APP). ?poscompra=on|off força (localStorage + cookie), auto desfaz
+            var ppc = pega("poscompra"), ckpc = null;
+            try { var cspc = String(document.cookie || "").split(";"); for (var ipc = 0; ipc < cspc.length; ipc++) { var jpc = cspc[ipc].indexOf("="); if (jpc > 0 && cspc[ipc].slice(0, jpc).trim() === "landing_poscompra_force") ckpc = cspc[ipc].slice(jpc + 1).trim(); } } catch (epc0) {}
+            if (ppc === "on" || ppc === "off" || ppc === "auto") {
+              try { if (ppc === "auto") localStorage.removeItem("landing-poscompra-force"); else localStorage.setItem("landing-poscompra-force", ppc); } catch (epc1) {}
+              try { document.cookie = "landing_poscompra_force=" + (ppc === "auto" ? "; Max-Age=0" : ppc + "; Max-Age=2592000") + "; Path=/; SameSite=Lax"; } catch (epc2) {}
+            }
+            var lpc = null; try { lpc = localStorage.getItem("landing-poscompra-force"); } catch (epc3) {}
+            var pc = (ppc === "on" || ppc === "off") ? ppc : ppc === "auto" ? null : (lpc || ckpc);
+            if (pc === "on" || pc === "off") mem.pos_app_forcado = true;
+            if (pc !== "on" && pc !== "off") pc = POS_COMPRA_APP === "on" ? "on" : "off";
+            if (pc === "on") { d.setAttribute("data-pos-app", "on"); mem.pos_app = "on"; }
           }
         }
         // 11/11 (dono: "faz uma nova LP, vai ser só isso aí do print… quando clica no botão vai para o checkout"; "cria em uma nova, não substitui"):

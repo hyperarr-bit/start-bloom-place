@@ -1,149 +1,92 @@
 /**
- * COMO ENTRAR NO APP (24/09, pedido do dono: "tutorial detalhado pra quem
- * quiser acessar o app — tem escrito 'já tem conta? entrar' e mesmo assim o
- * pessoal não clica").
+ * COMO ENTRAR NO APP — o passo a passo de quem comprou no site.
  *
- * O que os dados mostraram (17–24/09): de 153 compradores da web, 57 nunca
- * entraram no app com a conta que pagou. Na tela inicial do app o botão
- * grande é "Começar" (cria conta nova → pede pagamento) e o "Entrar" é uma
- * linha de texto embaixo; das 374 sessões que tocaram em "Entrar", 80
- * acabaram em "Crie agora" (conta nova, sem compra) e 80 nunca logaram.
- *
- * Por isso a página ensina o toque certo com o PRINT REAL da tela (anel no
- * "Já tenho conta? Entrar") e fala o nome dos botões que NÃO são pra tocar.
- * O texto do passo 3 serve pras duas telas de login que existem nas lojas
- * até a versão nova sair: a antiga (só e-mail/senha + "Esqueci minha senha")
- * e a nova (com "Entrar sem senha — receber código por e-mail").
+ * 24/09: nasceu porque 57 de 153 compradores da web nunca entravam no app (tocavam em "Começar" e caíam na venda).
+ * 22/11 (dono: tutorial bonito e detalhado, fiel ao app de HOJE): o MESMO passo a passo do pós-compra da /oferta
+ * (src/landing/pos-compra-app.ts — mesmas frases e mesmas telas reais do app 1.0.29 em public/como-entrar/v2):
+ *   1ª tela → "Já tenho conta? Entrar" (Android vindo do nosso link: "Entrar na minha conta") → e-mail + "Receber código"
+ *   → código de 8 números do e-mail → "Entrar". Mais o aviso "você já pagou, não compre de novo" e a saída da tela de planos.
  */
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Check, Copy, AlertTriangle } from "lucide-react";
-import { BotoesDasLojas, aparelhoDaWeb } from "@/components/LojasCard";
+import { Check, Copy } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { trackEvent } from "@/lib/analytics";
+import { CSS_POS, aparelhoPelaUa, htmlPassos, type Aparelho } from "@/landing/pos-compra-app";
 
-const MAGENTA = "hsl(330 65% 50%)";
-
-function Passo({ n, titulo, children }: { n: number; titulo: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-2xl border border-border bg-card p-5" data-testid={`passo-${n}`}>
-      <div className="flex items-center gap-3">
-        <span
-          className="grid place-items-center w-8 h-8 rounded-full text-white text-sm font-black shrink-0"
-          style={{ background: MAGENTA }}
-          aria-hidden
-        >
-          {n}
-        </span>
-        <h2 className="text-[17px] font-bold leading-tight text-foreground text-balance">{titulo}</h2>
-      </div>
-      <div className="mt-3 space-y-3 text-[14px] leading-relaxed text-muted-foreground">{children}</div>
-    </section>
-  );
-}
-
-function PrintDoApp({ src, alt }: { src: string; alt: string }) {
-  return (
-    <div className="mx-auto w-[220px] rounded-[28px] border-[6px] border-foreground/90 bg-foreground/90 shadow-lg overflow-hidden">
-      <img src={src} alt={alt} width={390} height={844} loading="lazy" className="block w-full h-auto rounded-[22px]" />
-    </div>
-  );
-}
-
-function Nao({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="flex gap-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 px-3 py-2.5 text-[13px] leading-snug text-amber-900 dark:text-amber-200">
-      <AlertTriangle className="w-4 h-4 shrink-0 mt-[1px]" aria-hidden />
-      <span>{children}</span>
-    </p>
-  );
-}
+const ABAS: Array<[Aparelho, string]> = [["ios", "iPhone"], ["android", "Android"], ["computador", "Computador"]];
 
 export default function ComoEntrar() {
   const { user } = useAuth();
   const [copiado, setCopiado] = useState(false);
-  const ap = aparelhoDaWeb();
-  const plat = ap === "android" ? "android" : "ios";
+  const inicial: Aparelho = (() => { try { return aparelhoPelaUa(navigator.userAgent || "", navigator.maxTouchPoints || 0); } catch { return "computador"; } })();
+  const [aba, setAba] = useState<Aparelho>(inicial);
   const email = user?.email ?? null;
 
-  useEffect(() => { trackEvent("como_entrar_view", { aparelho: ap, logado: !!user }); }, [ap, user]);
+  useEffect(() => { trackEvent("como_entrar_view", { aparelho: inicial, logado: !!user }); }, [inicial, user]);
 
   const copiar = async () => {
     if (!email) return;
     try { await navigator.clipboard.writeText(email); setCopiado(true); trackEvent("como_entrar_copiou_email", {}); } catch { /* sem clipboard: o e-mail está na tela */ }
     window.setTimeout(() => setCopiado(false), 2500);
   };
+  /* os links das lojas e do navegador vêm no HTML do passo a passo: mede pelo clique delegado */
+  const medirClique = (e: React.MouseEvent) => {
+    const a = (e.target as Element).closest?.("a");
+    if (!a) return;
+    if (a.dataset.loja) trackEvent("como_entrar_loja", { loja: a.dataset.loja });
+    if (a.hasAttribute("data-navegador")) trackEvent("como_entrar_navegador", {});
+  };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <main className="mx-auto w-full max-w-[440px] px-4 pt-8 pb-14 space-y-4">
-        <header className="text-center space-y-3 pb-1">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-3 py-1 text-xs font-semibold">
-            <Check className="w-3.5 h-3.5" /> Sua compra já está na sua conta
-          </span>
+    <div className="pc-raiz min-h-screen" style={{ background: "var(--pc-bg)", color: "var(--pc-tx)" }}>
+      <style>{CSS_POS}</style>
+      <main className="pc mx-auto w-full max-w-[440px] px-4 pt-8 pb-14" data-testid="como-entrar">
+        <div className="pc-topo">
           <h1 className="text-[28px] font-black leading-[1.1] tracking-tight text-balance">Como entrar no app</h1>
-          <p className="text-[15px] leading-relaxed text-muted-foreground max-w-[34ch] mx-auto">
-            Leva 1 minuto. É o mesmo CORE do site, com tudo que você já fez — sem pagar de novo.
-          </p>
-        </header>
+          <p>Leva 2 minutos. É o mesmo CORE do site, com a sua compra, sem pagar de novo.</p>
+        </div>
 
-        {/* 03/11 (dono): o guia em PDF com fotos — o mesmo do e-mail da compra (public/guia, só no site) */}
-        <a href="/guia/core-comece-aqui.pdf" target="_blank" rel="noopener" data-testid="como-entrar-guia"
-          className="flex items-center justify-between gap-3 rounded-2xl border bg-card p-4">
-          <span className="text-left">
-            <span className="block text-[15px] font-bold text-foreground">📖 Guia com fotos (PDF)</span>
-            <span className="block text-[13px] text-muted-foreground">Como entrar, primeiros passos e dicas.</span>
-          </span>
-          <span className="shrink-0 rounded-xl px-3.5 py-2.5 text-[14px] font-bold text-white" style={{ background: MAGENTA }}>Abrir</span>
-        </a>
-
-        {email && (
-          <div className="rounded-2xl border-2 bg-card p-4 text-center" style={{ borderColor: MAGENTA }} data-testid="como-entrar-email">
-            <p className="text-[12px] font-bold uppercase tracking-wider text-muted-foreground">Use este e-mail no app</p>
-            <p className="mt-1 text-[17px] font-bold break-all text-foreground">{email}</p>
-            <button type="button" onClick={copiar} className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-semibold" style={{ color: MAGENTA }}>
-              {copiado ? <><Check className="w-4 h-4" /> Copiado</> : <><Copy className="w-4 h-4" /> Copiar e-mail</>}
-            </button>
+        {email ? (
+          <div className="pc-email" data-testid="como-entrar-email">
+            <small>Seu e-mail de acesso</small>
+            <div className="pc-email-linha">
+              <b>{email}</b>
+              <button type="button" className="pc-copiar" onClick={copiar} {...(copiado ? { "data-ok": "" } : {})}>
+                {copiado ? <><Check className="inline w-4 h-4" /> Copiado</> : <><Copy className="inline w-4 h-4" /> Copiar</>}
+              </button>
+            </div>
+            <p>É com ele que você entra. Não precisa de senha.</p>
+          </div>
+        ) : (
+          <div className="pc-email" data-testid="como-entrar-email">
+            <small>Seu e-mail de acesso</small>
+            <p>Entre com <b>o mesmo e-mail que você usou na compra</b>. Não precisa de senha.</p>
           </div>
         )}
 
-        <Passo n={1} titulo="Baixe o CORE na loja">
-          <p>Procure por <b className="text-foreground">CORE</b> ou toque no botão do seu celular:</p>
-          <BotoesDasLojas origem="como_entrar" />
-        </Passo>
+        <div className="pc-aviso" role="note" data-testid="como-entrar-nao-compre">
+          <i aria-hidden="true">⚠️</i>
+          <div><b>Você já pagou. Não compre de novo no app.</b><span>No app, toque em <b>Entrar</b> e use o seu e-mail. Viu uma tela de preço? Não pague: no fim desta página mostramos como sair dela.</span></div>
+        </div>
 
-        <Passo n={2} titulo={'Abra o app e toque em "Já tenho conta? Entrar"'}>
-          <p>É a linha logo <b className="text-foreground">embaixo</b> do botão preto:</p>
-          <PrintDoApp src={`/como-entrar/1-tela-inicial-${plat}.jpg`} alt='Tela inicial do app com "Já tenho conta? Entrar" destacado' />
-          <Nao>
-            Não toque em <b>“Começar”</b>. Ele é pra quem ainda não tem conta: cria uma conta nova, sem a sua compra, e aí o app pede pagamento.
-          </Nao>
-        </Passo>
+        <p className="pc-abas-t" id="ce-abas-t">Como entrar, passo a passo:</p>
+        <div className="pc-abas" role="tablist" aria-labelledby="ce-abas-t">
+          {ABAS.map(([k, r]) => (
+            <button key={k} type="button" role="tab" className="pc-aba" aria-selected={aba === k} data-testid={`como-entrar-aba-${k}`}
+              onClick={() => { if (aba !== k) { setAba(k); trackEvent("como_entrar_aba", { aba: k }); } }}>{r}</button>
+          ))}
+        </div>
+        {/* o mesmo HTML do pós-compra (texto fixo nosso; o e-mail é escapado lá dentro) */}
+        <div role="tabpanel" onClick={medirClique} dangerouslySetInnerHTML={{ __html: htmlPassos(aba, email, "como_entrar") }} />
 
-        <Passo n={3} titulo="Entre com o mesmo e-mail da compra">
-          <p>
-            Digite {email ? <b className="text-foreground">{email}</b> : <b className="text-foreground">o e-mail que você usou no site</b>} e a senha que você criou, e toque em <b className="text-foreground">Entrar</b>.
-          </p>
-          <PrintDoApp src={`/como-entrar/2-entrar-${plat}.jpg`} alt='Tela de entrar do app com "Entrar sem senha — receber código por e-mail" destacado' />
-          <p>
-            <b className="text-foreground">Não lembra a senha, ou criou a conta com o Google?</b> Toque em <b className="text-foreground">“Entrar sem senha — receber código por e-mail”</b>: chega um código no seu e-mail em 1 minuto. Se o seu app mostrar só e-mail e senha, toque em <b className="text-foreground">“Esqueci minha senha”</b>.
-          </p>
-          <Nao>
-            Não toque em <b>“Crie agora”</b> nem em <b>“Criar conta”</b> — sua conta já existe.
-          </Nao>
-        </Passo>
+        <a href="/guia/core-comece-aqui.pdf" target="_blank" rel="noopener" data-testid="como-entrar-guia" className="pc-btn">📖 Guia com fotos (PDF)</a>
 
-        <section className="rounded-2xl bg-muted/60 p-5 space-y-2" data-testid="como-entrar-ajuda">
-          <h2 className="text-[15px] font-bold text-foreground">O app pediu pagamento?</h2>
-          <p className="text-[14px] leading-relaxed text-muted-foreground">
-            Você entrou em outra conta, sem a sua compra. No fim da tela de pagamento, toque em <b className="text-foreground">“Entrar com outra conta”</b> e use {email ? <b className="text-foreground">{email}</b> : "o e-mail da compra"}.
-          </p>
-          <p className="text-[14px] leading-relaxed text-muted-foreground">
-            Não achou esse botão? Apague o app, instale de novo e entre por <b className="text-foreground">“Já tenho conta? Entrar”</b>.
-          </p>
-          <p className="text-[14px] leading-relaxed text-muted-foreground">
-            Não deu certo? <Link to="/suporte" className="font-semibold underline underline-offset-2" style={{ color: MAGENTA }} onClick={() => trackEvent("como_entrar_suporte", {})}>Fale com a gente</Link> — a gente libera pra você.
-          </p>
+        <section className="pc-ajuda" data-testid="como-entrar-ajuda">
+          <b>O app pediu pagamento depois de entrar?</b>
+          Você entrou em outra conta, sem a sua compra. No fim da tela de pagamento, toque em <b>“Entrar com outra conta”</b> e use {email ? <b>{email}</b> : "o e-mail da compra"}.
+          <br /><br />
+          Não deu certo? <Link to="/suporte" style={{ color: "var(--pc-mag)", fontWeight: 800 }} onClick={() => trackEvent("como_entrar_suporte", {})}>Fale com a gente</Link> ou escreva pra <a href="mailto:contato@coreaplicativo.com.br">contato@coreaplicativo.com.br</a>. A gente libera pra você.
         </section>
       </main>
     </div>

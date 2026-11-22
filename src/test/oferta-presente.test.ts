@@ -18,7 +18,9 @@ const raiz = resolve(__dirname, "../..");
 const HTML_REAL = readFileSync(resolve(raiz, "landing.html"), "utf8");
 // 17/11: com o INDIQUE_OFERTA ligado o presente fica de fora na /oferta; este teste é do presente, então força o indique "off"
 const HTML = HTML_REAL.replace(/var UPSELL_OFERTA = "on";[^\n]*/, 'var UPSELL_OFERTA = "off";').replace(/var INDIQUE_OFERTA = "(on|off)";/, 'var INDIQUE_OFERTA = "off";');
-const cabeca = HTML.match(/<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
+const cabeca = HTML.match(/<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/)![1]
+  // 22/11: o POS_COMPRA_APP (pós-compra → app) mora no mesmo bloco do <head>; aqui fica "off" (o teste dele é o pos-compra-app.test.ts)
+  .replace(/var POS_COMPRA_APP = "(on|off)"/, 'var POS_COMPRA_APP = "off"');
 
 function rodar(fonte: string, url: string, store: Record<string, string> = {}) {
   const u = new URL(url, "https://www.coreaplicativo.com.br");

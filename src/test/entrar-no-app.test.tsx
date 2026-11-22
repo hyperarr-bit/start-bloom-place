@@ -41,17 +41,21 @@ beforeEach(() => { auth.user = null; saiu.n = 0; localStorage.clear(); });
 afterEach(cleanup);
 
 describe("página /como-entrar", () => {
-  it("ensina os 3 passos, o toque certo e os botões que NÃO são pra tocar", async () => {
+  it("22/11: o passo a passo do app de HOJE (o mesmo do pós-compra), o toque certo e o aviso de não comprar de novo", async () => {
     const { default: ComoEntrar } = await import("@/pages/ComoEntrar");
     render(<MemoryRouter><ComoEntrar /></MemoryRouter>);
     expect(screen.getByText("Como entrar no app")).toBeInTheDocument();
-    expect(screen.getByTestId("passo-1")).toBeInTheDocument();
-    expect(screen.getByTestId("passo-2").textContent).toMatch(/Já tenho conta\? Entrar/);
-    expect(screen.getByTestId("passo-2").textContent).toMatch(/Não toque em “Começar”/);
-    expect(screen.getByTestId("passo-3").textContent).toMatch(/Entrar sem senha — receber código por e-mail/);
-    expect(screen.getByTestId("passo-3").textContent).toMatch(/Esqueci minha senha/);
-    expect(screen.getByTestId("passo-3").textContent).toMatch(/Crie agora/);
-    expect(screen.queryByTestId("como-entrar-email")).not.toBeInTheDocument(); // deslogado: sem e-mail inventado
+    expect(screen.getByTestId("como-entrar-nao-compre").textContent).toMatch(/Você já pagou\. Não compre de novo no app\./);
+    fireEvent.click(screen.getByTestId("como-entrar-aba-ios"));
+    expect(screen.getByTestId("pos-passo-1").textContent).toMatch(/App Store/);
+    expect(screen.getByTestId("pos-passo-2").textContent).toMatch(/Já tenho conta\? Entrar/);
+    expect(screen.getByTestId("pos-passo-2").textContent).toMatch(/Não toque em “Começar”/);
+    expect(screen.getByTestId("pos-passo-3").textContent).toMatch(/Receber código/);
+    expect(screen.getByTestId("pos-passo-4").textContent).toMatch(/8 números/);
+    expect(screen.getByTestId("pos-planos").textContent).toMatch(/Já é cliente\? Entre com seu e-mail/);
+    fireEvent.click(screen.getByTestId("como-entrar-aba-android"));
+    expect(screen.getByTestId("pos-passo-2").textContent).toMatch(/Entrar na minha conta/);
+    expect(screen.getByTestId("como-entrar-email").textContent).not.toMatch(/@/); // deslogado: sem e-mail inventado
   });
 
   it("logado na web: mostra o e-mail exato pra usar no app", async () => {
@@ -59,7 +63,8 @@ describe("página /como-entrar", () => {
     const { default: ComoEntrar } = await import("@/pages/ComoEntrar");
     render(<MemoryRouter><ComoEntrar /></MemoryRouter>);
     expect(screen.getByTestId("como-entrar-email").textContent).toMatch(/maria@exemplo\.com/);
-    expect(screen.getByTestId("passo-3").textContent).toMatch(/maria@exemplo\.com/);
+    fireEvent.click(screen.getByTestId("como-entrar-aba-ios"));
+    expect(screen.getByTestId("pos-passo-3").textContent).toMatch(/maria@exemplo\.com/);
   });
 });
 

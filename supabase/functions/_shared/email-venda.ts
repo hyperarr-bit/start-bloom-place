@@ -133,7 +133,35 @@ export const blocoEntrar = (e: string, n = ""): string => `<table role="presenta
   <div style="font-size:14px;line-height:1.5;color:#3d3742;margin:8px 0 0;">Digite <b style="color:#16121c;">${e}</b>, toque em <b>“Entrar sem senha”</b> e use o código de 8 números que chega neste e-mail. Você já pagou: não precisa pagar de novo.</div>
 </td></tr></table>`;
 
-export function htmlVenda(args: { email: string; nome?: string | null; periodo: PeriodoVenda; fim?: string | null; hoje?: boolean; extra?: string }): string {
+/**
+ * 22/11 (dono: pós-compra = levar DIRETO pro app, tutorial detalhado e fiel ao app de hoje). O bloco "Como entrar no app" do
+ * e-mail da compra da /oferta (Stripe): as 2 lojas + os 4 passos do app 1.0.29 (Entrar → e-mail → "Receber código" → código de
+ * 8 números) + "você já pagou, não compre de novo" + a saída da tela de planos + o link do passo a passo com fotos.
+ * "off" = o e-mail de hoje (lojas + "No app, toque em Entrar" + guia + indique, se a env pedir). Vale no próximo deploy do
+ * stripe-webhook (o código não muda nada sozinho no ar).
+ */
+export const EMAIL_POS_COMPRA_APP = "on" as "on" | "off";
+export const URL_COMO_ENTRAR = "https://www.coreaplicativo.com.br/como-entrar";
+export const blocoComoEntrarApp = (e: string): string => {
+  const passo = (n: number, t: string) => `<tr><td style="vertical-align:top;padding:0 12px 14px 0;width:28px;"><div style="width:28px;height:28px;border-radius:14px;background:#d22d80;color:#fff;font-weight:900;font-size:14px;line-height:28px;text-align:center;">${n}</div></td><td style="vertical-align:top;padding:3px 0 14px;font-size:15px;line-height:1.5;color:#16121c;">${t}</td></tr>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px;" data-bloco="como-entrar-app"><tr><td style="padding:0;">
+  <div style="font-size:12px;font-weight:800;letter-spacing:.08em;color:#d22d80;text-transform:uppercase;margin:0 0 12px;">Como entrar no app (2 minutos)</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+    ${passo(1, `<b>Baixe o CORE</b> no seu celular:<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:8px;"><tr>
+        <td style="padding:0 8px 0 0;"><a href="${URL_APP_STORE_EMAIL}" style="display:inline-block;background:#16121c;color:#fff;text-decoration:none;font-size:14px;font-weight:700;padding:11px 16px;border-radius:10px;">&#63743; App Store</a></td>
+        <td><a href="${URL_PLAY_EMAIL}" style="display:inline-block;background:#16121c;color:#fff;text-decoration:none;font-size:14px;font-weight:700;padding:11px 16px;border-radius:10px;">&#9654; Google Play</a></td></tr></table>`)}
+    ${passo(2, `Abra o app e toque em <b>“Já tenho conta? Entrar”</b>. No Android pode aparecer <b>“Entrar na minha conta”</b>: é o mesmo. <span style="color:#b42318;font-weight:700;">Não toque em “Começar”.</span>`)}
+    ${passo(3, `Digite <b>${e}</b> e toque em <b>“Receber código”</b>. Não precisa de senha.`)}
+    ${passo(4, `Chega <b>outro e-mail do CORE com um código de 8 números</b>. Digite no app e toque em <b>“Entrar”</b>. Não achou? Olhe em Spam ou Promoções. O código vale 1 hora.`)}
+  </table>
+  <div style="margin:2px 0 0;padding:13px 14px;border-radius:12px;background:#fff6e5;border:1.5px solid #f3d28c;color:#6b4200;font-size:14px;line-height:1.5;">
+    <b style="color:#4a2e00;">⚠️ Você já pagou. Não compre de novo no app.</b><br>Se aparecer uma tela de planos ou de preço, não pague. No iPhone, role até o fim e toque em <b>“Já é cliente? Entre com seu e-mail”</b>. No Android, toque no <b>X</b> até voltar pra primeira tela e toque em <b>“Já tenho conta? Entrar”</b>.
+  </div>
+  <div style="margin:12px 0 0;font-size:14px;line-height:1.5;color:#3d3742;">Quer ver com as fotos das telas? <a href="${URL_COMO_ENTRAR}?utm_source=email&amp;utm_medium=compra" style="color:#d22d80;font-weight:800;">Passo a passo com fotos</a></div>
+</td></tr></table>`;
+};
+
+export function htmlVenda(args: { email: string; nome?: string | null; periodo: PeriodoVenda; fim?: string | null; hoje?: boolean; extra?: string; tutorialApp?: boolean }): string {
   const e = esc(args.email);
   const primeiro = esc(String(args.nome ?? "").trim().split(/\s+/)[0] || "");
   const ate = dataBr(args.fim);
@@ -152,13 +180,13 @@ export function htmlVenda(args: { email: string; nome?: string | null; periodo: 
     <div style="font-size:12px;font-weight:700;letter-spacing:.08em;color:#d22d80;text-transform:uppercase;">Pagamento confirmado</div>
     <h1 style="font-size:22px;line-height:1.25;margin:10px 0 8px;">${primeiro ? `${primeiro}, seu` : "Seu"} CORE está liberado.</h1>
     <p style="font-size:15px;line-height:1.5;margin:0 0 20px;color:#5b5560;">${plano}</p>
-    ${args.hoje ? blocoLojas(e) : `<p style="font-size:14px;line-height:1.5;margin:0 0 12px;color:#3d3742;"><b>1 ·</b> Baixe o CORE: <a href="https://coreaplicativo.com.br/baixar?origem=venda_email" style="color:#d22d80;font-weight:700;">App Store ou Google Play</a>.</p>`}
-    ${blocoEntrar(e, "2 · ")}
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0;border:1px solid #e9e2e6;border-radius:14px;" data-bloco="guia"><tr>
+    ${args.tutorialApp ? blocoComoEntrarApp(e) : `${args.hoje ? blocoLojas(e) : `<p style="font-size:14px;line-height:1.5;margin:0 0 12px;color:#3d3742;"><b>1 ·</b> Baixe o CORE: <a href="https://coreaplicativo.com.br/baixar?origem=venda_email" style="color:#d22d80;font-weight:700;">App Store ou Google Play</a>.</p>`}
+    ${blocoEntrar(e, "2 · ")}`}
+    ${args.tutorialApp ? "" : `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0;border:1px solid #e9e2e6;border-radius:14px;" data-bloco="guia"><tr>
       <td style="padding:14px 6px 14px 16px;vertical-align:middle;"><div style="font-size:15px;font-weight:800;color:#16121c;">📖 Guia com fotos</div><div style="font-size:13px;line-height:1.4;color:#5b5560;margin-top:2px;">Como entrar, primeiros passos e dicas.</div></td>
       <td style="padding:14px 14px 14px 6px;vertical-align:middle;text-align:right;white-space:nowrap;"><a href="${URL_GUIA_PDF}" style="display:inline-block;background:#d22d80;color:#fff;text-decoration:none;font-size:14px;font-weight:800;padding:11px 14px;border-radius:10px;">Abrir o guia</a></td>
-    </tr></table>
-    ${args.extra ?? ""}<p style="font-size:12.5px;color:#8a838f;line-height:1.5;margin:14px 0 0;">No computador, é o mesmo CORE em coreaplicativo.com.br. Dúvida? É só responder este e-mail.</p>
+    </tr></table>`}
+    ${args.extra ?? ""}<p style="font-size:12.5px;color:#8a838f;line-height:1.5;margin:14px 0 0;">${args.tutorialApp ? "No computador, é o mesmo CORE em coreaplicativo.com.br/entrar (toque em “Entrar sem senha”). Travou? É só responder este e-mail ou escrever pra contato@coreaplicativo.com.br." : "No computador, é o mesmo CORE em coreaplicativo.com.br. Dúvida? É só responder este e-mail."}</p>
   </div>
 </div></body></html>`;
 }

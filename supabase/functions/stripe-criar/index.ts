@@ -10,6 +10,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { criarOuReaproveitar, formUrl, metadataDoPedido, validarPedidoStripe } from "../_shared/stripe-criar.ts";
+import { ENV_PRECO_OFERTA_SERVIDOR, bracoPrecoLiberado } from "../_shared/stripe-ofertas.ts";
 import { ENV_PLANOS_SERVIDOR, assinarAppWeb, assinarPixPlanos, cartaoAppWeb, familiaDaPagina, pixAppWeb, planosTravadoNoServidor, validarAcaoAppWeb } from "../_shared/stripe-app-web.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
@@ -36,6 +37,8 @@ serve(async (req) => {
     if (!p) return json({ ok: false }, 400);
     // 18/11 (revisão /escolha): a família "planos" só cobra com PLANOS_SERVIDOR=on no Supabase (a /oferta e o /funil-app não mudam)
     if (planosTravadoNoServidor(p.pagina, Deno.env.get(ENV_PLANOS_SERVIDOR))) { log("planos travado no servidor (PLANOS_SERVIDOR != on)"); return json({ ok: false, erro: "indisponivel" }, 503); }
+    // 22/11 (AB_PRECO_OFERTA): 27,90 e 47,90 da /oferta só nascem com PRECO_OFERTA_SERVIDOR=on no Supabase (6790 e sem braço: sempre)
+    if (!bracoPrecoLiberado(p.bracoPreco ?? null, Deno.env.get(ENV_PRECO_OFERTA_SERVIDOR))) { log("braço de preço travado no servidor (PRECO_OFERTA_SERVIDOR != on)", { braco: p.bracoPreco }); return json({ ok: false, erro: "indisponivel" }, 503); }
     // 14/11 (/funil-app): as ações da folha do paywall do app na web — só com pagina "app_web"
     // 18/11 (/escolha): a página dos 2 planos (pagina "planos") cobra pelas MESMAS ações, com a família dela (+ "assinar_pix")
     const familia = familiaDaPagina(p.pagina);

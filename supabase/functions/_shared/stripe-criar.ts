@@ -4,7 +4,7 @@
  * Metadata (≤ 500 caracteres cada, só texto): ref, pagina "oferta", e-mail, user_id da sessão, fbp, fbc, fbclid, url, IP, UA,
  * utm/ad e o momento — o webhook usa pra achar a conta e pra CAPI (o webhook é chamado pela Stripe: IP/UA só existem aqui).
  */
-import { OFERTAS_STRIPE, mensalDaPagina, ofertaDaPagina, type OfertaStripe } from "./stripe-ofertas.ts";
+import { OFERTAS_STRIPE, bracoPrecoValido, mensalDaPagina, ofertaDaPagina, type BracoPrecoOferta, type OfertaStripe } from "./stripe-ofertas.ts";
 import { cpfValido, soDigitosCpf } from "./cpf.ts";
 import { normalizarCodigo } from "./afiliados.ts";
 
@@ -17,6 +17,8 @@ export type PedidoStripe = {
   pagina: string;
   /** 15/11 (UPSELL_OFERTA, chave da página): salvar o cartão da compra pro presente de 1 toque — SÓ /oferta, só quando a página pede */
   salvarCartao?: boolean;
+  /** 22/11 (AB_PRECO_OFERTA): o braço de preço da /oferta (2790 | 4790 | 6790) — SÓ pagina "oferta". null = a /oferta de sempre (6790) */
+  bracoPreco?: BracoPrecoOferta | null;
 };
 /** a oferta do pedido (a tabela de _shared/stripe-ofertas.ts) */
 export const ofertaDoPedido = (p: Pick<PedidoStripe, "pagina">): OfertaStripe => ofertaDaPagina(p.pagina) ?? OFERTAS_STRIPE.oferta;
@@ -42,6 +44,14 @@ export function validarPedidoStripe(body: unknown): PedidoStripe | null {
   // Só letras/números maiúsculos (o formato de afiliados.codigo); qualquer outra coisa é descartada.
   const ind = typeof a.indicador === "string" ? normalizarCodigo(a.indicador.slice(0, 64)) : null;
   if (ind && b.pagina !== "lp27" && b.pagina !== "app_web") atrib.indicador = ind;
+  // 22/11 (AB_PRECO_OFERTA): só a /oferta tem braço de preço; veio braço que não é um dos 3 = pedido recusado (nunca um valor arbitrário)
+  const paginaOk = b.pagina === "lp27" ? "lp27" : b.pagina === "app_web" ? "app_web" : b.pagina === "planos" ? "planos" : "oferta";
+  let bracoPreco: BracoPrecoOferta | null = null;
+  if (b.braco_preco !== undefined && b.braco_preco !== null && b.braco_preco !== "") {
+    if (paginaOk !== "oferta") return null;
+    bracoPreco = bracoPrecoValido(b.braco_preco);
+    if (!bracoPreco) return null;
+  }
   return {
     ref, pi: pi && /^pi_[A-Za-z0-9]+$/.test(pi) ? pi : null, email: email && EMAIL_OK.test(email) ? email : null,
     fbp: t(b.fbp, 120), fbc: t(b.fbc, 400), fbclid: t(b.fbclid, 300), url: url && SITES.some((s) => url.startsWith(s)) ? url : null,
@@ -49,6 +59,7 @@ export function validarPedidoStripe(body: unknown): PedidoStripe | null {
     // 18/11: "planos" = a /escolha (2 planos; só pelas ações, como o app_web). Qualquer outra coisa segue sendo a /oferta.
     pagina: b.pagina === "lp27" ? "lp27" : b.pagina === "app_web" ? "app_web" : b.pagina === "planos" ? "planos" : "oferta",
     ...(b.salvar_cartao === true && b.pagina !== "lp27" && b.pagina !== "app_web" && b.pagina !== "planos" ? { salvarCartao: true } : {}),
+    ...(bracoPreco ? { bracoPreco } : {}),
   };
 }
 
@@ -57,7 +68,7 @@ export function metadataDoPedido(p: PedidoStripe, args: { userId: string | null;
   const md: Record<string, string | null> = {
     ref: p.ref, pagina: ofertaDoPedido(p).pagina, email: p.email, user_id: args.userId, fbp: p.fbp, fbc: p.fbc, fbclid: p.fbclid, url: p.url,
     ip: args.ip && args.ua ? args.ip : null, ua: args.ip && args.ua ? args.ua.slice(0, 450) : null, sessao: p.landing_session_id, aparelho: p.landing_device_id,
-    criado_em: args.agoraIso, ...p.atrib,
+    criado_em: args.agoraIso, ...p.atrib, ...(p.bracoPreco ? { braco_preco: String(p.bracoPreco) } : {}),
   };
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(md)) if (v) out[k] = String(v).slice(0, 500);
@@ -69,15 +80,29 @@ export function metadataDoPedido(p: PedidoStripe, args: { userId: string | null;
  * o MESMO PaymentIntent numa recarga; um campo que muda (hora, IP, UA, fbp) dava idempotency_error por 24 h. Pix + cartão;
  * parcelas no cartão (installments BR); Pix vale 30 min. Os sinais variáveis vão depois, pelo atualizar.
  */
-export function paramsCriar(ref: string, oferta: OfertaStripe = OFERTAS_STRIPE.oferta): Array<[string, string]> {
+export function paramsCriar(ref: string, oferta: OfertaStripe = OFERTAS_STRIPE.oferta, bracoPreco: BracoPrecoOferta | null = null): Array<[string, string]> {
+  // 22/11 (AB_PRECO_OFERTA): com braço, o valor é o do braço (um dos 3 da tabela) e o braço fica gravado na metadata desde o nascimento
+  const braco = oferta.pagina === OFERTAS_STRIPE.oferta.pagina ? bracoPreco : null;
   return [
-    ["amount", String(oferta.centavos)], ["currency", "brl"],
+    ["amount", String(braco ?? oferta.centavos)], ["currency", "brl"],
     ["payment_method_types[]", "card"], ["payment_method_types[]", "pix"],
     ["payment_method_options[card][installments][enabled]", "true"],
     ["payment_method_options[pix][expires_after_seconds]", "1800"],
     ["description", oferta.descricao], ["statement_descriptor_suffix", "CORE"],
     ["metadata[ref]", ref], ["metadata[pagina]", oferta.pagina],
+    ...(braco ? [["metadata[braco_preco]", String(braco)] as [string, string]] : []),
   ];
+}
+/** 22/11: a chave de idempotência do criar. Sem braço = a de sempre ("oferta"); com braço = outra por braço ("oferta-p2790"…),
+ *  pra a mesma ref num braço diferente (forçado no QA) nunca cair no PI do outro valor nem dar idempotency_error. */
+export const idemDoPedido = (oferta: OfertaStripe, bracoPreco: BracoPrecoOferta | null | undefined): string =>
+  oferta.pagina === OFERTAS_STRIPE.oferta.pagina && bracoPreco ? `${oferta.idem}-p${bracoPreco}` : oferta.idem;
+/** 22/11: o PI que já existe serve pra este pedido? (mesmo valor e mesmo braço — só a /oferta confere; as outras páginas, como sempre) */
+export function piServeProBraco(j: Record<string, unknown>, oferta: OfertaStripe, bracoPreco: BracoPrecoOferta | null | undefined): boolean {
+  if (oferta.pagina !== OFERTAS_STRIPE.oferta.pagina) return true;
+  const md = (j.metadata ?? {}) as Record<string, string>;
+  const esperado = bracoPreco ?? oferta.centavos;
+  return Number(j.amount) === esperado && (md.braco_preco ?? "") === (bracoPreco ? String(bracoPreco) : "");
 }
 
 /** O POST /v1/payment_intents/<id> (atualizar): o e-mail e os sinais do navegador (variáveis). O valor NUNCA é reenviado.
@@ -91,7 +116,7 @@ export function paramsAtualizar(md: Record<string, string>, email: string | null
   if (email) out.push(["receipt_email", email]);
   if (cpf) out.push(["metadata[cpf]", cpf]); // nota fiscal: SÓ aqui (nunca no criar idempotente, nunca no banco)
   for (const [k, v] of Object.entries(md)) {
-    if (k === "ref" || k === "pagina") continue;
+    if (k === "ref" || k === "pagina" || k === "braco_preco") continue; // 22/11: o braço nasce no criar e nunca muda
     if (k === "criado_em" && jaTem.criado_em) continue;
     out.push([`metadata[${k}]`, v]);
   }
@@ -156,6 +181,9 @@ export async function criarOuReaproveitar(
 ): Promise<{ status: number; corpo: Record<string, unknown> }> {
   const { admin, stripe, log } = deps;
   const oferta = ofertaDoPedido(p);
+  // 22/11 (AB_PRECO_OFERTA): o braço de preço (só /oferta). null = a /oferta de sempre — todo o caminho abaixo fica igual a hoje
+  const bracoPreco = oferta.pagina === OFERTAS_STRIPE.oferta.pagina ? (p.bracoPreco ?? null) : null;
+  const idem = idemDoPedido(oferta, bracoPreco);
   let pi = p.pi;
   if (!pi) {
     try {
@@ -166,7 +194,7 @@ export async function criarOuReaproveitar(
     } catch { /* cria (a chave de idempotência ainda segura o 2º) */ }
   }
   const registrar = async (id: unknown) => {
-    try { await admin.from("analytics_events").insert({ event_name: "stripe_order_created", user_id: ctx.userId, session_id: p.landing_session_id, event_data: { ref: p.ref, pi: id, pagina: oferta.pagina, ...(ctx.ip ? { client_ip: ctx.ip } : {}), ...p.atrib } }); } catch { /* o PI existe; a próxima recarga acha pela chave */ }
+    try { await admin.from("analytics_events").insert({ event_name: "stripe_order_created", user_id: ctx.userId, session_id: p.landing_session_id, event_data: { ref: p.ref, pi: id, pagina: oferta.pagina, ...(ctx.ip ? { client_ip: ctx.ip } : {}), ...p.atrib, ...(bracoPreco ? { braco_preco: String(bracoPreco) } : {}) } }); } catch { /* o PI existe; a próxima recarga acha pela chave */ }
   };
   /** o PI como está AGORA na Stripe (a resposta de uma chave repetida é a foto antiga) */
   const estadoReal = async (x: Record<string, unknown>): Promise<Record<string, unknown>> => {
@@ -179,10 +207,14 @@ export async function criarOuReaproveitar(
     const mdAtual = (atual.j.metadata ?? {}) as Record<string, string>;
     // 14/11: o PI tem que ser da MESMA ref e da MESMA oferta (um PI da /oferta nunca serve pro /funil-app e vice-versa)
     if (!atual.ok || mdAtual.ref !== p.ref || (mdAtual.pagina ?? "oferta") !== oferta.pagina) return { status: 404, corpo: { ok: false } };
-    j = atual.j;
-  } else {
+    // 22/11: o PI desta ref é de OUTRO braço de preço (o QA trocou o ?preco= na mesma aba) → não serve: nasce um do braço certo,
+    // com outra chave de idempotência. Sem braço e PI sem braço (a /oferta de sempre) sempre serve, como hoje.
+    if (piServeProBraco(atual.j, oferta, bracoPreco)) j = atual.j;
+    else log("PI de outro braço de preço — cria um novo", { braco: bracoPreco ?? "nenhum" });
+  }
+  if (!j) {
     if (!(await ipPodeCriar(admin, ctx.ip, deps.agoraMs))) { log("limite por IP"); return { status: 429, corpo: { ok: false, limite: true } }; }
-    const r = await stripe("payment_intents", paramsCriar(p.ref, oferta), `${oferta.idem}-${p.ref}`);
+    const r = await stripe("payment_intents", paramsCriar(p.ref, oferta, bracoPreco), `${idem}-${p.ref}`);
     if (!r.ok || typeof r.j.client_secret !== "string") { log("criar falhou", { code: String((r.j.error as Record<string, unknown> | undefined)?.code ?? "") }); return { status: 502, corpo: { ok: false } }; }
     j = await estadoReal(r.j);
     if (String(j.status) !== "canceled") await registrar(j.id);
@@ -191,7 +223,7 @@ export async function criarOuReaproveitar(
   // 14/11 (revisão): a Idempotency-Key devolve a FOTO de quando o PI nasceu (status antigo) — depois de criar, relê o PI;
   // se aquela chave já era de um PI cancelado (Pix → cartão → Pix → cartão), segue pra próxima. Antes: 502 e a ref travava.
   for (let n = 2; String(j.status) === "canceled" && n <= 12; n++) {
-    const r = await stripe("payment_intents", paramsCriar(p.ref, oferta), `${oferta.idem}-${p.ref}-${n}`);
+    const r = await stripe("payment_intents", paramsCriar(p.ref, oferta, bracoPreco), `${idem}-${p.ref}-${n}`);
     if (!r.ok || typeof r.j.client_secret !== "string") { log("recriar falhou", { n }); return { status: 502, corpo: { ok: false } }; }
     j = await estadoReal(r.j);
     if (String(j.status) !== "canceled") await registrar(j.id);
@@ -214,5 +246,5 @@ export async function criarOuReaproveitar(
       if (p.email) return { status: 502, corpo: { ok: false } };
     }
   }
-  return { status: 200, corpo: { ok: true, client_secret: j.client_secret, pi: j.id, status: j.status, pix: pixDoIntento(j), ...(oferta.pagina === "lp27" ? { amount: j.amount, currency: j.currency, pagina: oferta.pagina } : {}) } };
+  return { status: 200, corpo: { ok: true, client_secret: j.client_secret, pi: j.id, status: j.status, pix: pixDoIntento(j), ...(oferta.pagina === "lp27" ? { amount: j.amount, currency: j.currency, pagina: oferta.pagina } : {}), ...(bracoPreco ? { amount: j.amount, currency: j.currency, braco_preco: String(bracoPreco) } : {}) } };
 }

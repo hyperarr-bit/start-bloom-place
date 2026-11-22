@@ -272,6 +272,18 @@ export function bracoTopoOfertaDoAparelho(id: string): BracoTopoOferta {
   return ((h >>> 4) & 1) === 0 ? "atual" : "anuncio";
 }
 
+/** 22/11: o braço de PREÇO da /oferta (AB_PRECO_OFERTA no <head> → html[data-preco] e __landing.braco_preco). null = sem teste (67,90 de sempre). */
+export type BracoPrecoOferta = "2790" | "4790" | "6790";
+export const BRACOS_PRECO: readonly BracoPrecoOferta[] = ["2790", "4790", "6790"];
+export const ehBracoPreco = (v: unknown): v is BracoPrecoOferta => typeof v === "string" && (BRACOS_PRECO as readonly string[]).includes(v);
+/** A conta do <head> (prefixo "pco:", bits ALTOS do djb2-xor: floor(h × 3 / 2^32) — fora dos bits 0, 4, 8, 12, 16, 20 e 24 dos outros sorteios), pros testes. */
+export function bracoPrecoOfertaDoAparelho(id: string): BracoPrecoOferta {
+  const s = `pco:${id}`;
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return BRACOS_PRECO[Math.floor((h * 3) / 4294967296)];
+}
+
 /** 08/11: o CHECKOUT do /organizar (CHECKOUT_ORG_V2 no <head> → html[data-cko]). "atual" = o Pix de hoje no cartão (IDÊNTICO); "v2" = a camada
  *  com a cara do checkout v2, o MESMO Pix (./checkout-organizar.ts; novidades-guardadas/2026-11-07/checkout-organizar/SPEC.md). Sem sorteio
  *  (a chave "on" vale pra todo o /organizar). Fora do /organizar, ou sem o atributo: "atual". */

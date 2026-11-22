@@ -53,6 +53,9 @@ export type OpcoesCheckout = {
   storagePrefix?: string;
   /** Server-owned catalog key; no client amount is trusted by stripe-criar. */
   pagina?: "oferta" | "lp27";
+  /** 22/11 (AB_PRECO_OFERTA, só /oferta): o braço de preço (2790 | 4790 | 6790). Vai no pedido como braco_preco (o servidor só aceita os 3 e
+   *  grava na metadata do PI); em produção a página confere que o PI veio com ESTE valor antes de deixar pagar. Sem isto: nada muda. */
+  bracoPreco?: number;
   /** só testes: liga a medição da carteira sem mexer em MEDIR_CARTEIRA */
   medirCarteira?: boolean;
   /** só testes: mostra o "Prefiro pagar com cartão" sem mexer em PIX_TROCA_CARTAO */
@@ -159,11 +162,13 @@ function apiSimulada(): ApiOferta {
   let pagoEm: number | null = null;
   (window as unknown as { __ofertaSimPagar?: () => void }).__ofertaSimPagar = () => { pagoEm = Date.now(); };
   return {
-    criar: async (c) => (c.trocar_pix || c.pi === "pi_sim2" ? { ok: true, clientSecret: "pi_sim2_secret_sim", pi: "pi_sim2" } : { ok: true, clientSecret: "pi_sim_secret_sim", pi: "pi_sim" }),
+    criar: async (c) => ({ ...(c.trocar_pix || c.pi === "pi_sim2" ? { ok: true, clientSecret: "pi_sim2_secret_sim", pi: "pi_sim2" } : { ok: true, clientSecret: "pi_sim_secret_sim", pi: "pi_sim" }), ...(c.braco_preco ? { amount: Number(c.braco_preco), currency: "brl" } : {}) }),
     status: async () => ({ ok: true, status: pagoEm && Date.now() >= pagoEm ? "succeeded" : "requires_action", pago: !!pagoEm && Date.now() >= pagoEm }),
   };
 }
 const QR_SIM = "00020101021226870014br.gov.bcb.pix2565qr.stripe.com/pix/SIMULADO5204000053039865406" + "67.905802BR5904CORE6009SAO PAULO62070503***6304ABCD";
+/** 22/11: o QR simulado com o valor do braço (só dev/prints; 6790 = o mesmo texto de sempre) */
+const qrSim = () => (opc && opc.precoCentavos !== 6790 ? QR_SIM.replace("67.90", (opc.precoCentavos / 100).toFixed(2)) : QR_SIM);
 /** um Element de cartão de mentira (dev/prints): os campos desenhados, sem País e sem parcelas */
 function stripeSimulado(): StripeLike {
   let pronto: (() => void) | undefined;
@@ -180,7 +185,7 @@ function stripeSimulado(): StripeLike {
     createPaymentMethod: async () => ({ paymentMethod: { id: "pm_sim", card: { brand: "visa", last4: "4242" } } }),
     handleNextAction: async () => ({ paymentIntent: { id: "pi_sim_presente", status: "succeeded" } }),
     confirmPayment: async () => ({ paymentIntent: { id: "pi_sim", status: "succeeded" } }),
-    confirmPixPayment: async () => ({ paymentIntent: { id: "pi_sim", status: "requires_action", next_action: { type: "pix_display_qr_code", pix_display_qr_code: { data: QR_SIM, expires_at: Math.floor(Date.now() / 1000) + 1800 } } } }),
+    confirmPixPayment: async () => ({ paymentIntent: { id: "pi_sim", status: "requires_action", next_action: { type: "pix_display_qr_code", pix_display_qr_code: { data: qrSim(), expires_at: Math.floor(Date.now() / 1000) + 1800 } } } }),
   };
 }
 
@@ -560,6 +565,7 @@ function corpoDoPedido(email: string | null, cpf: string | null = null, cartao =
     ref: est!.ref, pi: est!.pi, email, pagina: o.pagina ?? "oferta", ...(cpf ? { cpf } : {}), ...(o.presente && cartao ? { salvar_cartao: true } : {}), // revisão A3: só quando ela paga no CARTÃO
     fbp: lerCookie("_fbp"), fbc: lerCookie("_fbc"), fbclid: o.fbclid, url: o.urlChegada.slice(0, 500),
     landing_session_id: o.sessao, landing_device_id: o.aparelho, atrib: o.atrib,
+    ...(o.bracoPreco && (o.pagina ?? "oferta") === "oferta" ? { braco_preco: String(o.bracoPreco) } : {}),
   };
 }
 
@@ -576,6 +582,8 @@ async function garantirIntento(email: string | null, cpf: string | null = null, 
   if (!r.ok || !r.clientSecret) { o.evento("landing_erro", { onde: "stripe_criar", msg: String(r.erro ?? "falhou").slice(0, 80) }); return false; }
   // A stale deployment must never silently charge the old 67.90 offer on the 27.90 LP.
   if (o.producao && o.pagina === "lp27" && (r.amount !== o.precoCentavos || r.currency !== "brl" || r.pagina !== "lp27")) { o.evento("landing_erro", { onde: "stripe_preco_divergente" }); return false; }
+  // 22/11 (AB_PRECO_OFERTA): com braço, o PI tem que vir com o MESMO valor que a página mostra (servidor velho ou travado = não paga)
+  if (o.producao && o.bracoPreco && (r.amount !== o.bracoPreco || o.precoCentavos !== o.bracoPreco || r.currency !== "brl")) { o.evento("landing_erro", { onde: "stripe_preco_divergente" }); return false; }
   est!.clientSecret = r.clientSecret; est!.pi = r.pi ?? est!.pi;
   if (est!.pi) guardarPi(est!.ref, est!.pi);
   ultimaCriacao = r;

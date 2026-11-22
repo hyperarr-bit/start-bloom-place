@@ -47,6 +47,34 @@ export const OFERTAS_STRIPE: Record<string, OfertaStripe> = {
   },
 };
 
+/**
+ * 22/11 (AB_PRECO_OFERTA, sorteio de preço da /oferta): os ÚNICOS 3 valores que a /oferta pode cobrar. A página manda só QUAL braço
+ * (braco_preco "2790" | "4790" | "6790"); qualquer outro número é recusado (400). Sem braço = a /oferta de sempre (6790, nada muda).
+ * O stripe-criar grava o braço na metadata do PI (metadata[braco_preco]) e o webhook só libera 2790/4790 quando o valor pago bate com
+ * o braço gravado. 2790 e 4790 só são CRIADOS com a env PRECO_OFERTA_SERVIDOR=on no Supabase (a trava do servidor).
+ */
+export const BRACOS_PRECO_OFERTA = [2790, 4790, 6790] as const;
+export type BracoPrecoOferta = (typeof BRACOS_PRECO_OFERTA)[number];
+export const ENV_PRECO_OFERTA_SERVIDOR = "PRECO_OFERTA_SERVIDOR";
+/** "2790" | 2790 → 2790; qualquer outra coisa → null (nunca um valor arbitrário) */
+export function bracoPrecoValido(v: unknown): BracoPrecoOferta | null {
+  const s = typeof v === "number" ? String(v) : typeof v === "string" ? v.trim() : "";
+  if (!/^\d{4}$/.test(s)) return null;
+  const n = Number(s);
+  return (BRACOS_PRECO_OFERTA as readonly number[]).includes(n) ? (n as BracoPrecoOferta) : null;
+}
+/**
+ * o valor que o webhook aceita pra uma venda da /oferta, pela metadata do PI: sem braco_preco = 6790 (como sempre);
+ * com braco_preco válido = aquele valor; braco_preco presente mas fora dos 3 = null (ignora a venda).
+ */
+export function valorEsperadoOferta(md: Record<string, string | undefined>): number | null {
+  if (md.braco_preco === undefined || md.braco_preco === "") return OFERTAS_STRIPE.oferta.centavos;
+  return bracoPrecoValido(md.braco_preco);
+}
+/** o servidor pode criar este braço? 6790 (ou sem braço) sempre; 2790/4790 só com PRECO_OFERTA_SERVIDOR=on */
+export const bracoPrecoLiberado = (braco: BracoPrecoOferta | null, env: string | null | undefined): boolean =>
+  braco === null || braco === OFERTAS_STRIPE.oferta.centavos || env === "on";
+
 /** a oferta da página (desconhecida = null; o stripe-criar cai na "oferta" de sempre, o webhook ignora) */
 export const ofertaDaPagina = (pagina: unknown): OfertaStripe | null =>
   typeof pagina === "string" && Object.prototype.hasOwnProperty.call(OFERTAS_STRIPE, pagina) ? OFERTAS_STRIPE[pagina] : null;

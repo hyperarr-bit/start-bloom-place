@@ -20,6 +20,7 @@
  *   landing_html {tela1_ms, ttfb_ms, forcados, divisao}   · landing_bloco {bloco}  (1x por bloco visto)
  *   landing_area {area, modulo}                           · landing_demo_aberta {modulo, via}
  *   (11/11) landing_topo_foto {} — tocou na tela de Finanças da 1ª tela (braço "anuncio" do AB_OFERTA_TOPO); todo evento da /oferta leva braco_topo_oferta
+ *   (22/11) com o sorteio de preço (AB_PRECO_OFERTA on ou ?preco=), todo evento da /oferta leva braco_preco ("2790"|"4790"|"6790") + preco_forcado
  *   landing_demo_pronta {modulo, ms_desde_html}           · landing_demo_modulo {modulo, via: pilula|grade|dentro|area}
  *   landing_demo_mexeu {modulo}                           · landing_demo_saida {destino}
  *   landing_oferta_vista {}                               · landing_caixinha {marcada}
@@ -82,6 +83,7 @@ import {
   EMAIL_OK, MODULO_DA_AREA, NOME_DO_MODULO, ROTULO_OFERTA, VALOR_OFERTA, URL_APP_STORE,
   bracoCheckoutDoHtml, bracoLpDoHtml, bracoLpOfertaDoHtml, bracoCkoDoHtml, bracoEmailOfertaDoHtml, bracoTopoOfertaDoHtml, bracoPixDoHtml, motivoPixDoHtml, NOME_NO_BANCO, CNPJ_NO_BANCO, checarEmailAntes, sugestaoDeEmail, voltaDoLembrete, upsell2027DoHtml, voltaDoEmailU2027, upsellPosDoHtml, ehPraSempreOferta,
   ESTADO_VAZIO, bracoOfertaDoHtml, bracoTituloDoHtml, ehArea, ehModuloLanding, estadoQueVolta, mmss, ofertaEscolhida, reais, urlPlay, venceEm,
+  ehBracoPreco, type BracoPrecoOferta,
   type Area, type EstadoLanding, type MensagemDaDemo, type ModuloLanding, type OfertaLanding, type PixLanding, type PixU2027,
 } from "./regras";
 import { ligarOfertaNova, preaquecerStripe, sairDaOfertaNova } from "./oferta-nova";
@@ -112,7 +114,7 @@ const agora = () => Math.round(performance.now());
 type Janela = Window & {
   __landingCliqueLoja?: (e: MouseEvent) => void;
   __landingSimularJaTem?: boolean;
-  __landing?: { uma?: boolean; cko_forcado?: boolean; otp_forcado?: boolean; oem_forcado?: boolean; lpo_forcado?: boolean; lpo_link?: boolean; ab_lp_oferta?: string; lpo_stripe_cedo?: string; pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; up_oferta?: string; indique?: string; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null; planos_forcado?: boolean; ab_planos?: string; planos_vitalicio_centavos?: number; planos_mensal_centavos?: number; planos_parcelas_max?: number; planos_pix_mensal?: boolean };
+  __landing?: { uma?: boolean; cko_forcado?: boolean; otp_forcado?: boolean; oem_forcado?: boolean; lpo_forcado?: boolean; lpo_link?: boolean; ab_lp_oferta?: string; lpo_stripe_cedo?: string; pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; braco_preco?: string; preco_forcado?: boolean; ab_preco_oferta?: string; up_oferta?: string; indique?: string; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null; planos_forcado?: boolean; ab_planos?: string; planos_vitalicio_centavos?: number; planos_mensal_centavos?: number; planos_parcelas_max?: number; planos_pix_mensal?: boolean };
   __eventosLanding?: Record<string, unknown>[];
   /** 02/11 (dev/testes): voltou() = "voltei do banco" (≥ 5 s fora) sem trocar de aba; vencer() = o QR vence em 1,5 s */
   __landingSimular?: { pagar: () => void; pagarU2027?: () => void; voltou?: () => void; vencer?: () => void };
@@ -200,6 +202,13 @@ const OEM_FORCADO = !!w.__landing?.oem_forcado;
  *  abaixo do título (a pergunta desce); "atual" = a 1ª tela de hoje. Só na página de hoje. Sem o atributo (o <head> antigo em cache): nada. */
 const BRACO_TOPO_OFERTA = STRIPE && !LPO_NOVA && document.documentElement.hasAttribute("data-otp") ? bracoTopoOfertaDoHtml() : null;
 const OTP_FORCADO = !!w.__landing?.otp_forcado;
+/** 22/11: o braço de PREÇO da /oferta (AB_PRECO_OFERTA no <head> → __landing.braco_preco "2790" | "4790" | "6790"). O <head> já pôs o mesmo
+ *  valor em stripe_preco_centavos (ST_PRECO), então TODO texto de preço da página e do checkout sai dele. Vai em todo evento (braco_preco +
+ *  preco_forcado) e no pedido do stripe-criar (o servidor só aceita os 3). Só na página de hoje. Sem o campo (chave off): null e NADA muda. */
+const BRACO_PRECO = STRIPE && !LPO_NOVA && !LPO_LINK && ehBracoPreco(w.__landing?.braco_preco) && Number(w.__landing?.braco_preco) === ST_PRECO ? (w.__landing!.braco_preco as BracoPrecoOferta) : null;
+const PRECO_FORCADO = !!w.__landing?.preco_forcado;
+/** 22/11: braço mais barato que o de sempre (27,90 / 47,90): o presente de 24,90 e as caras do indique que citam 67,90 não valem nele */
+const PRECO_MENOR = BRACO_PRECO !== null && BRACO_PRECO !== "6790";
 /** 08/11: o braço do CHECKOUT do /organizar (CHECKOUT_ORG_V2 no <head> → html[data-cko]): "atual" (o Pix de hoje no cartão, idêntico) | "v2" (a camada
  *  ./checkout-organizar.ts, o MESMO Pix). Só no /organizar (PAGINA null): vai em todo evento (braco_cko + cko_forcado) e na atribuição da conta
  *  (finalizarConta). NÃO vai no Purchase nem na CAPI: o caminho de hoje não leva braço nenhum até lá (o Purchase sai do firePixPurchaseOnce,
@@ -261,7 +270,7 @@ const ua = navigator.userAgent || "";
 const plataforma = /iPhone|iPad|iPod/i.test(ua) ? "ios" : /Android/i.test(ua) ? "android" : "web";
 const inApp = /FBAN|FBAV|FB_IAB|FBIOS|Instagram/i.test(ua);
 const pixForcado = !!w.__landing?.pix_forcado; // 02/11 r1: ?pix=b do dono/QA fica no aparelho — todo evento diz, não só o landing_html (a análise exclui)
-const medicaoForçada = SIMULADO || ["lp_forcado", "pix_forcado", "oferta_forcada", "checkout_forcado", "t_forcado", "lpo_forcado", "oem_forcado", "otp_forcado", "planos_forcado"].some(k => (w.__landing as Record<string, unknown> | undefined)?.[k] === true);
+const medicaoForçada = SIMULADO || ["lp_forcado", "pix_forcado", "oferta_forcada", "checkout_forcado", "t_forcado", "lpo_forcado", "oem_forcado", "otp_forcado", "planos_forcado", "preco_forcado"].some(k => (w.__landing as Record<string, unknown> | undefined)?.[k] === true);
 const storageAtrib = (() => { try { return localStorage; } catch { return null; } })();
 const atrib = capturarAtribuicao(location.search, storageAtrib, Date.now(), medicaoForçada);
 const contextoAtribuicao = () => ({ landing_session_id: sessao, landing_device_id: aparelho, braco_lp: brLp, braco_pix: brPix, forçado: medicaoForçada, atrib });
@@ -269,7 +278,7 @@ const contextoAtribuicao = () => ({ landing_session_id: sessao, landing_device_i
 export function evento(nome: string, dados: Record<string, unknown> = {}): void {
   // O listener delegado registra uma vez também os links criados pelo checkout/upsells.
   if (nome === "landing_loja" && !dados.link_click_id) return;
-  const corpo = { landing_medicao_v: 2, medicao_forcada: medicaoForçada, ...dados, ...(PAGINA ? { pagina: PAGINA, braco_checkout_ext: EXT, braco_vida: BRACO_VIDA } : {}), ...(BRACO_LP_OFERTA ? { braco_lp_oferta: BRACO_LP_OFERTA, lpo_forcado: LPO_FORCADO } : {}), ...(BRACO_EMAIL_OFERTA ? { braco_email_oferta: BRACO_EMAIL_OFERTA, oem_forcado: OEM_FORCADO } : {}), ...(BRACO_TOPO_OFERTA ? { braco_topo_oferta: BRACO_TOPO_OFERTA, otp_forcado: OTP_FORCADO } : {}), ...(BRACO_CKO ? { braco_cko: BRACO_CKO, cko_forcado: CKO_FORCADO } : {}), landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, braco_pix: brPix, pix_forcado: pixForcado, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
+  const corpo = { landing_medicao_v: 2, medicao_forcada: medicaoForçada, ...dados, ...(PAGINA ? { pagina: PAGINA, braco_checkout_ext: EXT, braco_vida: BRACO_VIDA } : {}), ...(BRACO_LP_OFERTA ? { braco_lp_oferta: BRACO_LP_OFERTA, lpo_forcado: LPO_FORCADO } : {}), ...(BRACO_EMAIL_OFERTA ? { braco_email_oferta: BRACO_EMAIL_OFERTA, oem_forcado: OEM_FORCADO } : {}), ...(BRACO_TOPO_OFERTA ? { braco_topo_oferta: BRACO_TOPO_OFERTA, otp_forcado: OTP_FORCADO } : {}), ...(BRACO_PRECO ? { braco_preco: BRACO_PRECO, preco_forcado: PRECO_FORCADO } : {}), ...(BRACO_CKO ? { braco_cko: BRACO_CKO, cko_forcado: CKO_FORCADO } : {}), landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, braco_pix: brPix, pix_forcado: pixForcado, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
   listaDeEventos.push({ nome, ...corpo });
   if (!PRODUCAO) return;
   try {
@@ -2098,7 +2107,7 @@ const eventoStripe: typeof evento = LPO_NOVA || LPO_ATIVO
  *    cartão é salvo), o ?ref= da /oferta vai no pedido (atrib.indicador → metadata[indicador] do PI) e o pago abre a folha
  *    "Indique 2 amigas e seu CORE sai de graça". Off = nada da TELA roda; o ?ref= continua indo no pedido (críticas 17/11). ── */
 const INDIQUE = STRIPE && w.__landing?.indique === "on" && !LPO_LINK;
-const UP_OFERTA = STRIPE && w.__landing?.up_oferta === "on" && !LPO_LINK && !INDIQUE;
+const UP_OFERTA = STRIPE && w.__landing?.up_oferta === "on" && !LPO_LINK && !INDIQUE && !PRECO_MENOR; // 22/11: nunca nos braços 27,90/47,90 (o servidor do presente só aceita a compra de 67,90)
 const VALOR_PRESENTE_OFERTA = 24.9;
 type CompraPaga = import("./stripe-checkout").CompraPaga;
 // críticas da subida 17/11: o ?ref= é lido e vai no pedido SEMPRE na /oferta da Stripe, mesmo com a chave INDIQUE_OFERTA off — esconder a
@@ -2121,7 +2130,8 @@ const apiIndique = (): ApiIndique => SIMULADO
       return { erro: String(j.motivo ?? `http_${r.status}`) };
     },
   };
-const depsIndique = () => ({ api: apiIndique(), evento, copiar: (t: string) => copiarTexto(t), estilo: estiloIndique() });
+// 22/11: nos braços 27,90/47,90 sempre a cara "c" (as outras mostram "R$ 67,90 de volta", o preço de sempre)
+const depsIndique = () => ({ api: apiIndique(), evento, copiar: (t: string) => copiarTexto(t), estilo: PRECO_MENOR ? "c" as const : estiloIndique() });
 const abrirIndiqueOferta = (c: CompraPaga) => {
   abrirIndique({ ref: c.ref, pi: c.pi }, depsIndique());
 };
@@ -2255,6 +2265,7 @@ if (UP_OFERTA) window.setTimeout(() => {
 const opcoesStripe = () => ({
   ...(UP_OFERTA ? { presente: { abrir: abrirPresenteOferta } } : {}),
   ...(INDIQUE ? { indique: { abrir: abrirIndiqueOferta } } : {}),
+  ...(BRACO_PRECO ? { bracoPreco: Number(BRACO_PRECO) } : {}),
   pk: ST_PK, precoCentavos: ST_PRECO, parcelasMax: Number(w.__landing?.stripe_parcelas_max) || 12, producao: PRODUCAO, pedeCpf: w.__landing?.stripe_pede_cpf === true,
   evento: eventoStripe, pixel: pixelStripe, atrib: { ...atrib, ...(LPO_ATIVO ? { braco_lp_oferta: String(BRACO_LP_OFERTA) } : {}), ...(INDICADOR ? { indicador: INDICADOR } : {}) }, sessao, aparelho, urlChegada: URL_DE_CHEGADA, fbclid: BUSCA.get("fbclid"),
 });

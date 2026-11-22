@@ -5,13 +5,13 @@
  * desliga só a linha; pago depois do estorno não libera; Pix tardio (webhook depois) libera; e-mail que falha → 500 até 5×.
  * stripe-criar: valor SEMPRE do servidor, Pix + cartão + parcelas, limite por IP; stripe-status não vaza; /vendas com Stripe.
  */
-import { OFERTAS_STRIPE } from "../../supabase/functions/_shared/stripe-ofertas";
+import { OFERTAS_STRIPE, bracoPrecoLiberado, valorEsperadoOferta } from "../../supabase/functions/_shared/stripe-ofertas";
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createHmac } from "node:crypto";
 import { assinaturaOk, tratarStripe, STRIPE_PRECO_CENTAVOS, type DepsStripe } from "../../supabase/functions/_shared/stripe";
-import { criarOuReaproveitar, ipPodeCriar, metadataDoPedido, paramsAtualizar, paramsCriar, respostaStatus, validarPedidoStripe, LIMITE_POR_IP, type ChamarStripe } from "../../supabase/functions/_shared/stripe-criar";
+import { criarOuReaproveitar, idemDoPedido, ipPodeCriar, metadataDoPedido, paramsAtualizar, paramsCriar, respostaStatus, validarPedidoStripe, LIMITE_POR_IP, type ChamarStripe } from "../../supabase/functions/_shared/stripe-criar";
 import { tituloVenda, vendaPix } from "../../supabase/functions/_shared/aviso-venda";
 import { funilOferta, resumoDoDia, taxaSiteCents, vendasDoDia } from "../../supabase/functions/_shared/vendas-painel";
 
@@ -338,7 +338,8 @@ describe("stripe-criar / stripe-status", () => {
     expect(fn).toContain('"Idempotency-Key"');
     expect(fn).toContain("criarOuReaproveitar(");
     // 14/11: a chave vem da tabela de ofertas — a da /oferta continua "oferta-<ref>" (src/test/funil-app-web-servidor.test.ts confere a chamada)
-    expect(readFileSync(resolve(__dirname, "../../supabase/functions/_shared/stripe-criar.ts"), "utf8")).toContain("`${oferta.idem}-${p.ref}`");
+    // 22/11 (AB_PRECO_OFERTA): a chave sai de idemDoPedido — sem braço é o oferta.idem de sempre (src/test/preco-3-bracos.test.ts confere)
+    expect(readFileSync(resolve(__dirname, "../../supabase/functions/_shared/stripe-criar.ts"), "utf8")).toContain("`${idem}-${p.ref}`");
     expect(readFileSync(resolve(__dirname, "../../supabase/functions/_shared/stripe-ofertas.ts"), "utf8")).toMatch(/pagina: "oferta", centavos: 6790, idem: "oferta"/);
   });
   it(`limite de ${LIMITE_POR_IP} PaymentIntents por IP em 10 min`, async () => {
@@ -405,7 +406,7 @@ function stripeFalsa() {
       if (idem && chaves.has(idem)) { const c = chaves.get(idem)!; if (c.corpo !== corpo) return { ok: false, j: { error: { type: "idempotency_error", code: "idempotency_key_in_use" } } }; return { ok: true, j: { ...pis.get(c.pi)! } }; }
       const id = `pi_${++n}`;
       const md: Record<string, string> = {}; for (const [k, v] of pares) { const m = /^metadata\[(.+)\]$/.exec(k); if (m) md[m[1]] = v; }
-      pis.set(id, { id, client_secret: `${id}_secret_x`, status: "requires_payment_method", amount: 6790, metadata: md });
+      pis.set(id, { id, client_secret: `${id}_secret_x`, status: "requires_payment_method", amount: Number(pares.find(([k]) => k === "amount")?.[1] ?? 6790), currency: "brl", metadata: md });
       if (idem) chaves.set(idem, { corpo, pi: id });
       return { ok: true, j: { ...pis.get(id)! } };
     }
@@ -591,4 +592,150 @@ it('lp27 uses a dedicated creator without monthly subscription actions',()=>{
  const endpoint=readFileSync(resolve(__dirname,'../../supabase/functions/stripe-lp27-criar/index.ts'),'utf8');
  expect(endpoint).toContain('p.pagina !== "lp27"');expect(endpoint).not.toMatch(/assinarAppWeb|subscriptions|stripe-app-web/);
  const client=readFileSync(resolve(__dirname,'../landing/stripe-checkout.ts'),'utf8');expect(client).toContain('c.pagina === "lp27" ? "stripe-lp27-criar" : "stripe-criar"');
+});
+
+/* ───────── 22/11: o SORTEIO DE PREÇO da /oferta (AB_PRECO_OFERTA) — servidor ───────── */
+describe("22/11 preço de 3 braços: stripe-criar", () => {
+  const REF = "0f8a5c2e-1111-4222-8333-944455556666";
+  const pedido = (o: Linha = {}) => validarPedidoStripe({ ref: REF, ...o })!;
+  it("aceita SÓ 2790 | 4790 | 6790 e só na /oferta; qualquer outro valor (ou braço em outra página) = pedido recusado", () => {
+    for (const b of ["2790", "4790", "6790", 2790, 4790, 6790]) expect(pedido({ braco_preco: b }).bracoPreco).toBe(Number(b));
+    for (const lixo of ["1990", "27.90", "2790.5", 2790.5, "0", 0, -2790, "abc", "99999", "100", 100, "2790 ", { v: 2790 }, ["2790"], true]) {
+      if (lixo === "2790 ") continue; // espaço nas pontas é aparado (o número é o mesmo)
+      expect(validarPedidoStripe({ ref: REF, braco_preco: lixo })).toBeNull();
+    }
+    for (const pagina of ["lp27", "app_web", "planos"]) expect(validarPedidoStripe({ ref: REF, pagina, braco_preco: "2790" })).toBeNull();
+    // o corpo com "amount"/"valor" continua sem efeito (o valor é do servidor)
+    expect(pedido({ braco_preco: "2790", amount: 100, valor: 1 })).not.toHaveProperty("amount");
+  });
+  it("sem braço (chave off): o pedido, a metadata e os parâmetros do PI são IGUAIS aos de hoje", () => {
+    const p = pedido();
+    expect(p).not.toHaveProperty("bracoPreco");
+    expect(metadataDoPedido(p, { userId: null, ip: "1.1.1.1", ua: "UA", agoraIso: "x" })).not.toHaveProperty("braco_preco");
+    expect(paramsCriar(REF)).toEqual([
+      ["amount", "6790"], ["currency", "brl"], ["payment_method_types[]", "card"], ["payment_method_types[]", "pix"],
+      ["payment_method_options[card][installments][enabled]", "true"], ["payment_method_options[pix][expires_after_seconds]", "1800"],
+      ["description", "CORE vitalicio"], ["statement_descriptor_suffix", "CORE"], ["metadata[ref]", REF], ["metadata[pagina]", "oferta"],
+    ]);
+    expect(idemDoPedido(OFERTAS_STRIPE.oferta, null)).toBe("oferta");
+  });
+  it("com braço: o PI nasce com o valor do braço e metadata[braco_preco]; a chave de idempotência é por braço; o atualizar nunca troca o braço", () => {
+    const p = pedido({ braco_preco: "2790" });
+    expect(paramsCriar(REF, OFERTAS_STRIPE.oferta, 2790)).toEqual(expect.arrayContaining([["amount", "2790"], ["metadata[braco_preco]", "2790"], ["metadata[pagina]", "oferta"]]));
+    expect(paramsCriar(REF, OFERTAS_STRIPE.app_web, 2790)).toEqual(expect.arrayContaining([["amount", "9790"]])); // braço só vale na /oferta
+    expect(paramsCriar(REF, OFERTAS_STRIPE.app_web, 2790).some(([k]) => k === "metadata[braco_preco]")).toBe(false);
+    expect(idemDoPedido(OFERTAS_STRIPE.oferta, 2790)).toBe("oferta-p2790");
+    expect(idemDoPedido(OFERTAS_STRIPE.oferta, 6790)).toBe("oferta-p6790");
+    const md = metadataDoPedido(p, { userId: null, ip: "1.1.1.1", ua: "UA", agoraIso: "x" });
+    expect(md.braco_preco).toBe("2790");
+    expect(paramsAtualizar(md, null).some(([k]) => k === "metadata[braco_preco]")).toBe(false);
+  });
+  it("trava do servidor: 27,90 e 47,90 só com PRECO_OFERTA_SERVIDOR=on; 67,90 e sem braço sempre", () => {
+    for (const env of [undefined, null, "", "off", "ON", "1"]) {
+      expect(bracoPrecoLiberado(2790, env)).toBe(false);
+      expect(bracoPrecoLiberado(4790, env)).toBe(false);
+      expect(bracoPrecoLiberado(6790, env)).toBe(true);
+      expect(bracoPrecoLiberado(null, env)).toBe(true);
+    }
+    for (const b of [2790, 4790, 6790] as const) expect(bracoPrecoLiberado(b, "on")).toBe(true);
+    const fn = readFileSync(resolve(__dirname, "../../supabase/functions/stripe-criar/index.ts"), "utf8");
+    expect(fn).toMatch(/bracoPrecoLiberado\(p\.bracoPreco \?\? null, Deno\.env\.get\(ENV_PRECO_OFERTA_SERVIDOR\)\)/);
+    expect(fn.indexOf("bracoPrecoLiberado(")).toBeLessThan(fn.indexOf("criarOuReaproveitar({"));
+  });
+  it("criar: braço 2790 → PI de 2790 (resposta com amount + braco_preco); a mesma ref no braço 4790 → OUTRO PI (nunca o de 27,90); sem braço → a resposta de hoje", async () => {
+    const m = montar(); const s = stripeFalsa();
+    const md = (p: ReturnType<typeof pedido>) => metadataDoPedido(p, { userId: null, ip: "1.1.1.1", ua: "UA", agoraIso: "x" });
+    const p27 = pedido({ braco_preco: "2790" });
+    const r1 = await criarOuReaproveitar({ admin: m.admin as never, stripe: s.f, log: () => {} }, p27, md(p27), { userId: null, ip: "1.1.1.1" });
+    expect(r1.corpo).toMatchObject({ ok: true, pi: "pi_1", amount: 2790, currency: "brl", braco_preco: "2790" });
+    expect(s.pis.get("pi_1")).toMatchObject({ amount: 2790, metadata: { braco_preco: "2790", pagina: "oferta" } });
+    expect(s.ctl.idems).toContain(`oferta-p2790-${REF}`);
+    expect(m.db.analytics_events.find((e) => e.event_name === "stripe_order_created")!.event_data).toMatchObject({ pi: "pi_1", braco_preco: "2790" });
+    // recarga no mesmo braço (sem o pi na aba): acha o PI pela ref e reaproveita
+    const r2 = await criarOuReaproveitar({ admin: m.admin as never, stripe: s.f, log: () => {} }, p27, md(p27), { userId: null, ip: "1.1.1.1" });
+    expect(r2.corpo).toMatchObject({ pi: "pi_1", amount: 2790 });
+    expect(s.pis.size).toBe(1);
+    // o QA trocou pra 4790 na mesma aba (com o pi_1 guardado): nasce outro PI de 4790
+    const p47 = pedido({ braco_preco: "4790", pi: "pi_1" });
+    const r3 = await criarOuReaproveitar({ admin: m.admin as never, stripe: s.f, log: () => {} }, p47, md(p47), { userId: null, ip: "1.1.1.1" });
+    expect(r3.corpo).toMatchObject({ pi: "pi_2", amount: 4790, braco_preco: "4790" });
+    expect(s.pis.get("pi_2")).toMatchObject({ amount: 4790, metadata: { braco_preco: "4790" } });
+    expect((s.pis.get("pi_1")!.metadata as Linha).braco_preco).toBe("2790"); // o de 27,90 nunca virou outro preço
+    // sem braço (chave off) com o PI de 27,90 na aba: não reaproveita o de 27,90 — nasce o de 6790 de sempre, resposta sem amount
+    const p67 = pedido({ pi: "pi_1" });
+    const r4 = await criarOuReaproveitar({ admin: m.admin as never, stripe: s.f, log: () => {} }, p67, md(p67), { userId: null, ip: "1.1.1.1" });
+    expect(r4.corpo).toMatchObject({ pi: "pi_3" });
+    expect(r4.corpo).not.toHaveProperty("amount");
+    expect(r4.corpo).not.toHaveProperty("braco_preco");
+    expect(s.pis.get("pi_3")).toMatchObject({ amount: 6790 });
+    expect((s.pis.get("pi_3")!.metadata as Linha).braco_preco).toBeUndefined();
+    expect(s.ctl.idems).toContain(`oferta-${REF}`);
+  });
+});
+
+describe("22/11 preço de 3 braços: webhook", () => {
+  const venda = (m: ReturnType<typeof montar>) => m.db.analytics_events.find((e) => e.event_name === "stripe_venda")?.event_data as Linha | undefined;
+  for (const [valor, braco] of [[2790, "2790"], [4790, "4790"], [6790, "6790"]] as const) {
+    it(`PI de ${valor} com metadata braco_preco "${braco}" → libera; linha com o valor real; CAPI com o valor REAL e o mesmo event_id; stripe_venda com braco_preco`, async () => {
+      const m = montar();
+      m.db.users.set("u_anon", { id: "u_anon", email: null });
+      const r = await mandar(m, evento("payment_intent.succeeded", pi({ amount: valor, amount_received: valor, metadata: { user_id: "u_anon", braco_preco: braco } })));
+      expect(r.corpo).toMatchObject({ liberado: true, novo: true });
+      expect(m.db.subscriptions[0]).toMatchObject({ amount_cents: valor, plan: "lifetime", payment_method: "stripe", abacatepay_billing_id: "pi_3Abc" });
+      const ev = (m.saida.capi[0].data as Linha[])[0] as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+      expect(ev).toMatchObject({ event_name: "Purchase", event_id: "pi_3Abc" });
+      expect(ev.custom_data).toMatchObject({ value: valor / 100, currency: "BRL", content_name: "CORE vitalício (Stripe)" });
+      expect(venda(m)).toMatchObject({ pi: "pi_3Abc", valor_cents: valor, pagina: "oferta", braco_preco: braco });
+    });
+  }
+  it("sem braço na metadata: só 6790 (como hoje) e o stripe_venda sem o campo", async () => {
+    const m = montar();
+    m.db.users.set("u_anon", { id: "u_anon", email: null });
+    await mandar(m, evento("payment_intent.succeeded", pi({ metadata: { user_id: "u_anon" } })));
+    expect(m.db.subscriptions).toHaveLength(1);
+    expect(venda(m)).not.toHaveProperty("braco_preco");
+  });
+  const recusas: Array<[string, Linha]> = [
+    ["2790 sem braço gravado", { amount: 2790, amount_received: 2790, metadata: {} }],
+    ["4790 sem braço gravado", { amount: 4790, amount_received: 4790, metadata: {} }],
+    ["2790 com braço 4790", { amount: 2790, amount_received: 2790, metadata: { braco_preco: "4790" } }],
+    ["6790 com braço 2790", { amount: 6790, amount_received: 6790, metadata: { braco_preco: "2790" } }],
+    ["1990 com braço 1990 (fora dos 3)", { amount: 1990, amount_received: 1990, metadata: { braco_preco: "1990" } }],
+    ["100 com braço 100", { amount: 100, amount_received: 100, metadata: { braco_preco: "100" } }],
+    ["braço lixo", { amount: 2790, amount_received: 2790, metadata: { braco_preco: "27.90" } }],
+  ];
+  for (const [nome, o] of recusas) {
+    it(`recusa (${nome}) → não libera + stripe_venda_ignorada "valor" + push 1×`, async () => {
+      const m = montar();
+      m.db.users.set("u_anon", { id: "u_anon", email: null });
+      const base = pi();
+      const r = await mandar(m, evento("payment_intent.succeeded", { ...base, ...o, metadata: { ...base.metadata, user_id: "u_anon", ...(o.metadata as Linha) } }));
+      expect(r.corpo).toMatchObject({ ignorado: "valor" });
+      expect(m.db.subscriptions).toHaveLength(0);
+      expect(m.saida.capi).toHaveLength(0);
+      expect(m.db.analytics_events.filter((e) => e.event_name === "stripe_venda_ignorada")).toHaveLength(1);
+      expect(m.saida.push).toHaveLength(1);
+    });
+  }
+  it("o braço só vale na /oferta: outra página com braco_preco não muda o preço dela (app_web segue só 9790)", async () => {
+    const m = montar();
+    m.db.users.set("u_anon", { id: "u_anon", email: null });
+    const base = pi();
+    const r = await mandar(m, evento("payment_intent.succeeded", { ...base, amount: 2790, amount_received: 2790, metadata: { ...base.metadata, user_id: "u_anon", pagina: "app_web", braco_preco: "2790" } }));
+    expect(r.corpo).toMatchObject({ ignorado: "valor" });
+    expect(valorEsperadoOferta({})).toBe(6790);
+    expect(valorEsperadoOferta({ braco_preco: "4790" })).toBe(4790);
+    expect(valorEsperadoOferta({ braco_preco: "5000" })).toBeNull();
+  });
+  it("/vendas: vendas de 27,90 e 47,90 contam pelo valor real (receita, R$ por visita, taxa e líquido do site)", () => {
+    const ev = [{ event_name: "landing_html", sid: "a", pagina: "oferta" }, { event_name: "landing_html", sid: "b", pagina: "oferta" }, { event_name: "landing_html", sid: "c", pagina: "oferta" }];
+    const f = funilOferta(ev, [{ pi: "pi_1", valor_cents: "2790", metodo: "pix" }, { pi: "pi_2", valor_cents: 4790, metodo: "card" }, { pi: "pi_3", valor_cents: 6790, metodo: "pix" }], new Set(["pi_1", "pi_2", "pi_3"]));
+    expect(f).toMatchObject({ visitas: 3, pagaram: 3, receita: 143.7, porVisita: 47.9 });
+    const linha = { id: "s1", status: "active", payment_method: "stripe", amount_cents: 2790, abacatepay_billing_id: "pi_1", billing_period: "lifetime", plan: "lifetime", current_period_start: "2026-11-04T15:00:00Z", current_period_end: "2126-11-04T15:00:00Z", created_at: "2026-11-04T15:00:00Z", customer_email: "x@exemplo.com", user_id: "u1" };
+    const vd = vendasDoDia([linha, { ...linha, id: "s2", amount_cents: 4790, abacatepay_billing_id: "pi_2" }], [], new Map(), [], "2026-11-04", new Map([["pi_1", "pix" as const], ["pi_2", "card" as const]]));
+    expect(vd.itens.map((i) => i.valor_cents).sort()).toEqual([2790, 4790]);
+    expect(vd.total_cents).toBe(2790 + 4790);
+    expect(taxaSiteCents({ valor_cents: 2790, gateway: "stripe", metodo: "pix" })).toBe(Math.round(2790 * 0.0119));
+    expect(tituloVenda(vendaPix(linha)!)).toContain("R$ 27,90");
+  });
 });

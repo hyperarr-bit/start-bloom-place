@@ -5,6 +5,7 @@
  *
  *   assinatura  header stripe-signature "t=…,v1=…" = HMAC-SHA256 de "<t>.<corpo cru>" com STRIPE_WEBHOOK_SECRET (whsec_…),
  *               tolerância de 5 min. Sem secret = 401 sempre.
+ *               (22/11, AB_PRECO_OFERTA: na /oferta também 2790/4790 BRL, SÓ quando o metadata.braco_preco gravado pelo stripe-criar = o valor)
  *   pago        payment_intent.succeeded, só 6790 BRL e metadata.pagina "oferta" (outro → alarme "Venda Stripe IGNORADA" + push,
  *               1× por PI). Conta: metadata.user_id (a sessão — gravado pelo NOSSO stripe-criar) → e-mail → conta nova; a sessão
  *               de outra conta (outro e-mail) → a compra vai pro e-mail do comprador (stripe_conta_divergente). Libera o
@@ -20,7 +21,7 @@
 import { creditarPedido } from "./grant-pix.ts";
 import { assuntoVenda, htmlVenda } from "./email-venda.ts";
 import { acharContaHotmart, eventoPurchaseHotmart, mascararEmail, type AdminHotmart, type RegistroHotmart } from "./hotmart.ts";
-import { COMISSAO_FIXA_PLANOS_CENTS, MENSAL_APP_WEB, MENSAL_PLANOS, OFERTAS_STRIPE, mensalDaPagina, ofertaDaPagina } from "./stripe-ofertas.ts";
+import { COMISSAO_FIXA_PLANOS_CENTS, MENSAL_APP_WEB, MENSAL_PLANOS, OFERTAS_STRIPE, mensalDaPagina, ofertaDaPagina, valorEsperadoOferta } from "./stripe-ofertas.ts";
 import { avisarMensalStripeComVitalicio, registrarPagoEmDobro } from "./landing-travas.ts";
 import { PRESENTE_STRIPE, compraIgnorada, donoDaCompra } from "./stripe-presente.ts";
 import { garantirPresente, mandarLinkPorEmail } from "./presente.ts";
@@ -338,7 +339,10 @@ export async function tratarStripe(deps: DepsStripe, req: { assinatura: string |
     }
     const oferta = ofertaDaPagina(md.pagina);
     if (!oferta) return ignorar("outra_pagina");
-    if (pi.currency !== "brl" || valor !== oferta.centavos) return ignorar("valor");
+    // 22/11 (AB_PRECO_OFERTA): na /oferta o valor certo vem do braço GRAVADO pelo nosso stripe-criar (metadata[braco_preco]: 2790 | 4790 |
+    // 6790); sem braço = 6790 como sempre. Braço fora dos 3, ou valor que não bate com o braço = ignorada (alarme), nunca libera.
+    const esperado = oferta.pagina === PAGINA_STRIPE ? valorEsperadoOferta(md) : oferta.centavos;
+    if (pi.currency !== "brl" || esperado === null || valor !== esperado) return ignorar("valor");
     if (await existe(admin, `stripe-estorno:${pi.id}`)) return ignorar("estornada");
 
     // a cobrança (método, parcelas e o e-mail de cobrança): 1 leitura, usada na conta e no stripe_venda
@@ -398,7 +402,7 @@ export async function tratarStripe(deps: DepsStripe, req: { assinatura: string |
     if (await reservar(admin, `stripe-venda:${pi.id}`, "venda") === "ok") {
       let erroVenda: string | null = null;
       try {
-        const { error } = await admin.from("analytics_events").insert({ event_name: "stripe_venda", user_id: conta.userId, event_data: { pi: pi.id, pagina: oferta.pagina, plano: "vitalicio", valor_cents: valor, metodo: cob?.metodo ?? null, parcelas: cob?.parcelas ?? null, via: conta.via, ref: md.ref ?? null, ...(md.braco_lp_oferta ? { braco_lp_oferta: md.braco_lp_oferta } : {}) } });
+        const { error } = await admin.from("analytics_events").insert({ event_name: "stripe_venda", user_id: conta.userId, event_data: { pi: pi.id, pagina: oferta.pagina, plano: "vitalicio", valor_cents: valor, metodo: cob?.metodo ?? null, parcelas: cob?.parcelas ?? null, via: conta.via, ref: md.ref ?? null, ...(md.braco_lp_oferta ? { braco_lp_oferta: md.braco_lp_oferta } : {}), ...(oferta.pagina === PAGINA_STRIPE && md.braco_preco ? { braco_preco: md.braco_preco } : {}) } });
         if (error) erroVenda = String((error as Erro)?.message ?? error);
       } catch (e) { erroVenda = String((e as Error)?.message ?? e); }
       if (erroVenda) { await soltar(admin, `stripe-venda:${pi.id}`); log("stripe_venda não gravou — tenta no próximo reenvio", { pi: pi.id, msg: erroVenda.replace(/[^\s@]+@[^\s@]+/g, "***").slice(0, 120) }); }

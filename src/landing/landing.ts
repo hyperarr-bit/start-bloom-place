@@ -166,11 +166,15 @@ const HM_PARCELAS = typeof w.__landing?.hotmart_parcelas === "string" ? w.__land
 /* 04/11: /oferta (Stripe, ./stripe-checkout.ts): a página atual a R$ 67,90 com o checkout em tela cheia. STRIPE só com a chave e a
  * pk de verdade (o <head> já mandou pro /organizar se não). EXTERNO = checkout de fora (Hotmart ou Stripe): some o Pix da página. */
 const ST_PK = String(w.__landing?.stripe_pk ?? "");
-const STRIPE = (PAGINA === "oferta" || PAGINA === "organizar") && EXT === "stripe" && pkStripeValida(ST_PK);
-/** 22/11 (ORGANIZAR_STRIPE no <head>): o /organizar no MESMO checkout Stripe da /oferta, a R$ 27,90 fixo (o <head> já pôs 2790 em
- *  stripe_preco_centavos). Pedido com pagina "organizar" (o servidor só aceita 2790 nela); os eventos saem com pagina "organizar";
- *  o pós-compra é o MESMO da /oferta (abrirCheckout). Chave off: o /organizar não tem data-pagina e nada disto existe. */
-const ORG_STRIPE = STRIPE && PAGINA === "organizar";
+const STRIPE = PAGINA === "oferta" && EXT === "stripe" && pkStripeValida(ST_PK);
+/** 22/11 (ORGANIZAR_STRIPE no <head> → __landing.org_stripe "on"): a página do /organizar IDÊNTICA à de hoje (o e-mail no cartão do preço,
+ *  a âncora, tudo), só o PAGAMENTO muda: o "Pagar R$ 27,90 no Pix" do cartão, com o e-mail válido, abre o MESMO checkout Stripe em tela
+ *  cheia da /oferta já com o e-mail (Pix marcado ou cartão), a R$ 27,90 fixo (pedido com pagina "organizar"; o servidor só aceita 2790
+ *  nela). Os eventos saem com pagina "organizar"; o pós-compra é o MESMO da /oferta (abrirCheckout). Só no braço "atual" do AB_LP e na
+ *  oferta "sempre". Chave off: __landing.org_stripe não existe e nada disto roda. */
+const ORG_STRIPE = PAGINA === null && w.__landing?.org_stripe === "on" && pkStripeValida(String(w.__landing?.stripe_pk ?? ""))
+  && document.documentElement.getAttribute("data-lp") === "atual" && document.documentElement.getAttribute("data-oferta") === "sempre";
+const ORG_STRIPE_FORCADO = !!w.__landing?.org_stripe_forcado;
 const ST_PRECO = Number(w.__landing?.stripe_preco_centavos) > 0 ? Number(w.__landing?.stripe_preco_centavos) : 6790;
 const ST_PARCELAS = typeof w.__landing?.stripe_parcelas === "string" ? w.__landing.stripe_parcelas : "";
 /* 18/11: /escolha (PLANOS_PAGINA no <head>): a página da /oferta com os 2 planos e o checkout próprio (./planos-checkout.ts). Só com a
@@ -282,7 +286,7 @@ const contextoAtribuicao = () => ({ landing_session_id: sessao, landing_device_i
 export function evento(nome: string, dados: Record<string, unknown> = {}): void {
   // O listener delegado registra uma vez também os links criados pelo checkout/upsells.
   if (nome === "landing_loja" && !dados.link_click_id) return;
-  const corpo = { landing_medicao_v: 2, medicao_forcada: medicaoForçada, ...dados, ...(PAGINA ? { pagina: PAGINA, braco_checkout_ext: EXT, braco_vida: BRACO_VIDA } : {}), ...(BRACO_LP_OFERTA ? { braco_lp_oferta: BRACO_LP_OFERTA, lpo_forcado: LPO_FORCADO } : {}), ...(BRACO_EMAIL_OFERTA ? { braco_email_oferta: BRACO_EMAIL_OFERTA, oem_forcado: OEM_FORCADO } : {}), ...(BRACO_TOPO_OFERTA ? { braco_topo_oferta: BRACO_TOPO_OFERTA, otp_forcado: OTP_FORCADO } : {}), ...(BRACO_PRECO ? { braco_preco: BRACO_PRECO, preco_forcado: PRECO_FORCADO } : {}), ...(BRACO_CKO ? { braco_cko: BRACO_CKO, cko_forcado: CKO_FORCADO } : {}), landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, braco_pix: brPix, pix_forcado: pixForcado, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
+  const corpo = { landing_medicao_v: 2, medicao_forcada: medicaoForçada, ...dados, ...(PAGINA ? { pagina: PAGINA, braco_checkout_ext: EXT, braco_vida: BRACO_VIDA } : {}), ...(BRACO_LP_OFERTA ? { braco_lp_oferta: BRACO_LP_OFERTA, lpo_forcado: LPO_FORCADO } : {}), ...(BRACO_EMAIL_OFERTA ? { braco_email_oferta: BRACO_EMAIL_OFERTA, oem_forcado: OEM_FORCADO } : {}), ...(BRACO_TOPO_OFERTA ? { braco_topo_oferta: BRACO_TOPO_OFERTA, otp_forcado: OTP_FORCADO } : {}), ...(BRACO_PRECO ? { braco_preco: BRACO_PRECO, preco_forcado: PRECO_FORCADO } : {}), ...(ORG_STRIPE ? { pagina: "organizar", braco_checkout_ext: "stripe", org_stripe_forcado: ORG_STRIPE_FORCADO } : {}), ...(BRACO_CKO ? { braco_cko: BRACO_CKO, cko_forcado: CKO_FORCADO } : {}), landing_session_id: sessao, landing_device_id: aparelho, braco_titulo: brTitulo, braco_oferta: brOferta, braco_checkout: brCheckout, braco_lp: brLp, braco_pix: brPix, pix_forcado: pixForcado, plataforma, in_app: inApp, t_ms: agora(), ...atrib };
   listaDeEventos.push({ nome, ...corpo });
   if (!PRODUCAO) return;
   try {
@@ -1165,6 +1169,14 @@ async function gerar(comCodigo: string | null = null): Promise<void> {
       mostrarErroAntes(null);
     }
   }
+  // 22/11 (ORGANIZAR_STRIPE): com o e-mail já conferido no cartão (o mesmo campo, o mesmo erro, a mesma sugestão de hoje), o pagamento é o
+  // checkout Stripe em tela cheia JÁ com o e-mail — a pessoa só escolhe Pix (marcado) ou cartão. Nada de pedir o e-mail 2×.
+  if (ORG_STRIPE && comCodigo === null) {
+    evento("landing_cta", { onde: "pagar", oferta });
+    if (emailAntes) evento("landing_email_antes_ok", { via: "stripe" });
+    abrirStripeOrganizar(emailAntes);
+    return;
+  }
   erroPix = null; copiado = null; avisoOferta = null;
   voltaVista = null; motivoDado = null; sairDoConferindo(); // 02/11 (b): um Pix novo começa limpo
   const anteriores = estado.pix && venceEm(estado.pix) > Date.now() ? [...estado.anteriores, estado.pix] : estado.anteriores;
@@ -1852,7 +1864,7 @@ const ehPraSempreTxt = () => (estado.pago && estado.pago.oferta !== "LN_ano279" 
 /* ───────── 08/11: a ligação com a camada do checkout novo (ver CKO_V2 lá em cima) ───────── */
 /** a camada só abre com a pessoa ainda na oferta (sem Pix vivo, sem pago/conta, sem "já tem", sem o presente/2027 na tela) */
 function podeAbrirCko(): boolean {
-  return CKO_V2 && !ckoFalhou && (estado.fase === "oferta" || estado.fase === "erro") && !jaTem && !u27Tela;
+  return !ORG_STRIPE && CKO_V2 && !ckoFalhou && (estado.fase === "oferta" || estado.fase === "erro") && !jaTem && !u27Tela;
 }
 function carregarCko(): Promise<ModCko> {
   if (ckoMod) return Promise.resolve(ckoMod);
@@ -2271,11 +2283,32 @@ const opcoesStripe = () => ({
   ...(INDIQUE ? { indique: { abrir: abrirIndiqueOferta } } : {}),
   ...(BRACO_PRECO ? { bracoPreco: Number(BRACO_PRECO) } : {}),
   pk: ST_PK, precoCentavos: ST_PRECO, parcelasMax: Number(w.__landing?.stripe_parcelas_max) || 12, producao: PRODUCAO, pedeCpf: w.__landing?.stripe_pede_cpf === true,
-  // 22/11 (ORGANIZAR_STRIPE): só 27,90, Pix marcado + cartão à vista (sem parcelas, sem CPF), o Pix "copiar primeiro" no Android e a
-  // medição da carteira (Apple/Google Pay — só mede, nada aparece). Vem DEPOIS das opções de sempre pra valer sobre elas.
-  ...(ORG_STRIPE ? { pagina: "organizar" as const, storagePrefix: "organizar", parcelasMax: 1, pedeCpf: false, pixCopiaPrimeiro: true, medirCarteira: true } : {}),
   evento: eventoStripe, pixel: pixelStripe, atrib: { ...atrib, ...(LPO_ATIVO ? { braco_lp_oferta: String(BRACO_LP_OFERTA) } : {}), ...(INDICADOR ? { indicador: INDICADOR } : {}) }, sessao, aparelho, urlChegada: URL_DE_CHEGADA, fbclid: BUSCA.get("fbclid"),
 });
+/** 22/11 (ORGANIZAR_STRIPE): as opções do checkout Stripe do /organizar — só 27,90, Pix marcado + cartão à vista (sem parcelas, sem CPF),
+ *  o Pix "copiar primeiro" no Android e a medição da carteira (Apple/Google Pay — só mede, nada aparece). Sem presente, sem indique. */
+const opcoesOrganizar = () => ({
+  pk: String(w.__landing?.stripe_pk ?? ""), precoCentavos: 2790, pagina: "organizar" as const, storagePrefix: "organizar", parcelasMax: 1, pedeCpf: false,
+  pixCopiaPrimeiro: true, medirCarteira: true, producao: PRODUCAO,
+  evento, pixel, atrib: { ...atrib }, sessao, aparelho, urlChegada: URL_DE_CHEGADA, fbclid: BUSCA.get("fbclid"),
+});
+function abrirStripeOrganizar(email: string | null): void {
+  void carregarStripeCheckout().then((m) => m.abrirCheckout(email ? { ...opcoesOrganizar(), emailInicial: email } : opcoesOrganizar()))
+    .catch(() => { evento("landing_erro", { onde: "chunk_stripe_organizar" }); erroPix = "Não deu pra abrir o pagamento. Tente de novo."; render(); });
+}
+if (ORG_STRIPE) {
+  // voltou de um 3DS por redirecionamento (?payment_intent=…&redirect_status=…): reabre o checkout no estado certo (a mesma regra da /oferta)
+  if (BUSCA.get("payment_intent") && BUSCA.get("redirect_status")) {
+    try {
+      const limpa = new URL(location.href);
+      for (const k of ["payment_intent", "payment_intent_client_secret", "redirect_status"]) limpa.searchParams.delete(k);
+      history.replaceState(history.state, "", `${limpa.pathname}${limpa.search}${limpa.hash}`);
+    } catch { /* noop */ }
+    const voltaDoBanco = { pi: String(BUSCA.get("payment_intent")), status: String(BUSCA.get("redirect_status")) };
+    void carregarStripeCheckout().then((m) => m.abrirCheckout({ ...opcoesOrganizar(), voltaDoBanco }));
+  }
+  ocioso(() => { void carregarStripeCheckout().then((m) => m.preaquecerStripe(String(w.__landing?.stripe_pk ?? ""), PRODUCAO)); }, 3000);
+}
 /* ── 11/11: braço "pagina" (AB_OFERTA_EMAIL): o e-mail no cartão da oferta, acima do botão. Sem e-mail válido o checkout não abre (o erro fica
  *    embaixo do campo); com ele, o checkout abre já preenchido. O e-mail nunca vai em evento. A aba guarda o que foi digitado (recarga / volta do banco). ── */
 const CHAVE_EMAIL_OFERTA = "oferta-email-pagina";

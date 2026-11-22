@@ -20,10 +20,8 @@ export function urlHotmartValida(url: string | null | undefined): boolean {
 }
 
 /** 04/11: "vida" (Hotmart) ou "oferta" (Stripe, ./stripe-checkout.ts); no /organizar, null. */
-export function paginaDoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): "vida" | "oferta" | "planos" | "organizar" | null {
+export function paginaDoHtml(el: { getAttribute(n: string): string | null } = document.documentElement): "vida" | "oferta" | "planos" | null {
   const p = el.getAttribute("data-pagina");
-  // 22/11: "organizar" = o /organizar no checkout Stripe da /oferta (chave ORGANIZAR_STRIPE no <head>); sem a chave, o /organizar não tem data-pagina
-  if (p === "organizar") return "organizar";
   // 18/11: "planos" = a /escolha (2 planos, chave PLANOS_PAGINA no <head>)
   return p === "vida" ? "vida" : p === "oferta" ? "oferta" : p === "planos" ? "planos" : null;
 }

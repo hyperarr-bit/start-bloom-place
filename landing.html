@@ -137,9 +137,10 @@
         // checkout em vez de cobrar). Ver novidades-guardadas/2026-11-22/preco-3/LEIA.md. Rollback: "off".
         var AB_PRECO_OFERTA = "off";
         // 22/11 (dono): o /organizar (R$ 27,90) pagando pelo MESMO checkout Stripe em tela cheia da /oferta (Pix + cartão), valor fixo 27,90.
-        // "off" = o /organizar de hoje, IDÊNTICO (Pix próprio do Asaas no cartão da página). "on" = a página atual do /organizar (braço "atual"
-        // do AB_LP, oferta "sempre") vira html[data-pagina="organizar"] + data-checkout-ext="stripe": o preço 27,90 em todo lugar e o botão abre
-        // o checkout Stripe (pagina "organizar" no stripe-criar, que só cobra 2790 nela). Pós-compra = o mesmo da /oferta. A /oferta, a /vida,
+        // "off" = o /organizar de hoje, IDÊNTICO (Pix próprio do Asaas no cartão da página). "on" (dono 22/11: "idêntico, exceto o pagamento") =
+        // a MESMA página do /organizar (braço "atual" do AB_LP, oferta "sempre"; e-mail no cartão do preço, âncora, tudo igual); o "Pagar R$ 27,90
+        // no Pix" do cartão, com o e-mail válido, abre o checkout Stripe em tela cheia já com o e-mail (pagina "organizar" no stripe-criar, que só
+        // cobra 2790 nela). Pós-compra = o mesmo da /oferta. A /oferta, a /vida,
         // o /simples, o /tiktok e a /escolha não leem isto. QA: ?orgstripe=on|off força neste aparelho (localStorage + cookie), ?orgstripe=auto
         // desfaz. Antes de ligar: deploy stripe-criar + stripe-webhook (+ vendas-painel) e 1 compra real (LEIA.md). Rollback: "off".
         var ORGANIZAR_STRIPE = "off";
@@ -530,12 +531,9 @@
           var osForcado = bos === "on" || bos === "off";
           if (!osForcado) bos = ORGANIZAR_STRIPE === "on" ? "on" : "off";
           var osPk = /^pk_(live|test)_[A-Za-z0-9]+$/.test(STRIPE_PK) && !/PREENCHER/i.test(STRIPE_PK);
+          // a PÁGINA continua a de hoje (sem data-pagina, sem data-checkout-ext: nenhum CSS muda); só o landing.ts troca o pagamento
           if (bos === "on" && osPk) {
-            d.setAttribute("data-pagina", "organizar");
-            d.setAttribute("data-checkout-ext", "stripe");
-            if (!STRIPE_PARCELAS_TEXTO) d.setAttribute("data-hm-sem-parcelas", "");
-            mem.pagina = "organizar"; mem.checkout_ext = "stripe"; mem.org_stripe = "on"; mem.org_stripe_forcado = osForcado; mem.ab_org_stripe = ORGANIZAR_STRIPE;
-            mem.stripe_pk = STRIPE_PK; mem.stripe_preco_centavos = 2790; mem.stripe_parcelas_max = STRIPE_PARCELAS_MAX; mem.stripe_parcelas = STRIPE_PARCELAS_TEXTO; mem.stripe_pede_cpf = STRIPE_PEDE_CPF === true;
+            mem.org_stripe = "on"; mem.org_stripe_forcado = osForcado; mem.ab_org_stripe = ORGANIZAR_STRIPE; mem.stripe_pk = STRIPE_PK;
           }
         }
         mem.t = t; mem.oferta = o; mem.ab_titulo = AB_TITULO; mem.ab_oferta = AB_OFERTA;

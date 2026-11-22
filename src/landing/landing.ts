@@ -114,7 +114,7 @@ const agora = () => Math.round(performance.now());
 type Janela = Window & {
   __landingCliqueLoja?: (e: MouseEvent) => void;
   __landingSimularJaTem?: boolean;
-  __landing?: { uma?: boolean; cko_forcado?: boolean; otp_forcado?: boolean; oem_forcado?: boolean; lpo_forcado?: boolean; lpo_link?: boolean; ab_lp_oferta?: string; lpo_stripe_cedo?: string; pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; braco_preco?: string; preco_forcado?: boolean; ab_preco_oferta?: string; org_stripe?: string; org_stripe_forcado?: boolean; ab_org_stripe?: string; up_oferta?: string; indique?: string; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null; planos_forcado?: boolean; ab_planos?: string; planos_vitalicio_centavos?: number; planos_mensal_centavos?: number; planos_parcelas_max?: number; planos_pix_mensal?: boolean };
+  __landing?: { uma?: boolean; cko_forcado?: boolean; otp_forcado?: boolean; oem_forcado?: boolean; lpo_forcado?: boolean; lpo_link?: boolean; ab_lp_oferta?: string; lpo_stripe_cedo?: string; pagina?: string; checkout_ext?: string; hotmart_url?: string; hotmart_preco_centavos?: number; hotmart_parcelas?: string; hotmart_forcado?: boolean; vida_forcado?: boolean; stripe_pk?: string; stripe_preco_centavos?: number; stripe_parcelas?: string; stripe_parcelas_max?: number; stripe_pede_cpf?: boolean; braco_preco?: string; preco_forcado?: boolean; ab_preco_oferta?: string; org_stripe?: string; org_stripe_forcado?: boolean; ab_org_stripe?: string; up_oferta?: string; indique?: string; pos_app?: string; t?: string; oferta?: string; t_forcado?: boolean; oferta_forcada?: boolean; checkout_forcado?: boolean; lp_forcado?: boolean; pix_forcado?: boolean; divisao?: string | null; planos_forcado?: boolean; ab_planos?: string; planos_vitalicio_centavos?: number; planos_mensal_centavos?: number; planos_parcelas_max?: number; planos_pix_mensal?: boolean };
   __eventosLanding?: Record<string, unknown>[];
   /** 02/11 (dev/testes): voltou() = "voltei do banco" (≥ 5 s fora) sem trocar de aba; vencer() = o QR vence em 1,5 s */
   __landingSimular?: { pagar: () => void; pagarU2027?: () => void; voltou?: () => void; vencer?: () => void };
@@ -2122,8 +2122,21 @@ const eventoStripe: typeof evento = LPO_NOVA || LPO_ATIVO
 /* ── 23/11 (INDIQUE_OFERTA "on", só a /oferta): o INDIQUE E GANHE no lugar do presente (./indique.ts). Ligado, o presente some (nem o
  *    cartão é salvo), o ?ref= da /oferta vai no pedido (atrib.indicador → metadata[indicador] do PI) e o pago abre a folha
  *    "Indique 2 amigas e seu CORE sai de graça". Off = nada da TELA roda; o ?ref= continua indo no pedido (críticas 17/11). ── */
-const INDIQUE = STRIPE && w.__landing?.indique === "on" && !LPO_LINK;
-const UP_OFERTA = STRIPE && w.__landing?.up_oferta === "on" && !LPO_LINK && !INDIQUE && !PRECO_MENOR; // 22/11: nunca nos braços 27,90/47,90 (o servidor do presente só aceita a compra de 67,90)
+/* ── 22/11 (POS_COMPRA_APP "on", só a /oferta): o pós-compra vira "Pronto! Seu CORE está liberado" + o passo a passo de entrar no
+ *    app (./pos-compra-app.ts). Ligado, NADA de oferta/convite depois do pago: nem o indique, nem o presente. O ?ref= continua indo
+ *    no pedido (a comissão de quem já mandou o link não se perde). Off = o pós-pago de hoje, idêntico. ── */
+const POS_APP = STRIPE && w.__landing?.pos_app === "on" && !LPO_LINK;
+const INDIQUE = STRIPE && w.__landing?.indique === "on" && !LPO_LINK && !POS_APP;
+const UP_OFERTA = STRIPE && w.__landing?.up_oferta === "on" && !LPO_LINK && !INDIQUE && !POS_APP && !PRECO_MENOR; // 22/11: nunca nos braços 27,90/47,90 (o servidor do presente só aceita a compra de 67,90)
+// recarregou a aba depois de pagar (Instagram, volta da loja): o passo a passo de entrar no app abre de novo (6 h, só esta aba)
+if (POS_APP) window.setTimeout(() => {
+  let tem = false; try { tem = !!sessionStorage.getItem("oferta-pos-compra"); } catch { /* sem storage */ }
+  if (!tem) return;
+  void import("./pos-compra-app").then((m) => {
+    const c = m.lerCompraPos();
+    if (c && !document.querySelector("[data-testid='pos-compra']")) m.abrirPosCompraTelaCheia({ ...c, evento }, "recarga");
+  }, () => evento("landing_erro", { onde: "chunk_pos_compra" }));
+}, 0);
 const VALOR_PRESENTE_OFERTA = 24.9;
 type CompraPaga = import("./stripe-checkout").CompraPaga;
 // críticas da subida 17/11: o ?ref= é lido e vai no pedido SEMPRE na /oferta da Stripe, mesmo com a chave INDIQUE_OFERTA off — esconder a
@@ -2282,6 +2295,7 @@ const opcoesStripe = () => ({
   ...(UP_OFERTA ? { presente: { abrir: abrirPresenteOferta } } : {}),
   ...(INDIQUE ? { indique: { abrir: abrirIndiqueOferta } } : {}),
   ...(BRACO_PRECO ? { bracoPreco: Number(BRACO_PRECO) } : {}),
+  ...(POS_APP ? { posApp: true } : {}),
   pk: ST_PK, precoCentavos: ST_PRECO, parcelasMax: Number(w.__landing?.stripe_parcelas_max) || 12, producao: PRODUCAO, pedeCpf: w.__landing?.stripe_pede_cpf === true,
   evento: eventoStripe, pixel: pixelStripe, atrib: { ...atrib, ...(LPO_ATIVO ? { braco_lp_oferta: String(BRACO_LP_OFERTA) } : {}), ...(INDICADOR ? { indicador: INDICADOR } : {}) }, sessao, aparelho, urlChegada: URL_DE_CHEGADA, fbclid: BUSCA.get("fbclid"),
 });
@@ -2289,7 +2303,7 @@ const opcoesStripe = () => ({
  *  o Pix "copiar primeiro" no Android e a medição da carteira (Apple/Google Pay — só mede, nada aparece). Sem presente, sem indique. */
 const opcoesOrganizar = () => ({
   pk: String(w.__landing?.stripe_pk ?? ""), precoCentavos: 2790, pagina: "organizar" as const, storagePrefix: "organizar", parcelasMax: 1, pedeCpf: false,
-  pixCopiaPrimeiro: true, medirCarteira: true, producao: PRODUCAO,
+  pixCopiaPrimeiro: true, medirCarteira: true, producao: PRODUCAO, posApp: true, // 22/11 (dono): pós-compra = só o caminho pro app
   evento, pixel, atrib: { ...atrib }, sessao, aparelho, urlChegada: URL_DE_CHEGADA, fbclid: BUSCA.get("fbclid"),
 });
 function abrirStripeOrganizar(email: string | null): void {

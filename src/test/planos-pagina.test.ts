@@ -18,7 +18,8 @@ import { eventIdDaCompra, parcelaCentavos, reaisPlanos, textoParcela, vitalicioM
 const raiz = resolve(__dirname, "../..");
 const HTML = readFileSync(resolve(raiz, "landing.html"), "utf8");
 const RE_CABECA = /<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/;
-const scriptDaCabeca = HTML.match(RE_CABECA)![1];
+// 22/11: o POS_COMPRA_APP (pós-compra → app) fica "off" aqui — com ele off o <head> é o de antes; o teste dele é o pos-compra-app.test.ts
+const scriptDaCabeca = HTML.match(RE_CABECA)![1].replace(/var POS_COMPRA_APP = "(on|off)"/, 'var POS_COMPRA_APP = "off"');
 /** o <head> de ANTES desta mudança (o main de onde o ramo saiu) — null se o git não estiver à mão */
 const cabecaAntiga = (() => { try { return execSync("git show ead00a4a:landing.html", { cwd: raiz, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).match(RE_CABECA)?.[1] ?? null; } catch { return null; } })();
 const comPlanos = (v: "on" | "off", fonte = scriptDaCabeca) => fonte.replace(/var PLANOS_PAGINA = "(on|off)"/, `var PLANOS_PAGINA = "${v}"`);

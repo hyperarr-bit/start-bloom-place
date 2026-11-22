@@ -19,7 +19,9 @@
  * (Pagamentos → o PI → Metadados → cpf). Este webhook nunca lê, grava ou loga o CPF.
  */
 import { creditarPedido } from "./grant-pix.ts";
-import { assuntoVenda, htmlVenda } from "./email-venda.ts";
+import { EMAIL_POS_COMPRA_APP, assuntoVenda, htmlVenda } from "./email-venda.ts";
+/** 22/11: o e-mail da compra da /oferta leva o passo a passo do app (e não o convite do indique) — EMAIL_POS_COMPRA_APP */
+const tutorialNoEmail = (pagina: string): boolean => EMAIL_POS_COMPRA_APP === "on" && pagina === PAGINA_STRIPE;
 import { acharContaHotmart, eventoPurchaseHotmart, mascararEmail, type AdminHotmart, type RegistroHotmart } from "./hotmart.ts";
 import { COMISSAO_FIXA_PLANOS_CENTS, MENSAL_APP_WEB, MENSAL_PLANOS, OFERTAS_STRIPE, mensalDaPagina, ofertaDaPagina, valorEsperadoOferta } from "./stripe-ofertas.ts";
 import { avisarMensalStripeComVitalicio, registrarPagoEmDobro } from "./landing-travas.ts";
@@ -395,7 +397,7 @@ export async function tratarStripe(deps: DepsStripe, req: { assinatura: string |
     // 1 de cada por PI (reserva em webhook_events) — roda no crédito E no "já creditado" (reenvio)
     let emailFalhou = false;
     if (emailConta && await reservar(admin, `stripe-email:${pi.id}`, "email") === "ok") {
-      const ok = await deps.enviarEmail(emailConta, assuntoVenda("lifetime"), htmlVenda({ email: emailConta, nome: null, periodo: "lifetime", fim: g.r === "creditado" ? g.fim : null, hoje: true, ...(deps.indiqueNoEmail && COM_INDIQUE.has(oferta.pagina) ? { extra: blocoIndiqueEmail() } : {}) })).catch(() => false);
+      const ok = await deps.enviarEmail(emailConta, assuntoVenda("lifetime"), htmlVenda({ email: emailConta, nome: null, periodo: "lifetime", fim: g.r === "creditado" ? g.fim : null, hoje: true, ...(tutorialNoEmail(oferta.pagina) ? { tutorialApp: true } : deps.indiqueNoEmail && COM_INDIQUE.has(oferta.pagina) ? { extra: blocoIndiqueEmail() } : {}) })).catch(() => false);
       if (!ok) { await soltar(admin, `stripe-email:${pi.id}`); emailFalhou = true; }
       log(ok ? "e-mail da compra enviado" : "e-mail da compra FALHOU", { para: mascararEmail(emailConta) });
     }

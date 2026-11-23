@@ -320,7 +320,7 @@ describe("tudo.html e as rotas", () => {
     expect(texto).toMatch(/vitalício/i);
     expect(texto).toMatch(/iPhone, Android e computador/);
     expect(texto).not.toMatch(/parcela|taxa de servi/i);
-    expect(texto).toContain("No app, R$ 97,90 por ano. Aqui, R$ 27,90 uma vez só, pra sempre.");
+    expect(texto).toContain("No app, o plano anual custa R$ 99,90. Aqui, R$ 27,90 uma vez só, pra sempre.");
     expect(texto).toContain("Garantia de 7 dias · Pix ou cartão");
     expect(texto).toContain("CORE · SEU 2027 ORGANIZADO");
   });

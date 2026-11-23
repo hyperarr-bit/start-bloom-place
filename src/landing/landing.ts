@@ -125,6 +125,7 @@ type Janela = Window & {
   /** 30/10: diagnóstico de tempo (medição de desempenho; nada vai pro banco por aqui) */
   __landingDiag?: { terceirosEm: number | null; demoEm: number | null; demoVia: string | null };
   fbq?: (...a: unknown[]) => void;
+  TiktokAnalyticsObject?: string;
   requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
 };
 const w = window as Janela;
@@ -310,8 +311,35 @@ export function evento(nome: string, dados: Record<string, unknown> = {}): void 
     }).catch(() => {});
   } catch { /* nunca derruba a página */ }
 }
+/* 23/11 (dono: "bota no /oferta"): pixel do TikTok SÓ na /oferta. A fila ttq nasce aqui (nenhum evento se perde); o events.js
+ * entra no carregador adiado, junto do fbevents. Os mesmos eventos da Meta: ViewContent, InitiateCheckout e Purchase (no TikTok
+ * "CompletePayment"), com o mesmo event_id (o Purchase leva o id do PI, pronto pra deduplicar com a API de eventos depois). */
+export const TIKTOK_PIXEL_OFERTA = "DC2B4FBC77UDGJAO06IG";
+const TT = PRODUCAO && PAGINA === "oferta" && /^[A-Z0-9]{12,30}$/.test(TIKTOK_PIXEL_OFERTA) && !document.documentElement.hasAttribute("data-desligada");
+if (TT) {
+  try {
+    // o snippet oficial do TikTok, reescrito sem o append imediato do script (o load só roda no carregador adiado)
+    const t = "ttq"; w.TiktokAnalyticsObject = t;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const q: any = (w.ttq = w.ttq || ([] as unknown as NonNullable<Window["ttq"]>));
+    const metodos = ["page", "track", "identify", "instances", "debug", "on", "off", "once", "ready", "alias", "group", "enableCookie", "disableCookie", "holdConsent", "revokeConsent", "grantConsent"];
+    for (const m of metodos) q[m] = (...a: unknown[]) => { q.push([m, ...a]); };
+    q.load = (e: string) => {
+      const u = "https://analytics.tiktok.com/i18n/pixel/events.js";
+      q._i = q._i || {}; q._i[e] = []; q._i[e]._u = u; q._t = q._t || {}; q._t[e] = +new Date(); q._o = q._o || {}; q._o[e] = {};
+      carregarScript(`${u}?sdkid=${e}&lib=${t}`);
+    };
+  } catch { /* nunca derruba a página */ }
+}
+const TT_EVENTO: Record<string, string> = { ViewContent: "ViewContent", InitiateCheckout: "InitiateCheckout", Purchase: "CompletePayment" };
 const pixel = (ev: string, params: Record<string, unknown> = {}, eventID?: string) => {
   try { if (typeof w.fbq === "function") { if (eventID) w.fbq("track", ev, params, { eventID }); else w.fbq("track", ev, params); } } catch { /* noop */ }
+  try {
+    if (TT && TT_EVENTO[ev] && w.ttq) {
+      const p = { value: params.value, currency: params.currency ?? "BRL", content_type: "product", content_id: "core_vitalicio", content_name: params.content_name };
+      if (eventID) w.ttq.track(TT_EVENTO[ev], p, { event_id: eventID }); else w.ttq.track(TT_EVENTO[ev], p);
+    }
+  } catch { /* noop */ }
 };
 
 /* 1ª tela: o HTML já pintou; o 1º frame depois deste script confirma */
@@ -346,6 +374,7 @@ const carregarTerceiros = () => {
   diag.terceirosEm = agora();
   if (!PRODUCAO) { avisarPixel(); return; }
   carregarScript("https://connect.facebook.net/en_US/fbevents.js", avisarPixel);
+  if (TT && w.ttq) { try { (w.ttq as unknown as { load: (id: string) => void }).load(TIKTOK_PIXEL_OFERTA); w.ttq.page?.(); } catch { /* noop */ } }
   carregarScript("https://www.googletagmanager.com/gtag/js?id=AW-18254888989");
   window.setTimeout(avisarPixel, 2500);
 };

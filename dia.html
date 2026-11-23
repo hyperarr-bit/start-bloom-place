@@ -13,41 +13,54 @@
 <script>
 /*
  * /dia (23/11) — a "versão CORE do Porquim": um dia inteiro no app, em recortes reais, e o checkout Stripe de sempre por cima.
- * SPEC: novidades-guardadas/2026-11-23/porquim-core/SPEC.md. As quatro chaves moram aqui:
+ * SPEC: novidades-guardadas/2026-11-23/porquim-core/SPEC.md (desvios aceitos: …/construcao/desvios-da-spec.md). As cinco chaves moram aqui:
  *   PAGINA_DIA  "off" → vai pro /organizar com a mesma query. "on" → a página. ?dia=on abre só nesta aba (sessão), pra conferir.
  *   OFERTA_DIA  "27" (R$ 27,90, linha lp27) | "67" (R$ 67,90, linha oferta, sem braço de preço). Textos e linha: src/dia/oferta.ts.
  *   TOPO_DIA    "lista" (o celular com a lista primeiro) | "gesto" (o gesto e o 1º botão primeiro). Só troca a ordem, por CSS.
- *   FAIXA_DIA   "hoje" (faixa do topo "ACESSO VITALÍCIO · só hoje, DD/MM", como na SPEC e nas páginas no ar) | "sem-data"
- *               ("ACESSO VITALÍCIO · iPhone e Android", sem prazo nenhum). Nasce "hoje" porque é o padrão da SPEC (seção 4, item 0).
- *               O preço desta página não tem prazo de verdade: se o dono não quiser a urgência, é uma palavra aqui ("sem-data").
- * Só na prévia (?qa=1 ou fora do domínio, pagamento simulado): ?oferta=27|67, ?topo=lista|gesto e ?faixa=hoje|sem-data trocam as três últimas.
+ *   FAIXA_DIA   "sem-data" (faixa do topo "ACESSO VITALÍCIO · iPhone e Android", sem prazo nenhum) | "hoje" ("· só hoje, DD/MM",
+ *               a faixa da SPEC seção 4 item 0 e das páginas no ar). Rodada 3: nasce "sem-data" porque o preço desta página NÃO tem
+ *               prazo de verdade (a data era gerada todo dia: a frase nunca era verdadeira). Se o dono quiser a urgência mesmo
+ *               assim, é uma palavra aqui ("hoje"). DECISÃO DO DONO antes de ligar a página.
+ *   PRECO_CEDO_DIA "off" (a copy da SPEC: fato "Paga 1 vez só" na 1ª tela e "Paga uma vez · …" sob o 1º botão; o preço só aparece
+ *               no cartão do preço, como no Porquim) | "on" (o preço cedo: fato "R$ 27,90, 1 vez só" na 1ª tela e "R$ 27,90, uma
+ *               vez · …" sob o 1º botão). Os eventos levam preco_cedo. DECISÃO DO DONO (ele já viu "preço no início" falhar; a
+ *               persona fria pede o preço na 1ª tela): os dois prints estão em …/construcao/prints/.
+ * Só na prévia (?qa=1 ou fora do domínio, pagamento simulado): ?oferta=27|67, ?topo=lista|gesto, ?faixa=hoje|sem-data e ?cedo=on|off
+ * trocam as quatro últimas.
  * Rollback: PAGINA_DIA "off".
  *
  * ANTES DE LIGAR OFERTA_DIA "67" (o padrão "27" não tem este problema):
  *   a venda sai na linha "oferta" do servidor SEM braço de preço, isto é, no mesmo registro (ST_oferta) e com o mesmo nome na CAPI
  *   que a /oferta de sempre a R$ 67,90. Ela só se separa pela url de chegada gravada no PI (…/dia). Toda leitura do sorteio de preço
  *   da /oferta (AB_PRECO_OFERTA) tem de EXCLUIR os PIs com url /dia, senão a venda daqui entra no braço 6790 de lá.
- *   A página também não tem trava de valor pro 67 (só lp27 tem): com campanha, fazer a linha própria da SPEC 3.4
- *   (linha "dia" em OFERTAS_STRIPE + deploy + 1 compra real) e olhar, nessa compra, se a Stripe mostra seletor de parcelas.
+ *   A página também não tem trava de valor pro 67, e NÃO DÁ pra pôr só na página: o servidor (stripe-criar) só devolve o valor
+ *   do pedido nas linhas lp27 e organizar ou com braço de preço; na linha "oferta" sem braço não vem valor nenhum pra conferir.
+ *   Com campanha no 67: fazer a linha própria da SPEC 3.4 (linha "dia" em OFERTAS_STRIPE devolvendo o valor + a trava na página
+ *   + deploy + 1 compra real) e olhar, nessa compra, se a Stripe mostra seletor de parcelas.
  */
 (function () {
   var PAGINA_DIA = "off";
   var OFERTA_DIA = "27";
   var TOPO_DIA = "lista";
-  var FAIXA_DIA = "hoje";
+  var FAIXA_DIA = "sem-data";
+  var PRECO_CEDO_DIA = "off";
   var q = location.search, h = document.documentElement;
   var aba = /[?&]dia=on(&|$)/.test(q);
   try { if (aba) sessionStorage.setItem("dia-on", "1"); else aba = sessionStorage.getItem("dia-on") === "1"; } catch (e) { /* sem storage */ }
+  // a volta do banco (3DS) de uma compra feita AQUI abre a página mesmo se o navegador zerou a sessão (a conferência com ?dia=on não cai no /organizar)
+  aba = aba || /[?&]payment_intent=pi_/.test(q);
   if (PAGINA_DIA !== "on" && !aba) { h.setAttribute("data-desligada", ""); location.replace("/organizar" + q + location.hash); return; }
   var qa = /[?&]qa=1(&|$)/.test(q) || ["coreaplicativo.com.br", "www.coreaplicativo.com.br"].indexOf(location.hostname) < 0;
   if (qa) {
     var o = /[?&]oferta=(27|67)(&|$)/.exec(q); if (o) OFERTA_DIA = o[1];
     var t = /[?&]topo=(lista|gesto)(&|$)/.exec(q); if (t) TOPO_DIA = t[1];
     var f = /[?&]faixa=(hoje|sem-data)(&|$)/.exec(q); if (f) FAIXA_DIA = f[1];
+    var c = /[?&]cedo=(on|off)(&|$)/.exec(q); if (c) PRECO_CEDO_DIA = c[1];
   }
   h.setAttribute("data-oferta", OFERTA_DIA === "67" ? "67" : "27");
   h.setAttribute("data-topo", TOPO_DIA === "gesto" ? "gesto" : "lista");
-  h.setAttribute("data-faixa", FAIXA_DIA === "sem-data" ? "sem-data" : "hoje");
+  h.setAttribute("data-faixa", FAIXA_DIA === "hoje" ? "hoje" : "sem-data");
+  h.setAttribute("data-cedo", PRECO_CEDO_DIA === "on" ? "on" : "off");
 })();
 </script>
 <style>
@@ -86,6 +99,11 @@
   .pg .fatos { display: grid; grid-template-columns: .9fr 1.15fr 1.25fr; margin: 13px 20px 0; border-top: 1px solid var(--borda); border-bottom: 1px solid var(--borda); }
   .pg .fatos b { padding: 9px 2px; text-align: center; font-size: 13.5px; font-weight: 750; letter-spacing: -.01em; white-space: nowrap; }
   .pg .fatos b + b { border-left: 1px solid var(--borda); }
+  /* PRECO_CEDO_DIA (html[data-cedo]): "off" mostra a copy da SPEC; "on" mostra o preço na 1ª tela e sob o 1º botão */
+  .pg .cedo-on { display: none; }
+  html[data-cedo="on"] .pg .cedo-on { display: inline; }
+  html[data-cedo="on"] .pg .cedo-off { display: none; }
+  html[data-cedo="on"] .pg .fatos { grid-template-columns: .72fr 1.33fr 1.2fr; }
 
   /* a ordem lista ↔ gesto é a chave TOPO_DIA (html[data-topo]) */
   .pg .troca { display: flex; flex-direction: column; }
@@ -131,16 +149,17 @@
   .pg .ciclo .rec.campo { width: 78%; }
   .pg .ciclo small { display: block; margin-top: 7px; font-size: 13px; font-weight: 500; color: var(--suave); }
 
-  /* cartões de arrastar: cada recorte com a sua altura, sem corte forçado */
-  .pg .faixa-cartoes { margin-top: 20px; padding: 32px 0 18px; background: var(--papel); }
+  /* cartões de arrastar: cada recorte inteiro, com a sua altura (sem corte forçado por CSS) */
+  .pg .faixa-cartoes { margin-top: 20px; padding: 28px 0 12px; background: var(--papel); }
   .pg .faixa-cartoes h2 { padding: 0 20px; }
   .pg .arraste { display: inline-flex; align-items: center; gap: 6px; margin: 12px 20px 0; font-size: 12.5px; font-weight: 700; color: var(--magenta-escuro); }
   .pg .arraste svg { width: 14px; height: 14px; }
-  .pg .trilho { display: flex; align-items: flex-start; gap: 12px; margin-top: 14px; padding: 4px 20px 10px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-left: 20px; -webkit-overflow-scrolling: touch; scrollbar-width: none; overscroll-behavior-x: contain; }
+  .pg .trilho { display: flex; align-items: stretch; gap: 12px; margin-top: 14px; padding: 4px 20px 8px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-left: 20px; -webkit-overflow-scrolling: touch; scrollbar-width: none; overscroll-behavior-x: contain; }
   .pg .trilho::-webkit-scrollbar { display: none; }
   .pg .cartao { flex: 0 0 270px; display: flex; flex-direction: column; scroll-snap-align: start; padding: 16px 10px; border-radius: 20px; background: #fff; border: 1px solid var(--borda); box-shadow: 0 10px 24px -18px rgba(38,38,38,.35); }
   .pg .cartao h3 { padding: 0 4px; font-size: 18px; line-height: 1.15; font-weight: 800; letter-spacing: -.025em; }
-  .pg .cartao .print { margin-top: 12px; padding: 3px; border-radius: 12px; background: var(--papel); }
+  /* os 7 cartões fecham na mesma linha (sem buraco ao arrastar): a moldura do recorte estica e o recorte fica inteiro, no meio dela */
+  .pg .cartao .print { flex: 1 0 auto; display: flex; align-items: center; margin-top: 12px; padding: 3px; border-radius: 12px; background: var(--papel); }
   .pg .cartao .print img { width: 100%; border-radius: 8px; border: 1px solid var(--borda); background: #fff; }
   .pg .cartao p { margin-top: 11px; padding: 0 4px; font-size: 14.5px; line-height: 1.36; font-weight: 500; color: var(--suave); }
 
@@ -213,7 +232,7 @@
   .pg .info b { font-weight: 700; text-align: right; }
 
   /* fecho */
-  .pg .fim { margin-top: 30px; padding: 34px 20px 34px; background: var(--grafite); color: #fff; text-align: center; }
+  .pg .fim { margin-top: 26px; padding: 32px 20px 32px; background: var(--grafite); color: #fff; text-align: center; }
   .pg .fim h2 { color: #fff; }
   .pg .fim em { color: #ff7dbd; }
   .pg .fim > p { margin: 10px 0 0; font-size: 15.5px; font-weight: 600; color: #d9d6dc; }
@@ -229,7 +248,7 @@
   .pg .sem-js a { color: var(--magenta-escuro); font-weight: 700; }
 
   /* telas estreitas (iPhone SE antigo, 320 px): o título cabe em 2 linhas e a faixa de fatos respira */
-  @media (max-width: 350px) { .pg h1 { font-size: 29px; } .pg .fatos b { font-size: 12.5px; } }
+  @media (max-width: 350px) { .pg h1 { font-size: 29px; } .pg .fatos b { font-size: 12.5px; } html[data-cedo="on"] .pg .fatos b { font-size: 12px; letter-spacing: -.02em; } }
 
   /* só na prévia (?qa=1 ou fora do domínio) */
   .dia-qa { padding: 8px; text-align: center; background: #f8edf3; color: #9f3268; font: 11px/1.4 Inter, system-ui, sans-serif; }
@@ -247,8 +266,8 @@
 
   <div class="promo" role="note"><b>🔥 ACESSO VITALÍCIO</b> <span id="dia-promo">· iPhone e Android</span></div>
   <script>
-  /* FAIXA_DIA "hoje": a faixa das páginas no ar ("· só hoje, DD/MM", data do dia em Brasília). Com "sem-data" nada roda
-     e fica o texto do HTML, que não repete o cabeçalho do cartão do preço. */
+  /* FAIXA_DIA "hoje": a faixa das páginas no ar ("· só hoje, DD/MM", data do dia em Brasília). Com "sem-data" (o padrão) nada roda
+     e fica o texto do HTML, que não afirma prazo nenhum nem repete o cabeçalho do cartão do preço. */
   (function () {
     if (document.documentElement.getAttribute("data-faixa") !== "hoje") return;
     var t = "· só hoje";
@@ -270,7 +289,7 @@
       <h1>Sua vida organizada, <em>em um só app.</em></h1>
       <p class="sub">Dinheiro, hábitos, treino e contas no mesmo lugar. <b>Anota em segundos, sem planilha.</b></p>
     </div>
-    <div class="fatos" aria-label="Resumo"><b>16 áreas</b><b>Paga 1 vez só</b><b>iPhone e Android</b></div>
+    <div class="fatos" aria-label="Resumo"><b>16 áreas</b><b><span class="cedo-off">Paga 1 vez só</span><span class="cedo-on" data-oferta-txt="fato" data-v67="R$&nbsp;67,90, 1 vez só">R$&nbsp;27,90, 1 vez só</span></b><b>iPhone e Android</b></div>
   </section>
 
   <div class="troca">
@@ -292,14 +311,14 @@
         <div class="rec campo"><img src="/dia/gesto-voce.webp" width="720" height="80" loading="lazy" decoding="async" alt="Campo real do app com Mercado e 87 digitados" /></div>
         <svg class="seta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v15m-6-6 6 6 6-6"/></svg>
         <p class="rot"><i>2</i>O app responde</p>
-        <div class="rec"><img src="/dia/gesto-app.webp" width="700" height="176" loading="lazy" decoding="async" alt="Trecho real do card Quanto posso gastar hoje, do app: Sobram R$ 59 pra hoje, já saiu R$ 87 dos R$ 146 do dia" /></div>
+        <div class="rec"><img src="/dia/gesto-app.webp" width="828" height="204" loading="lazy" decoding="async" alt="Trecho real do card Quanto posso gastar hoje, do app: Sobram R$ 59 pra hoje, já saiu R$ 87 dos R$ 146 do dia" /></div>
         <p class="conta">146 − 87 = <b>59 pra hoje</b></p>
       </div>
       <div class="simples">
         <b>Simples assim.</b>
         <a class="cta" href="#preco" data-cta="gesto">Quero meu dia organizado</a>
       </div>
-      <p class="miudo"><span data-oferta-txt="cedo" data-v67="R$&nbsp;67,90, uma vez">R$&nbsp;27,90, uma vez</span> · iPhone e Android · 7&nbsp;dias de garantia</p>
+      <p class="miudo"><span class="cedo-off">Paga uma vez</span><span class="cedo-on" data-oferta-txt="cedo" data-v67="R$&nbsp;67,90, uma vez">R$&nbsp;27,90, uma vez</span> · iPhone e Android · 7&nbsp;dias de garantia</p>
     </section>
   </div>
 
@@ -330,7 +349,7 @@
     <h2>E o resto da vida <em>também.</em></h2>
     <span class="arraste">arraste pro lado <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></span>
     <div class="trilho" id="trilho">
-      <article class="cartao" data-cartao="treino"><h3>💪 Treino com séries e carga</h3><div class="print"><img src="/dia/k-treino.webp" width="640" height="567" loading="lazy" decoding="async" alt="Tela real: treino de glúteos e pernas de hoje, com o aviso da carga da semana passada e as séries do agachamento marcadas" /></div><p>Você marca a série. O app lembra a carga da semana passada.</p></article>
+      <article class="cartao" data-cartao="treino"><h3>💪 Treino com séries e carga</h3><div class="print"><img src="/dia/k-treino.webp" width="640" height="464" loading="lazy" decoding="async" alt="Tela real: treino de glúteos e pernas de hoje, com o aviso da carga da semana passada e a 1ª série do agachamento marcada" /></div><p>Você marca a série. O app lembra a carga da semana passada.</p></article>
       <article class="cartao" data-cartao="areas"><h3>✨ 16 áreas. Use só as que quiser.</h3><div class="print"><img src="/dia/k-areas.webp" width="760" height="373" loading="lazy" decoding="async" alt="Tela real: áreas escondidas e visíveis" /></div><p>Comece por uma. Esconda o resto.</p></article>
       <article class="cartao" data-cartao="limites"><h3>🎯 Um limite pra cada gasto</h3><div class="print"><img src="/dia/k-limites.webp" width="640" height="411" loading="lazy" decoding="async" alt="Tela real: limites por categoria" /></div><p>Você define o teto. A barra mostra quanto já foi.</p></article>
       <article class="cartao" data-cartao="agua"><h3>💧 Água do dia</h3><div class="print"><img src="/dia/k-agua.webp" width="640" height="260" loading="lazy" decoding="async" alt="Tela real: hidratação, 1500 ml de 2000 ml" /></div><p>Um toque por copo. O app conta quanto falta.</p></article>
@@ -339,7 +358,7 @@
       <article class="cartao" data-cartao="casa"><h3>🏠 Casa por cômodo</h3><div class="print"><img src="/dia/k-casa.webp" width="640" height="470" loading="lazy" decoding="async" alt="Tela real: afazeres por cômodo" /></div><p>Afazeres e lista de mercado, cada um no seu lugar.</p></article>
     </div>
     <p class="nota">Telas reais do app, com dados de exemplo.</p>
-    <!-- só rola até o preço (não abre pagamento): quem se convenceu nos cartões tem onde tocar. É o 4º toque de venda, fora dos 3 botões da SPEC. -->
+    <!-- só rola até o preço (não abre pagamento): quem se convenceu nos cartões tem onde tocar. É um link de texto, o 4º toque de venda: desvio aceito da SPEC ("3 botões + 1 link de texto", construcao/desvios-da-spec.md). -->
     <a class="ver-preco" href="#preco" data-cta="cartoes">Ver o preço <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v15m-6-6 6 6 6-6"/></svg></a>
   </section>
 
@@ -369,12 +388,12 @@
       <div><b>4,9<small>★</small></b><span>Google Play<br />221 avaliações</span></div>
     </div>
     <figure class="aval"><blockquote>“Simplesmente perfeito! Muito prático, completo e o melhor organizador que já tive.”</blockquote><figcaption><u>★★★★★</u> App Store · 04/11/2026</figcaption></figure>
-    <figure class="aval"><blockquote>“…tem tudo que eu preciso em um só lugar desde vida pessoal e profissional…”</blockquote><figcaption><u>★★★★★</u> Google Play · 05/11/2026</figcaption></figure>
-    <figure class="aval"><blockquote>“…bem produtivo para usar todos os dias…”</blockquote><figcaption><u>★★★★★</u> App Store · 06/11/2026</figcaption></figure>
-    <p class="conferido">Notas e opiniões públicas das lojas, lidas em 23/11/2026.</p>
+    <figure class="aval"><blockquote>“melhor aplicativo, pois tem tudo que eu preciso em um só lugar desde vida pessoal e profissional…”</blockquote><figcaption><u>★★★★★</u> Google Play · 05/11/2026</figcaption></figure>
+    <figure class="aval"><blockquote>“Muito bom para organizar algumas áreas da vida, bem produtivo para usar todos os dias…”</blockquote><figcaption><u>★★★★★</u> App Store · 06/11/2026</figcaption></figure>
+    <p class="conferido">Notas e opiniões públicas das lojas, lidas em 23/11/2026. Procure por CORE APP na sua loja pra conferir.</p>
   </section>
 
-  <!-- 8 · PREÇO. Os textos que mudam com OFERTA_DIA (5 chaves, 6 lugares: o preço cedo aparece sob o 1º botão e sob o do fecho) levam data-oferta-txt (padrão "27") e data-v67 (iguais a src/dia/oferta.ts) -->
+  <!-- 8 · PREÇO. Os textos que mudam com OFERTA_DIA levam data-oferta-txt (padrão "27") e data-v67 (iguais a src/dia/oferta.ts). À mostra no padrão, os 5 lugares da SPEC 3.3: frase, número, Compare, botão do preço e a linha sob o botão do fecho; com PRECO_CEDO_DIA "on", mais 2 (o fato da 1ª tela e a linha sob o 1º botão). -->
   <section class="oferta" id="preco" data-bloco="oferta">
     <div class="oferta-faixa">Acesso vitalício <span>paga uma vez</span></div>
     <div class="oferta-corpo">
@@ -403,7 +422,7 @@
   <!-- 9 · GARANTIA -->
   <section class="garantia" data-bloco="garantia">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.4 3.2 7.8 7.5 9 4.3-1.2 7.5-4.6 7.5-9V6z"/><path d="m8.8 12.2 2.3 2.3 4.2-4.4"/></svg>
-    <div><b>Experimente por 7 dias.</b><p>Até 7 dias depois da compra, é só mandar um e-mail pra <u>contato@coreaplicativo.com.br</u>. Devolvemos 100% do valor, sem perguntas.</p></div>
+    <div><b>7 dias de garantia.</b><p>Até 7 dias depois da compra, é só mandar um e-mail pra <u>contato@coreaplicativo.com.br</u>. Devolvemos 100% do valor, sem perguntas.</p></div>
   </section>
 
   <!-- 10 · INFORMAÇÕES -->

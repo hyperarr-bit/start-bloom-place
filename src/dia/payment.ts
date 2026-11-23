@@ -11,12 +11,14 @@ import {idDoAparelho} from '@/landing/marcador';
 import {fireMetaEvent} from '@/lib/meta-pixel';
 import {readStripeReturn} from '@/completo/stripe-return';
 import {compactCheckoutSource} from '@/conhecer/attribution';
-import {ofertaDe,topoDe,opcoesDaOferta} from './oferta';
+import {ofertaDe,topoDe,cedoDe,opcoesDaOferta} from './oferta';
 
 export const QA=new URLSearchParams(location.search).get('qa')==='1'||!['coreaplicativo.com.br','www.coreaplicativo.com.br'].includes(location.hostname);
 // as chaves OFERTA_DIA e TOPO_DIA chegam do <head> do dia.html (html[data-oferta], html[data-topo])
 export const OFERTA=ofertaDe(document.documentElement.getAttribute('data-oferta'));
 export const TOPO=topoDe(document.documentElement.getAttribute('data-topo'));
+// PRECO_CEDO_DIA (html[data-cedo]): vai em todo evento, pra separar as visitas que viram o preço na 1ª tela
+export const PRECO_CEDO=cedoDe(document.documentElement.getAttribute('data-cedo'));
 export const bankReturn=readStripeReturn(location.href);
 // Remove Stripe return secrets before initializing any page analytics.
 if(new URLSearchParams(location.search).has('payment_intent_client_secret')){const clean=new URL(location.href);clean.searchParams.delete('payment_intent_client_secret');history.replaceState(history.state,'',clean.href)}
@@ -26,7 +28,7 @@ const atrib:Record<string,string>={};
 for(const key of ['utm_source','utm_medium','utm_campaign','utm_content','utm_term','c_id','as_id','ad_id','pl']){const value=params.get(key);if(value)atrib[key]=value.slice(0,200)}
 const session=(()=>{try{const key='dia-session-v1';let id=sessionStorage.getItem(key);if(!id){id=crypto.randomUUID();sessionStorage.setItem(key,id)}return id}catch{return `c${Date.now()}${Math.random().toString(36).slice(2)}`}})();
 const device=idDoAparelho();
-export function event(name:string,data:Record<string,unknown>={}){const payload={...data,...atrib,funil:'dia',pagina:'dia',jornada:'dia_v1',path:'/dia',oferta:OFERTA.chave,topo:TOPO,landing_session_id:session,landing_device_id:device,preco_centavos:OFERTA.precoCentavos};const w=window as any;(w.__diaEvents??=[]).push({name,...payload});if(!QA)trackEventBeacon(name,payload)}
+export function event(name:string,data:Record<string,unknown>={}){const payload={...data,...atrib,funil:'dia',pagina:'dia',jornada:'dia_v1',path:'/dia',oferta:OFERTA.chave,topo:TOPO,preco_cedo:PRECO_CEDO,landing_session_id:session,landing_device_id:device,preco_centavos:OFERTA.precoCentavos};const w=window as any;(w.__diaEvents??=[]).push({name,...payload});if(!QA)trackEventBeacon(name,payload)}
 export function initPixel(){
  if(QA)return;
  captureLandingMeta();captureLeadSource();

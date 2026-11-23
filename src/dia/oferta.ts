@@ -1,6 +1,8 @@
 /**
  * /dia (23/11) — UM objeto por oferta: preço, os 5 textos que mudam na página (SPEC 3.3) e a linha do servidor (SPEC 3.1/3.2).
- * Rodada de conserto 1: `cedo` (o preço sob o 1º botão) entrou; `fecho` saiu (o botão do fecho passou a ser o mesmo `botao` do preço).
+ * Rodada de conserto 1: `cedo` (o preço sob o 1º botão) entrou. Rodada 2: o botão do fecho voltou a ser o da SPEC ("Quero
+ * experimentar agora", igual nas duas ofertas, por isso não mora aqui) com o `cedo` colado embaixo; `botao` é só o do cartão do preço.
+ * São 5 textos em 6 lugares da página (`cedo` aparece 2 vezes).
  * Arquivo puro (não toca em window): a página (payment.ts) e os testes leem daqui.
  *   "27" → linha `lp27` (stripe-lp27-criar, R$ 27,90 fixo no servidor; em produção o checkout recusa se o valor vier diferente).
  *   "67" → linha `oferta` SEM braço de preço (como a /completo): R$ 67,90, pedindo 1 parcela.

@@ -1,11 +1,14 @@
 /**
  * /dia (23/11) — a página aparece inteira sem este arquivo (HTML e CSS no dia.html). Aqui: medição, o toque nos botões e o checkout.
- *   • 1º botão ("Quero meu dia organizado") e o link "Ver o preço": descem até o #preco; aqui só mede e anima a descida. Nunca abrem pagamento.
+ *   • 1º botão ("Quero meu dia organizado") e o link "Ver o preço": descem até o preço; aqui só mede e anima a descida. Nunca abrem pagamento.
+ *     Em tela baixa (iPhone SE dentro do Instagram) a descida para com o botão de pagar à mostra, não com o alto do cartão.
  *   • botão do preço e do fecho: abrem o checkout Stripe de sempre por cima (a Stripe só carrega neste toque).
  *   • voltou do banco (3DS por redirecionamento): o checkout reabre e pergunta ao servidor (o endereço nunca prova pagamento).
  *   • já pagou nesta aba (6 h): no lugar do checkout, o passo a passo de entrar no app (o mesmo pós-compra da /organizar e da /tudo).
- * O pedaço pesado (pixel, medição, checkout: ./payment, pela porta ./dia-carga) NÃO é importado aqui em cima: ele só é pedido depois
- * que a imagem do topo terminou (teto de 1,5 s), pra não disputar a rede com ela. Os eventos e os toques esperam essa promessa, na ordem.
+ * O pedaço pesado (pixel, medição, checkout: ./payment, pela porta ./dia-carga) NÃO é importado aqui em cima (import estático punha
+ * os modulepreload de client/analytics no <head>): ele é pedido logo depois da PRIMEIRA PINTURA (dois quadros). Rodada 2: antes ele
+ * esperava a imagem do topo e o landing_view saía ~0,85 s depois do da /tudo, encolhendo a base de visitas da /dia na comparação.
+ * A imagem do topo já está em voo com prioridade alta desde o HTML. Os eventos e os toques esperam essa promessa, na ordem.
  */
 type Carga=typeof import('./dia-carga');
 
@@ -13,8 +16,8 @@ const CHAVE_COMPRA='oferta-pos-compra'; // a mesma de src/landing/pos-compra-app
 const temCompra=()=>{try{return !!sessionStorage.getItem(CHAVE_COMPRA)}catch{return false}};
 /** quanto tempo o bloco precisa ficar na tela pra contar como visto (a descida animada do 1º botão passa por cima sem contar) */
 export const PARADA_MS=600;
-/** teto de espera pela imagem do topo antes de pedir o pedaço pesado */
-export const TETO_IMAGEM_MS=1500;
+/** se a aba não pinta (aberta em segundo plano), o pedaço pesado é pedido assim mesmo depois deste tempo */
+export const TETO_PINTURA_MS=400;
 
 if(!document.documentElement.hasAttribute('data-desligada')){
  // a mesma conta de QA do payment.ts (a tarja não espera o pedaço pesado: sem salto de layout na prévia)
@@ -23,20 +26,20 @@ if(!document.documentElement.hasAttribute('data-desligada')){
 
  // voltou do banco: não espera imagem nenhuma (o segredo sai do endereço assim que o payment.ts carrega)
  const voltou=new URLSearchParams(location.search).has('payment_intent');
- const imagemDoTopo=new Promise<void>(ok=>{
-  const img=document.querySelector<HTMLImageElement>('.fone img');
-  if(voltou||!img||img.complete){ok();return}
-  const fim=()=>{clearTimeout(teto);ok()};
-  const teto=setTimeout(fim,TETO_IMAGEM_MS);
-  img.addEventListener('load',fim,{once:true});img.addEventListener('error',fim,{once:true});
+ const primeiraPintura=new Promise<void>(ok=>{
+  if(voltou||typeof requestAnimationFrame!=='function'){ok();return}
+  const teto=setTimeout(ok,TETO_PINTURA_MS);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{clearTimeout(teto);ok()}));
  });
- const carga:Promise<Carga>=imagemDoTopo.then(()=>import('./dia-carga'));
+ const carga:Promise<Carga>=primeiraPintura.then(()=>import('./dia-carga'));
  carga.catch(()=>{/* sem rede pro pedaço: a página segue inteira; o toque de pagar mostra o aviso */});
  /** os eventos esperam o pedaço pesado e saem na ordem em que foram pedidos */
  const event=(name:string,data:Record<string,unknown>={})=>{void carga.then(m=>m.event(name,data)).catch(()=>{/* noop */})};
 
  void carga.then(m=>m.initPixel()).catch(()=>{/* noop */});
- event('landing_view');
+ // ms_desde_abertura: quanto a medição demorou pra sair (pra comparar a base de visitas com a das outras páginas);
+ // volta_banco: a recarga da volta do 3DS não é visita nova (o relatório pode tirar)
+ void carga.then(m=>m.event('landing_view',{ms_desde_abertura:Math.round(performance.now()),...(voltou?{volta_banco:true}:{})})).catch(()=>{/* noop */});
 
  let abrindo=false;
  const erroDe=(botao?:HTMLElement)=>{
@@ -50,7 +53,11 @@ if(!document.documentElement.hasAttribute('data-desligada')){
   const erro=erroDe(botao);if(erro)erro.hidden=true;
   botao?.setAttribute('aria-busy','true');
   // o CSS do checkout só entra aqui, no toque de pagar (não segura a primeira pintura da página)
-  try{const [m]=await Promise.all([carga,import('../completo/checkout.css'),import('./style.css')]);await m.openPayment(voltando?m.bankReturn??undefined:undefined)}
+  try{
+   const [m]=await Promise.all([carga,import('../completo/checkout.css'),import('./style.css')]);await m.openPayment(voltando?m.bankReturn??undefined:undefined);
+   // celular: o checkout abre com o campo de e-mail à mostra (sem dar foco, pra não subir o teclado sozinho)
+   if(!voltando&&window.innerWidth<=700){const email=document.querySelector<HTMLElement>('#oc-email');if(email&&typeof email.scrollIntoView==='function')email.scrollIntoView({block:'center'})}
+  }
   catch(e){
    event('landing_erro',{onde:'dia_checkout_load',msg:String((e as Error)?.message??e).slice(0,80)});
    if(erro){erro.hidden=false;erro.textContent='Não conseguimos abrir o pagamento agora. Tente de novo.'}
@@ -73,7 +80,13 @@ if(!document.documentElement.hasAttribute('data-desligada')){
  for(const a of document.querySelectorAll<HTMLElement>('[data-cta]'))a.addEventListener('click',e=>{
   event('landing_cta',{onde:a.dataset.cta});
   const preco=document.getElementById('preco');
-  if(preco&&typeof preco.scrollIntoView==='function'){e.preventDefault();preco.scrollIntoView({behavior:'smooth',block:'start'})}
+  if(!preco||typeof preco.scrollIntoView!=='function')return;
+  e.preventDefault();
+  // o cartão cabe do alto até o botão de pagar? para no alto dele. Não cabe (tela baixa)? para com o botão de pagar no pé da tela.
+  const pagar=preco.querySelector<HTMLElement>('[data-checkout]');
+  const ate=pagar?pagar.getBoundingClientRect().bottom-preco.getBoundingClientRect().top:0;
+  if(pagar&&ate+32>window.innerHeight)pagar.scrollIntoView({behavior:'smooth',block:'end'});
+  else preco.scrollIntoView({behavior:'smooth',block:'start'});
  });
  for(const b of document.querySelectorAll<HTMLElement>('[data-checkout]'))b.addEventListener('click',e=>{
   e.preventDefault();
@@ -124,8 +137,9 @@ if(!document.documentElement.hasAttribute('data-desligada')){
  if(voltou){
   void carga.then(m=>{
    const volta=m.bankReturn;
-   if(!volta){void mostrarCompra('recarga');return}
+   // limpa sempre, mesmo com um redirect_status fora da lista (aí não há o que conferir, mas o endereço não fica com o PI)
    try{const limpa=new URL(location.href);for(const k of ['payment_intent','payment_intent_client_secret','redirect_status'])limpa.searchParams.delete(k);history.replaceState(history.state,'',`${limpa.pathname}${limpa.search}${limpa.hash}`)}catch{/* noop */}
+   if(!volta){void mostrarCompra('recarga');return}
    void mostrarCompra('volta_banco',volta.pi).then(ja=>{if(!ja)void checkout(undefined,true)});
   }).catch(()=>{/* noop */});
  }else void mostrarCompra('recarga');

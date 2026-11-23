@@ -38,8 +38,8 @@ describe("as chaves do <head>", () => {
   };
   const ligada = cabeca.replace('var PAGINA_DIA = "off"', 'var PAGINA_DIA = "on"');
 
-  it("nasce desligada, com a oferta 27, o topo lista e a faixa 'paga uma vez'", () => {
-    expect(HTML).toMatch(/var FAIXA_DIA = "uma-vez";/);
+  it("nasce desligada, com a oferta 27, o topo lista e a faixa 'só hoje' (os padrões da SPEC)", () => {
+    expect(HTML).toMatch(/var FAIXA_DIA = "hoje";/);
     expect(HTML).toMatch(/var PAGINA_DIA = "off";/);
     expect(HTML).toMatch(/var OFERTA_DIA = "27";/);
     expect(HTML).toMatch(/var TOPO_DIA = "lista";/);
@@ -57,7 +57,7 @@ describe("as chaves do <head>", () => {
     const aba = loja();
     const r = rodar(cabeca, "?dia=on&utm_content=c7", { storage: aba });
     expect(r.replace).not.toHaveBeenCalled();
-    expect(r.attrs).toEqual({ "data-oferta": "27", "data-topo": "lista", "data-faixa": "uma-vez" });
+    expect(r.attrs).toEqual({ "data-oferta": "27", "data-topo": "lista", "data-faixa": "hoje" });
     expect(rodar(cabeca, "?utm_content=c7", { storage: aba }).replace).not.toHaveBeenCalled(); // a mesma aba, sem o parâmetro (volta do banco)
     expect(rodar(cabeca, "?utm_content=c7").replace).toHaveBeenCalled(); // outra aba
     expect(rodar(cabeca, "?dia=on", { storage: null }).replace).not.toHaveBeenCalled(); // sem storage: o parâmetro basta
@@ -66,30 +66,32 @@ describe("as chaves do <head>", () => {
   it("on: abre pra todo mundo, sem redirecionar", () => {
     const r = rodar(ligada, "?utm_content=c7");
     expect(r.replace).not.toHaveBeenCalled();
-    expect(r.attrs).toEqual({ "data-oferta": "27", "data-topo": "lista", "data-faixa": "uma-vez" });
+    expect(r.attrs).toEqual({ "data-oferta": "27", "data-topo": "lista", "data-faixa": "hoje" });
   });
   it("OFERTA_DIA e TOPO_DIA: só os valores previstos; qualquer outra coisa cai no padrão", () => {
     expect(rodar(ligada.replace('var OFERTA_DIA = "27"', 'var OFERTA_DIA = "67"'), "").attrs["data-oferta"]).toBe("67");
     expect(rodar(ligada.replace('var OFERTA_DIA = "27"', 'var OFERTA_DIA = "97"'), "").attrs["data-oferta"]).toBe("27");
     expect(rodar(ligada.replace('var TOPO_DIA = "lista"', 'var TOPO_DIA = "gesto"'), "").attrs["data-topo"]).toBe("gesto");
     expect(rodar(ligada.replace('var TOPO_DIA = "lista"', 'var TOPO_DIA = "x"'), "").attrs["data-topo"]).toBe("lista");
-    expect(rodar(ligada.replace('var FAIXA_DIA = "uma-vez"', 'var FAIXA_DIA = "hoje"'), "").attrs["data-faixa"]).toBe("hoje");
-    expect(rodar(ligada.replace('var FAIXA_DIA = "uma-vez"', 'var FAIXA_DIA = "amanha"'), "").attrs["data-faixa"]).toBe("uma-vez");
+    expect(rodar(ligada.replace('var FAIXA_DIA = "hoje"', 'var FAIXA_DIA = "sem-data"'), "").attrs["data-faixa"]).toBe("sem-data");
+    expect(rodar(ligada.replace('var FAIXA_DIA = "hoje"', 'var FAIXA_DIA = "amanha"'), "").attrs["data-faixa"]).toBe("hoje");
   });
   it("?oferta e ?topo só trocam na prévia (fora do domínio ou ?qa=1); no domínio, o link não muda o preço", () => {
-    expect(rodar(ligada, "?oferta=67&topo=gesto").attrs).toEqual({ "data-oferta": "27", "data-topo": "lista", "data-faixa": "uma-vez" });
-    expect(rodar(ligada, "?oferta=67&topo=gesto&faixa=hoje").attrs["data-faixa"]).toBe("uma-vez");
-    expect(rodar(ligada, "?oferta=67&topo=gesto&faixa=hoje&qa=1").attrs).toEqual({ "data-oferta": "67", "data-topo": "gesto", "data-faixa": "hoje" });
+    expect(rodar(ligada, "?oferta=67&topo=gesto").attrs).toEqual({ "data-oferta": "27", "data-topo": "lista", "data-faixa": "hoje" });
+    expect(rodar(ligada, "?oferta=67&topo=gesto&faixa=sem-data").attrs["data-faixa"]).toBe("hoje");
+    expect(rodar(ligada, "?oferta=67&topo=gesto&faixa=sem-data&qa=1").attrs).toEqual({ "data-oferta": "67", "data-topo": "gesto", "data-faixa": "sem-data" });
     expect(rodar(ligada, "?oferta=67", { host: "localhost" }).attrs["data-oferta"]).toBe("67");
-    expect(rodar(ligada, "?oferta=12&topo=zzz", { host: "localhost" }).attrs).toEqual({ "data-oferta": "27", "data-topo": "lista", "data-faixa": "uma-vez" });
+    expect(rodar(ligada, "?oferta=12&topo=zzz", { host: "localhost" }).attrs).toEqual({ "data-oferta": "27", "data-topo": "lista", "data-faixa": "hoje" });
   });
-  it("a faixa do topo: 'paga uma vez' no HTML; 'só hoje, DD/MM' só com FAIXA_DIA 'hoje' (nenhuma urgência por padrão)", () => {
+  it("a faixa do topo: 'só hoje, DD/MM' com FAIXA_DIA 'hoje' (padrão da SPEC); com 'sem-data' fica 'iPhone e Android', sem repetir o cartão do preço", () => {
     const d = pagina();
-    expect(semNbsp(d.querySelector(".promo")!.textContent!)).toBe("🔥 ACESSO VITALÍCIO · paga uma vez");
-    expect(textoDe(d)).not.toMatch(/só hoje/i);
     const troca = HTML.match(/<script>\s*\/\* FAIXA_DIA "hoje"[\s\S]*?\*\/\s*(\(function \(\) \{[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
-    new Function("document", troca)(d); // sem a chave: nada muda
-    expect(semNbsp(d.querySelector(".promo")!.textContent!)).toBe("🔥 ACESSO VITALÍCIO · paga uma vez");
+    // sem a chave "hoje" (ou sem JavaScript): o texto do HTML, sem prazo nenhum
+    d.documentElement.setAttribute("data-faixa", "sem-data");
+    new Function("document", troca)(d);
+    expect(semNbsp(d.querySelector(".promo")!.textContent!)).toBe("🔥 ACESSO VITALÍCIO · iPhone e Android");
+    expect(textoDe(d)).not.toMatch(/só hoje/i);
+    expect(semNbsp(d.querySelector(".oferta-faixa")!.textContent!)).toBe("Acesso vitalício paga uma vez"); // a faixa não repete o cabeçalho do cartão
     d.documentElement.setAttribute("data-faixa", "hoje");
     new Function("document", troca)(d);
     expect(semNbsp(d.querySelector(".promo")!.textContent!)).toMatch(/^🔥 ACESSO VITALÍCIO · só hoje, \d\d\/\d\d$/);
@@ -117,29 +119,45 @@ describe("a página (copy da SPEC, seção 4)", () => {
   it("topo, lista e gesto", () => {
     expect(semNbsp(d.querySelector("h1")!.textContent!)).toBe("Sua vida organizada, em um só app.");
     expect(d.querySelector("h1 em")!.textContent).toBe("em um só app.");
-    for (const t of ["🔥 ACESSO VITALÍCIO · paga uma vez", "Dinheiro, hábitos, treino e contas no mesmo lugar. Anota em segundos, sem planilha.", "07:30 · seu dia numa lista só", "Tela real do app, com dados de exemplo.",
-      "Você anota.O app responde.", "08:10 · dinheiro", "Anotou o gasto. Já sabe quanto sobra hoje.", "146 − 87 = 59 pra hoje", "Simples assim.", "R$ 27,90, uma vez · 7 dias de garantia"]) expect(texto).toContain(t);
+    for (const t of ["🔥 ACESSO VITALÍCIO · iPhone e Android", "Dinheiro, hábitos, treino e contas no mesmo lugar. Anota em segundos, sem planilha.", "07:30 · seu dia numa lista só", "Tela real do app, com dados de exemplo.",
+      "Você anota.O app responde.", "08:10 · dinheiro", "Anotou o gasto. Já sabe quanto sobra hoje.", "146 − 87 = 59 pra hoje", "Simples assim.", "R$ 27,90, uma vez · iPhone e Android · 7 dias de garantia"]) expect(texto).toContain(t);
     expect([...d.querySelectorAll(".fatos b")].map((b) => b.textContent)).toEqual(["16 áreas", "Paga 1 vez só", "iPhone e Android"]);
     expect([...d.querySelectorAll(".gesto .rot")].map((p) => semNbsp(p.textContent!))).toEqual(["1Você anota", "2O app responde"]);
     expect(semNbsp(d.querySelector(".so-b")!.textContent!)).toBe("E o dia inteiro fica assim."); // só aparece no topo "gesto"
     // o preço aparece cedo: colado no 1º botão, bem antes do cartão do preço
-    expect(semNbsp(d.querySelector(".gesto .miudo")!.textContent!)).toBe("R$ 27,90, uma vez · 7 dias de garantia");
+    expect(semNbsp(d.querySelector(".gesto .miudo")!.textContent!)).toBe("R$ 27,90, uma vez · iPhone e Android · 7 dias de garantia");
     expect(texto.indexOf("27,90")).toBeLessThan(texto.indexOf("Mais tarde, no mesmo app."));
-    // o recorte do gesto é só a faixa da conta (sem o "R$ 135 por dia" do card), e a moldura do celular é lisa
+    // o recorte do gesto é só a faixa da conta (sem o "R$ 135 por dia" do card), estreito pra frase sair grande na tela (≥ 16 px), e a moldura do celular é lisa
     const gesto = d.querySelector("img[src='/dia/gesto-app.webp']")!;
     expect(gesto.getAttribute("alt")).toBe("Trecho real do card Quanto posso gastar hoje, do app: Sobram R$ 59 pra hoje, já saiu R$ 87 dos R$ 146 do dia");
-    expect([gesto.getAttribute("width"), gesto.getAttribute("height")]).toEqual(["720", "121"]);
+    expect([gesto.getAttribute("width"), gesto.getAttribute("height")]).toEqual(["700", "176"]);
+    expect(318 / 700 * 40).toBeGreaterThanOrEqual(16); // "Sobram R$ 59 pra hoje" tem ~40 px na origem; o recorte aparece com ~318 px de largura
+    // o exemplo de treino conversa com o público (a mesma conta "Ana" da Home): nada de peito e supino nas 3 telas
+    for (const src of ["/dia/topo-lista.webp", "/dia/k-treino.webp", "/dia/fecho-home.webp"]) expect(d.querySelector(`img[src='${src}']`)!.getAttribute("alt")).toMatch(/glúteos e pernas/);
+    expect(HTML).not.toMatch(/Peito|Supino|Tríceps/i);
     expect(HTML).not.toContain(".fone::before");
   });
   it("o resto do dia e os 7 cartões", () => {
     for (const t of ["Mais tarde, no mesmo app.", "12:30 · hábitos", "Marca o hábito. A sequência fica guardada.", "21:00 · contas", "Cadastra a conta uma vez. O app mostra antes de vencer.", "O aviso fica no app, dias antes.",
       "E o resto da vida também.", "arraste pro lado", "Telas reais do app, com dados de exemplo."]) expect(texto).toContain(t);
     expect(texto).not.toMatch(/nada 🙂|Não faz nada/);
-    expect([...d.querySelectorAll(".cartao h3")].map((h) => h.textContent)).toEqual(["💪 Treino com séries e carga", "🎯 Um limite pra cada gasto", "💧 Água do dia", "📊 Pra onde foi o dinheiro", "🍽️ Cardápio da semana", "🏠 Casa por cômodo", "✨ 16 áreas. Use só as que quiser."]);
-    expect([...d.querySelectorAll(".cartao p")].map((p) => p.textContent)).toEqual(["Você marca a série. O app lembra a carga da semana passada.", "Você define o teto. A barra mostra quanto já foi.", "Um toque a cada copo. O app mostra quanto falta.", "Seus gastos separados por categoria.", "Monta uma vez e consulta todo dia.", "Afazeres e lista de mercado, cada um no seu lugar.", "Comece por uma. Esconda o resto."]);
+    expect([...d.querySelectorAll(".cartao h3")].map((h) => h.textContent)).toEqual(["💪 Treino com séries e carga", "✨ 16 áreas. Use só as que quiser.", "🎯 Um limite pra cada gasto", "💧 Água do dia", "📊 Pra onde foi o dinheiro", "🍽️ Cardápio da semana", "🏠 Casa por cômodo"]);
+    expect([...d.querySelectorAll(".cartao p")].map((p) => p.textContent)).toEqual(["Você marca a série. O app lembra a carga da semana passada.", "Comece por uma. Esconda o resto.", "Você define o teto. A barra mostra quanto já foi.", "Um toque por copo. O app conta quanto falta.", "Seus gastos separados por categoria.", "Monta uma vez e consulta todo dia.", "Afazeres e lista de mercado, cada um no seu lugar."]);
     expect(HTML).toContain("overscroll-behavior-x: contain");
-    // cada recorte com a sua altura: nenhum corte forçado por CSS
+    // cada recorte com a sua altura: nenhum corte forçado por CSS, nenhuma caixa de altura fixa, e cada cartão com a altura do seu conteúdo
     expect(HTML).not.toMatch(/img\.alto|class="alto"|object-fit/);
+    expect(HTML).toMatch(/\.pg \.trilho \{ display: flex; align-items: flex-start;/);
+    expect(HTML.match(/\.pg \.cartao \.print \{[^}]*\}/)![0]).not.toMatch(/min-height/);
+    // a resposta pra "16 áreas é coisa demais" é o 2º cartão (a borda dele já aparece na tela), não o 7º
+    expect(d.querySelectorAll(".cartao")[1].getAttribute("data-cartao")).toBe("areas");
+    // o link "Ver o preço" logo depois dos cartões: só rola até o preço, nunca abre pagamento; área de toque de 44 px
+    const ver = d.querySelector("[data-bloco='cartoes'] a[data-cta='cartoes']")!;
+    expect(semNbsp(ver.textContent!)).toBe("Ver o preço");
+    expect(ver.getAttribute("href")).toBe("#preco");
+    expect(ver.hasAttribute("data-checkout")).toBe(false);
+    expect(ver.classList.contains("cta")).toBe(false);
+    expect(ver.previousElementSibling!.classList.contains("nota")).toBe(true);
+    expect(HTML.match(/\.pg \.ver-preco \{[^}]*\}/)![0]).toMatch(/min-height: 44px/);
   });
   it("como funciona: é um app, antes do preço, com os selos das duas lojas sem link", () => {
     for (const t of ["É um app. Você baixa e usa.", "Como funciona", "Garanta seu acesso", "Você paga uma vez, aqui no site. Pix ou cartão.", "Baixe o app", "Na App Store ou no Google Play. Também abre no computador.",
@@ -148,12 +166,9 @@ describe("a página (copy da SPEC, seção 4)", () => {
     expect([...d.querySelectorAll(".selos img")].map((i) => i.getAttribute("src"))).toEqual(["/selos/app-store.svg", "/selos/google-play.png"]);
     expect(d.querySelector(".selos a")).toBeNull();
     expect([...d.querySelectorAll(".selos img")].map((i) => i.getAttribute("data-selo"))).toEqual(["ios", "android"]); // o toque é medido (dia_selo_toque)
-    // o link "Ver o preço" do fim do bloco: só rola até o preço, nunca abre pagamento
-    const ver = d.querySelector("[data-bloco='como'] a[data-cta='como']")!;
-    expect(semNbsp(ver.textContent!)).toBe("Ver o preço");
-    expect(ver.getAttribute("href")).toBe("#preco");
-    expect(ver.hasAttribute("data-checkout")).toBe(false);
-    expect(ver.classList.contains("cta")).toBe(false);
+    // a linha "Você baixa depois…" vem ANTES dos selos (quem toca no selo já leu que a loja é depois)
+    expect(d.querySelector(".selos")!.previousElementSibling!.textContent).toBe("Você baixa depois de garantir o acesso.");
+    expect(d.querySelector("[data-bloco='como'] a")).toBeNull();
     // antes da compra ninguém é mandado pra loja: nenhum link pra fora
     expect([...d.querySelectorAll("#pagina a")].map((a) => a.getAttribute("href"))).toEqual(["#preco", "#preco", "mailto:contato@coreaplicativo.com.br", "/termos", "/privacidade", "/organizar", "/como-entrar"]);
     expect(d.querySelectorAll(".lojas").length).toBe(2); // topo e fecho
@@ -166,17 +181,21 @@ describe("a página (copy da SPEC, seção 4)", () => {
   });
   it("preço, garantia, informações, fecho e rodapé", () => {
     const preco = semNbsp(d.getElementById("preco")!.textContent!);
-    for (const t of ["Acesso vitalício paga uma vez", "Menos que um lanche.", "R$27,90", "Uma vez. É seu pra sempre.", "Não renova. Nada é cobrado depois.", "App só de finanças, por assinaturacerca de R$ 250por ano", "CORE, as 16 áreasR$ 27,90, uma vez",
-      "Preços públicos de apps de finanças no Brasil, consultados em 23/11/2026.", "As 16 áreas liberadas", "App no iPhone, no Android e no computador", "7 dias de garantia: não gostou, devolvemos", "Quero meu acesso por R$ 27,90", "Pagamento aqui no site · Pix ou cartão", "CORE · CNPJ 55.041.112/0001-82"]) expect(preco).toContain(t);
+    for (const t of ["Acesso vitalício paga uma vez", "Menos que um lanche.", "R$27,90", "Uma vez. É seu pra sempre.", "Não renova. Nada é cobrado depois.", "Um app só de finanças, por assinaturacerca de R$ 250por ano", "CORE, as 16 áreasR$ 27,90, uma vez",
+      "Preço público de dois apps de finanças no Brasil, consultado em 23/11/2026.", "As 16 áreas liberadas", "App no iPhone, no Android e no computador", "7 dias de garantia: não gostou, devolvemos", "Quero meu acesso por R$ 27,90", "Pagamento aqui no site · Pix ou cartão", "CORE · CNPJ 55.041.112/0001-82"]) expect(preco).toContain(t);
     expect(preco).not.toMatch(/só hoje/i);
-    expect(texto).not.toMatch(/experiment/i); // garantia não é teste grátis: nada de "experimente" perto de botão que cobra
-    for (const t of ["7 dias de garantia.", "Até 7 dias depois da compra, é só mandar um e-mail pra contato@coreaplicativo.com.br. Devolvemos 100% do valor, sem perguntas.",
+    // alavanca 7 da SPEC (seções 9 e 11): a garantia escrita como "experimente" e o último botão com verbo leve, 2 vezes como no mockup.
+    // Pra não ler como teste grátis: a garantia diz "depois da compra… devolvemos" e o preço vem colado embaixo do botão do fecho.
+    expect(texto.match(/experiment/gi)).toHaveLength(2);
+    expect(semNbsp(d.querySelector("[data-bloco='garantia'] b")!.textContent!)).toBe("Experimente por 7 dias.");
+    expect(semNbsp(d.querySelector(".fim .cta")!.nextElementSibling!.textContent!)).toBe("R$ 27,90, uma vez · Pix ou cartão7 dias de garantia");
+    for (const t of ["Experimente por 7 dias.", "Até 7 dias depois da compra, é só mandar um e-mail pra contato@coreaplicativo.com.br. Devolvemos 100% do valor, sem perguntas.",
       "Informações", "Onde funcionaiPhone, Android e computador", "PagamentoUma vez · Pix ou cartão, aqui no site", "Renova sozinho?Não", "Garantia7 dias, 100% do valor de volta", "VendedorCORE · CNPJ 55.041.112/0001-82",
-      "Amanhã cedo, seu diajá tem um lugar.", "Dinheiro, hábitos, treino, casa. Você escolhe por onde começar.", "Paga uma vez · Pix ou cartão7 dias de garantia", "contato@coreaplicativo.com.br · Termos · Privacidade"]) expect(texto).toContain(t);
+      "Amanhã cedo, seu diajá tem um lugar.", "Dinheiro, hábitos, treino, casa. Você escolhe por onde começar.", "Quero experimentar agora", "R$ 27,90, uma vez · Pix ou cartão7 dias de garantia", "contato@coreaplicativo.com.br · Termos · Privacidade"]) expect(texto).toContain(t);
   });
   it("exatamente 3 botões: o 1º só desce pro preço; os outros dois abrem o checkout; nenhum fixo", () => {
     const botoes = [...d.querySelectorAll(".cta")];
-    expect(botoes.map((b) => semNbsp(b.textContent!))).toEqual(["Quero meu dia organizado", "Quero meu acesso por R$ 27,90", "Quero meu acesso por R$ 27,90"]);
+    expect(botoes.map((b) => semNbsp(b.textContent!))).toEqual(["Quero meu dia organizado", "Quero meu acesso por R$ 27,90", "Quero experimentar agora"]);
     expect(botoes[0].tagName).toBe("A");
     expect(botoes[0].getAttribute("href")).toBe("#preco");
     expect(botoes[0].hasAttribute("data-checkout")).toBe(false);
@@ -242,10 +261,10 @@ describe("a oferta (um objeto só)", () => {
       expect(opcoesDaOferta(OFERTAS[k], true)).toMatchObject({ producao: false, storagePrefix: `${OFERTAS[k].storagePrefix}-qa` });
     }
   });
-  it("o HTML traz os textos do 27 e, em data-v67, os do 67: o preço cedo, os do cartão e o botão (no preço e no fecho), e só eles", () => {
+  it("o HTML traz os textos do 27 e, em data-v67, os do 67: o preço cedo (sob o 1º botão e sob o do fecho), os do cartão e o botão do preço, e só eles", () => {
     const d = pagina();
     const lugares = [...d.querySelectorAll("[data-oferta-txt]")];
-    expect(lugares.map((e) => e.getAttribute("data-oferta-txt"))).toEqual(["cedo", "frase", "numero", "compare", "botao", "botao"]);
+    expect(lugares.map((e) => e.getAttribute("data-oferta-txt"))).toEqual(["cedo", "frase", "numero", "compare", "botao", "cedo"]);
     expect(d.querySelectorAll("[data-v67]").length).toBe(6);
     expect(Object.keys(OFERTAS["27"].textos).sort()).toEqual(["botao", "cedo", "compare", "frase", "numero"]);
     for (const e of lugares) {
@@ -265,8 +284,8 @@ describe("a oferta (um objeto só)", () => {
     const depois = textoDe(d67);
     expect(depois).not.toContain("27,90");
     expect(depois).not.toContain("Menos que um lanche.");
-    for (const t of ["Paga uma vez. Usa pra sempre.", "R$67,90", "CORE, as 16 áreasR$ 67,90, uma vez", "Quero meu acesso por R$ 67,90", "R$ 67,90, uma vez · 7 dias de garantia"]) expect(depois).toContain(t);
-    expect(depois.match(/Quero meu acesso por R\$ 67,90/g)).toHaveLength(2);
+    for (const t of ["Paga uma vez. Usa pra sempre.", "R$67,90", "CORE, as 16 áreasR$ 67,90, uma vez", "Quero meu acesso por R$ 67,90", "R$ 67,90, uma vez · iPhone e Android · 7 dias de garantia", "Quero experimentar agora R$ 67,90, uma vez · Pix ou cartão"]) expect(depois).toContain(t);
+    expect(depois.match(/Quero meu acesso por R\$ 67,90/g)).toHaveLength(1);
     // tirando os 5 trechos, o resto da página é igual
     const neutro = (s: string) => s.replace("Menos que um lanche.", "§").replace("Paga uma vez. Usa pra sempre.", "§").replace(/[26]7,90/g, "§§");
     expect(neutro(depois)).toBe(neutro(antes));
@@ -450,7 +469,7 @@ describe("eventos da /dia", () => {
     for (const t of ["f('init','998037194527241')", "f('init','1104688251942954')", "f('track','PageView')", "content_name:'CORE vitalício (dia)',value:OFERTA.valor,currency:'BRL'", "if(QA)return;", "if(!QA)trackEventBeacon(name,payload)",
       "if(!QA && (name==='Purchase'||name==='InitiateCheckout'||name==='ViewContent'||name==='CompleteRegistration'))fireMetaEvent(name,data,id)", "funil:'dia'", "jornada:'dia_v1'", "path:'/dia'", "...opcoesDaOferta(OFERTA,QA)", "urlChegada:source.url"]) expect(fonte).toContain(t);
     const main = ler("src/dia/main.ts");
-    for (const t of ["event('landing_view')", "event('landing_cta',{onde:a.dataset.cta})", "event('landing_checkout_click',{onde:b.dataset.checkout})", "event('landing_section_view',{secao:", "event('landing_oferta_vista')", "event('dia_cartoes_arraste',{ate})", "event('landing_erro',", "event('dia_selo_toque',{loja:s.dataset.selo})"]) expect(main).toContain(t);
+    for (const t of ["m.event('landing_view',{ms_desde_abertura:", "event('landing_cta',{onde:a.dataset.cta})", "event('landing_checkout_click',{onde:b.dataset.checkout})", "event('landing_section_view',{secao:", "event('landing_oferta_vista')", "event('dia_cartoes_arraste',{ate})", "event('landing_erro',", "event('dia_selo_toque',{loja:s.dataset.selo})"]) expect(main).toContain(t);
     expect(main).not.toMatch(/stripe-checkout|js\.stripe/); // a Stripe só entra pelo import() do toque (payment.ts)
     expect(fonte).toContain("await import('@/landing/stripe-checkout')");
   });
@@ -493,24 +512,31 @@ describe("o main.ts na página: carga adiada, descida pro preço e medição só
   const carregar = async () => { await import("@/dia/main"); };
   const chegou = async () => { topo.dispatchEvent(new Event("load")); await vi.waitFor(() => expect(nomes()).toContain("landing_view")); };
 
-  it("o pedaço pesado (pixel, medição, checkout) só é pedido depois da imagem do topo; os eventos esperam e saem na ordem", async () => {
+  it("o pedaço pesado (pixel, medição, checkout) é pedido logo depois da 1ª pintura, SEM esperar a imagem do topo; os eventos esperam e saem na ordem", async () => {
     const fonte = ler("src/dia/main.ts");
     expect(fonte).not.toMatch(/^import\s*\{[^}]*\}\s*from\s*['"]\.\/(payment|dia-carga)['"]/m); // nada de import estático: é ele que punha os modulepreload no <head>
-    expect(fonte).toContain("const carga:Promise<Carga>=imagemDoTopo.then(()=>import('./dia-carga'));");
+    expect(fonte).toContain("const carga:Promise<Carga>=primeiraPintura.then(()=>import('./dia-carga'));");
+    expect(fonte).not.toMatch(/imagemDoTopo|TETO_IMAGEM_MS/); // a medição não espera mais a imagem (o landing_view saía ~0,85 s depois do da /tudo)
     await carregar();
-    (document.querySelector("[data-cta='gesto']") as HTMLElement).click(); // tocou antes de a imagem chegar
-    await espera(60);
+    (document.querySelector("[data-cta='gesto']") as HTMLElement).click(); // tocou antes de o pedaço chegar
     expect(nomes()).toEqual([]); // nada saiu ainda (nem foi perdido)
-    await chegou();
-    expect(nomes()).toEqual(["landing_view", "landing_cta:gesto"]);
+    // a imagem do topo NUNCA chega neste teste (complete = false, sem load): a medição sai assim mesmo
+    await vi.waitFor(() => expect(nomes()).toEqual(["landing_view", "landing_cta:gesto"]));
     const ev = (window as any).__diaEvents[0];
     expect(ev).toMatchObject({ funil: "dia", jornada: "dia_v1", path: "/dia", oferta: "27", topo: "lista" });
+    expect(typeof ev.ms_desde_abertura).toBe("number"); // quanto a medição demorou pra sair, pra comparar com as outras páginas
+    expect(ev).not.toHaveProperty("volta_banco");
   });
-  it("imagem que nunca chega: o teto de 1,5 s libera a carga (a medição não fica presa)", async () => {
-    const m = await import("@/dia/main");
-    expect(m.TETO_IMAGEM_MS).toBe(1500);
-    await espera(m.TETO_IMAGEM_MS + 150);
-    await vi.waitFor(() => expect(nomes()).toContain("landing_view"));
+  it("aba que não pinta (segundo plano): o teto de 0,4 s libera a carga (a medição não fica presa)", async () => {
+    const raf = vi.spyOn(window, "requestAnimationFrame").mockImplementation(() => 0); // nenhum quadro acontece
+    try {
+      const m = await import("@/dia/main");
+      expect(m.TETO_PINTURA_MS).toBe(400);
+      await espera(100);
+      expect(nomes()).toEqual([]);
+      await espera(m.TETO_PINTURA_MS);
+      await vi.waitFor(() => expect(nomes()).toContain("landing_view"));
+    } finally { raf.mockRestore(); }
   });
   it("página desligada: nada é pedido nem medido", async () => {
     document.documentElement.setAttribute("data-desligada", "");
@@ -523,7 +549,7 @@ describe("o main.ts na página: carga adiada, descida pro preço e medição só
   });
   it("1º botão e 'Ver o preço': medem, descem até o #preco com animação por JS e nunca abrem pagamento", async () => {
     await carregar(); await chegou();
-    for (const onde of ["gesto", "como"]) {
+    for (const onde of ["gesto", "cartoes"]) {
       const a = document.querySelector(`[data-cta='${onde}']`) as HTMLElement;
       const clique = new MouseEvent("click", { bubbles: true, cancelable: true });
       a.dispatchEvent(clique);
@@ -532,9 +558,45 @@ describe("o main.ts na página: carga adiada, descida pro preço e medição só
     expect(rolar).toHaveBeenCalledTimes(2);
     expect(rolar.mock.instances.every((el) => el === document.getElementById("preco"))).toBe(true);
     expect(rolar).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
-    await vi.waitFor(() => expect(nomes().filter((n: string) => n.startsWith("landing_cta"))).toEqual(["landing_cta:gesto", "landing_cta:como"]));
+    await vi.waitFor(() => expect(nomes().filter((n: string) => n.startsWith("landing_cta"))).toEqual(["landing_cta:gesto", "landing_cta:cartoes"]));
     expect(document.getElementById("oc")).toBeNull();
     expect(nomes().some((n: string) => n.startsWith("landing_checkout_click"))).toBe(false);
+  });
+  it("tela baixa (iPhone SE no Instagram): a descida para com o botão de pagar à mostra; em tela que cabe, para no alto do cartão", async () => {
+    await carregar(); await chegou();
+    const preco = document.getElementById("preco")!;
+    const pagar = preco.querySelector("[data-checkout='oferta']") as HTMLElement;
+    const caixa = (top: number, bottom: number) => () => ({ top, bottom, left: 0, right: 390, width: 390, height: bottom - top, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+    preco.getBoundingClientRect = caixa(3000, 3700); pagar.getBoundingClientRect = caixa(3540, 3596); // do alto do cartão ao pé do botão: 596 px
+    const tocar = () => (document.querySelector("[data-cta='gesto']") as HTMLElement).click();
+    const altura = (h: number) => Object.defineProperty(window, "innerHeight", { value: h, configurable: true });
+    const antes = window.innerHeight;
+    try {
+      altura(548); tocar();
+      expect(rolar).toHaveBeenCalledTimes(1);
+      expect(rolar.mock.instances[0]).toBe(pagar);
+      expect(rolar).toHaveBeenLastCalledWith({ behavior: "smooth", block: "end" });
+      altura(664); tocar();
+      expect(rolar.mock.instances[1]).toBe(preco);
+      expect(rolar).toHaveBeenLastCalledWith({ behavior: "smooth", block: "start" });
+    } finally { altura(antes); }
+    expect(HTML).toContain(".pg .oferta .cta { margin-top: 16px; scroll-margin-bottom: 20px; }");
+  });
+  it("o checkout abre no celular com o e-mail à mostra: o resumo perde a lista e a garantia (só no CSS da /dia) e a tela rola até o campo, sem foco", () => {
+    const css = ler("src/dia/style.css");
+    expect(css).toContain("@media(max-width:700px){.oc-novo .oc-order-card h3,.oc-novo .oc-order-card ul,.oc-novo .oc-guarantee{display:none}}");
+    const fonte = ler("src/dia/main.ts");
+    expect(fonte).toContain("email.scrollIntoView({block:'center'})");
+    expect(fonte).not.toMatch(/\.focus\(/); // o teclado não sobe sozinho
+    // o CSS da /dia não entra em nenhuma outra página
+    for (const arq of ["src/tudo/main.ts", "src/pra-sempre/main.ts", "src/landing/stripe-checkout.ts"]) expect(ler(arq), arq).not.toContain("dia/style.css");
+  });
+  it("volta do banco: o endereço é limpo SEMPRE (mesmo com redirect_status fora da lista) e o landing_view leva volta_banco", () => {
+    const fonte = ler("src/dia/main.ts");
+    const limpa = fonte.indexOf("for(const k of ['payment_intent','payment_intent_client_secret','redirect_status'])limpa.searchParams.delete(k)");
+    expect(limpa).toBeGreaterThan(0);
+    expect(limpa).toBeLessThan(fonte.indexOf("if(!volta){void mostrarCompra('recarga');return}"));
+    expect(fonte).toContain("...(voltou?{volta_banco:true}:{})");
   });
   it("a descida do 1º botão atravessa dia, cartões, como e prova sem contar nenhum; só o bloco onde a pessoa PAROU conta, 1 vez", async () => {
     const m = await import("@/dia/main"); await chegou();

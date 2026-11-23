@@ -13,14 +13,14 @@
 <script>
 /*
  * /dia (23/11) — a "versão CORE do Porquim": um dia inteiro no app, em recortes reais, e o checkout Stripe de sempre por cima.
- * SPEC: novidades-guardadas/2026-11-23/porquim-core/SPEC.md. As três chaves moram aqui:
+ * SPEC: novidades-guardadas/2026-11-23/porquim-core/SPEC.md. As quatro chaves moram aqui:
  *   PAGINA_DIA  "off" → vai pro /organizar com a mesma query. "on" → a página. ?dia=on abre só nesta aba (sessão), pra conferir.
  *   OFERTA_DIA  "27" (R$ 27,90, linha lp27) | "67" (R$ 67,90, linha oferta, sem braço de preço). Textos e linha: src/dia/oferta.ts.
  *   TOPO_DIA    "lista" (o celular com a lista primeiro) | "gesto" (o gesto e o 1º botão primeiro). Só troca a ordem, por CSS.
- *   FAIXA_DIA   "uma-vez" (faixa do topo "ACESSO VITALÍCIO · paga uma vez") | "hoje" ("· só hoje, DD/MM", como nas páginas no ar).
- *               Nasce "uma-vez" porque o preço desta página não tem prazo: "só hoje" todo dia é urgência que não existe.
- *               A SPEC pedia "hoje"; trocar é decisão do dono (uma palavra aqui).
- * Só na prévia (?qa=1 ou fora do domínio, pagamento simulado): ?oferta=27|67, ?topo=lista|gesto e ?faixa=hoje|uma-vez trocam as três últimas.
+ *   FAIXA_DIA   "hoje" (faixa do topo "ACESSO VITALÍCIO · só hoje, DD/MM", como na SPEC e nas páginas no ar) | "sem-data"
+ *               ("ACESSO VITALÍCIO · iPhone e Android", sem prazo nenhum). Nasce "hoje" porque é o padrão da SPEC (seção 4, item 0).
+ *               O preço desta página não tem prazo de verdade: se o dono não quiser a urgência, é uma palavra aqui ("sem-data").
+ * Só na prévia (?qa=1 ou fora do domínio, pagamento simulado): ?oferta=27|67, ?topo=lista|gesto e ?faixa=hoje|sem-data trocam as três últimas.
  * Rollback: PAGINA_DIA "off".
  *
  * ANTES DE LIGAR OFERTA_DIA "67" (o padrão "27" não tem este problema):
@@ -34,7 +34,7 @@
   var PAGINA_DIA = "off";
   var OFERTA_DIA = "27";
   var TOPO_DIA = "lista";
-  var FAIXA_DIA = "uma-vez";
+  var FAIXA_DIA = "hoje";
   var q = location.search, h = document.documentElement;
   var aba = /[?&]dia=on(&|$)/.test(q);
   try { if (aba) sessionStorage.setItem("dia-on", "1"); else aba = sessionStorage.getItem("dia-on") === "1"; } catch (e) { /* sem storage */ }
@@ -43,11 +43,11 @@
   if (qa) {
     var o = /[?&]oferta=(27|67)(&|$)/.exec(q); if (o) OFERTA_DIA = o[1];
     var t = /[?&]topo=(lista|gesto)(&|$)/.exec(q); if (t) TOPO_DIA = t[1];
-    var f = /[?&]faixa=(hoje|uma-vez)(&|$)/.exec(q); if (f) FAIXA_DIA = f[1];
+    var f = /[?&]faixa=(hoje|sem-data)(&|$)/.exec(q); if (f) FAIXA_DIA = f[1];
   }
   h.setAttribute("data-oferta", OFERTA_DIA === "67" ? "67" : "27");
   h.setAttribute("data-topo", TOPO_DIA === "gesto" ? "gesto" : "lista");
-  h.setAttribute("data-faixa", FAIXA_DIA === "hoje" ? "hoje" : "uma-vez");
+  h.setAttribute("data-faixa", FAIXA_DIA === "sem-data" ? "sem-data" : "hoje");
 })();
 </script>
 <style>
@@ -119,7 +119,7 @@
   .pg .simples > b { padding: 8px 16px; border-radius: 13px; background: #111; color: #fff; font-size: 16px; font-weight: 700; letter-spacing: -.02em; transform: rotate(-2deg); }
   .pg .cta { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 56px; padding: 6px 12px; border: 0; border-radius: 14px; background: var(--magenta); color: #fff; font-family: inherit; font-size: 17.5px; line-height: 1.15; font-weight: 800; letter-spacing: -.015em; box-shadow: 0 8px 20px -8px rgba(214,51,138,.65); text-decoration: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .pg .cta[aria-busy="true"] { opacity: .7; }
-  .pg .miudo { margin-top: 9px; text-align: center; font-size: 12.5px; font-weight: 600; color: var(--suave); }
+  .pg .miudo { margin-top: 9px; text-align: center; font-size: 12.5px; line-height: 1.45; font-weight: 600; color: var(--suave); text-wrap: balance; }
 
   /* o resto do dia: 2 ciclos curtos */
   .pg .dia { position: relative; margin-top: 20px; padding-left: 22px; }
@@ -132,15 +132,15 @@
   .pg .ciclo small { display: block; margin-top: 7px; font-size: 13px; font-weight: 500; color: var(--suave); }
 
   /* cartões de arrastar: cada recorte com a sua altura, sem corte forçado */
-  .pg .faixa-cartoes { margin-top: 20px; padding: 32px 0 28px; background: var(--papel); }
+  .pg .faixa-cartoes { margin-top: 20px; padding: 32px 0 18px; background: var(--papel); }
   .pg .faixa-cartoes h2 { padding: 0 20px; }
   .pg .arraste { display: inline-flex; align-items: center; gap: 6px; margin: 12px 20px 0; font-size: 12.5px; font-weight: 700; color: var(--magenta-escuro); }
   .pg .arraste svg { width: 14px; height: 14px; }
-  .pg .trilho { display: flex; gap: 12px; margin-top: 14px; padding: 4px 20px 10px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-left: 20px; -webkit-overflow-scrolling: touch; scrollbar-width: none; overscroll-behavior-x: contain; }
+  .pg .trilho { display: flex; align-items: flex-start; gap: 12px; margin-top: 14px; padding: 4px 20px 10px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-left: 20px; -webkit-overflow-scrolling: touch; scrollbar-width: none; overscroll-behavior-x: contain; }
   .pg .trilho::-webkit-scrollbar { display: none; }
   .pg .cartao { flex: 0 0 270px; display: flex; flex-direction: column; scroll-snap-align: start; padding: 16px 10px; border-radius: 20px; background: #fff; border: 1px solid var(--borda); box-shadow: 0 10px 24px -18px rgba(38,38,38,.35); }
   .pg .cartao h3 { padding: 0 4px; font-size: 18px; line-height: 1.15; font-weight: 800; letter-spacing: -.025em; }
-  .pg .cartao .print { display: flex; flex-direction: column; justify-content: center; gap: 6px; min-height: 184px; margin-top: 12px; padding: 3px; border-radius: 12px; background: var(--papel); }
+  .pg .cartao .print { margin-top: 12px; padding: 3px; border-radius: 12px; background: var(--papel); }
   .pg .cartao .print img { width: 100%; border-radius: 8px; border: 1px solid var(--borda); background: #fff; }
   .pg .cartao p { margin-top: 11px; padding: 0 4px; font-size: 14.5px; line-height: 1.36; font-weight: 500; color: var(--suave); }
 
@@ -151,7 +151,7 @@
   .pg .passos i { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--grafite); color: #fff; font-style: normal; font-size: 15px; font-weight: 800; }
   .pg .passos b { display: block; font-size: 17.5px; line-height: 1.2; font-weight: 800; letter-spacing: -.02em; }
   .pg .passos p { margin-top: 3px; font-size: 14.5px; line-height: 1.36; font-weight: 500; color: var(--suave); }
-  .pg .selos { display: flex; gap: 10px; margin-top: 10px; }
+  .pg .selos { display: flex; gap: 10px; margin-top: 8px; }
   .pg .selos img { width: auto; height: 42px; }
   .pg .passos p.depois { margin-top: 7px; font-size: 13px; color: var(--fraco); }
   .pg .aviso { margin-top: 4px; padding: 12px 14px; border-radius: 13px; background: #fff7e6; border: 1px solid #f5d48a; color: #5c4300; font-size: 14.5px; line-height: 1.4; font-weight: 500; }
@@ -159,7 +159,7 @@
   .pg .par { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   .pg .par span { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 999px; background: var(--verde-suave); color: #14532d; font-size: 13.5px; font-weight: 700; }
   .pg .par svg { width: 15px; height: 15px; color: var(--verde); }
-  .pg .ver-preco { display: inline-flex; align-items: center; gap: 5px; margin-top: 14px; padding: 6px 0; font-size: 14.5px; font-weight: 750; color: var(--magenta-escuro); text-decoration: underline; text-underline-offset: 3px; -webkit-tap-highlight-color: transparent; }
+  .pg .ver-preco { display: flex; align-items: center; justify-content: center; gap: 5px; min-height: 44px; margin: 6px 20px 0; padding: 6px 0; font-size: 14.5px; font-weight: 750; color: var(--magenta-escuro); text-decoration: underline; text-underline-offset: 3px; -webkit-tap-highlight-color: transparent; }
   .pg .ver-preco svg { width: 14px; height: 14px; }
 
   /* prova */
@@ -193,7 +193,7 @@
   .pg .vs { list-style: none; margin-top: 14px; }
   .pg .vs li { display: flex; align-items: flex-start; gap: 10px; padding: 5px 0; font-size: 15.5px; line-height: 1.3; font-weight: 600; letter-spacing: -.01em; }
   .pg .vs svg { flex: none; width: 19px; height: 19px; margin-top: 1px; color: var(--verde); }
-  .pg .oferta .cta { margin-top: 16px; }
+  .pg .oferta .cta { margin-top: 16px; scroll-margin-bottom: 20px; }
   .pg .confia { margin-top: 10px; font-size: 12px; line-height: 1.5; font-weight: 600; color: var(--fraco); text-align: center; }
   .pg .dia-erro { margin-top: 10px; text-align: center; font-size: 13.5px; font-weight: 600; color: #a32d43; }
   .pg .fim .dia-erro { color: #ffb3c0; }
@@ -245,9 +245,10 @@
 <body>
 <div class="pg" id="pagina">
 
-  <div class="promo" role="note"><b>🔥 ACESSO VITALÍCIO</b> <span id="dia-promo">· paga uma vez</span></div>
+  <div class="promo" role="note"><b>🔥 ACESSO VITALÍCIO</b> <span id="dia-promo">· iPhone e Android</span></div>
   <script>
-  /* FAIXA_DIA "hoje": a faixa das páginas no ar ("· só hoje, DD/MM", data do dia em Brasília). Com "uma-vez" nada roda. */
+  /* FAIXA_DIA "hoje": a faixa das páginas no ar ("· só hoje, DD/MM", data do dia em Brasília). Com "sem-data" nada roda
+     e fica o texto do HTML, que não repete o cabeçalho do cartão do preço. */
   (function () {
     if (document.documentElement.getAttribute("data-faixa") !== "hoje") return;
     var t = "· só hoje";
@@ -276,7 +277,7 @@
     <!-- 2 · A LISTA: o app aberto, celular inteiro de proporção real (390:844), tela real -->
     <h2 class="so-b">E o dia inteiro <em>fica assim.</em></h2>
     <section class="palco" data-bloco="lista">
-      <div class="fone"><img src="/dia/topo-lista.webp" width="600" height="1298" alt="Tela real do app CORE: Pendências de hoje com hábitos, treino, refeições, água e a conta que vence, e as 16 áreas embaixo" fetchpriority="high" decoding="async" /></div>
+      <div class="fone"><img src="/dia/topo-lista.webp" width="600" height="1298" alt="Tela real do app CORE: Pendências de hoje com hábitos, treino de glúteos e pernas, refeições, água e a conta que vence, e as áreas embaixo" fetchpriority="high" decoding="async" /></div>
       <span class="hora">07:30 <i>· seu dia numa lista só</i></span>
       <p class="nota">Tela real do app, com dados de exemplo.</p>
     </section>
@@ -291,14 +292,14 @@
         <div class="rec campo"><img src="/dia/gesto-voce.webp" width="720" height="80" loading="lazy" decoding="async" alt="Campo real do app com Mercado e 87 digitados" /></div>
         <svg class="seta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v15m-6-6 6 6 6-6"/></svg>
         <p class="rot"><i>2</i>O app responde</p>
-        <div class="rec"><img src="/dia/gesto-app.webp" width="720" height="121" loading="lazy" decoding="async" alt="Trecho real do card Quanto posso gastar hoje, do app: Sobram R$ 59 pra hoje, já saiu R$ 87 dos R$ 146 do dia" /></div>
+        <div class="rec"><img src="/dia/gesto-app.webp" width="700" height="176" loading="lazy" decoding="async" alt="Trecho real do card Quanto posso gastar hoje, do app: Sobram R$ 59 pra hoje, já saiu R$ 87 dos R$ 146 do dia" /></div>
         <p class="conta">146 − 87 = <b>59 pra hoje</b></p>
       </div>
       <div class="simples">
         <b>Simples assim.</b>
         <a class="cta" href="#preco" data-cta="gesto">Quero meu dia organizado</a>
       </div>
-      <p class="miudo"><span data-oferta-txt="cedo" data-v67="R$&nbsp;67,90, uma vez">R$&nbsp;27,90, uma vez</span> · 7 dias de garantia</p>
+      <p class="miudo"><span data-oferta-txt="cedo" data-v67="R$&nbsp;67,90, uma vez">R$&nbsp;27,90, uma vez</span> · iPhone e Android · 7&nbsp;dias de garantia</p>
     </section>
   </div>
 
@@ -329,15 +330,17 @@
     <h2>E o resto da vida <em>também.</em></h2>
     <span class="arraste">arraste pro lado <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></span>
     <div class="trilho" id="trilho">
-      <article class="cartao" data-cartao="treino"><h3>💪 Treino com séries e carga</h3><div class="print"><img src="/dia/k-treino.webp" width="640" height="567" loading="lazy" decoding="async" alt="Tela real: treino de hoje, com o aviso da carga da semana passada e as séries marcadas" /></div><p>Você marca a série. O app lembra a carga da semana passada.</p></article>
+      <article class="cartao" data-cartao="treino"><h3>💪 Treino com séries e carga</h3><div class="print"><img src="/dia/k-treino.webp" width="640" height="567" loading="lazy" decoding="async" alt="Tela real: treino de glúteos e pernas de hoje, com o aviso da carga da semana passada e as séries do agachamento marcadas" /></div><p>Você marca a série. O app lembra a carga da semana passada.</p></article>
+      <article class="cartao" data-cartao="areas"><h3>✨ 16 áreas. Use só as que quiser.</h3><div class="print"><img src="/dia/k-areas.webp" width="760" height="373" loading="lazy" decoding="async" alt="Tela real: áreas escondidas e visíveis" /></div><p>Comece por uma. Esconda o resto.</p></article>
       <article class="cartao" data-cartao="limites"><h3>🎯 Um limite pra cada gasto</h3><div class="print"><img src="/dia/k-limites.webp" width="640" height="411" loading="lazy" decoding="async" alt="Tela real: limites por categoria" /></div><p>Você define o teto. A barra mostra quanto já foi.</p></article>
-      <article class="cartao" data-cartao="agua"><h3>💧 Água do dia</h3><div class="print"><img src="/dia/k-agua.webp" width="640" height="260" loading="lazy" decoding="async" alt="Tela real: hidratação, 1500 ml de 2000 ml" /></div><p>Um toque a cada copo. O app mostra quanto falta.</p></article>
+      <article class="cartao" data-cartao="agua"><h3>💧 Água do dia</h3><div class="print"><img src="/dia/k-agua.webp" width="640" height="260" loading="lazy" decoding="async" alt="Tela real: hidratação, 1500 ml de 2000 ml" /></div><p>Um toque por copo. O app conta quanto falta.</p></article>
       <article class="cartao" data-cartao="categorias"><h3>📊 Pra onde foi o dinheiro</h3><div class="print"><img src="/dia/k-categorias.webp" width="640" height="399" loading="lazy" decoding="async" alt="Tela real: gastos por categoria" /></div><p>Seus gastos separados por categoria.</p></article>
       <article class="cartao" data-cartao="cardapio"><h3>🍽️ Cardápio da semana</h3><div class="print"><img src="/dia/k-dieta.webp" width="640" height="441" loading="lazy" decoding="async" alt="Tela real: cardápio de segunda, café da manhã e almoço" /></div><p>Monta uma vez e consulta todo dia.</p></article>
       <article class="cartao" data-cartao="casa"><h3>🏠 Casa por cômodo</h3><div class="print"><img src="/dia/k-casa.webp" width="640" height="470" loading="lazy" decoding="async" alt="Tela real: afazeres por cômodo" /></div><p>Afazeres e lista de mercado, cada um no seu lugar.</p></article>
-      <article class="cartao" data-cartao="areas"><h3>✨ 16 áreas. Use só as que quiser.</h3><div class="print"><img src="/dia/k-areas.webp" width="760" height="373" loading="lazy" decoding="async" alt="Tela real: áreas escondidas e visíveis" /></div><p>Comece por uma. Esconda o resto.</p></article>
     </div>
     <p class="nota">Telas reais do app, com dados de exemplo.</p>
+    <!-- só rola até o preço (não abre pagamento): quem se convenceu nos cartões tem onde tocar. É o 4º toque de venda, fora dos 3 botões da SPEC. -->
+    <a class="ver-preco" href="#preco" data-cta="cartoes">Ver o preço <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v15m-6-6 6 6 6-6"/></svg></a>
   </section>
 
   <!-- 6 · COMO FUNCIONA -->
@@ -347,8 +350,8 @@
     <ol class="passos">
       <li><i>1</i><div><b>Garanta seu acesso</b><p>Você paga uma vez, aqui no site. Pix ou cartão.</p></div></li>
       <li><i>2</i><div><b>Baixe o app</b><p>Na App Store ou no Google Play. Também abre no computador.</p>
-        <div class="selos"><img src="/selos/app-store.svg" data-selo="ios" width="126" height="42" loading="lazy" alt="Disponível na App Store" /><img src="/selos/google-play.png" data-selo="android" width="109" height="42" loading="lazy" alt="Disponível no Google Play" /></div>
-        <p class="depois">Você baixa depois de garantir o acesso.</p></div></li>
+        <p class="depois">Você baixa depois de garantir o acesso.</p>
+        <div class="selos"><img src="/selos/app-store.svg" data-selo="ios" width="126" height="42" loading="lazy" alt="Disponível na App Store" /><img src="/selos/google-play.png" data-selo="android" width="109" height="42" loading="lazy" alt="Disponível no Google Play" /></div></div></li>
       <li><i>3</i><div><b>Entre com o e-mail da compra</b><p>Toque em Entrar. Já está tudo liberado.</p></div></li>
     </ol>
     <p class="aviso"><b>Você paga só aqui.</b> No app, é só entrar. Não compre de novo.</p>
@@ -356,8 +359,6 @@
       <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Sem mensalidade</span>
       <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Não renova sozinho</span>
     </div>
-    <!-- só rola até o preço (não abre pagamento): quem se convenceu aqui tem onde tocar -->
-    <a class="ver-preco" href="#preco" data-cta="como">Ver o preço <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v15m-6-6 6 6 6-6"/></svg></a>
   </section>
 
   <!-- 7 · PROVA: nota real das lojas + opiniões reais com loja e data -->
@@ -373,7 +374,7 @@
     <p class="conferido">Notas e opiniões públicas das lojas, lidas em 23/11/2026.</p>
   </section>
 
-  <!-- 8 · PREÇO. Os textos que mudam com OFERTA_DIA (5 chaves, 6 lugares: o botão aparece no preço e no fecho) levam data-oferta-txt (padrão "27") e data-v67 (iguais a src/dia/oferta.ts) -->
+  <!-- 8 · PREÇO. Os textos que mudam com OFERTA_DIA (5 chaves, 6 lugares: o preço cedo aparece sob o 1º botão e sob o do fecho) levam data-oferta-txt (padrão "27") e data-v67 (iguais a src/dia/oferta.ts) -->
   <section class="oferta" id="preco" data-bloco="oferta">
     <div class="oferta-faixa">Acesso vitalício <span>paga uma vez</span></div>
     <div class="oferta-corpo">
@@ -382,11 +383,11 @@
       <p class="umavez">Uma vez. <em>É seu pra sempre.</em></p>
       <p class="semdepois">Não renova. Nada é cobrado depois.</p>
       <div class="compare">
-        <p><span>App só de finanças, por assinatura</span><b>cerca de R$&nbsp;250<br />por ano</b></p>
+        <p><span>Um app só de finanças, por assinatura</span><b>cerca de R$&nbsp;250<br />por ano</b></p>
         <p class="nos"><span>CORE, as 16 áreas</span><b data-oferta-txt="compare" data-v67="R$&nbsp;67,90, uma vez">R$&nbsp;27,90, uma vez</b></p>
       </div>
       <!-- lastro: novidades-guardadas/2026-11-23/porquim-core/construcao/lastro-23-11/ (prints de 23/11: R$ 249,90 por ano e R$ 20,99 × 12 = R$ 251,88). O "R$ 100" da SPEC saiu: não achei preço público que o provasse hoje. -->
-      <p class="fonte">Preços públicos de apps de finanças no Brasil, consultados em 23/11/2026.</p>
+      <p class="fonte">Preço público de dois apps de finanças no Brasil, consultado em 23/11/2026.</p>
       <ul class="vs">
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>As 16 áreas liberadas</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>App no iPhone, no Android e no computador</li>
@@ -402,7 +403,7 @@
   <!-- 9 · GARANTIA -->
   <section class="garantia" data-bloco="garantia">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.4 3.2 7.8 7.5 9 4.3-1.2 7.5-4.6 7.5-9V6z"/><path d="m8.8 12.2 2.3 2.3 4.2-4.4"/></svg>
-    <div><b>7 dias de garantia.</b><p>Até 7 dias depois da compra, é só mandar um e-mail pra <u>contato@coreaplicativo.com.br</u>. Devolvemos 100% do valor, sem perguntas.</p></div>
+    <div><b>Experimente por 7 dias.</b><p>Até 7 dias depois da compra, é só mandar um e-mail pra <u>contato@coreaplicativo.com.br</u>. Devolvemos 100% do valor, sem perguntas.</p></div>
   </section>
 
   <!-- 10 · INFORMAÇÕES -->
@@ -421,9 +422,9 @@
   <section class="fim" data-bloco="fim">
     <h2>Amanhã cedo, seu dia<br /><em>já tem um lugar.</em></h2>
     <p>Dinheiro, hábitos, treino, casa. Você escolhe por onde começar.</p>
-    <figure><img src="/dia/fecho-home.webp" width="720" height="1070" loading="lazy" decoding="async" alt="Tela inicial real do app CORE: próxima conta, orçamento, treino, sono e as áreas" /><figcaption>Tela real do app, com dados de exemplo.</figcaption></figure>
-    <button type="button" class="cta" data-checkout="fim" data-oferta-txt="botao" data-v67="Quero meu acesso por R$&nbsp;67,90">Quero meu acesso por R$&nbsp;27,90</button>
-    <p class="miudo">Paga uma vez · Pix ou cartão<br />7 dias de garantia</p>
+    <figure><img src="/dia/fecho-home.webp" width="720" height="1070" loading="lazy" decoding="async" alt="Tela inicial real do app CORE: próxima conta, orçamento, treino de glúteos e pernas feito, sono e as áreas" /><figcaption>Tela real do app, com dados de exemplo.</figcaption></figure>
+    <button type="button" class="cta" data-checkout="fim">Quero experimentar agora</button>
+    <p class="miudo"><span data-oferta-txt="cedo" data-v67="R$&nbsp;67,90, uma vez">R$&nbsp;27,90, uma vez</span> · Pix ou cartão<br />7 dias de garantia</p>
     <div class="lojas" aria-label="App na App Store e no Google Play">
       <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.7c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9s-2-.9-3.3-.8C6.1 7 4.6 8 3.7 9.5c-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.3.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.8-1.1-2.9-4.2zM13.9 5.3c.7-.8 1.2-2 1-3.2-1 0-2.3.7-3 1.5-.6.7-1.2 1.9-1.1 3.1 1.2.1 2.3-.6 3.1-1.4z"/></svg>App Store</span>
       <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 2.2 13.8 12 3.6 21.8c-.4-.2-.6-.6-.6-1.1V3.3c0-.5.2-.9.6-1.1zm11.7 11.3 2.8 2.8-10.4 6c-.6.3-1.2.3-1.7 0zM18.1 8.6l3.1 1.8c1 .6 1 1.6 0 2.2l-3.1 1.8L15.3 12zM5.8 1.9l10.3 6-2.8 2.8L5.8 2c.5-.3 1.2-.3 1.7 0z"/></svg>Google Play</span>

@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createHmac } from "node:crypto";
 import { assinaturaOk, tratarStripe, STRIPE_PRECO_CENTAVOS, type DepsStripe } from "../../supabase/functions/_shared/stripe";
-import { criarOuReaproveitar, idemDoPedido, ipPodeCriar, metadataDoPedido, paramsAtualizar, paramsCriar, respostaStatus, validarPedidoStripe, LIMITE_POR_IP, type ChamarStripe } from "../../supabase/functions/_shared/stripe-criar";
+import { criarOuReaproveitar, idemDoPedido, ipPodeCriar, metadataDoPedido, paramsAtualizar, paramsCriar, piServeProBraco, respostaStatus, validarPedidoStripe, LIMITE_POR_IP, type ChamarStripe } from "../../supabase/functions/_shared/stripe-criar";
 import { tituloVenda, vendaPix } from "../../supabase/functions/_shared/aviso-venda";
 import { funilOferta, resumoDoDia, taxaSiteCents, vendasDoDia } from "../../supabase/functions/_shared/vendas-painel";
 
@@ -590,8 +590,8 @@ describe('LP 27,90 — catalog and signed webhook',()=>{
 });
 it('lp27 uses a dedicated creator without monthly subscription actions',()=>{
  const endpoint=readFileSync(resolve(__dirname,'../../supabase/functions/stripe-lp27-criar/index.ts'),'utf8');
- expect(endpoint).toContain('p.pagina !== "lp27"');expect(endpoint).not.toMatch(/assinarAppWeb|subscriptions|stripe-app-web/);
- const client=readFileSync(resolve(__dirname,'../landing/stripe-checkout.ts'),'utf8');expect(client).toContain('c.pagina === "lp27" ? "stripe-lp27-criar" : "stripe-criar"');
+ expect(endpoint).toContain('p.pagina !== "lp27" && p.pagina !== "tudo"');expect(endpoint).not.toMatch(/assinarAppWeb|subscriptions|stripe-app-web/);
+ const client=readFileSync(resolve(__dirname,'../landing/stripe-checkout.ts'),'utf8');expect(client).toContain('c.pagina === "lp27" || c.pagina === "tudo" ? "stripe-lp27-criar" : "stripe-criar"');
 });
 
 /* ───────── 22/11: o SORTEIO DE PREÇO da /oferta (AB_PRECO_OFERTA) — servidor ───────── */
@@ -743,21 +743,21 @@ describe("22/11 preço de 3 braços: webhook", () => {
 /* ───────── 22/11: o /organizar no checkout Stripe (ORGANIZAR_STRIPE) — servidor ───────── */
 describe("22/11 /organizar no Stripe: servidor", () => {
   const REF = "0f8a5c2e-1111-4222-8333-944455556666";
-  it("pagina 'organizar' = R$ 27,90 fixo: o corpo nunca muda o valor; braço de preço é recusado; sem cartão salvo e sem indicador", () => {
+  it("pagina 'organizar' = R$ 19,90 fixo desde 23/11: o corpo nunca muda o valor; braço de preço é recusado; sem cartão salvo e sem indicador", () => {
     const p = validarPedidoStripe({ ref: REF, pagina: "organizar", amount: 100, valor: 1, salvar_cartao: true, atrib: { indicador: "ANA7K2" } })!;
     expect(p.pagina).toBe("organizar");
     expect(p).not.toHaveProperty("salvarCartao");
     expect(p.atrib.indicador).toBeUndefined();
     expect(validarPedidoStripe({ ref: REF, pagina: "organizar", braco_preco: "2790" })).toBeNull();
-    expect(OFERTAS_STRIPE.organizar).toMatchObject({ pagina: "organizar", centavos: 2790, idem: "organizar" });
-    expect(paramsCriar(REF, OFERTAS_STRIPE.organizar)).toEqual(expect.arrayContaining([["amount", "2790"], ["metadata[pagina]", "organizar"]]));
+    expect(OFERTAS_STRIPE.organizar).toMatchObject({ pagina: "organizar", centavos: 1990, idem: "organizar19", aceitaTambem: [2790] });
+    expect(paramsCriar(REF, OFERTAS_STRIPE.organizar)).toEqual(expect.arrayContaining([["amount", "1990"], ["metadata[pagina]", "organizar"]]));
   });
-  it("criar: PI de 2790 com a chave organizar-<ref>; a resposta traz amount/currency/pagina (a página confere antes de pagar)", async () => {
+  it("criar: PI de 1990 com a chave organizar19-<ref>; a resposta traz amount/currency/pagina (a página confere antes de pagar)", async () => {
     const m = montar(); const s = stripeFalsa();
     const p = validarPedidoStripe({ ref: REF, pagina: "organizar" })!;
     const r = await criarOuReaproveitar({ admin: m.admin as never, stripe: s.f, log: () => {} }, p, metadataDoPedido(p, { userId: null, ip: "1.1.1.1", ua: "UA", agoraIso: "x" }), { userId: null, ip: "1.1.1.1" });
-    expect(r.corpo).toMatchObject({ ok: true, amount: 2790, currency: "brl", pagina: "organizar" });
-    expect(s.ctl.idems).toContain(`organizar-${REF}`);
+    expect(r.corpo).toMatchObject({ ok: true, amount: 1990, currency: "brl", pagina: "organizar" });
+    expect(s.ctl.idems).toContain(`organizar19-${REF}`);
     // um PI da /oferta na mesma aba nunca serve pro /organizar (outra página → 404)
     const pOf = validarPedidoStripe({ ref: REF })!;
     await criarOuReaproveitar({ admin: montar().admin as never, stripe: s.f, log: () => {} }, pOf, {}, { userId: null, ip: null });
@@ -781,6 +781,36 @@ describe("22/11 /organizar no Stripe: servidor", () => {
     const r2 = await mandar(m2, evento("payment_intent.succeeded", { ...base, metadata: { ...base.metadata, user_id: "u_anon", pagina: "organizar" } }));
     expect(r2.corpo).toMatchObject({ ignorado: "valor" });
     expect(m2.db.subscriptions).toHaveLength(0);
+  });
+  it("23/11 (19,90): 1990 da pagina 'organizar' libera; o 2790 gerado ANTES da troca ainda libera (aceitaTambem); 1490 nela é ignorado", async () => {
+    const base = pi();
+    for (const [valor, libera] of [[1990, true], [2790, true], [1490, false]] as const) {
+      const m = montar();
+      m.db.users.set("u_anon", { id: "u_anon", email: null });
+      const r = await mandar(m, evento("payment_intent.succeeded", { ...base, amount: valor, amount_received: valor, metadata: { ...base.metadata, user_id: "u_anon", pagina: "organizar" } }));
+      if (libera) { expect(r.corpo).toMatchObject({ liberado: true }); expect(m.db.subscriptions[0]).toMatchObject({ amount_cents: valor }); }
+      else { expect(r.corpo).toMatchObject({ ignorado: "valor" }); expect(m.db.subscriptions).toHaveLength(0); }
+    }
+  });
+  it("23/11: a ref que já tinha um PI de 2790 no /organizar ganha um PI NOVO de 1990 (chave organizar19-<ref>), nunca reaproveita o de 27,90", () => {
+    expect(piServeProBraco({ amount: 2790, metadata: { pagina: "organizar" } }, OFERTAS_STRIPE.organizar, null)).toBe(false);
+    expect(piServeProBraco({ amount: 1990, metadata: { pagina: "organizar" } }, OFERTAS_STRIPE.organizar, null)).toBe(true);
+    expect(piServeProBraco({ amount: 2790, metadata: { pagina: "lp27" } }, OFERTAS_STRIPE.lp27, null)).toBe(true); // a /pra-sempre segue 27,90
+  });
+  it("23/11: a /tudo tem linha própria 'tudo' a 1990 (a lp27 da /pra-sempre segue 2790); 1990 libera, 2790 com pagina 'tudo' é ignorado", async () => {
+    expect(OFERTAS_STRIPE.tudo).toMatchObject({ pagina: "tudo", centavos: 1990, idem: "tudo19", parcelasMax: 1 });
+    expect(OFERTAS_STRIPE.lp27).toMatchObject({ pagina: "lp27", centavos: 2790 });
+    const p = validarPedidoStripe({ ref: REF, pagina: "tudo", amount: 100, atrib: { indicador: "ANA7K2" } })!;
+    expect(p.pagina).toBe("tudo");
+    expect(p.atrib.indicador).toBeUndefined();
+    expect(paramsCriar(REF, OFERTAS_STRIPE.tudo)).toEqual(expect.arrayContaining([["amount", "1990"], ["metadata[pagina]", "tudo"]]));
+    const base = pi();
+    for (const [valor, libera] of [[1990, true], [2790, false]] as const) {
+      const m = montar();
+      m.db.users.set("u_anon", { id: "u_anon", email: null });
+      const r = await mandar(m, evento("payment_intent.succeeded", { ...base, amount: valor, amount_received: valor, metadata: { ...base.metadata, user_id: "u_anon", pagina: "tudo" } }));
+      expect(r.corpo).toMatchObject(libera ? { liberado: true } : { ignorado: "valor" });
+    }
   });
   it("/vendas: o /organizar-Stripe tem funil próprio; a venda dele não entra no da /oferta (e vice-versa)", () => {
     const ev = [

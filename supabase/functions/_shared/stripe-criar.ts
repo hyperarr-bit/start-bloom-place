@@ -43,9 +43,9 @@ export function validarPedidoStripe(body: unknown): PedidoStripe | null {
   // 23/11 (INDIQUE_OFERTA, só /oferta): o código de quem indicou (?ref= da página, último clique) → metadata[indicador] do PI.
   // Só letras/números maiúsculos (o formato de afiliados.codigo); qualquer outra coisa é descartada.
   const ind = typeof a.indicador === "string" ? normalizarCodigo(a.indicador.slice(0, 64)) : null;
-  if (ind && b.pagina !== "lp27" && b.pagina !== "app_web" && b.pagina !== "organizar") atrib.indicador = ind;
+  if (ind && b.pagina !== "lp27" && b.pagina !== "tudo" && b.pagina !== "app_web" && b.pagina !== "organizar") atrib.indicador = ind;
   // 22/11 (AB_PRECO_OFERTA): só a /oferta tem braço de preço; veio braço que não é um dos 3 = pedido recusado (nunca um valor arbitrário)
-  const paginaOk = b.pagina === "lp27" ? "lp27" : b.pagina === "app_web" ? "app_web" : b.pagina === "planos" ? "planos" : b.pagina === "organizar" ? "organizar" : "oferta";
+  const paginaOk = b.pagina === "lp27" ? "lp27" : b.pagina === "tudo" ? "tudo" : b.pagina === "app_web" ? "app_web" : b.pagina === "planos" ? "planos" : b.pagina === "organizar" ? "organizar" : "oferta";
   let bracoPreco: BracoPrecoOferta | null = null;
   if (b.braco_preco !== undefined && b.braco_preco !== null && b.braco_preco !== "") {
     if (paginaOk !== "oferta") return null;
@@ -100,7 +100,9 @@ export const idemDoPedido = (oferta: OfertaStripe, bracoPreco: BracoPrecoOferta 
   oferta.pagina === OFERTAS_STRIPE.oferta.pagina && bracoPreco ? `${oferta.idem}-p${bracoPreco}` : oferta.idem;
 /** 22/11: o PI que já existe serve pra este pedido? (mesmo valor e mesmo braço — só a /oferta confere; as outras páginas, como sempre) */
 export function piServeProBraco(j: Record<string, unknown>, oferta: OfertaStripe, bracoPreco: BracoPrecoOferta | null | undefined): boolean {
-  if (oferta.pagina !== OFERTAS_STRIPE.oferta.pagina) return true;
+  // 23/11: nas outras páginas o PI só serve se tiver o valor de HOJE (o /organizar foi de 2790 pra 1990: a ref que já tinha um Pix de
+  // 27,90 ganha um novo, de 19,90, com a chave nova da tabela)
+  if (oferta.pagina !== OFERTAS_STRIPE.oferta.pagina) return Number(j.amount) === oferta.centavos;
   const md = (j.metadata ?? {}) as Record<string, string>;
   const esperado = bracoPreco ?? oferta.centavos;
   return Number(j.amount) === esperado && (md.braco_preco ?? "") === (bracoPreco ? String(bracoPreco) : "");
@@ -247,5 +249,5 @@ export async function criarOuReaproveitar(
       if (p.email) return { status: 502, corpo: { ok: false } };
     }
   }
-  return { status: 200, corpo: { ok: true, client_secret: j.client_secret, pi: j.id, status: j.status, pix: pixDoIntento(j), ...(oferta.pagina === "lp27" || oferta.pagina === "organizar" ? { amount: j.amount, currency: j.currency, pagina: oferta.pagina } : {}), ...(bracoPreco ? { amount: j.amount, currency: j.currency, braco_preco: String(bracoPreco) } : {}) } };
+  return { status: 200, corpo: { ok: true, client_secret: j.client_secret, pi: j.id, status: j.status, pix: pixDoIntento(j), ...(oferta.pagina === "lp27" || oferta.pagina === "tudo" || oferta.pagina === "organizar" ? { amount: j.amount, currency: j.currency, pagina: oferta.pagina } : {}), ...(bracoPreco ? { amount: j.amount, currency: j.currency, braco_preco: String(bracoPreco) } : {}) } };
 }

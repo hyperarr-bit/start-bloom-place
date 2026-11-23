@@ -314,13 +314,14 @@ describe("tudo.html e as rotas", () => {
     expect(rodar(cabeca, "?tudo=on&qa=1").replace).not.toHaveBeenCalled();
     expect(rodar(cabeca.replace('var PAGINA_TUDO = "off"', 'var PAGINA_TUDO = "on"'), "?utm_content=c7").replace).not.toHaveBeenCalled();
   });
-  it("a oferta: de R$97,90 por R$27,90, vitalício; sem parcela, sem taxa; diz que é app", () => {
+  it("a oferta: de R$97,90 por R$19,90 (dono 23/11), vitalício; sem parcela, sem taxa; diz que é app", () => {
     const texto = HTML.replace(/<[^>]+>/g, " ");
-    expect(texto).toMatch(/de\s+R\$97,90\s+por\s+R\$27,90/);
+    expect(texto).toMatch(/de\s+R\$97,90\s+por\s+R\$19,90/);
+    expect(texto).not.toContain("27,90");
     expect(texto).toMatch(/vitalício/i);
     expect(texto).toMatch(/iPhone, Android e computador/);
     expect(texto).not.toMatch(/parcela|taxa de servi/i);
-    expect(texto).toContain("No app, o plano anual custa R$ 99,90. Aqui, R$ 27,90 uma vez só, pra sempre.");
+    expect(texto).toContain("No app, o plano anual custa R$ 99,90. Aqui, R$ 19,90 uma vez só, pra sempre.");
     expect(texto).toContain("Garantia de 7 dias · Pix ou cartão");
     expect(texto).toContain("CORE · SEU 2027 ORGANIZADO");
   });

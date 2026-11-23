@@ -1,0 +1,3 @@
+/* /dia: o CSS da página mora no dia.html (ela aparece sem JavaScript). Aqui, carregado só no toque de pagar,
+   os mesmos acertos do checkout "novo" que a /pra-sempre usa (src/pra-sempre/style.css). */
+.oc-novo [hidden]{display:none!important}.oc-novo img{height:auto}.oc-novo .oc-barra b{font-size:17px}.oc-novo .oc-form-card h2,.oc-novo .oc-order-card h2{line-height:1.25}.oc-novo .oc-order-card h3{line-height:1.5}.oc-novo .oc-campo{box-sizing:border-box}.oc-novo .oc-miuda{margin-top:16px}.oc-novo .oc-sim input{box-sizing:border-box}

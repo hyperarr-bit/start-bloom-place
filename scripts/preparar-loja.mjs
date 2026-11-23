@@ -63,10 +63,12 @@ const MORTO = ["v3-hero.mp4", "v3-hero-poster.jpg", "videos", "hero-phones.png",
   // de fora dentro do app) — nenhuma rota do app chega nelas
   "completo.html", "completo", "pra-sempre.html", "pra-sempre-67.html", "pra-sempre",
   // 23/11: a /tudo (a página de venda que é o checkout) — só no site
-  "tudo.html", "tudo"];
+  "tudo.html", "tudo",
+  // 23/11: a /dia (página de venda com o checkout Stripe) — só no site
+  "dia.html", "dia"];
 // as páginas do site que NUNCA podem ir no binário (a trava do fim confere)
 const SO_SITE = ["landing.html", "vendas.html", "vida-obrigado.html", "conhecer.html", "conhecer-demo.html", "instalar.html", "instalar-demo.html",
-  "completo.html", "pra-sempre.html", "pra-sempre-67.html", "tudo.html"];
+  "completo.html", "pra-sempre.html", "pra-sempre-67.html", "tudo.html", "dia.html"];
 
 // Rastreadores de anúncio que moram no index.html da WEB e vinham de carona
 // pro binário (o Capacitor copia a pasta public inteira).

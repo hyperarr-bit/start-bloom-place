@@ -34,6 +34,10 @@
  *   landing_stripe_carteira {...}         só com MEDIR_CARTEIRA "on" (abaixo)
  *   landing_stripe_pix_trocou {ok, motivo}   só com PIX_TROCA_CARTAO "on"
  *
+ * 23/11 (/tudo): duas opções NOVAS e opcionais — montarEm (o formulário dentro de um elemento da página, sem camada) e
+ * layout "cakto" (a estrutura do checkout da Cakto, com Nome completo só pra Stripe). Sem elas, tudo acima vale igual
+ * (src/test/tudo-checkout.test.ts confere o padrão e o inline).
+ *
  * Testes e QA: window.__ofertaApi (no lugar das funções) e window.__stripeFalso (no lugar do Stripe.js). Fora do domínio de
  * produção, sem eles, tudo é SIMULADO (um Element de cartão de mentira) — nada sai pra Stripe.
  */
@@ -50,7 +54,15 @@ export type OpcoesCheckout = {
   pedeCpf?: boolean;
   /** Opt-in web journey; defaults preserve the existing /oferta checkout. */
   somentePix?: boolean;
-  layout?: "novo";
+  /** "novo" = o desenho da /pra-sempre e /completo. 23/11 "cakto" (/tudo): a ESTRUTURA do checkout da Cakto — produto com miniatura,
+   *  Nome completo + Email (rótulo em cima), "Forma de Pagamento" com 2 botões quadrados (PIX | Cartão de Crédito), Nome no cartão,
+   *  "Resumo do pedido" com Total, "Pagar com Pix" / "Pagar com Cartão de Crédito", "Compra segura". O nome vai SÓ pra Stripe
+   *  (billing_details.name), nunca pro nosso servidor nem pra evento. Mesma máquina de estados do Pix/cartão. */
+  layout?: "novo" | "cakto";
+  /** 23/11 (/tudo): o checkout DENTRO deste elemento da página (inline), não numa camada por cima: sem fundo, sem travar a rolagem,
+   *  sem entrada no histórico, sem X/Esc, sem foco puxado. O InitiateCheckout sai no 1º toque/foco dentro dele (não ao montar).
+   *  Sem isto: a camada de sempre, nada muda. */
+  montarEm?: HTMLElement;
   storagePrefix?: string;
   /** Server-owned catalog key; no client amount is trusted by stripe-criar. */
   pagina?: "oferta" | "lp27" | "organizar";
@@ -336,7 +348,7 @@ const ICO_CARTAO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 type Fase = "form" | "pix" | "aguardando" | "pago" | "recebido";
 type Metodo = "pix" | "card";
 /** o CPF fica SÓ na memória desta página (nada de storage, evento ou log) e vai só pro stripe-criar */
-type Estado = { fase: Fase; ref: string; pi: string | null; clientSecret: string | null; metodo: string; pix: PixQr | null; email: string; cpf: string };
+type Estado = { fase: Fase; ref: string; pi: string | null; clientSecret: string | null; metodo: string; pix: PixQr | null; email: string; cpf: string; nome?: string; titular?: string };
 
 let raiz: HTMLElement | null = null;
 let opc: OpcoesCheckout | null = null;
@@ -364,6 +376,8 @@ let carteiraMedida = false;
 let trocandoPix = false;
 const emailMedido = { comecou: "", valido: "" };
 let aberta = false;
+/** 23/11 (montarEm): o checkout está dentro da página, não numa camada */
+let inline = false;
 let yAntes = 0;
 let focoAntes: HTMLElement | null = null;
 let consulta: number | null = null;
@@ -396,7 +410,28 @@ function soltar() {
   try { window.scrollTo(0, yAntes); } catch { /* jsdom */ }
 }
 
+/** 23/11 (montarEm): só entra na página quando o checkout é inline; as regras só pegam .oc-inline (a camada não muda) */
+const CSS_INLINE = `
+.oc.oc-inline{position:relative;inset:auto;z-index:auto;height:auto;display:block;background:transparent;animation:none;overscroll-behavior:auto}
+.oc.oc-inline .oc-corpo{overflow:visible;padding:0}
+.oc.oc-inline .oc-in{max-width:none}
+.oc.oc-inline.pc-raiz{padding:22px 16px 26px;border-radius:20px}
+`;
+
+/** 23/11: o checkout dentro de um elemento da página (sem dialog, sem foco preso, sem Esc) */
+function montarInline(o: OpcoesCheckout, alvo: HTMLElement): HTMLElement {
+  if (!document.getElementById("oc-estilo")) { const st = document.createElement("style"); st.id = "oc-estilo"; st.textContent = CSS; document.head.appendChild(st); }
+  if (!document.getElementById("oc-estilo-inline")) { const st = document.createElement("style"); st.id = "oc-estilo-inline"; st.textContent = CSS_INLINE; document.head.appendChild(st); }
+  const el = document.createElement("div");
+  el.className = `oc oc-inline${o.layout === "cakto" ? " oc-cakto" : o.layout === "novo" ? " oc-novo" : ""}`; el.id = "oc";
+  el.setAttribute("role", "region"); el.setAttribute("aria-labelledby", "oc-tit");
+  el.innerHTML = `<div class="oc-corpo"><div class="oc-in" id="oc-in"></div></div>`;
+  alvo.replaceChildren(el);
+  return el;
+}
+
 function montarCamada(o: OpcoesCheckout): HTMLElement {
+  if (o.montarEm) return montarInline(o, o.montarEm);
   if (!document.getElementById("oc-estilo")) { const st = document.createElement("style"); st.id = "oc-estilo"; st.textContent = CSS; document.head.appendChild(st); }
   const el = document.createElement("div");
   el.className = o.layout === "novo" ? "oc oc-novo" : "oc"; el.id = "oc";
@@ -425,8 +460,8 @@ function telaForm() {
   const o = opc!;
   const alvo = raiz!.querySelector<HTMLElement>("#oc-in")!;
   // 11/11 (braço "pagina"): o e-mail veio do cartão da oferta — aqui vira uma linha, e o campo fica guardado atrás do "Trocar"
-  const emailPronto = !!o.emailInicial && EMAIL_OK.test(est!.email.trim().toLowerCase());
-  alvo.innerHTML = `
+  const emailPronto = o.layout !== "cakto" && !!o.emailInicial && EMAIL_OK.test(est!.email.trim().toLowerCase());
+  alvo.innerHTML = o.layout === "cakto" ? htmlCakto() : `
     <div class="oc-resumo" data-testid="oferta-resumo"><div><h2 id="oc-tit">CORE · Acesso vitalício</h2><p>Pagamento único · nada é cobrado depois</p></div><div class="oc-preco">${esc(preco())}</div></div>
     <ul class="oc-provas"><li>As 16 áreas da vida num app só</li><li>iPhone, Android e computador, com a mesma conta</li><li>7 dias de garantia: não gostou, devolvemos 100%</li></ul>
     ${emailPronto ? `<div class="oc-email-ok" id="oc-email-ok" data-testid="oferta-email-ok"><span>Seu acesso chega em<b>${esc(est!.email.trim().toLowerCase())}</b></span><button type="button" id="oc-email-trocar">Trocar</button></div>` : ""}
@@ -468,6 +503,11 @@ function telaForm() {
   sug.addEventListener("click", () => { campo.value = sug.dataset.s ?? campo.value; est!.email = campo.value; sug.hidden = true; o.evento("landing_email_antes_sugestao", { onde: "stripe" }); medirEmail(); });
   alvo.querySelector("#oc-email-trocar")?.addEventListener("click", () => { o.evento("landing_stripe_email_trocar", {}); mostrarCampoEmail(); campo.focus(); });
   if (emailPronto) medirEmail();
+  // 23/11 (layout "cakto"): o nome e o nome no cartão ficam SÓ na memória da página (nada de storage/evento) e vão só pra Stripe
+  const nome = alvo.querySelector<HTMLInputElement>("#oc-nome");
+  nome?.addEventListener("input", () => { est!.nome = nome.value; erroNome(null); });
+  const titular = alvo.querySelector<HTMLInputElement>("#oc-titular");
+  titular?.addEventListener("input", () => { est!.titular = titular.value; });
   const cpf = alvo.querySelector<HTMLInputElement>("#oc-cpf");
   cpf?.addEventListener("input", () => { const m = mascararCpf(cpf.value); if (cpf.value !== m) cpf.value = m; est!.cpf = soDigitosCpf(m); erroCpf(null); });
   alvo.querySelector("#oc-pagar")!.addEventListener("click", () => { void tocouPagar(); });
@@ -487,6 +527,41 @@ function telaForm() {
 }
 
 
+/** 23/11 (/tudo): a estrutura do checkout da Cakto, com os MESMOS ids da camada (a lógica de e-mail, método, Element e pagar é a mesma) */
+function htmlCakto(): string {
+  const e = est!;
+  return `
+    <div class="ck-produto" data-testid="oferta-resumo"><img src="/tudo/icone-app-512.webp" width="64" height="64" alt="" /><div><h2 id="oc-tit">CORE · Acesso vitalício</h2><p>App pra iPhone, Android e computador</p></div></div>
+    <label class="ck-rot" for="oc-nome">Nome completo</label>
+    <input class="ck-campo" id="oc-nome" type="text" autocomplete="name" autocapitalize="words" maxlength="120" placeholder="Preencha seu nome" value="${esc(e.nome ?? "")}" />
+    <p class="oc-erro" id="oc-nome-erro" role="alert" hidden></p>
+    <div class="oc-email-caixa" id="oc-email-caixa">
+    <label class="ck-rot" for="oc-email">Email</label>
+    <input class="ck-campo" id="oc-email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="254" placeholder="Preencha seu email" value="${esc(e.email)}" />
+    <button type="button" class="oc-sug" id="oc-sug" hidden></button>
+    <p class="oc-erro" id="oc-email-erro" role="alert" hidden></p>
+    <p class="ck-dica">É com este email que você entra no app.</p>
+    </div>
+    <h3 class="ck-titulo">Forma de Pagamento</h3>
+    <div class="oc-metodos ck-metodos" role="radiogroup" aria-label="Forma de pagamento">
+      <button type="button" class="ck-metodo" role="radio" data-metodo="pix" aria-checked="false">${ICO_PIX}<span>PIX</span></button>
+      <button type="button" class="ck-metodo" role="radio" data-metodo="card" aria-checked="false">${ICO_CARTAO}<span>Cartão de Crédito</span></button>
+    </div>
+    <div class="oc-pagamento">
+      <div class="oc-painel-pix ck-painel-pix" id="oc-painel-pix" data-testid="oferta-painel-pix"><b>Pix aprovado na hora</b><p>Toque em “Pagar com Pix”: o código copia e cola e o QR aparecem aqui mesmo.</p></div>
+      <div class="oc-pe-carregando" id="oc-pe-carregando" hidden>Carregando o cartão…</div>
+      <div class="oc-pe" id="oc-pe" data-oculto></div>
+      <div class="ck-titular" id="ck-titular" hidden><label class="ck-rot" for="oc-titular">Nome no cartão</label><input class="ck-campo" id="oc-titular" type="text" autocomplete="cc-name" autocapitalize="characters" maxlength="120" placeholder="Nome como está no cartão" value="${esc(e.titular ?? "")}" /></div>
+    </div>
+    <h3 class="ck-titulo">Resumo do pedido</h3>
+    <div class="ck-resumo"><div class="ck-linha"><span>CORE · Acesso vitalício</span><span>${esc(preco())}</span></div><div class="ck-linha ck-miuda"><span>Pagamento único</span><span>sem mensalidade</span></div><hr /><div class="ck-linha ck-total"><span>Total</span><strong>${esc(preco())}</strong></div></div>
+    <p class="oc-erro" id="oc-erro" role="alert" hidden></p>
+    <button type="button" class="oc-cta ck-pagar" id="oc-pagar"></button>
+    <p class="ck-segura">${ICO_CADEADO}Compra segura</p>
+    <p class="oc-miuda ck-termos">Ao prosseguir, você concorda com os <a href="/termos" target="_blank" rel="noopener">Termos de uso</a> e a <a href="/privacidade" target="_blank" rel="noopener">Privacidade</a> do CORE. 7 dias de garantia.</p>
+    <p class="ck-processado">Processado pela Stripe · CORE · CNPJ 55.041.112/0001-82</p>`;
+}
+
 /** The reviewed checkout design, using the same payment state machine and server confirmation. */
 function montarLayoutNovo(alvo: HTMLElement) {
   alvo.querySelector(".oc-resumo")?.remove();
@@ -502,7 +577,9 @@ function montarLayoutNovo(alvo: HTMLElement) {
 }
 
 const metodoAtual = (): Metodo => (est?.metodo === "card" ? "card" : "pix");
-const rotuloPagar = () => (metodoAtual() === "pix" ? `Gerar Pix de ${preco()}` : `Pagar ${preco()}`);
+const rotuloPagar = () => (opc?.layout === "cakto"
+  ? (metodoAtual() === "pix" ? "Pagar com Pix" : "Pagar com Cartão de Crédito")
+  : metodoAtual() === "pix" ? `Gerar Pix de ${preco()}` : `Pagar ${preco()}`);
 const metodoPronto = () => pixPronto && (metodoAtual() === "pix" || cartaoPronto);
 const metodoFalhou = () => cargaFalhou || (metodoAtual() === "card" && cartaoFalhou);
 const MSG_CARTAO_FALHOU = "O cartão não carregou. Tente de novo ou use o Pix.";
@@ -525,6 +602,8 @@ function mostrarMetodo() {
   const painel = raiz?.querySelector<HTMLElement>("#oc-painel-pix");
   if (painel) painel.hidden = m !== "pix";
   raiz?.querySelector<HTMLElement>("#oc-pe")?.toggleAttribute("data-oculto", m !== "card" || !cartaoPronto);
+  const titular = raiz?.querySelector<HTMLElement>("#ck-titular"); // só no layout "cakto"
+  if (titular) titular.hidden = m !== "card" || !cartaoPronto;
   atualizarPagar();
 }
 
@@ -570,6 +649,7 @@ function mostrarCampoEmail() {
   if (c) c.hidden = false;
 }
 function erroEmail(m: string | null) { if (m) mostrarCampoEmail(); const e = raiz?.querySelector<HTMLElement>("#oc-email-erro"); if (e) { e.hidden = !m; e.textContent = m ?? ""; } }
+function erroNome(m: string | null) { const e = raiz?.querySelector<HTMLElement>("#oc-nome-erro"); if (e) { e.hidden = !m; e.textContent = m ?? ""; } }
 function erroCpf(m: string | null) { const e = raiz?.querySelector<HTMLElement>("#oc-cpf-erro"); if (e) { e.hidden = !m; e.textContent = m ?? ""; } }
 function erroGeral(m: string | null) { const e = raiz?.querySelector<HTMLElement>("#oc-erro"); if (e) { e.hidden = !m; e.textContent = m ?? ""; } }
 
@@ -612,6 +692,13 @@ function falhouCarga(msg: string) {
   mostrarMetodo();
 }
 
+/** 23/11 (layout "cakto"): os campos da Stripe com a cara dos campos da Cakto (rótulo cinza em cima, caixa grande arredondada) */
+const APARENCIA_CAKTO = {
+  theme: "stripe", labels: "above",
+  variables: { colorPrimary: "#0f6b55", colorText: "#1f2937", colorTextSecondary: "#4b5563", colorDanger: "#b42318", borderRadius: "14px", fontFamily: "Inter, -apple-system, Segoe UI, Roboto, sans-serif", fontSizeBase: "16px", spacingUnit: "4px" },
+  rules: { ".Input": { padding: "15px 16px", border: "1.5px solid #e2e4e8", boxShadow: "none" }, ".Input:focus": { border: "1.5px solid #0f6b55", boxShadow: "0 0 0 3px rgba(15,107,85,.15)" }, ".Label": { fontSize: "15px", fontWeight: "500", color: "#4b5563", marginBottom: "8px" } },
+};
+
 /** o Element de cartão: nasce sem intent e invisível, enquanto o Pix está marcado (quem toca em Cartão já encontra pronto) */
 function montarCartao(s: StripeLike, minha: number, t0: number) {
   const o = opc!;
@@ -619,7 +706,7 @@ function montarCartao(s: StripeLike, minha: number, t0: number) {
   if (!caixa) return;
   elementos = s.elements({
     mode: "payment", amount: o.precoCentavos, currency: "brl", allowedPaymentMethodTypes: ["card"], paymentMethodCreation: "manual", locale: "pt-BR",
-    appearance: { theme: "stripe", variables: { colorPrimary: "#d6338a", colorText: "#1c1a1f", borderRadius: "12px", fontFamily: "Inter, -apple-system, Segoe UI, Roboto, sans-serif" } },
+    appearance: o.layout === "cakto" ? APARENCIA_CAKTO : { theme: "stripe", variables: { colorPrimary: "#d6338a", colorText: "#1c1a1f", borderRadius: "12px", fontFamily: "Inter, -apple-system, Segoe UI, Roboto, sans-serif" } },
     fonts: [{ cssSrc: "https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" }],
   });
   const pe = elementos.create("payment", { layout: { type: "tabs" }, fields: { billingDetails: { email: "never", address: "if_required" } }, wallets: { applePay: "never", googlePay: "never", link: "never" } });
@@ -697,6 +784,14 @@ async function medirCarteira(s: StripeLike) {
 async function pagar() {
   if (pagando || !opc || !est) return;
   const o = opc;
+  // 23/11 (layout "cakto"): Nome completo obrigatório (vai só pra Stripe; nunca em evento — só o motivo do erro)
+  let nome: string | null = null;
+  if (o.layout === "cakto") {
+    const campoNome = raiz!.querySelector<HTMLInputElement>("#oc-nome");
+    nome = (campoNome?.value ?? "").trim().replace(/\s+/g, " ");
+    if (nome.length < 2) { erroNome("Digite seu nome."); campoNome?.focus(); o.evento("landing_nome_erro", { motivo: "vazio" }); return; }
+    est.nome = nome;
+  }
   const campo = raiz!.querySelector<HTMLInputElement>("#oc-email")!;
   const email = campo.value.trim().toLowerCase();
   if (!email) { erroEmail("Digite seu e-mail: é por ele que você entra no CORE."); campo.focus(); o.evento("landing_email_antes_erro", { motivo: "vazio", onde: "stripe" }); return; }
@@ -721,7 +816,7 @@ async function pagar() {
     o.evento("landing_stripe_pagar", { metodo });
     if (metodo === "pix") {
       if (!(await garantirIntento(email, cpf))) { erroGeral("Não consegui registrar o pagamento. Tente de novo em instantes."); erroAoPagar("criar"); return; }
-      const r = await stripe.confirmPixPayment(est.clientSecret!, { payment_method: { billing_details: { email } } }, { handleActions: false });
+      const r = await stripe.confirmPixPayment(est.clientSecret!, { payment_method: { billing_details: nome ? { email, name: nome } : { email } } }, { handleActions: false });
       if (r.error) { erroGeral(r.error.message ?? "Não deu pra gerar o Pix. Tente de novo."); o.evento("landing_erro", { onde: "stripe_pix", msg: String(r.error.code ?? "").slice(0, 40) }); erroAoPagar("pix", r.error); return; }
       const qr = r.paymentIntent?.next_action?.pix_display_qr_code;
       if (r.paymentIntent?.status === "succeeded") return mostrarPago("pix");
@@ -734,7 +829,7 @@ async function pagar() {
     // cartão: confere os campos antes de ir ao servidor; o PaymentMethod e o e-mail no PI vão juntos
     const sub = await elementos!.submit();
     if (sub?.error) { erroGeral(sub.error.message ?? "Confira os dados do pagamento."); erroAoPagar("validar", sub.error); return; }
-    const [temIntento, criado] = await Promise.all([garantirIntento(email, cpf, true), stripe.createPaymentMethod({ elements: elementos, params: { billing_details: { email } } })]);
+    const [temIntento, criado] = await Promise.all([garantirIntento(email, cpf, true), stripe.createPaymentMethod({ elements: elementos, params: { billing_details: nome ? { email, name: (est.titular ?? "").trim() || nome } : { email } } })]);
     if (criado.error || !criado.paymentMethod) { erroGeral(criado.error?.message ?? "Confira os dados do cartão."); erroAoPagar("cartao", criado.error); return; }
     cartaoUsado = criado.paymentMethod.card ? { marca: criado.paymentMethod.card.brand ?? null, final: criado.paymentMethod.card.last4 ?? null } : null;
     if (!temIntento) { erroGeral("Não consegui registrar o pagamento. Tente de novo em instantes."); erroAoPagar("criar"); return; }
@@ -796,6 +891,13 @@ function telaPix() {
     o.evento("landing_pix_copiado", { ok, via: "stripe", ...(copiaPrimeiro ? { layout_pix: "copia_primeiro" } : {}) });
   });
   vigiar();
+  rolarInline();
+}
+
+/** 23/11 (montarEm): a tela trocou dentro da página (Pix, confirmando, pago) → o topo do checkout aparece. Na camada: nada. */
+function rolarInline() {
+  if (!inline || !raiz) return;
+  try { raiz.scrollIntoView({ block: "start", behavior: "smooth" }); } catch { /* jsdom */ }
 }
 
 /**
@@ -844,11 +946,13 @@ function telaRecebido() {
       <div class="oc-selos"><a href="${URL_APP_STORE}" data-loja="ios"><img src="/selos/app-store.svg" alt="Baixar na App Store" width="144" height="48" /></a><a href="${esc(urlPlay("oferta"))}" data-loja="android"><img src="/selos/google-play.png" alt="Disponível no Google Play" width="124" height="48" /></a></div>
       <p class="oc-contato">No app, toque em <b>“Já tenho conta? Entrar”</b> com o e-mail da compra. Não chegou? <a href="mailto:contato@coreaplicativo.com.br">contato@coreaplicativo.com.br</a></p>
     </div>`;
+  rolarInline();
 }
 
 function telaAguardando() {
   const alvo = raiz!.querySelector<HTMLElement>("#oc-in")!;
   alvo.innerHTML = `<div class="oc-pix" data-testid="oferta-aguardando"><h2 id="oc-tit">Confirmando o pagamento…</h2><span class="oc-pilula"><i></i>Só um instante</span><p>Não feche esta tela. O acesso também chega no seu e-mail.</p></div>`;
+  rolarInline();
 }
 
 /** pergunta ao servidor se o PaymentIntent pagou (a cada 3 s, e na volta pra aba) */
@@ -875,7 +979,7 @@ function mostrarPago(metodo: string) {
   est.fase = "pago";
   pararVigia();
   // o Pix caiu com a camada fechada: ela volta, já no "pago"
-  if (!aberta && raiz) {
+  if (!aberta && raiz && !inline) {
     raiz.hidden = false; aberta = true; travar();
     try { history.pushState({ ofertaCheckout: 1 }, ""); comHistorico = true; } catch { comHistorico = false; }
     window.addEventListener("popstate", aoVoltarNavegador);
@@ -913,7 +1017,7 @@ function telaPago() {
     try {
       montarPosCompra(alvo, { email: e || null, pi: est!.pi, evento: o.evento }, { pele: raiz });
       const selo = raiz!.querySelector<HTMLElement>(".oc-barra span"); if (selo) selo.textContent = "Compra confirmada ✓";
-      raiz!.querySelector<HTMLElement>(".oc-corpo")!.scrollTop = 0; return;
+      raiz!.querySelector<HTMLElement>(".oc-corpo")!.scrollTop = 0; rolarInline(); return;
     }
     catch { /* nada pode deixar a tela de pago em branco: cai no pago de sempre */ }
   }
@@ -931,6 +1035,7 @@ function telaPago() {
     </div>`;
   alvo.querySelectorAll<HTMLAnchorElement>("a[data-loja]").forEach((a) => a.addEventListener("click", () => o.evento("landing_loja", { loja: a.dataset.loja, onde: "stripe_pago" })));
   raiz!.querySelector<HTMLElement>(".oc-corpo")!.scrollTop = 0;
+  rolarInline();
 }
 
 function lerCookie(nome: string): string | null {
@@ -968,15 +1073,19 @@ export async function abrirCheckout(o: OpcoesCheckout): Promise<void> {
   if (aberta) return;
   opc = o;
   api = w.__ofertaApi ?? (o.producao ? apiReal : (api ?? apiSimulada()));
-  focoAntes = document.activeElement as HTMLElement | null;
+  inline = !!o.montarEm;
+  if (!inline) focoAntes = document.activeElement as HTMLElement | null;
   if (!raiz || !document.body.contains(raiz)) raiz = montarCamada(o);
   raiz.hidden = false;
   aberta = true;
-  travar();
-  try { history.pushState({ ofertaCheckout: 1 }, ""); comHistorico = true; } catch { comHistorico = false; }
-  window.addEventListener("popstate", aoVoltarNavegador);
+  // 23/11 (montarEm): dentro da página não trava a rolagem, não mexe no histórico e não mede "saiu com o checkout aberto"
+  if (!inline) {
+    travar();
+    try { history.pushState({ ofertaCheckout: 1 }, ""); comHistorico = true; } catch { comHistorico = false; }
+    window.addEventListener("popstate", aoVoltarNavegador);
+  }
   abertoEm = Date.now(); saiuEm = null; saidas = 0;
-  vigiarSaida(true);
+  if (!inline) vigiarSaida(true);
   if (!est) { const ref = refDaAba(); est = { fase: "form", ref, pi: piDaAba(ref), clientSecret: null, metodo: "pix", pix: null, email: "", cpf: "" }; }
   // só quando o e-mail do cartão da oferta mudou: quem trocou o e-mail aqui dentro, fechou e reabriu continua com o que escolheu
   if (o.emailInicial && est.fase === "form" && o.emailInicial !== ultimoEmailInicial) { est.email = o.emailInicial; ultimoEmailInicial = o.emailInicial; }
@@ -995,10 +1104,26 @@ export async function abrirCheckout(o: OpcoesCheckout): Promise<void> {
   o.evento("landing_stripe_aberto", { fase: est.fase });
   // 5 (revisão): InitiateCheckout 1× por ref (abrir e fechar várias vezes não infla)
   const chaveIc = `oferta-ic-${est.ref}`;
-  let jaFoi = false; try { jaFoi = sessionStorage.getItem(chaveIc) === "1"; sessionStorage.setItem(chaveIc, "1"); } catch { /* heap */ }
-  if (est.fase === "form" && !jaFoi && !icNoHeap.has(est.ref)) o.pixel("InitiateCheckout", { value: o.precoCentavos / 100, currency: "BRL", content_name: "oferta_stripe" }, `ic-${est.ref}`);
-  icNoHeap.add(est.ref);
-  window.setTimeout(() => { raiz?.querySelector<HTMLElement>("#oc-email, #oc-copiar, #oc-x")?.focus(); }, 30);
+  const iniciar = () => {
+    if (!est) return;
+    let jaFoi = false; try { jaFoi = sessionStorage.getItem(chaveIc) === "1"; sessionStorage.setItem(chaveIc, "1"); } catch { /* heap */ }
+    if (est.fase === "form" && !jaFoi && !icNoHeap.has(est.ref)) o.pixel("InitiateCheckout", { value: o.precoCentavos / 100, currency: "BRL", content_name: "oferta_stripe" }, `ic-${est.ref}`);
+    icNoHeap.add(est.ref);
+  };
+  if (!inline) {
+    iniciar();
+    window.setTimeout(() => { raiz?.querySelector<HTMLElement>("#oc-email, #oc-copiar, #oc-x")?.focus(); }, 30);
+    return;
+  }
+  // 23/11 (montarEm): o checkout já está na página; "começou a pagar" = o 1º toque ou foco dentro dele (1× por montagem)
+  const alvo = raiz;
+  const primeiro = () => {
+    alvo.removeEventListener("focusin", primeiro); alvo.removeEventListener("pointerdown", primeiro);
+    if (!est || est.fase !== "form") return;
+    o.evento("landing_stripe_comecou", {});
+    iniciar();
+  };
+  alvo.addEventListener("focusin", primeiro); alvo.addEventListener("pointerdown", primeiro);
 }
 
 /** X / Esc: fecha pelo histórico (o "voltar" do navegador também fecha, sem sair do site) */
@@ -1023,4 +1148,4 @@ function fecharJa(_via: string) {
 }
 
 /** testes: zera o módulo entre páginas */
-export function _zerar() { cartaoUsado = null; pararVigia(); raiz?.remove(); raiz = null; est = null; ultimoEmailInicial = null; ultimaCriacao = null; icNoHeap.clear(); aberta = false; opc = null; api = null; stripe = null; elementos = null; elementoCartao = null; montagem += 1; pixPronto = false; cartaoPronto = false; cargaFalhou = false; cartaoFalhou = false; carteiraMedida = false; emailMedido.comecou = ""; emailMedido.valido = ""; fechandoPelaTela = false; saiuEm = null; carregandoStripe = null; soltarTeto(); trocandoPix = false; window.removeEventListener("popstate", aoVoltarNavegador); vigiarSaida(false); soltar(); }
+export function _zerar() { inline = false; cartaoUsado = null; pararVigia(); raiz?.remove(); raiz = null; est = null; ultimoEmailInicial = null; ultimaCriacao = null; icNoHeap.clear(); aberta = false; opc = null; api = null; stripe = null; elementos = null; elementoCartao = null; montagem += 1; pixPronto = false; cartaoPronto = false; cargaFalhou = false; cartaoFalhou = false; carteiraMedida = false; emailMedido.comecou = ""; emailMedido.valido = ""; fechandoPelaTela = false; saiuEm = null; carregandoStripe = null; soltarTeto(); trocandoPix = false; window.removeEventListener("popstate", aoVoltarNavegador); vigiarSaida(false); soltar(); }

@@ -1,0 +1,93 @@
+/* /tudo (23/11): a parte de VENDA. A cara do CORE (grafite + magenta + Inter, quente, pastéis dos módulos) com o ritmo da página da Cakto. */
+:root{--tx:#1f1d22;--suave:#5f5862;--grafite:#262428;--magenta:#c92b78;--magenta-forte:#b0215f;--magenta-suave:#fdeef5;--creme:#faf7f4;--creme-2:#f3ece6;--verde:#0f6b55;--linha:#e8e1db}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--creme);color:var(--tx);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+img{display:block;max-width:100%;height:auto}
+h1,h2,h3,p,figure,ul{margin:0}
+ul{padding:0;list-style:none}
+a{color:inherit}
+button,input{font:inherit}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.tudo-qa{position:sticky;top:0;z-index:50;padding:6px 10px;background:#fff3c4;color:#7a5600;font-size:11px;font-weight:800;letter-spacing:.06em;text-align:center}
+.tudo>section{width:min(560px,100%);margin-inline:auto;padding-inline:20px}
+
+/* topo */
+.topo{padding-top:28px;text-align:center;background:radial-gradient(120% 70% at 50% 0%,#fff 0%,var(--creme) 70%)}
+.selo{display:inline-block;padding:11px 20px;border-radius:12px;background:var(--grafite);color:#fff;font-size:13px;font-weight:800;letter-spacing:.14em;box-shadow:0 10px 24px -14px rgba(0,0,0,.6)}
+.mosaico{position:relative;aspect-ratio:1/.77;margin:22px auto 0;max-width:440px}
+.cel{position:absolute;bottom:0;width:30%;aspect-ratio:9/17.5;border-radius:22px;border:5px solid #1c1a1f;background:#1c1a1f;overflow:hidden;box-shadow:0 18px 40px -18px rgba(40,20,40,.55)}
+.cel img{width:100%;height:auto}
+.cel-1{left:2%;bottom:8%;transform:rotate(-8deg)}
+.cel-4{right:2%;bottom:8%;transform:rotate(8deg)}
+.cel-3{right:17%;bottom:2%;width:33%;transform:rotate(3deg)}
+.cel-2{left:50%;bottom:0;width:38%;transform:translateX(-58%);border-width:6px;border-radius:26px;z-index:2}
+h1{margin-top:26px;font-size:clamp(30px,8.6vw,44px);line-height:1.06;letter-spacing:-.045em;font-weight:850;text-wrap:balance}
+h1 span{color:var(--grafite)}
+h1 em{display:block;font-style:normal;color:var(--magenta)}
+.areas{margin-top:16px;font-size:15px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--suave);line-height:1.5}
+.checks{display:grid;gap:10px;margin:22px auto 0;max-width:360px;text-align:left;font-size:16px;line-height:1.35}
+.checks li{display:flex;gap:10px;align-items:flex-start}
+.checks li::before{content:"";flex:none;width:22px;height:22px;margin-top:-1px;border-radius:50%;background:var(--magenta-suave) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c92b78' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center/13px no-repeat}
+.frase{margin:24px auto 0;padding:16px 18px;max-width:380px;border-radius:16px;background:#fff;border:1px solid var(--linha);font-size:16px;line-height:1.5;color:var(--tx)}
+
+/* áreas */
+.modulos{padding-top:44px;padding-bottom:8px}
+.modulos h2,.depo h2{font-size:clamp(24px,6.6vw,30px);line-height:1.15;letter-spacing:-.035em;font-weight:800;text-align:center}
+.area{margin-top:22px;padding:22px 18px 0;border-radius:24px;background:var(--cor);overflow:hidden;text-align:center}
+.area h3{font-size:30px;letter-spacing:-.04em;font-weight:850;color:var(--grafite)}
+.area p{margin:6px auto 0;max-width:330px;font-size:15px;line-height:1.45;color:#4a4248}
+.tela{width:min(270px,74%);margin:18px auto 0;border:6px solid #1c1a1f;border-bottom:0;border-radius:30px 30px 0 0;overflow:hidden;background:#1c1a1f;aspect-ratio:9/14;box-shadow:0 -6px 30px -16px rgba(0,0,0,.4)}
+.tela img{width:100%;height:auto}
+.mais{margin-top:22px;padding:18px;border-radius:20px;background:#fff;border:1px solid var(--linha);text-align:center}
+.mais p{font-size:15px;color:var(--suave)}
+.mais b{color:var(--tx)}
+.mais ul{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;margin-top:12px}
+.mais li{padding:7px 12px;border-radius:99px;background:var(--creme-2);font-size:13.5px;font-weight:650}
+
+/* oferta */
+.oferta{padding-top:48px;padding-bottom:30px;text-align:center}
+.fita{position:relative;display:inline-flex;flex-direction:column;align-items:center;padding:16px 36px 30px;background:var(--grafite);color:#fff;clip-path:polygon(0 0,100% 0,100% 100%,75% 84%,50% 100%,25% 84%,0 100%)}
+.fita b{font-size:34px;letter-spacing:.08em;font-weight:850;line-height:1}
+.fita span{margin-top:6px;font-size:20px;letter-spacing:.2em;font-weight:700;color:#ff8cc4;line-height:1}
+.oferta h2{margin-top:24px;font-size:22px;letter-spacing:.02em;font-weight:800;text-transform:uppercase;color:var(--grafite);padding-bottom:14px;border-bottom:2px solid var(--magenta)}
+.preco{margin-top:16px;font-size:clamp(24px,7.4vw,34px);font-weight:800;letter-spacing:-.02em;color:var(--suave)}
+.preco s{color:#b4434e;text-decoration-thickness:2px}
+.preco strong{color:var(--verde);font-weight:900}
+.preco-nota{margin-top:8px;font-size:14.5px;color:var(--suave)}
+.botao{display:flex;align-items:center;justify-content:center;min-height:56px;margin:20px auto 0;max-width:380px;border-radius:16px;background:var(--magenta);color:#fff;text-decoration:none;font-size:17px;font-weight:800;box-shadow:0 12px 26px -12px rgba(201,43,120,.7)}
+.botao:active{transform:translateY(1px)}
+.botao:focus-visible{outline:3px solid var(--grafite);outline-offset:3px}
+
+/* tarja rolando */
+.tarja{margin-top:6px;padding:10px 0;background:var(--magenta);color:#fff;overflow:hidden;transform:rotate(-1.5deg);width:104%;margin-left:-2%}
+.tarja-linha{display:flex;width:max-content;font-size:15px;font-weight:800;letter-spacing:.12em;white-space:nowrap;animation:tarja 26s linear infinite}
+.tarja-linha+.tarja-linha{margin-top:6px;opacity:.85}
+.tarja-volta{animation-direction:reverse}
+.tarja-linha span{padding-right:0}
+@keyframes tarja{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.tarja-linha{animation:none}}
+
+/* depoimentos */
+.depo{padding-top:44px;padding-bottom:36px}
+.depo-lista{display:grid;gap:12px;margin-top:20px}
+.depo-item{display:flex;gap:12px;padding:16px;border-radius:18px;background:#fff;border:1px solid var(--linha);box-shadow:0 8px 20px -18px rgba(0,0,0,.4)}
+.depo-item:nth-child(even){margin-left:18px}
+.depo-item:nth-child(odd){margin-right:18px}
+.av{flex:none;display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:var(--av);font-weight:800;color:var(--grafite)}
+.depo-item p{font-size:15px;line-height:1.45}
+.quem{font-weight:750}
+.quem small{font-weight:500;color:var(--suave);font-size:12.5px}
+.est{color:#e0a100;letter-spacing:.08em;font-size:13px!important;margin:1px 0 4px}
+
+/* pagamento (o bloco da Cakto: ./checkout.css) */
+.pagamento{background:#fff;padding-top:28px;padding-bottom:40px;border-radius:26px 26px 0 0;box-shadow:0 -14px 40px -30px rgba(0,0,0,.35)}
+.tudo>section.pagamento{width:100%;max-width:none;padding-inline:0}
+.checkout-inline{width:min(520px,100%);margin-inline:auto;padding-inline:20px}
+.ck-espera{display:grid;gap:6px;place-items:center;align-content:center;min-height:300px;border-radius:16px;background:#f7f7f8;text-align:center;color:#4b5563;font-size:14px}
+.ck-espera b{font-size:16px;color:#1f2937}
+.ck-tentar{margin-top:8px;min-height:48px;padding:0 20px;border:0;border-radius:12px;background:#0f6b55;color:#fff;font-weight:800}
+.rodape{background:#fff;padding:24px 20px 40px;text-align:center;font-size:12.5px;color:var(--suave);border-top:1px solid #eee}
+.rodape img{margin:0 auto 10px}
+.rodape p{line-height:1.6}

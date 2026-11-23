@@ -61,10 +61,12 @@ const MORTO = ["v3-hero.mp4", "v3-hero-poster.jpg", "videos", "hero-phones.png",
   // 16/11 (1.0.28/140): as páginas do vitalício na web com checkout Stripe (/completo, /pra-sempre, /pra-sempre-67)
   // entraram no main em 14–15/11 como entradas próprias (vite.config) e iam de carona pro binário (+20 MB, checkout
   // de fora dentro do app) — nenhuma rota do app chega nelas
-  "completo.html", "completo", "pra-sempre.html", "pra-sempre-67.html", "pra-sempre"];
+  "completo.html", "completo", "pra-sempre.html", "pra-sempre-67.html", "pra-sempre",
+  // 23/11: a /tudo (a página de venda que é o checkout) — só no site
+  "tudo.html", "tudo"];
 // as páginas do site que NUNCA podem ir no binário (a trava do fim confere)
 const SO_SITE = ["landing.html", "vendas.html", "vida-obrigado.html", "conhecer.html", "conhecer-demo.html", "instalar.html", "instalar-demo.html",
-  "completo.html", "pra-sempre.html", "pra-sempre-67.html"];
+  "completo.html", "pra-sempre.html", "pra-sempre-67.html", "tudo.html"];
 
 // Rastreadores de anúncio que moram no index.html da WEB e vinham de carona
 // pro binário (o Capacitor copia a pasta public inteira).

@@ -1,0 +1,42 @@
+/* /tudo (23/11): o bloco de pagamento com a ESTRUTURA do checkout da Cakto (fundo branco, campos com rótulo em cima e caixa grande,
+   2 botões quadrados de forma de pagamento, Resumo do pedido, botão grande, Compra segura). Cor da escolha e do botão de pagar:
+   o verde-escuro da Cakto (--ck), como na referência. Só pega .oc-cakto: a /oferta e o /organizar nunca têm essa classe. */
+.oc-cakto{--ck:#0f6b55;--ck-suave:#e8f3ef;--ck-tx:#111827;--ck-rot:#4b5563;--ck-borda:#e2e4e8;color:var(--ck-tx);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.oc-cakto .ck-produto{display:flex;align-items:center;gap:16px;padding-bottom:6px}
+.oc-cakto .ck-produto img{flex:none;width:64px;height:64px;border-radius:16px;box-shadow:0 6px 16px -8px rgba(0,0,0,.35)}
+.oc-cakto .ck-produto h2{margin:0;font-size:22px;line-height:1.2;font-weight:800;letter-spacing:-.02em}
+.oc-cakto .ck-produto p{margin:3px 0 0;font-size:13.5px;color:var(--ck-rot)}
+.oc-cakto .ck-rot{display:block;margin:20px 0 8px;font-size:15px;font-weight:500;color:var(--ck-rot)}
+.oc-cakto .ck-campo{display:block;width:100%;height:56px;padding:0 18px;border-radius:14px;border:1.5px solid var(--ck-borda);background:#fff;color:var(--ck-tx);font-size:16px;font-family:inherit}
+.oc-cakto .ck-campo::placeholder{color:#9ca3af}
+.oc-cakto .ck-campo:focus{outline:none;border-color:var(--ck);box-shadow:0 0 0 3px rgba(15,107,85,.15)}
+.oc-cakto .oc-sug{color:var(--ck)}
+.oc-cakto .ck-dica{margin:7px 0 0;font-size:12.5px;color:var(--ck-rot)}
+.oc-cakto .ck-titulo{margin:30px 0 0;font-size:19px;font-weight:800;letter-spacing:-.01em;color:#000}
+.oc-cakto .ck-metodos{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+.oc-cakto .ck-metodo{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:108px;padding:12px 8px;border-radius:16px;border:1.5px solid var(--ck-borda);background:#fff;color:#374151;font-family:inherit;font-size:15px;font-weight:700;line-height:1.2;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.oc-cakto .ck-metodo svg{width:30px;height:30px}
+.oc-cakto .ck-metodo[aria-checked="true"]{background:var(--ck);border-color:var(--ck);color:#fff}
+.oc-cakto .ck-metodo:focus-visible{outline:3px solid rgba(15,107,85,.35);outline-offset:2px}
+.oc-cakto .ck-painel-pix{margin-top:14px;padding:14px 16px;border-radius:14px;background:var(--ck-suave)}
+.oc-cakto .ck-painel-pix b{color:var(--ck)}
+.oc-cakto .ck-painel-pix p{color:#374151}
+.oc-cakto .oc-pe{margin-top:18px}
+.oc-cakto .ck-titular[hidden]{display:none}
+.oc-cakto .ck-resumo{margin-top:14px;padding:20px 22px 34px;border:1.5px solid var(--ck-borda);border-bottom:0;border-radius:16px 16px 0 0;position:relative;background:#fff}
+/* a borda serrilhada de recibo (triângulos cinza no pé, como na Cakto) */
+.oc-cakto .ck-resumo::after{content:"";position:absolute;left:-1.5px;right:-1.5px;bottom:0;height:9px;background:conic-gradient(from -45deg at bottom,#dfe2e6 90deg,transparent 0) 0 0/18px 9px repeat-x}
+.oc-cakto .ck-linha{display:flex;justify-content:space-between;gap:12px;font-size:16px;color:#374151}
+.oc-cakto .ck-miuda{margin-top:10px;font-size:13.5px;color:var(--ck-rot)}
+.oc-cakto .ck-resumo hr{margin:16px 0;border:0;border-top:2px solid #eceef1}
+.oc-cakto .ck-total{font-size:18px;font-weight:800;color:#1f2937}
+.oc-cakto .ck-total strong{font-size:20px}
+.oc-cakto .ck-pagar{margin-top:36px;min-height:60px;border-radius:14px;background:var(--ck);font-size:18px;font-weight:800;box-shadow:0 10px 22px -12px rgba(15,107,85,.8)}
+.oc-cakto .ck-segura{display:flex;align-items:center;justify-content:center;gap:7px;margin:20px 0 0;font-size:14px;font-weight:600;color:#4b5563}
+.oc-cakto .ck-termos{margin-top:12px;font-size:13px;line-height:1.55;color:#4b5563}
+.oc-cakto .ck-termos a{color:inherit}
+.oc-cakto .ck-processado{margin:12px 0 0;text-align:center;font-size:12.5px;color:#6b7280}
+/* Pix gerado e confirmando, dentro da página */
+.oc-cakto .oc-pix .oc-resumo{background:#f7f7f8}
+.oc-cakto .oc-copia button,.oc-cakto .oc-copiar-grande{background:var(--ck)}
+.oc-cakto .oc-pix{padding:6px 0 10px}

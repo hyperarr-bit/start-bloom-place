@@ -50,6 +50,7 @@ const rotaDaMissao = () => {
     else if (/^\/pra-sempre-67\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/pra-sempre-67\/?/, "/pra-sempre-67.html");
     else if (/^\/pra-sempre\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/pra-sempre\/?/, "/pra-sempre.html");
     else if (/^\/completo\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/completo\/?/, "/completo.html");
+    else if (/^\/tudo\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/tudo\/?/, "/tudo.html");
     else if (/^\/vitalicio\/demo\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/vitalicio\/demo\/?/, "/conhecer-demo.html");
     else if (/^\/vitalicio\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/vitalicio\/?/, "/conhecer.html");
     else if (req.url === "/missao" || req.url?.startsWith("/missao?")) req.url = req.url.replace("/missao", "/missao.html");
@@ -146,6 +147,7 @@ export default defineConfig(({ mode }) => ({
         praSempre67: path.resolve(__dirname, "pra-sempre-67.html"),
         praSempre: path.resolve(__dirname, "pra-sempre.html"),
         completo: path.resolve(__dirname, "completo.html"),
+        tudo: path.resolve(__dirname, "tudo.html"),
         conhecer: path.resolve(__dirname, "conhecer.html"),
         conhecerDemo: path.resolve(__dirname, "conhecer-demo.html"),
         missao: path.resolve(__dirname, "missao.html"),

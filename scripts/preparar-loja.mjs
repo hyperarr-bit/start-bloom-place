@@ -295,9 +295,11 @@ for (const alvo of MORTO) {
 }
 // os chunks de ENTRADA da página de venda, do painel, da /vitalicio e da /instalar (só eles: os compartilhados também
 // servem o app). Journey e Checkout são os pedaços da /vitalicio (src/conhecer) — só conhecer.html chega neles.
+// 23/11: + tudo e dia (os pedaços de entrada da /tudo e da /dia levam a chave pública da Stripe e os ids de pixel; "dia-" não
+// casa com dialog-/diario-, e o pedaço adiado da /dia chama dia-carga-* de propósito).
 const tirados = [];
 for (const f of readdirSync(join(ASSETS, "assets"))) {
-  if (!/^(landing|vendas|conhecer|conhecerDemo|instalar|instalarDemo|Journey|Checkout|completo|praSempre|praSempre67)-[\w-]+\.(js|css)$/.test(f)) continue;
+  if (!/^(landing|vendas|conhecer|conhecerDemo|instalar|instalarDemo|Journey|Checkout|completo|praSempre|praSempre67|tudo|dia)-[\w-]+\.(js|css)$/.test(f)) continue;
   console.log(`  − assets/${f}`);
   rmSync(join(ASSETS, "assets", f), { force: true });
   tirados.push(f);

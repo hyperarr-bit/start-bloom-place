@@ -86,7 +86,8 @@ describe("cabeçalhos de segurança do site (vercel.json)", () => {
     // 15/11 (main 6961413a): + /pra-sempre-67 e /pra-sempre-67/ → /pra-sempre-67.html (a mesma LP a R$ 67,90)
     // 18/11 (ramo planos-34-97): + /escolha e /escolha/ → /landing.html (a página dos 2 planos, chave PLANOS_PAGINA)
     // 23/11 (ramo pagina-checkout): + /tudo e /tudo/ → /tudo.html (a página de venda que é o checkout, chave PAGINA_TUDO)
-    expect(cfg.rewrites).toHaveLength(34);
+    // 23/11 (ramo pagina-dia): + /dia e /dia/ → /dia.html (a página "um dia inteiro no app", chave PAGINA_DIA)
+    expect(cfg.rewrites).toHaveLength(36);
     expect(rotas0(cfg).find((r) => r.source === "/pra-sempre")?.destination).toBe("/pra-sempre.html");
     expect(rotas0(cfg).find((r) => r.source === "/simples")?.destination).toBe("/landing.html");
     expect(rotas0(cfg).find((r) => r.source === "/tiktok")?.destination).toBe("/landing.html");

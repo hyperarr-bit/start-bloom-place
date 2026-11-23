@@ -17,24 +17,37 @@
  *   PAGINA_DIA  "off" → vai pro /organizar com a mesma query. "on" → a página. ?dia=on abre só nesta aba (sessão), pra conferir.
  *   OFERTA_DIA  "27" (R$ 27,90, linha lp27) | "67" (R$ 67,90, linha oferta, sem braço de preço). Textos e linha: src/dia/oferta.ts.
  *   TOPO_DIA    "lista" (o celular com a lista primeiro) | "gesto" (o gesto e o 1º botão primeiro). Só troca a ordem, por CSS.
- * Só na prévia (?qa=1 ou fora do domínio, pagamento simulado): ?oferta=27|67 e ?topo=lista|gesto trocam as duas últimas.
+ *   FAIXA_DIA   "uma-vez" (faixa do topo "ACESSO VITALÍCIO · paga uma vez") | "hoje" ("· só hoje, DD/MM", como nas páginas no ar).
+ *               Nasce "uma-vez" porque o preço desta página não tem prazo: "só hoje" todo dia é urgência que não existe.
+ *               A SPEC pedia "hoje"; trocar é decisão do dono (uma palavra aqui).
+ * Só na prévia (?qa=1 ou fora do domínio, pagamento simulado): ?oferta=27|67, ?topo=lista|gesto e ?faixa=hoje|uma-vez trocam as três últimas.
  * Rollback: PAGINA_DIA "off".
+ *
+ * ANTES DE LIGAR OFERTA_DIA "67" (o padrão "27" não tem este problema):
+ *   a venda sai na linha "oferta" do servidor SEM braço de preço, isto é, no mesmo registro (ST_oferta) e com o mesmo nome na CAPI
+ *   que a /oferta de sempre a R$ 67,90. Ela só se separa pela url de chegada gravada no PI (…/dia). Toda leitura do sorteio de preço
+ *   da /oferta (AB_PRECO_OFERTA) tem de EXCLUIR os PIs com url /dia, senão a venda daqui entra no braço 6790 de lá.
+ *   A página também não tem trava de valor pro 67 (só lp27 tem): com campanha, fazer a linha própria da SPEC 3.4
+ *   (linha "dia" em OFERTAS_STRIPE + deploy + 1 compra real) e olhar, nessa compra, se a Stripe mostra seletor de parcelas.
  */
 (function () {
   var PAGINA_DIA = "off";
   var OFERTA_DIA = "27";
   var TOPO_DIA = "lista";
+  var FAIXA_DIA = "uma-vez";
   var q = location.search, h = document.documentElement;
   var aba = /[?&]dia=on(&|$)/.test(q);
   try { if (aba) sessionStorage.setItem("dia-on", "1"); else aba = sessionStorage.getItem("dia-on") === "1"; } catch (e) { /* sem storage */ }
-  if (PAGINA_DIA !== "on" && !aba) { h.setAttribute("data-desligada", ""); location.replace("/organizar" + q); return; }
+  if (PAGINA_DIA !== "on" && !aba) { h.setAttribute("data-desligada", ""); location.replace("/organizar" + q + location.hash); return; }
   var qa = /[?&]qa=1(&|$)/.test(q) || ["coreaplicativo.com.br", "www.coreaplicativo.com.br"].indexOf(location.hostname) < 0;
   if (qa) {
     var o = /[?&]oferta=(27|67)(&|$)/.exec(q); if (o) OFERTA_DIA = o[1];
     var t = /[?&]topo=(lista|gesto)(&|$)/.exec(q); if (t) TOPO_DIA = t[1];
+    var f = /[?&]faixa=(hoje|uma-vez)(&|$)/.exec(q); if (f) FAIXA_DIA = f[1];
   }
   h.setAttribute("data-oferta", OFERTA_DIA === "67" ? "67" : "27");
   h.setAttribute("data-topo", TOPO_DIA === "gesto" ? "gesto" : "lista");
+  h.setAttribute("data-faixa", FAIXA_DIA === "hoje" ? "hoje" : "uma-vez");
 })();
 </script>
 <style>
@@ -46,7 +59,6 @@
     --verde: #16a34a; --verde-suave: #ecfdf3;
   }
   html[data-desligada] body { display: none; }
-  html { scroll-behavior: smooth; }
   html, body { margin: 0; background: #fff; color: var(--tx); font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%; }
   /* o mesmo reset global das páginas irmãs (/pra-sempre, /completo, /tudo): o checkout por cima conta com ele */
   * { box-sizing: border-box; }
@@ -56,7 +68,7 @@
   .pg img { display: block; max-width: 100%; height: auto; }
   .pg em { font-style: normal; color: var(--magenta); }
 
-  /* faixa "só hoje": a mesma das páginas no ar (magenta) */
+  /* faixa do topo: a mesma das páginas no ar (magenta); o texto depois do "·" é a chave FAIXA_DIA */
   .pg .promo { display: flex; align-items: center; justify-content: center; gap: 6px; height: 34px; padding: 0 12px; background: var(--magenta); color: #fff; font-size: 12.5px; font-weight: 800; letter-spacing: .02em; white-space: nowrap; }
   .pg .promo span { font-weight: 600; opacity: .95; }
 
@@ -68,6 +80,7 @@
   .pg .lojas svg { width: 12px; height: 12px; fill: currentColor; }
   .pg .titulo { padding: 15px 20px 0; }
   .pg h1 { font-size: 33px; line-height: 1.04; font-weight: 850; letter-spacing: -.04em; }
+  .pg h1 em { display: block; }
   .pg .sub { margin-top: 9px; font-size: 16px; line-height: 1.34; font-weight: 500; color: var(--suave); letter-spacing: -.005em; }
   .pg .sub b { color: var(--tx); font-weight: 700; }
   .pg .fatos { display: grid; grid-template-columns: .9fr 1.15fr 1.25fr; margin: 13px 20px 0; border-top: 1px solid var(--borda); border-bottom: 1px solid var(--borda); }
@@ -80,7 +93,6 @@
 
   .pg .palco { position: relative; margin-top: 30px; padding: 0 20px; }
   .pg .fone { position: relative; width: 300px; max-width: 100%; margin: 0 auto; border: 8px solid #1c1a1f; border-radius: 46px; overflow: hidden; background: #f4f3f1; box-shadow: 0 18px 40px -14px rgba(38,38,38,.35); }
-  .pg .fone::before { content: ""; position: absolute; z-index: 2; top: 7px; left: 50%; width: 78px; height: 21px; margin-left: -39px; border-radius: 12px; background: #1c1a1f; }
   .pg .fone img { width: 100%; aspect-ratio: 390 / 844; }
   .pg .hora { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border-radius: 999px; background: var(--grafite); color: #fff; font-size: 12.5px; font-weight: 700; letter-spacing: -.005em; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .pg .hora i { font-style: normal; font-weight: 600; opacity: .72; }
@@ -88,7 +100,7 @@
   .pg .nota { margin-top: 12px; text-align: center; font-size: 12px; font-weight: 600; color: var(--fraco); }
 
   /* seções */
-  .pg .bloco { padding: 40px 20px 0; }
+  .pg .bloco { padding: 36px 20px 0; }
   .pg h2 { font-size: 27px; line-height: 1.08; font-weight: 850; letter-spacing: -.035em; text-wrap: balance; }
   .pg .etq { display: inline-block; margin-bottom: 10px; padding: 5px 10px; border-radius: 999px; background: var(--magenta-suave); color: var(--magenta-escuro); font-size: 12.5px; font-weight: 750; letter-spacing: -.005em; }
 
@@ -96,7 +108,7 @@
   .pg .gesto-cartao { margin-top: 18px; padding: 16px 14px 14px; border-radius: 22px; background: var(--papel); border: 1px solid var(--borda); }
   .pg .gesto-cartao h3 { margin-top: 10px; font-size: 19px; line-height: 1.16; font-weight: 800; letter-spacing: -.025em; }
   .pg .gesto-cartao h3 span { color: var(--suave); }
-  .pg .rot { display: flex; align-items: center; gap: 7px; margin: 13px 0 6px; font-size: 11px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--suave); }
+  .pg .rot { display: flex; align-items: center; gap: 7px; margin: 13px 0 6px; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--suave); }
   .pg .rot i { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--grafite); color: #fff; font-style: normal; font-size: 10.5px; letter-spacing: 0; }
   .pg .rec { border-radius: 12px; overflow: hidden; border: 1px solid var(--borda); background: #fff; box-shadow: 0 8px 20px -14px rgba(38,38,38,.3); }
   .pg .rec.campo { width: 86%; padding: 3px; }
@@ -120,18 +132,17 @@
   .pg .ciclo small { display: block; margin-top: 7px; font-size: 13px; font-weight: 500; color: var(--suave); }
 
   /* cartões de arrastar: cada recorte com a sua altura, sem corte forçado */
-  .pg .faixa-cartoes { margin-top: 20px; padding: 38px 0 34px; background: var(--papel); }
+  .pg .faixa-cartoes { margin-top: 20px; padding: 32px 0 28px; background: var(--papel); }
   .pg .faixa-cartoes h2 { padding: 0 20px; }
   .pg .arraste { display: inline-flex; align-items: center; gap: 6px; margin: 12px 20px 0; font-size: 12.5px; font-weight: 700; color: var(--magenta-escuro); }
   .pg .arraste svg { width: 14px; height: 14px; }
   .pg .trilho { display: flex; gap: 12px; margin-top: 14px; padding: 4px 20px 10px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-left: 20px; -webkit-overflow-scrolling: touch; scrollbar-width: none; overscroll-behavior-x: contain; }
   .pg .trilho::-webkit-scrollbar { display: none; }
-  .pg .cartao { flex: 0 0 270px; display: flex; flex-direction: column; scroll-snap-align: start; padding: 16px 14px; border-radius: 20px; background: #fff; border: 1px solid var(--borda); box-shadow: 0 10px 24px -18px rgba(38,38,38,.35); }
-  .pg .cartao h3 { font-size: 18px; line-height: 1.15; font-weight: 800; letter-spacing: -.025em; }
-  .pg .cartao .print { display: flex; flex-direction: column; justify-content: center; gap: 6px; min-height: 184px; margin-top: 12px; padding: 8px; border-radius: 12px; background: var(--papel); }
+  .pg .cartao { flex: 0 0 270px; display: flex; flex-direction: column; scroll-snap-align: start; padding: 16px 10px; border-radius: 20px; background: #fff; border: 1px solid var(--borda); box-shadow: 0 10px 24px -18px rgba(38,38,38,.35); }
+  .pg .cartao h3 { padding: 0 4px; font-size: 18px; line-height: 1.15; font-weight: 800; letter-spacing: -.025em; }
+  .pg .cartao .print { display: flex; flex-direction: column; justify-content: center; gap: 6px; min-height: 184px; margin-top: 12px; padding: 3px; border-radius: 12px; background: var(--papel); }
   .pg .cartao .print img { width: 100%; border-radius: 8px; border: 1px solid var(--borda); background: #fff; }
-  .pg .cartao .print img.alto { height: 168px; object-fit: cover; object-position: top center; }
-  .pg .cartao p { margin-top: 11px; font-size: 14.5px; line-height: 1.36; font-weight: 500; color: var(--suave); }
+  .pg .cartao p { margin-top: 11px; padding: 0 4px; font-size: 14.5px; line-height: 1.36; font-weight: 500; color: var(--suave); }
 
   /* como funciona */
   .pg .passos { list-style: none; margin-top: 16px; }
@@ -142,11 +153,14 @@
   .pg .passos p { margin-top: 3px; font-size: 14.5px; line-height: 1.36; font-weight: 500; color: var(--suave); }
   .pg .selos { display: flex; gap: 10px; margin-top: 10px; }
   .pg .selos img { width: auto; height: 42px; }
+  .pg .passos p.depois { margin-top: 7px; font-size: 13px; color: var(--fraco); }
   .pg .aviso { margin-top: 4px; padding: 12px 14px; border-radius: 13px; background: #fff7e6; border: 1px solid #f5d48a; color: #5c4300; font-size: 14.5px; line-height: 1.4; font-weight: 500; }
   .pg .aviso b { font-weight: 800; }
   .pg .par { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   .pg .par span { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 999px; background: var(--verde-suave); color: #14532d; font-size: 13.5px; font-weight: 700; }
   .pg .par svg { width: 15px; height: 15px; color: var(--verde); }
+  .pg .ver-preco { display: inline-flex; align-items: center; gap: 5px; margin-top: 14px; padding: 6px 0; font-size: 14.5px; font-weight: 750; color: var(--magenta-escuro); text-decoration: underline; text-underline-offset: 3px; -webkit-tap-highlight-color: transparent; }
+  .pg .ver-preco svg { width: 14px; height: 14px; }
 
   /* prova */
   .pg .notas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
@@ -161,9 +175,9 @@
   .pg .aval figcaption u { text-decoration: none; color: #e8a400; letter-spacing: 1px; }
 
   /* preço */
-  .pg .oferta { margin: 40px 16px 0; border-radius: 24px; overflow: hidden; border: 1.5px solid var(--grafite); scroll-margin-top: 12px; }
+  .pg .oferta { margin: 34px 16px 0; border-radius: 24px; overflow: hidden; border: 1.5px solid var(--grafite); scroll-margin-top: 12px; }
   .pg .oferta-faixa { display: flex; align-items: center; justify-content: space-between; padding: 11px 18px; background: var(--grafite); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
-  .pg .oferta-faixa span { padding: 3px 9px; border-radius: 999px; background: #fff; color: var(--grafite); font-size: 10.5px; letter-spacing: .06em; }
+  .pg .oferta-faixa span { padding: 3px 9px; border-radius: 999px; background: #fff; color: var(--grafite); font-size: 12px; letter-spacing: .04em; }
   .pg .oferta-corpo { padding: 20px 18px 18px; }
   .pg .frase { font-size: 16px; line-height: 1.3; font-weight: 700; letter-spacing: -.015em; color: var(--suave); }
   .pg .preco { margin-top: 6px; font-size: 62px; line-height: 1; font-weight: 850; letter-spacing: -.05em; white-space: nowrap; }
@@ -175,7 +189,7 @@
   .pg .compare p b { flex: none; text-align: right; font-weight: 750; color: var(--tx); white-space: nowrap; }
   .pg .compare p.nos { background: var(--magenta-suave); color: var(--tx); font-weight: 650; }
   .pg .compare p.nos b { color: var(--magenta-escuro); font-weight: 850; }
-  .pg .fonte { margin-top: 6px; font-size: 11.5px; line-height: 1.35; font-weight: 500; color: var(--fraco); }
+  .pg .fonte { margin-top: 6px; font-size: 12px; line-height: 1.35; font-weight: 500; color: var(--suave); }
   .pg .vs { list-style: none; margin-top: 14px; }
   .pg .vs li { display: flex; align-items: flex-start; gap: 10px; padding: 5px 0; font-size: 15.5px; line-height: 1.3; font-weight: 600; letter-spacing: -.01em; }
   .pg .vs svg { flex: none; width: 19px; height: 19px; margin-top: 1px; color: var(--verde); }
@@ -199,11 +213,11 @@
   .pg .info b { font-weight: 700; text-align: right; }
 
   /* fecho */
-  .pg .fim { margin-top: 36px; padding: 40px 20px 36px; background: var(--grafite); color: #fff; text-align: center; }
+  .pg .fim { margin-top: 30px; padding: 34px 20px 34px; background: var(--grafite); color: #fff; text-align: center; }
   .pg .fim h2 { color: #fff; }
   .pg .fim em { color: #ff7dbd; }
   .pg .fim > p { margin: 10px 0 0; font-size: 15.5px; font-weight: 600; color: #d9d6dc; }
-  .pg .fim figure { width: 236px; margin: 22px auto 0; }
+  .pg .fim figure { width: 280px; max-width: 100%; margin: 18px auto 0; }
   .pg .fim figure img { width: 100%; border-radius: 22px; }
   .pg .fim figcaption { margin-top: 8px; font-size: 12px; font-weight: 600; color: #a9a4af; }
   .pg .fim .cta { margin-top: 22px; }
@@ -213,6 +227,9 @@
   .pg .rodape a { color: inherit; }
   .pg .sem-js { padding: 0 20px 28px; text-align: center; font-size: 13px; line-height: 1.5; color: var(--suave); }
   .pg .sem-js a { color: var(--magenta-escuro); font-weight: 700; }
+
+  /* telas estreitas (iPhone SE antigo, 320 px): o título cabe em 2 linhas e a faixa de fatos respira */
+  @media (max-width: 350px) { .pg h1 { font-size: 29px; } .pg .fatos b { font-size: 12.5px; } }
 
   /* só na prévia (?qa=1 ou fora do domínio) */
   .dia-qa { padding: 8px; text-align: center; background: #f8edf3; color: #9f3268; font: 11px/1.4 Inter, system-ui, sans-serif; }
@@ -228,8 +245,16 @@
 <body>
 <div class="pg" id="pagina">
 
-  <div class="promo" role="note"><b>🔥 ACESSO VITALÍCIO</b> <span>· só hoje<b id="dia-promo-data"></b></span></div>
-  <script>try { document.getElementById("dia-promo-data").textContent = ", " + new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" }).format(new Date()); } catch (e) {}</script>
+  <div class="promo" role="note"><b>🔥 ACESSO VITALÍCIO</b> <span id="dia-promo">· paga uma vez</span></div>
+  <script>
+  /* FAIXA_DIA "hoje": a faixa das páginas no ar ("· só hoje, DD/MM", data do dia em Brasília). Com "uma-vez" nada roda. */
+  (function () {
+    if (document.documentElement.getAttribute("data-faixa") !== "hoje") return;
+    var t = "· só hoje";
+    try { t += ", " + new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" }).format(new Date()); } catch (e) {}
+    document.getElementById("dia-promo").textContent = t;
+  })();
+  </script>
 
   <!-- 1 · TOPO -->
   <section data-bloco="topo">
@@ -266,14 +291,14 @@
         <div class="rec campo"><img src="/dia/gesto-voce.webp" width="720" height="80" loading="lazy" decoding="async" alt="Campo real do app com Mercado e 87 digitados" /></div>
         <svg class="seta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v15m-6-6 6 6 6-6"/></svg>
         <p class="rot"><i>2</i>O app responde</p>
-        <div class="rec"><img src="/dia/gesto-app.webp" width="720" height="274" loading="lazy" decoding="async" alt="Card real do app: Quanto posso gastar hoje. Sobram R$ 59 pra hoje, já saiu R$ 87 dos R$ 146 do dia" /></div>
+        <div class="rec"><img src="/dia/gesto-app.webp" width="720" height="121" loading="lazy" decoding="async" alt="Trecho real do card Quanto posso gastar hoje, do app: Sobram R$ 59 pra hoje, já saiu R$ 87 dos R$ 146 do dia" /></div>
         <p class="conta">146 − 87 = <b>59 pra hoje</b></p>
       </div>
       <div class="simples">
         <b>Simples assim.</b>
         <a class="cta" href="#preco" data-cta="gesto">Quero meu dia organizado</a>
       </div>
-      <p class="miudo">Paga uma vez · iPhone e Android · 7 dias de garantia</p>
+      <p class="miudo"><span data-oferta-txt="cedo" data-v67="R$&nbsp;67,90, uma vez">R$&nbsp;27,90, uma vez</span> · 7 dias de garantia</p>
     </section>
   </div>
 
@@ -304,11 +329,11 @@
     <h2>E o resto da vida <em>também.</em></h2>
     <span class="arraste">arraste pro lado <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></span>
     <div class="trilho" id="trilho">
-      <article class="cartao" data-cartao="treino"><h3>💪 Treino com séries e carga</h3><div class="print"><img src="/dia/k-treino.webp" class="alto" width="640" height="562" loading="lazy" decoding="async" alt="Tela real: treino de hoje, com o aviso da carga da semana passada e as séries marcadas" /></div><p>Você marca a série. O app lembra a carga da semana passada.</p></article>
+      <article class="cartao" data-cartao="treino"><h3>💪 Treino com séries e carga</h3><div class="print"><img src="/dia/k-treino.webp" width="640" height="567" loading="lazy" decoding="async" alt="Tela real: treino de hoje, com o aviso da carga da semana passada e as séries marcadas" /></div><p>Você marca a série. O app lembra a carga da semana passada.</p></article>
       <article class="cartao" data-cartao="limites"><h3>🎯 Um limite pra cada gasto</h3><div class="print"><img src="/dia/k-limites.webp" width="640" height="411" loading="lazy" decoding="async" alt="Tela real: limites por categoria" /></div><p>Você define o teto. A barra mostra quanto já foi.</p></article>
-      <article class="cartao" data-cartao="agua"><h3>💧 Água do dia</h3><div class="print"><img src="/dia/k-agua.webp" width="640" height="260" loading="lazy" decoding="async" alt="Tela real: hidratação, 6 copos de 8" /></div><p>Um toque por copo. O app conta quanto falta.</p></article>
+      <article class="cartao" data-cartao="agua"><h3>💧 Água do dia</h3><div class="print"><img src="/dia/k-agua.webp" width="640" height="260" loading="lazy" decoding="async" alt="Tela real: hidratação, 1500 ml de 2000 ml" /></div><p>Um toque a cada copo. O app mostra quanto falta.</p></article>
       <article class="cartao" data-cartao="categorias"><h3>📊 Pra onde foi o dinheiro</h3><div class="print"><img src="/dia/k-categorias.webp" width="640" height="399" loading="lazy" decoding="async" alt="Tela real: gastos por categoria" /></div><p>Seus gastos separados por categoria.</p></article>
-      <article class="cartao" data-cartao="cardapio"><h3>🍽️ Cardápio da semana</h3><div class="print"><img src="/dia/k-dieta.webp" class="alto" width="640" height="572" loading="lazy" decoding="async" alt="Tela real: cardápio de segunda" /></div><p>Monta uma vez e consulta todo dia.</p></article>
+      <article class="cartao" data-cartao="cardapio"><h3>🍽️ Cardápio da semana</h3><div class="print"><img src="/dia/k-dieta.webp" width="640" height="441" loading="lazy" decoding="async" alt="Tela real: cardápio de segunda, café da manhã e almoço" /></div><p>Monta uma vez e consulta todo dia.</p></article>
       <article class="cartao" data-cartao="casa"><h3>🏠 Casa por cômodo</h3><div class="print"><img src="/dia/k-casa.webp" width="640" height="470" loading="lazy" decoding="async" alt="Tela real: afazeres por cômodo" /></div><p>Afazeres e lista de mercado, cada um no seu lugar.</p></article>
       <article class="cartao" data-cartao="areas"><h3>✨ 16 áreas. Use só as que quiser.</h3><div class="print"><img src="/dia/k-areas.webp" width="760" height="373" loading="lazy" decoding="async" alt="Tela real: áreas escondidas e visíveis" /></div><p>Comece por uma. Esconda o resto.</p></article>
     </div>
@@ -322,7 +347,8 @@
     <ol class="passos">
       <li><i>1</i><div><b>Garanta seu acesso</b><p>Você paga uma vez, aqui no site. Pix ou cartão.</p></div></li>
       <li><i>2</i><div><b>Baixe o app</b><p>Na App Store ou no Google Play. Também abre no computador.</p>
-        <div class="selos"><img src="/selos/app-store.svg" width="126" height="42" loading="lazy" alt="Disponível na App Store" /><img src="/selos/google-play.png" width="109" height="42" loading="lazy" alt="Disponível no Google Play" /></div></div></li>
+        <div class="selos"><img src="/selos/app-store.svg" data-selo="ios" width="126" height="42" loading="lazy" alt="Disponível na App Store" /><img src="/selos/google-play.png" data-selo="android" width="109" height="42" loading="lazy" alt="Disponível no Google Play" /></div>
+        <p class="depois">Você baixa depois de garantir o acesso.</p></div></li>
       <li><i>3</i><div><b>Entre com o e-mail da compra</b><p>Toque em Entrar. Já está tudo liberado.</p></div></li>
     </ol>
     <p class="aviso"><b>Você paga só aqui.</b> No app, é só entrar. Não compre de novo.</p>
@@ -330,6 +356,8 @@
       <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Sem mensalidade</span>
       <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Não renova sozinho</span>
     </div>
+    <!-- só rola até o preço (não abre pagamento): quem se convenceu aqui tem onde tocar -->
+    <a class="ver-preco" href="#preco" data-cta="como">Ver o preço <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v15m-6-6 6 6 6-6"/></svg></a>
   </section>
 
   <!-- 7 · PROVA: nota real das lojas + opiniões reais com loja e data -->
@@ -340,12 +368,12 @@
       <div><b>4,9<small>★</small></b><span>Google Play<br />221 avaliações</span></div>
     </div>
     <figure class="aval"><blockquote>“Simplesmente perfeito! Muito prático, completo e o melhor organizador que já tive.”</blockquote><figcaption><u>★★★★★</u> App Store · 04/11/2026</figcaption></figure>
-    <figure class="aval"><blockquote>“Tem tudo que eu preciso em um só lugar, desde vida pessoal e profissional…”</blockquote><figcaption><u>★★★★★</u> Google Play · 05/11/2026</figcaption></figure>
-    <figure class="aval"><blockquote>“Bem produtivo para usar todos os dias…”</blockquote><figcaption><u>★★★★★</u> App Store · 06/11/2026</figcaption></figure>
+    <figure class="aval"><blockquote>“…tem tudo que eu preciso em um só lugar desde vida pessoal e profissional…”</blockquote><figcaption><u>★★★★★</u> Google Play · 05/11/2026</figcaption></figure>
+    <figure class="aval"><blockquote>“…bem produtivo para usar todos os dias…”</blockquote><figcaption><u>★★★★★</u> App Store · 06/11/2026</figcaption></figure>
     <p class="conferido">Notas e opiniões públicas das lojas, lidas em 23/11/2026.</p>
   </section>
 
-  <!-- 8 · PREÇO. Os 5 textos que mudam com OFERTA_DIA levam data-oferta-txt (padrão "27") e data-v67 (iguais a src/dia/oferta.ts) -->
+  <!-- 8 · PREÇO. Os textos que mudam com OFERTA_DIA (5 chaves, 6 lugares: o botão aparece no preço e no fecho) levam data-oferta-txt (padrão "27") e data-v67 (iguais a src/dia/oferta.ts) -->
   <section class="oferta" id="preco" data-bloco="oferta">
     <div class="oferta-faixa">Acesso vitalício <span>paga uma vez</span></div>
     <div class="oferta-corpo">
@@ -354,9 +382,10 @@
       <p class="umavez">Uma vez. <em>É seu pra sempre.</em></p>
       <p class="semdepois">Não renova. Nada é cobrado depois.</p>
       <div class="compare">
-        <p><span>App só de finanças, por assinatura</span><b>cerca de R$&nbsp;100<br />a R$&nbsp;250 por ano</b></p>
+        <p><span>App só de finanças, por assinatura</span><b>cerca de R$&nbsp;250<br />por ano</b></p>
         <p class="nos"><span>CORE, as 16 áreas</span><b data-oferta-txt="compare" data-v67="R$&nbsp;67,90, uma vez">R$&nbsp;27,90, uma vez</b></p>
       </div>
+      <!-- lastro: novidades-guardadas/2026-11-23/porquim-core/construcao/lastro-23-11/ (prints de 23/11: R$ 249,90 por ano e R$ 20,99 × 12 = R$ 251,88). O "R$ 100" da SPEC saiu: não achei preço público que o provasse hoje. -->
       <p class="fonte">Preços públicos de apps de finanças no Brasil, consultados em 23/11/2026.</p>
       <ul class="vs">
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>As 16 áreas liberadas</li>
@@ -373,7 +402,7 @@
   <!-- 9 · GARANTIA -->
   <section class="garantia" data-bloco="garantia">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.4 3.2 7.8 7.5 9 4.3-1.2 7.5-4.6 7.5-9V6z"/><path d="m8.8 12.2 2.3 2.3 4.2-4.4"/></svg>
-    <div><b>Experimente por 7 dias.</b><p>Até 7 dias depois da compra, é só mandar um e-mail pra <u>contato@coreaplicativo.com.br</u>. Devolvemos 100% do valor, sem perguntas.</p></div>
+    <div><b>7 dias de garantia.</b><p>Até 7 dias depois da compra, é só mandar um e-mail pra <u>contato@coreaplicativo.com.br</u>. Devolvemos 100% do valor, sem perguntas.</p></div>
   </section>
 
   <!-- 10 · INFORMAÇÕES -->
@@ -393,8 +422,8 @@
     <h2>Amanhã cedo, seu dia<br /><em>já tem um lugar.</em></h2>
     <p>Dinheiro, hábitos, treino, casa. Você escolhe por onde começar.</p>
     <figure><img src="/dia/fecho-home.webp" width="720" height="1070" loading="lazy" decoding="async" alt="Tela inicial real do app CORE: próxima conta, orçamento, treino, sono e as áreas" /><figcaption>Tela real do app, com dados de exemplo.</figcaption></figure>
-    <button type="button" class="cta" data-checkout="fim">Quero experimentar agora</button>
-    <p class="miudo"><span data-oferta-txt="fecho" data-v67="R$&nbsp;67,90, uma vez">R$&nbsp;27,90, uma vez</span> · Pix ou cartão<br />7 dias de garantia</p>
+    <button type="button" class="cta" data-checkout="fim" data-oferta-txt="botao" data-v67="Quero meu acesso por R$&nbsp;67,90">Quero meu acesso por R$&nbsp;27,90</button>
+    <p class="miudo">Paga uma vez · Pix ou cartão<br />7 dias de garantia</p>
     <div class="lojas" aria-label="App na App Store e no Google Play">
       <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.7c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9s-2-.9-3.3-.8C6.1 7 4.6 8 3.7 9.5c-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.3.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.8-1.1-2.9-4.2zM13.9 5.3c.7-.8 1.2-2 1-3.2-1 0-2.3.7-3 1.5-.6.7-1.2 1.9-1.1 3.1 1.2.1 2.3-.6 3.1-1.4z"/></svg>App Store</span>
       <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 2.2 13.8 12 3.6 21.8c-.4-.2-.6-.6-.6-1.1V3.3c0-.5.2-.9.6-1.1zm11.7 11.3 2.8 2.8-10.4 6c-.6.3-1.2.3-1.7 0zM18.1 8.6l3.1 1.8c1 .6 1 1.6 0 2.2l-3.1 1.8L15.3 12zM5.8 1.9l10.3 6-2.8 2.8L5.8 2c.5-.3 1.2-.3 1.7 0z"/></svg>Google Play</span>
@@ -406,7 +435,7 @@
   <noscript><p class="sem-js">Pra pagar por aqui, ligue o JavaScript do navegador ou <a href="/organizar">abra esta outra página</a>. Já comprou? <a href="/como-entrar">Veja como entrar</a>.</p></noscript>
 </div>
 <script>
-/* OFERTA_DIA "67": troca os 5 textos (os mesmos de src/dia/oferta.ts) antes da primeira pintura */
+/* OFERTA_DIA "67": troca os textos da oferta (os mesmos de src/dia/oferta.ts) antes da primeira pintura */
 (function () {
   if (document.documentElement.getAttribute("data-oferta") !== "67") return;
   var n = document.querySelectorAll("[data-v67]");

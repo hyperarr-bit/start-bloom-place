@@ -240,12 +240,32 @@ describe("revisão 23/11", () => {
     expect(ultimo.pi).toBeNull();
     expect(sessionStorage.getItem("tudo-qa-stripe-ref")).toBe(ultimo.ref);
     expect(evento.mock.calls.some((c) => c[0] === "landing_stripe_pix_voltou")).toBe(true);
-    // o PI velho que "cair" depois não leva esta tela pro pago (a página só pergunta pelo PI novo)
+    expect(host.querySelector("[data-testid='aviso-pix-velho']")?.textContent).toContain("ainda vale por 30 min");
+    // revisão: o Pix VELHO (o código já copiado) pago depois do "Voltar" leva a página pro pago, com o PI velho (eventID da CAPI)
     status.mockImplementation(async (c: { pi: string }) => (c.pi === "pi_tudo" ? { ok: true, pago: true, status: "succeeded" } : { ok: true, pago: false, status: "requires_payment_method" }));
-    document.dispatchEvent(new Event("visibilitychange"));
+    await new Promise((r) => setTimeout(r, 5200));
+    const compras = pixel.mock.calls.filter((c) => c[0] === "Purchase");
+    expect(compras).toHaveLength(1);
+    expect(compras[0][2]).toBe("pi_tudo");
+    expect(host.querySelector("[data-testid='pos-compra']")).not.toBeNull();
+    expect(evento.mock.calls.some((c) => c[0] === "landing_stripe_pix_velho_pago")).toBe(true);
+    await new Promise((r) => setTimeout(r, 5200));
+    expect(pixel.mock.calls.filter((c) => c[0] === "Purchase")).toHaveLength(1);
+  }, 20000);
+  it("o Pix velho que não foi pago: o formulário novo segue; depois de vencer a consulta para", async () => {
+    await abrirCheckout(inline());
     await flush();
+    digitar("#oc-nome", "Maria Teste"); digitar("#oc-email", "qa@example.com");
+    confirmPixPayment.mockResolvedValue({ paymentIntent: { id: "pi_tudo", status: "requires_action", next_action: { type: "pix_display_qr_code", pix_display_qr_code: { data: QR, expires_at: Math.floor(Date.now() / 1000) - 120 } } } });
+    (host.querySelector("#oc-pagar") as HTMLElement).click();
+    await flush();
+    (host.querySelector("#oc-voltar-pix") as HTMLElement).click();
+    await flush();
+    status.mockClear();
+    await new Promise((r) => setTimeout(r, 5200));
+    expect(status.mock.calls.filter((c) => c[0].pi === "pi_tudo")).toHaveLength(0); // já vencido (+60 s): nem pergunta
     expect(host.querySelector("#oc-nome")).not.toBeNull();
-  });
+  }, 15000);
   it("a camada (padrão) não tem o 'Voltar' do inline", async () => {
     await abrirCheckout({ ...base });
     await flush();

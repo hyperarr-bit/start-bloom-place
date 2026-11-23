@@ -38,21 +38,21 @@ if(!desligada){
   }else void montar();
  };
  let jaComprou=false;
- for(const a of document.querySelectorAll<HTMLAnchorElement>('[data-ir-checkout]'))a.addEventListener('click',()=>{if(!jaComprou){event('landing_checkout_click',{placement:'oferta'});void montar()}});
+ let comprou=false;try{comprou=!!sessionStorage.getItem('oferta-pos-compra')}catch{/* sem storage */}
+ for(const a of document.querySelectorAll<HTMLAnchorElement>('[data-ir-checkout]'))a.addEventListener('click',()=>{if(!jaComprou&&!comprou){event('landing_checkout_click',{placement:'oferta'});void montar()}});
  for(const a of document.querySelectorAll<HTMLAnchorElement>('[data-ir-oferta]'))a.addEventListener('click',()=>event('landing_ver_oferta_click',{placement:'topo'}));
  // já pagou nesta aba (6 h): nada de formulário novo nem PaymentIntent — no lugar do checkout, "Você já comprou", e o passo a passo
  // de entrar no app abre de novo (recarga, volta da loja, ou a volta do banco recarregada com a compra já gravada)
- let comprou=false;try{comprou=!!sessionStorage.getItem('oferta-pos-compra')}catch{/* sem storage */}
  if(!comprou)ligarFormulario();
  else void import('@/landing/pos-compra-app').then(m=>{
   const c=m.lerCompraPos();
-  if(!c||(bankReturn&&c.pi!==bankReturn.pi)){ligarFormulario();return}
+  if(!c||(bankReturn&&c.pi!==bankReturn.pi)){comprou=false;ligarFormulario();return}
   jaComprou=true;
   const ctx={...c,evento:event};
   alvo.innerHTML='<div class="ck-ja" data-testid="tudo-ja-comprou"><b>Você já comprou o CORE ✓</b><span>Seu acesso é vitalício. Agora é só entrar no app com o seu e-mail.</span><button type="button" class="ck-tentar">Ver como entrar no app</button></div>';
   alvo.querySelector('button')!.addEventListener('click',()=>m.abrirPosCompraTelaCheia(ctx,'ja_comprou'));
   if(!document.querySelector("[data-testid='pos-compra']"))m.abrirPosCompraTelaCheia(ctx,bankReturn?'volta_banco':'recarga');
- },()=>{event('landing_erro',{onde:'chunk_pos_compra'});ligarFormulario()});
+ },()=>{event('landing_erro',{onde:'chunk_pos_compra'});comprou=false;ligarFormulario()});
  // threshold 0 + margem: seção alta (cada área, o checkout) conta quando entra de verdade na tela (o .25 nunca batia nas altas)
  const visto=new IntersectionObserver(entries=>{for(const e of entries)if(e.isIntersecting){event('landing_section_view',{section:e.target.id||'topo'});visto.unobserve(e.target)}},{threshold:0,rootMargin:'0px 0px -35% 0px'});
  for(const s of document.querySelectorAll('.topo,.area,#oferta,#depoimentos,#checkout'))visto.observe(s);

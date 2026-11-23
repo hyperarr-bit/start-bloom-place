@@ -911,8 +911,32 @@ function voltarDoPix() {
   est = { fase: "form", ref: refDaAba(), pi: null, clientSecret: null, metodo: "pix", pix: null, email: antigo.email, cpf: antigo.cpf, nome: antigo.nome, titular: antigo.titular };
   ultimaCriacao = null;
   opc.evento("landing_stripe_pix_voltou", { pi_antigo: antigo.pi });
+  if (antigo.pi) vigiarPixVelho({ ref: antigo.ref, pi: antigo.pi, ate: (antigo.pix?.expires_at ? antigo.pix.expires_at * 1000 : Date.now() + 30 * 60_000) + 60_000 });
   telaForm();
+  if (pixVelho) raiz?.querySelector("#oc-in")?.insertAdjacentHTML("afterbegin", `<p class="oc-aviso-pix-velho" data-testid="aviso-pix-velho">O Pix que você gerou ainda vale por 30 min. Se já pagou, não pague de novo: o acesso chega no e-mail.</p>`);
   rolarInline();
+}
+
+/** 23/11 (montarEm, revisão): depois do "Voltar", o Pix velho ainda vale (o código pode ter sido copiado). A cada 5 s até vencer:
+ *  pagou → a página vai pro pago com a ref/PI dele (Purchase com o eventID do PI velho = o da CAPI). Sem isto o pago ficava invisível. */
+let pixVelho: { ref: string; pi: string; ate: number } | null = null;
+let consultaVelho: number | null = null;
+function pararPixVelho() { if (consultaVelho !== null) { window.clearInterval(consultaVelho); consultaVelho = null; } pixVelho = null; }
+function vigiarPixVelho(v: { ref: string; pi: string; ate: number }) {
+  pararPixVelho();
+  pixVelho = v;
+  const uma = async () => {
+    const velho = pixVelho;
+    if (!velho || !est || !api) return;
+    if (Date.now() > velho.ate) { pararPixVelho(); return; }
+    const r = await api.status({ ref: velho.ref, pi: velho.pi }).catch(() => null);
+    if (!r?.pago || pixVelho !== velho || !est || (est.fase !== "form" && est.fase !== "pix")) return;
+    pararVigia();
+    est.ref = velho.ref; est.pi = velho.pi;
+    opc?.evento("landing_stripe_pix_velho_pago", { pi: velho.pi });
+    mostrarPago("pix");
+  };
+  consultaVelho = window.setInterval(() => { void uma(); }, 5000);
 }
 
 /** 23/11 (montarEm): a tela trocou dentro da página (Pix, confirmando, pago) → o topo do checkout aparece. Na camada: nada. */
@@ -983,7 +1007,9 @@ function vigiar() {
   semConfirmar = 0;
   const uma = async () => {
     if (!est?.pi || est.fase === "pago" || est.fase === "recebido") return;
-    const r = await api!.status({ ref: est.ref, pi: est.pi }).catch(() => null);
+    const pi = est.pi;
+    const r = await api!.status({ ref: est.ref, pi }).catch(() => null);
+    if (!est || est.pi !== pi) return; // 23/11: o pedido mudou enquanto perguntava (o "Voltar" do Pix): a resposta é do PI velho
     if (r?.pago) return mostrarPago((r.metodo as string) || est.metodo);
     semConfirmar = r?.ok === false ? semConfirmar + 1 : 0;
     if (est.fase === "aguardando" && (semConfirmar >= 3 || Date.now() - vigiaDesde > VIGIA_MAX_MS)) telaRecebido();
@@ -999,6 +1025,7 @@ function mostrarPago(metodo: string) {
   const o = opc;
   est.fase = "pago";
   pararVigia();
+  pararPixVelho();
   // o Pix caiu com a camada fechada: ela volta, já no "pago"
   if (!aberta && raiz && !inline) {
     raiz.hidden = false; aberta = true; travar();
@@ -1169,4 +1196,4 @@ function fecharJa(_via: string) {
 }
 
 /** testes: zera o módulo entre páginas */
-export function _zerar() { inline = false; cartaoUsado = null; pararVigia(); raiz?.remove(); raiz = null; est = null; ultimoEmailInicial = null; ultimaCriacao = null; icNoHeap.clear(); aberta = false; opc = null; api = null; stripe = null; elementos = null; elementoCartao = null; montagem += 1; pixPronto = false; cartaoPronto = false; cargaFalhou = false; cartaoFalhou = false; carteiraMedida = false; emailMedido.comecou = ""; emailMedido.valido = ""; fechandoPelaTela = false; saiuEm = null; carregandoStripe = null; soltarTeto(); trocandoPix = false; window.removeEventListener("popstate", aoVoltarNavegador); vigiarSaida(false); soltar(); }
+export function _zerar() { pararPixVelho(); inline = false; cartaoUsado = null; pararVigia(); raiz?.remove(); raiz = null; est = null; ultimoEmailInicial = null; ultimaCriacao = null; icNoHeap.clear(); aberta = false; opc = null; api = null; stripe = null; elementos = null; elementoCartao = null; montagem += 1; pixPronto = false; cartaoPronto = false; cargaFalhou = false; cartaoFalhou = false; carteiraMedida = false; emailMedido.comecou = ""; emailMedido.valido = ""; fechandoPelaTela = false; saiuEm = null; carregandoStripe = null; soltarTeto(); trocandoPix = false; window.removeEventListener("popstate", aoVoltarNavegador); vigiarSaida(false); soltar(); }

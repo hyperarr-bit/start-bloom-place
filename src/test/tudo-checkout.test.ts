@@ -295,14 +295,17 @@ describe("revisão 23/11", () => {
 describe("tudo.html e as rotas", () => {
   const raiz = resolve(__dirname, "../..");
   const HTML = readFileSync(resolve(raiz, "tudo.html"), "utf8");
-  const cabeca = HTML.match(/<script>\s*\/\*[\s\S]*?\*\/\s*(\(function \(\) \{[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
+  const cabecaNoAr = HTML.match(/<script>\s*\/\*[\s\S]*?\*\/\s*(\(function \(\) \{[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
+  // 23/11: a chave ligou no ar (dono: "faz isso subir pro ar"); o comportamento "off" segue testado forçando "off"
+  const cabeca = cabecaNoAr.replace('var PAGINA_TUDO = "on"', 'var PAGINA_TUDO = "off"');
   const rodar = (fonte: string, busca: string) => {
     const attrs: Record<string, string> = {}; const replace = vi.fn();
     new Function("location", "document", fonte)({ search: busca, replace }, { documentElement: { setAttribute: (k: string, v: string) => { attrs[k] = v; } } });
     return { attrs, replace };
   };
-  it("nasce off: vai pro /organizar com a mesma query (página escondida)", () => {
-    expect(HTML).toMatch(/var PAGINA_TUDO = "off";/);
+  it("no ar: PAGINA_TUDO on; com off vai pro /organizar com a mesma query (página escondida)", () => {
+    expect(HTML).toMatch(/var PAGINA_TUDO = "on";/);
+    expect(rodar(cabecaNoAr, "?utm_content=c7").replace).not.toHaveBeenCalled();
     const r = rodar(cabeca, "?utm_content=c7&fbclid=x");
     expect(r.replace).toHaveBeenCalledWith("/organizar?utm_content=c7&fbclid=x");
     expect(r.attrs["data-desligada"]).toBe("");

@@ -16,7 +16,7 @@
  *   Rollback: "off".
  */
 (function () {
-  var PAGINA_TUDO = "off";
+  var PAGINA_TUDO = "on";
   var q = location.search;
   if (PAGINA_TUDO !== "on" && !/[?&]tudo=on(&|$)/.test(q)) {
     document.documentElement.setAttribute("data-desligada", "");

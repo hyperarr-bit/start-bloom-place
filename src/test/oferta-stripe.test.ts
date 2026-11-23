@@ -15,7 +15,9 @@ import { bracoEmailOfertaDoAparelho, bracoTopoOfertaDoAparelho } from "@/landing
 
 const raiz = resolve(__dirname, "../..");
 const HTML = readFileSync(resolve(raiz, "landing.html"), "utf8");
-const scriptDaCabeca = HTML.match(/<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
+const scriptDaCabeca = HTML.match(/<script>\s*(\(function \(\) \{\s*var LANDING_NOVA[\s\S]*?\}\)\(\);)\s*<\/script>/)![1]
+  // 22/11: o ORGANIZAR_STRIPE (o /organizar no Stripe) ligou no ar; este arquivo testa o CHECKOUT_STRIPE da /oferta → ele fica "off" aqui (o teste dele é o organizar-stripe.test.ts)
+  .replace(/var ORGANIZAR_STRIPE = "(on|off)"/, 'var ORGANIZAR_STRIPE = "off"');
 const PK = "pk_test_EXEMPLO123";
 const comStripe = (on: "on" | "off", pk = PK) => scriptDaCabeca.replace(/var CHECKOUT_STRIPE = "(on|off)"/, `var CHECKOUT_STRIPE = "${on}"`).replace(/var STRIPE_PK = "[^"]*"/, `var STRIPE_PK = "${pk}"`);
 

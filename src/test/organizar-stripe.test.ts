@@ -39,8 +39,8 @@ function rodar(fonte: string, url: string, store: Record<string, string> = {}, c
 }
 
 describe("o <head>", () => {
-  it("no código: ORGANIZAR_STRIPE nasce off; o regex do 'antes' tirou o bloco", () => {
-    expect(HTML).toMatch(/var ORGANIZAR_STRIPE = "off";/);
+  it("no código: ORGANIZAR_STRIPE ligado no ar (dono 22/11); o regex do 'antes' tirou o bloco", () => {
+    expect(HTML).toMatch(/var ORGANIZAR_STRIPE = "on";/);
     expect(cabeca).toContain("landing_orgstripe_force");
     expect(semOBloco).not.toContain("landing_orgstripe_force");
   });

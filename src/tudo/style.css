@@ -1,7 +1,7 @@
 /* /tudo (23/11): a parte de VENDA. A cara do CORE (grafite + magenta + Inter, quente, pastéis dos módulos) com o ritmo da página da Cakto. */
 :root{--tx:#1f1d22;--suave:#5f5862;--grafite:#262428;--magenta:#c92b78;--magenta-forte:#b0215f;--magenta-suave:#fdeef5;--creme:#faf7f4;--creme-2:#f3ece6;--verde:#0f6b55;--linha:#e8e1db}
 *{box-sizing:border-box}
-html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;overflow-x:clip}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 body{margin:0;background:var(--creme);color:var(--tx);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 img{display:block;max-width:100%;height:auto}
@@ -30,15 +30,16 @@ h1 em{display:block;font-style:normal;color:var(--magenta)}
 .checks{display:grid;gap:10px;margin:22px auto 0;max-width:360px;text-align:left;font-size:16px;line-height:1.35}
 .checks li{display:flex;gap:10px;align-items:flex-start}
 .checks li::before{content:"";flex:none;width:22px;height:22px;margin-top:-1px;border-radius:50%;background:var(--magenta-suave) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c92b78' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center/13px no-repeat}
-.frase{margin:24px auto 0;padding:16px 18px;max-width:380px;border-radius:16px;background:#fff;border:1px solid var(--linha);font-size:16px;line-height:1.5;color:var(--tx)}
+.frase{margin:22px auto 0;padding:16px 18px;max-width:380px;border-radius:16px;background:#fff;border:1px solid var(--linha);font-size:16px;line-height:1.5;color:var(--tx)}
 
 /* áreas */
-.modulos{padding-top:44px;padding-bottom:8px}
+.ver-oferta{display:inline-block;margin:16px auto 0;padding:10px 4px;font-size:15px;font-weight:750;color:var(--magenta-forte);text-decoration:underline;text-underline-offset:4px}
+.modulos{padding-top:36px;padding-bottom:8px}
 .modulos h2,.depo h2{font-size:clamp(24px,6.6vw,30px);line-height:1.15;letter-spacing:-.035em;font-weight:800;text-align:center}
-.area{margin-top:22px;padding:22px 18px 0;border-radius:24px;background:var(--cor);overflow:hidden;text-align:center}
-.area h3{font-size:30px;letter-spacing:-.04em;font-weight:850;color:var(--grafite)}
-.area p{margin:6px auto 0;max-width:330px;font-size:15px;line-height:1.45;color:#4a4248}
-.tela{width:min(270px,74%);margin:18px auto 0;border:6px solid #1c1a1f;border-bottom:0;border-radius:30px 30px 0 0;overflow:hidden;background:#1c1a1f;aspect-ratio:9/14;box-shadow:0 -6px 30px -16px rgba(0,0,0,.4)}
+.area{margin-top:16px;padding:18px 18px 0;border-radius:24px;background:var(--cor);overflow:hidden;text-align:center}
+.area h3{font-size:24px;letter-spacing:-.04em;font-weight:850;color:var(--grafite)}
+.area p{margin:4px auto 0;max-width:330px;font-size:14.5px;line-height:1.45;color:#4a4248}
+.tela{width:min(230px,64%);margin:12px auto 0;border:6px solid #1c1a1f;border-bottom:0;border-radius:30px 30px 0 0;overflow:hidden;background:#1c1a1f;aspect-ratio:9/8.5;box-shadow:0 -6px 30px -16px rgba(0,0,0,.4)}
 .tela img{width:100%;height:auto}
 .mais{margin-top:22px;padding:18px;border-radius:20px;background:#fff;border:1px solid var(--linha);text-align:center}
 .mais p{font-size:15px;color:var(--suave)}
@@ -55,6 +56,8 @@ h1 em{display:block;font-style:normal;color:var(--magenta)}
 .preco{margin-top:16px;font-size:clamp(24px,7.4vw,34px);font-weight:800;letter-spacing:-.02em;color:var(--suave)}
 .preco s{color:#b4434e;text-decoration-thickness:2px}
 .preco strong{color:var(--verde);font-weight:900}
+.ancora{margin:10px auto 0;max-width:340px;font-size:15px;line-height:1.45;font-weight:600;color:var(--tx)}
+.garantia{margin-top:10px;font-size:14px;font-weight:650;color:var(--verde)}
 .preco-nota{margin-top:8px;font-size:14.5px;color:var(--suave)}
 .botao{display:flex;align-items:center;justify-content:center;min-height:56px;margin:20px auto 0;max-width:380px;border-radius:16px;background:var(--magenta);color:#fff;text-decoration:none;font-size:17px;font-weight:800;box-shadow:0 12px 26px -12px rgba(201,43,120,.7)}
 .botao:active{transform:translateY(1px)}
@@ -88,6 +91,9 @@ h1 em{display:block;font-style:normal;color:var(--magenta)}
 .ck-espera{display:grid;gap:6px;place-items:center;align-content:center;min-height:300px;border-radius:16px;background:#f7f7f8;text-align:center;color:#4b5563;font-size:14px}
 .ck-espera b{font-size:16px;color:#1f2937}
 .ck-tentar{margin-top:8px;min-height:48px;padding:0 20px;border:0;border-radius:12px;background:#0f6b55;color:#fff;font-weight:800}
+.ck-ja{display:grid;gap:8px;place-items:center;padding:28px 18px;border-radius:16px;background:#e8f3ef;text-align:center;color:#374151;font-size:14.5px;line-height:1.45}
+.ck-ja b{font-size:18px;color:#0f6b55}
+.rodape a{display:inline-block;padding:8px 0}
 .rodape{background:#fff;padding:24px 20px 40px;text-align:center;font-size:12.5px;color:var(--suave);border-top:1px solid #eee}
 .rodape img{margin:0 auto 10px}
 .rodape p{line-height:1.6}

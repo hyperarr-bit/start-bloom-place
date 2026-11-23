@@ -73,7 +73,7 @@ export type OpcoesCheckout = {
   medirCarteira?: boolean;
   /** 22/11 (/organizar-Stripe): no ANDROID, a tela do Pix gerado põe "Copiar código Pix" como o botão principal grande + 3 passos curtos.
    *  No iPhone (e no computador) fica a tela de sempre. Sem isto: nada muda. */
-  pixCopiaPrimeiro?: boolean;
+  pixCopiaPrimeiro?: boolean | "sempre";
   /** só testes: mostra o "Prefiro pagar com cartão" sem mexer em PIX_TROCA_CARTAO */
   trocaCartao?: boolean;
   evento: Evento; pixel: Pixel; atrib: Record<string, string>; sessao: string; aparelho: string; urlChegada: string; fbclid: string | null;
@@ -531,16 +531,16 @@ function telaForm() {
 function htmlCakto(): string {
   const e = est!;
   return `
-    <div class="ck-produto" data-testid="oferta-resumo"><img src="/tudo/icone-app-512.webp" width="64" height="64" alt="" /><div><h2 id="oc-tit">CORE · Acesso vitalício</h2><p>App pra iPhone, Android e computador</p></div></div>
+    <div class="ck-produto" data-testid="oferta-resumo"><img src="/tudo/icone-app-256.webp" width="64" height="64" alt="" /><div><h2 id="oc-tit">CORE · Acesso vitalício</h2><p>App pra iPhone, Android e computador</p></div></div>
     <label class="ck-rot" for="oc-nome">Nome completo</label>
     <input class="ck-campo" id="oc-nome" type="text" autocomplete="name" autocapitalize="words" maxlength="120" placeholder="Preencha seu nome" value="${esc(e.nome ?? "")}" />
     <p class="oc-erro" id="oc-nome-erro" role="alert" hidden></p>
     <div class="oc-email-caixa" id="oc-email-caixa">
-    <label class="ck-rot" for="oc-email">Email</label>
-    <input class="ck-campo" id="oc-email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="254" placeholder="Preencha seu email" value="${esc(e.email)}" />
+    <label class="ck-rot" for="oc-email">E-mail</label>
+    <input class="ck-campo" id="oc-email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="254" placeholder="Preencha seu e-mail" value="${esc(e.email)}" />
     <button type="button" class="oc-sug" id="oc-sug" hidden></button>
     <p class="oc-erro" id="oc-email-erro" role="alert" hidden></p>
-    <p class="ck-dica">É com este email que você entra no app.</p>
+    <p class="ck-dica">É com este e-mail que você entra no app.</p>
     </div>
     <h3 class="ck-titulo">Forma de Pagamento</h3>
     <div class="oc-metodos ck-metodos" role="radiogroup" aria-label="Forma de pagamento">
@@ -557,8 +557,8 @@ function htmlCakto(): string {
     <div class="ck-resumo"><div class="ck-linha"><span>CORE · Acesso vitalício</span><span>${esc(preco())}</span></div><div class="ck-linha ck-miuda"><span>Pagamento único</span><span>sem mensalidade</span></div><hr /><div class="ck-linha ck-total"><span>Total</span><strong>${esc(preco())}</strong></div></div>
     <p class="oc-erro" id="oc-erro" role="alert" hidden></p>
     <button type="button" class="oc-cta ck-pagar" id="oc-pagar"></button>
-    <p class="ck-segura">${ICO_CADEADO}Compra segura</p>
-    <p class="oc-miuda ck-termos">Ao prosseguir, você concorda com os <a href="/termos" target="_blank" rel="noopener">Termos de uso</a> e a <a href="/privacidade" target="_blank" rel="noopener">Privacidade</a> do CORE. 7 dias de garantia.</p>
+    <p class="ck-segura">${ICO_CADEADO}Compra segura · Garantia de 7 dias</p>
+    <p class="oc-miuda ck-termos">Ao prosseguir, você concorda com os <a href="/termos" target="_blank" rel="noopener">Termos de uso</a> e a <a href="/privacidade" target="_blank" rel="noopener">Privacidade</a> do CORE. Não gostou em 7 dias? Devolvemos 100%.</p>
     <p class="ck-processado">Processado pela Stripe · CORE · CNPJ 55.041.112/0001-82</p>`;
 }
 
@@ -852,8 +852,8 @@ async function pagar() {
   }
 }
 
-/** 22/11: a tela do Pix "copiar primeiro" (só com pixCopiaPrimeiro e só no Android) */
-const pixCopiaPrimeiro = (): boolean => !!opc?.pixCopiaPrimeiro && /Android/i.test(navigator.userAgent || "");
+/** 22/11: a tela do Pix "copiar primeiro" (só com pixCopiaPrimeiro e só no Android). 23/11 (/tudo): "sempre" = em todo aparelho */
+const pixCopiaPrimeiro = (): boolean => opc?.pixCopiaPrimeiro === "sempre" || (!!opc?.pixCopiaPrimeiro && /Android/i.test(navigator.userAgent || ""));
 
 function telaPix() {
   const o = opc!, p = est!.pix!;
@@ -882,6 +882,13 @@ function telaPix() {
       ${!o.somentePix && (o.trocaCartao ?? PIX_TROCA_CARTAO === "on") ? `<p class="oc-erro" id="oc-erro" role="alert" hidden></p><button type="button" class="oc-trocar" id="oc-trocar">Prefiro pagar com cartão</button>` : ""}
     </div>`;
   alvo.querySelector("#oc-trocar")?.addEventListener("click", () => { void trocarPixPorCartao(); });
+  // 23/11 (layout "cakto"): o topo da tela do Pix é o mesmo do formulário (miniatura + nome + preço)
+  if (o.layout === "cakto") alvo.querySelector(".oc-pix > .oc-resumo")?.replaceWith(Object.assign(document.createElement("div"), { className: "ck-produto ck-produto-pix", innerHTML: `<img src="/tudo/icone-app-256.webp" width="64" height="64" alt="" /><div><h2 id="oc-tit">CORE · Acesso vitalício</h2><p>Pix · pagamento único · ${esc(preco())}</p></div>` }));
+  // 23/11 (montarEm): dentro da página não há X — a saída do Pix gerado (outra forma de pagamento / e-mail errado) é um pedido novo
+  if (inline) {
+    alvo.querySelector(".oc-pix")!.insertAdjacentHTML("beforeend", `<button type="button" class="oc-trocar oc-voltar-pix" id="oc-voltar-pix">Voltar e escolher outra forma de pagamento / corrigir o e-mail</button><p class="oc-miuda">Se você já pagou este Pix, não pague de novo: o acesso chega no seu e-mail.</p>`);
+    alvo.querySelector("#oc-voltar-pix")!.addEventListener("click", voltarDoPix);
+  }
   if (!p.image_url_png && p.data) void desenharQr(alvo.querySelector<HTMLElement>("#oc-qr")!, p.data);
   alvo.querySelector("#oc-copiar")!.addEventListener("click", async () => {
     const b = alvo.querySelector<HTMLButtonElement>("#oc-copiar")!;
@@ -891,6 +898,20 @@ function telaPix() {
     o.evento("landing_pix_copiado", { ok, via: "stripe", ...(copiaPrimeiro ? { layout_pix: "copia_primeiro" } : {}) });
   });
   vigiar();
+  rolarInline();
+}
+
+/** 23/11 (montarEm): "Voltar" na tela do Pix — esquece a ref e o PI desta aba e volta pro formulário com uma ref NOVA (outro PI no
+ *  servidor). Não cancela o Pix antigo (a lp27 não tem trocar_pix): ele vence sozinho em 30 min; se for pago, o webhook libera igual. */
+function voltarDoPix() {
+  if (!opc || !est || est.fase !== "pix") return;
+  pararVigia();
+  try { sessionStorage.removeItem(chaveRef()); sessionStorage.removeItem(chavePi()); } catch { /* noop */ }
+  const antigo = est;
+  est = { fase: "form", ref: refDaAba(), pi: null, clientSecret: null, metodo: "pix", pix: null, email: antigo.email, cpf: antigo.cpf, nome: antigo.nome, titular: antigo.titular };
+  ultimaCriacao = null;
+  opc.evento("landing_stripe_pix_voltou", { pi_antigo: antigo.pi });
+  telaForm();
   rolarInline();
 }
 
@@ -1101,7 +1122,7 @@ export async function abrirCheckout(o: OpcoesCheckout): Promise<void> {
   else if (est.fase === "pago") telaPago();
   else if (est.fase === "aguardando") { telaAguardando(); vigiar(); }
   else telaForm();
-  o.evento("landing_stripe_aberto", { fase: est.fase });
+  o.evento("landing_stripe_aberto", inline ? { fase: est.fase, inline: true } : { fase: est.fase });
   // 5 (revisão): InitiateCheckout 1× por ref (abrir e fechar várias vezes não infla)
   const chaveIc = `oferta-ic-${est.ref}`;
   const iniciar = () => {

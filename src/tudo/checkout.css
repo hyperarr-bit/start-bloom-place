@@ -34,9 +34,11 @@
 .oc-cakto .ck-pagar{margin-top:36px;min-height:60px;border-radius:14px;background:var(--ck);font-size:18px;font-weight:800;box-shadow:0 10px 22px -12px rgba(15,107,85,.8)}
 .oc-cakto .ck-segura{display:flex;align-items:center;justify-content:center;gap:7px;margin:20px 0 0;font-size:14px;font-weight:600;color:#4b5563}
 .oc-cakto .ck-termos{margin-top:12px;font-size:13px;line-height:1.55;color:#4b5563}
-.oc-cakto .ck-termos a{color:inherit}
+.oc-cakto .ck-termos a{color:inherit;display:inline-block;padding:8px 0}
 .oc-cakto .ck-processado{margin:12px 0 0;text-align:center;font-size:12.5px;color:#6b7280}
 /* Pix gerado e confirmando, dentro da página */
 .oc-cakto .oc-pix .oc-resumo{background:#f7f7f8}
 .oc-cakto .oc-copia button,.oc-cakto .oc-copiar-grande{background:var(--ck)}
 .oc-cakto .oc-pix{padding:6px 0 10px}
+.oc-cakto .ck-produto-pix{text-align:left;padding-bottom:4px}
+.oc-cakto .oc-voltar-pix{margin-top:18px;font-size:14px;font-weight:600;color:#374151;line-height:1.35;padding:8px 12px}

@@ -160,13 +160,14 @@ describe("layout cakto", () => {
     await flush();
     const t = host.textContent ?? "";
     expect(host.querySelector(".ck-produto h2")!.textContent).toBe("CORE · Acesso vitalício");
-    expect([...host.querySelectorAll(".ck-rot")].map((l) => l.textContent)).toEqual(["Nome completo", "Email", "Nome no cartão"]);
+    expect([...host.querySelectorAll(".ck-rot")].map((l) => l.textContent)).toEqual(["Nome completo", "E-mail", "Nome no cartão"]);
     expect([...host.querySelectorAll("[data-metodo]")].map((b) => b.textContent)).toEqual(["PIX", "Cartão de Crédito"]);
     expect(host.querySelector("[data-metodo='pix']")!.getAttribute("aria-checked")).toBe("true");
     expect(t).toContain("Forma de Pagamento");
     expect(t).toContain("Resumo do pedido");
     expect(host.querySelector(".ck-total")!.textContent).toMatch(/Total\s*R\$\s27,90/);
     expect(t).toContain("Compra segura");
+    expect(host.querySelector(".ck-segura")!.textContent).toContain("Garantia de 7 dias");
     expect(t).not.toMatch(/parcela|taxa de servi|CPF|celular/i);
     expect(host.querySelector("#oc-pagar")!.textContent).toBe("Pagar com Pix");
     (host.querySelector("[data-metodo='card']") as HTMLElement).click();
@@ -207,6 +208,70 @@ describe("layout cakto", () => {
   });
 });
 
+describe("revisão 23/11", () => {
+  it("landing_stripe_aberto do inline sai marcado (montou por rolagem, não é 'abriu')", async () => {
+    await abrirCheckout(inline());
+    await flush();
+    expect(evento.mock.calls.find((c) => c[0] === "landing_stripe_aberto")?.[1]).toMatchObject({ inline: true });
+  });
+  it("padrão: landing_stripe_aberto sem a marca inline", async () => {
+    await abrirCheckout({ ...base });
+    await flush();
+    expect(evento.mock.calls.find((c) => c[0] === "landing_stripe_aberto")?.[1]).toEqual({ fase: "form" });
+  });
+  it("Pix gerado no inline: topo com a miniatura; 'Voltar' esquece a ref/PI da aba e volta pro formulário com ref NOVA, com o que foi digitado", async () => {
+    await abrirCheckout(inline());
+    await flush();
+    digitar("#oc-nome", "Maria Teste");
+    digitar("#oc-email", "qa@example.com");
+    (host.querySelector("#oc-pagar") as HTMLElement).click();
+    await flush();
+    expect(host.querySelector(".oc-pix .ck-produto")).not.toBeNull();
+    const refAntiga = criar.mock.calls[0][0].ref;
+    expect(sessionStorage.getItem("tudo-qa-stripe-ref")).toBe(refAntiga);
+    criar.mockResolvedValue({ ok: true, pi: "pi_tudo2", clientSecret: "pi_tudo2_secret_QA" });
+    (host.querySelector("#oc-voltar-pix") as HTMLElement).click();
+    await flush();
+    expect(host.querySelector("[data-testid='oferta-pix']")).toBeNull();
+    expect((host.querySelector("#oc-nome") as HTMLInputElement).value).toBe("Maria Teste");
+    expect((host.querySelector("#oc-email") as HTMLInputElement).value).toBe("qa@example.com");
+    const ultimo = criar.mock.calls[criar.mock.calls.length - 1][0];
+    expect(ultimo.ref).not.toBe(refAntiga);
+    expect(ultimo.pi).toBeNull();
+    expect(sessionStorage.getItem("tudo-qa-stripe-ref")).toBe(ultimo.ref);
+    expect(evento.mock.calls.some((c) => c[0] === "landing_stripe_pix_voltou")).toBe(true);
+    // o PI velho que "cair" depois não leva esta tela pro pago (a página só pergunta pelo PI novo)
+    status.mockImplementation(async (c: { pi: string }) => (c.pi === "pi_tudo" ? { ok: true, pago: true, status: "succeeded" } : { ok: true, pago: false, status: "requires_payment_method" }));
+    document.dispatchEvent(new Event("visibilitychange"));
+    await flush();
+    expect(host.querySelector("#oc-nome")).not.toBeNull();
+  });
+  it("a camada (padrão) não tem o 'Voltar' do inline", async () => {
+    await abrirCheckout({ ...base });
+    await flush();
+    digitar("#oc-email", "qa@example.com");
+    (document.getElementById("oc-pagar") as HTMLElement).click();
+    await flush();
+    expect(document.querySelector("[data-testid='oferta-pix']")).not.toBeNull();
+    expect(document.getElementById("oc-voltar-pix")).toBeNull();
+  });
+  it("pixCopiaPrimeiro 'sempre': copiar primeiro também fora do Android; true continua só no Android", async () => {
+    await abrirCheckout(inline({ pixCopiaPrimeiro: "sempre" }));
+    await flush();
+    digitar("#oc-nome", "Maria Teste"); digitar("#oc-email", "qa@example.com");
+    (host.querySelector("#oc-pagar") as HTMLElement).click();
+    await flush();
+    expect(host.querySelector("[data-testid='oferta-pix']")!.getAttribute("data-layout")).toBe("copia_primeiro");
+    _zerar(); host.innerHTML = ""; sessionStorage.clear();
+    await abrirCheckout({ ...base, pixCopiaPrimeiro: true });
+    await flush();
+    digitar("#oc-email", "qa@example.com");
+    (document.getElementById("oc-pagar") as HTMLElement).click();
+    await flush();
+    expect(document.querySelector("[data-testid='oferta-pix']")!.getAttribute("data-layout")).toBeNull(); // jsdom não é Android
+  });
+});
+
 describe("tudo.html e as rotas", () => {
   const raiz = resolve(__dirname, "../..");
   const HTML = readFileSync(resolve(raiz, "tudo.html"), "utf8");
@@ -232,6 +297,9 @@ describe("tudo.html e as rotas", () => {
     expect(texto).toMatch(/vitalício/i);
     expect(texto).toMatch(/iPhone, Android e computador/);
     expect(texto).not.toMatch(/parcela|taxa de servi/i);
+    expect(texto).toContain("No app, R$ 97,90 por ano. Aqui, R$ 27,90 uma vez só, pra sempre.");
+    expect(texto).toContain("Garantia de 7 dias · Pix ou cartão");
+    expect(texto).toContain("CORE · SEU 2027 ORGANIZADO");
   });
   it("as rotas /tudo e /tudo/ existem na Vercel e no Vite", () => {
     const vercel = JSON.parse(readFileSync(resolve(raiz, "vercel.json"), "utf8"));

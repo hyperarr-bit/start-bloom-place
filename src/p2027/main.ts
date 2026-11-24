@@ -20,7 +20,8 @@
  *               · _pagar {metodo} · _pagar_erro · _pix_gerado {pi} · landing_pix_copiado · _pago {metodo, pi} · _recusado · _pix_voltou
  *               · _pix_velho_pago · _recebido_sem_confirmar;  do pós-compra: pos_compra_view · _aba · _loja · _copiar_email · _navegador · _ajuda
  *               rodada 2 (só no layout "cartao"): landing_stripe_email_pergunta {} · _email_pergunta_resposta {escolha: corrigido | manteve}
- *               · landing_stripe_pix_vencido {pi} · landing_stripe_pix_velho_email {ok} (o e-mail do Pix velho trocado depois do "Voltar")
+ *               · landing_stripe_pix_vencido {pi} · landing_stripe_pix_velho_email {ok, motivo} (o e-mail do Pix velho trocado depois do "Voltar"
+ *               ou do "Corrigir"; rodada 4: motivo sem_resposta | recusou | ja_pago) · landing_stripe_ja_estava_pago {pi}
  * Pixel da Meta (só produção): PageView + ViewContent ao abrir, InitiateCheckout no 1º toque no pagamento, Purchase com eventID = id do PI.
  */
 import { event, initPixel, mountPayment, bankReturn, QA, STORAGE_PREFIX } from "./payment";
@@ -29,6 +30,8 @@ import "./style.css";
 import "./checkout.css";
 
 const desligada = document.documentElement.hasAttribute("data-desligada");
+/** rodada 4 (V3-M1): o e-mail digitado antes do "Tentar de novo" (recarga), só nesta aba */
+const CHAVE_EMAIL_DIGITADO = `${STORAGE_PREFIX}-email-digitado`;
 if (!desligada) iniciar();
 
 function iniciar() {
@@ -55,6 +58,11 @@ function iniciar() {
   };
   // o "pago" do checkout passa por aqui: o cartão vira o pós-compra (o preço, a confiança e a avaliação saem) e a barra some
   const eventoDoCheckout = (nome: string, dados: Record<string, unknown> = {}) => { event(nome, dados); if (nome === "landing_stripe_pago") marcarPago(); };
+  // rodada 4 (V3-M1): voltou do "Tentar de novo" (a página recarregou): o e-mail que ela tinha digitado volta pro campo do esqueleto
+  try {
+    const guardado = sessionStorage.getItem(CHAVE_EMAIL_DIGITADO);
+    if (guardado) { sessionStorage.removeItem(CHAVE_EMAIL_DIGITADO); const sk = alvo.querySelector<HTMLInputElement>("#sk-email"); if (sk && !sk.value) sk.value = guardado; }
+  } catch { /* sem storage */ }
   let metodoPedido: string | null = null;
   let montado: Promise<void> | null = null;
   const montar = (volta?: { pi: string; status: string }): Promise<void> => {
@@ -64,8 +72,14 @@ function iniciar() {
       .then(() => { if (metodoPedido === "card") alvo.querySelector<HTMLElement>("[data-metodo='card']")?.click(); })
       .catch(() => {
         montado = null; event("landing_erro", { onde: "p2027_checkout_load" });
+        // rodada 4 (V3-M1): "Tentar de novo" RECARREGA a página — o navegador não pede de novo um pedaço que falhou, e o botão de antes não
+        // trazia o formulário nunca. O e-mail que ela já tinha digitado fica na aba e volta no campo do esqueleto.
+        const jaDigitado = alvo.querySelector<HTMLInputElement>("#sk-email, #oc-email")?.value.trim() || digitado || "";
         alvo.innerHTML = '<div class="ck-espera" role="alert"><b>O pagamento não carregou.</b><span>Confira a internet e tente de novo.</span><button type="button" class="ck-tentar">Tentar de novo</button></div>';
-        alvo.querySelector("button")!.addEventListener("click", () => { void montar(); });
+        alvo.querySelector("button")!.addEventListener("click", () => {
+          try { if (jaDigitado) sessionStorage.setItem(CHAVE_EMAIL_DIGITADO, jaDigitado); } catch { /* sem storage */ }
+          location.reload();
+        });
       });
     return montado;
   };
@@ -175,8 +189,7 @@ function iniciar() {
      — o teclado que sobe DEPOIS dos 350 ms (iPhone e Android barato avisam no fim da animação) também é coberto. */
   const toque = (() => { try { return matchMedia("(pointer: coarse)").matches; } catch { return false; } })();
   const ajustarAoTeclado = (campo: HTMLInputElement) => {
-    // rodada 3: no "Corrigir" com o Pix aberto, o botão que tem de ficar à vista é o "Salvar" do campo novo
-    const botao = alvo.querySelector<HTMLElement>("#oc-pagar") ?? alvo.querySelector<HTMLElement>(".ct-pix-editar [data-salvar]");
+    const botao = alvo.querySelector<HTMLElement>("#oc-pagar");
     if (!botao || document.activeElement !== campo) return;
     const vv = window.visualViewport;
     const topoVisivel = vv ? vv.offsetTop : 0, fimVisivel = topoVisivel + (vv ? vv.height : window.innerHeight);

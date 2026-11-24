@@ -32,6 +32,12 @@
   if (PAGINA_2027 !== "on" && !aba && !qa) { h.setAttribute("data-desligada", ""); location.replace("/organizar" + q + location.hash); }
 })();
 </script>
+<script>
+/* rodada 4 (V3-M4): imagem do app que não carregou (internet ruim) → o recorte some e fica a legenda, em vez de um quadrado com "?" que
+   empurra o preço (.recorte[hidden] no style.css). Fica aqui no <head>, antes de qualquer imagem: o main.ts chega depois do HTML lido e
+   perderia uma imagem que falhou cedo. */
+document.addEventListener("error", function (e) { var i = e.target; if (i && i.tagName === "IMG" && i.closest) { var f = i.closest(".recorte"); if (f) f.setAttribute("hidden", ""); } }, true);
+</script>
 <style>
 @font-face{font-family:Inter;src:url('/tudo/inter-latin.woff2') format('woff2');font-style:normal;font-weight:100 900;font-display:swap}
 html[data-desligada] body{display:none}

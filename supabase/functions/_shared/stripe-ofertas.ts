@@ -62,11 +62,14 @@ export const OFERTAS_STRIPE: Record<string, OfertaStripe> = {
   /** 23/11 (página do carrossel 2027, chave PAGINA_2027 em 2027.html): linha PRÓPRIA da /2027 — vitalício R$ 27,90, Pix + cartão à
    *  vista, pela mesma função stripe-lp27-criar. O valor tem que bater com PRECO_2027_CENTAVOS (src/p2027/preco.ts): em produção a
    *  página só deixa pagar se o criar devolver o MESMO valor.
-   *  SUBIR (cada passo com ok do dono): 1) publicar, do main juntado (nunca do worktree), stripe-webhook --no-verify-jwt e stripe-status
-   *  PRIMEIRO, depois stripe-lp27-criar — cada função leva a SUA cópia deste arquivo; só o criar publicado = venda ignorada
-   *  ("outra_pagina"), paga e sem acesso. O stripe-criar a /2027 não usa: não precisa publicar. 2) site com PAGINA_2027 "off" (push).
-   *  3) compra REAL de teste em /2027?p2027=on, numa aba sem a prévia: 1 Pix e 1 cartão (acesso, e-mail, stripe_venda "p2027"), e devolver.
-   *  4) PAGINA_2027 "on" + push. 5) campanha. MUDAR O PREÇO depois de vender: preco.ts e esta linha + idem NOVO (ex.: "p2027b") + o preço
+   *  SUBIR (cada passo com ok do dono; o roteiro inteiro está em src/p2027/preco.ts): 1) juntar o ramo lp-2027 no main ATUAL (sem push)
+   *  e olhar o que mais o main leva em supabase/functions/_shared/ desde o último deploy das funções (cada função leva a SUA cópia deste
+   *  arquivo). 2) publicar, desse main (nunca do worktree), stripe-webhook --no-verify-jwt e stripe-status PRIMEIRO, depois
+   *  stripe-lp27-criar — só o criar publicado = venda ignorada ("outra_pagina"), paga e sem acesso. O stripe-criar a /2027 não usa: não
+   *  precisa publicar. 3) site com PAGINA_2027 "off" (push). 4) prévia ?qa=1 numa aba; em OUTRA aba, /2027?p2027=on com um e-mail NOVO
+   *  (sem vitalício: com vitalício o webhook não manda o e-mail da compra): Pix com o e-mail A → Corrigir → pagar com o e-mail B → tela de
+   *  pago, e-mail da compra e acesso no app em B; recarregar no meio; e 1 cartão; devolver as duas. 5) só então PAGINA_2027 "on" + push.
+   *  6) nunca ?p2027=on em link de anúncio. MUDAR O PREÇO depois de vender: preco.ts e esta linha + idem NOVO (ex.: "p2027b") + o preço
    *  antigo em aceitaTambem (ex.: [2790]), como o /organizar em 23/11; o teste de stripe-webhook.test.ts trava isso.
    *  Esta linha NUNCA sai do servidor (nem no rollback, que é só PAGINA_2027 "off"): um Pix gerado vale 30 min. */
   p2027: {

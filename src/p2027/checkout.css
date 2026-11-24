@@ -50,16 +50,13 @@
 .oc-cartao .ct-pix-email{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:12px 0 0;padding:4px 4px 4px 12px;border-radius:12px;background:#fff;border:1.5px solid #ead0dd;text-align:left}
 .oc-cartao .ct-pix-email span{min-width:0;font-size:14.5px;line-height:1.35;color:var(--suave);overflow-wrap:anywhere}
 .oc-cartao .ct-pix-email b{display:block;font-size:15.5px;font-weight:800;color:var(--tx)}
-/* rodada 3 (T2-BAIXA 4 + cliente fria): "Corrigir" abre o campo AQUI, no mesmo Pix (Salvar troca o e-mail do pagamento que está na tela) */
-.oc-cartao .ct-pix-editar{margin:12px 0 0;padding:12px;border-radius:12px;background:#fff;border:1.5px solid #ead0dd;text-align:left}
-.oc-cartao .ct-pix-editar .ct-rot{margin-bottom:6px}
-.oc-cartao .ct-pix-editar-botoes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
-.oc-cartao .ct-pix-editar-botoes button{min-height:48px;border-radius:13px;font:inherit;font-size:15.5px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.oc-cartao .ct-pix-salvar{border:0;background:var(--magenta);color:#fff}
-.oc-cartao .ct-pix-salvar[aria-busy="true"]{opacity:.75;pointer-events:none}
-.oc-cartao .ct-pix-cancelar{border:1.5px solid #d9d1d6;background:#fff;color:var(--grafite)}
 .oc-cartao .oc-aviso-pix-velho b{font-weight:800;overflow-wrap:anywhere}
 .oc-cartao .ct-pix-corrigir{flex:none;min-height:44px;padding:0 10px;border:0;background:none;font:inherit;font-size:14.5px;font-weight:800;color:var(--magenta);text-decoration:underline;cursor:pointer}
+/* rodada 4 (V3-M3): o e-mail numa linha só dele (o "Corrigir" sobe pro canto): em 360 px um Gmail comum não quebra mais no meio */
+.oc-cartao .ct-pix-email{display:block;position:relative;padding:9px 12px 10px}
+.oc-cartao .ct-pix-email>span{display:block}
+.oc-cartao .ct-pix-email b{margin-top:2px}
+.oc-cartao .ct-pix-corrigir{position:absolute;top:0;right:2px}
 /* o Pix gerado e o "confirmando" dentro do cartão (as telas do checkout compartilhado) */
 .oc-cartao .oc-pix .oc-resumo{background:var(--papel)}
 .oc-cartao .oc-pix .oc-cta{background:var(--magenta);box-shadow:0 10px 22px -10px rgba(201,43,120,.65)}

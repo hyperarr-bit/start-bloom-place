@@ -358,18 +358,23 @@ describe("4 · o checkout dentro do cartão do preço (layout 'cartao')", () => 
     expect(confirmPixPayment).toHaveBeenCalledWith("pi_2027_secret_QA", { payment_method: { billing_details: { email: "ana@gmial.com", name: "Ana Teste" } } }, { handleActions: false });
   });
 
-  describe("rodada 2 (T-M1) · voltou do Pix e corrigiu o e-mail", () => {
-    // o 1º pedido (ref da aba) é o "pi_velho"; depois do "Voltar" nasce outra ref → "pi_novo"
-    const cenario = async (trocaOk: boolean) => {
+  describe("rodada 2/4 (T-M1) · 'Corrigir' (ou o 'Voltar' de baixo) → formulário → pagou com outro e-mail → a troca no Pix velho", () => {
+    // o 1º pedido (ref da aba) é o "pi_velho"; depois do "Corrigir"/"Voltar" nasce outra ref → "pi_novo"
+    // `troca`: o que o servidor faz com o pedido de troca do e-mail do PI velho (rodada 4: pode não responder, ou responder atrasado)
+    type Troca = (c: Record<string, unknown>) => Promise<unknown>;
+    const TROCOU: Troca = async () => ({ ok: true, pi: "pi_velho", clientSecret: "pi_velho_secret", status: "requires_action" });
+    const RECUSOU: Troca = async () => ({ ok: false });
+    const cenario = async (troca: Troca, botao = "[data-corrigir-email]", antesDoPago?: () => Promise<void>) => {
       vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
-      try { return await passos(trocaOk); } finally { vi.useRealTimers(); }
+      try { return await passos(troca, botao, antesDoPago); } finally { vi.useRealTimers(); }
     };
-    const passos = async (trocaOk: boolean) => {
+    const passos = async (troca: Troca, botao: string, antesDoPago?: () => Promise<void>) => {
       let refVelha: string | null = null;
+      status.mockResolvedValue({ ok: true, pago: false, status: "requires_action" });
       criar.mockImplementation(async (c: Record<string, unknown>) => {
         refVelha ??= String(c.ref);
         const velho = c.ref === refVelha;
-        if (velho && c.pi === "pi_velho" && c.email === "ana.certa@exemplo.com") return trocaOk ? { ok: true, pi: "pi_velho", clientSecret: "pi_velho_secret", status: "requires_action" } : { ok: false };
+        if (velho && c.pi === "pi_velho" && c.email === "ana.certa@exemplo.com") return troca(c);
         return { ok: true, pi: velho ? "pi_velho" : "pi_novo", clientSecret: velho ? "pi_velho_secret" : "pi_novo_secret", status: "requires_action" };
       });
       confirmPixPayment.mockImplementation(async (cs: string) => ({ paymentIntent: { id: cs.split("_secret")[0], status: "requires_action", next_action: { type: "pix_display_qr_code", pix_display_qr_code: { data: QR, expires_at: Math.floor(Date.now() / 1000) + 1700 } } } }));
@@ -378,10 +383,11 @@ describe("4 · o checkout dentro do cartão do preço (layout 'cartao')", () => 
       digitar("#oc-email", "ana@exemplo.com");
       await tocarPagar();
       expect(host.querySelector("[data-testid='pix-email']")!.textContent).toContain("ana@exemplo.com");
-      // rodada 3: o "Corrigir" do alto troca o e-mail no MESMO Pix (testes abaixo); este é o caminho do "Voltar" de baixo
-      (host.querySelector("#oc-voltar-pix") as HTMLElement).click();
+      (host.querySelector(botao) as HTMLElement).click();
       await flush();
-      expect(host.querySelector("[data-testid='aviso-pix-velho']")!.textContent).toMatch(/^O Pix anterior libera o acesso em ana@exemplo\.com \(vale até \d\dh\d\d\)\. Se você já pagou ele, não pague de novo\.$/);
+      expect(host.querySelector("[data-testid='oferta-pix']")).toBeNull(); // saiu do Pix: o formulário, com o e-mail no campo
+      expect(host.querySelector("[data-testid='aviso-pix-velho']")!.textContent).toMatch(/^O Pix anterior libera o acesso em ana@exemplo\.com e vale até \d\dh\d\d\. Se você já pagou ele, não pague de novo\.$/);
+      expect(host.querySelector("[data-testid='aviso-pix-velho'] b")!.textContent).toBe("ana@exemplo.com");
       expect((host.querySelector("#oc-email") as HTMLInputElement).value).toBe("ana@exemplo.com");
       digitar("#oc-email", "ana.certa@exemplo.com");
       await tocarPagar();
@@ -394,20 +400,61 @@ describe("4 · o checkout dentro do cartão do preço (layout 'cartao')", () => 
       status.mockImplementation(async (c: { pi: string }) => (c.pi === "pi_velho" ? { ok: true, pago: true, status: "succeeded", metodo: "pix" } : { ok: true, pago: false, status: "requires_action" }));
       vi.advanceTimersByTime(5000);
       await flush();
+      if (antesDoPago) await antesDoPago();
       expect(evento.mock.calls.some((c) => c[0] === "landing_stripe_pix_velho_pago")).toBe(true);
       return host.querySelector("[data-testid='pos-email']")!.textContent ?? "";
     };
-    it("a troca deu certo: pago o Pix velho, a tela mostra o e-mail corrigido (é pra ele que o acesso vai)", async () => {
-      expect(await cenario(true)).toContain("ana.certa@exemplo.com");
+    it("a troca deu certo: pago o Pix velho, a tela mostra o e-mail corrigido (é pra ele que o acesso vai) — pelo 'Corrigir' e pelo 'Voltar'", async () => {
+      expect(await cenario(TROCOU)).toContain("ana.certa@exemplo.com");
       expect(evento.mock.calls.some((c) => c[0] === "landing_stripe_pix_velho_email" && c[1]?.ok === true)).toBe(true);
+      _zerar(); host.innerHTML = ""; sessionStorage.clear(); criar.mockReset(); evento.mockClear();
+      expect(await cenario(TROCOU, "#oc-voltar-pix")).toContain("ana.certa@exemplo.com");
     });
-    it("a troca falhou: pago o Pix velho, a tela mostra o e-mail que ESTÁ nele (o antigo), nunca um que não tem acesso", async () => {
-      const t = await cenario(false);
+    it("o servidor respondeu que NÃO trocou: pago o Pix velho, a tela mostra o e-mail que ESTÁ nele (o antigo), nunca um que não tem acesso", async () => {
+      const t = await cenario(RECUSOU);
       expect(t).toContain("ana@exemplo.com");
       expect(t).not.toContain("ana.certa");
+      expect(evento.mock.calls.some((c) => c[0] === "landing_stripe_pix_velho_email" && c[1]?.motivo === "recusou")).toBe(true);
+    });
+    it("rodada 4 · a troca chegou no servidor mas a RESPOSTA se perdeu (rede caiu): a tela de pago não afirma e-mail nenhum (nem o antigo)", async () => {
+      const t = await cenario(async () => { throw new TypeError("Failed to fetch"); });
+      expect(t).not.toContain("ana@exemplo.com");
+      expect(t).not.toContain("ana.certa");
+      expect(t).toContain("o mesmo e-mail que você digitou na compra");
+      expect(evento.mock.calls.some((c) => c[0] === "landing_stripe_pix_velho_email" && c[1]?.motivo === "sem_resposta")).toBe(true);
+    });
+    it("rodada 4 · a resposta da troca ATRASA e o Pix velho é pago antes dela: a tela de pago espera a resposta e mostra o que o servidor confirmou", async () => {
+      let soltar: (v: unknown) => void = () => {};
+      const t = await cenario(() => new Promise((ok) => { soltar = ok; }), "[data-corrigir-email]", async () => {
+        expect(host.querySelector("[data-testid='pos-compra']")).toBeNull(); // ainda não: a troca está a caminho
+        soltar({ ok: true, pi: "pi_velho", clientSecret: "pi_velho_secret", status: "requires_action" });
+        await flush();
+        vi.advanceTimersByTime(5000);
+        await flush();
+      });
+      expect(t).toContain("ana.certa@exemplo.com");
     });
   });
-
+  it("rodada 4 · na tela do Pix do layout 'cartao' não há campo de e-mail pra editar: 'Corrigir' é o mesmo 'Voltar' (formulário com o e-mail no campo)", async () => {
+    await abrirCheckout(opcoes());
+    await flush();
+    digitar("#oc-email", "ana@exemplo.com");
+    await tocarPagar();
+    const pix = host.querySelector("[data-testid='oferta-pix']")!;
+    const campos = [...pix.querySelectorAll("input, textarea, [contenteditable]")];
+    expect(campos.map((c) => c.id)).toEqual(["oc-codigo"]);
+    expect((campos[0] as HTMLInputElement).readOnly).toBe(true);
+    expect(pix.querySelector("[data-corrigir-email]")!.textContent).toBe("Corrigir");
+    (pix.querySelector("[data-corrigir-email]") as HTMLElement).click();
+    await flush();
+    expect(host.querySelector("[data-testid='oferta-pix']")).toBeNull();
+    expect((host.querySelector("#oc-email") as HTMLInputElement).value).toBe("ana@exemplo.com");
+    expect(evento.mock.calls.some((c) => c[0] === "landing_stripe_pix_voltou")).toBe(true);
+    // no formulário, a pergunta do erro de digitação vale pro e-mail corrigido também
+    digitar("#oc-email", "ana@gmial.com");
+    await tocarPagar();
+    expect(host.querySelector("[data-testid='email-pergunta']")!.textContent).toContain("Você quis dizer ana@gmail.com?");
+  });
   it("rodada 2 (T-M2) · Pix vencido (o servidor diz requires_payment_method): sai do 'Esperando o Pix' pro formulário com o aviso; Pagar gera outro QR no MESMO pedido", async () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
     try {
@@ -516,6 +563,36 @@ describe("4 · o checkout dentro do cartão do preço (layout 'cartao')", () => 
       expect(pixel.mock.calls.filter((c) => c[0] === "Purchase")).toHaveLength(1);
     } finally { vi.useRealTimers(); }
   });
+  it("rodada 4 (T3-M2) · pedido já pago + 2º toque em Pagar enquanto a página confere: o botão segura 'Processando…' e a tela de pago mostra o e-mail do Pix (não o digitado)", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    try {
+      await abrirCheckout(opcoes());
+      await flush();
+      digitar("#oc-email", "bia@exemplo.com");
+      await tocarPagar();
+      status.mockResolvedValue({ ok: true, pago: false, status: "requires_payment_method" }); // venceu → formulário, mesmo pedido
+      vi.advanceTimersByTime(3000);
+      await flush();
+      expect(host.querySelector("#oc-erro")!.textContent).toBe("Esse Pix venceu. Toque em Pagar pra gerar outro.");
+      // o banco passou o Pix mesmo assim: o servidor agora diz PAGO; a conferência do método (stripe-status) demora
+      criar.mockResolvedValue({ ok: true, pi: "pi_2027", clientSecret: "pi_2027_secret_QA", status: "succeeded" });
+      const pendentes: Array<(v: unknown) => void> = [];
+      status.mockImplementation(() => new Promise((ok) => { pendentes.push(ok); }));
+      digitar("#oc-email", "outra@exemplo.com");
+      await tocarPagar();
+      const botao = host.querySelector("#oc-pagar") as HTMLButtonElement;
+      expect(botao.textContent).toBe("Processando…");
+      expect(JSON.parse(sessionStorage.getItem("p2027-qa-stripe-email")!).email).toBe("bia@exemplo.com"); // o digitado não entrou na aba
+      botao.click(); await flush(); // ela acha que não foi e toca de novo: não entra
+      for (const ok of pendentes) ok({ ok: true, pago: true, status: "succeeded", metodo: "pix" });
+      await flush();
+      expect(host.querySelector("[data-testid='pos-email']")!.textContent).toContain("bia@exemplo.com");
+      expect(host.querySelector("[data-testid='pos-email']")!.textContent).not.toContain("outra@");
+      expect(confirmPixPayment).toHaveBeenCalledOnce();
+      expect(confirmPayment).not.toHaveBeenCalled();
+      expect(pixel.mock.calls.filter((c) => c[0] === "Purchase")).toHaveLength(1);
+    } finally { vi.useRealTimers(); }
+  });
   it("rodada 3 (T2-MÉDIA 1) · mesmo caso no Pix: Pagar num pedido já pago não gera QR novo, vai pro pago", async () => {
     await abrirCheckout(opcoes());
     await flush();
@@ -582,103 +659,6 @@ describe("4 · o checkout dentro do cartão do preço (layout 'cartao')", () => 
     expect(confirmPixPayment).toHaveBeenCalledWith("pi_2027_secret_QA", { payment_method: { billing_details: { email: "jose@hotmail.com" } } }, { handleActions: false });
   });
 
-  describe("rodada 3 (T2-BAIXA 4 + cliente fria) · 'Corrigir' o e-mail com o Pix aberto troca o e-mail NO MESMO pagamento", () => {
-    const gerarPix = async () => {
-      await abrirCheckout(opcoes());
-      await flush();
-      digitar("#oc-email", "ana@exemplo.com");
-      await tocarPagar();
-      expect(host.querySelector("[data-testid='pix-email']")!.textContent).toContain("ana@exemplo.com");
-    };
-    const abrirEditor = async () => {
-      (host.querySelector("[data-corrigir-email]") as HTMLElement).click();
-      await flush();
-      return host.querySelector("[data-testid='pix-email-editar']")!;
-    };
-    const salvar = async (ed: Element, novo: string) => {
-      const campo = ed.querySelector("#ct-email-novo") as HTMLInputElement;
-      campo.value = novo; campo.dispatchEvent(new Event("input"));
-      (ed.querySelector("[data-salvar]") as HTMLElement).click();
-      await flush();
-    };
-    it("deu certo: o MESMO Pix na tela (mesmo QR, nenhum QR novo, nenhum pedido novo, sem o aviso) com o e-mail novo; pagou → o pago mostra o novo", async () => {
-      await gerarPix();
-      const ref = sessionStorage.getItem("p2027-qa-stripe-ref");
-      criar.mockClear(); confirmPixPayment.mockClear();
-      criar.mockResolvedValue({ ok: true, pi: "pi_2027", clientSecret: "pi_2027_secret_QA", status: "requires_action" });
-      // Cancelar não muda nada; e-mail incompleto não vai pro servidor
-      let ed = await abrirEditor();
-      expect((ed.querySelector("#ct-email-novo") as HTMLInputElement).value).toBe("ana@exemplo.com");
-      (ed.querySelector("[data-cancelar]") as HTMLElement).click();
-      expect(host.querySelector("[data-testid='pix-email']")!.textContent).toContain("ana@exemplo.com");
-      ed = await abrirEditor();
-      await salvar(ed, "ana@");
-      expect(ed.querySelector("#ct-email-novo-erro")!.textContent).toBe("Confira o e-mail: parece que falta alguma coisa.");
-      expect(criar).not.toHaveBeenCalled();
-      await salvar(ed, "Ana.Certa@Exemplo.com ");
-      expect(criar).toHaveBeenCalledOnce();
-      expect(criar.mock.calls[0][0]).toMatchObject({ ref, pi: "pi_2027", email: "ana.certa@exemplo.com", pagina: "p2027" });
-      expect(confirmPixPayment).not.toHaveBeenCalled();
-      expect(host.querySelector("[data-testid='oferta-pix']")).not.toBeNull();
-      expect((host.querySelector("#oc-codigo") as HTMLInputElement).value).toBe(QR);
-      expect(host.querySelector("[data-testid='pix-email']")!.textContent).toBe("O acesso vai pro e-mail ana.certa@exemplo.comCorrigir");
-      expect(host.querySelector("[data-testid='aviso-pix-velho']")).toBeNull();
-      expect(host.querySelector("#oc-email")).toBeNull(); // não voltou pro formulário
-      expect(sessionStorage.getItem("p2027-qa-stripe-ref")).toBe(ref);
-      expect(JSON.parse(sessionStorage.getItem("p2027-qa-stripe-email")!).email).toBe("ana.certa@exemplo.com");
-      expect(evento.mock.calls.some((c) => c[0] === "landing_stripe_pix_email_trocado" && c[1]?.ok === true)).toBe(true);
-      status.mockResolvedValue({ ok: true, pago: true, status: "succeeded", metodo: "pix" });
-      document.dispatchEvent(new Event("visibilitychange"));
-      await flush();
-      expect(host.querySelector("[data-testid='pos-email']")!.textContent).toContain("ana.certa@exemplo.com");
-      expect(JSON.stringify(evento.mock.calls)).not.toContain("ana.certa");
-    });
-    it("o 'ir'/Enter do teclado no campo novo salva (o Salvar pode estar atrás do teclado)", async () => {
-      await gerarPix();
-      criar.mockClear();
-      criar.mockResolvedValue({ ok: true, pi: "pi_2027", clientSecret: "pi_2027_secret_QA", status: "requires_action" });
-      const ed = await abrirEditor();
-      const campo = ed.querySelector("#ct-email-novo") as HTMLInputElement;
-      expect(document.activeElement).toBe(campo); // o teclado já abre no campo
-      campo.value = "ana.certa@exemplo.com"; campo.dispatchEvent(new Event("input"));
-      campo.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-      await flush();
-      expect(criar).toHaveBeenCalledOnce();
-      expect(host.querySelector("[data-testid='pix-email']")!.textContent).toContain("ana.certa@exemplo.com");
-    });
-    it("falhou (rede ou servidor): o caminho de antes — formulário com o e-mail corrigido e o aviso dizendo pra que e-mail o Pix anterior libera", async () => {
-      await gerarPix();
-      criar.mockResolvedValue({ ok: false });
-      await salvar(await abrirEditor(), "ana.certa@exemplo.com");
-      expect(host.querySelector("[data-testid='oferta-pix']")).toBeNull();
-      expect((host.querySelector("#oc-email") as HTMLInputElement).value).toBe("ana.certa@exemplo.com");
-      const aviso = host.querySelector("[data-testid='aviso-pix-velho']")!;
-      expect(aviso.textContent).toMatch(/^O Pix anterior libera o acesso em ana@exemplo\.com \(vale até \d\dh\d\d\)\. Se você já pagou ele, não pague de novo\.$/);
-      expect(aviso.querySelector("b")!.textContent).toBe("ana@exemplo.com");
-      expect(evento.mock.calls.some((c) => c[0] === "landing_stripe_pix_email_trocado" && c[1]?.ok === false && c[1]?.motivo === "falhou")).toBe(true);
-    });
-    it("o Pix já tinha sido pago quando ela salvou: tela de pago com o e-mail que ESTAVA no pagamento (o antigo); nada é confirmado de novo", async () => {
-      await gerarPix();
-      confirmPixPayment.mockClear();
-      criar.mockResolvedValue({ ok: true, pi: "pi_2027", clientSecret: "pi_2027_secret_QA", status: "succeeded" });
-      await salvar(await abrirEditor(), "ana.certa@exemplo.com");
-      expect(host.querySelector("[data-testid='pos-compra']")).not.toBeNull();
-      expect(host.querySelector("[data-testid='pos-email']")!.textContent).toContain("ana@exemplo.com");
-      expect(host.querySelector("[data-testid='pos-email']")!.textContent).not.toContain("ana.certa");
-      expect(confirmPixPayment).not.toHaveBeenCalled();
-      expect(pixel.mock.calls.filter((c) => c[0] === "Purchase")).toHaveLength(1);
-    });
-    it("o Pix venceu enquanto ela corrigia: o e-mail novo fica no pagamento e ela volta pro formulário com 'Esse Pix venceu' (o próximo Pagar é no MESMO pedido)", async () => {
-      await gerarPix();
-      const ref = sessionStorage.getItem("p2027-qa-stripe-ref");
-      criar.mockResolvedValue({ ok: true, pi: "pi_2027", clientSecret: "pi_2027_secret_QA", status: "requires_payment_method" });
-      await salvar(await abrirEditor(), "ana.certa@exemplo.com");
-      expect(host.querySelector("#oc-erro")!.textContent).toBe("Esse Pix venceu. Toque em Pagar pra gerar outro.");
-      expect((host.querySelector("#oc-email") as HTMLInputElement).value).toBe("ana.certa@exemplo.com");
-      expect(sessionStorage.getItem("p2027-qa-stripe-ref")).toBe(ref);
-    });
-  });
-
   it("rodada 2 (V-M7) · e-mail com erro de digitação: pergunta UMA vez antes de gerar o Pix, com 2 botões grandes; 'Sim, usar o corrigido' paga com o corrigido", async () => {
     await abrirCheckout(opcoes());
     await flush();
@@ -732,6 +712,25 @@ describe("4 · o checkout dentro do cartão do preço (layout 'cartao')", () => 
     expect(host.querySelector("#sk-email")).toBeNull();
     expect([...novo.value]).toEqual(letras);
     expect(document.activeElement).toBe(novo);
+  });
+});
+
+describe("rodada 4 (V3-M4) · imagem do app que não carregou", () => {
+  it("o recorte some (fica a legenda), pelo ouvinte do <head> — antes de qualquer imagem; imagem fora de recorte não muda nada", () => {
+    const cabeca = HTML_CRU.slice(0, HTML_CRU.indexOf("</head>"));
+    const scripts = [...cabeca.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+    const ouvinte = scripts.find((x) => x.includes('addEventListener("error"'))!;
+    expect(ouvinte).toBeTruthy();
+    expect(cabeca.indexOf(ouvinte)).toBeLessThan(cabeca.indexOf('<script type="module"')); // antes do main.ts
+    new Function(ouvinte)();
+    document.body.innerHTML = '<ul><li class="area"><h3>Hábitos ✅</h3><figure class="recorte"><img src="/p2027/x.webp"></figure><p>Marca o que fez.</p></li></ul><figure class="foto"><img id="foto" src="/p2027/y.webp"></figure>';
+    const img = document.querySelector(".recorte img")!;
+    img.dispatchEvent(new Event("error")); // erro de imagem não sobe (bubbles: false): o ouvinte é de captura
+    expect(document.querySelector(".recorte")!.hasAttribute("hidden")).toBe(true);
+    expect(document.querySelector(".area p")!.textContent).toBe("Marca o que fez.");
+    document.getElementById("foto")!.dispatchEvent(new Event("error"));
+    expect(document.querySelector(".foto")!.hasAttribute("hidden")).toBe(false);
+    expect(readFileSync(resolve(RAIZ, "src/p2027/style.css"), "utf8")).toContain(".recorte[hidden]{display:none}");
   });
 });
 
@@ -884,25 +883,6 @@ describe("5 · a página (main.ts)", () => {
       expect(ro.desligado).toBe(true); // saiu do campo: para de observar
     } finally { vi.useRealTimers(); }
   });
-  it("rodada 3 · 'Corrigir' com o Pix aberto e o teclado em cima: o 'Salvar' do campo novo sobe pra vista (a mesma conta do botão de pagar)", async () => {
-    vi.stubGlobal("matchMedia", (q: string) => ({ matches: q === "(pointer: coarse)", media: q, addEventListener() {}, removeEventListener() {} }));
-    const vv = Object.assign(new EventTarget(), { height: 330, offsetTop: 0 }); // 375×667 com o teclado
-    vi.stubGlobal("visualViewport", vv);
-    const scrollBy = vi.fn(); vi.stubGlobal("scrollBy", scrollBy);
-    await import("@/p2027/main");
-    const alvo = document.getElementById("pagamento")!;
-    alvo.innerHTML = '<div class="oc-pix"><div class="ct-pix-editar"><input id="ct-email-novo" type="email"><button type="button" data-salvar>Salvar</button></div></div>';
-    const campo = alvo.querySelector("#ct-email-novo") as HTMLInputElement, salvar = alvo.querySelector("[data-salvar]") as HTMLElement;
-    campo.getBoundingClientRect = () => ({ top: 200, bottom: 252 } as DOMRect);
-    salvar.getBoundingClientRect = () => ({ top: 312, bottom: 360 } as DOMRect);
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    try {
-      campo.focus();
-      vi.advanceTimersByTime(400);
-      expect(scrollBy).toHaveBeenCalledOnce();
-      expect((scrollBy.mock.calls[0][0] as { top: number }).top).toBe(42); // 360 + 12 − 330
-    } finally { vi.useRealTimers(); }
-  });
   it("rodada 3 (V2-B7) · tocar em 'Cartão' no esqueleto já marca Cartão e o botão diz 'no cartão'; o formulário de verdade abre no Cartão", async () => {
     const tocouCartao = vi.fn();
     pagina.mountPayment.mockImplementationOnce(async (alvo: HTMLElement) => {
@@ -923,6 +903,30 @@ describe("5 · a página (main.ts)", () => {
     expect(esq.querySelector("[data-sk-pagar]")!.textContent).toMatch(/^Pagar R\$\s27,90 no Pix$/);
     cartaoSk.click();
     await vi.waitFor(() => expect(tocouCartao).toHaveBeenCalledOnce());
+  });
+  it("rodada 4 (V3-M1) · o pagamento não carregou: 'Tentar de novo' recarrega a página e o e-mail que ela digitou volta no campo", async () => {
+    pagina.mountPayment.mockImplementationOnce(async () => { throw new TypeError("Failed to fetch dynamically imported module"); });
+    await import("@/p2027/main");
+    const sk = document.getElementById("sk-email") as HTMLInputElement;
+    sk.value = "ana@exemplo.com";
+    document.querySelector("[data-esqueleto]")!.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    await vi.waitFor(() => expect(document.querySelector(".ck-espera")).not.toBeNull());
+    expect(pagina.event).toHaveBeenCalledWith("landing_erro", { onde: "p2027_checkout_load" });
+    expect(sessionStorage.getItem("p2027-qa-email-digitado")).toBeNull(); // só guarda se ela tocar em "Tentar de novo"
+    const erro = vi.spyOn(console, "error").mockImplementation(() => {}); // o jsdom avisa que não navega: é o location.reload() pedido
+    try {
+      (document.querySelector(".ck-tentar") as HTMLElement).click();
+      expect(erro.mock.calls.some((c) => /Not implemented: navigation/.test(String(c[0])))).toBe(true);
+    } finally { erro.mockRestore(); }
+    expect(sessionStorage.getItem("p2027-qa-email-digitado")).toBe("ana@exemplo.com");
+  });
+  it("rodada 4 (V3-M1) · depois da recarga do 'Tentar de novo': o e-mail guardado volta pro esqueleto e sai da aba", async () => {
+    sessionStorage.setItem("p2027-qa-email-digitado", "ana@exemplo.com");
+    await import("@/p2027/main");
+    expect((document.getElementById("sk-email") as HTMLInputElement).value).toBe("ana@exemplo.com");
+    expect(sessionStorage.getItem("p2027-qa-email-digitado")).toBeNull();
+    document.querySelector("[data-esqueleto]")!.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    expect(pagina.mountPayment.mock.calls[0][1]).toMatchObject({ emailInicial: "ana@exemplo.com" });
   });
   it("já pagou nesta aba: 'Você já comprou o CORE ✓' no lugar do pagamento + o passo a passo em tela cheia; nada de PaymentIntent novo", async () => {
     sessionStorage.setItem("oferta-pos-compra", JSON.stringify({ pi: "pi_velho", email: "ana@example.com", em: Date.now() }));

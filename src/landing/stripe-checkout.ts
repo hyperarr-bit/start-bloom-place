@@ -149,6 +149,16 @@ function piDaAba(ref: string): string | null {
   try { const j = JSON.parse(sessionStorage.getItem(chavePi()) || "null") as { ref?: string; pi?: string } | null; return j && j.ref === ref && typeof j.pi === "string" && /^pi_/.test(j.pi) ? j.pi : null; } catch { return null; }
 }
 function guardarPi(ref: string, pi: string) { try { sessionStorage.setItem(chavePi(), JSON.stringify({ ref, pi })); } catch { /* heap */ } }
+/** rodada 2 (/2027, SÓ no layout "cartao"): o e-mail do pedido desta aba, junto da ref (sessionStorage `<prefixo>-stripe-email`).
+ *  A recarga com o Pix gerado (ou já pago) volta com o MESMO e-mail: a tela do Pix e a de pago mostram ele escrito.
+ *  As outras páginas não guardam nada (emailDaAba devolve "" e guardarEmail não faz nada fora do "cartao"). */
+const chaveEmail = () => `${opc?.storagePrefix ?? "oferta"}-stripe-email`;
+const guardaEmail = () => opc?.layout === "cartao";
+function emailDaAba(ref: string): string {
+  if (!guardaEmail()) return "";
+  try { const j = JSON.parse(sessionStorage.getItem(chaveEmail()) || "null") as { ref?: string; email?: string } | null; return j && j.ref === ref && typeof j.email === "string" && EMAIL_OK.test(j.email) ? j.email : ""; } catch { return ""; }
+}
+function guardarEmail(ref: string, email: string) { if (!guardaEmail() || !EMAIL_OK.test(email)) return; try { sessionStorage.setItem(chaveEmail(), JSON.stringify({ ref, email })); } catch { /* heap */ } }
 /** a ref do pedido nesta aba (a mesma se a pessoa fecha e reabre — o servidor não cria 2 PaymentIntents) */
 function refDaAba(): string {
   try { const r = sessionStorage.getItem(chaveRef()); if (r && /^[A-Za-z0-9-]{8,64}$/.test(r)) return r; } catch { /* noop */ }
@@ -658,6 +668,49 @@ function tocouPagar() {
   return pagar();
 }
 
+/** rodada 2 (/2027, layout "cartao", V-M7): o e-mail que ela disse que está certo (a pergunta não volta pra ele) */
+let emailConfirmado: string | null = null;
+/** rodada 2 (V-M7): "Você quis dizer …@gmail.com?" no lugar do botão de pagar, com 2 botões grandes. Responder = continua o pagamento
+ *  que ela já tinha pedido (o toque em Pagar). Nenhum evento leva o e-mail. */
+function perguntarEmail(email: string, sugerido: string) {
+  const alvo = raiz?.querySelector<HTMLElement>("#oc-in");
+  const botao = alvo?.querySelector<HTMLButtonElement>("#oc-pagar");
+  if (!alvo || !botao || !opc) return;
+  alvo.querySelector("#ct-pergunta")?.remove();
+  alvo.querySelector<HTMLElement>("#oc-sug")?.setAttribute("hidden", "");
+  const caixa = document.createElement("div");
+  caixa.className = "ct-pergunta"; caixa.id = "ct-pergunta"; caixa.setAttribute("role", "group"); caixa.setAttribute("aria-labelledby", "ct-pergunta-t"); caixa.setAttribute("data-testid", "email-pergunta");
+  caixa.innerHTML = `<p id="ct-pergunta-t">Você quis dizer <b>${esc(sugerido)}</b>?</p><button type="button" class="ct-pergunta-sim" data-usar>Sim, usar o corrigido</button><button type="button" class="ct-pergunta-nao" data-manter>Não, está certo assim</button>`;
+  botao.hidden = true;
+  botao.insertAdjacentElement("beforebegin", caixa);
+  opc.evento("landing_stripe_email_pergunta", {});
+  const responder = (usar: boolean) => {
+    const campo = alvo.querySelector<HTMLInputElement>("#oc-email");
+    if (usar && campo) { campo.value = sugerido; if (est) est.email = sugerido; }
+    else emailConfirmado = email;
+    caixa.remove(); botao.hidden = false;
+    opc?.evento("landing_stripe_email_pergunta_resposta", { escolha: usar ? "corrigido" : "manteve" });
+    medirEmail();
+    void tocouPagar();
+  };
+  caixa.querySelector("[data-usar]")!.addEventListener("click", () => responder(true));
+  caixa.querySelector("[data-manter]")!.addEventListener("click", () => responder(false));
+  try { caixa.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch { /* jsdom */ }
+}
+
+/** rodada 2 (T-M1, /2027, layout "cartao"): depois do "Voltar" na tela do Pix, o Pix velho ainda vale 30 min. Se ela paga com um e-mail
+ *  diferente do dele, o e-mail do PI velho é trocado 1 vez (o stripe-criar já aceita trocar o e-mail de um Pix gerado): pago o velho,
+ *  o acesso vai pro e-mail que a tela mostra. Só vira o e-mail do Pix velho quando o servidor confirma (falhou = fica o antigo, e a tela
+ *  de pago mostra o antigo, que é onde o acesso chega). */
+function atualizarEmailDoPixVelho(email: string) {
+  const velho = pixVelho;
+  if (!velho || !api || !opc || !est || velho.email === email || velho.pedido === email) return;
+  velho.pedido = email;
+  void api.criar({ ...corpoDoPedido(email), ref: velho.ref, pi: velho.pi })
+    .then((r) => { if (pixVelho === velho && r.ok && r.status !== "succeeded") { velho.email = email; opc?.evento("landing_stripe_pix_velho_email", { ok: true }); } else if (pixVelho === velho) opc?.evento("landing_stripe_pix_velho_email", { ok: false }); })
+    .catch(() => { opc?.evento("landing_stripe_pix_velho_email", { ok: false }); });
+}
+
 /** começou a digitar / ficou válido: 1× por pedido (nunca o e-mail no evento) */
 function medirEmail() {
   if (!est || !opc) return;
@@ -793,7 +846,10 @@ async function montarElemento() {
   if (!temIntento) { falhouCarga("Não consegui abrir o pagamento agora. Tente de novo em instantes."); return; }
   // 2 (revisão): a recarga reaproveitou o PI — Pix já gerado volta com o MESMO QR; já pago vai pro pago
   if (ultimaCriacao?.status === "succeeded") { mostrarPago(est!.metodo); return; }
-  if (ultimaCriacao?.pix && (ultimaCriacao.pix.data || ultimaCriacao.pix.image_url_png)) { est!.pix = ultimaCriacao.pix; est!.metodo = "pix"; est!.fase = "pix"; telaPix(); return; }
+  // rodada 2 (T-M2, layout "cartao"): um Pix já vencido (pelo relógio, com 1 min de folga) não volta — fica o formulário com o aviso
+  const pixVoltaVencido = o.layout === "cartao" && pixVencidoPeloRelogio(ultimaCriacao?.pix);
+  if (pixVoltaVencido) erroGeral(MSG_PIX_VENCEU);
+  else if (ultimaCriacao?.pix && (ultimaCriacao.pix.data || ultimaCriacao.pix.image_url_png)) { est!.pix = ultimaCriacao.pix; est!.metodo = "pix"; est!.fase = "pix"; telaPix(); return; }
   const temStripe = await comStripe;
   if (minha !== montagem) return;
   if (!temStripe) { o.evento("landing_erro", { onde: "stripe_js" }); falhouCarga("O pagamento não carregou. Confira a internet e tente de novo."); return; }
@@ -832,6 +888,11 @@ async function pagar() {
   const email = campo.value.trim().toLowerCase();
   if (!email) { erroEmail("Digite seu e-mail: é por ele que você entra no CORE."); campo.focus(); o.evento("landing_email_antes_erro", { motivo: "vazio", onde: "stripe" }); return; }
   if (!EMAIL_OK.test(email)) { erroEmail("Confira o e-mail: parece que falta alguma coisa."); campo.focus(); o.evento("landing_email_antes_erro", { motivo: "invalido", onde: "stripe" }); return; }
+  // rodada 2 (/2027, layout "cartao"): e-mail com cara de erro de digitação ("@gmial.com") → pergunta UMA vez antes de pagar
+  if (o.layout === "cartao") {
+    const s = sugestaoDeEmail(email);
+    if (s && s !== email && emailConfirmado !== email) { perguntarEmail(email, s); return; }
+  }
   // CPF (nota fiscal): só os dígitos, conferidos aqui e de novo no servidor; nunca vai pra evento/log (só o motivo do erro)
   let cpf: string | null = null;
   if (o.pedeCpf) {
@@ -848,6 +909,9 @@ async function pagar() {
   botao.setAttribute("aria-busy", "true"); botao.textContent = "Processando…";
   erroGeral(null);
   est.email = email;
+  guardarEmail(est.ref, email); // rodada 2: só no layout "cartao"
+  // rodada 2 (T-M1, layout "cartao"): ela voltou do Pix e corrigiu o e-mail → o Pix velho (que ainda vale) passa a liberar no e-mail novo
+  if (o.layout === "cartao") atualizarEmailDoPixVelho(email);
   try {
     o.evento("landing_stripe_pagar", { metodo });
     if (metodo === "pix") {
@@ -925,6 +989,12 @@ function telaPix() {
     alvo.querySelector(".oc-pix")!.insertAdjacentHTML("beforeend", `<button type="button" class="oc-trocar oc-voltar-pix" id="oc-voltar-pix">Voltar e escolher outra forma de pagamento / corrigir o e-mail</button><p class="oc-miuda">Se você já pagou este Pix, não pague de novo: o acesso chega no seu e-mail.</p>`);
     alvo.querySelector("#oc-voltar-pix")!.addEventListener("click", voltarDoPix);
   }
+  // rodada 2 (/2027, layout "cartao"): o e-mail do pedido escrito no alto da tela do Pix, com o "corrigir" (o mesmo "Voltar" de baixo)
+  const emailDoPix = (est!.email || "").trim().toLowerCase();
+  if (o.layout === "cartao" && inline && EMAIL_OK.test(emailDoPix)) {
+    alvo.querySelector(".oc-pix > .oc-resumo")?.insertAdjacentHTML("afterend", `<p class="ct-pix-email" data-testid="pix-email"><span>O acesso vai pro e-mail <b>${esc(emailDoPix)}</b></span><button type="button" class="ct-pix-corrigir" data-corrigir-email>Corrigir</button></p>`);
+    alvo.querySelector("[data-corrigir-email]")?.addEventListener("click", voltarDoPix);
+  }
   if (!p.image_url_png && p.data) void desenharQr(alvo.querySelector<HTMLElement>("#oc-qr")!, p.data);
   alvo.querySelector("#oc-copiar")!.addEventListener("click", async () => {
     const b = alvo.querySelector<HTMLButtonElement>("#oc-copiar")!;
@@ -946,19 +1016,25 @@ function voltarDoPix() {
   const antigo = est;
   est = { fase: "form", ref: refDaAba(), pi: null, clientSecret: null, metodo: "pix", pix: null, email: antigo.email, cpf: antigo.cpf, nome: antigo.nome, titular: antigo.titular };
   ultimaCriacao = null;
+  guardarEmail(est.ref, antigo.email.trim().toLowerCase()); // rodada 2: só no layout "cartao" (a recarga volta com o campo preenchido)
   opc.evento("landing_stripe_pix_voltou", { pi_antigo: antigo.pi });
-  if (antigo.pi) vigiarPixVelho({ ref: antigo.ref, pi: antigo.pi, ate: (antigo.pix?.expires_at ? antigo.pix.expires_at * 1000 : Date.now() + 30 * 60_000) + 60_000 });
+  // rodada 2 (T-M1): o Pix velho guarda o e-mail que está no PI dele (o que a tela de pago mostra se ele for o pago)
+  if (antigo.pi) vigiarPixVelho({ ref: antigo.ref, pi: antigo.pi, ate: (antigo.pix?.expires_at ? antigo.pix.expires_at * 1000 : Date.now() + 30 * 60_000) + 60_000, email: antigo.email.trim().toLowerCase() });
   telaForm();
-  if (pixVelho) raiz?.querySelector("#oc-in")?.insertAdjacentHTML("afterbegin", `<p class="oc-aviso-pix-velho" data-testid="aviso-pix-velho">O Pix que você gerou ainda vale por 30 min. Se já pagou, não pague de novo: o acesso chega no e-mail.</p>`);
+  // rodada 2 (/2027, layout "cartao", W-B3): o aviso diz até que horas o Pix velho vale (não "30 min" fixo)
+  const venceVelho = opc.layout === "cartao" && antigo.pix?.expires_at ? new Date(antigo.pix.expires_at * 1000).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }) : null;
+  const aviso = venceVelho ? `O Pix anterior vale até ${esc(venceVelho)}. Se você já pagou ele, não pague de novo.` : "O Pix que você gerou ainda vale por 30 min. Se já pagou, não pague de novo: o acesso chega no e-mail.";
+  if (pixVelho) raiz?.querySelector("#oc-in")?.insertAdjacentHTML("afterbegin", `<p class="oc-aviso-pix-velho" data-testid="aviso-pix-velho">${aviso}</p>`);
   rolarInline();
 }
 
 /** 23/11 (montarEm, revisão): depois do "Voltar", o Pix velho ainda vale (o código pode ter sido copiado). A cada 5 s até vencer:
  *  pagou → a página vai pro pago com a ref/PI dele (Purchase com o eventID do PI velho = o da CAPI). Sem isto o pago ficava invisível. */
-let pixVelho: { ref: string; pi: string; ate: number } | null = null;
+/** `email` = o e-mail que está no PI do Pix velho (muda só quando o servidor confirma a troca); `pedido` = a troca já pedida (1 vez) */
+let pixVelho: { ref: string; pi: string; ate: number; email: string; pedido?: string } | null = null;
 let consultaVelho: number | null = null;
 function pararPixVelho() { if (consultaVelho !== null) { window.clearInterval(consultaVelho); consultaVelho = null; } pixVelho = null; }
-function vigiarPixVelho(v: { ref: string; pi: string; ate: number }) {
+function vigiarPixVelho(v: { ref: string; pi: string; ate: number; email: string }) {
   pararPixVelho();
   pixVelho = v;
   const uma = async () => {
@@ -969,6 +1045,8 @@ function vigiarPixVelho(v: { ref: string; pi: string; ate: number }) {
     if (!r?.pago || pixVelho !== velho || !est || (est.fase !== "form" && est.fase !== "pix")) return;
     pararVigia();
     est.ref = velho.ref; est.pi = velho.pi;
+    // rodada 2 (T-M1, layout "cartao"): a tela de pago mostra o e-mail que está NESSE pagamento (é pra ele que o acesso vai)
+    if (opc?.layout === "cartao" && velho.email) est.email = velho.email;
     opc?.evento("landing_stripe_pix_velho_pago", { pi: velho.pi });
     mostrarPago("pix");
   };
@@ -1047,6 +1125,8 @@ function vigiar() {
     const r = await api!.status({ ref: est.ref, pi }).catch(() => null);
     if (!est || est.pi !== pi) return; // 23/11: o pedido mudou enquanto perguntava (o "Voltar" do Pix): a resposta é do PI velho
     if (r?.pago) return mostrarPago((r.metodo as string) || est.metodo);
+    // rodada 2 (T-M2, /2027, layout "cartao"): o Pix venceu → sai do "Esperando o Pix" e volta pro formulário (mesmo pedido)
+    if (opc?.layout === "cartao" && est.fase === "pix" && (r?.status === "requires_payment_method" || pixVencidoPeloRelogio(est.pix))) return pixVenceu();
     semConfirmar = r?.ok === false ? semConfirmar + 1 : 0;
     if (est.fase === "aguardando" && (semConfirmar >= 3 || Date.now() - vigiaDesde > VIGIA_MAX_MS)) telaRecebido();
   };
@@ -1055,6 +1135,23 @@ function vigiar() {
   void uma();
 }
 function pararVigia() { if (consulta !== null) { window.clearInterval(consulta); consulta = null; } }
+
+/** rodada 2 (T-M2): o Pix vale 30 min (stripe-criar, expires_after_seconds 1800). O sinal principal é o do servidor (o PI volta pra
+ *  "requires_payment_method" quando o Pix vence); o relógio do aparelho só conta 1 min DEPOIS da validade (folga pra relógio adiantado). */
+const FOLGA_PIX_VENCIDO_MS = 60_000;
+const MSG_PIX_VENCEU = "Esse Pix venceu. Toque em Pagar pra gerar outro.";
+const pixVencidoPeloRelogio = (p: PixQr | null | undefined): boolean => !!p?.expires_at && Date.now() > p.expires_at * 1000 + FOLGA_PIX_VENCIDO_MS;
+/** volta pro formulário com o MESMO pedido (mesma ref e mesmo PI): o próximo "Pagar" gera outro QR no mesmo PaymentIntent — nada é cobrado
+ *  de novo (um PI só paga uma vez). */
+function pixVenceu() {
+  if (!opc || !est || est.fase !== "pix") return;
+  pararVigia();
+  opc.evento("landing_stripe_pix_vencido", { pi: est.pi });
+  est.fase = "form"; est.pix = null; est.metodo = "pix";
+  telaForm();
+  erroGeral(MSG_PIX_VENCEU);
+  rolarInline();
+}
 
 function mostrarPago(metodo: string) {
   if (!opc || !est || est.fase === "pago") return;
@@ -1069,7 +1166,7 @@ function mostrarPago(metodo: string) {
     window.addEventListener("popstate", aoVoltarNavegador);
     vigiarSaida(true);
   }
-  try { sessionStorage.removeItem(chaveRef()); sessionStorage.removeItem(chavePi()); } catch { /* noop */ }
+  try { sessionStorage.removeItem(chaveRef()); sessionStorage.removeItem(chavePi()); if (guardaEmail()) sessionStorage.removeItem(chaveEmail()); } catch { /* noop */ }
   o.evento("landing_stripe_pago", { metodo, pi: est.pi });
   if (est.pi) o.pixel("Purchase", { value: o.precoCentavos / 100, currency: "BRL", content_name: "oferta_stripe" }, est.pi);
   telaPago();
@@ -1170,7 +1267,8 @@ export async function abrirCheckout(o: OpcoesCheckout): Promise<void> {
   }
   abertoEm = Date.now(); saiuEm = null; saidas = 0;
   if (!inline) vigiarSaida(true);
-  if (!est) { const ref = refDaAba(); est = { fase: "form", ref, pi: piDaAba(ref), clientSecret: null, metodo: "pix", pix: null, email: "", cpf: "" }; }
+  // rodada 2: no layout "cartao" o e-mail do pedido desta aba volta junto (recarga com o Pix gerado ou já pago); fora dele, "" como sempre
+  if (!est) { const ref = refDaAba(); est = { fase: "form", ref, pi: piDaAba(ref), clientSecret: null, metodo: "pix", pix: null, email: emailDaAba(ref), cpf: "" }; }
   // só quando o e-mail do cartão da oferta mudou: quem trocou o e-mail aqui dentro, fechou e reabriu continua com o que escolheu
   if (o.emailInicial && est.fase === "form" && o.emailInicial !== ultimoEmailInicial) { est.email = o.emailInicial; ultimoEmailInicial = o.emailInicial; }
   if (o.voltaDoBanco) {
@@ -1232,4 +1330,4 @@ function fecharJa(_via: string) {
 }
 
 /** testes: zera o módulo entre páginas */
-export function _zerar() { pararPixVelho(); inline = false; cartaoUsado = null; pararVigia(); raiz?.remove(); raiz = null; est = null; ultimoEmailInicial = null; ultimaCriacao = null; icNoHeap.clear(); aberta = false; opc = null; api = null; stripe = null; elementos = null; elementoCartao = null; montagem += 1; pixPronto = false; cartaoPronto = false; cargaFalhou = false; cartaoFalhou = false; carteiraMedida = false; emailMedido.comecou = ""; emailMedido.valido = ""; fechandoPelaTela = false; saiuEm = null; carregandoStripe = null; soltarTeto(); trocandoPix = false; window.removeEventListener("popstate", aoVoltarNavegador); vigiarSaida(false); soltar(); }
+export function _zerar() { pararPixVelho(); inline = false; cartaoUsado = null; emailConfirmado = null; pararVigia(); raiz?.remove(); raiz = null; est = null; ultimoEmailInicial = null; ultimaCriacao = null; icNoHeap.clear(); aberta = false; opc = null; api = null; stripe = null; elementos = null; elementoCartao = null; montagem += 1; pixPronto = false; cartaoPronto = false; cargaFalhou = false; cartaoFalhou = false; carteiraMedida = false; emailMedido.comecou = ""; emailMedido.valido = ""; fechandoPelaTela = false; saiuEm = null; carregandoStripe = null; soltarTeto(); trocandoPix = false; window.removeEventListener("popstate", aoVoltarNavegador); vigiarSaida(false); soltar(); }

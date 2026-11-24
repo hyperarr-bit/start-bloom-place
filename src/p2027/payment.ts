@@ -13,9 +13,10 @@ import { fireMetaEvent } from "@/lib/meta-pixel";
 import { readStripeReturn } from "@/completo/stripe-return";
 import { compactCheckoutSource } from "@/conhecer/attribution";
 import { PRECO_2027_CENTAVOS } from "./preco";
+import { DOMINIOS_PRODUCAO } from "./previa";
 
 export const PRECO_CENTAVOS = PRECO_2027_CENTAVOS;
-export const DOMINIOS = ["coreaplicativo.com.br", "www.coreaplicativo.com.br"];
+export const DOMINIOS: readonly string[] = DOMINIOS_PRODUCAO;
 export const QA = new URLSearchParams(location.search).get("qa") === "1" || !DOMINIOS.includes(location.hostname);
 /** o pedido desta aba (sessionStorage `<prefixo>-stripe-ref` / `-stripe-pi`): a prévia nunca reaproveita um pedido de verdade */
 export const STORAGE_PREFIX = QA ? "p2027-qa" : "p2027";
@@ -52,15 +53,25 @@ export function initPixel() {
   fireMetaEvent("ViewContent", { content_name: "CORE vitalício /2027", value: PRECO_CENTAVOS / 100, currency: "BRL" }, `p2027-vc-${session}`);
 }
 
-/** o checkout DENTRO de `alvo` (inline), layout "cartao". Purchase = o do checkout compartilhado (eventID = id do PI, o mesmo da CAPI). */
+/** o checkout DENTRO de `alvo` (inline), layout "cartao". Purchase = o do checkout compartilhado (eventID = id do PI, o mesmo da CAPI).
+ *  rodada 2 (V-M2/T-BAIXA 2): o e-mail digitado no esqueleto e o foco são lidos AGORA, depois de o pedaço do checkout chegar e logo antes
+ *  de o formulário de verdade trocar o esqueleto (antes: no 1º toque, com o campo ainda vazio → o que ela digitou sumia). */
 export async function mountPayment(alvo: HTMLElement, o: { voltaDoBanco?: { pi: string; status: string }; emailInicial?: string; evento?: (nome: string, dados?: Record<string, unknown>) => void } = {}) {
   const { abrirCheckout } = await import("@/landing/stripe-checkout");
+  const sk = alvo.querySelector<HTMLInputElement>("#sk-email");
+  const digitado = sk?.value.trim() || o.emailInicial;
+  const tinhaFoco = !!sk && document.activeElement === sk;
   await abrirCheckout({
     pk: "pk_live_51TJnAQQdjmrIbUhHDSWqG1trOT6mFfV87AC4Vv47kFJTAFOhYsNmvryGRnf3x824Ke3mXSsWiFCovKPIR6Kqx0IX00VcuAawhC",
     precoCentavos: PRECO_CENTAVOS, parcelasMax: 1, producao: !QA, pedeCpf: false, somentePix: false, layout: "cartao", montarEm: alvo,
     storagePrefix: STORAGE_PREFIX, pagina: "p2027", trocaCartao: false, medirCarteira: false, posApp: true, pixCopiaPrimeiro: "sempre",
-    voltaDoBanco: o.voltaDoBanco, ...(o.emailInicial ? { emailInicial: o.emailInicial } : {}), evento: o.evento ?? event,
+    voltaDoBanco: o.voltaDoBanco, ...(digitado ? { emailInicial: digitado } : {}), evento: o.evento ?? event,
     pixel: (name, data, id) => { if (!QA && (name === "Purchase" || name === "InitiateCheckout" || name === "ViewContent" || name === "CompleteRegistration")) fireMetaEvent(name, data, id); },
     atrib, sessao: session, aparelho: device, urlChegada: source.url, fbclid: params.get("fbclid"),
   });
+  // ela estava no campo do esqueleto: o cursor vai pro campo de verdade, no fim do que ela digitou
+  if (tinhaFoco) {
+    const novo = alvo.querySelector<HTMLInputElement>("#oc-email");
+    if (novo) { novo.focus(); try { novo.setSelectionRange(novo.value.length, novo.value.length); } catch { /* type=email não aceita em alguns navegadores */ } }
+  }
 }

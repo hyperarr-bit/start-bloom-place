@@ -8,7 +8,9 @@
 }
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;overflow-x:clip}
-body{margin:0;background:var(--papel);color:var(--tx);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+/* rodada 2 (V-M5): overflow-x CLIP (o hidden no body desligava o "grudar" da faixa "Você já comprou ✓"); hidden fica só pro navegador
+   que não conhece clip (iOS < 16), que segue como antes */
+body{margin:0;background:var(--papel);color:var(--tx);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased;overflow-x:hidden;overflow-x:clip}
 img{display:block;max-width:100%;height:auto}
 /* reset por elemento (especificidade 0,0,1): qualquer classe da página, do checkout ou do pós-compra ganha dele, sem  */
 h1,h2,h3,p,figure,ul,ol,dl,dd,blockquote{margin:0;padding:0}
@@ -87,6 +89,9 @@ button,input{font:inherit}
 .area{display:flex;flex-direction:column;min-width:0;overflow:hidden;border-radius:16px;background:var(--c)}
 .area h3{padding:8px 9px 6px;font-size:14.5px;line-height:1.2;font-weight:800;color:var(--t)}
 .a-casa h3,.a-lei h3,.a-ali h3,.a-dev h3{min-height:calc(2.4em + 14px)}
+/* rodada 2: o título de 1 linha (Leitura, Alimentação) encosta no recorte — a sobra da altura do vizinho de 2 linhas fica em cima, não
+   numa faixa de cor vazia entre o título e o print */
+.a-lei h3,.a-ali h3{display:flex;align-items:flex-end}
 .area .recorte{border-radius:0;border-width:1px 0;border-color:rgba(0,0,0,.07);box-shadow:none}
 .area .recorte img{aspect-ratio:350/140;object-fit:cover;object-position:left top}
 .area p{padding:6px 9px 9px;font-size:14px;line-height:1.32;color:var(--tx)}
@@ -102,8 +107,9 @@ button,input{font:inherit}
 .pilulas li.rot::before{display:none}
 .pilulas li{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:650;color:var(--grafite);line-height:1.5}
 .pilulas li::before{content:"";flex:none;width:9px;height:9px;border-radius:50%;background:var(--p)}
-.esconder{display:grid;grid-template-columns:118px minmax(0,1fr);gap:11px;align-items:center;margin-top:12px;padding:9px 11px;background:#fff;border:1px solid var(--linha);border-radius:16px}
-.esconder .recorte{box-shadow:none;border-color:#f0ecee;border-radius:10px}
+/* rodada 2 (V-M4): o print do olho em 1 linha do app, na largura toda do cartão (a letra do app passa de ~6 px pra ~15 px), a frase embaixo */
+.esconder{display:grid;grid-template-columns:minmax(0,1fr);gap:7px;margin-top:12px;padding:8px 11px 10px;background:#fff;border:1px solid var(--linha);border-radius:16px}
+.esconder .recorte{box-shadow:none;border:0;border-radius:8px}
 .esconder p{font-size:14px;line-height:1.36;font-weight:700;color:var(--grafite)}
 
 /* 4 · o que o post não contou */

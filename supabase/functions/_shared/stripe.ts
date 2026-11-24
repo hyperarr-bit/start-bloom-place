@@ -21,7 +21,7 @@
 import { creditarPedido } from "./grant-pix.ts";
 import { EMAIL_POS_COMPRA_APP, assuntoVenda, htmlVenda } from "./email-venda.ts";
 /** 22/11: o e-mail da compra da /oferta leva o passo a passo do app (e não o convite do indique) — EMAIL_POS_COMPRA_APP */
-const tutorialNoEmail = (pagina: string): boolean => EMAIL_POS_COMPRA_APP === "on" && (pagina === PAGINA_STRIPE || pagina === "dia"); // 23/11: + a /dia
+const tutorialNoEmail = (pagina: string): boolean => EMAIL_POS_COMPRA_APP === "on" && (pagina === PAGINA_STRIPE || pagina === "dia" || pagina === "p2027"); // 23/11: + a /dia e a /2027 (rodada 2)
 import { acharContaHotmart, eventoPurchaseHotmart, mascararEmail, type AdminHotmart, type RegistroHotmart } from "./hotmart.ts";
 import { COMISSAO_FIXA_PLANOS_CENTS, MENSAL_APP_WEB, MENSAL_PLANOS, OFERTAS_STRIPE, mensalDaPagina, ofertaDaPagina, valorEsperadoOferta } from "./stripe-ofertas.ts";
 import { avisarMensalStripeComVitalicio, registrarPagoEmDobro } from "./landing-travas.ts";

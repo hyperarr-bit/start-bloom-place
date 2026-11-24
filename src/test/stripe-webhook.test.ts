@@ -653,6 +653,34 @@ describe("23/11 /2027: linha própria 'p2027' (R$ 27,90, stripe-lp27-criar)", ()
     expect(respostaStatus(p, REF)).toMatchObject({ ok: true, pago: true });
     expect(respostaStatus(p, "outra-ref-qualquer")).toEqual({ ok: false });
   });
+  it("rodada 2 (W-M1): o e-mail da venda da /2027 leva o passo a passo do app de hoje ('Receber código'); a /tudo e o /organizar seguem com o e-mail de antes", async () => {
+    const base = pi({ amount: 2790, amount_received: 2790 });
+    const m = montar();
+    m.db.users.set("u_anon", { id: "u_anon", email: null });
+    await mandar(m, evento("payment_intent.succeeded", { ...base, metadata: { ...base.metadata, user_id: "u_anon", pagina: "p2027" } }));
+    expect(m.saida.emails).toHaveLength(1);
+    const h = m.saida.emails[0].html;
+    expect(h).toContain('data-bloco="como-entrar-app"');
+    for (const t of ["“Já tenho conta? Entrar”", "“Receber código”", "8 números", "Você já pagou. Não compre de novo no app."]) expect(h).toContain(t);
+    expect(h).not.toContain('data-bloco="entrar"'); // o bloco velho ("toque em Entrar sem senha… que chega neste e-mail")
+    expect(h).not.toContain('data-bloco="guia"'); // nem o guia em PDF (anterior ao login por código)
+    expect(h).not.toMatch(/R\$|indique/i);
+    for (const [pagina, valor] of [["tudo", 1990], ["organizar", 1990]] as const) {
+      const m2 = montar();
+      m2.db.users.set("u_anon", { id: "u_anon", email: null });
+      await mandar(m2, evento("payment_intent.succeeded", { ...base, amount: valor, amount_received: valor, metadata: { ...base.metadata, user_id: "u_anon", pagina } }));
+      expect(m2.saida.emails).toHaveLength(1);
+      expect(m2.saida.emails[0].html).not.toContain("como-entrar-app");
+      expect(m2.saida.emails[0].html).toContain('data-bloco="entrar"');
+    }
+  });
+  it("rodada 2 (T-ALTA 1): trocar o preço da /2027 exige chave de idempotência nova — com a chave 'p2027' o valor só pode ser 2790 (e a página tem o MESMO)", async () => {
+    // Mudou o preço? A linha ganha idem novo (ex.: "p2027b") e o 2790 vai pro aceitaTambem (Pix gerado antes e pago depois). Sem isso este teste quebra.
+    if (OFERTAS_STRIPE.p2027.idem === "p2027") expect(OFERTAS_STRIPE.p2027.centavos).toBe(2790);
+    else expect(OFERTAS_STRIPE.p2027.aceitaTambem ?? []).toContain(2790);
+    const { PRECO_2027_CENTAVOS } = await import("@/p2027/preco");
+    expect(PRECO_2027_CENTAVOS).toBe(OFERTAS_STRIPE.p2027.centavos);
+  });
 });
 
 /* ───────── 22/11: o SORTEIO DE PREÇO da /oferta (AB_PRECO_OFERTA) — servidor ───────── */

@@ -31,7 +31,22 @@
 .oc-cartao .oc-pe{margin-top:12px}
 .oc-cartao .oc-pe-carregando{height:96px}
 .oc-cartao .oc-erro{margin:8px 0 0;font-size:14px;line-height:1.35;color:#b42318;font-weight:600}
-.oc-cartao .oc-sug{margin:6px 0 0;padding:0;border:0;background:none;font-size:14px;font-weight:700;color:var(--magenta);text-align:left}
+/* rodada 2 (V-M7): a sugestão de e-mail com altura de toque (era um link de 20 px) */
+.oc-cartao .oc-sug{display:block;min-height:44px;margin:0;padding:10px 0;border:0;background:none;font-size:14px;font-weight:700;color:var(--magenta);text-align:left}
+.oc-cartao .oc-sug[hidden]{display:none}
+/* rodada 2 (V-M7): "Você quis dizer …?" no lugar do botão de pagar (que fica escondido até ela responder), 2 botões grandes */
+.oc-cartao .ct-pagar[hidden]{display:none}
+.oc-cartao .ct-pergunta{margin:12px 0 0;padding:14px;border-radius:14px;background:#fff6e5;border:1.5px solid #f3d28c}
+.oc-cartao .ct-pergunta p{margin:0;font-size:15.5px;line-height:1.4;color:var(--tx);overflow-wrap:anywhere}
+.oc-cartao .ct-pergunta b{font-weight:800}
+.oc-cartao .ct-pergunta button{display:block;width:100%;min-height:52px;margin:10px 0 0;padding:0 12px;border-radius:14px;font:inherit;font-size:16px;font-weight:800;line-height:1.2;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.oc-cartao .ct-pergunta-sim{border:0;background:var(--magenta);color:#fff}
+.oc-cartao .ct-pergunta-nao{border:1.5px solid #d9d1d6;background:#fff;color:var(--grafite)}
+/* rodada 2 (W-M2): no alto da tela do Pix, o e-mail do pedido + "Corrigir" (o mesmo "Voltar" do fim da tela) */
+.oc-cartao .ct-pix-email{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:12px 0 0;padding:4px 4px 4px 12px;border-radius:12px;background:#fff;border:1.5px solid #ead0dd;text-align:left}
+.oc-cartao .ct-pix-email span{min-width:0;font-size:14.5px;line-height:1.35;color:var(--suave);overflow-wrap:anywhere}
+.oc-cartao .ct-pix-email b{display:block;font-size:15.5px;font-weight:800;color:var(--tx)}
+.oc-cartao .ct-pix-corrigir{flex:none;min-height:44px;padding:0 10px;border:0;background:none;font:inherit;font-size:14.5px;font-weight:800;color:var(--magenta);text-decoration:underline;cursor:pointer}
 /* o Pix gerado e o "confirmando" dentro do cartão (as telas do checkout compartilhado) */
 .oc-cartao .oc-pix .oc-resumo{background:var(--papel)}
 .oc-cartao .oc-pix .oc-cta{background:var(--magenta);box-shadow:0 10px 22px -10px rgba(201,43,120,.65)}

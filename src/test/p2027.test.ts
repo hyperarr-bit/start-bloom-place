@@ -20,7 +20,8 @@ import { OFERTAS_STRIPE } from "../../supabase/functions/_shared/stripe-ofertas"
 const RAIZ = resolve(__dirname, "../..");
 const HTML_CRU = readFileSync(resolve(RAIZ, "2027.html"), "utf8");
 const HTML = aplicarPreco(HTML_CRU);
-const semMarcacao = (h: string) => h.replace(/<script[\s\S]*?<\/script>/g, " ").replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<!--[\s\S]*?-->/g, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&#8209;/g, "-").replace(/\s+/g, " ");
+// rodada 3 (V2-B15): o "e-mail" que não quebra no hífen vem em <span class="nw"> — some sem deixar espaço (é a mesma palavra)
+const semMarcacao = (h: string) => h.replace(/<span class="nw">([^<]*)<\/span>/g, "$1").replace(/<script[\s\S]*?<\/script>/g, " ").replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<!--[\s\S]*?-->/g, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&#8209;/g, "-").replace(/\s+/g, " ");
 const TEXTO = semMarcacao(HTML);
 const W = window as unknown as Record<string, unknown>;
 const corpoDoHtml = () => HTML.slice(HTML.indexOf("<body>") + 6, HTML.indexOf("</body>")).replace(/<script>[\s\S]*?<\/script>/g, "");
@@ -94,30 +95,56 @@ describe("3 · o que a página afirma", () => {
     expect(TEXTO).not.toMatch(/ESPECIAL · HOJE/);
     expect(TEXTO.match(/só hoje/g)).toHaveLength(1); // só na faixa do topo
   });
-  it("rodada 2 · as dúvidas: 'É só pra 2027?' logo depois de 'É mensalidade?'; a loja explica o porquê; computador pelo navegador", () => {
+  it("rodada 3 · as dúvidas, palavra por palavra (W2 + cliente fria): 'É só pra 2027?' sem '2027 é só o ano…'; a loja sem 'baixar é de graça'", () => {
     const dts = [...HTML.matchAll(/<dt>([^<]+)<\/dt>/g)].map((m) => m[1]);
     expect(dts.slice(0, 3)).toEqual(["É mensalidade?", "É só pra 2027?", "Funciona no meu celular?"]);
-    const resposta = (dt: string) => HTML.slice(HTML.indexOf(`<dt>${dt}</dt>`)).match(/<dd>([\s\S]*?)<\/dd>/)![1].replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
-    expect(resposta("É só pra 2027?")).toBe("Não. É seu pra sempre: continua em 2028, 2029… 2027 é só o ano em que você começa.");
-    expect(resposta("Por que na loja o preço é outro?")).toBe("Nas lojas o CORE custa R$ 97,90 (e tem plano mensal). Por aqui a venda é direta com a gente, sem a loja no meio, e a oferta é esta: R$ 27,90, uma vez só. O app é o mesmo, e baixar é de graça. Depois de pagar aqui, é só tocar em Entrar: não precisa comprar nada dentro do app.");
+    expect(new Set(dts).size).toBe(dts.length); // cada dúvida uma vez só
+    const resposta = (dt: string) => semMarcacao(HTML.slice(HTML.indexOf(`<dt>${dt}</dt>`)).match(/<dd>([\s\S]*?)<\/dd>/)![1]).trim();
+    expect(resposta("É só pra 2027?")).toBe("Não. É seu pra sempre: você começa hoje e continua em 2028, 2029…");
+    expect(resposta("Por que na loja o preço é outro?")).toBe("Nas lojas o CORE custa R$ 97,90 (e tem plano mensal). Por aqui a venda é direta com a gente, sem a loja no meio: R$ 27,90, uma vez só. O app é o mesmo. Depois de pagar aqui, baixe o CORE e toque em “Já tenho conta? Entrar” com o mesmo e-mail: não precisa comprar nada lá dentro.");
     expect(resposta("Funciona no meu celular?")).toBe("Sim. No iPhone e no Android. E no computador, pelo navegador, com a mesma conta.");
+    expect(TEXTO).not.toContain("baixar é de graça");
+    expect(TEXTO).not.toContain("2027 é só o ano");
     // o preço da dúvida da loja também vem de preco.ts
-    expect(semMarcacao(aplicarPreco(HTML_CRU, 1990))).toContain("e a oferta é esta: R$ 19,90, uma vez só.");
-    // "baixar é de graça": as lojas vendem DENTRO do app (vitalício 97,90 no Play, anual 97,90 no iPhone) e o pós-compra manda tocar em "Obter"/"Instalar"
-    expect(readFileSync(resolve(RAIZ, "src/lib/native-shell.ts"), "utf8")).toContain('vitalicio97: { id: "core_vitalicio_97", preco: "R$ 97,90" }');
-    expect(readFileSync(resolve(RAIZ, "src/landing/pos-compra-app.ts"), "utf8")).toContain('${ios ? "“Obter”" : "“Instalar”"}');
+    expect(semMarcacao(aplicarPreco(HTML_CRU, 1990))).toContain("sem a loja no meio: R$ 19,90, uma vez só.");
   });
-  it("rodada 2 · 'não em Começar' só no passo 3 do 'Depois de pagar'; nos outros lugares, só 'toque em Entrar'", () => {
-    expect(TEXTO.match(/Começar/g)).toHaveLength(1);
+  it("rodada 3 · 1ª tela: 'É app: iPhone, Android e computador, com a mesma conta.' (sai 'Uma conta só pros três', lido como três pessoas)", () => {
+    expect(TEXTO).toContain("É app: iPhone, Android e computador, com a mesma conta.");
+    expect(TEXTO).not.toMatch(/pros três/);
+  });
+  it("rodada 3 · um nome só pro botão de entrar: o da 1ª tela do app hoje (“Já tenho conta? Entrar”), igual em toda a página", () => {
+    const welcome = readFileSync(resolve(RAIZ, "src/components/app/AppWelcome.tsx"), "utf8");
+    expect(welcome).toContain("Já tenho conta? <b>Entrar</b>");
+    const entrar = [...TEXTO.matchAll(/Entrar/g)];
+    expect(entrar.length).toBe(4); // passo 3, linha do esqueleto, dúvida da loja, dúvida "Paguei e não consegui entrar"
+    for (const m of entrar) expect(TEXTO.slice(m.index! - 17, m.index! + 7)).toBe("“Já tenho conta? Entrar”");
+    expect(TEXTO).not.toMatch(/Entrar na minha conta/);
     const passo3 = semMarcacao(HTML.slice(HTML.indexOf('<section class="depois"'), HTML.indexOf("</section>", HTML.indexOf('<section class="depois"'))));
-    expect(passo3).toContain("Toca em Entrar (não em “Começar”)");
-    expect(TEXTO).toContain("No app, toque em Entrar com o mesmo e-mail da compra: o código de 8 números chega nele.");
+    expect(passo3).toContain("Toca em “Já tenho conta? Entrar” (não em “Começar”)");
+    expect(TEXTO.match(/Começar/g)).toHaveLength(1); // só no passo 3
+    expect(TEXTO).toContain("No app, toque em “Já tenho conta? Entrar” com o mesmo e-mail da compra: o código de 8 números chega nele.");
     expect(TEXTO).not.toContain("não compre de novo dentro do app");
   });
-  it("rodada 2 · 'AVALIAÇÕES' no lugar de 'QUEM USA CONTA'; a Susam termina com '…' (o corte do 'Recomendo!')", () => {
+  it("rodada 3 · 'Avaliações' uma vez só (o título não repete a palavra); a Susam termina com '…'; os textos alternativos dizem o que a imagem mostra", () => {
     expect(HTML).toContain('<p class="kicker">Avaliações</p>');
+    expect(HTML).toContain("<h2>Reais, das lojas.</h2>");
+    expect(TEXTO.match(/avaliações/gi)).toHaveLength(1);
     expect(TEXTO).not.toMatch(/quem usa conta/i);
     expect(HTML).toContain("<blockquote>“…Super prático, fácil de usar e está me ajudando muito a organizar melhor minha rotina…”</blockquote>");
+    const alt = (src: string) => HTML.match(new RegExp(`src="${src}"[^>]*alt="([^"]+)"`))![1];
+    expect(alt("/p2027/area-leitura.webp")).toBe("Tela real: o livro, na página 208 de 320");
+    expect(alt("/p2027/area-metas.webp")).toBe("Tela real: a lista de metas");
+    expect(alt("/p2027/area-habitos.webp")).toBe("Tela real: a grade de consistência dos hábitos, com dias marcados e dias em branco");
+    expect(alt("/p2027/esconder.webp")).toBe("Tela real do app: Dev. Pessoal à mostra, com o olho aberto, e Casa guardada, com o olho fechado");
+    expect(HTML).toMatch(/src="\/p2027\/esconder\.webp" width="700" height="231"/); // o recorte de 2 linhas (V2-M3)
+  });
+  it("rodada 3 (V2-B15/B6) · 'e-mail' nunca quebra no hífen: todo 'e-mail' do texto da página vem inteiro (span .nw); a página é só clara", () => {
+    const corpo = corpoDoHtml().replace(/<[^>]*>/g, (tag) => (tag === '<span class="nw">' ? "«" : tag === "</span>" ? "»" : "<>"));
+    const soltos = [...corpo.matchAll(/e-mail/g)].filter((m) => corpo.slice(m.index! - 1, m.index!) !== "«" || corpo.slice(m.index! + 6, m.index! + 7) !== "»");
+    expect(soltos).toHaveLength(0);
+    expect(corpo.match(/«e-mail»/g)!.length).toBeGreaterThanOrEqual(7);
+    expect(readFileSync(resolve(RAIZ, "src/p2027/style.css"), "utf8")).toMatch(/\.nw\{white-space:nowrap\}/);
+    expect(HTML).toContain('<meta name="color-scheme" content="only light">');
   });
   it("o código de entrar tem 8 números (o app), o botão é 'Entrar' (não 'Começar') e o e-mail da venda traz as lojas", () => {
     const entrar = readFileSync(resolve(RAIZ, "src/components/auth/EntrarComCodigo.tsx"), "utf8");
@@ -167,7 +194,7 @@ describe("3 · o que a página afirma", () => {
     const cartao = semMarcacao(HTML.slice(HTML.indexOf('id="cartao"'), HTML.indexOf('id="garantia"')));
     expect(cartao).toContain("CNPJ 55.041.112/0001-82");
     expect(cartao).toContain("contato@coreaplicativo.com.br");
-    expect(cartao).toContain("Depois de pagar: baixe o CORE e toque em Entrar com este e-mail.");
+    expect(cartao).toContain("Depois de pagar: baixe o CORE e toque em “Já tenho conta? Entrar” com este e-mail.");
   });
   it("pixel: a Meta como na /tudo (os 2 pixels, ViewContent, Purchase pelo checkout); sem TikTok", () => {
     const pagamento = readFileSync(resolve(RAIZ, "src/p2027/payment.ts"), "utf8");
@@ -223,7 +250,9 @@ describe("4 · o checkout dentro do cartão do preço (layout 'cartao')", () => 
     (host.querySelector("[data-metodo='card']") as HTMLElement).click();
     await flush();
     expect(host.querySelector("#oc-pagar")!.textContent).toMatch(/^Pagar R\$\s27,90 no cartão$/);
-    expect(host.querySelector(".ct-depois")!.textContent).toBe("Depois de pagar: baixe o CORE e toque em Entrar com este e-mail.");
+    expect(host.querySelector(".ct-depois")!.textContent).toBe("Depois de pagar: baixe o CORE e toque em “Já tenho conta? Entrar” com este e-mail.");
+    expect(host.querySelector(".ct-depois .nw")!.textContent).toBe("e-mail"); // rodada 3 (V2-B15): não quebra no hífen
+    expect(host.querySelector(".ct-rot .nw")!.textContent).toBe("e-mail");
     expect(host.textContent).not.toMatch(/CPF|Nome completo|parcela|débito/i);
     expect(document.body.style.position).toBe(""); // nada por cima: a página continua rolando
   });
@@ -349,9 +378,10 @@ describe("4 · o checkout dentro do cartão do preço (layout 'cartao')", () => 
       digitar("#oc-email", "ana@exemplo.com");
       await tocarPagar();
       expect(host.querySelector("[data-testid='pix-email']")!.textContent).toContain("ana@exemplo.com");
-      (host.querySelector("[data-corrigir-email]") as HTMLElement).click(); // o "Corrigir" do alto = o mesmo "Voltar" de baixo
+      // rodada 3: o "Corrigir" do alto troca o e-mail no MESMO Pix (testes abaixo); este é o caminho do "Voltar" de baixo
+      (host.querySelector("#oc-voltar-pix") as HTMLElement).click();
       await flush();
-      expect(host.querySelector("[data-testid='aviso-pix-velho']")!.textContent).toMatch(/^O Pix anterior vale até \d\d:\d\d\. Se você já pagou ele, não pague de novo\.$/);
+      expect(host.querySelector("[data-testid='aviso-pix-velho']")!.textContent).toMatch(/^O Pix anterior libera o acesso em ana@exemplo\.com \(vale até \d\dh\d\d\)\. Se você já pagou ele, não pague de novo\.$/);
       expect((host.querySelector("#oc-email") as HTMLInputElement).value).toBe("ana@exemplo.com");
       digitar("#oc-email", "ana.certa@exemplo.com");
       await tocarPagar();
@@ -404,22 +434,249 @@ describe("4 · o checkout dentro do cartão do preço (layout 'cartao')", () => 
       expect(host.querySelector("[data-testid='oferta-pix']")).not.toBeNull();
     } finally { vi.useRealTimers(); }
   });
-  it("rodada 2 (T-M2) · Pix vencido pelo relógio (1 min depois da validade): mesma saída; e um Pix vencido não volta na recarga", async () => {
-    confirmPixPayment.mockResolvedValue({ paymentIntent: { id: "pi_2027", status: "requires_action", next_action: { type: "pix_display_qr_code", pix_display_qr_code: { data: QR, expires_at: Math.floor(Date.now() / 1000) - 120 } } } });
+  /* ───────── rodada 3 (T2 + cliente fria) ───────── */
+  const REAL = Date.UTC(2026, 10, 24, 15, 0, 0); // 24/11 12:00 em Brasília
+  const MIN = 60_000;
+  const horaDoAparelho = (ms: number) => { const d = new Date(ms); return `${String(d.getHours()).padStart(2, "0")}h${String(d.getMinutes()).padStart(2, "0")}`; };
+  const qrDaStripe = (expiraEm: number) => ({ paymentIntent: { id: "pi_2027", status: "requires_action", next_action: { type: "pix_display_qr_code", pix_display_qr_code: { data: QR, expires_at: Math.floor(expiraEm / 1000) } } } });
+
+  it("rodada 3 (T2-MÉDIA 1) · celular com a hora adiantada (1 h e 20 min): o Pix FICA; só vence 31 min depois de o QR chegar (tempo decorrido no aparelho)", async () => {
+    for (const adiantado of [60, 20]) {
+      let celular = REAL + adiantado * MIN;
+      const spy = vi.spyOn(Date, "now").mockImplementation(() => celular);
+      try {
+        confirmPixPayment.mockResolvedValue(qrDaStripe(REAL + 30 * MIN)); // a Stripe carimba no relógio DELA (o certo)
+        await abrirCheckout(opcoes());
+        await flush();
+        digitar("#oc-email", "bia@exemplo.com");
+        await tocarPagar();
+        expect(host.querySelector("[data-testid='oferta-pix']")).not.toBeNull();
+        expect(host.querySelector("[data-testid='pix-validade']")!.textContent).toBe(`Vale por 30 minutos (até ${horaDoAparelho(celular + 30 * MIN)}). O acesso também chega no seu e-mail.`);
+        // ela vai no app do banco e volta 12 e 29 min depois (no relógio do celular); o servidor ainda espera o Pix
+        for (const m of [12, 29]) {
+          celular = REAL + (adiantado + m) * MIN;
+          document.dispatchEvent(new Event("visibilitychange"));
+          await flush();
+          expect(host.querySelector("[data-testid='oferta-pix']")).not.toBeNull();
+        }
+        expect(evento.mock.calls.some((c) => c[0] === "landing_stripe_pix_vencido")).toBe(false);
+        // 32 min depois de o QR chegar: vence pelo relógio, mesma saída de quando o servidor diz que venceu (mesmo pedido)
+        celular = REAL + (adiantado + 32) * MIN;
+        document.dispatchEvent(new Event("visibilitychange"));
+        await flush();
+        expect(host.querySelector("[data-testid='oferta-pix']")).toBeNull();
+        expect(host.querySelector("#oc-erro")!.textContent).toBe("Esse Pix venceu. Toque em Pagar pra gerar outro.");
+      } finally { spy.mockRestore(); _zerar(); host.innerHTML = ""; sessionStorage.clear(); evento.mockClear(); }
+    }
+  });
+  it("rodada 3 (T2-MÉDIA 1) · recarga com o Pix aberto: vale o servidor — o MESMO Pix volta mesmo com o celular 1 h adiantado (sem hora que pareça vencida); com o relógio certo, 'Vale até' a hora da Stripe", async () => {
+    let celular = REAL + 60 * MIN;
+    const spy = vi.spyOn(Date, "now").mockImplementation(() => celular);
+    try {
+      criar.mockResolvedValue({ ok: true, pi: "pi_2027", clientSecret: "pi_2027_secret_QA", status: "requires_action", pix: { data: QR, expires_at: Math.floor((REAL + 25 * MIN) / 1000) } });
+      await abrirCheckout(opcoes());
+      await flush();
+      expect(host.querySelector("[data-testid='oferta-pix']")).not.toBeNull();
+      expect((host.querySelector("#oc-codigo") as HTMLInputElement).value).toBe(QR);
+      expect(host.querySelector("[data-testid='pix-validade']")!.textContent).toBe("O acesso também chega no seu e-mail.");
+      document.dispatchEvent(new Event("visibilitychange")); // o relógio não derruba um Pix que voltou na recarga: só o servidor
+      await flush();
+      expect(host.querySelector("[data-testid='oferta-pix']")).not.toBeNull();
+      _zerar(); host.innerHTML = "";
+      celular = REAL;
+      await abrirCheckout(opcoes());
+      await flush();
+      expect(host.querySelector("[data-testid='pix-validade']")!.textContent).toBe(`Vale até ${horaDoAparelho(REAL + 25 * MIN)}. O acesso também chega no seu e-mail.`);
+    } finally { spy.mockRestore(); }
+  });
+  it("rodada 3 (T2-MÉDIA 1) · o Pix foi pago no banco e ela toca em Pagar no CARTÃO (mesmo pedido): tela de pago com o e-mail do Pix, nenhuma confirmação de cartão", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    try {
+      await abrirCheckout(opcoes());
+      await flush();
+      digitar("#oc-email", "bia@exemplo.com");
+      await tocarPagar();
+      status.mockResolvedValue({ ok: true, pago: false, status: "requires_payment_method" }); // o servidor diz que venceu → formulário, mesmo pedido
+      vi.advanceTimersByTime(3000);
+      await flush();
+      expect(host.querySelector("#oc-erro")!.textContent).toBe("Esse Pix venceu. Toque em Pagar pra gerar outro.");
+      // ...mas o banco ainda passou o Pix: o servidor agora diz que o pedido está PAGO
+      criar.mockResolvedValue({ ok: true, pi: "pi_2027", clientSecret: "pi_2027_secret_QA", status: "succeeded" });
+      status.mockResolvedValue({ ok: true, pago: false, status: "succeeded", metodo: "pix" });
+      (host.querySelector("[data-metodo='card']") as HTMLElement).click();
+      await flush();
+      digitar("#oc-email", "outra@exemplo.com");
+      await tocarPagar();
+      expect(confirmPayment).not.toHaveBeenCalled();
+      expect(confirmPixPayment).toHaveBeenCalledOnce(); // só o do 1º Pix
+      expect(host.querySelector("[data-testid='pos-compra']")).not.toBeNull();
+      expect(host.querySelector("[data-testid='pos-email']")!.textContent).toContain("bia@exemplo.com"); // o e-mail que estava no pagamento
+      expect(host.querySelector("[data-testid='pos-email']")!.textContent).not.toContain("outra@");
+      expect(evento.mock.calls.some((c) => c[0] === "landing_stripe_ja_estava_pago")).toBe(true);
+      expect(pixel.mock.calls.filter((c) => c[0] === "Purchase")).toHaveLength(1);
+    } finally { vi.useRealTimers(); }
+  });
+  it("rodada 3 (T2-MÉDIA 1) · mesmo caso no Pix: Pagar num pedido já pago não gera QR novo, vai pro pago", async () => {
     await abrirCheckout(opcoes());
     await flush();
+    criar.mockResolvedValue({ ok: true, pi: "pi_2027", clientSecret: "pi_2027_secret_QA", status: "succeeded" });
+    status.mockResolvedValue({ ok: true, pago: false, status: "succeeded", metodo: "pix" });
     digitar("#oc-email", "bia@exemplo.com");
     await tocarPagar();
-    expect(host.querySelector("[data-testid='oferta-pix']")).toBeNull();
-    expect(host.querySelector("#oc-erro")!.textContent).toBe("Esse Pix venceu. Toque em Pagar pra gerar outro.");
-    // recarga com o servidor ainda devolvendo aquele Pix (vencido): fica o formulário com o aviso, sem laço
-    _zerar(); host.innerHTML = "";
-    criar.mockResolvedValue({ ok: true, pi: "pi_2027", clientSecret: "pi_2027_secret_QA", status: "requires_action", pix: { data: QR, expires_at: Math.floor(Date.now() / 1000) - 120 } });
+    expect(confirmPixPayment).not.toHaveBeenCalled();
+    expect(host.querySelector("[data-testid='pos-compra']")).not.toBeNull();
+  });
+  it("rodada 3 (T2-BAIXA 2) · uma resposta ATRASADA dizendo 'venceu' (pedida antes do Pix novo do mesmo pedido) não derruba o Pix novo", async () => {
     await abrirCheckout(opcoes());
     await flush();
-    expect(host.querySelector("[data-testid='oferta-pix']")).toBeNull();
+    digitar("#oc-email", "ana@exemplo.com");
+    await tocarPagar();
+    status.mockResolvedValue({ ok: true, pago: false, status: "requires_payment_method" });
+    document.dispatchEvent(new Event("visibilitychange"));
+    await flush();
     expect(host.querySelector("#oc-erro")!.textContent).toBe("Esse Pix venceu. Toque em Pagar pra gerar outro.");
-    expect(host.querySelector("#oc-pagar")!.textContent).toMatch(/^Pagar R\$\s27,90 no Pix$/);
+    let soltarVelha: (v: unknown) => void = () => {};
+    status.mockImplementationOnce(() => new Promise((ok) => { soltarVelha = ok; }));
+    status.mockResolvedValue({ ok: true, pago: false, status: "requires_action" });
+    document.dispatchEvent(new Event("visibilitychange")); // internet lenta: a pergunta sai com o Pix ainda vencido
+    await flush();
+    await tocarPagar(); // Pix NOVO no mesmo pedido
+    expect(host.querySelector("[data-testid='oferta-pix']")).not.toBeNull();
+    soltarVelha({ ok: true, pago: false, status: "requires_payment_method" }); // chega a resposta velha
+    await flush();
+    expect(host.querySelector("[data-testid='oferta-pix']")).not.toBeNull();
+    expect(evento.mock.calls.filter((c) => c[0] === "landing_stripe_pix_vencido")).toHaveLength(1);
+  });
+  it("rodada 3 (cliente fria + W2-B3) · a hora do Pix: 'Vale por 30 minutos (até 01h13)', 30 min no relógio e no fuso do aparelho", async () => {
+    const spy = vi.spyOn(Date, "now").mockReturnValue(Date.UTC(2026, 10, 24, 3, 43, 0));
+    try {
+      await abrirCheckout(opcoes());
+      await flush();
+      digitar("#oc-email", "bia@exemplo.com");
+      await tocarPagar();
+      expect(host.querySelector("[data-testid='pix-validade']")!.textContent).toBe(`Vale por 30 minutos (até ${horaDoAparelho(Date.UTC(2026, 10, 24, 4, 13, 0))}). O acesso também chega no seu e-mail.`);
+      expect(host.querySelector("[data-testid='pix-validade'] .nw")!.textContent).toBe("e-mail");
+    } finally { spy.mockRestore(); }
+  });
+  it("rodada 3 (T2-BAIXA 1) · a pergunta 'Você quis dizer…?' some quando ela mexe no campo; o 'Sim' usa a sugestão do que está no campo AGORA", async () => {
+    await abrirCheckout(opcoes());
+    await flush();
+    digitar("#oc-email", "mariasilva@gmial.com");
+    await tocarPagar();
+    expect(host.querySelector("[data-testid='email-pergunta']")).not.toBeNull();
+    digitar("#oc-email", "maria.silva@gmail.com"); // ela mesma conserta
+    expect(host.querySelector("[data-testid='email-pergunta']")).toBeNull();
+    expect((host.querySelector("#oc-pagar") as HTMLElement).hidden).toBe(false);
+    expect(confirmPixPayment).not.toHaveBeenCalled();
+    await tocarPagar();
+    expect(confirmPixPayment).toHaveBeenCalledWith("pi_2027_secret_QA", { payment_method: { billing_details: { email: "maria.silva@gmail.com" } } }, { handleActions: false });
+    // o campo mudou sem aviso (preenchimento automático) e ela toca "Sim": vale a sugestão do que está no campo na hora do toque
+    _zerar(); host.innerHTML = ""; sessionStorage.clear(); confirmPixPayment.mockClear();
+    await abrirCheckout(opcoes());
+    await flush();
+    digitar("#oc-email", "ze@hotmial.com");
+    await tocarPagar();
+    (host.querySelector("#oc-email") as HTMLInputElement).value = "jose@hotmial.com";
+    (host.querySelector("[data-testid='email-pergunta'] [data-usar]") as HTMLElement).click();
+    await flush();
+    expect(confirmPixPayment).toHaveBeenCalledWith("pi_2027_secret_QA", { payment_method: { billing_details: { email: "jose@hotmail.com" } } }, { handleActions: false });
+  });
+
+  describe("rodada 3 (T2-BAIXA 4 + cliente fria) · 'Corrigir' o e-mail com o Pix aberto troca o e-mail NO MESMO pagamento", () => {
+    const gerarPix = async () => {
+      await abrirCheckout(opcoes());
+      await flush();
+      digitar("#oc-email", "ana@exemplo.com");
+      await tocarPagar();
+      expect(host.querySelector("[data-testid='pix-email']")!.textContent).toContain("ana@exemplo.com");
+    };
+    const abrirEditor = async () => {
+      (host.querySelector("[data-corrigir-email]") as HTMLElement).click();
+      await flush();
+      return host.querySelector("[data-testid='pix-email-editar']")!;
+    };
+    const salvar = async (ed: Element, novo: string) => {
+      const campo = ed.querySelector("#ct-email-novo") as HTMLInputElement;
+      campo.value = novo; campo.dispatchEvent(new Event("input"));
+      (ed.querySelector("[data-salvar]") as HTMLElement).click();
+      await flush();
+    };
+    it("deu certo: o MESMO Pix na tela (mesmo QR, nenhum QR novo, nenhum pedido novo, sem o aviso) com o e-mail novo; pagou → o pago mostra o novo", async () => {
+      await gerarPix();
+      const ref = sessionStorage.getItem("p2027-qa-stripe-ref");
+      criar.mockClear(); confirmPixPayment.mockClear();
+      criar.mockResolvedValue({ ok: true, pi: "pi_2027", clientSecret: "pi_2027_secret_QA", status: "requires_action" });
+      // Cancelar não muda nada; e-mail incompleto não vai pro servidor
+      let ed = await abrirEditor();
+      expect((ed.querySelector("#ct-email-novo") as HTMLInputElement).value).toBe("ana@exemplo.com");
+      (ed.querySelector("[data-cancelar]") as HTMLElement).click();
+      expect(host.querySelector("[data-testid='pix-email']")!.textContent).toContain("ana@exemplo.com");
+      ed = await abrirEditor();
+      await salvar(ed, "ana@");
+      expect(ed.querySelector("#ct-email-novo-erro")!.textContent).toBe("Confira o e-mail: parece que falta alguma coisa.");
+      expect(criar).not.toHaveBeenCalled();
+      await salvar(ed, "Ana.Certa@Exemplo.com ");
+      expect(criar).toHaveBeenCalledOnce();
+      expect(criar.mock.calls[0][0]).toMatchObject({ ref, pi: "pi_2027", email: "ana.certa@exemplo.com", pagina: "p2027" });
+      expect(confirmPixPayment).not.toHaveBeenCalled();
+      expect(host.querySelector("[data-testid='oferta-pix']")).not.toBeNull();
+      expect((host.querySelector("#oc-codigo") as HTMLInputElement).value).toBe(QR);
+      expect(host.querySelector("[data-testid='pix-email']")!.textContent).toBe("O acesso vai pro e-mail ana.certa@exemplo.comCorrigir");
+      expect(host.querySelector("[data-testid='aviso-pix-velho']")).toBeNull();
+      expect(host.querySelector("#oc-email")).toBeNull(); // não voltou pro formulário
+      expect(sessionStorage.getItem("p2027-qa-stripe-ref")).toBe(ref);
+      expect(JSON.parse(sessionStorage.getItem("p2027-qa-stripe-email")!).email).toBe("ana.certa@exemplo.com");
+      expect(evento.mock.calls.some((c) => c[0] === "landing_stripe_pix_email_trocado" && c[1]?.ok === true)).toBe(true);
+      status.mockResolvedValue({ ok: true, pago: true, status: "succeeded", metodo: "pix" });
+      document.dispatchEvent(new Event("visibilitychange"));
+      await flush();
+      expect(host.querySelector("[data-testid='pos-email']")!.textContent).toContain("ana.certa@exemplo.com");
+      expect(JSON.stringify(evento.mock.calls)).not.toContain("ana.certa");
+    });
+    it("o 'ir'/Enter do teclado no campo novo salva (o Salvar pode estar atrás do teclado)", async () => {
+      await gerarPix();
+      criar.mockClear();
+      criar.mockResolvedValue({ ok: true, pi: "pi_2027", clientSecret: "pi_2027_secret_QA", status: "requires_action" });
+      const ed = await abrirEditor();
+      const campo = ed.querySelector("#ct-email-novo") as HTMLInputElement;
+      expect(document.activeElement).toBe(campo); // o teclado já abre no campo
+      campo.value = "ana.certa@exemplo.com"; campo.dispatchEvent(new Event("input"));
+      campo.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await flush();
+      expect(criar).toHaveBeenCalledOnce();
+      expect(host.querySelector("[data-testid='pix-email']")!.textContent).toContain("ana.certa@exemplo.com");
+    });
+    it("falhou (rede ou servidor): o caminho de antes — formulário com o e-mail corrigido e o aviso dizendo pra que e-mail o Pix anterior libera", async () => {
+      await gerarPix();
+      criar.mockResolvedValue({ ok: false });
+      await salvar(await abrirEditor(), "ana.certa@exemplo.com");
+      expect(host.querySelector("[data-testid='oferta-pix']")).toBeNull();
+      expect((host.querySelector("#oc-email") as HTMLInputElement).value).toBe("ana.certa@exemplo.com");
+      const aviso = host.querySelector("[data-testid='aviso-pix-velho']")!;
+      expect(aviso.textContent).toMatch(/^O Pix anterior libera o acesso em ana@exemplo\.com \(vale até \d\dh\d\d\)\. Se você já pagou ele, não pague de novo\.$/);
+      expect(aviso.querySelector("b")!.textContent).toBe("ana@exemplo.com");
+      expect(evento.mock.calls.some((c) => c[0] === "landing_stripe_pix_email_trocado" && c[1]?.ok === false && c[1]?.motivo === "falhou")).toBe(true);
+    });
+    it("o Pix já tinha sido pago quando ela salvou: tela de pago com o e-mail que ESTAVA no pagamento (o antigo); nada é confirmado de novo", async () => {
+      await gerarPix();
+      confirmPixPayment.mockClear();
+      criar.mockResolvedValue({ ok: true, pi: "pi_2027", clientSecret: "pi_2027_secret_QA", status: "succeeded" });
+      await salvar(await abrirEditor(), "ana.certa@exemplo.com");
+      expect(host.querySelector("[data-testid='pos-compra']")).not.toBeNull();
+      expect(host.querySelector("[data-testid='pos-email']")!.textContent).toContain("ana@exemplo.com");
+      expect(host.querySelector("[data-testid='pos-email']")!.textContent).not.toContain("ana.certa");
+      expect(confirmPixPayment).not.toHaveBeenCalled();
+      expect(pixel.mock.calls.filter((c) => c[0] === "Purchase")).toHaveLength(1);
+    });
+    it("o Pix venceu enquanto ela corrigia: o e-mail novo fica no pagamento e ela volta pro formulário com 'Esse Pix venceu' (o próximo Pagar é no MESMO pedido)", async () => {
+      await gerarPix();
+      const ref = sessionStorage.getItem("p2027-qa-stripe-ref");
+      criar.mockResolvedValue({ ok: true, pi: "pi_2027", clientSecret: "pi_2027_secret_QA", status: "requires_payment_method" });
+      await salvar(await abrirEditor(), "ana.certa@exemplo.com");
+      expect(host.querySelector("#oc-erro")!.textContent).toBe("Esse Pix venceu. Toque em Pagar pra gerar outro.");
+      expect((host.querySelector("#oc-email") as HTMLInputElement).value).toBe("ana.certa@exemplo.com");
+      expect(sessionStorage.getItem("p2027-qa-stripe-ref")).toBe(ref);
+    });
   });
 
   it("rodada 2 (V-M7) · e-mail com erro de digitação: pergunta UMA vez antes de gerar o Pix, com 2 botões grandes; 'Sim, usar o corrigido' paga com o corrigido", async () => {
@@ -449,25 +706,31 @@ describe("4 · o checkout dentro do cartão do preço (layout 'cartao')", () => 
     await flush();
     expect(confirmPixPayment).toHaveBeenCalledWith("pi_2027_secret_QA", { payment_method: { billing_details: { email: "ze@hotmial.com" } } }, { handleActions: false });
     expect(evento.mock.calls.some((c) => c[0] === "landing_stripe_email_pergunta_resposta" && c[1]?.escolha === "manteve")).toBe(true);
-    (host.querySelector("[data-corrigir-email]") as HTMLElement).click(); // volta pro formulário e paga de novo com o MESMO e-mail
+    (host.querySelector("#oc-voltar-pix") as HTMLElement).click(); // volta pro formulário e paga de novo com o MESMO e-mail
     await flush();
     await tocarPagar();
     expect(host.querySelector("[data-testid='email-pergunta']")).toBeNull();
     expect(confirmPixPayment).toHaveBeenCalledTimes(2);
   });
 
-  it("rodada 2 (V-M2) · digitou no esqueleto ANTES de o formulário chegar: o que ela digitou e o foco vão pro campo de verdade (payment.ts de verdade)", async () => {
+  it("rodada 2/3 (V-M2, V2-M1) · digitou no esqueleto ANTES e DURANTE a troca, letra por letra: o e-mail chega inteiro e o foco vai pro campo de verdade (payment.ts de verdade)", async () => {
     host.innerHTML = '<div data-esqueleto><input id="sk-email" type="email"></div>';
     const sk = host.querySelector("#sk-email") as HTMLInputElement;
     sk.focus();
     const real = await vi.importActual<typeof import("@/p2027/payment")>("@/p2027/payment");
+    const letras = [..."ana@exemplo.com"];
+    // cada tecla vai pro campo que está com o foco, no fim (o teclado de verdade; o cursor no fim é o que o V2 provou nos 2 motores,
+    // scripts/04-checkout-atrasado.mjs — o jsdom não tem cursor em campo de e-mail)
+    const tecla = (l: string) => { const a = document.activeElement; if (a instanceof HTMLInputElement) a.value += l; };
+    for (const l of letras.slice(0, 3)) tecla(l); // "ana" antes do toque chegar no checkout
     const montando = real.mountPayment(host, { evento });
-    sk.value = "ana@exemplo.com"; // ela digitou depois do toque, enquanto o pedaço do checkout baixava
+    for (const l of letras.slice(3, 7)) { tecla(l); await Promise.resolve(); } // "@exe" enquanto o pedaço do checkout chega
     await montando;
+    for (const l of letras.slice(7)) tecla(l); // "mplo.com" depois da troca, no campo de verdade
     await flush();
     const novo = host.querySelector("#oc-email") as HTMLInputElement;
     expect(host.querySelector("#sk-email")).toBeNull();
-    expect(novo.value).toBe("ana@exemplo.com");
+    expect([...novo.value]).toEqual(letras);
     expect(document.activeElement).toBe(novo);
   });
 });
@@ -589,6 +852,77 @@ describe("5 · a página (main.ts)", () => {
       campo.blur(); vv.dispatchEvent(new Event("resize")); vi.advanceTimersByTime(100);
       expect(scrollBy).toHaveBeenCalledOnce(); // saiu do campo: não mexe mais
     } finally { vi.useRealTimers(); }
+  });
+  it("rodada 3 (V2-M2) · teclado aberto e o formulário cresce (a sugestão 'Você quis dizer…?' embaixo do campo): a conta é refeita e o botão de pagar volta pra vista", async () => {
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: q === "(pointer: coarse)", media: q, addEventListener() {}, removeEventListener() {} }));
+    const vv = Object.assign(new EventTarget(), { height: 480, offsetTop: 0 }); // o teclado já está aberto
+    vi.stubGlobal("visualViewport", vv);
+    const scrollBy = vi.fn(); vi.stubGlobal("scrollBy", scrollBy);
+    type Obs = { cb: () => void; alvo?: Element; desligado: boolean };
+    const observadores: Obs[] = [];
+    class RO { o: Obs; constructor(cb: () => void) { this.o = { cb, desligado: false }; observadores.push(this.o); } observe(el: Element) { this.o.alvo = el; } unobserve() {} disconnect() { this.o.desligado = true; } }
+    vi.stubGlobal("ResizeObserver", RO);
+    await import("@/p2027/main");
+    const alvo = document.getElementById("pagamento")!;
+    alvo.innerHTML = '<input id="oc-email" type="email"><button id="oc-pagar" type="button">Pagar</button>';
+    const campo = alvo.querySelector("#oc-email") as HTMLInputElement, botao = alvo.querySelector("#oc-pagar") as HTMLElement;
+    let fimDoBotao = 440;
+    campo.getBoundingClientRect = () => ({ top: 300, bottom: 352 } as DOMRect);
+    botao.getBoundingClientRect = () => ({ top: fimDoBotao - 56, bottom: fimDoBotao } as DOMRect);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      campo.focus();
+      vi.advanceTimersByTime(400);
+      expect(scrollBy).not.toHaveBeenCalled(); // 440 + 12 ≤ 480: o botão inteiro à vista
+      const ro = observadores.find((x) => x.alvo === alvo)!;
+      expect(ro).toBeTruthy();
+      fimDoBotao = 496; // a sugestão apareceu: o botão desceu 56 px, pra trás do teclado (sem mudar o tamanho da tela)
+      ro.cb(); vi.advanceTimersByTime(100);
+      expect(scrollBy).toHaveBeenCalledOnce();
+      expect((scrollBy.mock.calls[0][0] as { top: number }).top).toBe(28); // 496 + 12 − 480
+      campo.blur();
+      expect(ro.desligado).toBe(true); // saiu do campo: para de observar
+    } finally { vi.useRealTimers(); }
+  });
+  it("rodada 3 · 'Corrigir' com o Pix aberto e o teclado em cima: o 'Salvar' do campo novo sobe pra vista (a mesma conta do botão de pagar)", async () => {
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: q === "(pointer: coarse)", media: q, addEventListener() {}, removeEventListener() {} }));
+    const vv = Object.assign(new EventTarget(), { height: 330, offsetTop: 0 }); // 375×667 com o teclado
+    vi.stubGlobal("visualViewport", vv);
+    const scrollBy = vi.fn(); vi.stubGlobal("scrollBy", scrollBy);
+    await import("@/p2027/main");
+    const alvo = document.getElementById("pagamento")!;
+    alvo.innerHTML = '<div class="oc-pix"><div class="ct-pix-editar"><input id="ct-email-novo" type="email"><button type="button" data-salvar>Salvar</button></div></div>';
+    const campo = alvo.querySelector("#ct-email-novo") as HTMLInputElement, salvar = alvo.querySelector("[data-salvar]") as HTMLElement;
+    campo.getBoundingClientRect = () => ({ top: 200, bottom: 252 } as DOMRect);
+    salvar.getBoundingClientRect = () => ({ top: 312, bottom: 360 } as DOMRect);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      campo.focus();
+      vi.advanceTimersByTime(400);
+      expect(scrollBy).toHaveBeenCalledOnce();
+      expect((scrollBy.mock.calls[0][0] as { top: number }).top).toBe(42); // 360 + 12 − 330
+    } finally { vi.useRealTimers(); }
+  });
+  it("rodada 3 (V2-B7) · tocar em 'Cartão' no esqueleto já marca Cartão e o botão diz 'no cartão'; o formulário de verdade abre no Cartão", async () => {
+    const tocouCartao = vi.fn();
+    pagina.mountPayment.mockImplementationOnce(async (alvo: HTMLElement) => {
+      await new Promise((r) => setTimeout(r, 5)); // o pedaço do checkout baixando
+      alvo.innerHTML = '<button type="button" data-metodo="card">Cartão</button>';
+      alvo.querySelector("button")!.addEventListener("click", tocouCartao);
+    });
+    await import("@/p2027/main");
+    const esq = document.querySelector("[data-esqueleto]")!;
+    const cartaoSk = esq.querySelector("[data-sk-metodo='card']") as HTMLElement;
+    cartaoSk.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    cartaoSk.click();
+    expect(cartaoSk.getAttribute("aria-checked")).toBe("true");
+    expect(esq.querySelector("[data-sk-metodo='pix']")!.getAttribute("aria-checked")).toBe("false");
+    expect(esq.querySelector("[data-sk-pagar]")!.textContent).toMatch(/^Pagar R\$\s27,90 no cartão$/);
+    expect(pagina.mountPayment).toHaveBeenCalledOnce();
+    (esq.querySelector("[data-sk-metodo='pix']") as HTMLElement).click(); // mudou de ideia: volta pro Pix
+    expect(esq.querySelector("[data-sk-pagar]")!.textContent).toMatch(/^Pagar R\$\s27,90 no Pix$/);
+    cartaoSk.click();
+    await vi.waitFor(() => expect(tocouCartao).toHaveBeenCalledOnce());
   });
   it("já pagou nesta aba: 'Você já comprou o CORE ✓' no lugar do pagamento + o passo a passo em tela cheia; nada de PaymentIntent novo", async () => {
     sessionStorage.setItem("oferta-pos-compra", JSON.stringify({ pi: "pi_velho", email: "ana@example.com", em: Date.now() }));

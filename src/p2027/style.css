@@ -56,10 +56,12 @@ button,input{font:inherit}
 .eh-app b{font-weight:800}
 .pronto{margin-top:4px;font-size:15px;line-height:1.4;color:var(--suave)}
 .elo{display:inline-block;margin-top:8px;padding:4px 0;font-size:14.5px;font-weight:750;color:var(--magenta);text-decoration:none}
+/* rodada 3 (V2-B2): o toque do elo vai a ~45 px de altura sem mexer em nada do layout (a área invisível passa 8 px pra cima e pra baixo) */
+.elo{position:relative}.elo::after{content:"";position:absolute;left:0;right:0;top:-8px;bottom:-8px}
 @media (max-width:370px){
   .vitrine{grid-template-columns:minmax(0,1fr) 108px;column-gap:10px}
   .fone{width:108px;margin-top:-116px}
-  .lista{font-size:13.5px}
+  /* rodada 3 (V2-B14): a lista dos 6 ✅ fica nos 14 px também aqui (era 13,5) */
 }
 
 /* 2 · um dia comum */
@@ -143,6 +145,8 @@ button,input{font:inherit}
 .cartao-topo span+span{color:#f6b8d6;letter-spacing:.01em;font-weight:700}
 .cartao-corpo{padding:16px}
 .p27 .cartao-tit{font-size:21px;line-height:1.15;letter-spacing:-.025em}
+/* rodada 3 (V2-B3): em telas de até 370 px o título do cartão cabe em 1 linha (o rótulo do e-mail: checkout.css) */
+@media (max-width:370px){.p27 .cartao-tit{font-size:19px}}
 .ancora{margin-top:6px;font-size:14.5px;line-height:1.35;color:var(--suave)}
 .preco{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;margin-top:2px;color:var(--grafite)}
 .preco strong{font-size:50px;line-height:1.06;font-weight:850;letter-spacing:-.04em;white-space:nowrap}
@@ -200,7 +204,9 @@ button,input{font:inherit}
 .rodape a{color:#5c5560}
 
 /* barra fixa (grafite: nunca disputa com o botão magenta de pagar) */
-.barra{position:fixed;left:0;right:0;bottom:0;z-index:40;padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:rgba(250,247,244,.94);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-top:1px solid #ece5e9;transform:translateY(110%);transition:transform .22s ease;pointer-events:none}
+/* rodada 3 (cliente fria): fundo OPACO até o fim da tela, incluindo a área segura do iPhone (o padding de baixo) — antes, a .94 de opacidade
+   deixava aparecer resto de letra da página por trás da barra */
+.barra{position:fixed;left:0;right:0;bottom:0;z-index:40;padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:var(--papel);border-top:1px solid #ece5e9;transform:translateY(110%);transition:transform .22s ease;pointer-events:none}
 .barra.on{transform:none;pointer-events:auto}
 .barra a{display:flex;align-items:center;justify-content:center;max-width:420px;min-height:52px;margin:0 auto;padding:0 12px;border-radius:15px;background:var(--grafite);color:#fff;font-size:16.5px;font-weight:800;text-decoration:none;text-align:center}
 .barra .bp{display:none;color:#f9b9d8;font-weight:700}

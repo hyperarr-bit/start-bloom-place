@@ -15,21 +15,21 @@
  * /dia (23/11) — a "versão CORE do Porquim": um dia inteiro no app, em recortes reais, e o checkout Stripe de sempre por cima.
  * SPEC: novidades-guardadas/2026-11-23/porquim-core/SPEC.md (desvios aceitos: …/construcao/desvios-da-spec.md). As cinco chaves moram aqui:
  *   PAGINA_DIA  "off" → vai pro /organizar com a mesma query. "on" → a página. ?dia=on abre só nesta aba (sessão), pra conferir.
- *   OFERTA_DIA  "27" (R$ 27,90, linha lp27) | "67" (R$ 67,90, linha oferta, sem braço de preço). Textos e linha: src/dia/oferta.ts.
+ *   OFERTA_DIA  "19" (R$ 19,90, linha própria "dia") | "67" (R$ 67,90, linha oferta, sem braço de preço). Textos e linha: src/dia/oferta.ts.
  *   TOPO_DIA    "lista" (o celular com a lista primeiro) | "gesto" (o gesto e o 1º botão primeiro). Só troca a ordem, por CSS.
  *   FAIXA_DIA   "sem-data" (faixa do topo "ACESSO VITALÍCIO · iPhone e Android", sem prazo nenhum) | "hoje" ("· só hoje, DD/MM",
  *               a faixa da SPEC seção 4 item 0 e das páginas no ar). Rodada 3: nasce "sem-data" porque o preço desta página NÃO tem
  *               prazo de verdade (a data era gerada todo dia: a frase nunca era verdadeira). Se o dono quiser a urgência mesmo
  *               assim, é uma palavra aqui ("hoje"). DECISÃO DO DONO antes de ligar a página.
  *   PRECO_CEDO_DIA "off" (a copy da SPEC: fato "Paga 1 vez só" na 1ª tela e "Paga uma vez · …" sob o 1º botão; o preço só aparece
- *               no cartão do preço, como no Porquim) | "on" (o preço cedo: fato "R$ 27,90, 1 vez só" na 1ª tela e "R$ 27,90, uma
+ *               no cartão do preço, como no Porquim) | "on" (o preço cedo: fato "R$ 19,90, 1 vez só" na 1ª tela e "R$ 19,90, uma
  *               vez · …" sob o 1º botão). Os eventos levam preco_cedo. DECISÃO DO DONO (ele já viu "preço no início" falhar; a
  *               persona fria pede o preço na 1ª tela): os dois prints estão em …/construcao/prints/.
- * Só na prévia (?qa=1 ou fora do domínio, pagamento simulado): ?oferta=27|67, ?topo=lista|gesto, ?faixa=hoje|sem-data e ?cedo=on|off
+ * Só na prévia (?qa=1 ou fora do domínio, pagamento simulado): ?oferta=19|67, ?topo=lista|gesto, ?faixa=hoje|sem-data e ?cedo=on|off
  * trocam as quatro últimas.
  * Rollback: PAGINA_DIA "off".
  *
- * ANTES DE LIGAR OFERTA_DIA "67" (o padrão "27" não tem este problema):
+ * ANTES DE LIGAR OFERTA_DIA "67" (o padrão "19" não tem este problema):
  *   a venda sai na linha "oferta" do servidor SEM braço de preço, isto é, no mesmo registro (ST_oferta) e com o mesmo nome na CAPI
  *   que a /oferta de sempre a R$ 67,90. Ela só se separa pela url de chegada gravada no PI (…/dia). Toda leitura do sorteio de preço
  *   da /oferta (AB_PRECO_OFERTA) tem de EXCLUIR os PIs com url /dia, senão a venda daqui entra no braço 6790 de lá.
@@ -40,7 +40,7 @@
  */
 (function () {
   var PAGINA_DIA = "off";
-  var OFERTA_DIA = "27";
+  var OFERTA_DIA = "19";
   var TOPO_DIA = "lista";
   var FAIXA_DIA = "sem-data";
   var PRECO_CEDO_DIA = "off";
@@ -52,12 +52,12 @@
   if (PAGINA_DIA !== "on" && !aba) { h.setAttribute("data-desligada", ""); location.replace("/organizar" + q + location.hash); return; }
   var qa = /[?&]qa=1(&|$)/.test(q) || ["coreaplicativo.com.br", "www.coreaplicativo.com.br"].indexOf(location.hostname) < 0;
   if (qa) {
-    var o = /[?&]oferta=(27|67)(&|$)/.exec(q); if (o) OFERTA_DIA = o[1];
+    var o = /[?&]oferta=(19|67)(&|$)/.exec(q); if (o) OFERTA_DIA = o[1];
     var t = /[?&]topo=(lista|gesto)(&|$)/.exec(q); if (t) TOPO_DIA = t[1];
     var f = /[?&]faixa=(hoje|sem-data)(&|$)/.exec(q); if (f) FAIXA_DIA = f[1];
     var c = /[?&]cedo=(on|off)(&|$)/.exec(q); if (c) PRECO_CEDO_DIA = c[1];
   }
-  h.setAttribute("data-oferta", OFERTA_DIA === "67" ? "67" : "27");
+  h.setAttribute("data-oferta", OFERTA_DIA === "67" ? "67" : "19");
   h.setAttribute("data-topo", TOPO_DIA === "gesto" ? "gesto" : "lista");
   h.setAttribute("data-faixa", FAIXA_DIA === "hoje" ? "hoje" : "sem-data");
   h.setAttribute("data-cedo", PRECO_CEDO_DIA === "on" ? "on" : "off");
@@ -289,7 +289,7 @@
       <h1>Sua vida organizada, <em>em um só app.</em></h1>
       <p class="sub">Dinheiro, hábitos, treino e contas no mesmo lugar. <b>Anota em segundos, sem planilha.</b></p>
     </div>
-    <div class="fatos" aria-label="Resumo"><b>16 áreas</b><b><span class="cedo-off">Paga 1 vez só</span><span class="cedo-on" data-oferta-txt="fato" data-v67="R$&nbsp;67,90, 1 vez só">R$&nbsp;27,90, 1 vez só</span></b><b>iPhone e Android</b></div>
+    <div class="fatos" aria-label="Resumo"><b>16 áreas</b><b><span class="cedo-off">Paga 1 vez só</span><span class="cedo-on" data-oferta-txt="fato" data-v67="R$&nbsp;67,90, 1 vez só">R$&nbsp;19,90, 1 vez só</span></b><b>iPhone e Android</b></div>
   </section>
 
   <div class="troca">
@@ -318,7 +318,7 @@
         <b>Simples assim.</b>
         <a class="cta" href="#preco" data-cta="gesto">Quero meu dia organizado</a>
       </div>
-      <p class="miudo"><span class="cedo-off">Paga uma vez</span><span class="cedo-on" data-oferta-txt="cedo" data-v67="R$&nbsp;67,90, uma vez">R$&nbsp;27,90, uma vez</span> · iPhone e Android · 7&nbsp;dias de garantia</p>
+      <p class="miudo"><span class="cedo-off">Paga uma vez</span><span class="cedo-on" data-oferta-txt="cedo" data-v67="R$&nbsp;67,90, uma vez">R$&nbsp;19,90, uma vez</span> · iPhone e Android · 7&nbsp;dias de garantia</p>
     </section>
   </div>
 
@@ -393,17 +393,17 @@
     <p class="conferido">Notas e opiniões públicas das lojas, lidas em 23/11/2026. Procure por CORE APP na sua loja pra conferir.</p>
   </section>
 
-  <!-- 8 · PREÇO. Os textos que mudam com OFERTA_DIA levam data-oferta-txt (padrão "27") e data-v67 (iguais a src/dia/oferta.ts). À mostra no padrão, os 5 lugares da SPEC 3.3: frase, número, Compare, botão do preço e a linha sob o botão do fecho; com PRECO_CEDO_DIA "on", mais 2 (o fato da 1ª tela e a linha sob o 1º botão). -->
+  <!-- 8 · PREÇO. Os textos que mudam com OFERTA_DIA levam data-oferta-txt (padrão "19") e data-v67 (iguais a src/dia/oferta.ts). À mostra no padrão, os 5 lugares da SPEC 3.3: frase, número, Compare, botão do preço e a linha sob o botão do fecho; com PRECO_CEDO_DIA "on", mais 2 (o fato da 1ª tela e a linha sob o 1º botão). -->
   <section class="oferta" id="preco" data-bloco="oferta">
     <div class="oferta-faixa">Acesso vitalício <span>paga uma vez</span></div>
     <div class="oferta-corpo">
       <p class="frase" data-oferta-txt="frase" data-v67="Paga uma vez. Usa pra sempre.">Menos que um lanche.</p>
-      <p class="preco"><small>R$</small><span data-oferta-txt="numero" data-v67="67,90">27,90</span></p>
+      <p class="preco"><small>R$</small><span data-oferta-txt="numero" data-v67="67,90">19,90</span></p>
       <p class="umavez">Uma vez. <em>É seu pra sempre.</em></p>
       <p class="semdepois">Não renova. Nada é cobrado depois.</p>
       <div class="compare">
         <p><span>Um app só de finanças, por assinatura</span><b>cerca de R$&nbsp;250<br />por ano</b></p>
-        <p class="nos"><span>CORE, as 16 áreas</span><b data-oferta-txt="compare" data-v67="R$&nbsp;67,90, uma vez">R$&nbsp;27,90, uma vez</b></p>
+        <p class="nos"><span>CORE, as 16 áreas</span><b data-oferta-txt="compare" data-v67="R$&nbsp;67,90, uma vez">R$&nbsp;19,90, uma vez</b></p>
       </div>
       <!-- lastro: novidades-guardadas/2026-11-23/porquim-core/construcao/lastro-23-11/ (prints de 23/11: R$ 249,90 por ano e R$ 20,99 × 12 = R$ 251,88). O "R$ 100" da SPEC saiu: não achei preço público que o provasse hoje. -->
       <p class="fonte">Preço público de dois apps de finanças no Brasil, consultado em 23/11/2026.</p>
@@ -413,7 +413,7 @@
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Sem mensalidade</li>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>7 dias de garantia: não gostou, devolvemos</li>
       </ul>
-      <button type="button" class="cta" data-checkout="oferta" data-oferta-txt="botao" data-v67="Quero meu acesso por R$&nbsp;67,90">Quero meu acesso por R$&nbsp;27,90</button>
+      <button type="button" class="cta" data-checkout="oferta" data-oferta-txt="botao" data-v67="Quero meu acesso por R$&nbsp;67,90">Quero meu acesso por R$&nbsp;19,90</button>
       <p class="miudo">Pagamento aqui no site · Pix ou cartão</p>
       <p class="confia">CORE · CNPJ 55.041.112/0001-82</p>
     </div>
@@ -443,7 +443,7 @@
     <p>Dinheiro, hábitos, treino, casa. Você escolhe por onde começar.</p>
     <figure><img src="/dia/fecho-home.webp" width="720" height="1070" loading="lazy" decoding="async" alt="Tela inicial real do app CORE: próxima conta, orçamento, treino de glúteos e pernas feito, sono e as áreas" /><figcaption>Tela real do app, com dados de exemplo.</figcaption></figure>
     <button type="button" class="cta" data-checkout="fim">Quero experimentar agora</button>
-    <p class="miudo"><span data-oferta-txt="cedo" data-v67="R$&nbsp;67,90, uma vez">R$&nbsp;27,90, uma vez</span> · Pix ou cartão<br />7 dias de garantia</p>
+    <p class="miudo"><span data-oferta-txt="cedo" data-v67="R$&nbsp;67,90, uma vez">R$&nbsp;19,90, uma vez</span> · Pix ou cartão<br />7 dias de garantia</p>
     <div class="lojas" aria-label="App na App Store e no Google Play">
       <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.7c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9s-2-.9-3.3-.8C6.1 7 4.6 8 3.7 9.5c-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.3.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.8-1.1-2.9-4.2zM13.9 5.3c.7-.8 1.2-2 1-3.2-1 0-2.3.7-3 1.5-.6.7-1.2 1.9-1.1 3.1 1.2.1 2.3-.6 3.1-1.4z"/></svg>App Store</span>
       <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 2.2 13.8 12 3.6 21.8c-.4-.2-.6-.6-.6-1.1V3.3c0-.5.2-.9.6-1.1zm11.7 11.3 2.8 2.8-10.4 6c-.6.3-1.2.3-1.7 0zM18.1 8.6l3.1 1.8c1 .6 1 1.6 0 2.2l-3.1 1.8L15.3 12zM5.8 1.9l10.3 6-2.8 2.8L5.8 2c.5-.3 1.2-.3 1.7 0z"/></svg>Google Play</span>

@@ -8,28 +8,29 @@
  * `fato` (a célula do meio da faixa de fatos da 1ª tela) e o `cedo` sob o 1º botão. `prefixoDaAba` é a regra única do nome
  * da aba do pedido (o checkout guarda `<prefixo>-stripe-ref`; o main.ts olha a mesma chave pra reabrir o Pix na recarga).
  * Arquivo puro (não toca em window): a página (payment.ts) e os testes leem daqui.
- *   "27" → linha `lp27` (stripe-lp27-criar, R$ 27,90 fixo no servidor; em produção o checkout recusa se o valor vier diferente).
+ *   "19" → linha `dia` (stripe-lp27-criar, R$ 19,90 fixo no servidor; em produção o checkout recusa se o valor vier diferente).
+ *          23/11 (dono: "sobe o /dia a 19,90 também"): era "27" na linha lp27 (R$ 27,90) enquanto a página não tinha ido pro ar.
  *   "67" → linha `oferta` SEM braço de preço (como a /completo): R$ 67,90, pedindo 1 parcela.
- * O dia.html traz os textos do "27" no HTML e os do "67" em data-v67; o teste confere que são estes.
+ * O dia.html traz os textos do "19" no HTML e os do "67" em data-v67; o teste confere que são estes.
  */
 import type { OpcoesCheckout } from "@/landing/stripe-checkout";
 
-export type ChaveOferta = "27" | "67";
+export type ChaveOferta = "19" | "67";
 export type ChaveTopo = "lista" | "gesto";
 export type OfertaDia = {
   chave: ChaveOferta;
   precoCentavos: number;
   /** o `value` do pixel (ViewContent; o Purchase sai do checkout com precoCentavos / 100) */
   valor: number;
-  pagina: "lp27" | "oferta";
+  pagina: "dia" | "oferta";
   storagePrefix: string;
   textos: { fato: string; cedo: string; frase: string; numero: string; compare: string; botao: string };
 };
 
 export const OFERTAS: Record<ChaveOferta, OfertaDia> = {
-  "27": {
-    chave: "27", precoCentavos: 2790, valor: 27.9, pagina: "lp27", storagePrefix: "dia",
-    textos: { fato: "R$ 27,90, 1 vez só", cedo: "R$ 27,90, uma vez", frase: "Menos que um lanche.", numero: "27,90", compare: "R$ 27,90, uma vez", botao: "Quero meu acesso por R$ 27,90" },
+  "19": {
+    chave: "19", precoCentavos: 1990, valor: 19.9, pagina: "dia", storagePrefix: "dia",
+    textos: { fato: "R$ 19,90, 1 vez só", cedo: "R$ 19,90, uma vez", frase: "Menos que um lanche.", numero: "19,90", compare: "R$ 19,90, uma vez", botao: "Quero meu acesso por R$ 19,90" },
   },
   "67": {
     chave: "67", precoCentavos: 6790, valor: 67.9, pagina: "oferta", storagePrefix: "dia67",
@@ -37,7 +38,7 @@ export const OFERTAS: Record<ChaveOferta, OfertaDia> = {
   },
 };
 
-export const ofertaDe = (chave: string | null | undefined): OfertaDia => OFERTAS[chave === "67" ? "67" : "27"];
+export const ofertaDe = (chave: string | null | undefined): OfertaDia => OFERTAS[chave === "67" ? "67" : "19"];
 export const topoDe = (chave: string | null | undefined): ChaveTopo => (chave === "gesto" ? "gesto" : "lista");
 /** PRECO_CEDO_DIA (html[data-cedo]): só "on" liga; qualquer outra coisa é a copy da SPEC */
 export const cedoDe = (chave: string | null | undefined): "on" | "off" => (chave === "on" ? "on" : "off");

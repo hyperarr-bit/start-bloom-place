@@ -1,8 +1,8 @@
 /**
  * /dia (23/11) — pixel, eventos e atribuição IGUAIS aos da /pra-sempre (src/pra-sempre/payment.ts) e da /tudo, com funil "dia" e
  * path "/dia". O pagamento é o checkout Stripe compartilhado (src/landing/stripe-checkout.ts) no caminho PADRÃO (camada por cima,
- * layout "novo"), com o pós-compra direto pro app (posApp). Servidor: OFERTA_DIA "27" usa a linha "lp27" (a mesma da /pra-sempre
- * e da /tudo); a venda da /dia se separa pela url de chegada gravada no PI (…/dia) e pelos eventos (funil "dia").
+ * layout "novo"), com o pós-compra direto pro app (posApp). Servidor: OFERTA_DIA "19" usa a linha própria "dia" (R$ 19,90, stripe-lp27-criar);
+ * a venda da /dia sai separada no stripe_venda (pagina "dia") e nos eventos (funil "dia").
  * Nenhum evento leva e-mail.
  */
 import {captureLandingMeta,trackEventBeacon} from '@/lib/analytics';

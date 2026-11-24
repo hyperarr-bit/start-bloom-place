@@ -2,7 +2,7 @@
  * /dia (23/11) — a "versão CORE do Porquim" (SPEC: novidades-guardadas/2026-11-23/porquim-core/SPEC.md).
  *   1. as chaves do <head>: PAGINA_DIA nasce "off" (→ /organizar com a mesma query), ?dia=on só na aba, OFERTA_DIA e TOPO_DIA;
  *   2. os textos-chave da SPEC, os 3 botões, as imagens (reais, com tamanho, leves) e as palavras proibidas;
- *   3. a oferta: um objeto só (src/dia/oferta.ts) = os 5 textos que mudam + a linha do servidor (27 → lp27, 67 → oferta sem braço);
+ *   3. a oferta: um objeto só (src/dia/oferta.ts) = os 5 textos que mudam + a linha do servidor (19 → dia, 67 → oferta sem braço);
  *   4. o checkout: o caminho PADRÃO do stripe-checkout (camada), sem parcela, sem CPF; pago → Purchase 1× (eventID = PI) e o
  *      pós-compra direto pro app com as duas lojas;
  *   5. os eventos levam funil "dia" e nunca e-mail; em prévia nada vai pro banco;
@@ -38,11 +38,11 @@ describe("as chaves do <head>", () => {
   };
   const ligada = cabeca.replace('var PAGINA_DIA = "off"', 'var PAGINA_DIA = "on"');
 
-  it("nasce desligada, com a oferta 27, o topo lista, a faixa SEM prazo (o preço não tem prazo de verdade) e o preço só no cartão (copy da SPEC)", () => {
+  it("nasce desligada, com a oferta 19, o topo lista, a faixa SEM prazo (o preço não tem prazo de verdade) e o preço só no cartão (copy da SPEC)", () => {
     expect(HTML).toMatch(/var FAIXA_DIA = "sem-data";/);
     expect(HTML).toMatch(/var PRECO_CEDO_DIA = "off";/);
     expect(HTML).toMatch(/var PAGINA_DIA = "off";/);
-    expect(HTML).toMatch(/var OFERTA_DIA = "27";/);
+    expect(HTML).toMatch(/var OFERTA_DIA = "19";/);
     expect(HTML).toMatch(/var TOPO_DIA = "lista";/);
     expect(ligada).not.toBe(cabeca);
   });
@@ -58,7 +58,7 @@ describe("as chaves do <head>", () => {
     const aba = loja();
     const r = rodar(cabeca, "?dia=on&utm_content=c7", { storage: aba });
     expect(r.replace).not.toHaveBeenCalled();
-    expect(r.attrs).toEqual({ "data-oferta": "27", "data-topo": "lista", "data-faixa": "sem-data", "data-cedo": "off" });
+    expect(r.attrs).toEqual({ "data-oferta": "19", "data-topo": "lista", "data-faixa": "sem-data", "data-cedo": "off" });
     expect(rodar(cabeca, "?utm_content=c7", { storage: aba }).replace).not.toHaveBeenCalled(); // a mesma aba, sem o parâmetro (volta do banco)
     expect(rodar(cabeca, "?utm_content=c7").replace).toHaveBeenCalled(); // outra aba
     expect(rodar(cabeca, "?dia=on", { storage: null }).replace).not.toHaveBeenCalled(); // sem storage: o parâmetro basta
@@ -67,11 +67,11 @@ describe("as chaves do <head>", () => {
   it("on: abre pra todo mundo, sem redirecionar", () => {
     const r = rodar(ligada, "?utm_content=c7");
     expect(r.replace).not.toHaveBeenCalled();
-    expect(r.attrs).toEqual({ "data-oferta": "27", "data-topo": "lista", "data-faixa": "sem-data", "data-cedo": "off" });
+    expect(r.attrs).toEqual({ "data-oferta": "19", "data-topo": "lista", "data-faixa": "sem-data", "data-cedo": "off" });
   });
   it("OFERTA_DIA e TOPO_DIA: só os valores previstos; qualquer outra coisa cai no padrão", () => {
-    expect(rodar(ligada.replace('var OFERTA_DIA = "27"', 'var OFERTA_DIA = "67"'), "").attrs["data-oferta"]).toBe("67");
-    expect(rodar(ligada.replace('var OFERTA_DIA = "27"', 'var OFERTA_DIA = "97"'), "").attrs["data-oferta"]).toBe("27");
+    expect(rodar(ligada.replace('var OFERTA_DIA = "19"', 'var OFERTA_DIA = "67"'), "").attrs["data-oferta"]).toBe("67");
+    expect(rodar(ligada.replace('var OFERTA_DIA = "19"', 'var OFERTA_DIA = "97"'), "").attrs["data-oferta"]).toBe("19");
     expect(rodar(ligada.replace('var TOPO_DIA = "lista"', 'var TOPO_DIA = "gesto"'), "").attrs["data-topo"]).toBe("gesto");
     expect(rodar(ligada.replace('var TOPO_DIA = "lista"', 'var TOPO_DIA = "x"'), "").attrs["data-topo"]).toBe("lista");
     expect(rodar(ligada.replace('var FAIXA_DIA = "sem-data"', 'var FAIXA_DIA = "hoje"'), "").attrs["data-faixa"]).toBe("hoje");
@@ -80,12 +80,12 @@ describe("as chaves do <head>", () => {
     expect(rodar(ligada.replace('var PRECO_CEDO_DIA = "off"', 'var PRECO_CEDO_DIA = "sim"'), "").attrs["data-cedo"]).toBe("off");
   });
   it("?oferta e ?topo só trocam na prévia (fora do domínio ou ?qa=1); no domínio, o link não muda o preço", () => {
-    expect(rodar(ligada, "?oferta=67&topo=gesto").attrs).toEqual({ "data-oferta": "27", "data-topo": "lista", "data-faixa": "sem-data", "data-cedo": "off" });
+    expect(rodar(ligada, "?oferta=67&topo=gesto").attrs).toEqual({ "data-oferta": "19", "data-topo": "lista", "data-faixa": "sem-data", "data-cedo": "off" });
     expect(rodar(ligada, "?oferta=67&topo=gesto&faixa=hoje&cedo=on").attrs["data-faixa"]).toBe("sem-data");
     expect(rodar(ligada, "?cedo=on").attrs["data-cedo"]).toBe("off");
     expect(rodar(ligada, "?oferta=67&topo=gesto&faixa=hoje&cedo=on&qa=1").attrs).toEqual({ "data-oferta": "67", "data-topo": "gesto", "data-faixa": "hoje", "data-cedo": "on" });
     expect(rodar(ligada, "?oferta=67", { host: "localhost" }).attrs["data-oferta"]).toBe("67");
-    expect(rodar(ligada, "?oferta=12&topo=zzz", { host: "localhost" }).attrs).toEqual({ "data-oferta": "27", "data-topo": "lista", "data-faixa": "sem-data", "data-cedo": "off" });
+    expect(rodar(ligada, "?oferta=12&topo=zzz", { host: "localhost" }).attrs).toEqual({ "data-oferta": "19", "data-topo": "lista", "data-faixa": "sem-data", "data-cedo": "off" });
   });
   it("a volta do banco (?payment_intent=pi_…) abre a página mesmo com a chave off e a sessão zerada (a conferência do dono não cai no /organizar)", () => {
     const r = rodar(cabeca, "?payment_intent=pi_3Abc&payment_intent_client_secret=pi_3Abc_secret_x&redirect_status=succeeded");
@@ -113,7 +113,7 @@ describe("as chaves do <head>", () => {
     for (const t of ['ANTES DE LIGAR OFERTA_DIA "67"', "ST_oferta", "AB_PRECO_OFERTA", "EXCLUIR os PIs com url /dia", "SPEC 3.4", "NÃO DÁ pra pôr só na página"]) expect(HTML).toContain(t);
     // por que a trava de valor do 67 não cabe só na página: o servidor só devolve o valor em lp27, organizar ou com braço de preço
     const servidor = ler("supabase/functions/_shared/stripe-criar.ts");
-    expect(servidor).toContain('...(oferta.pagina === "lp27" || oferta.pagina === "organizar" ? { amount: j.amount, currency: j.currency, pagina: oferta.pagina } : {})');
+    expect(servidor).toContain('...(oferta.pagina === "lp27" || oferta.pagina === "tudo" || oferta.pagina === "dia" || oferta.pagina === "organizar" ? { amount: j.amount, currency: j.currency, pagina: oferta.pagina } : {})');
   });
   it("a ordem do topo é só CSS (html[data-topo='gesto']) e o noindex está lá", () => {
     expect(HTML).toContain('html[data-topo="gesto"] .pg .troca .gesto { order: 1;');
@@ -141,14 +141,14 @@ describe("a página (copy da SPEC, seção 4)", () => {
     const comPrecoCedo = (el: Element) => { const c = el.cloneNode(true) as HTMLElement; c.querySelectorAll(".cedo-off").forEach((n) => n.remove()); return semNbsp(c.textContent ?? ""); };
     expect([...d.querySelectorAll(".fatos > b")].map(aMostra)).toEqual(["16 áreas", "Paga 1 vez só", "iPhone e Android"]);
     expect(aMostra(d.querySelector(".gesto .miudo")!)).toBe("Paga uma vez · iPhone e Android · 7 dias de garantia");
-    expect([...d.querySelectorAll(".fatos > b")].map(comPrecoCedo)).toEqual(["16 áreas", "R$ 27,90, 1 vez só", "iPhone e Android"]);
-    expect(comPrecoCedo(d.querySelector(".gesto .miudo")!)).toBe("R$ 27,90, uma vez · iPhone e Android · 7 dias de garantia");
+    expect([...d.querySelectorAll(".fatos > b")].map(comPrecoCedo)).toEqual(["16 áreas", "R$ 19,90, 1 vez só", "iPhone e Android"]);
+    expect(comPrecoCedo(d.querySelector(".gesto .miudo")!)).toBe("R$ 19,90, uma vez · iPhone e Android · 7 dias de garantia");
     expect(d.querySelectorAll(".cedo-on").length).toBe(2);
     expect(d.querySelectorAll(".cedo-off").length).toBe(2);
     for (const t of ['.pg .cedo-on { display: none; }', 'html[data-cedo="on"] .pg .cedo-on { display: inline; }', 'html[data-cedo="on"] .pg .cedo-off { display: none; }']) expect(HTML).toContain(t);
-    // com a chave off, o 1º "27,90" à mostra é o do cartão do preço (como no Porquim); a 1ª tela diz só "Paga 1 vez só"
+    // com a chave off, o 1º "19,90" à mostra é o do cartão do preço (como no Porquim); a 1ª tela diz só "Paga 1 vez só"
     const semCedo = (() => { const c = d.getElementById("pagina")!.cloneNode(true) as HTMLElement; c.querySelectorAll("script,noscript,.cedo-on").forEach((n) => n.remove()); return semNbsp(c.textContent ?? ""); })();
-    expect(semCedo.indexOf("27,90")).toBeGreaterThan(semCedo.indexOf("Menos que um lanche."));
+    expect(semCedo.indexOf("19,90")).toBeGreaterThan(semCedo.indexOf("Menos que um lanche."));
     expect([...d.querySelectorAll(".gesto .rot")].map((p) => semNbsp(p.textContent!))).toEqual(["1Você anota", "2O app responde"]);
     expect(semNbsp(d.querySelector(".so-b")!.textContent!)).toBe("E o dia inteiro fica assim."); // só aparece no topo "gesto"
     // o recorte do gesto é o miolo do card real capturado em tela de 320 px (rodada 3): a barra inteira, respiro dos lados, sem o
@@ -215,21 +215,21 @@ describe("a página (copy da SPEC, seção 4)", () => {
   });
   it("preço, garantia, informações, fecho e rodapé", () => {
     const preco = semNbsp(d.getElementById("preco")!.textContent!);
-    for (const t of ["Acesso vitalício paga uma vez", "Menos que um lanche.", "R$27,90", "Uma vez. É seu pra sempre.", "Não renova. Nada é cobrado depois.", "Um app só de finanças, por assinaturacerca de R$ 250por ano", "CORE, as 16 áreasR$ 27,90, uma vez",
-      "Preço público de dois apps de finanças no Brasil, consultado em 23/11/2026.", "As 16 áreas liberadas", "App no iPhone, no Android e no computador", "7 dias de garantia: não gostou, devolvemos", "Quero meu acesso por R$ 27,90", "Pagamento aqui no site · Pix ou cartão", "CORE · CNPJ 55.041.112/0001-82"]) expect(preco).toContain(t);
+    for (const t of ["Acesso vitalício paga uma vez", "Menos que um lanche.", "R$19,90", "Uma vez. É seu pra sempre.", "Não renova. Nada é cobrado depois.", "Um app só de finanças, por assinaturacerca de R$ 250por ano", "CORE, as 16 áreasR$ 19,90, uma vez",
+      "Preço público de dois apps de finanças no Brasil, consultado em 23/11/2026.", "As 16 áreas liberadas", "App no iPhone, no Android e no computador", "7 dias de garantia: não gostou, devolvemos", "Quero meu acesso por R$ 19,90", "Pagamento aqui no site · Pix ou cartão", "CORE · CNPJ 55.041.112/0001-82"]) expect(preco).toContain(t);
     expect(preco).not.toMatch(/só hoje/i);
     // rodada 3: "Experimente por 7 dias." lia como teste grátis que cobra depois; o título da garantia diz o que é ("7 dias de garantia.").
     // O verbo leve fica só no último botão, com o preço colado embaixo.
     expect(texto.match(/experiment/gi)).toHaveLength(1);
     expect(semNbsp(d.querySelector("[data-bloco='garantia'] b")!.textContent!)).toBe("7 dias de garantia.");
-    expect(semNbsp(d.querySelector(".fim .cta")!.nextElementSibling!.textContent!)).toBe("R$ 27,90, uma vez · Pix ou cartão7 dias de garantia");
+    expect(semNbsp(d.querySelector(".fim .cta")!.nextElementSibling!.textContent!)).toBe("R$ 19,90, uma vez · Pix ou cartão7 dias de garantia");
     for (const t of ["7 dias de garantia.", "Até 7 dias depois da compra, é só mandar um e-mail pra contato@coreaplicativo.com.br. Devolvemos 100% do valor, sem perguntas.",
       "Informações", "Onde funcionaiPhone, Android e computador", "PagamentoUma vez · Pix ou cartão, aqui no site", "Renova sozinho?Não", "Garantia7 dias, 100% do valor de volta", "VendedorCORE · CNPJ 55.041.112/0001-82",
-      "Amanhã cedo, seu diajá tem um lugar.", "Dinheiro, hábitos, treino, casa. Você escolhe por onde começar.", "Quero experimentar agora", "R$ 27,90, uma vez · Pix ou cartão7 dias de garantia", "contato@coreaplicativo.com.br · Termos · Privacidade"]) expect(texto).toContain(t);
+      "Amanhã cedo, seu diajá tem um lugar.", "Dinheiro, hábitos, treino, casa. Você escolhe por onde começar.", "Quero experimentar agora", "R$ 19,90, uma vez · Pix ou cartão7 dias de garantia", "contato@coreaplicativo.com.br · Termos · Privacidade"]) expect(texto).toContain(t);
   });
   it("exatamente 3 botões: o 1º só desce pro preço; os outros dois abrem o checkout; nenhum fixo", () => {
     const botoes = [...d.querySelectorAll(".cta")];
-    expect(botoes.map((b) => semNbsp(b.textContent!))).toEqual(["Quero meu dia organizado", "Quero meu acesso por R$ 27,90", "Quero experimentar agora"]);
+    expect(botoes.map((b) => semNbsp(b.textContent!))).toEqual(["Quero meu dia organizado", "Quero meu acesso por R$ 19,90", "Quero experimentar agora"]);
     expect(botoes[0].tagName).toBe("A");
     expect(botoes[0].getAttribute("href")).toBe("#preco");
     expect(botoes[0].hasAttribute("data-checkout")).toBe(false);
@@ -279,55 +279,55 @@ describe("a página (copy da SPEC, seção 4)", () => {
 
 /* ───────────────────────── 3. a oferta ───────────────────────── */
 describe("a oferta (um objeto só)", () => {
-  it("27 → linha lp27, R$ 27,90; 67 → linha oferta, R$ 67,90; a chave desconhecida cai no 27", () => {
-    expect(OFERTAS["27"]).toMatchObject({ precoCentavos: 2790, valor: 27.9, pagina: "lp27", storagePrefix: "dia" });
+  it("19 → linha dia, R$ 19,90; 67 → linha oferta, R$ 67,90; a chave desconhecida cai no 19", () => {
+    expect(OFERTAS["19"]).toMatchObject({ precoCentavos: 1990, valor: 19.9, pagina: "dia", storagePrefix: "dia" });
     expect(OFERTAS["67"]).toMatchObject({ precoCentavos: 6790, valor: 67.9, pagina: "oferta", storagePrefix: "dia67" });
     expect(ofertaDe("67")).toBe(OFERTAS["67"]);
-    for (const k of [null, undefined, "", "27", "97", "on"]) expect(ofertaDe(k)).toBe(OFERTAS["27"]);
+    for (const k of [null, undefined, "", "19", "97", "on"]) expect(ofertaDe(k)).toBe(OFERTAS["19"]);
     expect(topoDe("gesto")).toBe("gesto");
     for (const k of [null, "", "lista", "x"]) expect(topoDe(k)).toBe("lista");
     expect(cedoDe("on")).toBe("on");
     for (const k of [null, "", "off", "sim"]) expect(cedoDe(k)).toBe("off");
     // o nome da aba do pedido: uma regra só, usada pelo checkout (storagePrefix) e pelo main.ts (reabrir o Pix na recarga)
-    expect([prefixoDaAba(OFERTAS["27"], false), prefixoDaAba(OFERTAS["27"], true), prefixoDaAba(OFERTAS["67"], false), prefixoDaAba(OFERTAS["67"], true)]).toEqual(["dia", "dia-qa", "dia67", "dia67-qa"]);
+    expect([prefixoDaAba(OFERTAS["19"], false), prefixoDaAba(OFERTAS["19"], true), prefixoDaAba(OFERTAS["67"], false), prefixoDaAba(OFERTAS["67"], true)]).toEqual(["dia", "dia-qa", "dia67", "dia67-qa"]);
   });
   it("o pedido ao checkout: à vista, sem CPF, Pix e cartão, layout novo, pós-compra do app; nada das opções novas da /tudo", () => {
-    for (const k of ["27", "67"] as ChaveOferta[]) {
+    for (const k of ["19", "67"] as ChaveOferta[]) {
       const o = opcoesDaOferta(OFERTAS[k], false) as Partial<OpcoesCheckout>;
       expect(o).toEqual({ precoCentavos: OFERTAS[k].precoCentavos, parcelasMax: 1, producao: true, pedeCpf: false, somentePix: false, layout: "novo", storagePrefix: OFERTAS[k].storagePrefix, pagina: OFERTAS[k].pagina, trocaCartao: false, medirCarteira: false, posApp: true });
       for (const fora of ["bracoPreco", "montarEm", "pixCopiaPrimeiro", "presente", "indique", "emailInicial"]) expect(o).not.toHaveProperty(fora);
       expect(opcoesDaOferta(OFERTAS[k], true)).toMatchObject({ producao: false, storagePrefix: `${OFERTAS[k].storagePrefix}-qa` });
     }
   });
-  it("o HTML traz os textos do 27 e, em data-v67, os do 67: os 5 lugares da SPEC 3.3 (cartão, botão do preço, linha do fecho) e os 2 do preço cedo (escondidos no padrão), e só eles", () => {
+  it("o HTML traz os textos do 19 e, em data-v67, os do 67: os 5 lugares da SPEC 3.3 (cartão, botão do preço, linha do fecho) e os 2 do preço cedo (escondidos no padrão), e só eles", () => {
     const d = pagina();
     const lugares = [...d.querySelectorAll("[data-oferta-txt]")];
     expect(lugares.map((e) => e.getAttribute("data-oferta-txt"))).toEqual(["fato", "cedo", "frase", "numero", "compare", "botao", "cedo"]);
     expect(d.querySelectorAll("[data-v67]").length).toBe(7);
-    expect(Object.keys(OFERTAS["27"].textos).sort()).toEqual(["botao", "cedo", "compare", "fato", "frase", "numero"]);
+    expect(Object.keys(OFERTAS["19"].textos).sort()).toEqual(["botao", "cedo", "compare", "fato", "frase", "numero"]);
     // com PRECO_CEDO_DIA "off", só 5 lugares ficam à mostra (SPEC 3.3 e critério 14); os 2 do preço cedo moram em .cedo-on
     expect(lugares.filter((e) => !e.closest(".cedo-on") && !e.classList.contains("cedo-on")).map((e) => e.getAttribute("data-oferta-txt"))).toEqual(["frase", "numero", "compare", "botao", "cedo"]);
     for (const e of lugares) {
-      const k = e.getAttribute("data-oferta-txt") as keyof (typeof OFERTAS)["27"]["textos"];
-      expect(semNbsp(e.textContent!)).toBe(OFERTAS["27"].textos[k]);
+      const k = e.getAttribute("data-oferta-txt") as keyof (typeof OFERTAS)["19"]["textos"];
+      expect(semNbsp(e.textContent!)).toBe(OFERTAS["19"].textos[k]);
       expect(semNbsp(e.getAttribute("data-v67")!)).toBe(OFERTAS["67"].textos[k]);
     }
   });
-  it("com a chave em 67, o script do fim troca só esses textos; com 27 não troca nada", () => {
+  it("com a chave em 67, o script do fim troca só esses textos; com 19 não troca nada", () => {
     const troca = HTML.match(/<script>\s*\/\* OFERTA_DIA "67"[\s\S]*?\*\/\s*(\(function \(\) \{[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
-    const d27 = pagina(); d27.documentElement.setAttribute("data-oferta", "27");
+    const d27 = pagina(); d27.documentElement.setAttribute("data-oferta", "19");
     const antes = textoDe(d27);
     new Function("document", troca)(d27);
     expect(textoDe(d27)).toBe(antes);
     const d67 = pagina(); d67.documentElement.setAttribute("data-oferta", "67");
     new Function("document", troca)(d67);
     const depois = textoDe(d67);
-    expect(depois).not.toContain("27,90");
+    expect(depois).not.toContain("19,90");
     expect(depois).not.toContain("Menos que um lanche.");
     for (const t of ["Paga uma vez. Usa pra sempre.", "R$67,90", "CORE, as 16 áreasR$ 67,90, uma vez", "Quero meu acesso por R$ 67,90", "R$ 67,90, uma vez · iPhone e Android · 7 dias de garantia", "R$ 67,90, 1 vez só", "Quero experimentar agora R$ 67,90, uma vez · Pix ou cartão"]) expect(depois).toContain(t);
     expect(depois.match(/Quero meu acesso por R\$ 67,90/g)).toHaveLength(1);
     // tirando os 5 trechos, o resto da página é igual
-    const neutro = (s: string) => s.replace("Menos que um lanche.", "§").replace("Paga uma vez. Usa pra sempre.", "§").replace(/[26]7,90/g, "§§");
+    const neutro = (s: string) => s.replace("Menos que um lanche.", "§").replace("Paga uma vez. Usa pra sempre.", "§").replace(/(?:19|67),90/g, "§§");
     expect(neutro(depois)).toBe(neutro(antes));
     expect(depois).not.toMatch(/por mês|por dia|12x|\b1x\b|parcela/i);
   });
@@ -370,7 +370,7 @@ describe("o checkout da /dia (o caminho padrão do stripe-checkout)", () => {
   };
 
   it("abre por cima da página (camada), no desenho novo; sem CPF, sem parcela, Pix e cartão; e-mail só dentro do checkout", async () => {
-    await abrirCheckout(opcoes("27"));
+    await abrirCheckout(opcoes("19"));
     await flush();
     const oc = document.getElementById("oc")!;
     expect(oc.parentElement).toBe(document.body);
@@ -382,19 +382,19 @@ describe("o checkout da /dia (o caminho padrão do stripe-checkout)", () => {
     expect(document.getElementById("oc-cpf")).toBeNull();
     expect(document.getElementById("oc-email")).not.toBeNull();
     expect([...document.querySelectorAll("[data-metodo]")].map((b) => b.getAttribute("data-metodo"))).toEqual(["pix", "card"]);
-    expect(oc.textContent).toContain("27,90");
+    expect(oc.textContent).toContain("19,90");
     expect(oc.textContent).not.toMatch(/parcela|12x|\b1x\b|CPF/i);
-    expect(document.getElementById("oc-pagar")!.textContent).toMatch(/^Gerar Pix de R\$\s27,90$/);
+    expect(document.getElementById("oc-pagar")!.textContent).toMatch(/^Gerar Pix de R\$\s19,90$/);
     expect(pixel.mock.calls.filter((c) => c[0] === "InitiateCheckout")).toHaveLength(1);
   });
-  it("27: o pedido sai na linha lp27, sem braço de preço, sem valor do cliente, com a url de chegada da /dia e a aba separada das outras páginas", async () => {
+  it("19: o pedido sai na linha dia, sem braço de preço, sem valor do cliente, com a url de chegada da /dia e a aba separada das outras páginas", async () => {
     sessionStorage.setItem("oferta-stripe-ref", "pedido-da-oferta");
     sessionStorage.setItem("tudo-qa-stripe-ref", "pedido-da-tudo");
-    await abrirCheckout(opcoes("27"));
+    await abrirCheckout(opcoes("19"));
     await flush();
     await pagarNoPix();
     for (const [corpo] of criar.mock.calls) {
-      expect(corpo.pagina).toBe("lp27");
+      expect(corpo.pagina).toBe("dia");
       expect(corpo).not.toHaveProperty("braco_preco");
       expect(corpo).not.toHaveProperty("amount");
       expect(corpo).not.toHaveProperty("salvar_cartao");
@@ -405,19 +405,19 @@ describe("o checkout da /dia (o caminho padrão do stripe-checkout)", () => {
     expect(sessionStorage.getItem("oferta-stripe-ref")).toBe("pedido-da-oferta");
     expect(sessionStorage.getItem("tudo-qa-stripe-ref")).toBe("pedido-da-tudo");
   });
-  it("27: pagou → Purchase 1× (27,90, eventID = PI); nada se repete na consulta seguinte nem ao fechar e reabrir", async () => {
-    await abrirCheckout(opcoes("27"));
+  it("19: pagou → Purchase 1× (19,90, eventID = PI); nada se repete na consulta seguinte nem ao fechar e reabrir", async () => {
+    await abrirCheckout(opcoes("19"));
     await flush();
     await pagarNoPix();
     const compras = pixel.mock.calls.filter((c) => c[0] === "Purchase");
     expect(compras).toHaveLength(1);
-    expect(compras[0][1]).toMatchObject({ value: 27.9, currency: "BRL" });
+    expect(compras[0][1]).toMatchObject({ value: 19.9, currency: "BRL" });
     expect(compras[0][2]).toBe("pi_dia");
     document.dispatchEvent(new Event("visibilitychange"));
     await flush();
     (document.getElementById("oc-x") as HTMLElement | null)?.click();
     await flush();
-    await abrirCheckout(opcoes("27"));
+    await abrirCheckout(opcoes("19"));
     await flush();
     expect(pixel.mock.calls.filter((c) => c[0] === "Purchase")).toHaveLength(1);
     expect(evento.mock.calls.filter((c) => c[0] === "landing_stripe_pago")).toHaveLength(1);
@@ -426,7 +426,7 @@ describe("o checkout da /dia (o caminho padrão do stripe-checkout)", () => {
     await abrirCheckout(opcoes("67"));
     await flush();
     expect(document.getElementById("oc")!.textContent).toContain("67,90");
-    expect(document.getElementById("oc")!.textContent).not.toMatch(/27,90|parcela|12x/i);
+    expect(document.getElementById("oc")!.textContent).not.toMatch(/19,90|parcela|12x/i);
     await pagarNoPix();
     for (const [corpo] of criar.mock.calls) { expect(corpo.pagina).toBe("oferta"); expect(corpo).not.toHaveProperty("braco_preco"); expect(corpo).not.toHaveProperty("amount"); }
     const compras = pixel.mock.calls.filter((c) => c[0] === "Purchase");
@@ -435,7 +435,7 @@ describe("o checkout da /dia (o caminho padrão do stripe-checkout)", () => {
     expect(sessionStorage.getItem("oferta-stripe-ref")).toBeNull(); // não mexe na aba da /oferta
   });
   it("pago: o pós-compra direto pro app, com as duas lojas com link e o aviso de não comprar de novo; sem presente, sem indique", async () => {
-    await abrirCheckout(opcoes("27"));
+    await abrirCheckout(opcoes("19"));
     await flush();
     await pagarNoPix();
     const pos = document.querySelector("[data-testid='pos-compra']")!;
@@ -453,7 +453,7 @@ describe("o checkout da /dia (o caminho padrão do stripe-checkout)", () => {
     expect(evento.mock.calls.some((c) => c[0] === "pos_compra_view")).toBe(true);
   });
   it("cartão: à vista (sem pedir parcela), Purchase 1×", async () => {
-    await abrirCheckout(opcoes("27"));
+    await abrirCheckout(opcoes("19"));
     await flush();
     (document.querySelector("[data-metodo='card']") as HTMLElement).click();
     await flush();
@@ -468,16 +468,16 @@ describe("o checkout da /dia (o caminho padrão do stripe-checkout)", () => {
   });
   it("voltou do banco: o endereço não prova pagamento; só o servidor confirma", async () => {
     status.mockResolvedValue({ ok: false, pago: false });
-    await abrirCheckout({ ...opcoes("27"), voltaDoBanco: { pi: "pi_dia", status: "succeeded" } });
+    await abrirCheckout({ ...opcoes("19"), voltaDoBanco: { pi: "pi_dia", status: "succeeded" } });
     await flush();
     expect(status).toHaveBeenCalledWith(expect.objectContaining({ pi: "pi_dia" }));
     expect(pixel.mock.calls.some((c) => c[0] === "Purchase")).toBe(false);
     expect(document.querySelector("[data-testid='pos-compra']")).toBeNull();
   });
   it("Pix gerado + aba recarregada: o pedido fica guardado na aba; reabrir o checkout cai no MESMO pedido e o pago sai 1× (Purchase e landing_stripe_pago)", async () => {
-    const chave = `${prefixoDaAba(OFERTAS["27"], true)}-stripe-ref`; // a mesma chave que o main.ts lê na recarga
+    const chave = `${prefixoDaAba(OFERTAS["19"], true)}-stripe-ref`; // a mesma chave que o main.ts lê na recarga
     expect(sessionStorage.getItem(chave)).toBeNull();
-    await abrirCheckout(opcoes("27"));
+    await abrirCheckout(opcoes("19"));
     await flush();
     digitar("#oc-email", "qa@example.com");
     (document.getElementById("oc-pagar") as HTMLElement).click();
@@ -485,14 +485,14 @@ describe("o checkout da /dia (o caminho padrão do stripe-checkout)", () => {
     expect(document.querySelector("[data-testid='oferta-pix']")).not.toBeNull();
     const ref = sessionStorage.getItem(chave);
     expect(ref).toBeTruthy();
-    expect(JSON.parse(sessionStorage.getItem(`${prefixoDaAba(OFERTAS["27"], true)}-stripe-pi`)!)).toEqual({ ref, pi: "pi_dia" });
+    expect(JSON.parse(sessionStorage.getItem(`${prefixoDaAba(OFERTAS["19"], true)}-stripe-pi`)!)).toEqual({ ref, pi: "pi_dia" });
     // a aba recarrega (o Instagram, na volta do app do banco): some a memória da página, fica o sessionStorage.
     // O servidor devolve o MESMO pedido (mesma ref → mesmo PI), com o Pix já gerado: a tela volta no mesmo QR, sem pedir o e-mail de novo
-    const recarregar = async () => { _zerar(); document.body.innerHTML = '<div class="pg" id="pagina"><p>venda</p></div>'; criar.mockClear(); await abrirCheckout(opcoes("27")); await flush(); await flush(); };
+    const recarregar = async () => { _zerar(); document.body.innerHTML = '<div class="pg" id="pagina"><p>venda</p></div>'; criar.mockClear(); await abrirCheckout(opcoes("19")); await flush(); await flush(); };
     criar.mockResolvedValue({ ok: true, pi: "pi_dia", clientSecret: "pi_dia_secret_QA", status: "requires_action", pix: { data: QR } });
     await recarregar();
     expect(criar.mock.calls.length).toBeGreaterThan(0);
-    for (const [corpo] of criar.mock.calls) { expect(corpo.ref).toBe(ref); expect(corpo.pi).toBe("pi_dia"); expect(corpo.pagina).toBe("lp27"); } // nenhum pedido novo
+    for (const [corpo] of criar.mock.calls) { expect(corpo.ref).toBe(ref); expect(corpo.pi).toBe("pi_dia"); expect(corpo.pagina).toBe("dia"); } // nenhum pedido novo
     expect(document.querySelector("[data-testid='oferta-pix']")).not.toBeNull();
     expect([document.getElementById("oc")!.innerHTML, ...[...document.querySelectorAll<HTMLInputElement>("#oc input, #oc textarea")].map((i) => i.value)].join(" ")).toContain(QR); // o mesmo código Pix
     expect(document.getElementById("oc-email")).toBeNull();
@@ -512,7 +512,7 @@ describe("o checkout da /dia (o caminho padrão do stripe-checkout)", () => {
     expect(pixel.mock.calls.filter((c) => c[0] === "Purchase")).toHaveLength(1);
   });
   it("nenhum evento leva o e-mail", async () => {
-    await abrirCheckout(opcoes("27"));
+    await abrirCheckout(opcoes("19"));
     await flush();
     await pagarNoPix();
     expect(JSON.stringify(evento.mock.calls)).not.toContain("qa@example.com");
@@ -602,7 +602,7 @@ describe("o main.ts na página: carga adiada, descida pro preço e medição só
     // a imagem do topo NUNCA chega neste teste (complete = false, sem load): a medição sai assim mesmo
     await vi.waitFor(() => expect(nomes()).toEqual(["landing_view", "landing_cta:gesto"]));
     const ev = (window as any).__diaEvents[0];
-    expect(ev).toMatchObject({ funil: "dia", jornada: "dia_v1", path: "/dia", oferta: "27", topo: "lista", preco_cedo: "off" });
+    expect(ev).toMatchObject({ funil: "dia", jornada: "dia_v1", path: "/dia", oferta: "19", topo: "lista", preco_cedo: "off" });
     expect(typeof ev.ms_desde_abertura).toBe("number"); // quanto a medição demorou pra sair, pra comparar com as outras páginas
     expect(ev).not.toHaveProperty("volta_banco");
   });
@@ -665,7 +665,7 @@ describe("o main.ts na página: carga adiada, descida pro preço e medição só
     const css = ler("src/dia/style.css");
     expect(css).toContain("@media(max-width:700px){.oc-novo .oc-order-card h3,.oc-novo .oc-order-card ul,.oc-novo .oc-guarantee{display:none}}");
     const fonte = ler("src/dia/main.ts");
-    expect(fonte).toContain("email.scrollIntoView({block:'nearest'})"); // se o campo já cabe, não rola: "Total da compra R$ 27,90" e "Sem renovação" ficam em cima
+    expect(fonte).toContain("email.scrollIntoView({block:'nearest'})"); // se o campo já cabe, não rola: "Total da compra R$ 19,90" e "Sem renovação" ficam em cima
     expect(fonte).not.toContain("block:'center'");
     expect(css).toContain(".oc-novo #oc-email{scroll-margin-bottom:16px}");
     expect(fonte).not.toMatch(/\.focus\(/); // o teclado não sobe sozinho
@@ -793,7 +793,7 @@ describe("o main.ts na página: carga adiada, descida pro preço e medição só
       expect(openPayment).not.toHaveBeenCalled();
       // com o pedido desta página (prévia + oferta 27 → "dia-qa"): reabre 1 vez
       vi.resetModules(); (window as any).__diaEvents = [];
-      sessionStorage.setItem(`${prefixoDaAba(OFERTAS["27"], true)}-stripe-ref`, "ref-do-pix-0001");
+      sessionStorage.setItem(`${prefixoDaAba(OFERTAS["19"], true)}-stripe-ref`, "ref-do-pix-0001");
       await carregar();
       await vi.waitFor(() => expect(openPayment).toHaveBeenCalledTimes(1));
       expect(openPayment).toHaveBeenCalledWith(undefined); // não é volta do banco: o checkout compartilhado reaproveita a ref e o PI da aba
@@ -932,7 +932,7 @@ describe("rotas, build e o que NÃO mudou", () => {
   });
   it("o checkout compartilhado e as outras páginas não sabem da /dia (nenhuma opção nova, nenhum comportamento novo)", () => {
     const ck = ler("src/landing/stripe-checkout.ts");
-    expect(ck).toContain('pagina?: "oferta" | "lp27" | "organizar";');
+    expect(ck).toContain('pagina?: "oferta" | "lp27" | "tudo" | "dia" | "organizar";');
     expect(ck).toContain('layout?: "novo" | "cakto";');
     for (const arq of ["src/landing/stripe-checkout.ts", "src/landing/pos-compra-app.ts", "src/tudo/main.ts", "src/tudo/payment.ts", "src/pra-sempre/main.ts", "src/pra-sempre/payment.ts", "src/completo/payment.ts", "tudo.html", "pra-sempre.html", "pra-sempre-67.html", "completo.html", "landing.html"]) {
       const f = ler(arq);

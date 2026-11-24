@@ -53,6 +53,12 @@ export const OFERTAS_STRIPE: Record<string, OfertaStripe> = {
     pagina: "tudo", centavos: 1990, idem: "tudo19", descricao: "CORE vitalicio", parcelasMax: 1, offer: "ST_tudo",
     contentName: "CORE vitalício (/tudo)", urlPadrao: "https://www.coreaplicativo.com.br/tudo",
   },
+  /** 23/11 (dono: "sobe o /dia a 19,90 também"): linha PRÓPRIA da /dia (a "versão CORE do Porquim"). Mesma função stripe-lp27-criar.
+   *  Página nova, nunca vendeu a outro preço: não tem valor antigo pra aceitar. */
+  dia: {
+    pagina: "dia", centavos: 1990, idem: "dia19", descricao: "CORE vitalicio", parcelasMax: 1, offer: "ST_dia",
+    contentName: "CORE vitalício (/dia)", urlPadrao: "https://www.coreaplicativo.com.br/dia",
+  },
   app_web: {
     pagina: "app_web", centavos: 9790, idem: "appweb", descricao: "CORE vitalicio", parcelasMax: 3, offer: "ST_app_web",
     contentName: "CORE vitalício (funil app web)", urlPadrao: "https://www.coreaplicativo.com.br/funil-app",

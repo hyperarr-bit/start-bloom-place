@@ -590,8 +590,8 @@ describe('LP 27,90 — catalog and signed webhook',()=>{
 });
 it('lp27 uses a dedicated creator without monthly subscription actions',()=>{
  const endpoint=readFileSync(resolve(__dirname,'../../supabase/functions/stripe-lp27-criar/index.ts'),'utf8');
- expect(endpoint).toContain('p.pagina !== "lp27" && p.pagina !== "tudo"');expect(endpoint).not.toMatch(/assinarAppWeb|subscriptions|stripe-app-web/);
- const client=readFileSync(resolve(__dirname,'../landing/stripe-checkout.ts'),'utf8');expect(client).toContain('c.pagina === "lp27" || c.pagina === "tudo" ? "stripe-lp27-criar" : "stripe-criar"');
+ expect(endpoint).toContain('p.pagina !== "lp27" && p.pagina !== "tudo" && p.pagina !== "dia"');expect(endpoint).not.toMatch(/assinarAppWeb|subscriptions|stripe-app-web/);
+ const client=readFileSync(resolve(__dirname,'../landing/stripe-checkout.ts'),'utf8');expect(client).toContain('c.pagina === "lp27" || c.pagina === "tudo" || c.pagina === "dia" ? "stripe-lp27-criar" : "stripe-criar"');
 });
 
 /* ───────── 22/11: o SORTEIO DE PREÇO da /oferta (AB_PRECO_OFERTA) — servidor ───────── */
@@ -809,6 +809,25 @@ describe("22/11 /organizar no Stripe: servidor", () => {
       const m = montar();
       m.db.users.set("u_anon", { id: "u_anon", email: null });
       const r = await mandar(m, evento("payment_intent.succeeded", { ...base, amount: valor, amount_received: valor, metadata: { ...base.metadata, user_id: "u_anon", pagina: "tudo" } }));
+      expect(r.corpo).toMatchObject(libera ? { liberado: true } : { ignorado: "valor" });
+    }
+  });
+  it("23/11: a /dia tem linha própria 'dia' a 1990; 1990 libera, 2790 e 6790 com pagina 'dia' são ignorados; as outras linhas não mudam", async () => {
+    expect(OFERTAS_STRIPE.dia).toMatchObject({ pagina: "dia", centavos: 1990, idem: "dia19", parcelasMax: 1, offer: "ST_dia", urlPadrao: "https://www.coreaplicativo.com.br/dia" });
+    expect(OFERTAS_STRIPE.dia.aceitaTambem).toBeUndefined();
+    expect([OFERTAS_STRIPE.lp27.centavos, OFERTAS_STRIPE.tudo.centavos, OFERTAS_STRIPE.organizar.centavos, OFERTAS_STRIPE.oferta.centavos]).toEqual([2790, 1990, 1990, 6790]);
+    const p = validarPedidoStripe({ ref: REF, pagina: "dia", amount: 100, atrib: { indicador: "ANA7K2" } })!;
+    expect(p.pagina).toBe("dia");
+    expect(p.atrib.indicador).toBeUndefined();
+    expect(validarPedidoStripe({ ref: REF, pagina: "dia", braco_preco: "2790" })).toBeNull(); // braço de preço é só da /oferta
+    expect(paramsCriar(REF, OFERTAS_STRIPE.dia)).toEqual(expect.arrayContaining([["amount", "1990"], ["metadata[pagina]", "dia"]]));
+    expect(piServeProBraco({ amount: 1990, metadata: { pagina: "dia" } }, OFERTAS_STRIPE.dia, null)).toBe(true);
+    expect(piServeProBraco({ amount: 2790, metadata: { pagina: "dia" } }, OFERTAS_STRIPE.dia, null)).toBe(false);
+    const base = pi();
+    for (const [valor, libera] of [[1990, true], [2790, false], [6790, false]] as const) {
+      const m = montar();
+      m.db.users.set("u_anon", { id: "u_anon", email: null });
+      const r = await mandar(m, evento("payment_intent.succeeded", { ...base, amount: valor, amount_received: valor, metadata: { ...base.metadata, user_id: "u_anon", pagina: "dia" } }));
       expect(r.corpo).toMatchObject(libera ? { liberado: true } : { ignorado: "valor" });
     }
   });

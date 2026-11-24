@@ -69,9 +69,12 @@ export async function mountPayment(alvo: HTMLElement, o: { voltaDoBanco?: { pi: 
     pixel: (name, data, id) => { if (!QA && (name === "Purchase" || name === "InitiateCheckout" || name === "ViewContent" || name === "CompleteRegistration")) fireMetaEvent(name, data, id); },
     atrib, sessao: session, aparelho: device, urlChegada: source.url, fbclid: params.get("fbclid"),
   });
-  // ela estava no campo do esqueleto: o cursor vai pro campo de verdade, no fim do que ela digitou
+  // ela estava no campo do esqueleto: o cursor vai pro campo de verdade, no FIM do que ela digitou.
+  // rodada 3 (V2-M1): `setSelectionRange` dá erro (InvalidStateError) em campo type="email" nos dois motores — o cursor ficava no começo
+  // (Chromium) ou com tudo selecionado (WebKit), e quem digitava DURANTE a troca embaralhava o e-mail. Reescrever o valor depois do foco
+  // põe o cursor no fim nos dois (provado pelo V2: 04b-cursor-email, modo B).
   if (tinhaFoco) {
     const novo = alvo.querySelector<HTMLInputElement>("#oc-email");
-    if (novo) { novo.focus(); try { novo.setSelectionRange(novo.value.length, novo.value.length); } catch { /* type=email não aceita em alguns navegadores */ } }
+    if (novo) { novo.focus(); const v = novo.value; novo.value = ""; novo.value = v; }
   }
 }

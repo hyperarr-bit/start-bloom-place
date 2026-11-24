@@ -10,6 +10,10 @@
 .oc-cartao .ct-sr{position:absolute;width:1px;height:1px;margin:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .oc-cartao .ct-rot{display:block;margin:0 0 6px;font-size:14px;font-weight:750;line-height:1.3;color:var(--tx)}
 .oc-cartao .ct-rot span{font-weight:500;color:var(--suave)}
+/* rodada 3 (V2-B15): o "e-mail" que não quebra no hífen é um <span class="nw"> — ele é parte do rótulo, não da dica cinza */
+.oc-cartao .ct-rot .nw{font-weight:inherit;color:inherit}
+/* rodada 3 (V2-B3): em telas de até 370 px o rótulo do e-mail (rótulo, não texto de leitura) cabe em 1 linha — sem o "app" sozinho embaixo */
+@media (max-width:370px){.oc-cartao .ct-rot{font-size:13.5px}}
 .oc-cartao .ct-campo{display:block;width:100%;height:52px;margin:0;padding:0 15px;border:1.5px solid #d9d1d6;border-radius:13px;background:#fff;color:var(--tx);font:inherit;font-size:16px;outline:none;-webkit-appearance:none;appearance:none}
 .oc-cartao .ct-campo::placeholder{color:#9a929f}
 .oc-cartao .ct-campo:focus{border-color:var(--magenta);box-shadow:0 0 0 4px rgba(201,43,120,.14)}
@@ -46,6 +50,15 @@
 .oc-cartao .ct-pix-email{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:12px 0 0;padding:4px 4px 4px 12px;border-radius:12px;background:#fff;border:1.5px solid #ead0dd;text-align:left}
 .oc-cartao .ct-pix-email span{min-width:0;font-size:14.5px;line-height:1.35;color:var(--suave);overflow-wrap:anywhere}
 .oc-cartao .ct-pix-email b{display:block;font-size:15.5px;font-weight:800;color:var(--tx)}
+/* rodada 3 (T2-BAIXA 4 + cliente fria): "Corrigir" abre o campo AQUI, no mesmo Pix (Salvar troca o e-mail do pagamento que está na tela) */
+.oc-cartao .ct-pix-editar{margin:12px 0 0;padding:12px;border-radius:12px;background:#fff;border:1.5px solid #ead0dd;text-align:left}
+.oc-cartao .ct-pix-editar .ct-rot{margin-bottom:6px}
+.oc-cartao .ct-pix-editar-botoes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.oc-cartao .ct-pix-editar-botoes button{min-height:48px;border-radius:13px;font:inherit;font-size:15.5px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.oc-cartao .ct-pix-salvar{border:0;background:var(--magenta);color:#fff}
+.oc-cartao .ct-pix-salvar[aria-busy="true"]{opacity:.75;pointer-events:none}
+.oc-cartao .ct-pix-cancelar{border:1.5px solid #d9d1d6;background:#fff;color:var(--grafite)}
+.oc-cartao .oc-aviso-pix-velho b{font-weight:800;overflow-wrap:anywhere}
 .oc-cartao .ct-pix-corrigir{flex:none;min-height:44px;padding:0 10px;border:0;background:none;font:inherit;font-size:14.5px;font-weight:800;color:var(--magenta);text-decoration:underline;cursor:pointer}
 /* o Pix gerado e o "confirmando" dentro do cartão (as telas do checkout compartilhado) */
 .oc-cartao .oc-pix .oc-resumo{background:var(--papel)}

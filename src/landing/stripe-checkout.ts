@@ -361,7 +361,17 @@ const ICO_CARTAO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 type Fase = "form" | "pix" | "aguardando" | "pago" | "recebido";
 type Metodo = "pix" | "card";
 /** o CPF fica SÓ na memória desta página (nada de storage, evento ou log) e vai só pro stripe-criar */
-type Estado = { fase: Fase; ref: string; pi: string | null; clientSecret: string | null; metodo: string; pix: PixQr | null; email: string; cpf: string; nome?: string; titular?: string };
+/** rodada 3: `pixDesde` = quando o QR chegou NESTA aba (Date.now() do aparelho) — a validade de 30 min conta a partir daqui, pelo mesmo
+ *  relógio (relógio adiantado ou atrasado não derruba o Pix). Pix que voltou na recarga não tem (vale o que o servidor disser). */
+type Estado = { fase: Fase; ref: string; pi: string | null; clientSecret: string | null; metodo: string; pix: PixQr | null; pixDesde?: number; email: string; cpf: string; nome?: string; titular?: string };
+
+/** rodada 3 (/2027, layout "cartao", V2-B15): "e-mail" nunca quebra no hífen ("e-" numa linha, "mail" na outra). `.nw` é da página. */
+const EMAIL_NW = '<span class="nw">e-mail</span>';
+/** rodada 3 (/2027, layout "cartao", cliente fria + W2-B3): a hora no relógio e no fuso DO APARELHO, do jeito brasileiro ("01h13") */
+const horaCurta = (ms: number): string => new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }).replace(":", "h");
+/** rodada 3 (T2): até quando o Pix vale, no relógio do aparelho — gerado nesta aba: 30 min desde que chegou; voltou na recarga: o carimbo da
+ *  Stripe, só se ele ainda estiver no futuro pro relógio do aparelho (celular adiantado: sem hora, em vez de uma hora que parece vencida) */
+const fimDoPix = (p: PixQr | null | undefined, desde?: number): number | null => (desde ? desde + 30 * 60_000 : p?.expires_at && p.expires_at * 1000 > Date.now() ? p.expires_at * 1000 : null);
 
 let raiz: HTMLElement | null = null;
 let opc: OpcoesCheckout | null = null;
@@ -512,7 +522,9 @@ function telaForm() {
     const s = sugestaoDeEmail(campo.value);
     if (s) { sug.hidden = false; sug.textContent = `Você quis dizer ${s}?`; sug.dataset.s = s; } else { sug.hidden = true; delete sug.dataset.s; }
   };
-  campo.addEventListener("input", () => { est!.email = campo.value; erroEmail(null); atualizarSug(); medirEmail(); });
+  // rodada 3 (T2-BAIXA 1, layout "cartao"): mexeu no campo com a pergunta "Você quis dizer…?" aberta → a pergunta sai e o Pagar volta
+  // (o "Sim" nunca manda uma sugestão calculada pra um e-mail que não está mais no campo)
+  campo.addEventListener("input", () => { est!.email = campo.value; erroEmail(null); atualizarSug(); medirEmail(); if (o.layout === "cartao") fecharPergunta(); });
   campo.addEventListener("blur", atualizarSug);
   sug.addEventListener("click", () => { campo.value = sug.dataset.s ?? campo.value; est!.email = campo.value; sug.hidden = true; o.evento("landing_email_antes_sugestao", { onde: "stripe" }); medirEmail(); });
   alvo.querySelector("#oc-email-trocar")?.addEventListener("click", () => { o.evento("landing_stripe_email_trocar", {}); mostrarCampoEmail(); campo.focus(); });
@@ -583,7 +595,7 @@ function htmlCartao(): string {
   const e = est!;
   return `
     <h3 class="ct-sr" id="oc-tit">Pagamento</h3>
-    <label class="ct-rot" for="oc-email">Seu e-mail <span>· é com ele que você entra no app</span></label>
+    <label class="ct-rot" for="oc-email">Seu ${EMAIL_NW} <span>· é com ele que você entra no app</span></label>
     <input class="ct-campo" id="oc-email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="254" placeholder="seuemail@gmail.com" value="${esc(e.email)}" />
     <button type="button" class="oc-sug" id="oc-sug" hidden></button>
     <p class="oc-erro" id="oc-email-erro" role="alert" hidden></p>
@@ -597,7 +609,7 @@ function htmlCartao(): string {
     </div>
     <p class="oc-erro" id="oc-erro" role="alert" hidden></p>
     <button type="button" class="ct-pagar" id="oc-pagar"></button>
-    <p class="ct-depois">Depois de pagar: baixe o CORE e toque em <b>Entrar</b> com este e-mail.</p>`;
+    <p class="ct-depois">Depois de pagar: baixe o CORE e toque em <b>“Já tenho conta? Entrar”</b> com este ${EMAIL_NW}.</p>`;
 }
 
 /** The reviewed checkout design, using the same payment state machine and server confirmation. */
@@ -686,8 +698,11 @@ function perguntarEmail(email: string, sugerido: string) {
   opc.evento("landing_stripe_email_pergunta", {});
   const responder = (usar: boolean) => {
     const campo = alvo.querySelector<HTMLInputElement>("#oc-email");
-    if (usar && campo) { campo.value = sugerido; if (est) est.email = sugerido; }
-    else emailConfirmado = email;
+    // rodada 3 (T2-BAIXA 1): a sugestão é a do que está no campo AGORA (não a de quando ela tocou em Pagar)
+    const noCampo = (campo?.value ?? email).trim().toLowerCase();
+    const sugestaoAgora = sugestaoDeEmail(noCampo);
+    if (usar && campo) { const v = sugestaoAgora ?? noCampo; campo.value = v; if (est) est.email = v; }
+    else emailConfirmado = noCampo;
     caixa.remove(); botao.hidden = false;
     opc?.evento("landing_stripe_email_pergunta_resposta", { escolha: usar ? "corrigido" : "manteve" });
     medirEmail();
@@ -696,6 +711,15 @@ function perguntarEmail(email: string, sugerido: string) {
   caixa.querySelector("[data-usar]")!.addEventListener("click", () => responder(true));
   caixa.querySelector("[data-manter]")!.addEventListener("click", () => responder(false));
   try { caixa.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch { /* jsdom */ }
+}
+
+/** rodada 3 (T2-BAIXA 1): fecha a pergunta "Você quis dizer…?" (ela mexeu no campo) e devolve o botão de pagar */
+function fecharPergunta() {
+  const caixa = raiz?.querySelector("#ct-pergunta");
+  if (!caixa) return;
+  caixa.remove();
+  const botao = raiz?.querySelector<HTMLButtonElement>("#oc-pagar");
+  if (botao) botao.hidden = false;
 }
 
 /** rodada 2 (T-M1, /2027, layout "cartao"): depois do "Voltar" na tela do Pix, o Pix velho ainda vale 30 min. Se ela paga com um e-mail
@@ -730,10 +754,12 @@ function mostrarCampoEmail() {
   const c = raiz?.querySelector<HTMLElement>("#oc-email-caixa");
   if (c) c.hidden = false;
 }
-function erroEmail(m: string | null) { if (m) mostrarCampoEmail(); const e = raiz?.querySelector<HTMLElement>("#oc-email-erro"); if (e) { e.hidden = !m; e.textContent = m ?? ""; } }
+/** rodada 3 (V2-B15): no layout "cartao" a mensagem sai com "e-mail" inteiro (sem quebrar no hífen); fora dele, o texto de sempre */
+const pintarMensagem = (e: HTMLElement, m: string | null) => { if (m && opc?.layout === "cartao") e.innerHTML = esc(m).replace(/e-mail/g, EMAIL_NW); else e.textContent = m ?? ""; };
+function erroEmail(m: string | null) { if (m) mostrarCampoEmail(); const e = raiz?.querySelector<HTMLElement>("#oc-email-erro"); if (e) { e.hidden = !m; pintarMensagem(e, m); } }
 function erroNome(m: string | null) { const e = raiz?.querySelector<HTMLElement>("#oc-nome-erro"); if (e) { e.hidden = !m; e.textContent = m ?? ""; } }
 function erroCpf(m: string | null) { const e = raiz?.querySelector<HTMLElement>("#oc-cpf-erro"); if (e) { e.hidden = !m; e.textContent = m ?? ""; } }
-function erroGeral(m: string | null) { const e = raiz?.querySelector<HTMLElement>("#oc-erro"); if (e) { e.hidden = !m; e.textContent = m ?? ""; } }
+function erroGeral(m: string | null) { const e = raiz?.querySelector<HTMLElement>("#oc-erro"); if (e) { e.hidden = !m; pintarMensagem(e, m); } }
 
 function corpoDoPedido(email: string | null, cpf: string | null = null, cartao = false): Record<string, unknown> {
   const o = opc!;
@@ -846,10 +872,9 @@ async function montarElemento() {
   if (!temIntento) { falhouCarga("Não consegui abrir o pagamento agora. Tente de novo em instantes."); return; }
   // 2 (revisão): a recarga reaproveitou o PI — Pix já gerado volta com o MESMO QR; já pago vai pro pago
   if (ultimaCriacao?.status === "succeeded") { mostrarPago(est!.metodo); return; }
-  // rodada 2 (T-M2, layout "cartao"): um Pix já vencido (pelo relógio, com 1 min de folga) não volta — fica o formulário com o aviso
-  const pixVoltaVencido = o.layout === "cartao" && pixVencidoPeloRelogio(ultimaCriacao?.pix);
-  if (pixVoltaVencido) erroGeral(MSG_PIX_VENCEU);
-  else if (ultimaCriacao?.pix && (ultimaCriacao.pix.data || ultimaCriacao.pix.image_url_png)) { est!.pix = ultimaCriacao.pix; est!.metodo = "pix"; est!.fase = "pix"; telaPix(); return; }
+  // rodada 3 (T2-MÉDIA 1): na recarga vale o servidor — se ele devolveu o Pix, o PI está esperando o Pix (o QR vive) e o Pix volta. O relógio
+  // do aparelho não decide mais nada aqui (celular adiantado derrubava um QR válido). Pix que voltou na recarga não tem `pixDesde`.
+  if (ultimaCriacao?.pix && (ultimaCriacao.pix.data || ultimaCriacao.pix.image_url_png)) { est!.pix = ultimaCriacao.pix; est!.pixDesde = undefined; est!.metodo = "pix"; est!.fase = "pix"; telaPix(); return; }
   const temStripe = await comStripe;
   if (minha !== montagem) return;
   if (!temStripe) { o.evento("landing_erro", { onde: "stripe_js" }); falhouCarga("O pagamento não carregou. Confira a internet e tente de novo."); return; }
@@ -908,6 +933,8 @@ async function pagar() {
   const botao = raiz!.querySelector<HTMLButtonElement>("#oc-pagar")!;
   botao.setAttribute("aria-busy", "true"); botao.textContent = "Processando…";
   erroGeral(null);
+  // rodada 3: o e-mail que este pedido já tinha (o de um Pix gerado antes) — se o pedido já estiver pago, é ESSE que a tela de pago mostra
+  const emailDoPedidoAntes = o.layout === "cartao" ? emailDaAba(est.ref) : "";
   est.email = email;
   guardarEmail(est.ref, email); // rodada 2: só no layout "cartao"
   // rodada 2 (T-M1, layout "cartao"): ela voltou do Pix e corrigiu o e-mail → o Pix velho (que ainda vale) passa a liberar no e-mail novo
@@ -916,12 +943,14 @@ async function pagar() {
     o.evento("landing_stripe_pagar", { metodo });
     if (metodo === "pix") {
       if (!(await garantirIntento(email, cpf))) { erroGeral("Não consegui registrar o pagamento. Tente de novo em instantes."); erroAoPagar("criar"); return; }
+      // rodada 3 (T2-MÉDIA 1, layout "cartao"): o pedido JÁ está pago (ela pagou o Pix que estava no banco) → tela de pago, nunca confirmar de novo
+      if (o.layout === "cartao" && ultimaCriacao?.status === "succeeded") return jaEstavaPago(emailDoPedidoAntes);
       const r = await stripe.confirmPixPayment(est.clientSecret!, { payment_method: { billing_details: nome ? { email, name: nome } : { email } } }, { handleActions: false });
       if (r.error) { erroGeral(r.error.message ?? "Não deu pra gerar o Pix. Tente de novo."); o.evento("landing_erro", { onde: "stripe_pix", msg: String(r.error.code ?? "").slice(0, 40) }); erroAoPagar("pix", r.error); return; }
       const qr = r.paymentIntent?.next_action?.pix_display_qr_code;
       if (r.paymentIntent?.status === "succeeded") return mostrarPago("pix");
       if (!qr?.data && !qr?.image_url_png) { erroGeral("Não deu pra mostrar o Pix. Tente de novo."); erroAoPagar("pix", { code: "sem_qr" }); return; }
-      est.pix = qr; est.fase = "pix";
+      est.pix = qr; est.pixDesde = Date.now(); est.fase = "pix"; // rodada 3: a validade conta daqui, no relógio do aparelho
       o.evento("landing_stripe_pix_gerado", { pi: est.pi, ...(pixCopiaPrimeiro() ? { layout_pix: "copia_primeiro" } : {}) });
       telaPix();
       return;
@@ -933,6 +962,8 @@ async function pagar() {
     if (criado.error || !criado.paymentMethod) { erroGeral(criado.error?.message ?? "Confira os dados do cartão."); erroAoPagar("cartao", criado.error); return; }
     cartaoUsado = criado.paymentMethod.card ? { marca: criado.paymentMethod.card.brand ?? null, final: criado.paymentMethod.card.last4 ?? null } : null;
     if (!temIntento) { erroGeral("Não consegui registrar o pagamento. Tente de novo em instantes."); erroAoPagar("criar"); return; }
+    // rodada 3 (T2-MÉDIA 1, layout "cartao"): nunca confirmar o cartão num pedido que JÁ foi pago (pelo Pix): vai pra tela de pago
+    if (o.layout === "cartao" && ultimaCriacao?.status === "succeeded") return jaEstavaPago(emailDoPedidoAntes);
     const retorno = new URL(location.href); retorno.search = ""; retorno.hash = "";
     for (const [k, v] of new URLSearchParams(location.search)) if (!/^(payment_intent|payment_intent_client_secret|redirect_status)$/.test(k)) retorno.searchParams.set(k, v);
     const r = await stripe.confirmPayment({ clientSecret: est.clientSecret, redirect: "if_required", confirmParams: { return_url: retorno.toString(), payment_method: criado.paymentMethod.id } });
@@ -960,6 +991,13 @@ function telaPix() {
   const alvo = raiz!.querySelector<HTMLElement>("#oc-in")!;
   const vence = p.expires_at ? new Date(p.expires_at * 1000) : null;
   const hora = vence ? vence.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }) : null;
+  // rodada 3 (layout "cartao", cliente fria + W2-B3): "Vale por 30 minutos (até 01h13)" — a hora no relógio e no fuso do aparelho; um Pix que
+  // voltou na recarga diz só "Vale até 01h13". Fora do "cartao", o texto de sempre.
+  const cartao = o.layout === "cartao";
+  const fimCartao = cartao ? fimDoPix(p, est!.pixDesde) : null;
+  const validade = cartao
+    ? `<p data-testid="pix-validade">${fimCartao ? (est!.pixDesde ? `Vale por 30 minutos (até ${horaCurta(fimCartao)}). ` : `Vale até ${horaCurta(fimCartao)}. `) : ""}O acesso também chega no seu ${EMAIL_NW}.</p>`
+    : hora ? `<p>Vale até ${esc(hora)}. O acesso também chega no seu e-mail.</p>` : "<p>O acesso também chega no seu e-mail.</p>";
   const copiaPrimeiro = pixCopiaPrimeiro();
   alvo.innerHTML = copiaPrimeiro ? `
     <div class="oc-pix" data-testid="oferta-pix" data-layout="copia_primeiro">
@@ -970,7 +1008,7 @@ function telaPix() {
       <input id="oc-codigo" readonly value="${esc(p.data ?? "")}" aria-label="Pix copia e cola" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0" tabindex="-1" />
       <ol class="oc-passos3"><li><i>1</i>Abra o app do banco</li><li><i>2</i>Pix copia e cola</li><li><i>3</i>Volte aqui: libera sozinho</li></ol>
       <details class="oc-qr-menor"><summary>Ver QR code</summary><div class="oc-qr" id="oc-qr" aria-label="QR code do Pix">${p.image_url_png ? `<img alt="QR code do Pix" src="${esc(p.image_url_png)}" width="180" height="180" />` : ""}</div></details>
-      ${hora ? `<p>Vale até ${esc(hora)}. O acesso também chega no seu e-mail.</p>` : "<p>O acesso também chega no seu e-mail.</p>"}
+      ${validade}
     </div>` : `
     <div class="oc-pix" data-testid="oferta-pix">
       <div class="oc-resumo" style="text-align:left"><div><h2 id="oc-tit">CORE · Acesso vitalício</h2><p>Pix · pagamento único</p></div><div class="oc-preco">${esc(preco())}</div></div>
@@ -978,7 +1016,7 @@ function telaPix() {
       <div class="oc-qr" id="oc-qr" aria-label="QR code do Pix">${p.image_url_png ? `<img alt="QR code do Pix" src="${esc(p.image_url_png)}" width="180" height="180" />` : ""}</div>
       <div class="oc-copia"><input id="oc-codigo" readonly value="${esc(p.data ?? "")}" aria-label="Pix copia e cola" /><button type="button" id="oc-copiar">Copiar</button></div>
       <ol class="oc-passos"><li>Abra o app do seu banco e escolha <b>Pix copia e cola</b> (ou leia o QR).</li><li>Cole o código e confirme ${esc(preco())}.</li><li>Volte aqui: esta tela confirma sozinha.</li></ol>
-      ${hora ? `<p>Vale até ${esc(hora)}. O acesso também chega no seu e-mail.</p>` : "<p>O acesso também chega no seu e-mail.</p>"}
+      ${validade}
       ${!o.somentePix && (o.trocaCartao ?? PIX_TROCA_CARTAO === "on") ? `<p class="oc-erro" id="oc-erro" role="alert" hidden></p><button type="button" class="oc-trocar" id="oc-trocar">Prefiro pagar com cartão</button>` : ""}
     </div>`;
   alvo.querySelector("#oc-trocar")?.addEventListener("click", () => { void trocarPixPorCartao(); });
@@ -986,15 +1024,14 @@ function telaPix() {
   if (o.layout === "cakto") alvo.querySelector(".oc-pix > .oc-resumo")?.replaceWith(Object.assign(document.createElement("div"), { className: "ck-produto ck-produto-pix", innerHTML: `<img src="/tudo/icone-app-256.webp" width="64" height="64" alt="" /><div><h2 id="oc-tit">CORE · Acesso vitalício</h2><p>Pix · pagamento único · ${esc(preco())}</p></div>` }));
   // 23/11 (montarEm): dentro da página não há X — a saída do Pix gerado (outra forma de pagamento / e-mail errado) é um pedido novo
   if (inline) {
-    alvo.querySelector(".oc-pix")!.insertAdjacentHTML("beforeend", `<button type="button" class="oc-trocar oc-voltar-pix" id="oc-voltar-pix">Voltar e escolher outra forma de pagamento / corrigir o e-mail</button><p class="oc-miuda">Se você já pagou este Pix, não pague de novo: o acesso chega no seu e-mail.</p>`);
+    // rodada 3 (layout "cartao"): o e-mail se corrige no alto, no MESMO Pix; o "Voltar" de baixo fica só pra trocar a forma de pagamento
+    const voltar = cartao ? "Voltar e escolher outra forma de pagamento" : "Voltar e escolher outra forma de pagamento / corrigir o e-mail";
+    const nota = cartao ? `Se você já pagou este Pix, não pague de novo: o acesso chega no seu ${EMAIL_NW}.` : "Se você já pagou este Pix, não pague de novo: o acesso chega no seu e-mail.";
+    alvo.querySelector(".oc-pix")!.insertAdjacentHTML("beforeend", `<button type="button" class="oc-trocar oc-voltar-pix" id="oc-voltar-pix">${voltar}</button><p class="oc-miuda">${nota}</p>`);
     alvo.querySelector("#oc-voltar-pix")!.addEventListener("click", voltarDoPix);
   }
-  // rodada 2 (/2027, layout "cartao"): o e-mail do pedido escrito no alto da tela do Pix, com o "corrigir" (o mesmo "Voltar" de baixo)
-  const emailDoPix = (est!.email || "").trim().toLowerCase();
-  if (o.layout === "cartao" && inline && EMAIL_OK.test(emailDoPix)) {
-    alvo.querySelector(".oc-pix > .oc-resumo")?.insertAdjacentHTML("afterend", `<p class="ct-pix-email" data-testid="pix-email"><span>O acesso vai pro e-mail <b>${esc(emailDoPix)}</b></span><button type="button" class="ct-pix-corrigir" data-corrigir-email>Corrigir</button></p>`);
-    alvo.querySelector("[data-corrigir-email]")?.addEventListener("click", voltarDoPix);
-  }
+  // rodada 2 (/2027, layout "cartao"): o e-mail do pedido escrito no alto da tela do Pix, com o "Corrigir" (rodada 3: no MESMO Pix)
+  if (cartao && inline) { const linha = linhaDoEmailNoPix(); if (linha) alvo.querySelector(".oc-pix > .oc-resumo")?.insertAdjacentElement("afterend", linha); }
   if (!p.image_url_png && p.data) void desenharQr(alvo.querySelector<HTMLElement>("#oc-qr")!, p.data);
   alvo.querySelector("#oc-copiar")!.addEventListener("click", async () => {
     const b = alvo.querySelector<HTMLButtonElement>("#oc-copiar")!;
@@ -1019,13 +1056,108 @@ function voltarDoPix() {
   guardarEmail(est.ref, antigo.email.trim().toLowerCase()); // rodada 2: só no layout "cartao" (a recarga volta com o campo preenchido)
   opc.evento("landing_stripe_pix_voltou", { pi_antigo: antigo.pi });
   // rodada 2 (T-M1): o Pix velho guarda o e-mail que está no PI dele (o que a tela de pago mostra se ele for o pago)
-  if (antigo.pi) vigiarPixVelho({ ref: antigo.ref, pi: antigo.pi, ate: (antigo.pix?.expires_at ? antigo.pix.expires_at * 1000 : Date.now() + 30 * 60_000) + 60_000, email: antigo.email.trim().toLowerCase() });
+  // rodada 3 (T2, layout "cartao"): até quando vigiar = 30 min DESDE QUE O QR CHEGOU (tempo decorrido no relógio do aparelho), não a hora absoluta
+  const cartao = opc.layout === "cartao";
+  const ateVelho = cartao ? (antigo.pixDesde ?? Date.now()) + 30 * 60_000 : (antigo.pix?.expires_at ? antigo.pix.expires_at * 1000 : Date.now() + 30 * 60_000);
+  if (antigo.pi) vigiarPixVelho({ ref: antigo.ref, pi: antigo.pi, ate: ateVelho + 60_000, email: antigo.email.trim().toLowerCase() });
   telaForm();
-  // rodada 2 (/2027, layout "cartao", W-B3): o aviso diz até que horas o Pix velho vale (não "30 min" fixo)
-  const venceVelho = opc.layout === "cartao" && antigo.pix?.expires_at ? new Date(antigo.pix.expires_at * 1000).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }) : null;
-  const aviso = venceVelho ? `O Pix anterior vale até ${esc(venceVelho)}. Se você já pagou ele, não pague de novo.` : "O Pix que você gerou ainda vale por 30 min. Se já pagou, não pague de novo: o acesso chega no e-mail.";
+  // rodada 2/3 (/2027, layout "cartao", W2-B4 + cliente fria): o aviso diz pra que e-mail o Pix anterior libera e até que horas (no relógio do aparelho)
+  const emailVelho = antigo.email.trim().toLowerCase();
+  const fimVelho = cartao ? fimDoPix(antigo.pix, antigo.pixDesde) : null;
+  const ateTexto = fimVelho ? ` (vale até ${horaCurta(fimVelho)})` : "";
+  const aviso = !cartao ? "O Pix que você gerou ainda vale por 30 min. Se já pagou, não pague de novo: o acesso chega no e-mail."
+    : EMAIL_OK.test(emailVelho) ? `O Pix anterior libera o acesso em <b>${esc(emailVelho)}</b>${ateTexto}. Se você já pagou ele, não pague de novo.`
+    : `O Pix anterior ainda vale${ateTexto}. Se você já pagou ele, não pague de novo.`;
   if (pixVelho) raiz?.querySelector("#oc-in")?.insertAdjacentHTML("afterbegin", `<p class="oc-aviso-pix-velho" data-testid="aviso-pix-velho">${aviso}</p>`);
   rolarInline();
+}
+
+/** rodada 2/3 (/2027, layout "cartao"): a linha "O acesso vai pro e-mail x · Corrigir" do alto da tela do Pix */
+function linhaDoEmailNoPix(): HTMLElement | null {
+  const email = (est?.email || "").trim().toLowerCase();
+  if (!EMAIL_OK.test(email)) return null;
+  const p = document.createElement("p");
+  p.className = "ct-pix-email"; p.setAttribute("data-testid", "pix-email");
+  p.innerHTML = `<span>O acesso vai pro ${EMAIL_NW} <b>${esc(email)}</b></span><button type="button" class="ct-pix-corrigir" data-corrigir-email>Corrigir</button>`;
+  p.querySelector("[data-corrigir-email]")!.addEventListener("click", abrirCorrecaoDoEmail);
+  return p;
+}
+
+/**
+ * rodada 3 (T2-BAIXA 4 + cliente fria, só layout "cartao"): "Corrigir" com o Pix aberto troca o e-mail NO MESMO pagamento — o stripe-criar
+ * já aceita trocar o e-mail de um Pix gerado (mesma ref, mesmo PI: atualiza receipt_email e metadata, o Pix segue esperando) — e a tela
+ * fica no MESMO Pix: sem QR novo, sem 2º pedido, sem o aviso "Pix anterior". A vigia espera a resposta da troca (o pago sempre mostra o
+ * e-mail que ficou no pagamento). Se a troca falhar: o caminho de antes (Voltar = pedido novo) com o aviso dizendo pra que e-mail o Pix
+ * anterior libera, e o e-mail corrigido já no campo.
+ */
+let trocandoEmailDoPix = false;
+function abrirCorrecaoDoEmail() {
+  if (!opc || !est || est.fase !== "pix" || !raiz) return;
+  const linha = raiz.querySelector<HTMLElement>("[data-testid='pix-email']");
+  if (!linha) return;
+  const caixa = document.createElement("div");
+  caixa.className = "ct-pix-editar"; caixa.setAttribute("data-testid", "pix-email-editar");
+  caixa.innerHTML = `<label class="ct-rot" for="ct-email-novo">Seu ${EMAIL_NW} certo <span>· este mesmo Pix passa a liberar nele</span></label>
+    <input class="ct-campo" id="ct-email-novo" type="email" inputmode="email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="254" value="${esc(est.email.trim().toLowerCase())}" />
+    <button type="button" class="oc-sug" id="ct-email-novo-sug" hidden></button>
+    <p class="oc-erro" id="ct-email-novo-erro" role="alert" hidden></p>
+    <div class="ct-pix-editar-botoes"><button type="button" class="ct-pix-salvar" data-salvar>Salvar</button><button type="button" class="ct-pix-cancelar" data-cancelar>Cancelar</button></div>`;
+  linha.replaceWith(caixa);
+  opc.evento("landing_stripe_pix_corrigir", {});
+  const campo = caixa.querySelector<HTMLInputElement>("#ct-email-novo")!;
+  const sug = caixa.querySelector<HTMLButtonElement>("#ct-email-novo-sug")!;
+  const erro = caixa.querySelector<HTMLElement>("#ct-email-novo-erro")!;
+  const salvar = caixa.querySelector<HTMLButtonElement>("[data-salvar]")!;
+  campo.addEventListener("input", () => {
+    erro.hidden = true;
+    const s = sugestaoDeEmail(campo.value);
+    sug.hidden = !s; if (s) { sug.textContent = `Você quis dizer ${s}?`; sug.dataset.s = s; } else delete sug.dataset.s;
+  });
+  sug.addEventListener("click", () => { campo.value = sug.dataset.s ?? campo.value; sug.hidden = true; });
+  const fechar = () => { const nova = linhaDoEmailNoPix(); if (nova) caixa.replaceWith(nova); else caixa.remove(); };
+  caixa.querySelector("[data-cancelar]")!.addEventListener("click", () => { if (!trocandoEmailDoPix) fechar(); });
+  salvar.addEventListener("click", () => { void salvarEmailNoPix(campo, erro, salvar, fechar); });
+  // o "ir"/Enter do teclado salva (o Salvar pode estar atrás do teclado)
+  campo.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); salvar.click(); } });
+  try { campo.focus(); } catch { /* jsdom */ }
+}
+
+async function salvarEmailNoPix(campo: HTMLInputElement, erro: HTMLElement, botao: HTMLButtonElement, fechar: () => void) {
+  if (!opc || !est || !api || trocandoEmailDoPix || est.fase !== "pix") return;
+  const o = opc;
+  const novo = campo.value.trim().toLowerCase();
+  if (!EMAIL_OK.test(novo)) { erro.hidden = false; pintarMensagem(erro, "Confira o e-mail: parece que falta alguma coisa."); campo.focus(); return; }
+  if (novo === est.email.trim().toLowerCase()) { fechar(); return; }
+  trocandoEmailDoPix = true; botao.setAttribute("aria-busy", "true"); botao.textContent = "Salvando…";
+  pararVigia(); // a vigia espera a troca: se o Pix cair agora, a tela de pago sai depois, com o e-mail que ficou no pagamento
+  const piDaVez = est.pi;
+  const r = await api.criar({ ...corpoDoPedido(novo) }).catch(() => ({ ok: false } as RespostaCriar));
+  trocandoEmailDoPix = false;
+  if (!est || est.pi !== piDaVez || est.fase !== "pix") return; // a tela mudou enquanto esperava
+  const mesmoPedido = r.ok && !!r.pi && r.pi === est.pi;
+  // já estava pago: a troca não aconteceu e o acesso foi pro e-mail que estava no pagamento (o de antes) — é ele que a tela mostra
+  if (mesmoPedido && r.status === "succeeded") { o.evento("landing_stripe_pix_email_trocado", { ok: false, motivo: "ja_pago" }); mostrarPago("pix"); return; }
+  if (mesmoPedido && (r.status === "requires_action" || r.status === "requires_payment_method")) {
+    est.email = novo; guardarEmail(est.ref, novo);
+    o.evento("landing_stripe_pix_email_trocado", { ok: true, ...(r.status === "requires_payment_method" ? { motivo: "vencido" } : {}) });
+    if (r.status === "requires_payment_method") { pixVenceu(); return; } // o Pix venceu enquanto ela corrigia: formulário, já com o e-mail novo
+    fechar(); vigiar(); return;
+  }
+  // a troca falhou (rede, servidor, outro pedido): o caminho de antes — pedido novo, o aviso diz pra que e-mail o Pix anterior libera
+  o.evento("landing_stripe_pix_email_trocado", { ok: false, motivo: r.ok ? "outro_pedido" : "falhou" });
+  voltarDoPix();
+  const campoDoForm = raiz?.querySelector<HTMLInputElement>("#oc-email");
+  if (campoDoForm && est) { campoDoForm.value = novo; est.email = novo; guardarEmail(est.ref, novo); }
+}
+
+/** rodada 3 (T2-MÉDIA 1, layout "cartao"): o servidor disse que ESTE pedido já está pago (ela pagou o Pix que estava no banco) → a tela de
+ *  pago, sem confirmar nada de novo. O e-mail é o que já estava no pedido; o método vem do servidor (quase sempre o Pix). */
+async function jaEstavaPago(emailDoPedido: string) {
+  if (!est || !api || !opc) return;
+  opc.evento("landing_stripe_ja_estava_pago", { pi: est.pi });
+  est.email = emailDoPedido; // desconhecido ("") = o pós-compra diz "o mesmo e-mail que você digitou na compra", sem chutar
+  const st = est.pi ? await api.status({ ref: est.ref, pi: est.pi }).catch(() => null) : null;
+  mostrarPago((st?.metodo as string) || "pix");
 }
 
 /** 23/11 (montarEm, revisão): depois do "Voltar", o Pix velho ainda vale (o código pode ter sido copiado). A cada 5 s até vencer:
@@ -1122,11 +1254,14 @@ function vigiar() {
   const uma = async () => {
     if (!est?.pi || est.fase === "pago" || est.fase === "recebido") return;
     const pi = est.pi;
+    const pixDaVez = est.pix; // rodada 3 (T2-BAIXA 2): a resposta só vale pro Pix que estava na tela quando a pergunta saiu
     const r = await api!.status({ ref: est.ref, pi }).catch(() => null);
     if (!est || est.pi !== pi) return; // 23/11: o pedido mudou enquanto perguntava (o "Voltar" do Pix): a resposta é do PI velho
     if (r?.pago) return mostrarPago((r.metodo as string) || est.metodo);
     // rodada 2 (T-M2, /2027, layout "cartao"): o Pix venceu → sai do "Esperando o Pix" e volta pro formulário (mesmo pedido)
-    if (opc?.layout === "cartao" && est.fase === "pix" && (r?.status === "requires_payment_method" || pixVencidoPeloRelogio(est.pix))) return pixVenceu();
+    // rodada 3 (T2): o servidor decide (requires_payment_method) ou passaram 31 min DESDE QUE O QR CHEGOU nesta aba (tempo decorrido, imune a
+    // relógio errado); e uma resposta atrasada, pedida antes de um Pix NOVO do mesmo pedido, não derruba o novo
+    if (opc?.layout === "cartao" && est.fase === "pix" && est.pix === pixDaVez && (r?.status === "requires_payment_method" || pixVencidoPeloRelogio(est.pixDesde))) return pixVenceu();
     semConfirmar = r?.ok === false ? semConfirmar + 1 : 0;
     if (est.fase === "aguardando" && (semConfirmar >= 3 || Date.now() - vigiaDesde > VIGIA_MAX_MS)) telaRecebido();
   };
@@ -1137,17 +1272,20 @@ function vigiar() {
 function pararVigia() { if (consulta !== null) { window.clearInterval(consulta); consulta = null; } }
 
 /** rodada 2 (T-M2): o Pix vale 30 min (stripe-criar, expires_after_seconds 1800). O sinal principal é o do servidor (o PI volta pra
- *  "requires_payment_method" quando o Pix vence); o relógio do aparelho só conta 1 min DEPOIS da validade (folga pra relógio adiantado). */
+ *  "requires_payment_method" quando o Pix vence).
+ *  rodada 3 (T2-MÉDIA 1): o relógio do aparelho só entra como TEMPO DECORRIDO desde que o QR chegou nesta aba (+1 min de folga) — antes
+ *  comparava a hora do celular com o carimbo da Stripe, e um celular adiantado derrubava um QR ainda válido. Pix que voltou na recarga
+ *  (sem `pixDesde`) só vence pelo servidor. */
 const FOLGA_PIX_VENCIDO_MS = 60_000;
 const MSG_PIX_VENCEU = "Esse Pix venceu. Toque em Pagar pra gerar outro.";
-const pixVencidoPeloRelogio = (p: PixQr | null | undefined): boolean => !!p?.expires_at && Date.now() > p.expires_at * 1000 + FOLGA_PIX_VENCIDO_MS;
+const pixVencidoPeloRelogio = (desde: number | undefined): boolean => !!desde && Date.now() - desde > 30 * 60_000 + FOLGA_PIX_VENCIDO_MS;
 /** volta pro formulário com o MESMO pedido (mesma ref e mesmo PI): o próximo "Pagar" gera outro QR no mesmo PaymentIntent — nada é cobrado
  *  de novo (um PI só paga uma vez). */
 function pixVenceu() {
   if (!opc || !est || est.fase !== "pix") return;
   pararVigia();
   opc.evento("landing_stripe_pix_vencido", { pi: est.pi });
-  est.fase = "form"; est.pix = null; est.metodo = "pix";
+  est.fase = "form"; est.pix = null; est.pixDesde = undefined; est.metodo = "pix";
   telaForm();
   erroGeral(MSG_PIX_VENCEU);
   rolarInline();
@@ -1330,4 +1468,4 @@ function fecharJa(_via: string) {
 }
 
 /** testes: zera o módulo entre páginas */
-export function _zerar() { pararPixVelho(); inline = false; cartaoUsado = null; emailConfirmado = null; pararVigia(); raiz?.remove(); raiz = null; est = null; ultimoEmailInicial = null; ultimaCriacao = null; icNoHeap.clear(); aberta = false; opc = null; api = null; stripe = null; elementos = null; elementoCartao = null; montagem += 1; pixPronto = false; cartaoPronto = false; cargaFalhou = false; cartaoFalhou = false; carteiraMedida = false; emailMedido.comecou = ""; emailMedido.valido = ""; fechandoPelaTela = false; saiuEm = null; carregandoStripe = null; soltarTeto(); trocandoPix = false; window.removeEventListener("popstate", aoVoltarNavegador); vigiarSaida(false); soltar(); }
+export function _zerar() { pararPixVelho(); inline = false; cartaoUsado = null; emailConfirmado = null; trocandoEmailDoPix = false; pararVigia(); raiz?.remove(); raiz = null; est = null; ultimoEmailInicial = null; ultimaCriacao = null; icNoHeap.clear(); aberta = false; opc = null; api = null; stripe = null; elementos = null; elementoCartao = null; montagem += 1; pixPronto = false; cartaoPronto = false; cargaFalhou = false; cartaoFalhou = false; carteiraMedida = false; emailMedido.comecou = ""; emailMedido.valido = ""; fechandoPelaTela = false; saiuEm = null; carregandoStripe = null; soltarTeto(); trocandoPix = false; window.removeEventListener("popstate", aoVoltarNavegador); vigiarSaida(false); soltar(); }

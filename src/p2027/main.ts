@@ -76,7 +76,14 @@ function iniciar() {
     esqueleto.addEventListener("pointerdown", () => { void montar(); }, { once: true });
     esqueleto.addEventListener("focusin", () => { void montar(); }, { once: true });
     esqueleto.addEventListener("click", (e) => {
-      const b = (e.target as HTMLElement).closest<HTMLElement>("[data-sk-metodo]"); if (b) metodoPedido = b.dataset.skMetodo ?? null;
+      const b = (e.target as HTMLElement).closest<HTMLElement>("[data-sk-metodo]");
+      if (b) {
+        metodoPedido = b.dataset.skMetodo ?? null;
+        // rodada 3 (V2-B7): o toque em "Cartão" no esqueleto já marca Cartão e o botão já diz "no cartão" (antes, nada mudava até o formulário chegar)
+        for (const x of esqueleto.querySelectorAll<HTMLElement>("[data-sk-metodo]")) x.setAttribute("aria-checked", String(x === b));
+        const pagarSk = esqueleto.querySelector<HTMLElement>("[data-sk-pagar]");
+        if (pagarSk && pagarSk.getAttribute("aria-busy") !== "true") pagarSk.textContent = (pagarSk.textContent ?? "").replace(/no (Pix|cartão)$/, metodoPedido === "card" ? "no cartão" : "no Pix");
+      }
       const pg = (e.target as HTMLElement).closest<HTMLElement>("[data-sk-pagar]"); if (pg) { pg.textContent = "Carregando…"; pg.setAttribute("aria-busy", "true"); void montar(); }
     });
   }
@@ -168,7 +175,8 @@ function iniciar() {
      — o teclado que sobe DEPOIS dos 350 ms (iPhone e Android barato avisam no fim da animação) também é coberto. */
   const toque = (() => { try { return matchMedia("(pointer: coarse)").matches; } catch { return false; } })();
   const ajustarAoTeclado = (campo: HTMLInputElement) => {
-    const botao = alvo.querySelector<HTMLElement>("#oc-pagar");
+    // rodada 3: no "Corrigir" com o Pix aberto, o botão que tem de ficar à vista é o "Salvar" do campo novo
+    const botao = alvo.querySelector<HTMLElement>("#oc-pagar") ?? alvo.querySelector<HTMLElement>(".ct-pix-editar [data-salvar]");
     if (!botao || document.activeElement !== campo) return;
     const vv = window.visualViewport;
     const topoVisivel = vv ? vv.offsetTop : 0, fimVisivel = topoVisivel + (vv ? vv.height : window.innerHeight);
@@ -185,7 +193,11 @@ function iniciar() {
     const vv = window.visualViewport;
     window.setTimeout(() => ajustarAoTeclado(campo), 350);
     vv?.addEventListener("resize", deNovo); window.addEventListener("resize", deNovo);
-    campo.addEventListener("blur", () => { window.clearTimeout(espera); vv?.removeEventListener("resize", deNovo); window.removeEventListener("resize", deNovo); }, { once: true });
+    // rodada 3 (V2-M2): o próprio formulário muda de altura com o teclado aberto (a sugestão "Você quis dizer…?" aparece embaixo do campo
+    // e empurrava o botão de pagar pra trás do teclado) → a mesma conta, refeita quando o #pagamento muda de tamanho
+    const ro = "ResizeObserver" in window ? new ResizeObserver(deNovo) : null;
+    ro?.observe(alvo);
+    campo.addEventListener("blur", () => { window.clearTimeout(espera); vv?.removeEventListener("resize", deNovo); window.removeEventListener("resize", deNovo); ro?.disconnect(); }, { once: true });
   });
 
   /* ───────── bloco visto (1× cada) ───────── */

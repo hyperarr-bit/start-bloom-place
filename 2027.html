@@ -23,7 +23,7 @@
  *   Rollback: PAGINA_2027 "off" (+ push).
  */
 (function () {
-  var PAGINA_2027 = "off";
+  var PAGINA_2027 = "on";
   var q = location.search, h = document.documentElement;
   var aba = /[?&]p2027=on(&|$)/.test(q);
   try { if (aba) sessionStorage.setItem("p2027-on", "1"); else aba = sessionStorage.getItem("p2027-on") === "1"; } catch (e) { /* sem storage */ }

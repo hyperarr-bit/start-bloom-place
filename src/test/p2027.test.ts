@@ -53,15 +53,23 @@ describe("1 · o preço num lugar só", () => {
 });
 
 describe("2 · a chave PAGINA_2027", () => {
-  const cabeca = HTML_CRU.match(/<script>\s*\/\*[\s\S]*?\*\/\s*(\(function \(\) \{[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
+  // 24/11: a página está NO AR (PAGINA_2027 "on" — dono: "publica"). `cabecaNoAr` = o que está no arquivo; `cabeca` = o rollback ("off").
+  const cabecaNoAr = HTML_CRU.match(/<script>\s*\/\*[\s\S]*?\*\/\s*(\(function \(\) \{[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
+  const cabeca = cabecaNoAr.replace('var PAGINA_2027 = "on"', 'var PAGINA_2027 = "off"');
   const rodar = (fonte: string, busca: string, host = "www.coreaplicativo.com.br", sessao: Record<string, string> = {}) => {
     const attrs: Record<string, string> = {}; const replace = vi.fn();
     const ss = { getItem: (k: string) => sessao[k] ?? null, setItem: (k: string, v: string) => { sessao[k] = v; } };
     new Function("location", "document", "sessionStorage", fonte)({ search: busca, hostname: host, hash: "", replace }, { documentElement: { setAttribute: (k: string, v: string) => { attrs[k] = v; } } }, ss);
     return { attrs, replace, sessao };
   };
-  it("nasce OFF: no domínio de produção, sem nada na URL, vai pro /organizar com a mesma query e a página nem pinta", () => {
-    expect(HTML_CRU).toMatch(/var PAGINA_2027 = "off";/);
+  it("no ar: ligada (PAGINA_2027 on) — abre pra todo mundo, com a query intacta", () => {
+    expect(HTML_CRU).toMatch(/var PAGINA_2027 = "on";/);
+    expect(cabeca).not.toBe(cabecaNoAr);
+    const r = rodar(cabecaNoAr, "?utm_content=c7&fbclid=x");
+    expect(r.replace).not.toHaveBeenCalled();
+    expect(r.attrs["data-desligada"]).toBeUndefined();
+  });
+  it("rollback (OFF): no domínio de produção, sem nada na URL, vai pro /organizar com a mesma query e a página nem pinta", () => {
     const r = rodar(cabeca, "?utm_content=c7&fbclid=x");
     expect(r.replace).toHaveBeenCalledWith("/organizar?utm_content=c7&fbclid=x");
     expect(r.attrs["data-desligada"]).toBe("");
@@ -75,7 +83,7 @@ describe("2 · a chave PAGINA_2027", () => {
     expect(comAba.replace).not.toHaveBeenCalled();
     expect(rodar(cabeca, "?utm_source=x", "www.coreaplicativo.com.br", comAba.sessao).replace).not.toHaveBeenCalled(); // recarregou sem o parâmetro
     expect(rodar(cabeca, "?payment_intent=pi_3Abc&redirect_status=succeeded").replace).not.toHaveBeenCalled();
-    expect(rodar(cabeca.replace('var PAGINA_2027 = "off"', 'var PAGINA_2027 = "on"'), "?utm_content=c7").replace).not.toHaveBeenCalled();
+    expect(rodar(cabecaNoAr, "?utm_content=c7").replace).not.toHaveBeenCalled();
   });
 });
 

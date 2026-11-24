@@ -95,10 +95,6 @@ const PERGUNTAS: Array<{ q: string; a: ReactNode }> = [
     a: <>Você assina pela própria loja do seu celular — App Store ou Google Play. O app mostra as opções antes de você decidir, e o pagamento é feito pra loja: a gente não guarda cartão.</>,
   },
   {
-    q: "Dá pra testar antes?",
-    a: <>No iPhone, dá: você testa antes de pagar e, se não for pra você, cancela dentro do período de teste sem custo. No Android o app mostra as opções antes de assinar.</>,
-  },
-  {
     q: "Como cancelo?",
     a: <>Pela própria loja: no iPhone em Ajustes → seu nome → Assinaturas; no Android em Google Play → Pagamentos e assinaturas. Você continua com acesso até o fim do período que já pagou.</>,
   },

@@ -56,7 +56,7 @@ export function AssineNoApp({ variante }: { variante: "gate" | "pagina" }) {
 
             <SelosDasLojas onde="paywall" prefixo="web" altura={48} className="mt-5" />
             {/* 01/10: sem preço aqui (dono) — o app mostra as opções antes de assinar */}
-            <p className="mt-2.5 text-[12.5px] text-muted-foreground" data-testid="assine-oferta">O app mostra as opções antes de você assinar{ap === "iphone" ? " — e no iPhone dá pra testar antes" : ""}.</p>
+            <p className="mt-2.5 text-[12.5px] text-muted-foreground" data-testid="assine-oferta">O app mostra as opções antes de você assinar.</p>
           </div>
         </div>
 

@@ -126,7 +126,7 @@ async function abrirPagina(o: { ua?: string; on?: boolean } = {}) {
   fbq = vi.fn();
   (window as unknown as { fbq?: unknown }).fbq = fbq;
   (window as unknown as { __ofertaApi?: unknown }).__ofertaApi = {
-    criar: async (c: Record<string, unknown>) => { criadas.push(c); return { ok: true, clientSecret: "pi_777_secret_abc", pi: "pi_777", amount: 2790, currency: "brl", pagina: "organizar" }; },
+    criar: async (c: Record<string, unknown>) => { criadas.push(c); return { ok: true, clientSecret: "pi_777_secret_abc", pi: "pi_777", amount: 1990, currency: "brl", pagina: "organizar" }; }, // 23/11: 19,90
     status: async () => ({ ok: true, status: statusPago ? "succeeded" : "requires_action", pago: statusPago, metodo: statusPago ? "pix" : null }),
   };
   (window as unknown as { __stripeFalso?: unknown }).__stripeFalso = {
@@ -169,15 +169,20 @@ const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebK
 const CAMPOS_DA_MEDICAO = ["pagina", "braco_checkout_ext", "org_stripe_forcado"];
 
 describe("a página do /organizar com a chave on é IDÊNTICA à de hoje (só o pagamento muda)", { timeout: 30000 }, () => {
-  it("HTML do corpo e texto visível: on = off, antes de tocar em pagar. Diferenças permitidas na página: NENHUMA", async () => {
+  it("HTML do corpo e texto visível: on = off, antes de tocar em pagar. Diferença permitida: SÓ o preço (27,90 → 19,90, dono 23/11)", async () => {
     await abrirPagina({ on: false, ua: IPHONE });
     const htmlOff = document.body.innerHTML, textoOff = textoVisivel(document.body);
     const nomesOff = eventos().map((e) => e.nome);
     const eventosOff = eventos().map(({ t_ms: _t, tela1_ms: _t1, ttfb_ms: _tt, landing_session_id: _s, landing_device_id: _d, ...r }) => r);
     await abrirPagina({ on: true, ua: IPHONE });
-    expect(document.body.innerHTML).toBe(htmlOff);
-    expect(textoVisivel(document.body)).toBe(textoOff);
+    // 23/11 (dono: "troca o /organizar para 19,90"): com a chave on (checkout Stripe) a única diferença é o preço; off (Asaas) segue 27,90
+    // (o <template> do /simples segue 27,90 — ele não pinta no /organizar e o /simples cobra 27,90 pelo Asaas)
+    const semPreco = (h: string) => h.replace(/27,90|19,90/g, "PRECO");
+    expect(semPreco(document.body.innerHTML)).toBe(semPreco(htmlOff));
+    expect(textoVisivel(document.body)).toBe(textoOff.replace(/27,90/g, "19,90"));
     for (const t of ["De R$ 97,90 por ano", "Só hoje", "Pra sempre por R$ 27,90", "Pagar R$ 27,90 no Pix"]) expect(semEspaco(textoOff)).toContain(semEspaco(t));
+    for (const t of ["De R$ 97,90 por ano", "Só hoje", "Pra sempre por R$ 19,90", "Pagar R$ 19,90 no Pix"]) expect(semEspaco(textoVisivel(document.body))).toContain(semEspaco(t));
+    expect(textoVisivel(document.body)).not.toContain("27,90");
     expect(campoCartao()).not.toBeNull(); // o e-mail continua NO CARTÃO do preço
     // eventos: os mesmos nomes; cada um igual ao de hoje, fora os campos de medição permitidos
     expect(eventos().map((e) => e.nome)).toEqual(nomesOff);
@@ -201,20 +206,20 @@ describe("a página do /organizar com a chave on é IDÊNTICA à de hoje (só o 
     expect(document.getElementById("lp-email-antes-sugestao")!.textContent).toContain("ana@gmail.com");
   });
 
-  it("e-mail válido no cartão → checkout Stripe já com o e-mail (sem pedir de novo), Pix marcado, cartão à vista, sem CPF; R$ 27,90; Purchase = PI", async () => {
+  it("e-mail válido no cartão → checkout Stripe já com o e-mail (sem pedir de novo), Pix marcado, cartão à vista, sem CPF; R$ 19,90; Purchase = PI", async () => {
     await abrirPagina({ ua: IPHONE });
     await pagarNoCartao("ana@exemplo.com");
     const camada = () => document.querySelector<HTMLElement>("#oc")!;
     expect(document.querySelector('[data-testid="oferta-email-ok"]')!.textContent).toContain("ana@exemplo.com");
     expect(document.getElementById("oc-email-caixa")!.hidden).toBe(true); // o campo só volta no "Trocar"
     expect(nb(camada().textContent)).not.toMatch(/67,90|97,90/);
-    expect(nb(camada().textContent)).toContain("R$ 27,90");
+    expect(nb(camada().textContent)).toContain("R$ 19,90");
     expect(document.querySelector('[data-metodo="pix"]')!.getAttribute("aria-checked")).toBe("true");
-    expect(nb(pagar().textContent)).toBe("Gerar Pix de R$ 27,90");
+    expect(nb(pagar().textContent)).toBe("Gerar Pix de R$ 19,90");
     expect(document.getElementById("oc-cpf")).toBeNull();
     expect(camada().textContent).not.toMatch(/em até \d+x/);
     (document.querySelector('[data-metodo="card"]') as HTMLButtonElement).click();
-    expect(nb(pagar().textContent)).toBe("Pagar R$ 27,90");
+    expect(nb(pagar().textContent)).toBe("Pagar R$ 19,90");
     (document.querySelector('[data-metodo="pix"]') as HTMLButtonElement).click();
     expect(eventos().find((e) => e.nome === "landing_email_antes_ok")).toMatchObject({ via: "stripe" });
     expect(eventos().find((e) => e.nome === "landing_cta")).toMatchObject({ onde: "pagar", pagina: "organizar" });
@@ -226,7 +231,7 @@ describe("a página do /organizar com a chave on é IDÊNTICA à de hoje (só o 
     expect(document.querySelector('[data-testid="oferta-pix"]')!.getAttribute("data-layout")).toBeNull(); // iPhone: a tela de sempre
     statusPago = true;
     await vi.waitFor(() => { if (!document.querySelector('[data-testid="oferta-pago"]')) throw new Error("sem pago"); }, { timeout: 10000, interval: 50 });
-    expect(fbq).toHaveBeenCalledWith("track", "Purchase", expect.objectContaining({ value: 27.9, currency: "BRL" }), { eventID: "pi_777" });
+    expect(fbq).toHaveBeenCalledWith("track", "Purchase", expect.objectContaining({ value: 19.9, currency: "BRL" }), { eventID: "pi_777" });
     for (const e of eventos().filter((x) => x.nome.startsWith("landing_"))) { expect(e).toMatchObject({ pagina: "organizar" }); expect(e).not.toHaveProperty("braco_preco"); }
   });
 

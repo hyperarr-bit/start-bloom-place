@@ -1,7 +1,7 @@
 /**
  * /tudo (23/11) — pixel, eventos e atribuição IGUAIS aos da /pra-sempre (src/pra-sempre/payment.ts), com funil "tudo" e path "/tudo".
  * O pagamento é o checkout Stripe compartilhado (src/landing/stripe-checkout.ts) DENTRO da página (montarEm) e com a estrutura da
- * Cakto (layout "cakto"). Servidor: a mesma oferta "lp27" (stripe-lp27-criar, 2790 fixo); a venda da /tudo se separa da /pra-sempre
+ * Cakto (layout "cakto"). Servidor: desde 23/11 a linha própria "tudo" (stripe-lp27-criar, 1990 fixo; antes "lp27" 2790); a venda da /tudo se separa da /pra-sempre
  * pela metadata do PI (url = .../tudo) e pelos eventos (funil "tudo", pagina "tudo").
  */
 import {captureLandingMeta,trackEventBeacon} from '@/lib/analytics';
@@ -11,9 +11,9 @@ import {fireMetaEvent} from '@/lib/meta-pixel';
 import {readStripeReturn} from '@/completo/stripe-return';
 import {compactCheckoutSource} from '@/conhecer/attribution';
 
-export const PRECO_CENTAVOS=2790;
+export const PRECO_CENTAVOS=1990; // 23/11 (dono): 27,90 → 19,90
 export const QA=new URLSearchParams(location.search).get('qa')==='1'||!['coreaplicativo.com.br','www.coreaplicativo.com.br'].includes(location.hostname);
-export const STORAGE_PREFIX=QA?'tudo-qa':'tudo';
+export const STORAGE_PREFIX=QA?'tudo19-qa':'tudo19'; // 23/11: prefixo novo — o PI de 27,90 (pagina lp27) guardado na aba não serve pra linha "tudo"
 export const bankReturn=readStripeReturn(location.href);
 // Remove Stripe return secrets before initializing any page analytics.
 if(new URLSearchParams(location.search).has('payment_intent_client_secret')){const clean=new URL(location.href);clean.searchParams.delete('payment_intent_client_secret');history.replaceState(history.state,'',clean.href)}
@@ -38,10 +38,10 @@ export function initPixel(){
     q._i={[pixel]:[]};q._i[pixel]._u=url;q._t={[pixel]:Date.now()};q._o={[pixel]:{}};
     const script=document.createElement('script');script.async=true;script.src=`${url}?sdkid=${pixel}&lib=ttq`;document.head.appendChild(script);q.page();
   }
- fireMetaEvent('ViewContent',{content_name:'CORE vitalício 27,90',value:27.9,currency:'BRL'},`tudo-vc-${session}`);
+ fireMetaEvent('ViewContent',{content_name:'CORE vitalício 19,90',value:19.9,currency:'BRL'},`tudo-vc-${session}`);
 }
 /** o checkout DENTRO de `alvo` (inline), com a estrutura da Cakto. Purchase = o do checkout compartilhado (eventID = id do PI, o mesmo da CAPI). */
 export async function mountPayment(alvo:HTMLElement,voltaDoBanco?:{pi:string;status:string}){
  const {abrirCheckout}=await import('@/landing/stripe-checkout');
- await abrirCheckout({pk:'pk_live_51TJnAQQdjmrIbUhHDSWqG1trOT6mFfV87AC4Vv47kFJTAFOhYsNmvryGRnf3x824Ke3mXSsWiFCovKPIR6Kqx0IX00VcuAawhC',precoCentavos:PRECO_CENTAVOS,parcelasMax:1,producao:!QA,pedeCpf:false,somentePix:false,layout:'cakto',montarEm:alvo,storagePrefix:STORAGE_PREFIX,pagina:'lp27',trocaCartao:false,medirCarteira:false,posApp:true,pixCopiaPrimeiro:"sempre",voltaDoBanco,evento:event,pixel:(name,data,id)=>{if(!QA && (name==='Purchase'||name==='InitiateCheckout'||name==='ViewContent'||name==='CompleteRegistration'))fireMetaEvent(name,data,id)},atrib,sessao:session,aparelho:device,urlChegada:source.url,fbclid:params.get('fbclid')});
+ await abrirCheckout({pk:'pk_live_51TJnAQQdjmrIbUhHDSWqG1trOT6mFfV87AC4Vv47kFJTAFOhYsNmvryGRnf3x824Ke3mXSsWiFCovKPIR6Kqx0IX00VcuAawhC',precoCentavos:PRECO_CENTAVOS,parcelasMax:1,producao:!QA,pedeCpf:false,somentePix:false,layout:'cakto',montarEm:alvo,storagePrefix:STORAGE_PREFIX,pagina:'tudo',trocaCartao:false,medirCarteira:false,posApp:true,pixCopiaPrimeiro:"sempre",voltaDoBanco,evento:event,pixel:(name,data,id)=>{if(!QA && (name==='Purchase'||name==='InitiateCheckout'||name==='ViewContent'||name==='CompleteRegistration'))fireMetaEvent(name,data,id)},atrib,sessao:session,aparelho:device,urlChegada:source.url,fbclid:params.get('fbclid')});
 }

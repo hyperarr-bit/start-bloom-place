@@ -25,6 +25,9 @@ export type OfertaStripe = {
   offer: string;
   contentName: string;
   urlPadrao: string;
+  /** 23/11 (dono: "troca o /tudo e o /organizar para 19,90"): valores ANTIGOS que o webhook ainda aceita nesta página — o Pix/cartão
+   *  gerado antes da troca (Pix vence em 30 min) e pago depois não pode ficar sem acesso. O criar NUNCA cobra estes valores. */
+  aceitaTambem?: readonly number[];
 };
 
 export const OFERTAS_STRIPE: Record<string, OfertaStripe> = {
@@ -39,8 +42,16 @@ export const OFERTAS_STRIPE: Record<string, OfertaStripe> = {
   /** 22/11 (ORGANIZAR_STRIPE, chave do <head>): o /organizar pagando pelo MESMO checkout Stripe da /oferta — vitalício R$ 27,90, Pix + cartão.
    *  Só este valor nesta página; a página só diz pagina "organizar" (o preço nunca vem dela). Chave off = o /organizar com o Pix do Asaas. */
   organizar: {
-    pagina: "organizar", centavos: 2790, idem: "organizar", descricao: "CORE vitalicio", parcelasMax: 1, offer: "ST_organizar",
-    contentName: "CORE vitalício (organizar Stripe)", urlPadrao: "https://www.coreaplicativo.com.br/organizar",
+    // 23/11 (dono): 27,90 → 19,90. Chave de idempotência nova ("organizar19-<ref>") pra não bater no pedido antigo de 2790 da mesma ref;
+    // o 2790 gerado antes da troca ainda libera no webhook (aceitaTambem).
+    pagina: "organizar", centavos: 1990, idem: "organizar19", descricao: "CORE vitalicio", parcelasMax: 1, offer: "ST_organizar",
+    contentName: "CORE vitalício (organizar Stripe)", urlPadrao: "https://www.coreaplicativo.com.br/organizar", aceitaTambem: [2790],
+  },
+  /** 23/11 (dono: /tudo a 19,90): linha PRÓPRIA da /tudo (antes ela usava a "lp27" da /pra-sempre, que segue 27,90). Mesma função
+   *  stripe-lp27-criar. O /tudo velho (pagina "lp27", 2790) continua liberando pela linha lp27. */
+  tudo: {
+    pagina: "tudo", centavos: 1990, idem: "tudo19", descricao: "CORE vitalicio", parcelasMax: 1, offer: "ST_tudo",
+    contentName: "CORE vitalício (/tudo)", urlPadrao: "https://www.coreaplicativo.com.br/tudo",
   },
   app_web: {
     pagina: "app_web", centavos: 9790, idem: "appweb", descricao: "CORE vitalicio", parcelasMax: 3, offer: "ST_app_web",

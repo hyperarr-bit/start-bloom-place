@@ -125,6 +125,7 @@ type Janela = Window & {
   /** 30/10: diagnóstico de tempo (medição de desempenho; nada vai pro banco por aqui) */
   __landingDiag?: { terceirosEm: number | null; demoEm: number | null; demoVia: string | null };
   fbq?: (...a: unknown[]) => void;
+  TiktokAnalyticsObject?: string;
   requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
 };
 const w = window as Janela;
@@ -175,6 +176,19 @@ const STRIPE = PAGINA === "oferta" && EXT === "stripe" && pkStripeValida(ST_PK);
 const ORG_STRIPE = PAGINA === null && w.__landing?.org_stripe === "on" && pkStripeValida(String(w.__landing?.stripe_pk ?? ""))
   && document.documentElement.getAttribute("data-lp") === "atual" && document.documentElement.getAttribute("data-oferta") === "sempre";
 const ORG_STRIPE_FORCADO = !!w.__landing?.org_stripe_forcado;
+/** 23/11 (dono: "troca o /tudo e o /organizar para 19,90"): o /organizar pagando pela Stripe vende a R$ 19,90 (o servidor cobra 1990 na
+ *  página "organizar"). Só com ORG_STRIPE: o /simples, o /tiktok e o caminho do Asaas seguem 27,90 (o HTML é o mesmo, por isso a troca
+ *  do texto é aqui, no navegador, e só nesta página). */
+const PRECO_ORG_CENTAVOS = 1990;
+if (ORG_STRIPE) {
+  VALOR_OFERTA.LN_sempre279 = PRECO_ORG_CENTAVOS / 100;
+  try {
+    const andar = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n = andar.nextNode(); n; n = andar.nextNode()) if (n.nodeValue && n.nodeValue.includes("27,90")) n.nodeValue = n.nodeValue.replace(/27,90/g, "19,90");
+    const desc = document.querySelector('meta[name="description"]');
+    if (desc) desc.setAttribute("content", String(desc.getAttribute("content") ?? "").replace(/27,90/g, "19,90"));
+  } catch { /* noop */ }
+}
 const ST_PRECO = Number(w.__landing?.stripe_preco_centavos) > 0 ? Number(w.__landing?.stripe_preco_centavos) : 6790;
 const ST_PARCELAS = typeof w.__landing?.stripe_parcelas === "string" ? w.__landing.stripe_parcelas : "";
 /* 18/11: /escolha (PLANOS_PAGINA no <head>): a página da /oferta com os 2 planos e o checkout próprio (./planos-checkout.ts). Só com a
@@ -297,8 +311,35 @@ export function evento(nome: string, dados: Record<string, unknown> = {}): void 
     }).catch(() => {});
   } catch { /* nunca derruba a página */ }
 }
+/* 23/11 (dono: "bota no /oferta"): pixel do TikTok SÓ na /oferta. A fila ttq nasce aqui (nenhum evento se perde); o events.js
+ * entra no carregador adiado, junto do fbevents. Os mesmos eventos da Meta: ViewContent, InitiateCheckout e Purchase (no TikTok
+ * "CompletePayment"), com o mesmo event_id (o Purchase leva o id do PI, pronto pra deduplicar com a API de eventos depois). */
+export const TIKTOK_PIXEL_OFERTA = "DC2B4FBC77UDGJAO06IG";
+const TT = PRODUCAO && PAGINA === "oferta" && /^[A-Z0-9]{12,30}$/.test(TIKTOK_PIXEL_OFERTA) && !document.documentElement.hasAttribute("data-desligada");
+if (TT) {
+  try {
+    // o snippet oficial do TikTok, reescrito sem o append imediato do script (o load só roda no carregador adiado)
+    const t = "ttq"; w.TiktokAnalyticsObject = t;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const q: any = (w.ttq = w.ttq || ([] as unknown as NonNullable<Window["ttq"]>));
+    const metodos = ["page", "track", "identify", "instances", "debug", "on", "off", "once", "ready", "alias", "group", "enableCookie", "disableCookie", "holdConsent", "revokeConsent", "grantConsent"];
+    for (const m of metodos) q[m] = (...a: unknown[]) => { q.push([m, ...a]); };
+    q.load = (e: string) => {
+      const u = "https://analytics.tiktok.com/i18n/pixel/events.js";
+      q._i = q._i || {}; q._i[e] = []; q._i[e]._u = u; q._t = q._t || {}; q._t[e] = +new Date(); q._o = q._o || {}; q._o[e] = {};
+      carregarScript(`${u}?sdkid=${e}&lib=${t}`);
+    };
+  } catch { /* nunca derruba a página */ }
+}
+const TT_EVENTO: Record<string, string> = { ViewContent: "ViewContent", InitiateCheckout: "InitiateCheckout", Purchase: "CompletePayment" };
 const pixel = (ev: string, params: Record<string, unknown> = {}, eventID?: string) => {
   try { if (typeof w.fbq === "function") { if (eventID) w.fbq("track", ev, params, { eventID }); else w.fbq("track", ev, params); } } catch { /* noop */ }
+  try {
+    if (TT && TT_EVENTO[ev] && w.ttq) {
+      const p = { value: params.value, currency: params.currency ?? "BRL", content_type: "product", content_id: "core_vitalicio", content_name: params.content_name };
+      if (eventID) w.ttq.track(TT_EVENTO[ev], p, { event_id: eventID }); else w.ttq.track(TT_EVENTO[ev], p);
+    }
+  } catch { /* noop */ }
 };
 
 /* 1ª tela: o HTML já pintou; o 1º frame depois deste script confirma */
@@ -333,6 +374,7 @@ const carregarTerceiros = () => {
   diag.terceirosEm = agora();
   if (!PRODUCAO) { avisarPixel(); return; }
   carregarScript("https://connect.facebook.net/en_US/fbevents.js", avisarPixel);
+  if (TT && w.ttq) { try { (w.ttq as unknown as { load: (id: string) => void }).load(TIKTOK_PIXEL_OFERTA); w.ttq.page?.(); } catch { /* noop */ } }
   carregarScript("https://www.googletagmanager.com/gtag/js?id=AW-18254888989");
   window.setTimeout(avisarPixel, 2500);
 };
@@ -826,13 +868,13 @@ function atualizarRotulos() {
   const fim = $("fim");
   fim.dataset.fase = contaNaTela() ? "conta" : estado.fase;
   const fimP = fim.querySelector<HTMLElement>(HOTMART ? 'p[data-so-lp="v2"][data-so-ext="hotmart"]' : 'p[data-so-lp="v2"]');
-  if (fimP) fimP.textContent = contaNaTela() ? "Sua conta está pronta." : estado.fase === "pago" ? "Pagamento confirmado. Falta só o seu e-mail." : estado.fase === "qr" ? "Seu Pix está logo acima." : HOTMART ? `Vitalício por ${reaisDeCentavos(HM_PRECO)} · Pix ou cartão` : "Vitalício por R$ 27,90 · Pix na hora";
+  if (fimP) fimP.textContent = contaNaTela() ? "Sua conta está pronta." : estado.fase === "pago" ? "Pagamento confirmado. Falta só o seu e-mail." : estado.fase === "qr" ? "Seu Pix está logo acima." : HOTMART ? `Vitalício por ${reaisDeCentavos(HM_PRECO)} · Pix ou cartão` : `Vitalício por ${reais(VALOR_OFERTA.LN_sempre279)} · Pix na hora`; // 23/11: 19,90 no /organizar Stripe
   for (const barra of barrasDePreco()) {
     const fixoB = barra.querySelector<HTMLElement>(".lp2-fixo-p b"); const fixoS = barra.querySelector<HTMLElement>(".lp2-fixo-p span");
     if (!fixoB || !fixoS) continue;
     if (estado.fase === "qr" && estado.pix) { fixoB.textContent = "Pix gerado"; fixoS.textContent = `vale por ${mmss(Math.max(0, venceEm(estado.pix) - Date.now()))}`; }
     else if (HOTMART) { fixoB.textContent = reaisDeCentavos(HM_PRECO); fixoS.innerHTML = "Vitalício<i> · Pix ou cartão</i>"; }
-    else { fixoB.textContent = "R$ 27,90"; fixoS.innerHTML = "Vitalício<i> · Pix</i>"; }
+    else { fixoB.textContent = reais(VALOR_OFERTA.LN_sempre279); fixoS.innerHTML = "Vitalício<i> · Pix</i>"; }
   }
 }
 const atualizarFixo = () => {
@@ -854,7 +896,7 @@ const viuAOferta = (via?: string) => {
   ofertaVista = true;
   evento("landing_oferta_vista", { via: via ?? (V2 ? "botao_50" : "bloco_15") }); // 08/11: "checkout" = a camada do checkout novo abriu antes de o cartão aparecer
   if (brCheckout === "email" && !EXTERNO) evento("landing_email_antes_visto", {}); // 05/11: o braço Hotmart da /vida (e a /oferta) não tem a caixa de e-mail
-  pixel("ViewContent", { content_name: STRIPE ? "oferta_stripe" : PLANOS ? "planos" : HOTMART ? "vida_oferta" : "landing_oferta", value: EXTERNO ? PRECO_EXT / 100 : 27.9, currency: "BRL" });
+  pixel("ViewContent", { content_name: STRIPE ? "oferta_stripe" : PLANOS ? "planos" : HOTMART ? "vida_oferta" : "landing_oferta", value: EXTERNO ? PRECO_EXT / 100 : ORG_STRIPE ? PRECO_ORG_CENTAVOS / 100 : 27.9, currency: "BRL" });
   if (PIX_REAL && !SIMULADO && !EXTERNO) void pg(false).catch(() => null); // pré-aquece o Pix de verdade (sem recarregar a página se falhar)
   aoVerOferta?.();
 };
@@ -2302,7 +2344,7 @@ const opcoesStripe = () => ({
 /** 22/11 (ORGANIZAR_STRIPE): as opções do checkout Stripe do /organizar — só 27,90, Pix marcado + cartão à vista (sem parcelas, sem CPF),
  *  o Pix "copiar primeiro" no Android e a medição da carteira (Apple/Google Pay — só mede, nada aparece). Sem presente, sem indique. */
 const opcoesOrganizar = () => ({
-  pk: String(w.__landing?.stripe_pk ?? ""), precoCentavos: 2790, pagina: "organizar" as const, storagePrefix: "organizar", parcelasMax: 1, pedeCpf: false,
+  pk: String(w.__landing?.stripe_pk ?? ""), precoCentavos: PRECO_ORG_CENTAVOS, pagina: "organizar" as const, storagePrefix: "organizar", parcelasMax: 1, pedeCpf: false,
   pixCopiaPrimeiro: true, medirCarteira: true, producao: PRODUCAO, posApp: true, // 22/11 (dono): pós-compra = só o caminho pro app
   evento, pixel, atrib: { ...atrib }, sessao, aparelho, urlChegada: URL_DE_CHEGADA, fbclid: BUSCA.get("fbclid"),
 });

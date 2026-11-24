@@ -344,7 +344,9 @@ export async function tratarStripe(deps: DepsStripe, req: { assinatura: string |
     // 22/11 (AB_PRECO_OFERTA): na /oferta o valor certo vem do braço GRAVADO pelo nosso stripe-criar (metadata[braco_preco]: 2790 | 4790 |
     // 6790); sem braço = 6790 como sempre. Braço fora dos 3, ou valor que não bate com o braço = ignorada (alarme), nunca libera.
     const esperado = oferta.pagina === PAGINA_STRIPE ? valorEsperadoOferta(md) : oferta.centavos;
-    if (pi.currency !== "brl" || esperado === null || valor !== esperado) return ignorar("valor");
+    // 23/11: fora da /oferta, também um valor antigo da página (aceitaTambem: o Pix de 27,90 gerado antes da troca pra 19,90)
+    const valorOk = esperado !== null && (valor === esperado || (oferta.pagina !== PAGINA_STRIPE && (oferta.aceitaTambem ?? []).includes(valor)));
+    if (pi.currency !== "brl" || !valorOk) return ignorar("valor");
     if (await existe(admin, `stripe-estorno:${pi.id}`)) return ignorar("estornada");
 
     // a cobrança (método, parcelas e o e-mail de cobrança): 1 leitura, usada na conta e no stripe_venda

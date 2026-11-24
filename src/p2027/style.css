@@ -63,12 +63,13 @@ button,input{font:inherit}
 }
 
 /* 2 · um dia comum */
-.dia{padding-top:20px}
+/* rodada 2: −39 px de espaçamento entre a 1ª tela e o preço (o olho legível e a cena das 22h com colunas inteiras somaram +63) */
+.dia{padding-top:15px}
 .agenda{margin-top:12px;background:#fff;border-radius:18px;border:1px solid var(--linha);box-shadow:0 10px 26px rgba(40,25,45,.07);overflow:hidden}
 .agenda-topo{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--grafite);color:#fff;padding:9px 14px;font-size:12px;font-weight:800;letter-spacing:.1em}
 .agenda-topo span+span{color:#f9b9d8;letter-spacing:.01em;font-weight:700;font-size:12.5px}
 .cenas{padding:0 12px;background-image:radial-gradient(rgba(38,36,40,.1) 1px,transparent 1.3px);background-size:14px 14px;background-position:7px 7px}
-.cena{display:grid;grid-template-columns:48px minmax(0,1fr);column-gap:10px;padding:10px 0 11px;border-bottom:1.5px dashed #e7dfe4}
+.cena{display:grid;grid-template-columns:48px minmax(0,1fr);column-gap:10px;padding:8px 0 10px;border-bottom:1.5px dashed #e7dfe4}
 .cena:last-child{border-bottom:0}
 .hora{align-self:start;text-align:center;font-size:13px;font-weight:800;line-height:1.1;padding:6px 0 5px;border-radius:9px;background:var(--hb);color:var(--hc)}
 .hora small{display:block;font-size:11px;font-weight:700;margin-top:2px}
@@ -83,7 +84,7 @@ button,input{font:inherit}
 .prova figcaption{font-size:14px;color:var(--suave);margin-top:5px;font-weight:600}
 
 /* 3 · as áreas (cartões pequenos, uma cor por área, 2 por linha) */
-.areas{padding-top:22px}
+.areas{padding-top:16px}
 .grade{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
 /* o recorte vai de borda a borda do cartão (quanto mais largo, maior a letra do app: ~70% do tamanho real em 390 px) */
 .area{display:flex;flex-direction:column;min-width:0;overflow:hidden;border-radius:16px;background:var(--c)}
@@ -101,19 +102,19 @@ button,input{font:inherit}
 .a-lei{--c:#fbe6d7;--t:#8c3d0c}
 .a-ali{--c:#e9f5d6;--t:#3f650c}
 .a-dev{--c:#efe3fd;--t:#6a2fb8}
-.mais10{margin-top:12px}
+.mais10{margin-top:10px}
 .pilulas{display:flex;flex-wrap:wrap;align-items:center;gap:3px 13px}
 .pilulas li.rot{font-size:15px;font-weight:800}
 .pilulas li.rot::before{display:none}
 .pilulas li{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:650;color:var(--grafite);line-height:1.5}
 .pilulas li::before{content:"";flex:none;width:9px;height:9px;border-radius:50%;background:var(--p)}
 /* rodada 2 (V-M4): o print do olho em 1 linha do app, na largura toda do cartão (a letra do app passa de ~6 px pra ~15 px), a frase embaixo */
-.esconder{display:grid;grid-template-columns:minmax(0,1fr);gap:7px;margin-top:12px;padding:8px 11px 10px;background:#fff;border:1px solid var(--linha);border-radius:16px}
+.esconder{display:grid;grid-template-columns:minmax(0,1fr);gap:7px;margin-top:10px;padding:8px 11px 10px;background:#fff;border:1px solid var(--linha);border-radius:16px}
 .esconder .recorte{box-shadow:none;border:0;border-radius:8px}
 .esconder p{font-size:14px;line-height:1.36;font-weight:700;color:var(--grafite)}
 
 /* 4 · o que o post não contou */
-.contou{padding-top:20px}
+.contou{padding-top:15px}
 .folha{background:#fff;border:1px solid var(--linha);border-radius:18px;overflow:hidden;box-shadow:0 12px 30px -24px rgba(40,20,30,.6)}
 .folha-faixa{padding:10px 14px;background:var(--grafite);color:#fff;font-size:12.5px;font-weight:800;letter-spacing:.12em}
 .folha-faixa span{color:#ff9ccc}
@@ -127,7 +128,7 @@ button,input{font:inherit}
 .folha-lista li::before{top:8px}
 
 /* 5 · depois de pagar */
-.depois{padding-top:20px}
+.depois{padding-top:15px}
 .passos{display:grid;gap:10px;margin-top:12px}
 .passos li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:11px;align-items:start}
 .passos i{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--grafite);color:#fff;font-style:normal;font-size:14px;font-weight:800}
@@ -135,7 +136,7 @@ button,input{font:inherit}
 .passos p b{font-weight:800}
 
 /* 6 · o cartão do preço (o pagamento mora dentro dele: ./checkout.css) */
-.oferta{padding-top:20px}
+.oferta{padding-top:15px}
 .link-e-esse{margin-bottom:8px;font-size:20px;font-weight:850;letter-spacing:-.02em;color:var(--grafite)}
 .cartao{background:#fff;border:1.5px solid #ead0dd;border-radius:20px;overflow:hidden;box-shadow:0 18px 40px -26px rgba(169,31,99,.5)}
 .cartao-topo{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:2px 8px;padding:11px 16px;background:var(--grafite);color:#fff;font-size:12.5px;font-weight:800;letter-spacing:.08em}

@@ -68,7 +68,7 @@ export type OpcoesCheckout = {
   montarEm?: HTMLElement;
   storagePrefix?: string;
   /** Server-owned catalog key; no client amount is trusted by stripe-criar. */
-  pagina?: "oferta" | "lp27" | "tudo" | "organizar" | "p2027";
+  pagina?: "oferta" | "lp27" | "tudo" | "dia" | "organizar" | "p2027";
   /** 22/11 (AB_PRECO_OFERTA, só /oferta): o braço de preço (2790 | 4790 | 6790). Vai no pedido como braco_preco (o servidor só aceita os 3 e
    *  grava na metadata do PI); em produção a página confere que o PI veio com ESTE valor antes de deixar pagar. Sem isto: nada muda. */
   bracoPreco?: number;
@@ -176,7 +176,7 @@ const postar = async (fn: string, corpo: Record<string, unknown>): Promise<Recor
   return r.ok ? j : { ...j, ok: false };
 };
 const apiReal: ApiOferta = {
-  criar: async (c) => { const j = await postar(c.pagina === "lp27" || c.pagina === "tudo" || c.pagina === "p2027" ? "stripe-lp27-criar" : "stripe-criar", c); return { amount: j.amount as number | undefined, currency: j.currency as string | undefined, pagina: j.pagina as string | undefined, ok: j.ok === true, clientSecret: j.client_secret as string | undefined, pi: j.pi as string | undefined, erro: j.erro as string | undefined, status: j.status as string | undefined, pix: (j.pix as PixQr | null | undefined) ?? null }; },
+  criar: async (c) => { const j = await postar(c.pagina === "lp27" || c.pagina === "tudo" || c.pagina === "dia" || c.pagina === "p2027" ? "stripe-lp27-criar" : "stripe-criar", c); return { amount: j.amount as number | undefined, currency: j.currency as string | undefined, pagina: j.pagina as string | undefined, ok: j.ok === true, clientSecret: j.client_secret as string | undefined, pi: j.pi as string | undefined, erro: j.erro as string | undefined, status: j.status as string | undefined, pix: (j.pix as PixQr | null | undefined) ?? null }; },
   status: async (c) => { const j = await postar("stripe-status", c); return { ok: j.ok === true, status: j.status as string | undefined, pago: j.pago === true, metodo: (j.metodo as string | null) ?? null }; },
 };
 /** fora do domínio de produção: nada sai pra Stripe. O Pix simulado "cai" 6 s depois de gerado. */
@@ -704,7 +704,7 @@ async function garantirIntento(email: string | null, cpf: string | null = null, 
   const r = await criarComTeto(corpoDoPedido(email, cpf, cartao));
   if (!r.ok || !r.clientSecret) { o.evento("landing_erro", { onde: "stripe_criar", msg: String(r.erro ?? "falhou").slice(0, 80) }); return false; }
   // A stale deployment must never silently charge the old 67.90 offer on the 27.90 LP.
-  if (o.producao && (o.pagina === "lp27" || o.pagina === "tudo" || o.pagina === "p2027") && (r.amount !== o.precoCentavos || r.currency !== "brl" || r.pagina !== o.pagina)) { o.evento("landing_erro", { onde: "stripe_preco_divergente" }); return false; }
+  if (o.producao && (o.pagina === "lp27" || o.pagina === "tudo" || o.pagina === "dia" || o.pagina === "p2027") && (r.amount !== o.precoCentavos || r.currency !== "brl" || r.pagina !== o.pagina)) { o.evento("landing_erro", { onde: "stripe_preco_divergente" }); return false; }
   // 22/11 (ORGANIZAR_STRIPE): o /organizar só paga se o servidor devolver o PI de 27,90 da página "organizar" (servidor velho = /oferta 67,90)
   if (o.producao && o.pagina === "organizar" && (r.amount !== o.precoCentavos || r.currency !== "brl" || r.pagina !== "organizar")) { o.evento("landing_erro", { onde: "stripe_preco_divergente" }); return false; }
   // 22/11 (AB_PRECO_OFERTA): com braço, o PI tem que vir com o MESMO valor que a página mostra (servidor velho ou travado = não paga)

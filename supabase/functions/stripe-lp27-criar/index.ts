@@ -1,4 +1,4 @@
-/** Dedicated LP lifetime checkout: /pra-sempre (lp27, R$27.90), /tudo (tudo, R$19.90 since 23/11) and /2027 (p2027, R$27.90). Prices come from the offers table. */
+/** Dedicated LP lifetime checkout: /pra-sempre (lp27, R$27.90), /tudo (tudo, R$19.90 since 23/11), /dia (dia, R$19.90) and /2027 (p2027, R$27.90). Prices come from the offers table. */
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { criarOuReaproveitar, formUrl, metadataDoPedido, validarPedidoStripe } from "../_shared/stripe-criar.ts";
@@ -25,7 +25,7 @@ serve(async (req) => {
     const corpoCru = await req.json().catch(() => null);
     const p = validarPedidoStripe(corpoCru);
     if (!p) return json({ ok: false }, 400);
-    if (p.pagina !== "lp27" && p.pagina !== "tudo" && p.pagina !== "p2027") return json({ ok: false }, 400); // 23/11: + a /tudo (linha própria, 19,90) e a /2027 (linha "p2027")
+    if (p.pagina !== "lp27" && p.pagina !== "tudo" && p.pagina !== "dia" && p.pagina !== "p2027") return json({ ok: false }, 400); // 23/11: + a /tudo e a /dia (linhas próprias, 19,90) e a /2027 (linha "p2027")
     const admin = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false } });
     let userId: string | null = null;
     const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");

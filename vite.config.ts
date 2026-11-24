@@ -58,6 +58,7 @@ const rotaDaMissao = () => {
     else if (/^\/pra-sempre\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/pra-sempre\/?/, "/pra-sempre.html");
     else if (/^\/completo\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/completo\/?/, "/completo.html");
     else if (/^\/tudo\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/tudo\/?/, "/tudo.html");
+    else if (/^\/dia\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/dia\/?/, "/dia.html");
     // 23/11: /2027 = a página do carrossel 2027 (2027.html + src/p2027/; chave PAGINA_2027 no próprio HTML)
     else if (/^\/2027\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/2027\/?/, "/2027.html");
     else if (/^\/vitalicio\/demo\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/vitalicio\/demo\/?/, "/conhecer-demo.html");
@@ -157,6 +158,8 @@ export default defineConfig(({ mode }) => ({
         praSempre: path.resolve(__dirname, "pra-sempre.html"),
         completo: path.resolve(__dirname, "completo.html"),
         tudo: path.resolve(__dirname, "tudo.html"),
+        // 23/11: /dia — a "versão CORE do Porquim" (chave PAGINA_DIA "off" no próprio HTML)
+        dia: path.resolve(__dirname, "dia.html"),
         // 23/11: /2027 — a página do carrossel 2027 (chave PAGINA_2027 "off" no próprio HTML) — HTML + src/p2027/
         p2027: path.resolve(__dirname, "2027.html"),
         conhecer: path.resolve(__dirname, "conhecer.html"),

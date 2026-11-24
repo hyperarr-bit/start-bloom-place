@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#ffffff" />
+<meta name="robots" content="noindex,follow" />
+<meta name="description" content="CORE: sua vida organizada em um só app. Dinheiro, hábitos, treino e contas no mesmo lugar, no iPhone e no Android. Paga uma vez." />
+<title>CORE · Sua vida organizada, em um só app</title>
+<link rel="icon" type="image/png" href="/favicon.png" />
+<link rel="preload" as="font" type="font/woff2" href="/fonts/inter-latin.woff2" crossorigin />
+<link rel="canonical" href="https://www.coreaplicativo.com.br/dia" />
+<script>
+/*
+ * /dia (23/11) — a "versão CORE do Porquim": um dia inteiro no app, em recortes reais, e o checkout Stripe de sempre por cima.
+ * SPEC: novidades-guardadas/2026-11-23/porquim-core/SPEC.md (desvios aceitos: …/construcao/desvios-da-spec.md). As cinco chaves moram aqui:
+ *   PAGINA_DIA  "off" → vai pro /organizar com a mesma query. "on" → a página. ?dia=on abre só nesta aba (sessão), pra conferir.
+ *   OFERTA_DIA  "19" (R$ 19,90, linha própria "dia") | "67" (R$ 67,90, linha oferta, sem braço de preço). Textos e linha: src/dia/oferta.ts.
+ *   TOPO_DIA    "lista" (o celular com a lista primeiro) | "gesto" (o gesto e o 1º botão primeiro). Só troca a ordem, por CSS.
+ *   FAIXA_DIA   "sem-data" (faixa do topo "ACESSO VITALÍCIO · iPhone e Android", sem prazo nenhum) | "hoje" ("· só hoje, DD/MM",
+ *               a faixa da SPEC seção 4 item 0 e das páginas no ar). Rodada 3: nasce "sem-data" porque o preço desta página NÃO tem
+ *               prazo de verdade (a data era gerada todo dia: a frase nunca era verdadeira). Se o dono quiser a urgência mesmo
+ *               assim, é uma palavra aqui ("hoje"). DECISÃO DO DONO antes de ligar a página.
+ *   PRECO_CEDO_DIA "off" (a copy da SPEC: fato "Paga 1 vez só" na 1ª tela e "Paga uma vez · …" sob o 1º botão; o preço só aparece
+ *               no cartão do preço, como no Porquim) | "on" (o preço cedo: fato "R$ 19,90, 1 vez só" na 1ª tela e "R$ 19,90, uma
+ *               vez · …" sob o 1º botão). Os eventos levam preco_cedo. DECISÃO DO DONO (ele já viu "preço no início" falhar; a
+ *               persona fria pede o preço na 1ª tela): os dois prints estão em …/construcao/prints/.
+ * Só na prévia (?qa=1 ou fora do domínio, pagamento simulado): ?oferta=19|67, ?topo=lista|gesto, ?faixa=hoje|sem-data e ?cedo=on|off
+ * trocam as quatro últimas.
+ * Rollback: PAGINA_DIA "off".
+ *
+ * ANTES DE LIGAR OFERTA_DIA "67" (o padrão "19" não tem este problema):
+ *   a venda sai na linha "oferta" do servidor SEM braço de preço, isto é, no mesmo registro (ST_oferta) e com o mesmo nome na CAPI
+ *   que a /oferta de sempre a R$ 67,90. Ela só se separa pela url de chegada gravada no PI (…/dia). Toda leitura do sorteio de preço
+ *   da /oferta (AB_PRECO_OFERTA) tem de EXCLUIR os PIs com url /dia, senão a venda daqui entra no braço 6790 de lá.
+ *   A página também não tem trava de valor pro 67, e NÃO DÁ pra pôr só na página: o servidor (stripe-criar) só devolve o valor
+ *   do pedido nas linhas lp27 e organizar ou com braço de preço; na linha "oferta" sem braço não vem valor nenhum pra conferir.
+ *   Com campanha no 67: fazer a linha própria da SPEC 3.4 (linha "dia" em OFERTAS_STRIPE devolvendo o valor + a trava na página
+ *   + deploy + 1 compra real) e olhar, nessa compra, se a Stripe mostra seletor de parcelas.
+ */
+(function () {
+  var PAGINA_DIA = "on";
+  var OFERTA_DIA = "19";
+  var TOPO_DIA = "lista";
+  var FAIXA_DIA = "sem-data";
+  var PRECO_CEDO_DIA = "off";
+  var q = location.search, h = document.documentElement;
+  var aba = /[?&]dia=on(&|$)/.test(q);
+  try { if (aba) sessionStorage.setItem("dia-on", "1"); else aba = sessionStorage.getItem("dia-on") === "1"; } catch (e) { /* sem storage */ }
+  // a volta do banco (3DS) de uma compra feita AQUI abre a página mesmo se o navegador zerou a sessão (a conferência com ?dia=on não cai no /organizar)
+  aba = aba || /[?&]payment_intent=pi_/.test(q);
+  if (PAGINA_DIA !== "on" && !aba) { h.setAttribute("data-desligada", ""); location.replace("/organizar" + q + location.hash); return; }
+  var qa = /[?&]qa=1(&|$)/.test(q) || ["coreaplicativo.com.br", "www.coreaplicativo.com.br"].indexOf(location.hostname) < 0;
+  if (qa) {
+    var o = /[?&]oferta=(19|67)(&|$)/.exec(q); if (o) OFERTA_DIA = o[1];
+    var t = /[?&]topo=(lista|gesto)(&|$)/.exec(q); if (t) TOPO_DIA = t[1];
+    var f = /[?&]faixa=(hoje|sem-data)(&|$)/.exec(q); if (f) FAIXA_DIA = f[1];
+    var c = /[?&]cedo=(on|off)(&|$)/.exec(q); if (c) PRECO_CEDO_DIA = c[1];
+  }
+  h.setAttribute("data-oferta", OFERTA_DIA === "67" ? "67" : "19");
+  h.setAttribute("data-topo", TOPO_DIA === "gesto" ? "gesto" : "lista");
+  h.setAttribute("data-faixa", FAIXA_DIA === "hoje" ? "hoje" : "sem-data");
+  h.setAttribute("data-cedo", PRECO_CEDO_DIA === "on" ? "on" : "off");
+})();
+</script>
+<style>
+  @font-face { font-family: 'Inter'; font-style: normal; font-weight: 300 900; font-display: swap; src: url(/fonts/inter-latin-ext.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+  @font-face { font-family: 'Inter'; font-style: normal; font-weight: 300 900; font-display: swap; src: url(/fonts/inter-latin.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  :root {
+    --tx: #1c1a1f; --suave: #6b6670; --fraco: #8d8894; --borda: #ebe8ee; --papel: #f7f5f8;
+    --grafite: #262626; --magenta: #d6338a; --magenta-escuro: #b0256f; --magenta-suave: #fdf0f6;
+    --verde: #16a34a; --verde-suave: #ecfdf3;
+  }
+  html[data-desligada] body { display: none; }
+  html, body { margin: 0; background: #fff; color: var(--tx); font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%; }
+  /* o mesmo reset global das páginas irmãs (/pra-sempre, /completo, /tudo): o checkout por cima conta com ele */
+  * { box-sizing: border-box; }
+  /* o resto da página fica dentro de .pg: o checkout e o pós-compra (camadas por cima) não herdam mais nada daqui */
+  .pg * { margin: 0; padding: 0; }
+  .pg { max-width: 440px; margin: 0 auto; background: #fff; overflow: hidden; overflow: clip; }
+  .pg img { display: block; max-width: 100%; height: auto; }
+  .pg em { font-style: normal; color: var(--magenta); }
+
+  /* faixa do topo: a mesma das páginas no ar (magenta); o texto depois do "·" é a chave FAIXA_DIA */
+  .pg .promo { display: flex; align-items: center; justify-content: center; gap: 6px; height: 34px; padding: 0 12px; background: var(--magenta); color: #fff; font-size: 12.5px; font-weight: 800; letter-spacing: .02em; white-space: nowrap; }
+  .pg .promo span { font-weight: 600; opacity: .95; }
+
+  /* topo */
+  .pg .marca { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 20px 0; }
+  .pg .marca b { font-size: 15px; font-weight: 900; letter-spacing: .14em; }
+  .pg .lojas { display: inline-flex; align-items: center; gap: 9px; font-size: 12px; font-weight: 600; color: var(--suave); white-space: nowrap; }
+  .pg .lojas span { display: inline-flex; align-items: center; gap: 3px; }
+  .pg .lojas svg { width: 12px; height: 12px; fill: currentColor; }
+  .pg .titulo { padding: 15px 20px 0; }
+  .pg h1 { font-size: 33px; line-height: 1.04; font-weight: 850; letter-spacing: -.04em; }
+  .pg h1 em { display: block; }
+  .pg .sub { margin-top: 9px; font-size: 16px; line-height: 1.34; font-weight: 500; color: var(--suave); letter-spacing: -.005em; }
+  .pg .sub b { color: var(--tx); font-weight: 700; }
+  .pg .fatos { display: grid; grid-template-columns: .9fr 1.15fr 1.25fr; margin: 13px 20px 0; border-top: 1px solid var(--borda); border-bottom: 1px solid var(--borda); }
+  .pg .fatos b { padding: 9px 2px; text-align: center; font-size: 13.5px; font-weight: 750; letter-spacing: -.01em; white-space: nowrap; }
+  .pg .fatos b + b { border-left: 1px solid var(--borda); }
+  /* PRECO_CEDO_DIA (html[data-cedo]): "off" mostra a copy da SPEC; "on" mostra o preço na 1ª tela e sob o 1º botão */
+  .pg .cedo-on { display: none; }
+  html[data-cedo="on"] .pg .cedo-on { display: inline; }
+  html[data-cedo="on"] .pg .cedo-off { display: none; }
+  html[data-cedo="on"] .pg .fatos { grid-template-columns: .72fr 1.33fr 1.2fr; }
+
+  /* a ordem lista ↔ gesto é a chave TOPO_DIA (html[data-topo]) */
+  .pg .troca { display: flex; flex-direction: column; }
+  .pg .so-b { display: none; }
+
+  .pg .palco { position: relative; margin-top: 30px; padding: 0 20px; }
+  .pg .fone { position: relative; width: 300px; max-width: 100%; margin: 0 auto; border: 8px solid #1c1a1f; border-radius: 46px; overflow: hidden; background: #f4f3f1; box-shadow: 0 18px 40px -14px rgba(38,38,38,.35); }
+  .pg .fone img { width: 100%; aspect-ratio: 390 / 844; }
+  .pg .hora { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border-radius: 999px; background: var(--grafite); color: #fff; font-size: 12.5px; font-weight: 700; letter-spacing: -.005em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pg .hora i { font-style: normal; font-weight: 600; opacity: .72; }
+  .pg .palco .hora { position: absolute; z-index: 3; top: -16px; left: 22px; transform: rotate(-3deg); padding: 8px 13px; font-size: 13.5px; box-shadow: 0 8px 18px -6px rgba(0,0,0,.4); }
+  .pg .nota { margin-top: 12px; text-align: center; font-size: 12px; font-weight: 600; color: var(--fraco); }
+
+  /* seções */
+  .pg .bloco { padding: 36px 20px 0; }
+  .pg h2 { font-size: 27px; line-height: 1.08; font-weight: 850; letter-spacing: -.035em; text-wrap: balance; }
+  .pg .etq { display: inline-block; margin-bottom: 10px; padding: 5px 10px; border-radius: 999px; background: var(--magenta-suave); color: var(--magenta-escuro); font-size: 12.5px; font-weight: 750; letter-spacing: -.005em; }
+
+  /* O GESTO: dois recortes reais SOLTOS num cartão claro; rótulos fora dos recortes */
+  .pg .gesto-cartao { margin-top: 18px; padding: 16px 14px 14px; border-radius: 22px; background: var(--papel); border: 1px solid var(--borda); }
+  .pg .gesto-cartao h3 { margin-top: 10px; font-size: 19px; line-height: 1.16; font-weight: 800; letter-spacing: -.025em; }
+  .pg .gesto-cartao h3 span { color: var(--suave); }
+  .pg .rot { display: flex; align-items: center; gap: 7px; margin: 13px 0 6px; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--suave); }
+  .pg .rot i { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--grafite); color: #fff; font-style: normal; font-size: 10.5px; letter-spacing: 0; }
+  .pg .rec { border-radius: 12px; overflow: hidden; border: 1px solid var(--borda); background: #fff; box-shadow: 0 8px 20px -14px rgba(38,38,38,.3); }
+  .pg .rec.campo { width: 86%; padding: 3px; }
+  .pg .seta { display: block; width: 16px; height: 16px; margin: 8px 0 -6px 14px; color: var(--fraco); }
+  .pg .conta { margin-top: 11px; text-align: center; font-size: 15px; font-weight: 600; color: #14532d; font-variant-numeric: tabular-nums; }
+  .pg .conta b { font-weight: 850; }
+  .pg .simples { display: flex; flex-direction: column; align-items: center; gap: 14px; margin-top: 18px; }
+  .pg .simples > b { padding: 8px 16px; border-radius: 13px; background: #111; color: #fff; font-size: 16px; font-weight: 700; letter-spacing: -.02em; transform: rotate(-2deg); }
+  .pg .cta { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 56px; padding: 6px 12px; border: 0; border-radius: 14px; background: var(--magenta); color: #fff; font-family: inherit; font-size: 17.5px; line-height: 1.15; font-weight: 800; letter-spacing: -.015em; box-shadow: 0 8px 20px -8px rgba(214,51,138,.65); text-decoration: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .pg .cta[aria-busy="true"] { opacity: .7; }
+  .pg .miudo { margin-top: 9px; text-align: center; font-size: 12.5px; line-height: 1.45; font-weight: 600; color: var(--suave); text-wrap: balance; }
+
+  /* o resto do dia: 2 ciclos curtos */
+  .pg .dia { position: relative; margin-top: 20px; padding-left: 22px; }
+  .pg .dia::before { content: ""; position: absolute; left: 5px; top: 10px; bottom: 24px; width: 2px; border-radius: 2px; background: var(--magenta); opacity: .28; }
+  .pg .ciclo { position: relative; padding-bottom: 24px; }
+  .pg .ciclo::before { content: ""; position: absolute; left: -22px; top: 8px; width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 3px solid var(--magenta); }
+  .pg .ciclo h3 { margin-top: 9px; font-size: 18px; line-height: 1.18; font-weight: 800; letter-spacing: -.025em; }
+  .pg .ciclo h3 span { color: var(--suave); font-weight: 700; }
+  .pg .ciclo .rec.campo { width: 78%; }
+  .pg .ciclo small { display: block; margin-top: 7px; font-size: 13px; font-weight: 500; color: var(--suave); }
+
+  /* cartões de arrastar: cada recorte inteiro, com a sua altura (sem corte forçado por CSS) */
+  .pg .faixa-cartoes { margin-top: 20px; padding: 28px 0 12px; background: var(--papel); }
+  .pg .faixa-cartoes h2 { padding: 0 20px; }
+  .pg .arraste { display: inline-flex; align-items: center; gap: 6px; margin: 12px 20px 0; font-size: 12.5px; font-weight: 700; color: var(--magenta-escuro); }
+  .pg .arraste svg { width: 14px; height: 14px; }
+  .pg .trilho { display: flex; align-items: stretch; gap: 12px; margin-top: 14px; padding: 4px 20px 8px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-left: 20px; -webkit-overflow-scrolling: touch; scrollbar-width: none; overscroll-behavior-x: contain; }
+  .pg .trilho::-webkit-scrollbar { display: none; }
+  .pg .cartao { flex: 0 0 270px; display: flex; flex-direction: column; scroll-snap-align: start; padding: 16px 10px; border-radius: 20px; background: #fff; border: 1px solid var(--borda); box-shadow: 0 10px 24px -18px rgba(38,38,38,.35); }
+  .pg .cartao h3 { padding: 0 4px; font-size: 18px; line-height: 1.15; font-weight: 800; letter-spacing: -.025em; }
+  /* os 7 cartões fecham na mesma linha (sem buraco ao arrastar): a moldura do recorte estica e o recorte fica inteiro, no meio dela */
+  .pg .cartao .print { flex: 1 0 auto; display: flex; align-items: center; margin-top: 12px; padding: 3px; border-radius: 12px; background: var(--papel); }
+  .pg .cartao .print img { width: 100%; border-radius: 8px; border: 1px solid var(--borda); background: #fff; }
+  .pg .cartao p { margin-top: 11px; padding: 0 4px; font-size: 14.5px; line-height: 1.36; font-weight: 500; color: var(--suave); }
+
+  /* como funciona */
+  .pg .passos { list-style: none; margin-top: 16px; }
+  .pg .passos li { display: flex; gap: 14px; padding: 15px 0; }
+  .pg .passos li + li { border-top: 1px solid var(--borda); }
+  .pg .passos i { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--grafite); color: #fff; font-style: normal; font-size: 15px; font-weight: 800; }
+  .pg .passos b { display: block; font-size: 17.5px; line-height: 1.2; font-weight: 800; letter-spacing: -.02em; }
+  .pg .passos p { margin-top: 3px; font-size: 14.5px; line-height: 1.36; font-weight: 500; color: var(--suave); }
+  .pg .selos { display: flex; gap: 10px; margin-top: 8px; }
+  .pg .selos img { width: auto; height: 42px; }
+  .pg .passos p.depois { margin-top: 7px; font-size: 13px; color: var(--fraco); }
+  .pg .aviso { margin-top: 4px; padding: 12px 14px; border-radius: 13px; background: #fff7e6; border: 1px solid #f5d48a; color: #5c4300; font-size: 14.5px; line-height: 1.4; font-weight: 500; }
+  .pg .aviso b { font-weight: 800; }
+  .pg .par { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .pg .par span { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 999px; background: var(--verde-suave); color: #14532d; font-size: 13.5px; font-weight: 700; }
+  .pg .par svg { width: 15px; height: 15px; color: var(--verde); }
+  .pg .ver-preco { display: flex; align-items: center; justify-content: center; gap: 5px; min-height: 44px; margin: 6px 20px 0; padding: 6px 0; font-size: 14.5px; font-weight: 750; color: var(--magenta-escuro); text-decoration: underline; text-underline-offset: 3px; -webkit-tap-highlight-color: transparent; }
+  .pg .ver-preco svg { width: 14px; height: 14px; }
+
+  /* prova */
+  .pg .notas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+  .pg .notas div { padding: 13px 14px; border-radius: 16px; background: var(--papel); }
+  .pg .notas b { display: block; font-size: 26px; line-height: 1; font-weight: 850; letter-spacing: -.03em; }
+  .pg .notas b small { font-size: 16px; color: #e8a400; margin-left: 2px; }
+  .pg .notas span { display: block; margin-top: 5px; font-size: 12.5px; line-height: 1.3; font-weight: 600; color: var(--suave); }
+  .pg .conferido { margin-top: 8px; font-size: 12px; font-weight: 600; color: var(--fraco); }
+  .pg .aval { margin-top: 10px; padding: 14px 16px; border-radius: 16px; border: 1px solid var(--borda); }
+  .pg .aval blockquote { font-size: 16px; line-height: 1.32; font-weight: 650; letter-spacing: -.012em; }
+  .pg .aval figcaption { display: flex; align-items: center; gap: 6px; margin-top: 7px; font-size: 12.5px; font-weight: 600; color: var(--suave); }
+  .pg .aval figcaption u { text-decoration: none; color: #e8a400; letter-spacing: 1px; }
+
+  /* preço */
+  .pg .oferta { margin: 34px 16px 0; border-radius: 24px; overflow: hidden; border: 1.5px solid var(--grafite); scroll-margin-top: 12px; }
+  .pg .oferta-faixa { display: flex; align-items: center; justify-content: space-between; padding: 11px 18px; background: var(--grafite); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+  .pg .oferta-faixa span { padding: 3px 9px; border-radius: 999px; background: #fff; color: var(--grafite); font-size: 12px; letter-spacing: .04em; }
+  .pg .oferta-corpo { padding: 20px 18px 18px; }
+  .pg .frase { font-size: 16px; line-height: 1.3; font-weight: 700; letter-spacing: -.015em; color: var(--suave); }
+  .pg .preco { margin-top: 6px; font-size: 62px; line-height: 1; font-weight: 850; letter-spacing: -.05em; white-space: nowrap; }
+  .pg .preco small { font-size: 26px; font-weight: 800; letter-spacing: -.02em; margin-right: 4px; vertical-align: 22px; }
+  .pg .umavez { margin-top: 8px; font-size: 18px; line-height: 1.2; font-weight: 800; letter-spacing: -.02em; }
+  .pg .semdepois { margin-top: 4px; font-size: 14px; font-weight: 600; color: var(--suave); }
+  .pg .compare { margin-top: 14px; border-radius: 14px; overflow: hidden; border: 1px solid var(--borda); }
+  .pg .compare p { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; font-size: 13.5px; line-height: 1.25; font-weight: 500; color: var(--suave); background: var(--papel); }
+  .pg .compare p b { flex: none; text-align: right; font-weight: 750; color: var(--tx); white-space: nowrap; }
+  .pg .compare p.nos { background: var(--magenta-suave); color: var(--tx); font-weight: 650; }
+  .pg .compare p.nos b { color: var(--magenta-escuro); font-weight: 850; }
+  .pg .fonte { margin-top: 6px; font-size: 12px; line-height: 1.35; font-weight: 500; color: var(--suave); }
+  .pg .vs { list-style: none; margin-top: 14px; }
+  .pg .vs li { display: flex; align-items: flex-start; gap: 10px; padding: 5px 0; font-size: 15.5px; line-height: 1.3; font-weight: 600; letter-spacing: -.01em; }
+  .pg .vs svg { flex: none; width: 19px; height: 19px; margin-top: 1px; color: var(--verde); }
+  .pg .oferta .cta { margin-top: 16px; scroll-margin-bottom: 20px; }
+  .pg .confia { margin-top: 10px; font-size: 12px; line-height: 1.5; font-weight: 600; color: var(--fraco); text-align: center; }
+  .pg .dia-erro { margin-top: 10px; text-align: center; font-size: 13.5px; font-weight: 600; color: #a32d43; }
+  .pg .fim .dia-erro { color: #ffb3c0; }
+
+  /* garantia */
+  .pg .garantia { display: flex; gap: 14px; align-items: flex-start; margin: 14px 16px 0; padding: 18px; border-radius: 20px; background: var(--verde-suave); color: #14532d; }
+  .pg .garantia svg { flex: none; width: 34px; height: 34px; color: var(--verde); }
+  .pg .garantia b { display: block; font-size: 19px; line-height: 1.15; font-weight: 850; letter-spacing: -.025em; }
+  .pg .garantia p { margin-top: 5px; font-size: 14.5px; line-height: 1.4; font-weight: 500; }
+  .pg .garantia p u { text-decoration: none; font-weight: 750; overflow-wrap: anywhere; }
+
+  /* informações */
+  .pg .info { margin-top: 10px; }
+  .pg .info div { display: flex; justify-content: space-between; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--borda); font-size: 14.5px; line-height: 1.3; }
+  .pg .info div:last-child { border-bottom: 0; }
+  .pg .info span { flex: none; color: var(--suave); font-weight: 500; }
+  .pg .info b { font-weight: 700; text-align: right; }
+
+  /* fecho */
+  .pg .fim { margin-top: 26px; padding: 32px 20px 32px; background: var(--grafite); color: #fff; text-align: center; }
+  .pg .fim h2 { color: #fff; }
+  .pg .fim em { color: #ff7dbd; }
+  .pg .fim > p { margin: 10px 0 0; font-size: 15.5px; font-weight: 600; color: #d9d6dc; }
+  .pg .fim figure { width: 280px; max-width: 100%; margin: 18px auto 0; }
+  .pg .fim figure img { width: 100%; border-radius: 22px; }
+  .pg .fim figcaption { margin-top: 8px; font-size: 12px; font-weight: 600; color: #a9a4af; }
+  .pg .fim .cta { margin-top: 22px; }
+  .pg .fim .miudo { margin: 11px 0 0; color: #d9d6dc; }
+  .pg .fim .lojas { margin-top: 14px; color: #b9b5be; }
+  .pg .rodape { padding: 20px 20px 36px; text-align: center; font-size: 12px; line-height: 1.7; color: var(--suave); }
+  .pg .rodape a { color: inherit; }
+  .pg .sem-js { padding: 0 20px 28px; text-align: center; font-size: 13px; line-height: 1.5; color: var(--suave); }
+  .pg .sem-js a { color: var(--magenta-escuro); font-weight: 700; }
+
+  /* telas estreitas (iPhone SE antigo, 320 px): o título cabe em 2 linhas e a faixa de fatos respira */
+  @media (max-width: 350px) { .pg h1 { font-size: 29px; } .pg .fatos b { font-size: 12.5px; } html[data-cedo="on"] .pg .fatos b { font-size: 12px; letter-spacing: -.02em; } }
+
+  /* só na prévia (?qa=1 ou fora do domínio) */
+  .dia-qa { padding: 8px; text-align: center; background: #f8edf3; color: #9f3268; font: 11px/1.4 Inter, system-ui, sans-serif; }
+
+  /* ===== TOPO_DIA "gesto" (variante B): o gesto sobe pra 1ª tela, a lista vem logo depois ===== */
+  html[data-topo="gesto"] .pg .troca .gesto { order: 1; padding-top: 6px; }
+  html[data-topo="gesto"] .pg .troca .palco { order: 2; margin-top: 34px; }
+  html[data-topo="gesto"] .pg .gesto > h2 { display: none; }
+  html[data-topo="gesto"] .pg .so-b { display: block; padding: 40px 20px 0; order: 2; }
+</style>
+<script type="module" src="/src/dia/main.ts"></script>
+</head>
+<body>
+<div class="pg" id="pagina">
+
+  <div class="promo" role="note"><b>🔥 ACESSO VITALÍCIO</b> <span id="dia-promo">· iPhone e Android</span></div>
+  <script>
+  /* FAIXA_DIA "hoje": a faixa das páginas no ar ("· só hoje, DD/MM", data do dia em Brasília). Com "sem-data" (o padrão) nada roda
+     e fica o texto do HTML, que não afirma prazo nenhum nem repete o cabeçalho do cartão do preço. */
+  (function () {
+    if (document.documentElement.getAttribute("data-faixa") !== "hoje") return;
+    var t = "· só hoje";
+    try { t += ", " + new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" }).format(new Date()); } catch (e) {}
+    document.getElementById("dia-promo").textContent = t;
+  })();
+  </script>
+
+  <!-- 1 · TOPO -->
+  <section data-bloco="topo">
+    <div class="marca">
+      <b>CORE</b>
+      <div class="lojas" aria-label="App na App Store e no Google Play">
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.7c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9s-2-.9-3.3-.8C6.1 7 4.6 8 3.7 9.5c-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.3.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.8-1.1-2.9-4.2zM13.9 5.3c.7-.8 1.2-2 1-3.2-1 0-2.3.7-3 1.5-.6.7-1.2 1.9-1.1 3.1 1.2.1 2.3-.6 3.1-1.4z"/></svg>App Store</span>
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 2.2 13.8 12 3.6 21.8c-.4-.2-.6-.6-.6-1.1V3.3c0-.5.2-.9.6-1.1zm11.7 11.3 2.8 2.8-10.4 6c-.6.3-1.2.3-1.7 0zM18.1 8.6l3.1 1.8c1 .6 1 1.6 0 2.2l-3.1 1.8L15.3 12zM5.8 1.9l10.3 6-2.8 2.8L5.8 2c.5-.3 1.2-.3 1.7 0z"/></svg>Google Play</span>
+      </div>
+    </div>
+    <div class="titulo">
+      <h1>Sua vida organizada, <em>em um só app.</em></h1>
+      <p class="sub">Dinheiro, hábitos, treino e contas no mesmo lugar. <b>Anota em segundos, sem planilha.</b></p>
+    </div>
+    <div class="fatos" aria-label="Resumo"><b>16 áreas</b><b><span class="cedo-off">Paga 1 vez só</span><span class="cedo-on" data-oferta-txt="fato" data-v67="R$&nbsp;67,90, 1 vez só">R$&nbsp;19,90, 1 vez só</span></b><b>iPhone e Android</b></div>
+  </section>
+
+  <div class="troca">
+    <!-- 2 · A LISTA: o app aberto, celular inteiro de proporção real (390:844), tela real -->
+    <h2 class="so-b">E o dia inteiro <em>fica assim.</em></h2>
+    <section class="palco" data-bloco="lista">
+      <div class="fone"><img src="/dia/topo-lista.webp" width="600" height="1298" alt="Tela real do app CORE: Pendências de hoje com hábitos, treino de glúteos e pernas, refeições, água e a conta que vence, e as áreas embaixo" fetchpriority="high" decoding="async" /></div>
+      <span class="hora">07:30 <i>· seu dia numa lista só</i></span>
+      <p class="nota">Tela real do app, com dados de exemplo.</p>
+    </section>
+
+    <!-- 3 · O GESTO + 1º botão (só desce até o preço) -->
+    <section class="bloco gesto" data-bloco="gesto">
+      <h2>Você anota.<br /><em>O app responde.</em></h2>
+      <div class="gesto-cartao">
+        <span class="hora">08:10 <i>· dinheiro</i></span>
+        <h3>Anotou o gasto. <span>Já sabe quanto sobra hoje.</span></h3>
+        <p class="rot"><i>1</i>Você anota</p>
+        <div class="rec campo"><img src="/dia/gesto-voce.webp" width="720" height="80" loading="lazy" decoding="async" alt="Campo real do app com Mercado e 87 digitados" /></div>
+        <svg class="seta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v15m-6-6 6 6 6-6"/></svg>
+        <p class="rot"><i>2</i>O app responde</p>
+        <div class="rec"><img src="/dia/gesto-app.webp" width="828" height="204" loading="lazy" decoding="async" alt="Trecho real do card Quanto posso gastar hoje, do app: Sobram R$ 59 pra hoje, já saiu R$ 87 dos R$ 146 do dia" /></div>
+        <p class="conta">146 − 87 = <b>59 pra hoje</b></p>
+      </div>
+      <div class="simples">
+        <b>Simples assim.</b>
+        <a class="cta" href="#preco" data-cta="gesto">Quero meu dia organizado</a>
+      </div>
+      <p class="miudo"><span class="cedo-off">Paga uma vez</span><span class="cedo-on" data-oferta-txt="cedo" data-v67="R$&nbsp;67,90, uma vez">R$&nbsp;19,90, uma vez</span> · iPhone e Android · 7&nbsp;dias de garantia</p>
+    </section>
+  </div>
+
+  <!-- 4 · O RESTO DO DIA -->
+  <section class="bloco" data-bloco="dia">
+    <h2>Mais tarde, <em>no mesmo app.</em></h2>
+    <div class="dia">
+      <article class="ciclo">
+        <span class="hora">12:30 <i>· hábitos</i></span>
+        <h3>Marca o hábito. <span>A sequência fica guardada.</span></h3>
+        <p class="rot"><i>1</i>Você marca</p>
+        <div class="rec campo"><img src="/dia/habito-voce.webp" width="720" height="76" loading="lazy" decoding="async" alt="Linha real do app: hábitos de segunda marcados" /></div>
+        <p class="rot"><i>2</i>O app guarda</p>
+        <div class="rec"><img src="/dia/habito-app.webp" width="760" height="363" loading="lazy" decoding="async" alt="Tela real do app: consistência, 41 dias seguidos" /></div>
+      </article>
+      <article class="ciclo">
+        <span class="hora">21:00 <i>· contas</i></span>
+        <h3>Cadastra a conta uma vez. <span>O app mostra antes de vencer.</span></h3>
+        <p class="rot">O app mostra</p>
+        <div class="rec"><img src="/dia/conta-app.webp" width="720" height="91" loading="lazy" decoding="async" alt="Aviso real do app: 1 conta vence em 2 dias, Internet" /></div>
+        <small>O aviso fica no app, dias antes.</small>
+      </article>
+    </div>
+  </section>
+
+  <!-- 5 · CARTÕES DE ARRASTAR -->
+  <section class="faixa-cartoes" data-bloco="cartoes">
+    <h2>E o resto da vida <em>também.</em></h2>
+    <span class="arraste">arraste pro lado <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></span>
+    <div class="trilho" id="trilho">
+      <article class="cartao" data-cartao="treino"><h3>💪 Treino com séries e carga</h3><div class="print"><img src="/dia/k-treino.webp" width="640" height="464" loading="lazy" decoding="async" alt="Tela real: treino de glúteos e pernas de hoje, com o aviso da carga da semana passada e a 1ª série do agachamento marcada" /></div><p>Você marca a série. O app lembra a carga da semana passada.</p></article>
+      <article class="cartao" data-cartao="areas"><h3>✨ 16 áreas. Use só as que quiser.</h3><div class="print"><img src="/dia/k-areas.webp" width="760" height="373" loading="lazy" decoding="async" alt="Tela real: áreas escondidas e visíveis" /></div><p>Comece por uma. Esconda o resto.</p></article>
+      <article class="cartao" data-cartao="limites"><h3>🎯 Um limite pra cada gasto</h3><div class="print"><img src="/dia/k-limites.webp" width="640" height="411" loading="lazy" decoding="async" alt="Tela real: limites por categoria" /></div><p>Você define o teto. A barra mostra quanto já foi.</p></article>
+      <article class="cartao" data-cartao="agua"><h3>💧 Água do dia</h3><div class="print"><img src="/dia/k-agua.webp" width="640" height="260" loading="lazy" decoding="async" alt="Tela real: hidratação, 1500 ml de 2000 ml" /></div><p>Um toque por copo. O app conta quanto falta.</p></article>
+      <article class="cartao" data-cartao="categorias"><h3>📊 Pra onde foi o dinheiro</h3><div class="print"><img src="/dia/k-categorias.webp" width="640" height="399" loading="lazy" decoding="async" alt="Tela real: gastos por categoria" /></div><p>Seus gastos separados por categoria.</p></article>
+      <article class="cartao" data-cartao="cardapio"><h3>🍽️ Cardápio da semana</h3><div class="print"><img src="/dia/k-dieta.webp" width="640" height="441" loading="lazy" decoding="async" alt="Tela real: cardápio de segunda, café da manhã e almoço" /></div><p>Monta uma vez e consulta todo dia.</p></article>
+      <article class="cartao" data-cartao="casa"><h3>🏠 Casa por cômodo</h3><div class="print"><img src="/dia/k-casa.webp" width="640" height="470" loading="lazy" decoding="async" alt="Tela real: afazeres por cômodo" /></div><p>Afazeres e lista de mercado, cada um no seu lugar.</p></article>
+    </div>
+    <p class="nota">Telas reais do app, com dados de exemplo.</p>
+    <!-- só rola até o preço (não abre pagamento): quem se convenceu nos cartões tem onde tocar. É um link de texto, o 4º toque de venda: desvio aceito da SPEC ("3 botões + 1 link de texto", construcao/desvios-da-spec.md). -->
+    <a class="ver-preco" href="#preco" data-cta="cartoes">Ver o preço <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v15m-6-6 6 6 6-6"/></svg></a>
+  </section>
+
+  <!-- 6 · COMO FUNCIONA -->
+  <section class="bloco" data-bloco="como">
+    <span class="etq">É um app. Você baixa e usa.</span>
+    <h2>Como funciona</h2>
+    <ol class="passos">
+      <li><i>1</i><div><b>Garanta seu acesso</b><p>Você paga uma vez, aqui no site. Pix ou cartão.</p></div></li>
+      <li><i>2</i><div><b>Baixe o app</b><p>Na App Store ou no Google Play. Também abre no computador.</p>
+        <p class="depois">Você baixa depois de garantir o acesso.</p>
+        <div class="selos"><img src="/selos/app-store.svg" data-selo="ios" width="126" height="42" loading="lazy" alt="Disponível na App Store" /><img src="/selos/google-play.png" data-selo="android" width="109" height="42" loading="lazy" alt="Disponível no Google Play" /></div></div></li>
+      <li><i>3</i><div><b>Entre com o e-mail da compra</b><p>Toque em Entrar. Já está tudo liberado.</p></div></li>
+    </ol>
+    <p class="aviso"><b>Você paga só aqui.</b> No app, é só entrar. Não compre de novo.</p>
+    <div class="par">
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Sem mensalidade</span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Não renova sozinho</span>
+    </div>
+  </section>
+
+  <!-- 7 · PROVA: nota real das lojas + opiniões reais com loja e data -->
+  <section class="bloco" data-bloco="prova">
+    <h2>Quem usa, <em>avalia assim.</em></h2>
+    <div class="notas">
+      <div><b>4,7<small>★</small></b><span>App Store<br />99 avaliações</span></div>
+      <div><b>4,9<small>★</small></b><span>Google Play<br />221 avaliações</span></div>
+    </div>
+    <figure class="aval"><blockquote>“Simplesmente perfeito! Muito prático, completo e o melhor organizador que já tive.”</blockquote><figcaption><u>★★★★★</u> App Store · 04/11/2026</figcaption></figure>
+    <figure class="aval"><blockquote>“melhor aplicativo, pois tem tudo que eu preciso em um só lugar desde vida pessoal e profissional…”</blockquote><figcaption><u>★★★★★</u> Google Play · 05/11/2026</figcaption></figure>
+    <figure class="aval"><blockquote>“Muito bom para organizar algumas áreas da vida, bem produtivo para usar todos os dias…”</blockquote><figcaption><u>★★★★★</u> App Store · 06/11/2026</figcaption></figure>
+    <p class="conferido">Notas e opiniões públicas das lojas, lidas em 23/11/2026. Procure por CORE APP na sua loja pra conferir.</p>
+  </section>
+
+  <!-- 8 · PREÇO. Os textos que mudam com OFERTA_DIA levam data-oferta-txt (padrão "19") e data-v67 (iguais a src/dia/oferta.ts). À mostra no padrão, os 5 lugares da SPEC 3.3: frase, número, Compare, botão do preço e a linha sob o botão do fecho; com PRECO_CEDO_DIA "on", mais 2 (o fato da 1ª tela e a linha sob o 1º botão). -->
+  <section class="oferta" id="preco" data-bloco="oferta">
+    <div class="oferta-faixa">Acesso vitalício <span>paga uma vez</span></div>
+    <div class="oferta-corpo">
+      <p class="frase" data-oferta-txt="frase" data-v67="Paga uma vez. Usa pra sempre.">Menos que um lanche.</p>
+      <p class="preco"><small>R$</small><span data-oferta-txt="numero" data-v67="67,90">19,90</span></p>
+      <p class="umavez">Uma vez. <em>É seu pra sempre.</em></p>
+      <p class="semdepois">Não renova. Nada é cobrado depois.</p>
+      <div class="compare">
+        <p><span>Um app só de finanças, por assinatura</span><b>cerca de R$&nbsp;250<br />por ano</b></p>
+        <p class="nos"><span>CORE, as 16 áreas</span><b data-oferta-txt="compare" data-v67="R$&nbsp;67,90, uma vez">R$&nbsp;19,90, uma vez</b></p>
+      </div>
+      <!-- lastro: novidades-guardadas/2026-11-23/porquim-core/construcao/lastro-23-11/ (prints de 23/11: R$ 249,90 por ano e R$ 20,99 × 12 = R$ 251,88). O "R$ 100" da SPEC saiu: não achei preço público que o provasse hoje. -->
+      <p class="fonte">Preço público de dois apps de finanças no Brasil, consultado em 23/11/2026.</p>
+      <ul class="vs">
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>As 16 áreas liberadas</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>App no iPhone, no Android e no computador</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Sem mensalidade</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>7 dias de garantia: não gostou, devolvemos</li>
+      </ul>
+      <button type="button" class="cta" data-checkout="oferta" data-oferta-txt="botao" data-v67="Quero meu acesso por R$&nbsp;67,90">Quero meu acesso por R$&nbsp;19,90</button>
+      <p class="miudo">Pagamento aqui no site · Pix ou cartão</p>
+      <p class="confia">CORE · CNPJ 55.041.112/0001-82</p>
+    </div>
+  </section>
+
+  <!-- 9 · GARANTIA -->
+  <section class="garantia" data-bloco="garantia">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.4 3.2 7.8 7.5 9 4.3-1.2 7.5-4.6 7.5-9V6z"/><path d="m8.8 12.2 2.3 2.3 4.2-4.4"/></svg>
+    <div><b>7 dias de garantia.</b><p>Até 7 dias depois da compra, é só mandar um e-mail pra <u>contato@coreaplicativo.com.br</u>. Devolvemos 100% do valor, sem perguntas.</p></div>
+  </section>
+
+  <!-- 10 · INFORMAÇÕES -->
+  <section class="bloco" data-bloco="informacoes">
+    <h2>Informações</h2>
+    <div class="info">
+      <div><span>Onde funciona</span><b>iPhone, Android e computador</b></div>
+      <div><span>Pagamento</span><b>Uma vez · Pix ou cartão, aqui no site</b></div>
+      <div><span>Renova sozinho?</span><b>Não</b></div>
+      <div><span>Garantia</span><b>7 dias, 100% do valor de volta</b></div>
+      <div><span>Vendedor</span><b>CORE · CNPJ 55.041.112/0001-82</b></div>
+    </div>
+  </section>
+
+  <!-- 11 · FECHO: a Home aprovada (recorte solto, sem moldura de celular) -->
+  <section class="fim" data-bloco="fim">
+    <h2>Amanhã cedo, seu dia<br /><em>já tem um lugar.</em></h2>
+    <p>Dinheiro, hábitos, treino, casa. Você escolhe por onde começar.</p>
+    <figure><img src="/dia/fecho-home.webp" width="720" height="1070" loading="lazy" decoding="async" alt="Tela inicial real do app CORE: próxima conta, orçamento, treino de glúteos e pernas feito, sono e as áreas" /><figcaption>Tela real do app, com dados de exemplo.</figcaption></figure>
+    <button type="button" class="cta" data-checkout="fim">Quero experimentar agora</button>
+    <p class="miudo"><span data-oferta-txt="cedo" data-v67="R$&nbsp;67,90, uma vez">R$&nbsp;19,90, uma vez</span> · Pix ou cartão<br />7 dias de garantia</p>
+    <div class="lojas" aria-label="App na App Store e no Google Play">
+      <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.7c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9s-2-.9-3.3-.8C6.1 7 4.6 8 3.7 9.5c-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.3.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.8-1.1-2.9-4.2zM13.9 5.3c.7-.8 1.2-2 1-3.2-1 0-2.3.7-3 1.5-.6.7-1.2 1.9-1.1 3.1 1.2.1 2.3-.6 3.1-1.4z"/></svg>App Store</span>
+      <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 2.2 13.8 12 3.6 21.8c-.4-.2-.6-.6-.6-1.1V3.3c0-.5.2-.9.6-1.1zm11.7 11.3 2.8 2.8-10.4 6c-.6.3-1.2.3-1.7 0zM18.1 8.6l3.1 1.8c1 .6 1 1.6 0 2.2l-3.1 1.8L15.3 12zM5.8 1.9l10.3 6-2.8 2.8L5.8 2c.5-.3 1.2-.3 1.7 0z"/></svg>Google Play</span>
+    </div>
+  </section>
+
+  <!-- 12 · RODAPÉ (falta a cidade/UF do CNPJ: pendência P6 da SPEC, dado do dono) -->
+  <footer class="rodape">CORE · CNPJ 55.041.112/0001-82<br /><a href="mailto:contato@coreaplicativo.com.br">contato@coreaplicativo.com.br</a> · <a href="/termos">Termos</a> · <a href="/privacidade">Privacidade</a></footer>
+  <noscript><p class="sem-js">Pra pagar por aqui, ligue o JavaScript do navegador ou <a href="/organizar">abra esta outra página</a>. Já comprou? <a href="/como-entrar">Veja como entrar</a>.</p></noscript>
+</div>
+<script>
+/* OFERTA_DIA "67": troca os textos da oferta (os mesmos de src/dia/oferta.ts) antes da primeira pintura */
+(function () {
+  if (document.documentElement.getAttribute("data-oferta") !== "67") return;
+  var n = document.querySelectorAll("[data-v67]");
+  for (var i = 0; i < n.length; i++) n[i].textContent = n[i].getAttribute("data-v67");
+})();
+</script>
+</body>
+</html>

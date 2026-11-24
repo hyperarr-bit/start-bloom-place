@@ -21,6 +21,16 @@
       ]
     },
     {
+      "source": "/(dia|dia/)",
+      "headers": [
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "Content-Security-Policy", "value": "frame-ancestors 'self'" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=(self \"https://js.stripe.com\")" }
+      ]
+    },
+    {
       "source": "/vendas/sw.js",
       "headers": [
         { "key": "Content-Type", "value": "application/javascript; charset=utf-8" },
@@ -49,6 +59,8 @@
     { "source": "/completo/", "destination": "/completo.html" },
     { "source": "/tudo", "destination": "/tudo.html" },
     { "source": "/tudo/", "destination": "/tudo.html" },
+    { "source": "/dia", "destination": "/dia.html" },
+    { "source": "/dia/", "destination": "/dia.html" },
     { "source": "/2027", "destination": "/2027.html" },
     { "source": "/2027/", "destination": "/2027.html" },
     { "source": "/instalar", "destination": "/instalar.html" },

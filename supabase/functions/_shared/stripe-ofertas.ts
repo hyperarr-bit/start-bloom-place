@@ -53,6 +53,12 @@ export const OFERTAS_STRIPE: Record<string, OfertaStripe> = {
     pagina: "tudo", centavos: 1990, idem: "tudo19", descricao: "CORE vitalicio", parcelasMax: 1, offer: "ST_tudo",
     contentName: "CORE vitalício (/tudo)", urlPadrao: "https://www.coreaplicativo.com.br/tudo",
   },
+  /** 23/11 (dono: "sobe o /dia a 19,90 também"): linha PRÓPRIA da /dia (a "versão CORE do Porquim"). Mesma função stripe-lp27-criar.
+   *  Página nova, nunca vendeu a outro preço: não tem valor antigo pra aceitar. */
+  dia: {
+    pagina: "dia", centavos: 1990, idem: "dia19", descricao: "CORE vitalicio", parcelasMax: 1, offer: "ST_dia",
+    contentName: "CORE vitalício (/dia)", urlPadrao: "https://www.coreaplicativo.com.br/dia",
+  },
   /** 23/11 (página do carrossel 2027, chave PAGINA_2027 em 2027.html): linha PRÓPRIA da /2027 — vitalício R$ 27,90, Pix + cartão à
    *  vista, pela mesma função stripe-lp27-criar. O valor tem que bater com PRECO_2027_CENTAVOS (src/p2027/preco.ts): em produção a
    *  página só deixa pagar se o criar devolver o MESMO valor. Mudar o preço = mudar os dois + subir as funções. */

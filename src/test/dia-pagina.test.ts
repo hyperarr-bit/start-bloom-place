@@ -28,7 +28,9 @@ const textoDe = (d: Document) => { const c = d.getElementById("pagina")!.cloneNo
 
 /* ───────────────────────── 1. as chaves ───────────────────────── */
 describe("as chaves do <head>", () => {
-  const cabeca = HTML.match(/<script>\s*\/\*[\s\S]*?\*\/\s*(\(function \(\) \{[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
+  // 23/11 (dono: "sobe o /dia a 19,90 também"): no ar a chave está "on"; os testes do "off" rodam com a chave trocada (o rollback)
+  const cabecaNoAr = HTML.match(/<script>\s*\/\*[\s\S]*?\*\/\s*(\(function \(\) \{[\s\S]*?\}\)\(\);)\s*<\/script>/)![1];
+  const cabeca = cabecaNoAr.replace('var PAGINA_DIA = "on"', 'var PAGINA_DIA = "off"');
   const loja = () => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => { m.set(k, v); } }; };
   const rodar = (fonte: string, busca: string, o: { host?: string; hash?: string; storage?: ReturnType<typeof loja> | null } = {}) => {
     const attrs: Record<string, string> = {}; const replace = vi.fn();
@@ -36,12 +38,12 @@ describe("as chaves do <head>", () => {
     new Function("location", "document", "sessionStorage", fonte)({ search: busca, hash: o.hash ?? "", hostname: o.host ?? "www.coreaplicativo.com.br", replace }, { documentElement: { setAttribute: (k: string, v: string) => { attrs[k] = v; } } }, storage);
     return { attrs, replace };
   };
-  const ligada = cabeca.replace('var PAGINA_DIA = "off"', 'var PAGINA_DIA = "on"');
+  const ligada = cabecaNoAr;
 
-  it("nasce desligada, com a oferta 19, o topo lista, a faixa SEM prazo (o preço não tem prazo de verdade) e o preço só no cartão (copy da SPEC)", () => {
+  it("no ar: ligada (PAGINA_DIA on; com off é o rollback), com a oferta 19, o topo lista, a faixa SEM prazo (o preço não tem prazo de verdade) e o preço só no cartão (copy da SPEC)", () => {
     expect(HTML).toMatch(/var FAIXA_DIA = "sem-data";/);
     expect(HTML).toMatch(/var PRECO_CEDO_DIA = "off";/);
-    expect(HTML).toMatch(/var PAGINA_DIA = "off";/);
+    expect(HTML).toMatch(/var PAGINA_DIA = "on";/);
     expect(HTML).toMatch(/var OFERTA_DIA = "19";/);
     expect(HTML).toMatch(/var TOPO_DIA = "lista";/);
     expect(ligada).not.toBe(cabeca);

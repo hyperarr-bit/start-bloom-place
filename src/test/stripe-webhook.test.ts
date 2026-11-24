@@ -590,8 +590,69 @@ describe('LP 27,90 — catalog and signed webhook',()=>{
 });
 it('lp27 uses a dedicated creator without monthly subscription actions',()=>{
  const endpoint=readFileSync(resolve(__dirname,'../../supabase/functions/stripe-lp27-criar/index.ts'),'utf8');
- expect(endpoint).toContain('p.pagina !== "lp27" && p.pagina !== "tudo"');expect(endpoint).not.toMatch(/assinarAppWeb|subscriptions|stripe-app-web/);
- const client=readFileSync(resolve(__dirname,'../landing/stripe-checkout.ts'),'utf8');expect(client).toContain('c.pagina === "lp27" || c.pagina === "tudo" ? "stripe-lp27-criar" : "stripe-criar"');
+ expect(endpoint).toContain('p.pagina !== "lp27" && p.pagina !== "tudo" && p.pagina !== "p2027"');expect(endpoint).not.toMatch(/assinarAppWeb|subscriptions|stripe-app-web/);
+ const client=readFileSync(resolve(__dirname,'../landing/stripe-checkout.ts'),'utf8');expect(client).toContain('c.pagina === "lp27" || c.pagina === "tudo" || c.pagina === "p2027" ? "stripe-lp27-criar" : "stripe-criar"');
+});
+
+/* ───────── 23/11: a /2027 (página do carrossel 2027) — linha própria "p2027" ───────── */
+describe("23/11 /2027: linha própria 'p2027' (R$ 27,90, stripe-lp27-criar)", () => {
+  const REF = "0f8a5c2e-2027-4222-8333-944455556666";
+  it("a linha: 2790, chave de idempotência própria, offer/contentName próprios, url /2027, à vista; o preço da página é o MESMO", async () => {
+    expect(OFERTAS_STRIPE.p2027).toMatchObject({ pagina: "p2027", centavos: 2790, idem: "p2027", parcelasMax: 1, offer: "ST_p2027", contentName: "CORE vitalício (/2027)", urlPadrao: "https://www.coreaplicativo.com.br/2027" });
+    // nenhuma outra linha mudou (a /tudo segue 1990, a lp27 2790, a /oferta 6790)
+    expect([OFERTAS_STRIPE.tudo.centavos, OFERTAS_STRIPE.lp27.centavos, OFERTAS_STRIPE.oferta.centavos, OFERTAS_STRIPE.organizar.centavos]).toEqual([1990, 2790, 6790, 1990]);
+    const { PRECO_2027_CENTAVOS } = await import("@/p2027/preco");
+    expect(PRECO_2027_CENTAVOS).toBe(OFERTAS_STRIPE.p2027.centavos);
+  });
+  it("o pedido: pagina 'p2027' (o valor que o navegador manda não vale; indicador e braço de preço não entram)", () => {
+    const p = validarPedidoStripe({ ref: REF, pagina: "p2027", amount: 100, preco_centavos: 1, atrib: { indicador: "ANA7K2", utm_campaign: "c2027" } })!;
+    expect(p.pagina).toBe("p2027");
+    expect(p.atrib).toEqual({ utm_campaign: "c2027" });
+    expect(validarPedidoStripe({ ref: REF, pagina: "p2027", braco_preco: "2790" })).toBeNull();
+    expect(metadataDoPedido(p, { userId: null, ip: null, ua: null, agoraIso: "x" }).pagina).toBe("p2027");
+    expect(paramsCriar(REF, OFERTAS_STRIPE.p2027)).toEqual(expect.arrayContaining([["amount", "2790"], ["metadata[pagina]", "p2027"], ["payment_method_types[]", "pix"], ["payment_method_types[]", "card"]]));
+    expect(idemDoPedido(OFERTAS_STRIPE.p2027, null)).toBe("p2027");
+  });
+  it("o criar devolve amount, moeda e página (a /2027 confere antes de deixar pagar) e usa a chave p2027-<ref>", async () => {
+    const m = montar(); const s = stripeFalsa();
+    const p = validarPedidoStripe({ ref: REF, pagina: "p2027" })!;
+    const r = await criarOuReaproveitar({ admin: m.admin as never, stripe: s.f, log: () => {} }, p, metadataDoPedido(p, { userId: null, ip: null, ua: null, agoraIso: "x" }), { userId: null, ip: null });
+    expect(r.status).toBe(200);
+    expect(r.corpo).toMatchObject({ ok: true, amount: 2790, currency: "brl", pagina: "p2027" });
+    expect(s.ctl.idems[0]).toBe(`p2027-${REF}`);
+    expect(m.db.analytics_events.find((e) => e.event_name === "stripe_order_created")?.event_data).toMatchObject({ ref: REF, pagina: "p2027" });
+    // o PI de outra página (a /tudo, 1990) nunca serve pra esta ref
+    const outra = validarPedidoStripe({ ref: REF, pagina: "tudo", pi: String(r.corpo.pi) })!;
+    expect((await criarOuReaproveitar({ admin: m.admin as never, stripe: s.f, log: () => {} }, outra, {}, { userId: null, ip: null })).status).toBe(404);
+  });
+  it("o webhook: 2790 com pagina 'p2027' libera o vitalício 1× + Purchase (content_name e url da /2027) + stripe_venda 'p2027'; 1990 ou 6790 nela é ignorado", async () => {
+    const base = pi({ amount: 2790, amount_received: 2790 });
+    const m = montar();
+    m.db.users.set("u_anon", { id: "u_anon", email: null });
+    const corpo = evento("payment_intent.succeeded", { ...base, metadata: { ...base.metadata, user_id: "u_anon", pagina: "p2027", url: undefined } });
+    expect((await mandar(m, corpo)).corpo).toMatchObject({ liberado: true });
+    await mandar(m, corpo);
+    expect(m.db.subscriptions).toHaveLength(1);
+    expect(m.db.subscriptions[0]).toMatchObject({ plan: "lifetime", amount_cents: 2790, payment_method: "stripe" });
+    expect(m.saida.capi).toHaveLength(1);
+    const ev = (m.saida.capi[0].data as Linha[])[0];
+    expect(ev.event_id).toBe("pi_3Abc");
+    expect(ev.custom_data).toMatchObject({ value: 27.9, currency: "BRL", content_name: "CORE vitalício (/2027)" });
+    expect(ev.event_source_url).toBe("https://www.coreaplicativo.com.br/2027");
+    expect(m.db.analytics_events.find((e) => e.event_name === "stripe_venda")?.event_data).toMatchObject({ pagina: "p2027", valor_cents: 2790 });
+    for (const valor of [1990, 6790]) {
+      const m2 = montar();
+      m2.db.users.set("u_anon", { id: "u_anon", email: null });
+      const r = await mandar(m2, evento("payment_intent.succeeded", { ...base, amount: valor, amount_received: valor, metadata: { ...base.metadata, user_id: "u_anon", pagina: "p2027" } }));
+      expect(r.corpo).toMatchObject({ ignorado: "valor" });
+      expect(m2.db.subscriptions).toHaveLength(0);
+    }
+  });
+  it("o stripe-status responde à /2027 só com a mesma ref", () => {
+    const p = { metadata: { pagina: "p2027", ref: REF }, status: "succeeded" };
+    expect(respostaStatus(p, REF)).toMatchObject({ ok: true, pago: true });
+    expect(respostaStatus(p, "outra-ref-qualquer")).toEqual({ ok: false });
+  });
 });
 
 /* ───────── 22/11: o SORTEIO DE PREÇO da /oferta (AB_PRECO_OFERTA) — servidor ───────── */

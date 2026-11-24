@@ -57,15 +57,18 @@ export type OpcoesCheckout = {
   /** "novo" = o desenho da /pra-sempre e /completo. 23/11 "cakto" (/tudo): a ESTRUTURA do checkout da Cakto — produto com miniatura,
    *  Nome completo + Email (rótulo em cima), "Forma de Pagamento" com 2 botões quadrados (PIX | Cartão de Crédito), Nome no cartão,
    *  "Resumo do pedido" com Total, "Pagar com Pix" / "Pagar com Cartão de Crédito", "Compra segura". O nome vai SÓ pra Stripe
-   *  (billing_details.name), nunca pro nosso servidor nem pra evento. Mesma máquina de estados do Pix/cartão. */
-  layout?: "novo" | "cakto";
+   *  (billing_details.name), nunca pro nosso servidor nem pra evento. Mesma máquina de estados do Pix/cartão.
+   *  23/11 "cartao" (/2027): o pagamento DENTRO do cartão do preço da página — SÓ o e-mail ("Seu e-mail · é com ele que você entra
+   *  no app"), Pix | Cartão de crédito com bolinha e ícone, "Pagar R$ X no Pix" / "Pagar R$ X no cartão" e 1 linha de depois de
+   *  pagar. Sem resumo nem provas (o cartão da página já tem o preço e os ✅). Billing só com o e-mail, como o padrão. */
+  layout?: "novo" | "cakto" | "cartao";
   /** 23/11 (/tudo): o checkout DENTRO deste elemento da página (inline), não numa camada por cima: sem fundo, sem travar a rolagem,
    *  sem entrada no histórico, sem X/Esc, sem foco puxado. O InitiateCheckout sai no 1º toque/foco dentro dele (não ao montar).
    *  Sem isto: a camada de sempre, nada muda. */
   montarEm?: HTMLElement;
   storagePrefix?: string;
   /** Server-owned catalog key; no client amount is trusted by stripe-criar. */
-  pagina?: "oferta" | "lp27" | "tudo" | "organizar";
+  pagina?: "oferta" | "lp27" | "tudo" | "organizar" | "p2027";
   /** 22/11 (AB_PRECO_OFERTA, só /oferta): o braço de preço (2790 | 4790 | 6790). Vai no pedido como braco_preco (o servidor só aceita os 3 e
    *  grava na metadata do PI); em produção a página confere que o PI veio com ESTE valor antes de deixar pagar. Sem isto: nada muda. */
   bracoPreco?: number;
@@ -173,7 +176,7 @@ const postar = async (fn: string, corpo: Record<string, unknown>): Promise<Recor
   return r.ok ? j : { ...j, ok: false };
 };
 const apiReal: ApiOferta = {
-  criar: async (c) => { const j = await postar(c.pagina === "lp27" || c.pagina === "tudo" ? "stripe-lp27-criar" : "stripe-criar", c); return { amount: j.amount as number | undefined, currency: j.currency as string | undefined, pagina: j.pagina as string | undefined, ok: j.ok === true, clientSecret: j.client_secret as string | undefined, pi: j.pi as string | undefined, erro: j.erro as string | undefined, status: j.status as string | undefined, pix: (j.pix as PixQr | null | undefined) ?? null }; },
+  criar: async (c) => { const j = await postar(c.pagina === "lp27" || c.pagina === "tudo" || c.pagina === "p2027" ? "stripe-lp27-criar" : "stripe-criar", c); return { amount: j.amount as number | undefined, currency: j.currency as string | undefined, pagina: j.pagina as string | undefined, ok: j.ok === true, clientSecret: j.client_secret as string | undefined, pi: j.pi as string | undefined, erro: j.erro as string | undefined, status: j.status as string | undefined, pix: (j.pix as PixQr | null | undefined) ?? null }; },
   status: async (c) => { const j = await postar("stripe-status", c); return { ok: j.ok === true, status: j.status as string | undefined, pago: j.pago === true, metodo: (j.metodo as string | null) ?? null }; },
 };
 /** fora do domínio de produção: nada sai pra Stripe. O Pix simulado "cai" 6 s depois de gerado. */
@@ -423,7 +426,7 @@ function montarInline(o: OpcoesCheckout, alvo: HTMLElement): HTMLElement {
   if (!document.getElementById("oc-estilo")) { const st = document.createElement("style"); st.id = "oc-estilo"; st.textContent = CSS; document.head.appendChild(st); }
   if (!document.getElementById("oc-estilo-inline")) { const st = document.createElement("style"); st.id = "oc-estilo-inline"; st.textContent = CSS_INLINE; document.head.appendChild(st); }
   const el = document.createElement("div");
-  el.className = `oc oc-inline${o.layout === "cakto" ? " oc-cakto" : o.layout === "novo" ? " oc-novo" : ""}`; el.id = "oc";
+  el.className = `oc oc-inline${o.layout === "cakto" ? " oc-cakto" : o.layout === "novo" ? " oc-novo" : o.layout === "cartao" ? " oc-cartao" : ""}`; el.id = "oc";
   el.setAttribute("role", "region"); el.setAttribute("aria-labelledby", "oc-tit");
   el.innerHTML = `<div class="oc-corpo"><div class="oc-in" id="oc-in"></div></div>`;
   alvo.replaceChildren(el);
@@ -460,8 +463,9 @@ function telaForm() {
   const o = opc!;
   const alvo = raiz!.querySelector<HTMLElement>("#oc-in")!;
   // 11/11 (braço "pagina"): o e-mail veio do cartão da oferta — aqui vira uma linha, e o campo fica guardado atrás do "Trocar"
-  const emailPronto = o.layout !== "cakto" && !!o.emailInicial && EMAIL_OK.test(est!.email.trim().toLowerCase());
-  alvo.innerHTML = o.layout === "cakto" ? htmlCakto() : `
+  // 23/11 (layout "cartao"): o e-mail que já veio da página fica no próprio campo (sem a linha "Trocar")
+  const emailPronto = o.layout !== "cakto" && o.layout !== "cartao" && !!o.emailInicial && EMAIL_OK.test(est!.email.trim().toLowerCase());
+  alvo.innerHTML = o.layout === "cakto" ? htmlCakto() : o.layout === "cartao" ? htmlCartao() : `
     <div class="oc-resumo" data-testid="oferta-resumo"><div><h2 id="oc-tit">CORE · Acesso vitalício</h2><p>Pagamento único · nada é cobrado depois</p></div><div class="oc-preco">${esc(preco())}</div></div>
     <ul class="oc-provas"><li>As 16 áreas da vida num app só</li><li>iPhone, Android e computador, com a mesma conta</li><li>7 dias de garantia: não gostou, devolvemos 100%</li></ul>
     ${emailPronto ? `<div class="oc-email-ok" id="oc-email-ok" data-testid="oferta-email-ok"><span>Seu acesso chega em<b>${esc(est!.email.trim().toLowerCase())}</b></span><button type="button" id="oc-email-trocar">Trocar</button></div>` : ""}
@@ -562,6 +566,30 @@ function htmlCakto(): string {
     <p class="ck-processado">Processado pela Stripe · CORE · CNPJ 55.041.112/0001-82</p>`;
 }
 
+/** 23/11 (/2027, layout "cartao"): o pagamento dentro do cartão do preço — só o e-mail, Pix | Cartão de crédito (bolinha + ícone), o
+ *  botão que diz o valor e o método, e 1 linha de depois de pagar. Os MESMOS ids da camada (a lógica de e-mail, método, Element e
+ *  pagar é a mesma). O título fica escondido (é a página que mostra o preço; o #oc-tit só nomeia a região pro leitor de tela). */
+function htmlCartao(): string {
+  const e = est!;
+  return `
+    <h3 class="ct-sr" id="oc-tit">Pagamento</h3>
+    <label class="ct-rot" for="oc-email">Seu e-mail <span>· é com ele que você entra no app</span></label>
+    <input class="ct-campo" id="oc-email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="254" placeholder="seuemail@gmail.com" value="${esc(e.email)}" />
+    <button type="button" class="oc-sug" id="oc-sug" hidden></button>
+    <p class="oc-erro" id="oc-email-erro" role="alert" hidden></p>
+    <div class="oc-metodos ct-metodos" role="radiogroup" aria-label="Forma de pagamento">
+      <button type="button" class="ct-metodo" role="radio" data-metodo="pix" aria-checked="false"><span class="ct-bol" aria-hidden="true"></span>${ICO_PIX}<span class="ct-m">Pix<small>na hora</small></span></button>
+      <button type="button" class="ct-metodo" role="radio" data-metodo="card" aria-checked="false"><span class="ct-bol" aria-hidden="true"></span>${ICO_CARTAO}<span class="ct-m">Cartão<small>de crédito</small></span></button>
+    </div>
+    <div class="oc-pagamento">
+      <div class="oc-pe-carregando" id="oc-pe-carregando" hidden>Carregando o cartão…</div>
+      <div class="oc-pe" id="oc-pe" data-oculto></div>
+    </div>
+    <p class="oc-erro" id="oc-erro" role="alert" hidden></p>
+    <button type="button" class="ct-pagar" id="oc-pagar"></button>
+    <p class="ct-depois">Depois de pagar: baixe o CORE e toque em <b>Entrar</b> com este e-mail.</p>`;
+}
+
 /** The reviewed checkout design, using the same payment state machine and server confirmation. */
 function montarLayoutNovo(alvo: HTMLElement) {
   alvo.querySelector(".oc-resumo")?.remove();
@@ -579,6 +607,7 @@ function montarLayoutNovo(alvo: HTMLElement) {
 const metodoAtual = (): Metodo => (est?.metodo === "card" ? "card" : "pix");
 const rotuloPagar = () => (opc?.layout === "cakto"
   ? (metodoAtual() === "pix" ? "Pagar com Pix" : "Pagar com Cartão de Crédito")
+  : opc?.layout === "cartao" ? `Pagar ${preco()} ${metodoAtual() === "pix" ? "no Pix" : "no cartão"}`
   : metodoAtual() === "pix" ? `Gerar Pix de ${preco()}` : `Pagar ${preco()}`);
 const metodoPronto = () => pixPronto && (metodoAtual() === "pix" || cartaoPronto);
 const metodoFalhou = () => cargaFalhou || (metodoAtual() === "card" && cartaoFalhou);
@@ -675,7 +704,7 @@ async function garantirIntento(email: string | null, cpf: string | null = null, 
   const r = await criarComTeto(corpoDoPedido(email, cpf, cartao));
   if (!r.ok || !r.clientSecret) { o.evento("landing_erro", { onde: "stripe_criar", msg: String(r.erro ?? "falhou").slice(0, 80) }); return false; }
   // A stale deployment must never silently charge the old 67.90 offer on the 27.90 LP.
-  if (o.producao && (o.pagina === "lp27" || o.pagina === "tudo") && (r.amount !== o.precoCentavos || r.currency !== "brl" || r.pagina !== o.pagina)) { o.evento("landing_erro", { onde: "stripe_preco_divergente" }); return false; }
+  if (o.producao && (o.pagina === "lp27" || o.pagina === "tudo" || o.pagina === "p2027") && (r.amount !== o.precoCentavos || r.currency !== "brl" || r.pagina !== o.pagina)) { o.evento("landing_erro", { onde: "stripe_preco_divergente" }); return false; }
   // 22/11 (ORGANIZAR_STRIPE): o /organizar só paga se o servidor devolver o PI de 27,90 da página "organizar" (servidor velho = /oferta 67,90)
   if (o.producao && o.pagina === "organizar" && (r.amount !== o.precoCentavos || r.currency !== "brl" || r.pagina !== "organizar")) { o.evento("landing_erro", { onde: "stripe_preco_divergente" }); return false; }
   // 22/11 (AB_PRECO_OFERTA): com braço, o PI tem que vir com o MESMO valor que a página mostra (servidor velho ou travado = não paga)
@@ -699,6 +728,13 @@ const APARENCIA_CAKTO = {
   rules: { ".Input": { padding: "15px 16px", border: "1.5px solid #e2e4e8", boxShadow: "none" }, ".Input:focus": { border: "1.5px solid #0f6b55", boxShadow: "0 0 0 3px rgba(15,107,85,.15)" }, ".Label": { fontSize: "15px", fontWeight: "500", color: "#4b5563", marginBottom: "8px" } },
 };
 
+/** 23/11 (layout "cartao", /2027): os campos da Stripe com a cara do campo de e-mail do cartão do preço (borda 1,5 px, canto 13, magenta) */
+const APARENCIA_CARTAO = {
+  theme: "stripe", labels: "above",
+  variables: { colorPrimary: "#c92b78", colorText: "#1f1d22", colorTextSecondary: "#5c5560", colorDanger: "#b42318", borderRadius: "13px", fontFamily: "Inter, -apple-system, Segoe UI, Roboto, sans-serif", fontSizeBase: "16px", spacingUnit: "4px" },
+  rules: { ".Input": { padding: "14px 15px", border: "1.5px solid #d9d1d6", boxShadow: "none" }, ".Input:focus": { border: "1.5px solid #c92b78", boxShadow: "0 0 0 3px rgba(201,43,120,.14)" }, ".Label": { fontSize: "14px", fontWeight: "600", color: "#1f1d22", marginBottom: "6px" } },
+};
+
 /** o Element de cartão: nasce sem intent e invisível, enquanto o Pix está marcado (quem toca em Cartão já encontra pronto) */
 function montarCartao(s: StripeLike, minha: number, t0: number) {
   const o = opc!;
@@ -706,7 +742,7 @@ function montarCartao(s: StripeLike, minha: number, t0: number) {
   if (!caixa) return;
   elementos = s.elements({
     mode: "payment", amount: o.precoCentavos, currency: "brl", allowedPaymentMethodTypes: ["card"], paymentMethodCreation: "manual", locale: "pt-BR",
-    appearance: o.layout === "cakto" ? APARENCIA_CAKTO : { theme: "stripe", variables: { colorPrimary: "#d6338a", colorText: "#1c1a1f", borderRadius: "12px", fontFamily: "Inter, -apple-system, Segoe UI, Roboto, sans-serif" } },
+    appearance: o.layout === "cakto" ? APARENCIA_CAKTO : o.layout === "cartao" ? APARENCIA_CARTAO : { theme: "stripe", variables: { colorPrimary: "#d6338a", colorText: "#1c1a1f", borderRadius: "12px", fontFamily: "Inter, -apple-system, Segoe UI, Roboto, sans-serif" } },
     fonts: [{ cssSrc: "https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" }],
   });
   const pe = elementos.create("payment", { layout: { type: "tabs" }, fields: { billingDetails: { email: "never", address: "if_required" } }, wallets: { applePay: "never", googlePay: "never", link: "never" } });

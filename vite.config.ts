@@ -5,6 +5,13 @@ import fs from "fs";
 import { componentTagger } from "lovable-tagger";
 import { medicaoTextos } from "./vite-plugin-medicao-textos";
 import { preloadDaHome } from "./vite-plugin-preload-home";
+import { aplicarPreco } from "./src/p2027/preco";
+
+/** 23/11 (/2027): o preço da página vem de UM lugar (src/p2027/preco.ts) — cada %PRECO_2027% do 2027.html vira "27,90" no build e no dev */
+const precoDa2027 = () => ({
+  name: "preco-da-2027",
+  transformIndexHtml: { order: "pre" as const, handler(html: string, ctx: { filename?: string; path?: string }) { return /(^|[\\/])2027\.html$/.test(ctx.filename || ctx.path || "") ? aplicarPreco(html) : html; } },
+});
 
 /**
  * A versão do app, lida do build.gradle no momento do build (29/07).
@@ -51,6 +58,8 @@ const rotaDaMissao = () => {
     else if (/^\/pra-sempre\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/pra-sempre\/?/, "/pra-sempre.html");
     else if (/^\/completo\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/completo\/?/, "/completo.html");
     else if (/^\/tudo\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/tudo\/?/, "/tudo.html");
+    // 23/11: /2027 = a página do carrossel 2027 (2027.html + src/p2027/; chave PAGINA_2027 no próprio HTML)
+    else if (/^\/2027\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/2027\/?/, "/2027.html");
     else if (/^\/vitalicio\/demo\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/vitalicio\/demo\/?/, "/conhecer-demo.html");
     else if (/^\/vitalicio\/?(\?|$)/.test(req.url ?? "")) req.url = req.url!.replace(/^\/vitalicio\/?/, "/conhecer.html");
     else if (req.url === "/missao" || req.url?.startsWith("/missao?")) req.url = req.url.replace("/missao", "/missao.html");
@@ -148,6 +157,8 @@ export default defineConfig(({ mode }) => ({
         praSempre: path.resolve(__dirname, "pra-sempre.html"),
         completo: path.resolve(__dirname, "completo.html"),
         tudo: path.resolve(__dirname, "tudo.html"),
+        // 23/11: /2027 — a página do carrossel 2027 (chave PAGINA_2027 "off" no próprio HTML) — HTML + src/p2027/
+        p2027: path.resolve(__dirname, "2027.html"),
         conhecer: path.resolve(__dirname, "conhecer.html"),
         conhecerDemo: path.resolve(__dirname, "conhecer-demo.html"),
         missao: path.resolve(__dirname, "missao.html"),
@@ -165,7 +176,7 @@ export default defineConfig(({ mode }) => ({
   // medicaoTextos (1.0.16): o dicionário de textos do código que a medição total usa como peneira de
   // privacidade — ver vite-plugin-medicao-textos.ts. Sai num pedaço próprio, carregado só nas telas do app.
   // preloadDaHome (07/11, desempenho): com sessão no aparelho, o HTML pede os pedaços da Home junto com a entrada — ver vite-plugin-preload-home.ts
-  plugins: [react(), medicaoTextos(path.resolve(__dirname)), preloadDaHome(path.resolve(__dirname)), mode === "development" && componentTagger(), rotaDaMissao()].filter(Boolean),
+  plugins: [react(), medicaoTextos(path.resolve(__dirname)), preloadDaHome(path.resolve(__dirname)), mode === "development" && componentTagger(), rotaDaMissao(), precoDa2027()].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

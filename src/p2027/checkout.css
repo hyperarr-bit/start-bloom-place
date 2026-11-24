@@ -1,0 +1,48 @@
+/* /2027 (23/11): o pagamento DENTRO do cartão do preço — o layout "cartao" do checkout compartilhado (src/landing/stripe-checkout.ts).
+   Ordem (SINTESE §6 + J3 §5 "melhor bloco de pagamento"): Seu e-mail (rótulo na mesma linha da dica) → Pix | Cartão de crédito (bolinha +
+   ícone) → "Pagar R$ X no Pix" → 1 linha de depois de pagar. O ESQUELETO do 2027.html usa as MESMAS classes (a página não pula quando o
+   formulário de verdade entra). Só pega .oc-cartao: a /oferta, o /organizar e a /tudo nunca têm essa classe. */
+.cartao .pagamento{margin-top:14px;padding-top:14px;border-top:1.5px dashed #ebe2e7}
+.cartao[data-pago] .pagamento{margin-top:0;padding-top:0;border-top:0}
+.oc-cartao{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--tx)}
+.cartao .oc.oc-inline{position:relative;display:block;height:auto;background:transparent}
+.cartao .oc.oc-inline .oc-corpo{padding:0;overflow:visible}
+.oc-cartao .ct-sr{position:absolute;width:1px;height:1px;margin:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.oc-cartao .ct-rot{display:block;margin:0 0 6px;font-size:14px;font-weight:750;line-height:1.3;color:var(--tx)}
+.oc-cartao .ct-rot span{font-weight:500;color:var(--suave)}
+.oc-cartao .ct-campo{display:block;width:100%;height:52px;margin:0;padding:0 15px;border:1.5px solid #d9d1d6;border-radius:13px;background:#fff;color:var(--tx);font:inherit;font-size:16px;outline:none;-webkit-appearance:none;appearance:none}
+.oc-cartao .ct-campo::placeholder{color:#9a929f}
+.oc-cartao .ct-campo:focus{border-color:var(--magenta);box-shadow:0 0 0 4px rgba(201,43,120,.14)}
+.cartao .oc-cartao .ct-metodos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.oc-cartao .ct-metodo{display:flex;align-items:center;gap:8px;min-height:54px;margin:0;padding:0 10px;border:1.5px solid #ddd5da;border-radius:13px;background:#fff;color:var(--grafite);font:inherit;font-size:15px;font-weight:750;line-height:1.1;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.oc-cartao .ct-metodo svg{flex:none;width:20px;height:20px;color:#6b6470}
+.oc-cartao .ct-m{min-width:0}
+.oc-cartao .ct-m small{display:block;margin-top:2px;font-size:12px;font-weight:600;color:var(--suave)}
+.oc-cartao .ct-bol{flex:none;width:18px;height:18px;border-radius:50%;border:2px solid #c9bfc5;background:#fff}
+.oc-cartao .ct-metodo[aria-checked="true"]{border:2px solid var(--magenta);background:var(--magenta-suave);padding:0 9.5px}
+.oc-cartao .ct-metodo[aria-checked="true"] .ct-bol{border:5px solid var(--magenta)}
+.oc-cartao .ct-metodo[aria-checked="true"] svg{color:var(--magenta)}
+.oc-cartao .ct-metodo:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(201,43,120,.25)}
+.oc-cartao .ct-pagar{display:block;width:100%;min-height:56px;margin:12px 0 0;border:0;border-radius:15px;background:var(--magenta);color:#fff;font:inherit;font-size:17px;font-weight:800;box-shadow:0 10px 22px -10px rgba(201,43,120,.65);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.oc-cartao .ct-pagar[aria-busy="true"]{opacity:.75;pointer-events:none}
+.oc-cartao .ct-pagar[aria-disabled="true"]{opacity:.62}
+.oc-cartao .ct-depois{margin:9px 0 0;font-size:14px;line-height:1.4;color:var(--suave);text-align:center}
+.oc-cartao .ct-depois b{color:var(--grafite)}
+.oc-cartao .oc-pe{margin-top:12px}
+.oc-cartao .oc-pe-carregando{height:96px}
+.oc-cartao .oc-erro{margin:8px 0 0;font-size:14px;line-height:1.35;color:#b42318;font-weight:600}
+.oc-cartao .oc-sug{margin:6px 0 0;padding:0;border:0;background:none;font-size:14px;font-weight:700;color:var(--magenta);text-align:left}
+/* o Pix gerado e o "confirmando" dentro do cartão (as telas do checkout compartilhado) */
+.oc-cartao .oc-pix .oc-resumo{background:var(--papel)}
+.oc-cartao .oc-pix .oc-cta{background:var(--magenta);box-shadow:0 10px 22px -10px rgba(201,43,120,.65)}
+.oc-cartao .oc-pix>p,.oc-cartao .oc-passos3 li{font-size:14.5px}
+.oc-cartao .oc-miuda{font-size:13px}
+.oc-cartao .oc-aviso-pix-velho{margin:0 0 12px;padding:10px 12px;border-radius:12px;background:#fff6e5;border:1px solid #f3d28c;color:#6b4200;font-size:14px;line-height:1.4}
+/* o pós-compra dentro do cartão: sempre claro (a página é clara) e sem a moldura extra da camada */
+.cartao .pc-raiz{--pc-bg:#fff;--pc-papel:#f7f5f8;--pc-card:#fff;--pc-borda:#ebe7ee;--pc-tx:#1c1a1f;--pc-suave:#6b6670;--pc-mag:#c92b78;--pc-mag-suave:#fdf2f8;--pc-mag-borda:#f3c1dc;--pc-grafite:#262626;--pc-grafite-tx:#fff;--pc-aviso-bg:#fff6e5;--pc-aviso-borda:#f3d28c;--pc-aviso-tx:#6b4200;--pc-ok:#16a34a;--pc-ok-suave:#e8f7ee;--pc-sombra:0 10px 28px -14px rgba(28,26,31,.28)}
+.cartao .oc.oc-inline.pc-raiz{padding:0;border-radius:0;background:transparent}
+/* carregando / falhou / já comprou (no lugar do formulário) */
+.ck-espera,.ja-comprou{display:grid;gap:6px;justify-items:center;padding:18px 14px;border-radius:14px;background:var(--papel);text-align:center}
+.ck-espera b,.ja-comprou b{font-size:16px;font-weight:800;color:var(--grafite)}
+.ck-espera span,.ja-comprou span{font-size:14px;line-height:1.4;color:var(--suave)}
+.ck-espera button,.ja-comprou button{margin-top:6px;min-height:48px;padding:0 18px;border:0;border-radius:13px;background:var(--grafite);color:#fff;font:inherit;font-size:15px;font-weight:800;cursor:pointer}

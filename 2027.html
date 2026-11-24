@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#faf7f4">
+<meta name="robots" content="noindex">
+<meta name="description" content="CORE, o app do post: as 16 áreas da sua vida num app só, no iPhone, no Android e no computador. Paga uma vez, usa pra sempre.">
+<title>CORE · Sua vida toda num app só</title>
+<link rel="icon" href="/tudo/icone-app-256.webp">
+<link rel="preload" href="/tudo/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/p2027/post-financas.webp" as="image" fetchpriority="high">
+<script>
+/*
+ * /2027 (23/11) — a página do carrossel campeão ("Vamos organizar sua vida para 2027?"). Especificação:
+ * novidades-guardadas/2026-11-23/lp-2027/SINTESE.md (base K3 + enxertos K1/K2). Página + pagamento Stripe na MESMA rolagem,
+ * dentro do cartão do preço (sem folha por cima). Preço: src/p2027/preco.ts (um lugar só; o build troca os %PRECO_2027%).
+ *   PAGINA_2027 "off" → vai pro /organizar com a mesma query (a página nem pinta). "on" → a página pra todo mundo.
+ *   Com a chave off a página abre só:
+ *     · na PRÉVIA (?qa=1, ou qualquer domínio que não seja o de produção): pagamento SIMULADO, nada rastreado, faixa "PRÉVIA";
+ *     · com ?p2027=on (vale pra esta aba): a página DE VERDADE, com pagamento de verdade — é a compra real de teste antes de ligar;
+ *     · na volta do banco (3DS) de uma compra feita aqui (?payment_intent=pi_…).
+ *   Rollback: PAGINA_2027 "off" (+ push).
+ */
+(function () {
+  var PAGINA_2027 = "off";
+  var q = location.search, h = document.documentElement;
+  var aba = /[?&]p2027=on(&|$)/.test(q);
+  try { if (aba) sessionStorage.setItem("p2027-on", "1"); else aba = sessionStorage.getItem("p2027-on") === "1"; } catch (e) { /* sem storage */ }
+  aba = aba || /[?&]payment_intent=pi_/.test(q);
+  var qa = /[?&]qa=1(&|$)/.test(q) || ["coreaplicativo.com.br", "www.coreaplicativo.com.br"].indexOf(location.hostname) < 0;
+  if (PAGINA_2027 !== "on" && !aba && !qa) { h.setAttribute("data-desligada", ""); location.replace("/organizar" + q + location.hash); }
+})();
+</script>
+<style>
+@font-face{font-family:Inter;src:url('/tudo/inter-latin.woff2') format('woff2');font-style:normal;font-weight:100 900;font-display:swap}
+html[data-desligada] body{display:none}
+</style>
+<script type="module" src="/src/p2027/main.ts"></script>
+<link rel="canonical" href="https://www.coreaplicativo.com.br/2027">
+</head>
+<body>
+<div class="faixa" role="note"><b>🔥 ACESSO VITALÍCIO</b><span>&nbsp;· só hoje<b id="faixa-data"></b></span></div>
+<script>try { document.getElementById("faixa-data").textContent = ", " + new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" }).format(new Date()); } catch (e) {}</script>
+<main class="p27">
+
+<!-- 1 · 1ª TELA: continua o post (foto do post + o mesmo app no celular + as 6 áreas do post). Sem preço, sem botão de compra. -->
+<header class="topo" id="topo" data-secao="topo">
+  <p class="marca"><img src="/tudo/icone-app-256.webp" width="30" height="30" alt=""><b>CORE</b><span>Esse é o app do post.</span></p>
+  <div class="vitrine">
+    <figure class="foto"><img src="/p2027/post-financas.webp" width="716" height="392" alt="Foto do post: Finanças ✅, o CORE aberto no notebook" fetchpriority="high"><figcaption>no notebook</figcaption></figure>
+    <ul class="lista" aria-label="As áreas do post">
+      <li>Finanças ✅</li>
+      <li>Hábitos ✅</li>
+      <li>Casa, Rotina e Compras ✅</li>
+      <li>Leitura ✅</li>
+      <li>Alimentação ✅</li>
+      <li>Desenvolvimento Pessoal ✅</li>
+      <li class="mais">+ 10 áreas no mesmo app</li>
+    </ul>
+    <figure class="fone" aria-label="A mesma área de Finanças, no celular"><div class="fone-tela"><i class="ilha"></i><img src="/p2027/cel-financas.webp" width="260" height="563" alt="Tela real do app no celular: Finanças"></div><figcaption>no celular</figcaption></figure>
+  </div>
+  <h1>Sua vida toda<br>num app só.<br><em>Pra 2027 inteiro,<br>não só pra janeiro.</em></h1>
+  <p class="eh-app"><b>É app:</b> iPhone, Android e computador. Uma conta só pros três.</p>
+  <p class="pronto">Já vem pronto. Você começa por uma área.</p>
+  <a class="elo" href="#dia" data-elo>Veja um dia comum com o CORE ↓</a>
+</header>
+
+<!-- 2 · UM DIA COMUM DE 2027: 3 cenas, cada uma com um recorte de tela real (data das telas = a da folha) -->
+<section class="dia" id="dia" data-secao="dia">
+  <p class="kicker">Um dia comum de 2027</p>
+  <h2>Uns 5 minutos no seu dia.<br><em>Sem rotina perfeita.</em></h2>
+  <div class="agenda">
+    <p class="agenda-topo"><span>TERÇA · 9 DE MARÇO</span><span>bem depois de janeiro</span></p>
+    <ol class="cenas">
+      <li class="cena c1"><p class="hora">7h40<small>manhã</small></p><div><p class="cena-txt"><b>Uma olhada no café:</b> a conta que vence e quanto ainda sobra.</p><figure class="recorte"><img src="/p2027/dia-manha.webp" width="548" height="188" alt="Tela real do app: as contas que vencem amanhã e em 2 dias" loading="lazy" decoding="async"></figure></div></li>
+      <li class="cena c2"><p class="hora">12h30<small>almoço</small></p><div><p class="cena-txt"><b>Gastou? Anota em segundos.</b> Ele faz a conta.</p><figure class="recorte"><img src="/p2027/dia-almoco.webp" width="548" height="147" alt="Tela real do app: quanto posso gastar hoje" loading="lazy" decoding="async"></figure></div></li>
+      <li class="cena c3"><p class="hora">22h<small>noite</small></p><div><p class="cena-txt"><b>À noite, marca o que fez.</b></p><figure class="recorte"><img src="/p2027/dia-noite.webp" width="548" height="191" alt="Tela real do app: hábitos da semana, com dias marcados e dias em branco" loading="lazy" decoding="async"></figure></div></li>
+    </ol>
+  </div>
+  <p class="nota">Telas reais do app, com dados de exemplo.</p>
+  <figure class="prova">
+    <blockquote>“…Super prático, fácil de usar e está me ajudando muito a organizar melhor minha rotina.”</blockquote>
+    <figcaption><span class="est" aria-label="5 estrelas">★★★★★</span> Susam · no Google Play</figcaption>
+  </figure>
+</section>
+
+<!-- 3 · AS ÁREAS: as 6 do post (nome e ordem do post), cada uma com um recorte real ampliado + "use só as que quiser" -->
+<section class="areas" id="areas" data-secao="areas">
+  <h2>Você leva as 16 áreas.<br><em>Usa só as que quiser.</em></h2>
+  <ul class="grade" aria-label="As 6 áreas do post">
+    <li class="area a-fin"><h3>Finanças ✅</h3><figure class="recorte"><img src="/p2027/area-financas.webp" width="350" height="140" alt="Tela real: gastos do mês por categoria" loading="lazy" decoding="async"></figure><p>Pra onde o dinheiro vai, e a conta antes de vencer.</p></li>
+    <li class="area a-hab"><h3>Hábitos ✅</h3><figure class="recorte"><img src="/p2027/area-habitos.webp" width="350" height="140" alt="Tela real: a grade de consistência dos hábitos" loading="lazy" decoding="async"></figure><p>Marca o que fez. Sumiu uns dias? Continua de onde parou.</p></li>
+    <li class="area a-casa"><h3>Casa, Rotina e Compras ✅</h3><figure class="recorte"><img src="/p2027/area-casa.webp" width="350" height="140" alt="Tela real: afazeres da cozinha" loading="lazy" decoding="async"></figure><p>Lista do mercado por corredor e afazeres por cômodo.</p></li>
+    <li class="area a-lei"><h3>Leitura ✅</h3><figure class="recorte"><img src="/p2027/area-leitura.webp" width="350" height="140" alt="Tela real: o livro que você está lendo e quando termina" loading="lazy" decoding="async"></figure><p>Em que página você tá e quando termina o livro.</p></li>
+    <li class="area a-ali"><h3>Alimentação ✅</h3><figure class="recorte"><img src="/p2027/area-alimentacao.webp" width="350" height="140" alt="Tela real: o cardápio da semana" loading="lazy" decoding="async"></figure><p>O cardápio da semana, com a lista de compras.</p></li>
+    <li class="area a-dev"><h3>Desenvolvimento Pessoal ✅</h3><figure class="recorte"><img src="/p2027/area-metas.webp" width="350" height="140" alt="Tela real: o plano de ação de cada meta" loading="lazy" decoding="async"></figure><p>Suas metas de 2027, cada uma com o plano pra chegar lá.</p></li>
+  </ul>
+  <div class="mais10">
+    <ul class="pilulas" aria-label="As outras 10 áreas">
+      <li class="rot">E mais 10 áreas:</li><li style="--p:#dc2626">Saúde</li><li style="--p:#2563eb">Treino</li><li style="--p:#4f46e5">Estudos</li><li style="--p:#db2777">Beleza</li><li style="--p:#7c3aed">Mente</li>
+      <li style="--p:#475569">Carreira</li><li style="--p:#e11d48">Relações</li><li style="--p:#0d9488">Viagens</li><li style="--p:#d97706">Pet</li><li style="--p:#65a30d">Detox</li>
+    </ul>
+  </div>
+  <div class="esconder">
+    <figure class="recorte"><img src="/landing/lpo-organizar.webp" width="760" height="373" alt="Tela real do app: o olho que mostra ou esconde cada área" loading="lazy" decoding="async"></figure>
+    <p>Começou só pelo dinheiro? As outras ficam guardadas até você querer.</p>
+  </div>
+</section>
+
+<!-- 4 · O QUE O POST NÃO CONTOU: as respostas, antes do preço -->
+<section class="contou" id="contou" data-secao="contou">
+  <div class="folha">
+    <p class="folha-faixa">O QUE O POST <span>NÃO CONTOU</span></p>
+    <p class="folha-abre">Já comprou planner ou planilha e largou? Normal: era um arquivo. <b>App fica no celular.</b></p>
+    <ul class="folha-lista">
+      <li><b>É app.</b> iPhone, Android e computador, com a mesma conta.</li>
+      <li><b>Já vem pronto.</b> Você só anota o que é seu.</li>
+      <li><b>Sumiu uns dias?</b> Tudo continua onde você deixou. Sem bronca.</li>
+      <li><b>Paga uma vez. Não renova.</b> Nada é cobrado depois.</li>
+      <li><b>Não tem versão grátis: tem garantia.</b> 7 dias; não gostou, devolvemos 100%.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 5 · DEPOIS DE PAGAR (antes do preço) -->
+<section class="depois" id="depois" data-secao="depois">
+  <p class="kicker">Depois de pagar</p>
+  <h2>Não chega arquivo.<br><em>Chega o app.</em></h2>
+  <ol class="passos">
+    <li><i>1</i><p>Você paga aqui, uma vez, só com o seu <span class="nw">e-mail</span>.</p></li>
+    <li><i>2</i><p>Baixa o CORE na App Store ou no Google Play (ou abre no computador). Os links aparecem na tela e no seu <span class="nw">e-mail</span>.</p></li>
+    <li><i>3</i><p>Toca em <b>Entrar</b> (não em “Começar”) com o mesmo <span class="nw">e-mail</span> e digita o código de 8 números que chega nele. Já está pago: não precisa assinar nada lá dentro.</p></li>
+  </ol>
+</section>
+
+<!-- 6 · O CARTÃO DO PREÇO + O PAGAMENTO (tudo numa tela). O formulário de verdade (src/landing/stripe-checkout.ts, layout "cartao")
+     entra no lugar do #pagamento quando a pessoa chega perto; até lá fica o esqueleto com o MESMO desenho (a página não pula). -->
+<section class="oferta" id="oferta" data-secao="oferta">
+  <p class="link-e-esse">O link é esse 👇</p>
+  <div class="cartao" id="cartao">
+    <p class="cartao-topo"><span>OFERTA ESPECIAL · HOJE</span><span>pagamento único</span></p>
+    <div class="cartao-corpo">
+      <div class="cabeca">
+        <h2 class="cartao-tit">Paga uma vez, usa pra sempre.</h2>
+        <p class="ancora">O plano anual do CORE custa R$&nbsp;97,90.</p>
+        <p class="preco" id="preco"><strong><small>R$</small>%PRECO_2027%</strong><span>uma vez só</span></p>
+        <p class="dezembro">Não vence em dezembro: continua seu em 2028, 2029…</p>
+        <ul class="checks">
+          <li>As 16 áreas, no celular e no computador</li>
+          <li>Não renova. Nada é cobrado depois</li>
+          <li>7 dias de garantia</li>
+        </ul>
+      </div>
+      <div class="pagamento" id="pagamento">
+        <div class="oc oc-inline oc-cartao esqueleto" data-esqueleto><div class="oc-corpo"><div class="oc-in">
+          <label class="ct-rot" for="sk-email">Seu e-mail <span>· é com ele que você entra no app</span></label>
+          <input class="ct-campo" id="sk-email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="254" placeholder="seuemail@gmail.com">
+          <div class="oc-metodos ct-metodos" role="radiogroup" aria-label="Forma de pagamento">
+            <button type="button" class="ct-metodo" role="radio" aria-checked="true" data-sk-metodo="pix"><span class="ct-bol" aria-hidden="true"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.8 21.2 12 12 21.2 2.8 12z"/><path d="M7.4 12H9l3-3 3 3h1.6M9 12l3 3 3-3"/></svg><span class="ct-m">Pix<small>na hora</small></span></button>
+            <button type="button" class="ct-metodo" role="radio" aria-checked="false" data-sk-metodo="card"><span class="ct-bol" aria-hidden="true"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19"/></svg><span class="ct-m">Cartão<small>de crédito</small></span></button>
+          </div>
+          <div class="oc-pagamento"></div>
+          <button type="button" class="ct-pagar" data-sk-pagar>Pagar R$&nbsp;%PRECO_2027% no Pix</button>
+          <p class="ct-depois">Depois de pagar: baixe o CORE e toque em <b>Entrar</b> com este e-mail.</p>
+        </div></div></div>
+      </div>
+      <div class="confianca">
+        <p><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Compra segura · pagamento pela Stripe</p>
+        <p><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6"/></svg>CORE · CNPJ 55.041.112/0001-82</p>
+        <p><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>contato@coreaplicativo.com.br</p>
+      </div>
+      <figure class="mini">
+        <blockquote>“…Era tudo que eu precisava, eu amei demais. Vale muito a pena pagar”</blockquote>
+        <figcaption><span class="est" aria-label="5 estrelas">★★★★★</span> Sabryna · na App Store</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- 7 · GARANTIA (uma caixa só) -->
+<section class="garantia-sec" id="garantia" data-secao="garantia">
+  <div class="garantia"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg><p><b>7 dias pra ver se é pra você.</b> Não gostou? Devolvemos 100%, é só mandar um <span class="nw">e-mail</span> pra contato@coreaplicativo.com.br.</p></div>
+</section>
+
+<!-- 8 · AVALIAÇÕES REAIS (as das páginas no ar: 1º nome, loja e estrelas; cortes com "…"). Sem nota média. -->
+<section class="avaliacoes" id="avaliacoes" data-secao="avaliacoes">
+  <p class="kicker">Quem usa conta</p>
+  <h2>Avaliações reais, das lojas.</h2>
+  <ul class="depos">
+    <li><span class="av" style="--av:#cdeedd">R</span><div><p class="quem">Rebeca <small>· Google Play</small></p><p class="est" aria-label="5 estrelas">★★★★★</p><p class="depo-txt">“Estou gostando bastante do Core! Acho muito legal reunir várias áreas da vida em um só lugar, como rotina, finanças, treino, alimentação… A interface é bonita e fácil de usar…”</p></div></li>
+    <li><span class="av" style="--av:#fbdbe9">E</span><div><p class="quem">Elisa <small>· Google Play</small></p><p class="est" aria-label="5 estrelas">★★★★★</p><p class="depo-txt">“Que app incrível! Tudo que eu sempre quis num planner online. É maravilhoso pra se organizar e motivar. Vale cada centavo.”</p></div></li>
+    <li><span class="av" style="--av:#fde7b0">P</span><div><p class="quem">Paulo <small>· Google Play</small></p><p class="est" aria-label="5 estrelas">★★★★★</p><p class="depo-txt">“aplicativo muito bom, vale o preço, depois que baixei, organizei minha rotina…”</p></div></li>
+  </ul>
+</section>
+
+<!-- 9 · DÚVIDAS (já abertas, com as palavras dela) -->
+<section class="duvidas" id="duvidas" data-secao="duvidas">
+  <p class="kicker">Dúvidas</p>
+  <h2>Respondidas, sem letra miúda.</h2>
+  <dl>
+    <dt>É mensalidade?</dt><dd><b>Não.</b> Você paga R$&nbsp;%PRECO_2027% uma vez e nada é cobrado depois.</dd>
+    <dt>Funciona no meu celular?</dt><dd><b>Sim.</b> No iPhone e no Android. E no computador, com a mesma conta.</dd>
+    <dt>Tem versão grátis?</dt><dd><b>Não.</b> Tem 7 dias de garantia: não gostou, devolvemos 100%.</dd>
+    <dt>Vou ter que montar tudo?</dt><dd><b>Não.</b> As áreas já vêm prontas. Comece por uma e esconda o resto.</dd>
+    <dt>E se eu ficar uns dias sem abrir?</dt><dd>Tudo continua onde você deixou. É só abrir e seguir.</dd>
+    <dt>Por que na loja o preço é outro?</dt><dd>Nas lojas o CORE custa R$&nbsp;97,90 (e tem plano mensal). Este acesso é pago uma vez só, por aqui. Depois de pagar, não compre de novo dentro do app: toque em <b>Entrar</b>.</dd>
+    <dt>Paguei e não consegui entrar. E agora?</dt><dd>No app, toque em <b>Entrar</b> (não em “Começar”) e use o mesmo e-mail da compra: o código de 8 números chega nele. Travou? Escreva pra contato@coreaplicativo.com.br.</dd>
+    <dt>E se eu trocar de celular?</dt><dd>Entra com o mesmo e-mail no celular novo e tá tudo lá.</dd>
+    <dt>Como falo com vocês?</dt><dd>contato@coreaplicativo.com.br</dd>
+  </dl>
+</section>
+
+<!-- 10 · FECHO -->
+<section class="fecho" id="fecho" data-secao="fecho">
+  <h2>Sua vida toda num app só.<br><em>Pra 2027 e pros anos seguintes.</em></h2>
+  <a class="botao" href="#oferta" data-ir="fecho">Quero organizar tudo</a>
+  <p>R$&nbsp;%PRECO_2027% uma vez · 7 dias de garantia</p>
+</section>
+
+</main>
+<footer class="rodape"><img src="/tudo/icone-app-256.webp" width="36" height="36" alt="" loading="lazy"><p>CORE · CNPJ 55.041.112/0001-82<br>contato@coreaplicativo.com.br · <a href="/termos">Termos</a> · <a href="/privacidade">Privacidade</a></p></footer>
+
+<!-- BARRA FIXA (grafite): depois da 1ª tela; sem preço até o número do preço ter passado pela tela; some com o cartão do preço e com o fecho;
+     o toque leva ao cartão com o número do preço, o e-mail e o botão na mesma vista -->
+<div class="barra" id="barra" aria-hidden="true"><a href="#oferta" data-ir="barra_fixa" tabindex="-1">Quero organizar tudo<span class="bp">&nbsp;· R$&nbsp;%PRECO_2027%</span></a></div>
+</body>
+</html>

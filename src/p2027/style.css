@@ -135,7 +135,7 @@ button,input{font:inherit}
 .cartao-topo{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:2px 8px;padding:11px 16px;background:var(--grafite);color:#fff;font-size:12.5px;font-weight:800;letter-spacing:.08em}
 .cartao-topo span+span{color:#f6b8d6;letter-spacing:.01em;font-weight:700}
 .cartao-corpo{padding:16px}
-.p27 .cartao-tit{font-size:22px;line-height:1.15}
+.p27 .cartao-tit{font-size:21px;line-height:1.15;letter-spacing:-.025em}
 .ancora{margin-top:6px;font-size:14.5px;line-height:1.35;color:var(--suave)}
 .preco{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;margin-top:2px;color:var(--grafite)}
 .preco strong{font-size:50px;line-height:1.06;font-weight:850;letter-spacing:-.04em;white-space:nowrap}

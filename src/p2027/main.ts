@@ -151,6 +151,25 @@ function iniciar() {
   }
   document.querySelector("[data-elo]")?.addEventListener("click", () => event("landing_topo_elo", {}));
 
+  /* ───────── teclado aberto: o e-mail e o botão de pagar na parte que sobra da tela ─────────
+     Só em tela de toque. Depois que o teclado sobe (~350 ms), se o botão ficou escondido, a página sobe o que falta (sem passar o
+     campo de e-mail do topo da parte visível). Nada de foco forçado: só reage ao toque dela no campo. */
+  const toque = (() => { try { return matchMedia("(pointer: coarse)").matches; } catch { return false; } })();
+  if (toque) alvo.addEventListener("focusin", (e) => {
+    const campo = e.target;
+    if (!(campo instanceof HTMLInputElement) || campo.type !== "email") return;
+    window.setTimeout(() => {
+      const botao = alvo.querySelector<HTMLElement>("#oc-pagar");
+      if (!botao || document.activeElement !== campo) return;
+      const vv = window.visualViewport;
+      const topoVisivel = vv ? vv.offsetTop : 0, fimVisivel = topoVisivel + (vv ? vv.height : window.innerHeight);
+      const falta = botao.getBoundingClientRect().bottom + 12 - fimVisivel;
+      const folga = campo.getBoundingClientRect().top - (topoVisivel + 8);
+      const passo = Math.min(falta, folga);
+      if (passo > 4) { try { window.scrollBy({ top: Math.round(passo), behavior: reduz ? "auto" : "smooth" }); } catch { window.scrollBy(0, Math.round(passo)); } }
+    }, 350);
+  });
+
   /* ───────── bloco visto (1× cada) ───────── */
   if ("IntersectionObserver" in window) {
     const visto = new IntersectionObserver((entradas) => {

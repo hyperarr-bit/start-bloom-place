@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#faf7f4">
+<meta name="robots" content="noindex">
+<meta name="description" content="CORE: app de organização pra iPhone, Android e computador. Rotina, hábitos, metas, treino, casa e estudos num lugar só. De R$ 97,90 por R$ 19,90, acesso vitalício.">
+<title>CORE — Chega da bagunça</title>
+<link rel="icon" href="/tudo/icone-app-256.webp">
+<link rel="preload" href="/tudo/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<script>
+/*
+ * /planner (26/11) — a mesma página e o mesmo pagamento da /tudo (R$ 19,90 vitalício, linha "tudo" no servidor), com a
+ * vitrine de rotina, metas, treino, casa, estudos e alimentação. Código próprio em src/planner/ (a /tudo não muda).
+ *   PAGINA_PLANNER "off" → vai pra /tudo (com a mesma query). "on" → a página. ?planner=on mostra mesmo com a chave off (QA).
+ *   Rollback: "off".
+ */
+(function () {
+  var PAGINA_PLANNER = "on";
+  var q = location.search;
+  if (PAGINA_PLANNER !== "on" && !/[?&]planner=on(&|$)/.test(q)) {
+    document.documentElement.setAttribute("data-desligada", "");
+    location.replace("/tudo" + q);
+  }
+})();
+</script>
+<style>
+@font-face{font-family:Inter;src:url('/tudo/inter-latin.woff2') format('woff2');font-style:normal;font-weight:100 900;font-display:swap}
+html[data-desligada] body{display:none}
+</style>
+<script type="module" src="/src/planner/main.ts"></script>
+<link rel="canonical" href="https://www.coreaplicativo.com.br/planner">
+</head>
+<body>
+<main class="tudo">
+
+<section class="topo" id="topo" aria-labelledby="titulo">
+  <p class="selo">CORE · SEU 2027 ORGANIZADO</p>
+  <figure class="mosaico" aria-label="Telas reais do app CORE: Rotina, Metas, Treino e Casa">
+    <div class="cel cel-1"><img src="/tudo/rotina.webp" width="540" height="1169" alt="Rotina no CORE: hábitos da semana" fetchpriority="high"></div>
+    <div class="cel cel-4"><img src="/tudo/casa.webp" width="540" height="1169" alt="Casa no CORE: afazeres por cômodo"></div>
+    <div class="cel cel-3"><img src="/tudo/treino.webp" width="540" height="1169" alt="Treino no CORE: séries e cargas do dia"></div>
+    <div class="cel cel-2"><img src="/tudo/metas.webp" width="540" height="1169" alt="Metas no CORE: cada meta com o plano de ação" fetchpriority="high"></div>
+  </figure>
+  <h1 id="titulo"><span>Chega da bagunça</span> <em>e de uma vida sem rumo</em></h1>
+  <p class="areas">Organize seus hábitos, rotina, metas, treino, estudos…</p>
+  <ul class="checks">
+    <li>Do seu jeito: use só as áreas que importam pra você</li>
+    <li>Rápido e fácil de usar, todo dia</li>
+    <li>App pra iPhone, Android e computador</li>
+  </ul>
+  <p class="frase">Pare de deixar tudo pra depois. Sua vida inteira num app só.</p>
+  <a class="ver-oferta" href="#oferta" data-ir-oferta>Vitalício por R$ 19,90 · ver oferta ↓</a>
+</section>
+
+<section class="modulos" id="modulos" aria-labelledby="modulos-titulo">
+  <h2 id="modulos-titulo">O que tem no CORE</h2>
+  <article class="area" id="area_rotina" style="--cor:#cdeedd">
+    <h3>Rotina e hábitos</h3><p>Marque os hábitos do dia e veja sua sequência crescer.</p>
+    <div class="tela"><img src="/tudo/rotina.webp" width="540" height="1169" alt="Tela de Rotina do CORE com hábitos diários" loading="lazy" decoding="async"></div>
+  </article>
+  <article class="area" id="area_metas" style="--cor:#e7dcfb">
+    <h3>Metas</h3><p>Cada meta com o plano de ação pra chegar lá.</p>
+    <div class="tela"><img src="/tudo/metas.webp" width="540" height="1169" alt="Tela de Metas do CORE" loading="lazy" decoding="async"></div>
+  </article>
+  <article class="area" id="area_treino" style="--cor:#d6e6fb">
+    <h3>Treino</h3><p>Séries e cargas do dia, com a da semana passada do lado.</p>
+    <div class="tela"><img src="/tudo/treino.webp" width="540" height="1169" alt="Tela de Treino do CORE" loading="lazy" decoding="async"></div>
+  </article>
+  <article class="area" id="area_casa" style="--cor:#fdf1b8">
+    <h3>Casa</h3><p>Afazeres por cômodo, lista do mercado e a rotina da casa.</p>
+    <div class="tela"><img src="/tudo/casa.webp" width="540" height="1169" alt="Tela de Casa do CORE" loading="lazy" decoding="async"></div>
+  </article>
+  <article class="area" id="area_estudos" style="--cor:#fbdbe9">
+    <h3>Estudos</h3><p>Cursos, aulas feitas e o que você aprendeu em cada um.</p>
+    <div class="tela"><img src="/tudo/estudos.webp" width="540" height="1169" alt="Tela de Estudos do CORE" loading="lazy" decoding="async"></div>
+  </article>
+  <article class="area" id="area_dieta" style="--cor:#fde7b0">
+    <h3>Alimentação</h3><p>O cardápio da semana, refeição por refeição.</p>
+    <div class="tela"><img src="/landing/dieta.webp" width="780" height="1688" alt="Tela de Alimentação do CORE com o cardápio da semana" loading="lazy" decoding="async"></div>
+  </article>
+  <div class="mais">
+    <p><b>E mais 9 áreas</b> no mesmo app:</p>
+    <ul><li>Saúde</li><li>Beleza</li><li>Carreira</li><li>Biblioteca</li><li>Mente</li><li>Relações</li><li>Detox</li><li>Pet</li><li>Viagens</li></ul>
+  </div>
+</section>
+
+<section class="oferta" id="oferta" aria-labelledby="oferta-titulo">
+  <div class="fita"><b>OFERTA</b><span>ESPECIAL</span></div>
+  <h2 id="oferta-titulo">CORE completo · vitalício</h2>
+  <p class="preco">de <s>R$97,90</s> por <strong>R$19,90</strong></p>
+  <p class="ancora">O plano anual do CORE custa R$ 97,90. Aqui, R$ 19,90 uma vez só, pra sempre.</p>
+  <p class="preco-nota">Pagamento único. Não renova, nada é cobrado depois.</p>
+  <a class="botao" href="#checkout" data-ir-checkout>Quero o meu CORE</a>
+  <p class="garantia">Garantia de 7 dias · Pix ou cartão</p>
+</section>
+
+<div class="tarja" aria-hidden="true">
+  <div class="tarja-linha"><span>OFERTA LIMITADA · OFERTA LIMITADA · OFERTA LIMITADA · OFERTA LIMITADA · OFERTA LIMITADA · OFERTA LIMITADA · </span><span>OFERTA LIMITADA · OFERTA LIMITADA · OFERTA LIMITADA · OFERTA LIMITADA · OFERTA LIMITADA · OFERTA LIMITADA · </span></div>
+  <div class="tarja-linha tarja-volta"><span>OFERTA LIMITADA · OFERTA LIMITADA · OFERTA LIMITADA · OFERTA LIMITADA · OFERTA LIMITADA · OFERTA LIMITADA · </span><span>OFERTA LIMITADA · OFERTA LIMITADA · OFERTA LIMITADA · OFERTA LIMITADA · OFERTA LIMITADA · OFERTA LIMITADA · </span></div>
+</div>
+<p class="sr-only">Oferta limitada.</p>
+
+<section class="depo" id="depoimentos" aria-labelledby="depo-titulo">
+  <h2 id="depo-titulo">Avaliações reais de quem já usa o CORE</h2>
+  <!-- Avaliações REAIS das lojas, literais (cortes só com "…"), só o primeiro nome. As mesmas da /tudo; nesta página a da Rebeca e a do
+       Paulo levam um corte a mais ("…") no trecho que citava o módulo que a página não mostra. Fonte: src/pages/site/Landing.tsx (AVALIACOES). -->
+  <ul class="depo-lista">
+    <li class="depo-item"><span class="av" style="--av:#fbdbe9">E</span><div><p class="quem">Elisa <small>· Google Play</small></p><p class="est" aria-label="5 estrelas">★★★★★</p><p>Que app incrível! Tudo que eu sempre quis num planner online. É maravilhoso pra se organizar e motivar. Vale cada centavo.</p></div></li>
+    <li class="depo-item"><span class="av" style="--av:#cdeedd">R</span><div><p class="quem">Rebeca <small>· Google Play</small></p><p class="est" aria-label="5 estrelas">★★★★★</p><p>Estou gostando bastante do Core! Acho muito legal reunir várias áreas da vida em um só lugar… A interface é bonita e fácil de usar…</p></div></li>
+    <li class="depo-item"><span class="av" style="--av:#d6e6fb">S</span><div><p class="quem">Sabryna <small>· App Store</small></p><p class="est" aria-label="5 estrelas">★★★★★</p><p>Gente, que aplicativo incrível!!! Era tudo que eu precisava, eu amei demais. Vale muito a pena pagar</p></div></li>
+    <li class="depo-item"><span class="av" style="--av:#fde7b0">P</span><div><p class="quem">Paulo <small>· Google Play</small></p><p class="est" aria-label="5 estrelas">★★★★★</p><p>aplicativo muito bom, vale o preço, depois que baixei, organizei minha rotina…</p></div></li>
+    <li class="depo-item"><span class="av" style="--av:#e7dcfb">S</span><div><p class="quem">Susam <small>· Google Play</small></p><p class="est" aria-label="5 estrelas">★★★★★</p><p>Estou adorando o Core! Super prático, fácil de usar e está me ajudando muito a organizar melhor minha rotina. Recomendo!</p></div></li>
+  </ul>
+</section>
+
+<section class="pagamento" id="checkout" aria-label="Pagamento">
+  <div id="checkout-inline" class="checkout-inline">
+    <div class="ck-espera" role="status"><b>Carregando o pagamento…</b><span>Pix ou cartão · R$ 19,90</span></div>
+  </div>
+</section>
+
+</main>
+<footer class="rodape"><img src="/tudo/core-logo-black.webp" width="74" height="20" alt="CORE" loading="lazy"><p>CORE · CNPJ 55.041.112/0001-82 · <a href="/termos">Termos</a> · <a href="/privacidade">Privacidade</a> · <a href="mailto:contato@coreaplicativo.com.br">contato@coreaplicativo.com.br</a></p></footer>
+</body>
+</html>

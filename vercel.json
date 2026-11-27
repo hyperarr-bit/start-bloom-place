@@ -59,6 +59,8 @@
     { "source": "/completo/", "destination": "/completo.html" },
     { "source": "/tudo", "destination": "/tudo.html" },
     { "source": "/tudo/", "destination": "/tudo.html" },
+    { "source": "/planner", "destination": "/planner.html" },
+    { "source": "/planner/", "destination": "/planner.html" },
     { "source": "/dia", "destination": "/dia.html" },
     { "source": "/dia/", "destination": "/dia.html" },
     { "source": "/2027", "destination": "/2027.html" },

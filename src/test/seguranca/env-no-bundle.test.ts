@@ -87,7 +87,12 @@ describe("cabeçalhos de segurança do site (vercel.json)", () => {
     // 18/11 (ramo planos-34-97): + /escolha e /escolha/ → /landing.html (a página dos 2 planos, chave PLANOS_PAGINA)
     // 23/11 (ramo pagina-checkout): + /tudo e /tudo/ → /tudo.html (a página de venda que é o checkout, chave PAGINA_TUDO)
     // 23/11 (ramo pagina-dia): + /dia e /dia/ → /dia.html (a página "um dia inteiro no app", chave PAGINA_DIA)
-    expect(cfg.rewrites).toHaveLength(36);
+    // 24/11 (main 52c32b23): + /2027 e /2027/ → /2027.html (a página do carrossel 2027; a conta daqui tinha ficado em 36)
+    // 26/11 (ramo pagina-sem-financas-26-11): + /planner e /planner/ → /planner.html (a /tudo com outra vitrine, chave PAGINA_PLANNER)
+    expect(cfg.rewrites).toHaveLength(40);
+    expect(rotas0(cfg).find((r) => r.source === "/2027")?.destination).toBe("/2027.html");
+    expect(rotas0(cfg).find((r) => r.source === "/planner")?.destination).toBe("/planner.html");
+    expect(rotas0(cfg).find((r) => r.source === "/tudo")?.destination).toBe("/tudo.html");
     expect(rotas0(cfg).find((r) => r.source === "/pra-sempre")?.destination).toBe("/pra-sempre.html");
     expect(rotas0(cfg).find((r) => r.source === "/simples")?.destination).toBe("/landing.html");
     expect(rotas0(cfg).find((r) => r.source === "/tiktok")?.destination).toBe("/landing.html");
